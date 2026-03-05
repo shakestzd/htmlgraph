@@ -36,13 +36,17 @@ git status --short
 
 Understand the files changed — use this to write an accurate commit message.
 
-### Step 2: Execute the script (one call)
+### Step 2: Stage, commit, and push (one call)
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/commit-and-push.sh" "feat: your message here" --no-confirm
+git add -A && git commit -m "your message here" && git push origin $(git branch --show-current)
 ```
 
-That's it. The script handles: `git add -A` → `git commit` → `git push`.
+That's it — stage everything, commit, and push in a single Bash call.
+
+> **Note on `${CLAUDE_PLUGIN_ROOT}`:** This variable is only substituted in JSON config files
+> (`hooks.json`, `.mcp.json`). It is NOT available as a shell env var in command markdown or
+> direct Bash calls. Use the one-liner above instead of referencing the bundled script.
 
 ### Commit Message Format
 
@@ -82,7 +86,7 @@ git status
 ```bash
 # ✅ 2 calls = ~545 tokens
 git status --short   # understand what changed
-"${CLAUDE_PLUGIN_ROOT}/scripts/commit-and-push.sh" "feat: description" --no-confirm
+git add -A && git commit -m "feat: description" && git push origin $(git branch --show-current)
 ```
 
 ## Output Format
