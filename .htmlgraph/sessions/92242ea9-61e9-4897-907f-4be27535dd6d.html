@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Session 2026-02-14 11:08</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="92242ea9-61e9-4897-907f-4be27535dd6d"
+             data-type="session"
+             data-status="stale"
+             data-agent="claude-code"
+             data-started-at="2026-02-14T11:08:46.877951"
+             data-last-activity="2026-03-05T14:29:47.182816+00:00"
+             data-event-count="31" data-is-subagent="false" data-start-commit="0ffdcdff" data-ended-at="2026-03-05T14:29:47.182816+00:00">
+
+        <header>
+            <h1>Session 2026-02-14 11:08</h1>
+            <div class="metadata">
+                <span class="badge status-stale">Stale</span>
+                <span class="badge">claude-code</span>
+                <span class="badge">31 events</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="worked-on">
+                <h3>Worked On:</h3>
+                <ul>
+                    <li><a href="../features/spike-init-92242ea9.html" data-relationship="worked-on">spike-init-92242ea9</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-detected-patterns>
+            <h3>Detected Patterns (5)</h3>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Sequence</th>
+                        <th>Type</th>
+                        <th>Count</th>
+                        <th>First/Last Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Stop → UserQuery → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.002526 / 2026-03-05T09:49:33.334236</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">UserQuery → Bash → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.002532 / 2026-03-05T09:49:33.334246</td>
+                    </tr>
+                    <tr data-pattern-type="anti-pattern">
+                        <td class="sequence">Bash → Bash → Bash</td>
+                        <td><span class="badge pattern-anti-pattern">anti-pattern</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.002535 / 2026-03-05T09:49:33.334249</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Bash → Stop</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.002538 / 2026-03-05T09:49:33.334254</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Stop → UserQuery</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.002541 / 2026-03-05T09:49:33.334256</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section data-activity-log>
+            <h3>Activity Log (31 events)</h3>
+            <ol reversed>
+                <li data-ts="2026-02-16T19:54:23.041889" data-tool="Stop" data-success="true" data-event-id="evt-d24ca2df" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-16T19:53:53.334429" data-tool="UserQuery" data-success="true" data-event-id="evt-52d5d0cd" data-feature="spk-05ddee15" data-drift="0.00">"/roborev:review-branch "</li>
+                <li data-ts="2026-02-16T19:50:26.671543" data-tool="Stop" data-success="true" data-event-id="evt-6ebcb23d" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-16T19:50:22.605326" data-tool="Bash" data-success="true" data-event-id="evt-c1a417be" data-feature="spk-05ddee15" data-parent="evt-af044ac5">Push to remote</li>
+                <li data-ts="2026-02-16T19:50:07.968285" data-tool="UserQuery" data-success="true" data-event-id="evt-66eb288d" data-feature="spk-05ddee15" data-drift="0.00">"push it"</li>
+                <li data-ts="2026-02-15T18:48:23.538416" data-tool="Stop" data-success="true" data-event-id="evt-f35a47e3" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-15T18:48:14.530504" data-tool="Bash" data-success="true" data-event-id="evt-7f115154" data-feature="spk-05ddee15" data-parent="evt-a6dcddd3">Re-stage formatted files and commit</li>
+                <li data-ts="2026-02-15T18:46:49.570305" data-tool="Bash" data-success="true" data-event-id="evt-a365697d" data-feature="spk-05ddee15" data-parent="evt-a6dcddd3">Format the 5 unformatted session files</li>
+                <li data-ts="2026-02-15T18:46:22.961826" data-tool="UserQuery" data-success="true" data-event-id="evt-f8d9614d" data-feature="spk-05ddee15" data-drift="0.00">"fix the formatting and commit"</li>
+                <li data-ts="2026-02-15T18:41:06.073497" data-tool="Stop" data-success="true" data-event-id="evt-b6c34730" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-15T18:39:46.080397" data-tool="Bash" data-success="true" data-event-id="evt-4d3a9064" data-feature="spk-05ddee15" data-parent="evt-1f878b51">Verify staged changes</li>
+                <li data-ts="2026-02-15T18:39:34.135936" data-tool="Bash" data-success="true" data-event-id="evt-6cdbdc54" data-feature="spk-05ddee15" data-parent="evt-1f878b51">Stage sessions consolidation files</li>
+                <li data-ts="2026-02-15T18:39:19.484587" data-tool="Bash" data-success="true" data-event-id="evt-91f9b091" data-feature="spk-05ddee15" data-parent="evt-1f878b51">Show recent commit messages</li>
+                <li data-ts="2026-02-15T18:39:11.121024" data-tool="Bash" data-success="true" data-event-id="evt-8e7c5535" data-feature="spk-05ddee15" data-parent="evt-1f878b51">Show working tree status</li>
+                <li data-ts="2026-02-15T18:38:53.000480" data-tool="UserQuery" data-success="true" data-event-id="evt-e176c1c0" data-feature="spk-05ddee15" data-drift="0.00">"yes, commit"</li>
+                <li data-ts="2026-02-14T18:20:48.725365" data-tool="Stop" data-success="true" data-event-id="evt-1d6da68b" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-14T18:20:39.627031" data-tool="Stop" data-success="true" data-event-id="evt-1121d3e6" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-14T18:20:28.799844" data-tool="Stop" data-success="true" data-event-id="evt-d23dc1b5" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-14T18:20:24.265219" data-tool="Read" data-success="true" data-event-id="evt-c2dbf2c8" data-feature="spk-05ddee15" data-parent="evt-04dbb249">/private/tmp/claude-501/-Users-shakes-DevProjects-htmlgraph/tasks/b347557.output</li>
+                <li data-ts="2026-02-14T18:20:06.080361" data-tool="Stop" data-success="true" data-event-id="evt-85efe6e2" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-14T18:19:56.168733" data-tool="TaskOutput" data-success="true" data-event-id="evt-7019054a" data-feature="spk-05ddee15" data-parent="evt-04dbb249">{'task_id': 'ba4de36', 'block': True, 'timeout': 3</li>
+                <li data-ts="2026-02-14T18:19:11.580870" data-tool="Bash" data-success="true" data-event-id="evt-62160779" data-feature="spk-05ddee15" data-parent="evt-04dbb249">Run tests for regressions</li>
+                <li data-ts="2026-02-14T18:14:04.027543" data-tool="Bash" data-success="true" data-event-id="evt-902845d9" data-feature="spk-05ddee15" data-parent="evt-04dbb249">Verify mypy clean on sessions module</li>
+                <li data-ts="2026-02-14T18:13:51.213121" data-tool="Task" data-success="true" data-event-id="evt-b33f2024" data-feature="spk-05ddee15" data-parent="evt-04dbb249">(htmlgraph:sonnet-coder): Fix _spikes/_linking mypy errors</li>
+                <li data-ts="2026-02-14T18:04:51.379243" data-tool="Task" data-success="true" data-event-id="evt-b96f7df9" data-feature="spk-05ddee15" data-parent="evt-04dbb249">(htmlgraph:sonnet-coder): Fix mypy errors properly</li>
+                <li data-ts="2026-02-14T18:03:15.111484" data-tool="Task" data-success="true" data-event-id="evt-c1b84380" data-feature="spk-05ddee15" data-parent="evt-04dbb249">(htmlgraph:haiku-coder): Fix 4 mypy errors in features.py</li>
+                <li data-ts="2026-02-14T18:00:45.304961" data-tool="UserQuery" data-success="true" data-event-id="evt-4cd135db" data-feature="spk-05ddee15" data-drift="0.00">"yes, fix them"</li>
+                <li data-ts="2026-02-14T11:11:19.245727" data-tool="Stop" data-success="true" data-event-id="evt-1e51e85b" data-feature="spk-05ddee15" data-drift="0.00">Agent stopped</li>
+                <li data-ts="2026-02-14T11:11:07.051840" data-tool="Task" data-success="true" data-event-id="evt-a4a4c942" data-feature="spk-05ddee15" data-parent="evt-b86df47c">(htmlgraph:researcher): Review sessions consolidation</li>
+                <li data-ts="2026-02-14T11:08:49.410488" data-tool="UserQuery" data-success="true" data-event-id="evt-c2a96905" data-feature="spk-05ddee15" data-drift="0.00">"please review the work that was done: ``` htmlgraph:opus-coder(Consolidate sessions/ from 16 to 6)  ..."</li>
+                <li data-ts="2026-02-14T11:08:46.877951" data-tool="SessionStart" data-success="true">Session started</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Plan Subagent</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="b92f0ebe-81f7-4e50-956f-fa8d0d775df9-Plan"
+             data-type="session"
+             data-status="active"
+             data-agent="Plan-spawner"
+             data-started-at="2026-02-13T00:46:14.006174"
+             data-last-activity="2026-02-13T05:49:18.086626+00:00"
+             data-event-count="31" data-is-subagent="true" data-start-commit="8581d223">
+
+        <header>
+            <h1>Plan Subagent</h1>
+            <div class="metadata">
+                <span class="badge status-active">Active</span>
+                <span class="badge">Plan-spawner</span>
+                <span class="badge">31 events</span>
+            </div>
+        </header>
+
+        <section data-detected-patterns>
+            <h3>Detected Patterns (9)</h3>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Sequence</th>
+                        <th>Type</th>
+                        <th>Count</th>
+                        <th>First/Last Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Bash → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029062 / 2026-03-05T09:49:33.360041</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Read → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029066 / 2026-03-05T09:49:33.360044</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Read → Read → Grep</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.029069 / 2026-03-05T09:49:33.360046</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Read → Grep → Grep</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029072 / 2026-03-05T09:49:33.360048</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Grep → Grep → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029075 / 2026-03-05T09:49:33.360050</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Grep → Read → Grep</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029078 / 2026-03-05T09:49:33.360052</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Read → Grep → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029081 / 2026-03-05T09:49:33.360055</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Read → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029084 / 2026-03-05T09:49:33.360057</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Read → Bash → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.029088 / 2026-03-05T09:49:33.360060</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section data-activity-log>
+            <h3>Activity Log (31 events)</h3>
+            <ol reversed>
+                <li data-ts="2026-02-13T00:49:18.079732" data-tool="Read" data-success="true" data-event-id="evt-4549c04f" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/__init__.py</li>
+                <li data-ts="2026-02-13T00:49:09.914752" data-tool="Bash" data-success="true" data-event-id="evt-c3042ee2" data-feature="spk-05ddee15" data-parent="evt-797d65f4">Check __init__.py size</li>
+                <li data-ts="2026-02-13T00:48:56.598403" data-tool="Bash" data-success="true" data-event-id="evt-7b6cb4c9" data-feature="spk-05ddee15" data-parent="evt-797d65f4">Count lines in cli/models.py</li>
+                <li data-ts="2026-02-13T00:48:51.698057" data-tool="Grep" data-success="true" data-event-id="evt-9abcc87e" data-feature="spk-05ddee15" data-parent="evt-797d65f4">^    def |^class</li>
+                <li data-ts="2026-02-13T00:48:49.448966" data-tool="Read" data-success="true" data-event-id="evt-f10d4015" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models.py</li>
+                <li data-ts="2026-02-13T00:48:41.304326" data-tool="Read" data-success="true" data-event-id="evt-42f9ecf3" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/posttooluse.py</li>
+                <li data-ts="2026-02-13T00:48:30.962532" data-tool="Bash" data-success="true" data-event-id="evt-2f8d70cc" data-feature="spk-05ddee15" data-parent="evt-797d65f4">Find backup files</li>
+                <li data-ts="2026-02-13T00:48:27.871144" data-tool="Read" data-success="true" data-event-id="evt-4086ade0" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py</li>
+                <li data-ts="2026-02-13T00:48:18.663154" data-tool="Grep" data-success="true" data-event-id="evt-8ec33e5b" data-feature="spk-05ddee15" data-parent="evt-797d65f4">^    def |^class</li>
+                <li data-ts="2026-02-13T00:48:16.187693" data-tool="Grep" data-success="true" data-event-id="evt-51e90dfd" data-feature="spk-05ddee15" data-parent="evt-797d65f4">from htmlgraph\.pydantic_models|from htmlgraph.cli.models</li>
+                <li data-ts="2026-02-13T00:48:07.341866" data-tool="Bash" data-success="true" data-event-id="evt-f320d365" data-feature="spk-05ddee15" data-parent="evt-797d65f4">List db directory</li>
+                <li data-ts="2026-02-13T00:48:04.366984" data-tool="Read" data-success="true" data-event-id="evt-28f60641" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py</li>
+                <li data-ts="2026-02-13T00:47:55.393945" data-tool="Bash" data-success="true" data-event-id="evt-9abeecd6" data-feature="spk-05ddee15" data-parent="evt-797d65f4">List hooks directory contents</li>
+                <li data-ts="2026-02-13T00:47:51.023825" data-tool="Read" data-success="true" data-event-id="evt-02e930b3" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models.py</li>
+                <li data-ts="2026-02-13T00:47:42.535100" data-tool="Bash" data-success="true" data-event-id="evt-d00f3a24" data-feature="spk-05ddee15" data-parent="evt-797d65f4">List test files</li>
+                <li data-ts="2026-02-13T00:47:38.390508" data-tool="Grep" data-success="true" data-event-id="evt-90b09c5d" data-feature="spk-05ddee15" data-parent="evt-797d65f4">CREATE TABLE</li>
+                <li data-ts="2026-02-13T00:47:28.835728" data-tool="Grep" data-success="true" data-event-id="evt-9cab0adf" data-feature="spk-05ddee15" data-parent="evt-797d65f4">^    def</li>
+                <li data-ts="2026-02-13T00:47:26.056207" data-tool="Read" data-success="true" data-event-id="evt-4ac8b8d1" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/cache.py</li>
+                <li data-ts="2026-02-13T00:47:18.365949" data-tool="Grep" data-success="true" data-event-id="evt-77bb2d4a" data-feature="spk-05ddee15" data-parent="evt-797d65f4">class \w+</li>
+                <li data-ts="2026-02-13T00:47:15.871631" data-tool="Read" data-success="true" data-event-id="evt-445ecfd7" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/pydantic_models.py</li>
+                <li data-ts="2026-02-13T00:47:09.057492" data-tool="Read" data-success="true" data-event-id="evt-86abbe77" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py</li>
+                <li data-ts="2026-02-13T00:47:07.198998" data-tool="Grep" data-success="true" data-event-id="evt-07412a68" data-feature="spk-05ddee15" data-parent="evt-797d65f4">from htmlgraph\.archive|import htmlgraph\.archive</li>
+                <li data-ts="2026-02-13T00:46:59.163847" data-tool="Read" data-success="true" data-event-id="evt-0b8e2205" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/learning.py</li>
+                <li data-ts="2026-02-13T00:46:56.793781" data-tool="Grep" data-success="true" data-event-id="evt-4ad9810f" data-feature="spk-05ddee15" data-parent="evt-797d65f4">subagent.*suffix|SUBAGENT|known_subagent|subagent_types</li>
+                <li data-ts="2026-02-13T00:46:48.541241" data-tool="Grep" data-success="true" data-event-id="evt-0db41861" data-feature="spk-05ddee15" data-parent="evt-797d65f4">SUBAGENT_SUFFIXES|subagent_suffixes|KNOWN_SUBAGENTS</li>
+                <li data-ts="2026-02-13T00:46:45.666853" data-tool="Read" data-success="true" data-event-id="evt-d8de4464" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py</li>
+                <li data-ts="2026-02-13T00:46:37.571443" data-tool="Read" data-success="true" data-event-id="evt-e5a8c8d5" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py</li>
+                <li data-ts="2026-02-13T00:46:35.303640" data-tool="Read" data-success="true" data-event-id="evt-36323f34" data-feature="spk-05ddee15" data-parent="evt-797d65f4">/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_manager.py</li>
+                <li data-ts="2026-02-13T00:46:28.732802" data-tool="Bash" data-success="true" data-event-id="evt-f77ed2fa" data-feature="spk-05ddee15" data-parent="evt-797d65f4">Check archive directory</li>
+                <li data-ts="2026-02-13T00:46:16.242252" data-tool="Bash" data-success="true" data-event-id="evt-58d74b17" data-feature="spk-05ddee15" data-parent="evt-797d65f4">List Python source files</li>
+                <li data-ts="2026-02-13T00:46:14.006174" data-tool="SessionStart" data-success="true">Session started</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

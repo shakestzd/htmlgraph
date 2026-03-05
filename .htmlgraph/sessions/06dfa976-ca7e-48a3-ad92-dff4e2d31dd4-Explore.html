@@ -33,6 +33,57 @@
                 </ul>
             </section>
         </nav>
+        <section data-detected-patterns>
+            <h3>Detected Patterns (6)</h3>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Sequence</th>
+                        <th>Type</th>
+                        <th>Count</th>
+                        <th>First/Last Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Read → Bash → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.090443 / 2026-03-05T09:49:33.412098</td>
+                    </tr>
+                    <tr data-pattern-type="anti-pattern">
+                        <td class="sequence">Bash → Bash → Bash</td>
+                        <td><span class="badge pattern-anti-pattern">anti-pattern</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.090446 / 2026-03-05T09:49:33.412101</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Bash → Grep</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.090450 / 2026-03-05T09:49:33.412103</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Grep → Grep</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.090452 / 2026-03-05T09:49:33.412106</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Grep → Grep → Grep</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.090455 / 2026-03-05T09:49:33.412108</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Grep → Grep → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.090458 / 2026-03-05T09:49:33.412110</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
         <section data-activity-log>
             <h3>Activity Log (34 events)</h3>
             <ol reversed>

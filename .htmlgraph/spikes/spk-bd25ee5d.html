@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Git Worktree Feasibility for HtmlGraph Parallel Dev</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-bd25ee5d"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T16:07:56.626755"
+             data-updated="2026-03-05T16:07:56.626758" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Git Worktree Feasibility for HtmlGraph Parallel Dev</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Git Worktree Feasibility for HtmlGraph Parallel Development
+
+### Environment
+- Git version: 2.49.0 (well above 2.5 minimum, full worktree support)
+- Repo size: 897MB total, 153MB .git
+- Current worktrees: 1 (main only)
+- Existing local branches: claude/explore-storage-backends-6C5qe, claude/html-graph-browser-ideas-dbyXy, claude/setup-htmlgraph-plugin-OlaGS, dev, gh-pages, main
+
+---
+
+### Worktree Creation Test
+- Command: git worktree add /tmp/test-worktree -b test-worktree-branch
+- Result: SUCCESS - completed in ~5 seconds
+- Checkout speed: 3903 files checked out without issue
+- Cleanup: git worktree remove --force + git branch -D worked cleanly
+
+---
+
+### CRITICAL BLOCKER: Untracked Source Files
+
+The current git status has 8 NEW SOURCE FILES that are untracked (not committed):
+- src/python/htmlgraph/db/ddl.py
+- src/python/htmlgraph/db/extensions.py
+- src/python/htmlgraph/hooks/constants.py
+- src/python/htmlgraph/hooks/db_helpers.py
+- src/python/htmlgraph/hooks/drift.py
+- src/python/htmlgraph/hooks/event_recording.py
+- src/python/htmlgraph/hooks/model_detection.py
+- src/python/htmlgraph/json_utils.py
+
+Worktrees only contain committed files. The test worktree failed with:
+  ModuleNotFoundError: No module named htmlgraph.db.ddl
+
+These files are REQUIRED for the package to import correctly.
+FIX REQUIRED BEFORE PARALLEL WORK: git add + git commit these files.
+
+---
+
+### uv/venv Behavior in Worktrees
+
+Each worktree creates its OWN independent .venv when uv run is invoked.
+- Warning seen: VIRTUAL_ENV=/Users/shakes/DevProjects/htmlgraph/.venv does not match project environment path .venv and will be ignored
+- uv re-downloads and builds all 59 packages (~40MB including playwright) for each worktree
+- This means: 5 worktrees = 5 separate installs = ~200MB extra disk + significant time (playwright alone is 38.9MB)
+- The venv creation itself takes about 30-60 seconds per worktree on first run
+- uv.lock is shared (committed), so package versions stay consistent across worktrees
+
+---
+
+### .htmlgraph/ and .claude/ Conflict Analysis
+
+Both directories ARE present in worktrees (they are tracked/committed files):
+- .htmlgraph/ - present in worktree (contains features, spikes, sessions, tracks, bugs etc.)
+- .claude/ - present in worktree (contains rules, skills, hooks, settings.json)
+
+Key concerns:
+1. .htmlgraph/htmlgraph.db - The SQLite database is tracked. Multiple worktrees opening the same db path = SQLite locking conflicts. HOWEVER each worktree has its own copy of the file at its own path, so no actual sharing.
+2. .htmlgraph/ HTML files (features, spikes etc.) - Safe: each worktree has its own copy
+3. .claude/settings.json - Safe: each worktree has its own copy
+4. .claude/settings.local.json - Gitignored, will NOT appear in worktrees (no local settings)
+
+The .gitignore correctly excludes:
+- .venv/ (each worktree creates its own)
+- .htmlgraph/index.sqlite (analytics cache, rebuildable)
+- .htmlgraph/sessions/*.jsonl (runtime data)
+- .htmlgraph/parent-activity.json (runtime data)
+
+NOT excluded (present in all worktrees):
+- .htmlgraph/htmlgraph.db (the main database - each worktree gets its own copy at creation time, then they diverge independently)
+- .htmlgraph/features/, spikes/, tracks/ etc.
+
+---
+
+### Symlinks
+- Root symlink: WARP.md -> CLAUDE.md (cosmetic, safe for worktrees)
+- docs/ contains many symlinks - these resolve correctly within each worktree since they point to relative paths within the same tree
+- No submodules
+
+---
+
+### Worktree Setup Script Requirements
+
+A setup script for parallel worktrees MUST:
+1. First: git add + git commit all untracked source files (the 8 listed above)
+2. Create worktrees outside the main repo tree (e.g., /tmp/wt-feature-X or ../htmlgraph-wt-X)
+3. Accept that each worktree needs its own uv venv (first uv run is slow due to playwright download)
+4. NOT try to share .venv between worktrees (uv enforces this correctly)
+5. Pre-warm the venv: cd worktree && uv sync after creation to front-load the install cost
+
+Recommended worktree location pattern:
+  /Users/shakes/DevProjects/htmlgraph-wt-<feature-name>
+  (sibling to main repo, not nested inside it)
+
+---
+
+### Can We Safely Create 5+ Worktrees?
+
+YES, with caveats:
+- Git mechanics: fully supported, no issues
+- Disk: ~200MB extra per worktree for venv (playwright is large)
+- Time: ~60-90s per worktree for first uv run (venv creation + playwright download)
+- .htmlgraph/htmlgraph.db: each worktree gets an independent snapshot copy - no conflicts but also no sharing of tracking data between parallel branches
+- .claude/ config: safe, each worktree independent
+
+Blockers to resolve first:
+1. Commit the 8 untracked source files or worktrees will fail to import htmlgraph
+2. Accept that uv venv is NOT shared (each worktree is independent)
+
+---
+
+### Summary Table
+
+| Concern | Status | Action Required |
+|---|---|---|
+| Git version (need 2.5+) | OK - v2.49.0 | None |
+| Worktree creation speed | OK - ~5s for 3903 files | None |
+| uv run in worktree | BROKEN until files committed | Commit 8 untracked src files |
+| Shared .venv | NOT shared - each worktree independent | Accept 60-90s setup per worktree |
+| .htmlgraph/ conflicts | No conflicts - independent copies | None |
+| .claude/ conflicts | No conflicts - independent copies | None |
+| Submodules | None | None |
+| Symlinks | Safe (relative, in-tree) | None |
+| 5+ worktrees feasibility | YES after fix | Commit untracked files first |
+            </div>
+        </section>
+    </article>
+</body>
+</html>

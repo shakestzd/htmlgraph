@@ -343,5 +343,15 @@
     "spike_id": "spk-ed878d96",
     "created": "2026-02-11T23:27:49.555586",
     "occurrences": 3
+  },
+  "Bash:Exit code 1\nsrc/python/htmlgraph/sessions/features.py:399: error: \"SessionManager\" has no attribute ": {
+    "spike_id": "spk-483cee38",
+    "created": "2026-02-14T18:04:47.206239",
+    "occurrences": 3
+  },
+  "WebFetch:Request failed with status code 404": {
+    "spike_id": "spk-f97c50d1",
+    "created": "2026-03-05T09:39:50.122664",
+    "occurrences": 3
   }
 }

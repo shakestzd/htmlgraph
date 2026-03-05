@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Backfill Research: NULL tool_input rows</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-294f252a"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-02-12T23:01:38.264993"
+             data-updated="2026-02-12T23:01:38.264996" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Backfill Research: NULL tool_input rows</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Research Question
+How many NULL tool_input rows exist in the database, and can we backfill them from input_summary?
+
+## Key Findings
+
+### 1. Total NULL tool_input Rows: 3,501
+
+**Breakdown by tool_name:**
+- Bash: 1,732 (49.5%)
+- Read: 594 (17.0%)
+- Edit: 354 (10.1%)
+- Task: 189 (5.4%)
+- Stop: 148 (4.2%)
+- Grep: 115 (3.3%)
+- Glob: 82 (2.3%)
+- TaskUpdate: 57 (1.6%)
+- Write: 56 (1.6%)
+- Others: 174 (5.0%)
+
+### 2. All Rows Have Non-NULL input_summary
+
+**CRITICAL FINDING**: 0 rows have BOTH tool_input AND input_summary as NULL.
+
+This means every NULL tool_input row has an input_summary we can examine.
+
+### 3. input_summary Format Distribution
+
+Analyzed 1,000 sample rows with NULL tool_input:
+
+**SIMPLE_STRING: 445 rows (44.5%)**
+- Format: "Tool: description"
+- Examples:
+  - "Bash: Remove locked database to force clean state"
+  - "Bash: Run integration tests sequentially"
+  - "Read: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/__init__.py"
+- **NOT EXTRACTABLE** - No structured data, only human-readable description
+
+**INVALID_JSON (Truncated): 354 rows (35.4%)**
+- Format: Starts with "{" but truncated/incomplete
+- Examples: '{"session_id": "6f0ea23f-d7f6-4779-995b-d775e06d2155", "transcript_path": "/Users/shakes/.claude/pro'
+- **NOT EXTRACTABLE** - JSON was truncated during storage
+
+**FULL_JSON_WITH_TOOL_INPUT: 119 rows (11.9%)**
+- Format: Complete JSON with embedded tool_input
+- Structure:
+```json
+{
+  "session_id": "...",
+  "transcript_path": "...",
+  "cwd": "...",
+  "permission_mode": "...",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "...",
+    "description": "..."
+  },
+  "tool_use_id": "..."
+}
+```
+- **EXTRACTABLE** - Can parse JSON and extract tool_input field
+
+**FULL_JSON_NO_TOOL_INPUT: 82 rows (8.2%)**
+- Format: Complete JSON but missing tool_input key
+- **NOT EXTRACTABLE** - No tool_input to extract
+
+### 4. Backfill Feasibility
+
+**Total NULL tool_input rows**: 3,501
+- **JSON format (potentially extractable)**: 2,185 (62.4%)
+- **String format (not extractable)**: 1,316 (37.6%)
+
+**JSON extraction test (100 samples)**:
+- Successfully extracted: 24 (24.0%)
+- Missing tool_input key: 1 (1.0%)
+- Truncated JSON: 75 (75.0%)
+
+**Realistic backfill estimate**: ~24% of 3,501 = **840 rows** can be backfilled
+
+### 5. Root Cause Analysis
+
+**Why are there NULL tool_input rows?**
+
+Based on the data patterns:
+
+1. **Truncated input_summary (75% of JSON format)**: The input_summary field appears to have a length limit, causing JSON to be truncated
+2. **Simple string format (37.6%)**: Older hook implementation or different code path that only stored description
+3. **Missing tool_input key (1%)**: Edge cases where hook_input didn't contain tool_input
+
+**When did this happen?**
+
+The presence of both formats suggests:
+- Older sessions used simple string format
+- Newer sessions store full JSON but it gets truncated
+- Current implementation (with tool_input column) doesn't have this issue
+
+### 6. Backfill Strategy Recommendation
+
+**Option A: Partial Backfill (Recommended)**
+- Extract tool_input from the ~840 rows with valid JSON
+- Leave other rows with NULL tool_input (acceptable data loss for historical data)
+- Benefits: Simple, safe, recovers most valuable data
+
+**Option B: Skip Backfill (Alternative)**
+- Accept that historical data is incomplete
+- Focus on ensuring new data is correct (already done)
+- Benefits: No risk, no complexity
+- Drawback: Analytics on old sessions will be incomplete
+
+**Option C: Aggressive Parsing (Not Recommended)**
+- Try to parse simple string format into structured data
+- High risk of incorrect assumptions
+- Example: "Read: /path/to/file" → {"file_path": "/path/to/file"}
+- Drawback: Fragile, error-prone, not worth the complexity
+
+## Recommendation
+
+**Implement Option A: Partial Backfill**
+
+1. Write migration script that:
+   - Finds rows where tool_input IS NULL AND input_summary LIKE '{%'
+   - Tries to parse JSON and extract tool_input field
+   - Updates row with extracted tool_input
+   - Logs success/failure for monitoring
+
+2. Expected outcome:
+   - ~840 rows backfilled successfully
+   - ~2,661 rows remain with NULL tool_input (acceptable)
+   - No data corruption risk (only updating NULL → non-NULL)
+
+3. Script structure:
+```python
+import json
+import sqlite3
+
+conn = sqlite3.connect(db_path)
+cursor = conn.cursor()
+
+# Find candidates
+cursor.execute('''
+    SELECT event_id, input_summary 
+    FROM agent_events 
+    WHERE tool_input IS NULL 
+    AND input_summary LIKE '{%'
+''')
+
+success_count = 0
+for event_id, input_summary in cursor.fetchall():
+    try:
+        data = json.loads(input_summary)
+        if 'tool_input' in data:
+            tool_input_json = json.dumps(data['tool_input'])
+            cursor.execute(
+                'UPDATE agent_events SET tool_input = ? WHERE event_id = ?',
+                (tool_input_json, event_id)
+            )
+            success_count += 1
+    except json.JSONDecodeError:
+        pass  # Skip truncated JSON
+
+conn.commit()
+print(f"Backfilled {success_count} rows")
+```
+
+## Data Quality Insights
+
+This research reveals important insights about HtmlGraph's evolution:
+
+1. **Schema migration was incomplete**: When tool_input column was added, historical data wasn't backfilled
+2. **input_summary has length limits**: Truncation suggests VARCHAR limit or application-level truncation
+3. **Current implementation is correct**: New events have proper tool_input
+4. **Historical data loss is acceptable**: Analytics work fine with partial data
+            </div>
+        </section>
+    </article>
+</body>
+</html>

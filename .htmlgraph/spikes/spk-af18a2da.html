@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Copilot CLI Session File Format Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-af18a2da"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T09:42:15.112763"
+             data-updated="2026-03-05T09:42:15.112766" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Copilot CLI Session File Format Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+Research the GitHub Copilot CLI session file format and location for potential HtmlGraph integration.
+
+## Research Sources
+
+- DeepWiki: https://deepwiki.com/github/copilot-cli/3.3-session-management-and-history
+- Inventive HQ: https://inventivehq.com/knowledge-base/copilot/where-configuration-files-are-stored
+- GitHub Docs: https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli
+- Live filesystem inspection of ~/.copilot/
+
+## File Locations
+
+Primary session storage (v0.0.342+):
+  ~/.copilot/session-state/<uuid>.jsonl
+
+Each session is a single JSONL file named by UUID (the session ID).
+Example: ~/.copilot/session-state/ce52f396-198b-4ca5-bd6f-020c62130b06.jsonl
+
+Other config files:
+  ~/.copilot/config.json                  - Core settings (model, editor, theme)
+  ~/.copilot/mcp-config.json             - MCP server configurations (global)
+  ~/.copilot/command-history-state.json  - Command recall history
+  ~/.copilot/logs/                        - Debug/error logs
+  ~/.copilot/agents/                      - Custom agent markdown definitions
+
+Legacy location (pre-v0.0.342):
+  ~/.copilot/history-session-state/       - Auto-migrated on --resume
+
+XDG_CONFIG_HOME override is supported.
+
+Authentication is read from GitHub CLI: ~/.config/gh/hosts.yml
+
+## File Format
+
+JSONL (one JSON object per line). Each line is an event/record.
+Files confirmed present on this machine: 30+ session files in ~/.copilot/session-state/
+
+### Top-level envelope (all event types share this):
+{
+  "type":      string   // event type (see below)
+  "data":      object   // event-specific payload
+  "id":        string   // UUID of this event
+  "timestamp": string   // ISO 8601 datetime with milliseconds
+  "parentId":  string | null  // UUID of parent event (forms linked chain)
+}
+
+### Event Types Observed (from 865 total lines across all session files):
+
+| type                    | count | description                          |
+|-------------------------|-------|--------------------------------------|
+| session.error           | 192   | Error events (quota, model failures) |
+| user.message            | 130   | User prompt submitted                |
+| session.start           | 123   | Session opened                       |
+| session.model_change    | 120   | Model switched                       |
+| assistant.message       | 98    | AI response                          |
+| tool.execution_start    | 96    | Tool call began                      |
+| tool.execution_complete | 93    | Tool call finished                   |
+| session.info            | 11    | Informational (auth, MCP, trust)     |
+| abort                   | 2     | Session aborted                      |
+
+### Per-type data fields:
+
+session.start:
+  data.sessionId      - UUID matching the filename
+  data.version        - integer (1)
+  data.producer       - "copilot-agent"
+  data.copilotVersion - e.g. "0.0.351"
+  data.startTime      - ISO timestamp
+
+session.model_change:
+  data.newModel       - model name e.g. "claude-haiku-4.5"
+
+session.info:
+  data.infoType       - "mcp" | "authentication" | "folder_trust"
+  data.message        - human-readable string
+
+user.message:
+  data.content        - string (the user's prompt text)
+  data.attachments    - array (file attachments)
+
+assistant.message:
+  data.messageId      - UUID
+  data.content        - string (the assistant's response text)
+  data.toolRequests   - array of tool call requests (may be empty [])
+
+tool.execution_start:
+  data.toolCallId     - ID linking to assistant.message toolRequests
+  data.toolName       - string e.g. "report_intent", "read_file"
+  data.arguments      - object with tool-specific args
+
+tool.execution_complete:
+  data.toolCallId     - links back to tool.execution_start
+  data.success        - boolean
+  data.result         - object (tool output, e.g. {"content": "..."})
+  data.error          - present on failure
+
+session.error:
+  data.errorType      - "model_call" | "quota" | others
+  data.message        - error description
+
+abort:
+  data.reason         - reason string
+
+command-history-state.json format:
+{
+  "commandHistory": ["string", ...]   // array of previous prompt strings
+}
+
+## Concrete Examples
+
+session.start:
+{"type":"session.start","data":{"sessionId":"ce52f396-...","version":1,"producer":"copilot-agent","copilotVersion":"0.0.351","startTime":"2026-02-13T07:37:52.307Z"},"id":"dce13b6e-...","timestamp":"2026-02-13T07:37:52.309Z","parentId":null}
+
+user.message:
+{"type":"user.message","data":{"content":"I was wondering if we could...","attachments":[]},"id":"b7eb2e5d-...","timestamp":"2026-02-13T07:38:24.249Z","parentId":"dad8dd27-..."}
+
+assistant.message (with empty toolRequests):
+{"type":"assistant.message","data":{"messageId":"8f178e85-...","content":"I created a Marimo notebook stub...","toolRequests":[]},"id":"3276216c-...","timestamp":"2026-02-13T07:38:40.177Z","parentId":"8d46beaf-..."}
+
+tool.execution_start:
+{"type":"tool.execution_start","data":{"toolCallId":"call_hJ2wIKtrLP59W93J5WKN50BN","toolName":"report_intent","arguments":{"intent":"Creating research nb"}},"id":"396762ae-...","timestamp":"2026-02-13T07:38:34.948Z","parentId":"86ae989f-..."}
+
+tool.execution_complete:
+{"type":"tool.execution_complete","data":{"toolCallId":"call_hJ2wIKtrLP59W93J5WKN50BN","success":true,"result":{"content":"Creating research nb"}},"id":"f4b36ad5-...","timestamp":"2026-02-13T07:38:34.948Z","parentId":"324c6990-..."}
+
+session.error:
+{"type":"session.error","data":{"errorType":"quota","message":"Quota exceeded. Upgrade to increase your limit: https://github.com/features/copilot/plans"},"id":"b299b797-...","timestamp":"2026-01-03T20:11:04.080Z","parentId":"10d57c08-..."}
+
+## Key Observations for HtmlGraph Integration
+
+1. Sessions are UUID-named JSONL files - easy to glob and parse incrementally
+2. parentId chain forms a linked tree of events within each session - maps naturally to HtmlGraph edges
+3. session.start contains copilotVersion and sessionId - good metadata anchor
+4. user.message + assistant.message pairs are the conversation turns
+5. tool.execution_start/complete are linked by toolCallId - enables tool call tracking
+6. session.model_change tracks which model was active per turn
+7. No legacy history-session-state/ directory found on this machine (pure v0.0.342+ install)
+8. Copilot CLI version on this machine: 0.0.351
+
+## Recommended Approach for Integration
+
+- Glob: ~/.copilot/session-state/*.jsonl
+- Parse each file as JSONL (one JSON object per line)
+- Use parentId links to reconstruct conversation tree
+- Key fields to extract per session:
+    - Session ID: data.sessionId from session.start event
+    - Start time: data.startTime from session.start
+    - Copilot version: data.copilotVersion from session.start  
+    - Conversation turns: user.message + assistant.message pairs
+    - Tool usage: tool.execution_start/complete pairs linked by toolCallId
+    - Model used: data.newModel from session.model_change
+            </div>
+        </section>
+    </article>
+</body>
+</html>

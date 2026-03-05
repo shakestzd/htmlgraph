@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Investigation: 43% of Read events have NULL tool_input</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-eaac10a1"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-02-12T20:39:05.330730"
+             data-updated="2026-02-12T20:39:05.330732" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Investigation: 43% of Read events have NULL tool_input</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                
+## ROOT CAUSE IDENTIFIED: tool_input IS NULL (Not Empty String)
+
+### Summary
+594 out of 1,378 Read events (43%) have **NULL tool_input**, not empty file_path.
+This is NOT a bug in file_path extraction - the tool_input field itself is NULL in the database.
+
+### Evidence
+
+**Query Results:**
+```sql
+-- Categorization shows NULL, not empty file_path
+SELECT 
+  CASE 
+    WHEN tool_input IS NULL THEN 'NULL'
+    WHEN tool_input = '' THEN 'EMPTY_STRING'
+    WHEN json_extract(tool_input, '$.file_path') IS NULL THEN 'JSON_NO_FILE_PATH'
+    WHEN json_extract(tool_input, '$.file_path') = '' THEN 'JSON_EMPTY_FILE_PATH'
+    ELSE 'HAS_FILE_PATH'
+  END as category,
+  COUNT(*) as count
+FROM agent_events 
+WHERE tool_name = 'Read'
+GROUP BY category;
+
+-- Results:
+HAS_FILE_PATH: 793 events (57%)
+NULL: 594 events (43%)
+```
+
+**Database Samples:**
+```
+-- Empty tool_input examples (most recent):
+event_id: evt-8c8abec9
+tool_input: NULL (not empty JSON, literally NULL)
+
+event_id: evt-27943857  
+tool_input: NULL
+input_summary: "Read: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/__init__.py"
+```
+
+**Valid tool_input examples:**
+```json
+{"file_path": "/Users/shakes/DevProjects/htmlgraph/tests/unit/api/conftest.py"}
+{"file_path": "/Users/shakes/DevProjects/htmlgraph/tests/unit/api/test_repositories.py"}
+```
+
+### Temporal Pattern
+
+```
+Date         | Empty Reads
+-------------|------------
+2026-01-13   | 170 events
+2026-02-02   | 295 events (peak)
+2026-02-03   | 101 events
+2026-02-09   | 14 events
+2026-02-10   | 14 events
+```
+
+**Observation:** Most empty reads occurred in January-February 2026, suggesting a specific version or behavior change.
+
+### Session Distribution
+
+Top sessions with ALL reads being empty (100% null tool_input):
+- 6f0ea23f-d7f6-4779-995b-d775e06d2155: 126 empty reads (100%)
+- 7d98e1b7-df45-4ab4-a108-35edaa1126f6: 101 empty reads (100%)
+- 7d98e1b7-df45-4ab4-a108-35edaa1126f6-general-purpose: 90 empty reads (100%)
+- d62c4f67-7779-4ec1-9cf3-97540d3f7129: 53 empty reads (100%)
+- 76ace32b-693a-48c6-b476-4b1229f33702: 52 empty reads (100%)
+
+**Pattern:** Specific sessions have ALL reads with null tool_input, while other sessions have NONE.
+This suggests the issue is session-specific or version-specific, not random.
+
+### Test Data Found
+
+62 events with tool_input = `{"file_path": "/tmp/test.txt"}` from test sessions:
+- nonexistent-session: 46 events
+- test-session-* (various): 16 events
+
+These are from tests, not production usage.
+
+### Code Analysis: Where tool_input Gets Set
+
+**File: `src/python/htmlgraph/hooks/event_tracker.py`**
+
+**Line 728-737: record_event_to_sqlite() - Where tool_input is passed:**
+```python
+# Insert event to SQLite
+success = db.insert_event(
+    event_id=event_id,
+    agent_id=agent_id or "claude-code",
+    event_type="tool_call",
+    session_id=session_id,
+    tool_name=tool_name,
+    input_summary=input_summary,
+    tool_input=tool_input,  # CRITICAL: Pass tool_input for dashboard display
+    output_summary=output_summary,
+    context=context,
+    parent_event_id=parent_event_id,
+    # ...
+)
+```
+
+**Line 1391-1392: PostToolUse hook extracts tool_input:**
+```python
+tool_name = hook_input.get("tool_name", "unknown")
+tool_input_data = hook_input.get("tool_input", {})
+```
+
+**Line 1561-1575: record_event_to_sqlite is called with tool_input_data:**
+```python
+event_id = record_event_to_sqlite(
+    db=db,
+    session_id=active_session_id,
+    tool_name=tool_name,
+    tool_input=tool_input_data,  # ← This is what gets stored
+    tool_response=tool_response,
+    is_error=is_error,
+    file_paths=file_paths if file_paths else None,
+    parent_event_id=parent_activity_id,
+    agent_id=detected_agent,
+    subagent_type=task_subagent_type,
+    model=detected_model,
+    feature_id=result.feature_id if result else None,
+)
+```
+
+### Hypothesis: Why tool_input is NULL
+
+**Possible causes:**
+
+1. **PostToolUse hook not receiving tool_input from Claude Code**
+   - Claude Code may not pass tool_input in PostToolUse events for certain tool types
+   - Or tool_input may be missing in hook_input dict
+
+2. **PreToolUse vs PostToolUse discrepancy**
+   - PreToolUse hooks HAVE tool_input (we saw examples with hook metadata)
+   - PostToolUse hooks may NOT receive tool_input consistently
+
+3. **Version-specific behavior**
+   - The temporal pattern (Jan-Feb 2026) suggests a Claude Code version change
+   - Newer versions may provide tool_input, older versions may not
+
+4. **Hook script bug**
+   - The hook script may be failing to extract tool_input from hook_input
+   - Line 1392: `tool_input_data = hook_input.get("tool_input", {})`
+   - If hook_input doesn't contain "tool_input" key, defaults to `{}`
+   - But database shows NULL, not `{}`
+
+### Next Steps
+
+**To determine root cause, we need to:**
+
+1. **Add debug logging to PostToolUse hook**
+   - Log the entire hook_input JSON to see what Claude Code actually sends
+   - Check if tool_input is present in hook_input or missing entirely
+
+2. **Check if db.insert_event() handles empty dict differently**
+   - Empty dict `{}` vs NULL in database
+   - May be SQLite behavior or HtmlGraphDB.insert_event() logic
+
+3. **Compare sessions with NULL vs non-NULL tool_input**
+   - Check if they used different Claude Code versions
+   - Check if they have different hook configurations
+
+4. **Review Claude Code hook documentation**
+   - What fields are guaranteed in PostToolUse hook_input?
+   - Is tool_input optional or always present?
+
+### Impact
+
+**Current impact:**
+- Dashboard queries that filter by file_path (e.g., "show all Read events for file X") miss 43% of Read events
+- input_summary DOES capture the file path (we see "Read: /path/to/file.py")
+- So user-visible summaries work, but structured queries don't
+
+**Recommended fix priority: MEDIUM**
+- Not breaking user experience (input_summary works)
+- Affects analytics and dashboard filtering
+- Should investigate why tool_input is NULL and backfill if possible
+
+### Recommendation
+
+**Short-term:**
+Use `input_summary` for file path extraction in dashboard queries:
+```sql
+-- Instead of:
+SELECT * FROM agent_events 
+WHERE tool_name = 'Read' 
+AND json_extract(tool_input, '$.file_path') = '/path/to/file.py'
+
+-- Use:
+SELECT * FROM agent_events 
+WHERE tool_name = 'Read' 
+AND input_summary LIKE '%/path/to/file.py%'
+```
+
+**Long-term:**
+1. Add debug logging to PostToolUse hook to understand why tool_input is NULL
+2. Fix hook if it's a bug in our code
+3. Document if it's expected Claude Code behavior
+4. Consider backfilling NULL tool_input from input_summary if possible
+
+            </div>
+        </section>
+    </article>
+</body>
+</html>

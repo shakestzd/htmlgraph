@@ -25,6 +25,39 @@
             </div>
         </header>
 
+        <section data-detected-patterns>
+            <h3>Detected Patterns (3)</h3>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Sequence</th>
+                        <th>Type</th>
+                        <th>Count</th>
+                        <th>First/Last Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Read → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:15.991742 / 2026-03-05T09:49:33.325676</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Read → Bash → Read</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:15.991750 / 2026-03-05T09:49:33.325686</td>
+                    </tr>
+                    <tr data-pattern-type="anti-pattern">
+                        <td class="sequence">Read → Read → Read</td>
+                        <td><span class="badge pattern-anti-pattern">anti-pattern</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:15.991753 / 2026-03-05T09:49:33.325689</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
         <section data-activity-log>
             <h3>Activity Log (20 events)</h3>
             <ol reversed>

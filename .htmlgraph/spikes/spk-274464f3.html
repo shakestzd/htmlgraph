@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Gemini CLI Session File Format Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-274464f3"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T09:42:56.435330"
+             data-updated="2026-03-05T09:42:56.435334" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Gemini CLI Session File Format Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+Research the Gemini CLI session file format, location, and key fields for use in HtmlGraph integration.
+
+## Research Sources
+- Local filesystem exploration of ~/.gemini/ (Gemini CLI is installed)
+- Direct inspection of session JSON files and protobuf conversation files
+
+## Directory Structure
+
+### Primary location: ~/.gemini/
+```
+~/.gemini/
+├── settings.json              # Global settings (MCP servers, auth, UI prefs)
+├── state.json                 # Simple state (banner shown count, tips count)
+├── google_accounts.json       # Active Google account: {"active": "email", "old": []}
+├── oauth_creds.json           # OAuth credentials (mode 600)
+├── trustedFolders.json        # Trusted folders list
+├── installation_id            # Plain text installation UUID
+├── GEMINI.md                  # User-level memory/context file
+├── tmp/                       # Per-project session data (keyed by project hash)
+│   └── <sha256-project-hash>/
+│       ├── chats/             # Session JSON files (primary session format)
+│       │   └── session-<YYYY-MM-DDTHH-MM>-<8-char-session-id-prefix>.json
+│       ├── logs.json          # Flat log of user messages across sessions
+│       ├── shell_history      # Plain text shell command history
+│       └── *.output           # Large tool output files
+└── antigravity/               # Antigravity app (Gemini Web) session data
+    └── conversations/
+        └── <uuid>.pb          # Protobuf-encoded conversation files (binary, not easily readable)
+```
+
+## Session File Format (chats/*.json)
+
+### File Naming Pattern
+`session-<YYYY-MM-DDTHH-MM>-<8-char-hex-suffix>.json`
+
+Examples:
+- `session-2025-12-17T13-51-08b49e08.json`
+- `session-2026-02-13T18-10-3076b200.json`
+
+The datetime is when the session STARTED (UTC). The 8-char hex suffix is the first 8 chars of the session UUID.
+
+### Top-Level Fields
+```json
+{
+  "sessionId": "08b49e08-7569-458d-83de-b68c5338d10e",  // Full UUID v4
+  "projectHash": "64968b38...",                          // SHA256 hash of project directory path
+  "startTime": "2025-12-17T13:52:24.486Z",              // ISO 8601 UTC
+  "lastUpdated": "2025-12-17T14:03:37.175Z",            // ISO 8601 UTC
+  "messages": [ ... ]
+}
+```
+
+### Message Types
+
+#### 1. User message
+```json
+{
+  "id": "<uuid>",
+  "timestamp": "2025-12-17T13:53:02.167Z",
+  "type": "user",
+  "content": "<plain string for simple messages>",
+  // OR for structured/slash-command messages:
+  "content": [{"text": "<full prompt sent to model>"}],
+  "displayContent": [{"text": "<user-visible text, e.g. /generate ..."}]
+}
+```
+
+#### 2. Gemini (assistant) message
+```json
+{
+  "id": "<uuid>",
+  "timestamp": "2025-12-17T13:53:14.662Z",
+  "type": "gemini",
+  "content": "<text response, may be empty string when only tool calls>",
+  "model": "gemini-2.5-flash",  // or "gemini-3-flash-preview" etc.
+  "tokens": {
+    "input": 9519,
+    "output": 61,
+    "cached": 1017,
+    "thoughts": 51,    // Thinking token count
+    "tool": 0,
+    "total": 9631
+  },
+  "thoughts": [        // Thinking blocks (extended thinking)
+    {
+      "subject": "Defining the Command Sequence",
+      "description": "<thinking text>",
+      "timestamp": "2025-12-17T13:53:04.190Z"
+    }
+  ],
+  "toolCalls": [ ... ]  // Tool call records
+}
+```
+
+#### 3. Info message
+```json
+{
+  "id": "<uuid>",
+  "timestamp": "2025-12-22T04:39:09.287Z",
+  "type": "info",
+  "content": "Update successful! The new version will be used on your next run."
+}
+```
+
+### Tool Call Record (within gemini message)
+```json
+{
+  "id": "<tool-name>-<epoch-ms>-<random-hex>",  // e.g. "run_shell_command-1765979584206-8196d72f611b2"
+  "name": "run_shell_command",
+  "args": { "command": "...", "description": "..." },
+  "result": [
+    {
+      "functionResponse": {
+        "id": "<same id>",
+        "name": "<tool name>",
+        "response": { "output": "<stdout>", "error": "<stderr or cancel message>" }
+      }
+    }
+  ],
+  "status": "success" | "cancelled",
+  "timestamp": "2025-12-17T13:53:14.662Z",
+  "resultDisplay": "<human-readable summary>",
+  "displayName": "Shell" | "ReadFile" | etc.,
+  "description": "<full tool description text>",
+  "renderOutputAsMarkdown": false
+}
+```
+
+## logs.json Format (flat message log)
+Located at `~/.gemini/tmp/<hash>/logs.json`, this is a JSON array of all user messages
+across all sessions for this project:
+```json
+[
+  {
+    "sessionId": "<uuid>",
+    "messageId": 0,       // Sequential integer within session
+    "type": "user",
+    "message": "<raw user text>",
+    "timestamp": "2025-12-17T13:53:00.819Z"
+  }
+]
+```
+
+## settings.json Format
+```json
+{
+  "mcpServers": {
+    "<name>": { "command": "<path>", "args": ["..."] }
+  },
+  "security": { "auth": { "selectedType": "oauth-personal" } },
+  "ui": {
+    "theme": "Default",
+    "showStatusInTitle": true,
+    "hideBanner": true,
+    "footer": { "hideContextPercentage": false },
+    "showMemoryUsage": true
+  },
+  "ide": { "hasSeenNudge": true, "enabled": true },
+  "general": {
+    "previewFeatures": true,
+    "sessionRetention": { "enabled": true },
+    "enablePromptCompletion": true
+  },
+  "output": { "format": "text" }
+}
+```
+
+## Project Hash
+The tmp/<hash>/ directory name is a SHA256 hash of the project working directory path.
+Each unique project (CWD) gets its own hash directory.
+
+## Antigravity Conversations (Gemini Web/App)
+- Location: `~/.gemini/antigravity/conversations/<uuid>.pb`
+- Format: Binary Protocol Buffers (not human-readable with strings)
+- File sizes range from 122 KB to 26 MB
+- These are separate from CLI sessions
+
+## Key Observations for HtmlGraph Integration
+1. Sessions are JSON files - easy to parse
+2. Thinking blocks are captured per-message with subject+description+timestamp
+3. Token counts track input/output/cached/thoughts/tool/total separately
+4. Tool calls include full args, results, and status (success/cancelled)
+5. User messages can have content vs displayContent (raw prompt vs slash command display)
+6. The project hash allows isolating sessions by working directory
+7. logs.json provides a flat cross-session message log for quick scanning
+8. Session file naming encodes start datetime + UUID prefix for easy sorting
+9. Info messages capture system events (updates, extension notifications)
+10. Model name is recorded per gemini message (supports multiple models in one session)
+
+## Recommended Approach for HtmlGraph
+- Parse `~/.gemini/tmp/` directories to find project sessions
+- Compute SHA256 of project path to find the right hash directory
+- Read session JSON files from `chats/` subdirectory
+- Extract: sessionId, startTime, lastUpdated, message count, token totals
+- For thinking blocks: aggregate thoughts per session for analysis
+- For tool calls: extract tool name, status, timing for activity tracking
+            </div>
+        </section>
+    </article>
+</body>
+</html>

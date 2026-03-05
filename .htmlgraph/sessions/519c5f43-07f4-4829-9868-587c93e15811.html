@@ -52,6 +52,45 @@
                 </ul>
             </section>
         </nav>
+        <section data-detected-patterns>
+            <h3>Detected Patterns (4)</h3>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Sequence</th>
+                        <th>Type</th>
+                        <th>Count</th>
+                        <th>First/Last Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-pattern-type="anti-pattern">
+                        <td class="sequence">Bash → Bash → Bash</td>
+                        <td><span class="badge pattern-anti-pattern">anti-pattern</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.024022 / 2026-03-05T09:49:33.354728</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">ClaudeSessionStart → ClaudeSessionStart → ClaudeSessionStart</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>20</td>
+                        <td>2026-03-05T09:38:16.024026 / 2026-03-05T09:49:33.354734</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">ClaudeSessionStart → ClaudeSessionStart → FeatureCreate</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.024029 / 2026-03-05T09:49:33.354736</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">FeatureCreate → FeatureCreate → FeatureCreate</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.024032 / 2026-03-05T09:49:33.354738</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
         <section data-activity-log>
             <h3>Activity Log (41 events)</h3>
             <ol reversed>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Contextune to HtmlGraph Port Analysis</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-155bc743"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T16:11:40.339076"
+             data-updated="2026-03-05T16:11:40.339078" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Contextune to HtmlGraph Port Analysis</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Contextune to HtmlGraph Port Analysis
+
+### Overview of Contextune
+
+Contextune is a Claude Code plugin providing two core capabilities:
+1. **Intent Detection / Smart Routing** - 3-tier NLP cascade (keyword -> Model2Vec -> Semantic Router) that detects user intent from natural language and routes to slash commands
+2. **Parallel Development Workflow** - Git worktree-based parallel task execution with Haiku agents
+
+Version: 0.9.0
+Architecture: Claude Code plugin with hooks, commands, agents, and skills
+
+---
+
+### Component-by-Component Analysis
+
+#### Commands
+
+**ctx-plan.md**
+- Purpose: Creates modular YAML plan for parallel execution using PlanBuilder Python class
+- Key innovation: Each task is a separate .md file in .parallel/plans/tasks/; master plan.yaml references them
+- Spawns 5 parallel research agents (web search, codebase patterns, spec validation, dependency analysis, libraries)
+- HtmlGraph mapping: No direct equivalent - HtmlGraph has features/tracks but no "parallel execution plan" abstraction
+- Action: PORT - create htmlgraph:plan command that creates HtmlGraph-native plan artifacts
+
+**ctx-execute.md**
+- Purpose: Execute plan using git worktrees + parallel Claude subagents (Haiku)
+- Uses pre-created worktrees via setup_worktrees.sh for O(1) setup regardless of task count
+- Each task agent: creates GitHub issue -> creates worktree -> implements -> tests -> pushes -> reports
+- HtmlGraph mapping: No equivalent - HtmlGraph tracks sessions/features but doesn't orchestrate parallel git execution
+- Action: PORT as htmlgraph:execute - leverage HtmlGraph features/tracks for task tracking
+
+**ctx-status.md**
+- Purpose: Check git worktree status, branch ahead/behind, task file status
+- Read-only diagnostic across all parallel worktrees
+- HtmlGraph mapping: "uv run htmlgraph status" command exists but tracks HtmlGraph items not git worktrees
+- Action: PORT as htmlgraph:parallel-status to complement existing status command
+
+**ctx-cleanup.md**
+- Purpose: Remove merged worktrees, delete local/remote branches, archive task files
+- Safety: always verifies merged before deleting, asks for confirmation
+- HtmlGraph mapping: No equivalent
+- Action: PORT as htmlgraph:cleanup script/command
+
+**ctx-research.md**
+- Purpose: 3 parallel Haiku agents (web, codebase, dependencies) for quick technical decisions (1-2 min)
+- Lighter than ctx-plan (3 agents vs 5, no task file creation)
+- HtmlGraph mapping: Partial - HtmlGraph has researcher agent but single-agent, not parallel
+- Action: REWRITE - enhance existing htmlgraph:researcher agent to spawn 3 parallel subagents
+
+**ctx-verify.md**
+- Purpose: Verification sub-agent for intent detection confirmation (AskUserQuestion flow)
+- Used by intent detection hook, not standalone
+- HtmlGraph mapping: Not applicable (Contextune-specific to intent detection feature)
+- Action: SKIP - intent detection is Contextune-specific feature, not needed in HtmlGraph
+
+#### Agents
+
+**parallel-task-executor.md**
+- Purpose: Haiku-optimized autonomous feature implementation (creates issue -> worktree -> implement -> test -> push)
+- Model: Haiku 4.5 for 85% cost savings vs Sonnet
+- Full lifecycle: GitHub issue creation, worktree setup, implementation, validation, PR readiness
+- HtmlGraph mapping: HtmlGraph has htmlgraph:sonnet-coder and htmlgraph:haiku-coder agents but no parallel worktree awareness
+- Action: PORT - create htmlgraph:parallel-task-executor agent that integrates with HtmlGraph SDK for tracking
+
+**worktree-manager.md**
+- Purpose: Haiku-optimized git worktree lifecycle (create, diagnose, cleanup, lock resolution)
+- Handles edge cases: lock files, orphaned worktrees, concurrent creation conflicts
+- HtmlGraph mapping: No equivalent
+- Action: PORT as htmlgraph:worktree-manager agent
+
+**issue-orchestrator.md**
+- Purpose: Haiku-optimized GitHub issue CRUD, bulk operations, label management, linking
+- HtmlGraph mapping: HtmlGraph has its own tracking system (features/spikes) separate from GitHub issues
+- Action: REWRITE - adapt to use HtmlGraph SDK for tracking instead of/alongside GitHub issues
+
+**test-runner.md**
+- Purpose: Multi-language test execution (Python/JS/Rust/Go), coverage, GitHub issue creation for failures
+- HtmlGraph mapping: HtmlGraph has htmlgraph:test-runner agent but simpler
+- Action: PORT - enhance existing test-runner with coverage tracking and failure issue creation
+
+**performance-analyzer.md**
+- Purpose: Benchmark parallel workflows using Amdahl's Law, identify bottlenecks, cost comparisons
+- Contains Python analysis scripts embedded
+- HtmlGraph mapping: No equivalent
+- Action: PORT as htmlgraph:performance-analyzer agent
+
+#### Scripts
+
+**setup_worktrees.sh**
+- Purpose: Parallel worktree creation from plan.yaml (O(1) via xargs -P 10)
+- Reads task IDs from plan.yaml (yq or grep fallback)
+- HtmlGraph mapping: No equivalent
+- Action: PORT as script in packages/claude-plugin/hooks/scripts/ or standalone
+
+**merge_and_cleanup.sh**
+- Purpose: Deterministic merge-and-cleanup (merge branch, delete local, delete remote)
+- Simple, fast, auto-detects remote
+- HtmlGraph mapping: No equivalent
+- Action: PORT as utility script
+
+**smart_execute.sh**
+- Purpose: 3-tier error recovery (execute -> Haiku analyzer -> Copilot escalation -> Claude main)
+- HtmlGraph mapping: No equivalent, but aligns with HtmlGraph's error spike system
+- Action: ADAPT - simplify to 2-tier (execute -> Haiku -> Claude main), remove Copilot dependency
+
+**commit_and_push.sh**
+- Purpose: Simple deterministic git add/commit/push with auto-detection of branch/remote
+- HtmlGraph mapping: No equivalent (utility script)
+- Action: PORT as-is
+
+**create_prs.sh**
+- Purpose: Creates GitHub PRs for completed tasks (status: completed in YAML frontmatter)
+- Uses task .md file as PR body (zero transformation)
+- HtmlGraph mapping: No equivalent
+- Action: PORT as-is
+
+**extract-current-plan.sh**
+- Status: DEPRECATED in Contextune itself (replaced by PlanBuilder direct creation)
+- HtmlGraph mapping: Not applicable
+- Action: SKIP
+
+#### PlanBuilder (lib/plan_builder.py)
+
+- Purpose: Fluent Python API for creating .parallel/plans/ structure
+  - plan.yaml (master with metadata, research synthesis, task references)
+  - tasks/task-N.md (individual task content with YAML frontmatter)
+  - templates/ and scripts/ directories
+- API: PlanBuilder(name).set_research({}).set_metadata(**kwargs).add_task(id, name, priority, content, deps).build()
+- Priorities: blocker > high > medium > low
+- HtmlGraph mapping: HtmlGraph SDK has TrackBuilder with similar fluent API, but for HtmlGraph HTML nodes
+- Action: REWRITE - create HtmlGraph-native parallel plan that stores in .htmlgraph/ instead of .parallel/
+
+---
+
+### Mapping Table
+
+| Contextune Component | HtmlGraph Equivalent | Action | Notes |
+|---|---|---|---|
+| ctx:plan command | None (tracks exist but different) | PORT | Create htmlgraph:plan command |
+| ctx:execute command | None | PORT | Integrate with HtmlGraph SDK tracking |
+| ctx:status command | htmlgraph status (different scope) | PORT | Add as htmlgraph:parallel-status |
+| ctx:cleanup command | None | PORT | Add as htmlgraph:cleanup |
+| ctx:research command | researcher agent (single-agent) | REWRITE | Make parallel (3 Haiku subagents) |
+| ctx:verify command | None | SKIP | Intent detection specific |
+| parallel-task-executor agent | haiku-coder (partial) | PORT | Add worktree + GitHub issue awareness |
+| worktree-manager agent | None | PORT | New agent |
+| issue-orchestrator agent | None (HtmlGraph uses its own tracking) | REWRITE | Use HtmlGraph SDK for tracking |
+| test-runner agent | test-runner (simpler) | PORT | Add coverage + failure issues |
+| performance-analyzer agent | None | PORT | New agent |
+| setup_worktrees.sh | None | PORT | Script for parallel setup |
+| merge_and_cleanup.sh | None | PORT | Utility script |
+| smart_execute.sh | None | ADAPT | Remove Copilot dependency |
+| commit_and_push.sh | None | PORT | Utility script |
+| create_prs.sh | None | PORT | PR creation script |
+| PlanBuilder Python class | TrackBuilder (different structure) | REWRITE | HtmlGraph-native plan structure |
+| .parallel/plans/ directory | .htmlgraph/ directory | REWRITE | Use HtmlGraph HTML nodes not YAML |
+| Intent detection (main feature) | None | SKIP | Contextune-specific NLP feature |
+| 3-tier detection cascade | None | SKIP | Contextune-specific |
+| Statusline integration | None | SKIP | Contextune-specific |
+
+---
+
+### Key Architecture Differences
+
+1. **Storage format**: Contextune uses YAML + Markdown files in .parallel/; HtmlGraph uses HTML nodes in .htmlgraph/
+2. **Tracking system**: Contextune uses GitHub issues as primary tracking; HtmlGraph uses its own features/spikes/tracks
+3. **Plan structure**: Contextune's plan.yaml + task-N.md vs HtmlGraph's features and tracks
+4. **Agents**: Contextune uses subagent_type: for routing; HtmlGraph uses named agent definitions
+5. **SDK**: HtmlGraph has a rich Python SDK (features, spikes, tracks, sessions); Contextune has PlanBuilder only
+
+### What HtmlGraph Should Port (Priority Order)
+
+**High Priority (Core Value):**
+1. parallel-task-executor agent - enables Haiku-powered parallel execution
+2. ctx:plan command - parallel planning with research synthesis
+3. ctx:execute command - actual parallel execution orchestration
+4. setup_worktrees.sh - infrastructure for parallel git worktrees
+5. PlanBuilder -> rewrite as HtmlGraph-native with SDK integration
+
+**Medium Priority (Supporting Infrastructure):**
+6. ctx:status command - monitoring parallel work
+7. ctx:cleanup command - lifecycle management
+8. worktree-manager agent - git expertise
+9. create_prs.sh - PR creation after parallel work
+10. commit_and_push.sh - deterministic git ops
+
+**Lower Priority (Enhancement):**
+11. test-runner enhancements (coverage, failure issues)
+12. performance-analyzer agent - ROI measurement
+13. ctx:research command rewrite (parallel Haiku research)
+14. smart_execute.sh adaptation
+
+**Skip:**
+- Intent detection / 3-tier cascade (Contextune-specific value prop)
+- ctx:verify (tied to intent detection)
+- Statusline integration (Contextune-specific)
+- extract-current-plan.sh (deprecated even in Contextune)
+
+### Integration Points with HtmlGraph
+
+When porting, the parallel workflow should:
+1. Create HtmlGraph features for each parallel task (SDK: sdk.features.create())
+2. Use spikes for research synthesis output (SDK: sdk.spikes.create())
+3. Store plan metadata in HtmlGraph tracks (SDK: sdk.tracks)
+4. Record parallel execution sessions in HtmlGraph sessions
+5. Store task files as HtmlGraph-native HTML nodes, not YAML/MD
+
+### Recommended Implementation Approach
+
+Phase 1: Port scripts (setup_worktrees.sh, commit_and_push.sh, create_prs.sh, merge_and_cleanup.sh)
+Phase 2: Create parallel-task-executor and worktree-manager agents
+Phase 3: Implement htmlgraph:plan command with HtmlGraph-native plan structure
+Phase 4: Implement htmlgraph:execute command that uses Phase 1-3 infrastructure
+Phase 5: Add monitoring (ctx:status port) and cleanup (ctx:cleanup port)
+Phase 6: Enhance test-runner and add performance-analyzer
+            </div>
+        </section>
+    </article>
+</body>
+</html>

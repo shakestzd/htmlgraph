@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Read Efficiency & File Organization Analysis</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-3d6e011d"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-02-13T00:35:13.458684"
+             data-updated="2026-02-13T00:35:13.458686" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Read Efficiency & File Organization Analysis</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                # Read Efficiency & File Organization Analysis
+
+## Executive Summary
+
+**Key Finding: 41% of all Read operations use chunked reading (offset/limit), indicating files too large to read at once.**
+
+- **Total Reads**: 1,460 across 58 sessions
+- **Chunked Reads**: 439 (41% use offset/limit parameters)
+- **Unique Files Read**: 269 distinct files
+- **Search:Read Ratio**: 1:2.8 (356 Grep + 170 Glob vs 1,460 Reads)
+- **Total Python Files**: 293 files, 113,351 lines of code
+
+## 1. Large File Analysis - Critical Findings
+
+### Files Over 500 Lines (85 files - 29% of codebase)
+
+**Top 10 Largest Files:**
+1. session_manager.py - 2,880 lines (CRITICAL - needs splitting)
+2. models.py - 2,427 lines (CRITICAL - needs splitting)
+3. db/schema.py - 2,120 lines (CRITICAL - needs splitting)
+4. graph.py - 2,082 lines (CRITICAL - needs splitting)
+5. hooks/event_tracker.py - 1,800 lines (needs splitting)
+6. session_context.py - 1,646 lines (needs splitting)
+7. server.py - 1,508 lines (needs splitting)
+8. cli/analytics.py - 1,424 lines (needs splitting)
+9. planning.py - 1,149 lines (needs splitting)
+10. api/services.py - 1,140 lines (needs splitting)
+
+**File Size Distribution:**
+- <100 lines: 50 files (17%)
+- 100-299 lines: 94 files (32%)
+- 300-499 lines: 64 files (22%)
+- 500+ lines: 85 files (29%) - This is the problem
+
+**Impact**: Nearly 1/3 of codebase requires chunked reading or multiple read passes.
+
+## 2. Chunked Reads Analysis
+
+### Files Most Frequently Requiring Chunked Reads
+
+**Top Files with Chunked Reads:**
+1. api/main.py - 86 chunked reads
+2. api/services.py - 34 chunked reads
+3. hooks/event_tracker.py - 32 chunked reads
+4. db/schema.py - 28 chunked reads
+5. cli/base.py - 27 chunked reads
+
+**Pattern**: Files exceeding 2000 lines require 2-6 read operations each.
+
+## 3. Same File, Multiple Reads Per Session
+
+**Top Offenders:**
+1. cli/base.py - 27 reads in one session
+2. api/main.py - 22 reads in one session
+3. api/services.py - 16 reads in one session
+
+**Why Multiple Reads:**
+- a) Offset/Limit Chunking (expected for large files)
+- b) Cross-Agent Coordination (inefficient - no shared context)
+- c) Re-reading After Edit (expected)
+- d) Exploratory Reading (inefficient - poor search/discovery)
+
+## 4. Subagent Model Usage
+
+**Top Readers:**
+1. claude-code (main) - 680 reads
+2. general-purpose-spawner - 371 reads
+3. htmlgraph:researcher-spawner - 152 reads
+
+**Key Finding**: Subagents do NOT share read context. When spawned, they re-read files already read by parent.
+
+## 5. Search Tools vs Read Efficiency
+
+**Tool Usage:**
+- Read: 1,460 (58 sessions, 25.2 avg/session)
+- Edit: 610 (30 sessions)
+- Grep: 356 (27 sessions)
+- Glob: 170 (23 sessions)
+
+**Search:Read Ratio**: 1:2.8 (should be closer to 1:1)
+
+**Problem**: Agents not using Grep/Glob efficiently before reading.
+
+## 6. Recommendations
+
+### A. Immediate Actions (Priority 1)
+
+**1. Split Core Monoliths**
+- session_manager.py (2,880 lines) -> 4 modules x 700 lines
+- models.py (2,427 lines) -> 4 modules x 600 lines
+- db/schema.py (2,120 lines) -> 4 modules x 530 lines
+- graph.py (2,082 lines) -> 4 modules x 520 lines
+
+**2. Target**: Max 500 lines per module
+
+### B. SDK Improvements
+
+**1. File Summary Tool** - Avoid full reads
+**2. Semantic Search** - Better discovery
+**3. Subagent Context Sharing** - Pass file contents to spawned agents
+**4. Read Cache Analytics** - Track read patterns
+
+### C. Workflow Improvements
+
+**1. Pre-Read Search** - Always Grep before Read
+**2. File Size Monitoring** - Pre-commit hook for files >800 lines
+**3. Module Dependency Graph** - Visualize split boundaries
+
+## 7. Efficiency Metrics
+
+### Current State
+- Chunked Read %: 41%
+- Avg Reads/Session: 25.2
+- Search:Read Ratio: 1:2.8
+
+### Target State
+- Chunked Read %: <10%
+- Avg Reads/Session: 15 (40% reduction)
+- Search:Read Ratio: 1:1
+
+### Expected Impact
+- Token Cost Reduction: 30-40%
+- Agent Efficiency: 50% faster file discovery
+
+## Conclusion
+
+**Root Cause**: 29% of codebase (85 files) exceeds 500 lines, forcing chunked reads.
+
+**Primary Impact**: 41% of reads use chunking, causing higher token costs and slower performance.
+
+**Solution**: Systematic file splitting + SDK enhancements + workflow improvements.
+
+**Expected ROI**: 30-40% token cost reduction, 50% faster file discovery.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

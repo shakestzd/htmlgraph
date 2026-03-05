@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Claude Code Session File Format Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-0db2adaa"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T09:44:38.631622"
+             data-updated="2026-03-05T09:44:38.631624" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Claude Code Session File Format Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+Document the exact file paths, formats, and field schemas of Claude Code CLI session files to build a parser.
+
+## Research Sources
+- Direct filesystem inspection of ~/.claude/projects/
+- Live JSONL file analysis across multiple session files
+- Examined session file: 06dfa976-ca7e-48a3-ad92-dff4e2d31dd4.jsonl (10MB, rich content)
+
+---
+
+## File Location Pattern
+
+Sessions are stored per-project using a path-encoded directory name:
+
+```
+~/.claude/projects/<encoded-project-path>/<session-uuid>.jsonl
+```
+
+The project path encoding replaces `/` with `-`:
+- Project: /Users/shakes/DevProjects/htmlgraph
+- Directory: ~/.claude/projects/-Users-shakes-DevProjects-htmlgraph/
+
+Each session UUID has:
+1. A `.jsonl` file (the conversation transcript)
+2. Optionally a matching UUID subdirectory containing:
+   - `subagents/` — subagent JSONL files (agent-<id>.jsonl, agent-<id>compact-<id>.jsonl)
+   - `tool-results/` — tool result .txt files (toolu_<id>.txt)
+
+Older/empty sessions may have only a UUID subdirectory with a `subagents/` folder but no .jsonl.
+
+---
+
+## Index/Metadata Files
+
+### sessions-index.json
+Location: `~/.claude/projects/<encoded-path>/sessions-index.json`
+
+Schema:
+```json
+{
+  "version": 1,
+  "entries": [
+    {
+      "sessionId": "uuid",
+      "fullPath": "/absolute/path/to/session.jsonl",
+      "fileMtime": 1769330854772,       // Unix ms timestamp
+      "firstPrompt": "truncated text...",
+      "summary": "AI-generated session summary",
+      "messageCount": 2,
+      "created": "2026-01-03T11:06:45.584Z",
+      "modified": "2026-01-03T11:06:45.584Z",
+      "gitBranch": "main",
+      "projectPath": "/Users/shakes/DevProjects/htmlgraph",
+      "isSidechain": false
+    }
+  ]
+}
+```
+
+### history.jsonl
+Location: `~/.claude/history.jsonl`
+Global command history (not session transcripts):
+```json
+{"display": "user message text", "pastedContents": {}, "timestamp": 1759771380131, "project": "/Users/shakes/.claude"}
+```
+
+---
+
+## JSONL Session File Format
+
+Each line is a JSON object. All records share a common envelope, then type-specific fields.
+
+### Common Envelope Fields (all record types except file-history-snapshot)
+```
+parentUuid      string | null   — UUID of parent record (null for root/first records)
+isSidechain     boolean         — true for subagent records
+userType        string          — "external" (the human user)
+cwd             string          — working directory when record was created
+sessionId       string          — UUID of the session
+version         string          — Claude Code version (e.g. "2.1.39")
+gitBranch       string          — git branch at time of record
+type            string          — record type (see below)
+uuid            string          — unique ID for this record
+timestamp       string          — ISO 8601 datetime
+```
+
+Subagent records additionally have:
+```
+agentId         string          — short agent identifier (e.g. "a179643", "acompact-708eeb")
+slug            string          — human-readable session name (e.g. "quirky-dreaming-lynx")
+```
+
+---
+
+## Record Types
+
+### type: "user"
+Human turn. `message.content` is either a string or array of content blocks.
+
+```json
+{
+  "type": "user",
+  "parentUuid": "uuid-of-preceding-assistant-record",
+  "isMeta": true,              // optional: true for hook/system-injected messages
+  "thinkingMetadata": {...},   // optional: present when thinking was requested
+  "message": {
+    "role": "user",
+    "content": "string"
+    // OR content as array:
+    "content": [
+      {"type": "text", "text": "user message text"},
+      {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}},
+      {"type": "tool_result", "tool_use_id": "toolu_xxx", "content": [{"type": "text", "text": "..."}]}
+    ]
+  }
+}
+```
+
+### type: "assistant"
+Claude's response turn.
+
+```json
+{
+  "type": "assistant",
+  "parentUuid": "uuid-of-preceding-user-record",
+  "requestId": "req_xxx",
+  "isApiErrorMessage": true,   // optional: true when API returned an error
+  "message": {
+    "id": "msg_xxx",
+    "model": "claude-opus-4-6",   // or "<synthetic>" for compact summaries
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "end_turn" | "tool_use" | "stop_sequence" | null,
+    "stop_sequence": null | string,
+    "content": [
+      {"type": "text", "text": "response text"},
+      {
+        "type": "thinking",
+        "thinking": "internal reasoning text",
+        "signature": "base64-encoded-signature"
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_xxx",
+        "name": "Bash" | "Read" | "Task" | "Write" | ...,
+        "input": { ... }   // tool-specific parameters
+      }
+    ],
+    "usage": {
+      "input_tokens": 3,
+      "cache_creation_input_tokens": 63951,
+      "cache_read_input_tokens": 24773,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 63951
+      },
+      "output_tokens": 421,
+      "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0},
+      "service_tier": "standard",
+      "inference_geo": "not_available"
+    }
+  }
+}
+```
+
+### type: "system"
+System events and metadata. Differentiated by `subtype`.
+
+#### subtype: "stop_hook_summary"
+Fired when Stop hooks complete.
+```json
+{
+  "type": "system",
+  "subtype": "stop_hook_summary",
+  "hookCount": 2,
+  "hookInfos": [{"command": "..."}],
+  "hookErrors": [],
+  "preventedContinuation": false,
+  "stopReason": "",
+  "hasOutput": true,
+  "level": "suggestion",
+  "toolUseID": "toolu_xxx"
+}
+```
+
+#### subtype: "turn_duration"
+Timing record for a complete turn.
+```json
+{
+  "type": "system",
+  "subtype": "turn_duration",
+  "durationMs": 93688,
+  "isMeta": true
+}
+```
+
+#### subtype: "compact_boundary"
+Marks where context was compacted. KEY for session continuation/fork detection.
+```json
+{
+  "type": "system",
+  "subtype": "compact_boundary",
+  "logicalParentUuid": "uuid-of-last-message-before-compact",
+  "slug": "quirky-dreaming-lynx",
+  "compactMetadata": {
+    "trigger": "auto",
+    "preTokens": 167315
+  },
+  "content": "compact summary text",
+  "isMeta": true,
+  "level": "suggestion"
+}
+```
+
+### type: "progress"
+Streaming progress updates (tool execution, hook execution).
+
+```json
+{
+  "type": "progress",
+  "parentToolUseID": "toolu_xxx",
+  "toolUseID": "toolu_xxx",
+  "data": {
+    "type": "bash_progress" | "hook_progress",
+    // for hook_progress:
+    "hookEvent": "SessionStart",
+    "hookName": "SessionStart:clear",
+    "command": "uv run ..."
+    // for bash_progress:
+    "output": "partial stdout",
+    "fullOutput": "full stdout so far"
+  }
+}
+```
+
+### type: "queue-operation"
+Task queue events.
+```json
+{
+  "type": "queue-operation",
+  "operation": "enqueue",
+  "timestamp": "2026-02-11T17:41:11.540Z",
+  "sessionId": "...",
+  "content": "<task-notification>...</task-notification>\nRead the output file..."
+}
+```
+
+### type: "file-history-snapshot"
+File tracking snapshots (undo/redo state). Does NOT have the common envelope fields.
+```json
+{
+  "type": "file-history-snapshot",
+  "messageId": "uuid",
+  "snapshot": {
+    "messageId": "uuid",
+    "trackedFileBackups": {},
+    "timestamp": "2026-02-11T17:40:45.281Z"
+  },
+  "isSnapshotUpdate": false
+}
+```
+
+---
+
+## Session Continuation / Fork Indicators
+
+### parentUuid chain
+- Records form a linked list via `parentUuid`
+- First actual message in session typically has `parentUuid` pointing to preceding record
+- Enables reconstruction of conversation tree
+
+### compact_boundary (context window management)
+- `type: "system"`, `subtype: "compact_boundary"`
+- `logicalParentUuid` — points to last real message before compaction
+- `compactMetadata.trigger` — "auto" (token limit) or "manual" (/compact command)
+- `compactMetadata.preTokens` — token count before compaction
+- After compact_boundary, a `type: "user"`, `isCompactSummary: true` record contains the summary
+
+### isSidechain flag
+- `true` = this record belongs to a subagent (Task() call)
+- Subagent records are stored in `subagents/agent-<id>.jsonl`
+- They share the same `sessionId` as the parent session
+- The `agentId` field identifies which subagent
+
+### isCompactSummary flag
+- `true` on `type: "user"` records that ARE the compact summary injected after /compact
+- `message.content` is a string beginning with "This session is being continued from a previous conversation..."
+
+---
+
+## Complete List of Top-Level Fields Observed
+
+```
+compactMetadata, content, cwd, data, durationMs, error, gitBranch,
+hasOutput, hookCount, hookErrors, hookInfos, imagePasteIds,
+isApiErrorMessage, isCompactSummary, isMeta, isSidechain,
+isSnapshotUpdate, isVisibleInTranscriptOnly, level, logicalParentUuid,
+message, messageId, operation, parentToolUseID, parentUuid,
+permissionMode, preventedContinuation, requestId, sessionId, slug,
+snapshot, sourceToolAssistantUUID, stopReason, subtype, thinkingMetadata,
+timestamp, toolUseID, toolUseResult, type, userType, uuid, version
+```
+
+---
+
+## Subagent File Structure
+
+Subagent files at `<session-dir>/subagents/agent-<id>.jsonl`:
+- Same JSONL format as parent session
+- `isSidechain: true` on all records
+- `agentId` field present
+- `sessionId` matches parent session UUID
+- `slug` present (human-readable name, e.g. "quirky-dreaming-lynx")
+- Compact subagents named `agent-<id>compact-<id>.jsonl`
+
+Tool result files at `<session-dir>/tool-results/toolu_<id>.txt`:
+- Plain text files containing tool output
+- Named by tool_use_id from assistant content blocks
+
+---
+
+## Recommended Parser Approach
+
+1. Read `sessions-index.json` for session list and metadata
+2. For each session, open `<session-uuid>.jsonl`
+3. Parse line-by-line, skip `file-history-snapshot` records (no envelope)
+4. Build conversation tree using `parentUuid` chains
+5. Identify compact boundaries via `type=system, subtype=compact_boundary`
+6. For subagent content, read files from `subagents/` subdirectory
+7. Correlate tool calls: `tool_use` in assistant content -> `tool_result` in subsequent user content (matched by `tool_use_id`)
+8. Token usage is on assistant records in `message.usage`
+            </div>
+        </section>
+    </article>
+</body>
+</html>

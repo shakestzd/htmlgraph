@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>AI Coding CLI Tools Landscape Research (2025-2026)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-5c35f753"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T09:46:54.545934"
+             data-updated="2026-03-05T09:46:54.545937" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>AI Coding CLI Tools Landscape Research (2025-2026)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Research: AI Coding CLI Tools Landscape (2025-2026)
+## Date: 2026-03-05
+
+---
+
+## 1. GitHub Copilot CLI (gh copilot / copilot-cli)
+
+### Status
+- GA released February 2026 for all Copilot subscribers
+- Public preview launched September 2025
+
+### Hook System
+STRONG HOOK SUPPORT - Mirrors Claude Code architecture closely:
+- preToolUse: can DENY or MODIFY tool calls (blocks execution, rewrites args)
+- postToolUse: enables custom post-processing
+- agentStop / subagentStop: session lifecycle hooks
+- Plugin hooks: bundled with plugins via hooks.json
+
+### Plugin System
+Full plugin system with /plugin install owner/repo:
+- Plugins bundle: MCP servers, agents, skills, hooks
+- Remote sources: GitHub repos and git URLs
+- Local installs via --plugin-dir flag
+- Skills take effect immediately (no restart needed)
+- Plugin components: commands, agents, skills, hooks
+
+### Session Storage
+- AI-generated session names from first message
+- Infinite sessions with automatic context compaction (at 95% context window)
+- /resume command with fuzzy search
+- Cross-session memory: remembers conventions, patterns, preferences
+- Background delegation: prefix & to run in cloud, /resume to switch
+
+### MCP Support
+FULL MCP SUPPORT:
+- Built-in GitHub MCP server
+- Custom MCP servers for any tool/service
+- OAuth configuration (Microsoft OAuth auto-configures)
+- Workspace-local MCP config via .vscode/mcp.json
+- /mcp show: displays User/Workspace/Plugins/Built-in servers
+- Structured content display + tool filtering
+
+### Observability APIs
+- SDK exposes tools.list RPC to query available tools
+- session.list responses include session context
+- tool.execution_start events with MCP server + tool names
+- web_fetch tool with URL access control via ~/.copilot/config
+
+### Integration Opportunity for HtmlGraph
+EXTREMELY HIGH - Architecture is nearly identical to Claude Code:
+- Same hook event names (preToolUse, postToolUse)
+- Same plugin/skill/agent model
+- Could share hook scripts with minimal modification
+
+---
+
+## 2. Cursor
+
+### Status
+- Version 2.x in 2026 with Cursor 2.2 including Plan Mode improvements
+- Available in JetBrains via Agent Client Protocol (ACP)
+
+### Hook/Extension System
+LIMITED - No native hook system analogous to Claude Code:
+- Plugin marketplace with installer (design, databases, payments, analytics)
+- Extensions built on VS Code extension API
+- Agent Client Protocol (ACP) for JetBrains integration
+- Visual Editor for drag-and-drop UI changes
+- Bugbot auto-fix for PR issues
+- No pre/post tool execution hooks
+
+### Session Storage
+LOCAL SQLITE - Not easily interceptable:
+- macOS: ~/Library/Application Support/Cursor/User/globalStorage/state.vscdb
+- Linux: ~/.config/Cursor/User/globalStorage/state.vscdb
+- Windows: %APPDATA%\Cursor\User\globalStorage\state.vscdb
+- Format: SQLite with ItemTable (key TEXT PRIMARY KEY, value TEXT)
+- Chat data in cursorDiskKV table, keys like composer.composerData
+- Also per-workspace: workspaceStorage/<hash>/state.vscdb
+- Data is LOCAL ONLY (not stored on Cursor servers)
+
+### MCP Support
+YES - Full MCP support via workspace .vscode/mcp.json
+
+### Observability
+- Enterprise Insights dashboard (enterprise tier)
+- No public telemetry API
+- Third-party Cursor DB MCP Server exists (jbdamask) to query state.vscdb
+
+### Integration Opportunity for HtmlGraph
+MEDIUM - Session data accessible via SQLite but no hook injection point.
+Could read state.vscdb to extract chat sessions post-hoc.
+No real-time hook injection possible without VS Code extension.
+
+---
+
+## 3. OpenCode
+
+### Status
+- Open source terminal AI coding agent
+- January 2026: GitHub official partnership, Copilot auth for all subscribers
+- Supports 75+ providers including Ollama local models
+
+### Hook/Plugin System
+STRONG PLUGIN SYSTEM - JavaScript/TypeScript modules:
+Plugin load paths: .opencode/plugins/ or ~/.config/opencode/plugins/
+Also via npm packages in config.
+
+Available events:
+- session.created, session.compacted, session.deleted, session.diff,
+  session.error, session.idle, session.status, session.updated
+- tool.execute.before, tool.execute.after
+- file.edited, file.watcher.updated
+- message.part.removed/updated, message.removed/updated
+- permission.asked, permission.replied
+- command.executed, lsp.client.diagnostics, lsp.updated
+- tui.prompt.append, tui.command.execute, tui.toast.show
+- shell.env, todo.updated, server.connected
+
+Notable: oh-my-opencode plugin creates multi-agent system with planner/researcher/debugger roles
+
+### Session Storage
+SQLite database (not JSONL):
+- Location: .opencode/ directory (project-local) + ~/.config/opencode/
+- Format: SQLite for conversation/session persistence
+
+### MCP Support
+YES - stdio-type MCP servers configurable in config
+
+### Observability
+- Debug logging via -d flag or Ctrl+L
+- Tool call logs (copilot_chat_enable_tool_call_logs feature flag)
+- LSP integration with per-language config
+
+### Integration Opportunity for HtmlGraph
+HIGH - Rich plugin event system very similar in spirit to Claude Code hooks.
+Could write a plugin that calls HtmlGraph SDK on session/tool events.
+JavaScript/TypeScript plugin (not Python) - would need JS SDK or HTTP calls.
+
+---
+
+## 4. Windsurf (formerly Codeium, acquired by OpenAI 2025)
+
+### Status
+- Windsurf Next is the latest channel
+- Cascade is the agentic AI assistant
+
+### Hook System
+YES - Cascade Hooks introduced:
+- Execute custom commands at key points during Cascade workflow
+- Includes on model response for auditing purposes
+
+### Plugin/Extension System
+Skills system via .agents/skills directory
+- Skills readable by Cascade agent
+- Arena Mode: side-by-side model comparison
+- Plan Mode: /plan or megaplan command
+- Multi-Cascade Sessions: parallel agent sessions
+
+### Session Storage
+- Config/memories: ~/.codeium/windsurf/ (macOS/Linux)
+- Windows: %USERPROFILE%\.codeium\windsurf\
+- Memories persisted: ~/.codeium/windsurf/memories/
+- MCP config: ~/.codeium/windsurf/mcp_config.json
+- Session transcript format: undocumented
+
+### MCP Support
+FULL MCP SUPPORT:
+- Streamable HTTP transport (replaced SSE)
+- MCP authentication (replaced API key config)
+- GitLab remote MCP support
+- OAuth for MCP server auth
+
+### Integration Opportunity for HtmlGraph
+MEDIUM-LOW - Cascade hooks exist but underdocumented.
+Skills directory (.agents/skills) is an opportunity to inject HtmlGraph context.
+
+---
+
+## 5. Aider
+
+### Status
+- Mature terminal-based AI pair programming tool
+- No major extensibility changes in 2025-2026
+
+### Hook/Plugin System
+NONE - No native hook or plugin system:
+- /commands via --load flag for custom commands
+- Analytics logging via --analytics-log
+- No pre/post tool hooks
+
+### Session Storage
+MARKDOWN FILES (unique format):
+- Chat history: .aider.chat.history.md (project dir) or ~/.aider.chat.history.md
+- Input history: .aider.input.history (project dir)
+- LLM debug log: configurable via --llm-history-file
+- Analytics: configurable via --analytics-log
+- A SQLite+Datasette PR exists (PR #1860) but unclear if merged
+
+### MCP Support
+NO documented MCP support.
+
+### Observability
+- --llm-history-file: raw LLM conversation log
+- --analytics-log: analytics events to file
+- GitHub issue #1916 discusses opt-in telemetry (status unclear)
+
+### Integration Opportunity for HtmlGraph
+LOW - No hook injection point. Could parse .aider.chat.history.md post-hoc
+but Markdown format is lossy. Best: tail the LLM history file for monitoring.
+
+---
+
+## 6. Continue.dev
+
+### Status
+- Active VS Code / JetBrains extension
+- Recent additions: GPT-5 Codex, xAI Grok Code Fast 1, Responses API
+- Shareable agents (January 2026)
+
+### Hook/Plugin System
+EXTENSION-BASED - No dedicated hook system:
+- Custom assistants in ~/.continue/ or workspace .continue/
+- Custom slash commands
+- MCP servers as tool providers
+- Additional Instructions: dynamic prompting on agent start
+
+### Session Storage
+- Development data: .continue/dev_data/ (local)
+- Format: JSON blobs (events sent to HTTP endpoints or local dir)
+- Event schema: packages/config-yaml/src/schemas/data
+- LLM logging UI: views prompts + completions + metadata
+- Config: ~/.continue/config.yaml
+
+### MCP Support
+FULL MCP SUPPORT:
+- SSE and Streamable HTTP transports
+- MCP authentication via OAuth
+- JSON config with env var templating
+- .continue/mcpServers/ folder structure
+- Resource templates support
+
+### Observability
+- PostHog telemetry (usage patterns)
+- Built-in LLM logging UI
+- /info command for diagnostics
+- Development data export to HTTP endpoints
+
+### Integration Opportunity for HtmlGraph
+MEDIUM - Development data export to HTTP endpoint is the key integration point.
+Could configure Continue to POST events to a local HtmlGraph HTTP receiver.
+MCP server is another integration vector.
+
+---
+
+## 7. Gemini CLI (BONUS - highly relevant, not originally in scope)
+
+### Status
+- Open source from Google
+- v0.31.0 released 2026-02-27
+- Very active development, experimental browser agent
+
+### Hook System
+MOST COMPREHENSIVE of all tools:
+Events:
+- BeforeTool: validate/rewrite tool args before execution
+- AfterTool: audit/modify tool results
+- BeforeAgent: fires after user input, before planning
+- AfterAgent: fires after final model response
+- BeforeModel: intercept requests before LLM
+- BeforeToolSelection: filter tools or force tool modes
+- AfterModel: process LLM response chunks in real-time
+- SessionStart: on startup/resume/clear
+- SessionEnd: on shutdown/clear
+- Notification: system events (tool permissions etc.)
+- PreCompress: before history summarization
+
+Communication: stdin/stdout JSON, exit code 0=success, 2=system block
+Defined in settings.json hooks object.
+
+### Extensions System
+Extensions bundle: prompts, MCP servers, custom commands, themes, hooks, sub-agents, agent skills
+Install: gemini extensions install <github-url>
+
+### Session Storage
+- Location: ~/.gemini/tmp/<project_hash>/chats/
+- Current format: session-*.json (single JSON file per session)
+- Proposed migration: session-*.jsonl (JSONL stream, issue #15292)
+  Proposed format: { type: "session_metadata" } + { type: "user"|"gemini", id: "..." }
+  JSONL append is 9000x faster than JSON rewrite (performance motivation)
+- Preserves: user prompts, model responses, tool I/O, token usage, reasoning summaries
+
+### MCP Support
+FULL MCP SUPPORT with policy engine, project-level policies, wildcards
+
+### Observability
+- Hooks provide full observability (BeforeTool/AfterTool/AfterModel)
+- AI Observer (tobilg/ai-observer) already reads Gemini sessions:
+  reads ~/.gemini/tmp/**/session-*.json
+  exports to OpenTelemetry (OTLP), stores in DuckDB
+  REST API + WebSocket dashboard
+
+### Integration Opportunity for HtmlGraph
+VERY HIGH - Hooks nearly identical to Claude Code (stdin/stdout JSON).
+AI Observer already demonstrates the integration pattern.
+
+---
+
+## Cross-Tool Summary Table
+
+| Tool          | Hooks    | Plugin System  | Session Format     | MCP  | HtmlGraph Priority |
+|---------------|----------|----------------|--------------------|------|--------------------|
+| Copilot CLI   | YES      | YES (full)     | JSONL (likely)     | YES  | VERY HIGH          |
+| Gemini CLI    | YES      | Extensions     | JSON->JSONL        | YES  | VERY HIGH          |
+| OpenCode      | YES (JS) | YES (npm/JS)   | SQLite             | YES  | HIGH               |
+| Cursor        | NO       | VS Code ext    | SQLite             | YES  | MEDIUM             |
+| Continue.dev  | NO       | Extensions     | JSON events/HTTP   | YES  | MEDIUM             |
+| Windsurf      | LIMITED  | Skills dir     | Undocumented       | YES  | MEDIUM-LOW         |
+| Aider         | NO       | NO             | Markdown           | NO   | LOW                |
+
+---
+
+## Key Integration Opportunities for HtmlGraph
+
+### Tier 1 - Immediate (Hook-compatible, minimal adaptation)
+1. GitHub Copilot CLI: Same preToolUse/postToolUse hook names as Claude Code.
+   Could literally reuse Claude Code hook scripts.
+   
+2. Gemini CLI: Richer hook system (11 events vs Claude Code's ~4).
+   SessionStart/SessionEnd + BeforeTool/AfterTool = near-identical pattern.
+
+### Tier 2 - Moderate Effort
+3. OpenCode: JS/TS plugin system. Need a JS wrapper calling HtmlGraph
+   via subprocess or HTTP REST API.
+   
+4. Continue.dev: HTTP event export. Run local receiver feeding HtmlGraph SDK.
+
+5. Cursor: Read state.vscdb SQLite post-hoc for session import.
+
+### Tier 3 - Low ROI
+6. Windsurf: Hooks exist but underdocumented. Watch for documentation improvements.
+7. Aider: No hooks. Tail LLM history file only option.
+
+---
+
+## Ecosystem Meta-Patterns
+
+1. MCP IS UNIVERSAL: Every modern tool supports MCP.
+   A HtmlGraph MCP server would integrate with ALL tools automatically.
+
+2. Hook naming convergence: preToolUse/postToolUse spreading from Claude Code
+   to Copilot CLI. Gemini uses BeforeTool/AfterTool (same semantic).
+
+3. JSONL dominance: Claude Code, Codex, Gemini (migrating) all use JSONL.
+   SQLite used by OpenCode and Cursor for different reasons.
+
+4. Skills directories convergence: .agents/skills (Windsurf), skills/ (Claude Code),
+   extensions (Gemini) - all support injecting agent skills from files.
+
+5. Cross-tool observability demand confirmed by:
+   - coding_agent_session_search (11+ providers, unified TUI search)
+   - ai-observer (OpenTelemetry bridge for Claude/Codex/Gemini)
+   Both are community tools filling a gap HtmlGraph can own.
+
+6. OpenAI acquired Windsurf (2025): consolidation is happening in the space.
+
+---
+
+## Sources
+- https://github.blog/changelog/2026-02-25-github-copilot-cli-is-now-generally-available/
+- https://github.blog/changelog/2026-01-14-github-copilot-cli-enhanced-agents-context-management-and-new-ways-to-install/
+- https://github.com/github/copilot-cli
+- https://opencode.ai/docs/plugins/
+- https://github.com/opencode-ai/opencode
+- https://geminicli.com/docs/hooks/reference/
+- https://geminicli.com/docs/extensions/
+- https://geminicli.com/docs/cli/session-management/
+- https://github.com/google-gemini/gemini-cli/issues/15292
+- https://windsurf.com/changelog/windsurf-next
+- https://docs.windsurf.com/windsurf/cascade/mcp
+- https://cursor.com/changelog
+- https://docs.continue.dev/customize/deep-dives/development-data
+- https://changelog.continue.dev/
+- https://aider.chat/docs/config/options.html
+- https://github.com/tobilg/ai-observer
+- https://github.com/Dicklesworthstone/coding_agent_session_search
+            </div>
+        </section>
+    </article>
+</body>
+</html>

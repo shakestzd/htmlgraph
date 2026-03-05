@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>OpenCode Session File Format Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-ccc3567e"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-05T09:43:36.670297"
+             data-updated="2026-03-05T09:43:36.670299" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>OpenCode Session File Format Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## OpenCode CLI Session File Format - Research Findings
+
+### Storage Root
+
+Default location: ~/.local/share/opencode/  (follows XDG base dir spec on Linux/macOS)
+
+Top-level directories observed:
+- storage/      - All session/message/part data (JSON files)
+- snapshot/     - File system snapshots (keyed by project hash)
+- log/          - Log files named by ISO timestamp, e.g. 2026-01-02T190229.log
+- auth.json     - Auth credentials (keys: ["opencode"])
+- bin/          - Binaries
+
+Also present (separate installs):
+- ~/.opencode/       - Extension/plugin node_modules (bun.lock, package.json)
+- ~/.config/opencode/ - Another extension directory (package-lock.json, package.json)
+
+---
+
+### Storage Directory Structure
+
+~/.local/share/opencode/storage/
+├── migration              - Plain text migration marker (1 byte)
+├── project/               - One JSON file per project (keyed by git worktree SHA1 hash)
+│   └── {projectHash}.json
+├── session/               - One subdirectory per project hash
+│   └── {projectHash}/
+│       └── {sessionID}.json
+├── session_diff/          - One JSON file per session (diffs vs baseline)
+│   └── {sessionID}.json
+├── message/               - One subdirectory per session
+│   └── {sessionID}/
+│       └── {messageID}.json
+├── part/                  - One subdirectory per message
+│   └── {messageID}/
+│       └── {partID}.json
+└── todo/                  - Task/todo storage
+
+---
+
+### ID Format Pattern
+
+All IDs use a sortable base62 timestamp prefix + random suffix:
+- Session IDs:  ses_{timestamp}{random}   e.g. ses_47fafa35cffexVyRNT3Fa8kgLw
+- Message IDs:  msg_{timestamp}{random}   e.g. msg_b80505ca5001YtabbzN0Ul7suC
+- Part IDs:     prt_{timestamp}{random}   e.g. prt_b8017a240001aOMg0JFqiXTIHk
+- Project IDs:  SHA1 hash of worktree path  e.g. 25717627d45d5bd756b942b32fc031ac2b09ba85
+
+Descending sort: newer IDs sort lexicographically smaller (by design).
+
+---
+
+### project/{hash}.json Schema
+
+{
+  "id": "25717627d45d5bd756b942b32fc031ac2b09ba85",   // SHA1 of worktree path
+  "worktree": "/Users/shakes/DevProjects/htmlgraph",   // absolute path
+  "vcs": "git",                                         // version control system
+  "time": {
+    "created": 1767380610103,   // Unix ms timestamp
+    "updated": 1767401786426
+  }
+}
+
+---
+
+### session/{projectHash}/{sessionID}.json Schema
+
+{
+  "id": "ses_47eae93edffe2xvH1XwO3tXpia",
+  "version": "1.0.223",                            // opencode version that created it
+  "projectID": "25717627d45d5bd756b942b32fc031ac2b09ba85",
+  "directory": "/Users/shakes/DevProjects/htmlgraph",  // working dir at creation
+  "title": "New session - 2026-01-03T00:45:55.602Z",   // auto-generated or user-set
+  "time": {
+    "created": 1767401155602,   // Unix ms timestamp
+    "updated": 1767401155699
+  },
+  "summary": {
+    "additions": 0,    // total lines added in session
+    "deletions": 0,    // total lines removed
+    "files": 0         // total files touched
+  }
+  // Optional fields (from DeepWiki/source):
+  // "slug": "human-readable-url-slug",
+  // "parentID": "ses_...",         // present if forked from another session
+  // "share_url": "https://...",    // present if shared publicly
+  // "time".compacting, time.archived  // lifecycle timestamps
+}
+
+---
+
+### message/{sessionID}/{messageID}.json Schema
+
+User message example:
+{
+  "id": "msg_b80505ca5001YtabbzN0Ul7suC",
+  "sessionID": "ses_47fafa35cffexVyRNT3Fa8kgLw",
+  "role": "user",
+  "time": {
+    "created": 1767384308904
+  },
+  "summary": {
+    "title": "Continuing opencode extension work",
+    "body": "...",     // AI-generated summary of the user message
+    "diffs": [           // file diffs attached to this message
+      {
+        "file": "path/to/file.md",
+        "before": "...",
+        "after": "",
+        "additions": 0,
+        "deletions": 40
+      }
+    ]
+  }
+}
+
+Assistant message example:
+{
+  "id": "msg_b8050981b001LUA74fwBAX0etu",
+  "sessionID": "ses_47fafa35cffexVyRNT3Fa8kgLw",
+  "role": "assistant",
+  "time": {
+    "created": 1767384324123,
+    "completed": 1767384325098   // when generation finished
+  },
+  "parentID": "msg_b80505ca5001YtabbzN0Ul7suC",  // message this responds to
+  "modelID": "grok-code",         // LLM model used
+  "providerID": "opencode",       // provider (opencode, anthropic, openai, etc.)
+  "mode": "build",                // agent mode
+  "agent": "build",
+  "path": {
+    "cwd": "/Users/shakes/DevProjects/htmlgraph",
+    "root": "/Users/shakes/DevProjects/htmlgraph"
+  },
+  "cost": 0,                       // USD cost
+  "tokens": {
+    "input": 274,
+    "output": 34,
+    "reasoning": 18,
+    "cache": {
+      "read": 29184,
+      "write": 0
+    }
+  },
+  "finish": "tool-calls"          // stop reason: "tool-calls", "end-turn", etc.
+}
+
+---
+
+### part/{messageID}/{partID}.json Schema - Part Types
+
+Parts are the atomic content units within a message. Each message has 1..N parts.
+
+TYPE: "text" (user input or assistant prose)
+{
+  "id": "prt_b80179af4002i1cJ62UTe5jVJc",
+  "sessionID": "ses_47fe8650effeioCAVnEdqpSbyJ",
+  "messageID": "msg_b80179af4001fTVaOQnPik6vFi",
+  "type": "text",
+  "text": "teach me about opencode",
+  // Optional timing:
+  "time": { "start": 1767380591171, "end": 1767380591171 }
+}
+
+TYPE: "step-start" (marks beginning of an LLM inference step)
+{
+  "id": "prt_b8017a240001aOMg0JFqiXTIHk",
+  "sessionID": "...",
+  "messageID": "...",
+  "type": "step-start",
+  "snapshot": "e28ff419acd49ffaf40c4575e9a61425fc6eb13c"  // filesystem snapshot hash
+}
+
+TYPE: "step-finish" (marks end of an LLM inference step)
+{
+  "id": "prt_b8017a35e001LH5bur3kPgr2sg",
+  "sessionID": "...",
+  "messageID": "...",
+  "type": "step-finish",
+  "reason": "tool-calls",         // why the step ended
+  "snapshot": "e28ff419...",
+  "cost": 0,
+  "tokens": {
+    "input": 13403,
+    "output": 29,
+    "reasoning": 0,
+    "cache": { "read": 32, "write": 0 }
+  }
+}
+
+TYPE: "tool" (a tool invocation + result)
+{
+  "id": "prt_b8017a242001NNJUm4LsjAbwDY",
+  "sessionID": "...",
+  "messageID": "...",
+  "type": "tool",
+  "callID": "chatcmpl-tool-24d1711e6dc34de9aefaf4b60620402c",  // provider call ID
+  "tool": "webfetch",            // tool name (bash, read, webfetch, etc.)
+  "state": {
+    "status": "completed",       // "pending", "running", "completed", "error"
+    "input": { ... },              // tool-specific input params
+    "output": "...",             // raw output string
+    "title": "https://opencode.ai (text/html)",
+    "metadata": {},
+    "time": {
+      "start": 1767380591170,
+      "end": 1767380591452
+    }
+  }
+}
+
+---
+
+### session_diff/{sessionID}.json
+
+Array of file diff objects showing all changes made during the session.
+Empty sessions have: []
+
+---
+
+### Key Design Observations
+
+1. Hierarchical storage: project -> session -> message -> part
+2. All files are JSON (no SQLite observed on disk - SQLite may be internal/memory only)
+3. IDs are sortable by time (descending - newer = lexicographically smaller)
+4. Parts provide granular streaming: step-start/text/tool/step-finish sequence
+5. Token and cost tracking at both message and step (step-finish part) level
+6. Snapshots link parts to filesystem state via SHA1 hash
+7. User messages include AI-generated summaries with diffs for context compression
+8. The "migration" file in storage root is a version marker (1 byte)
+9. Log files are named by ISO8601 timestamp: YYYY-MM-DDTHHMMSS.log
+10. Project identity is SHA1 hash of the git worktree path
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SDK-Based Cache Layer Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-88af39c8"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-02-13T00:10:15.678037"
+             data-updated="2026-02-13T00:10:15.678040" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>SDK-Based Cache Layer Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                # SDK-Based File Read Cache Layer - Research Findings
+
+## Executive Summary
+
+**FEASIBILITY: HIGH** - HtmlGraph's existing hook infrastructure can support a file read cache with minimal modifications. The architecture is already in place.
+
+**RECOMMENDATION: Database-Only Cache (Option B)** - Don't inject via PreToolUse due to SAFETY NET constraints and token overhead.
+
+## 1. PostToolUse Hook - Capturing Read Results
+
+**Current Capability:**
+- PostToolUse receives full file content in tool_response
+- Hook input format includes tool_name, tool_input, and tool_response
+- Database (HtmlGraphDB) already exists for storage
+
+**From posttooluse.py analysis:**
+```python
+# Lines 1479-1497
+tool_name = hook_input.get("tool_name", "unknown")
+tool_input_data = hook_input.get("tool_input", {})
+tool_response = hook_input.get("tool_response", {}) or {}
+```
+
+**Storage Strategy:**
+- Create new file_cache table in schema.py
+- Cache file_path, content_hash, content, mtime, session_id
+- Index on (file_path, mtime) for fast lookups
+
+## 2. PreToolUse Hook - Injection Limitations
+
+**Current Capability:**
+- Can return additionalContext that Claude sees
+- Can return permissionDecision: "allow" or "deny"
+- Can return BOTH additionalContext AND permission decision
+
+**CRITICAL FINDING - SAFETY NET:**
+From pretooluse.py lines 922-926:
+```python
+# FINAL SAFETY NET: Strip any "deny" decisions
+if permissionDecision == "deny":
+    response["permissionDecision"] = "allow"
+    # Convert denial reason to guidance
+```
+
+**This means: We CANNOT block Read tool, only inject guidance.**
+
+**additionalContext Support:**
+- Supported since v2.1.9+
+- Appears as system message BEFORE tool execution
+- No documented size limit, but practical limit ~10KB-50KB
+- Source: Claude Code Hooks documentation
+
+## 3. Hook Output Format (from web research)
+
+**PreToolUse Standard Format:**
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "Optional reason",
+    "additionalContext": "Context for Claude",
+    "updatedInput": {"field": "modified value"}
+  }
+}
+```
+
+**Key findings:**
+- permissionDecision: "allow" (bypass), "deny" (block), "ask" (user confirm)
+- additionalContext: Injected as discrete context (not visible stdout)
+- permissionDecisionReason: Shown to user if "allow", shown to Claude if "deny"
+
+## 4. Proposed Architecture
+
+### Option A: Cache + Guidance (NOT RECOMMENDED)
+
+**Why NOT recommended:**
+1. SAFETY NET prevents blocking Read (tool always executes)
+2. Injecting file content wastes tokens (duplicate content)
+3. May confuse Claude with duplicate information
+4. No actual token savings achieved
+
+### Option B: Database-Only Cache (RECOMMENDED)
+
+**Implementation:**
+- Cache in PostToolUse only
+- Provide query methods: SDK and CLI
+- No PreToolUse injection
+- Historical/debugging use case
+
+**Pros:**
+- Simple, deterministic behavior
+- No token overhead
+- Useful for debugging and analytics
+- Foundation for future MCP server
+
+**Use cases:**
+- Historical queries: "What did we read at timestamp X?"
+- Debugging: "When did this file last change?"
+- Analytics: "Which files are read most often?"
+- Future: MCP protocol cache queries
+
+## 5. Database Schema
+
+**Recommended addition to schema.py (line ~660):**
+
+```python
+# FILE_CACHE TABLE - Read operation caching
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS file_cache (
+        cache_id TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        content TEXT NOT NULL,
+        mtime REAL NOT NULL,
+        file_size INTEGER DEFAULT 0,
+        session_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_accessed_at TIMESTAMP,
+        access_count INTEGER DEFAULT 0,
+        FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+''')
+
+# Index for fast lookups
+cursor.execute('''
+    CREATE INDEX IF NOT EXISTS idx_file_cache_path_mtime 
+    ON file_cache(file_path, mtime DESC)
+''')
+```
+
+## 6. Implementation Files
+
+**Files to modify:**
+1. `src/python/htmlgraph/db/schema.py` - Add file_cache table
+2. `src/python/htmlgraph/hooks/posttooluse.py` - Cache Read results
+3. `src/python/htmlgraph/api/cache.py` - NEW: Cache API
+4. `src/python/htmlgraph/cli/cache.py` - NEW: CLI commands
+
+**Sample usage:**
+```python
+# SDK
+sdk = SDK()
+cached = sdk.cache.get('/path/to/file.py')
+history = sdk.cache.history('/path/to/file.py', limit=10)
+
+# CLI
+uv run htmlgraph cache show /path/to/file.py
+uv run htmlgraph cache history /path/to/file.py
+uv run htmlgraph cache stats
+```
+
+## 7. Why MCP Server is NOT Needed
+
+**Original concern:** Need MCP server for cache layer
+
+**Research finding:** Not necessary because:
+1. PostToolUse hooks already capture Read results
+2. HtmlGraph database already exists
+3. SDK provides query interface
+4. PreToolUse injection doesn't save tokens (SAFETY NET)
+
+**Future consideration:**
+- MCP server could expose cache via protocol
+- Useful for cross-platform access
+- But not required for core functionality
+
+## 8. Conclusion
+
+**Implement database-only cache (Option B):**
+- Add file_cache table to schema.py
+- Capture Read results in PostToolUse hook
+- Provide SDK/CLI query methods
+- Document as debugging/analytics feature
+
+**DO NOT implement PreToolUse injection because:**
+- SAFETY NET prevents blocking Read tool
+- No token savings achieved
+- Duplicate content wastes context
+- Better as query-based feature
+
+**Future enhancement:**
+If Claude Code adds true cache support with blocking, revisit PreToolUse injection.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

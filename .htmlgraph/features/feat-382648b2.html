@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Integrate Contextune Parallel Execution into HtmlGraph</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-382648b2"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="high"
+             data-created="2026-03-05T16:09:01.632638"
+             data-updated="2026-03-05T16:18:38.365144" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>Integrate Contextune Parallel Execution into HtmlGraph</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="7768fcaa-b664-4475-b0fb-1a0d438e6fd3.html" data-relationship="implemented-in" data-since="2026-03-05T16:09:04.378685">7768fcaa-b664-4475-b0fb-1a0d438e6fd3</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false">⏳ Port PlanBuilder from Contextune to htmlgraph SDK (sdk.plans.builder())</li>
+                <li data-completed="false">⏳ Add htmlgraph plan CLI command (creates parallelized plans from conversation)</li>
+                <li data-completed="false">⏳ Add htmlgraph execute CLI command (spawns parallel agents in worktrees)</li>
+                <li data-completed="false">⏳ Add htmlgraph worktree setup/merge/cleanup commands</li>
+                <li data-completed="false">⏳ Port parallel-task-executor agent to htmlgraph:task-executor</li>
+                <li data-completed="false">⏳ Add /htmlgraph:plan skill (slash command)</li>
+                <li data-completed="false">⏳ Add /htmlgraph:execute skill (slash command)</li>
+                <li data-completed="false">⏳ Integrate with Track/Feature system (plan phases → features)</li>
+                <li data-completed="false">⏳ Add parallel research phase (5 agents for grounded research)</li>
+                <li data-completed="false">⏳ Status monitoring: htmlgraph status --parallel</li>
+                <li data-completed="false">⏳ Tests for all new commands and SDK methods</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

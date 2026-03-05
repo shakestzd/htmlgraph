@@ -10,21 +10,150 @@
 <body>
     <article id="97e4f1d4-154c-4d99-9c9c-8693037e5931"
              data-type="session"
-             data-status="active"
+             data-status="stale"
              data-agent="claude-code"
              data-started-at="2026-02-12T07:11:25.011710"
-             data-last-activity="2026-02-13T01:14:04.626279+00:00"
-             data-event-count="71" data-is-subagent="false" data-start-commit="d44c4e7c">
+             data-last-activity="2026-02-14T16:08:48.492902+00:00"
+             data-event-count="71" data-is-subagent="false" data-start-commit="d44c4e7c" data-ended-at="2026-02-14T16:08:48.492902+00:00">
 
         <header>
             <h1>Session 2026-02-12 07:11</h1>
             <div class="metadata">
-                <span class="badge status-active">Active</span>
+                <span class="badge status-stale">Stale</span>
                 <span class="badge">claude-code</span>
                 <span class="badge">71 events</span>
             </div>
         </header>
 
+        <section data-detected-patterns>
+            <h3>Detected Patterns (19)</h3>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Sequence</th>
+                        <th>Type</th>
+                        <th>Count</th>
+                        <th>First/Last Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">TaskOutput → Stop → Stop</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>5</td>
+                        <td>2026-03-05T09:38:16.068163 / 2026-03-05T09:49:33.394306</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Stop → Stop → UserQuery</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>6</td>
+                        <td>2026-03-05T09:38:16.068167 / 2026-03-05T09:49:33.394309</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Stop → UserQuery → Stop</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068170 / 2026-03-05T09:49:33.394311</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">UserQuery → Stop → UserQuery</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068173 / 2026-03-05T09:49:33.394313</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Stop → UserQuery → Task</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>6</td>
+                        <td>2026-03-05T09:38:16.068176 / 2026-03-05T09:49:33.394315</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">UserQuery → Task → Task</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.068179 / 2026-03-05T09:49:33.394317</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Task → Task → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.068182 / 2026-03-05T09:49:33.394319</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Task → Bash → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068185 / 2026-03-05T09:49:33.394322</td>
+                    </tr>
+                    <tr data-pattern-type="anti-pattern">
+                        <td class="sequence">Bash → Bash → Bash</td>
+                        <td><span class="badge pattern-anti-pattern">anti-pattern</span></td>
+                        <td>3</td>
+                        <td>2026-03-05T09:38:16.068189 / 2026-03-05T09:49:33.394324</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Bash → TaskOutput</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068193 / 2026-03-05T09:49:33.394327</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Task → Stop → UserQuery</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068197 / 2026-03-05T09:49:33.394330</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Stop → UserQuery → Bash</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>4</td>
+                        <td>2026-03-05T09:38:16.068200 / 2026-03-05T09:49:33.394333</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">UserQuery → Bash → TaskOutput</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068204 / 2026-03-05T09:49:33.394336</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → TaskOutput → Stop</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>4</td>
+                        <td>2026-03-05T09:38:16.068208 / 2026-03-05T09:49:33.394339</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → Stop → UserQuery</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:16.068212 / 2026-03-05T09:49:33.394342</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → TaskOutput</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:17.929282 / 2026-03-05T09:38:17.929282</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → TaskOutput</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:22.073078 / 2026-03-05T09:38:22.073078</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → TaskOutput</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:38:26.132077 / 2026-03-05T09:38:26.132077</td>
+                    </tr>
+                    <tr data-pattern-type="neutral">
+                        <td class="sequence">Bash → TaskOutput</td>
+                        <td><span class="badge pattern-neutral">neutral</span></td>
+                        <td>2</td>
+                        <td>2026-03-05T09:49:35.382818 / 2026-03-05T09:49:35.382818</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
         <section data-activity-log>
             <h3>Activity Log (71 events)</h3>
             <ol reversed>
