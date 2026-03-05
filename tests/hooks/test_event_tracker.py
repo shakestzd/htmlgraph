@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
+from htmlgraph.hooks.db_helpers import get_parent_user_query, resolve_project_path
 from htmlgraph.hooks.drift import (
     add_to_drift_queue,
     build_classification_prompt,
@@ -34,7 +35,6 @@ from htmlgraph.hooks.event_recording import (
 )
 from htmlgraph.hooks.event_tracker import track_event
 from htmlgraph.hooks.model_detection import detect_agent_from_environment
-from htmlgraph.hooks.db_helpers import get_parent_user_query, resolve_project_path
 
 # ============================================================================
 # FIXTURES

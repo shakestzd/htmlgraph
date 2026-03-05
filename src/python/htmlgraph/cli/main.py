@@ -52,6 +52,14 @@ Track Management:
   htmlgraph track new "User Auth"  # Create a new track
   htmlgraph track list              # List all tracks
 
+Planning:
+  htmlgraph plan show              # Show current plan
+  htmlgraph plan create plan.json  # Create plan from JSON
+  htmlgraph worktree setup         # Set up worktrees for tasks
+  htmlgraph worktree status        # Show worktree status
+  htmlgraph worktree merge task-1  # Merge completed task
+  htmlgraph worktree cleanup       # Clean up worktrees
+
 Analytics:
   htmlgraph analytics               # Project-wide analytics
   htmlgraph analytics --recent 10   # Analyze last 10 sessions
@@ -84,12 +92,13 @@ For more help: https://github.com/Shakes-tzd/htmlgraph
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # Import command registration functions
-    from htmlgraph.cli import analytics, core, work
+    from htmlgraph.cli import analytics, core, plan, work
 
     # Register commands from each module
     core.register_commands(subparsers)
     work.register_commands(subparsers)
     analytics.register_commands(subparsers)
+    plan.register_commands(subparsers)
 
     return parser
 
