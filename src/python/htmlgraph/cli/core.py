@@ -225,6 +225,65 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     )
     ingest_gemini_parser.set_defaults(func=IngestGeminiCommand.from_args)
 
+    # serve-hooks
+    serve_hooks_parser = subparsers.add_parser(
+        "serve-hooks", help="Start HTTP hook server to receive CloudEvent JSON events"
+    )
+    serve_hooks_parser.add_argument(
+        "--port",
+        "-p",
+        type=int,
+        default=8081,
+        help="Port to listen on (default: 8081)",
+    )
+    serve_hooks_parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)",
+    )
+    serve_hooks_parser.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    serve_hooks_parser.set_defaults(func=ServeHooksCommand.from_args)
+
+    # export otel
+    export_parser = subparsers.add_parser(
+        "export", help="Export HtmlGraph data to external systems"
+    )
+    export_subparsers = export_parser.add_subparsers(
+        dest="export_target", help="Export target"
+    )
+
+    export_otel_parser = export_subparsers.add_parser(
+        "otel",
+        help="Export sessions/events as OTLP traces to an OpenTelemetry collector",
+    )
+    export_otel_parser.add_argument(
+        "--endpoint",
+        default="http://localhost:4318",
+        help="OTLP HTTP base URL (default: http://localhost:4318)",
+    )
+    export_otel_parser.add_argument(
+        "--session-limit",
+        type=int,
+        default=100,
+        help="Maximum number of recent sessions to export (default: 100)",
+    )
+    export_otel_parser.add_argument(
+        "--service-name",
+        default="htmlgraph",
+        help="OTLP service.name attribute (default: htmlgraph)",
+    )
+    export_otel_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print OTLP JSON payload instead of sending it",
+    )
+    export_otel_parser.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    export_otel_parser.set_defaults(func=ExportOtelCommand.from_args)
+
 
 # ============================================================================
 # Command Implementations
@@ -1110,6 +1169,85 @@ class IngestGeminiCommand(BaseCommand):
                 "errors": result.errors,
                 "session_ids": result.session_ids,
                 "error_files": result.error_files,
+                "dry_run": self.dry_run,
+            },
+        )
+
+
+class ServeHooksCommand(BaseCommand):
+    """Start an HTTP server that accepts CloudEvent JSON and stores events."""
+
+    def __init__(self, *, host: str, port: int) -> None:
+        super().__init__()
+        self.host = host
+        self.port = port
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> ServeHooksCommand:
+        return cls(
+            host=getattr(args, "host", "0.0.0.0"),
+            port=getattr(args, "port", 8081),
+        )
+
+    def execute(self) -> CommandResult:
+        """Start the HTTP hook server (blocking)."""
+        from htmlgraph.http_hook import run_http_hook_server
+
+        run_http_hook_server(
+            host=self.host,
+            port=self.port,
+            graph_dir=self.graph_dir or ".htmlgraph",
+        )
+        return CommandResult(text="HTTP hook server stopped.", json_data={})
+
+
+class ExportOtelCommand(BaseCommand):
+    """Export HtmlGraph sessions/events as OTLP traces."""
+
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        session_limit: int,
+        service_name: str,
+        dry_run: bool,
+    ) -> None:
+        super().__init__()
+        self.endpoint = endpoint
+        self.session_limit = session_limit
+        self.service_name = service_name
+        self.dry_run = dry_run
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> ExportOtelCommand:
+        return cls(
+            endpoint=getattr(args, "endpoint", "http://localhost:4318"),
+            session_limit=getattr(args, "session_limit", 100),
+            service_name=getattr(args, "service_name", "htmlgraph"),
+            dry_run=getattr(args, "dry_run", False),
+        )
+
+    def execute(self) -> CommandResult:
+        """Export sessions as OTLP traces."""
+        from htmlgraph.otel import export_to_otlp
+
+        count = export_to_otlp(
+            endpoint=self.endpoint,
+            graph_dir=self.graph_dir or ".htmlgraph",
+            session_limit=self.session_limit,
+            service_name=self.service_name,
+            dry_run=self.dry_run,
+        )
+
+        msg = f"Exported {count} sessions to {self.endpoint}"
+        if self.dry_run:
+            msg = f"Dry run: {count} sessions would be exported to {self.endpoint}"
+
+        return CommandResult(
+            text=msg,
+            json_data={
+                "exported": count,
+                "endpoint": self.endpoint,
                 "dry_run": self.dry_run,
             },
         )
