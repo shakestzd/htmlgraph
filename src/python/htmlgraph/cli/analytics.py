@@ -74,6 +74,9 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     # Costs command
     _register_costs_command(subparsers)
 
+    # Search command
+    _register_search_command(subparsers)
+
 
 def _register_cigs_commands(subparsers: _SubParsersAction) -> None:
     """Register CIGS (Cost Intelligence & Governance System) commands."""
@@ -1422,3 +1425,156 @@ class CostsCommand(BaseCommand):
                 return f"{minutes:.0f}m"
         except Exception:
             return "unknown"
+
+
+# ============================================================================
+# Search Command - FTS5 full-text search across sessions and events
+# ============================================================================
+
+
+def _register_search_command(subparsers: _SubParsersAction) -> None:
+    """Register the 'search' command with the argument parser."""
+    search_parser = subparsers.add_parser(
+        "search",
+        help="Full-text search across sessions and events (FTS5)",
+    )
+    search_parser.add_argument(
+        "query",
+        help="Search query (supports FTS5 syntax: phrases, boolean, column filters)",
+    )
+    search_parser.add_argument(
+        "--limit",
+        "-n",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Maximum number of results to return (default: 20)",
+    )
+    search_parser.add_argument(
+        "--events",
+        action="store_true",
+        help="Search agent events (tool calls) instead of sessions",
+    )
+    search_parser.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        help="Rebuild the FTS index before searching",
+    )
+    search_parser.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    search_parser.set_defaults(func=SearchCommand.from_args)
+
+
+class SearchCommand(BaseCommand):
+    """Full-text search across HtmlGraph sessions and events."""
+
+    def __init__(
+        self,
+        query: str,
+        limit: int = 20,
+        search_events: bool = False,
+        rebuild_index: bool = False,
+        graph_dir: str = DEFAULT_GRAPH_DIR,
+    ) -> None:
+        super().__init__()
+        self.query = query
+        self.limit = limit
+        self.search_events = search_events
+        self.rebuild_index = rebuild_index
+        self.graph_dir = graph_dir
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> SearchCommand:
+        return cls(
+            query=args.query,
+            limit=args.limit,
+            search_events=getattr(args, "events", False),
+            rebuild_index=getattr(args, "rebuild_index", False),
+            graph_dir=getattr(args, "graph_dir", DEFAULT_GRAPH_DIR),
+        )
+
+    def execute(self) -> CommandResult:
+        from pathlib import Path
+
+        from htmlgraph.search import build_fts_index, search_events, search_sessions
+
+        # Resolve database path from graph_dir
+        graph_dir = self.graph_dir or DEFAULT_GRAPH_DIR
+        db_path = str(Path(graph_dir) / "htmlgraph.db")
+        # Fall back to home default if not found in graph_dir
+        if not Path(db_path).exists():
+            db_path = str(Path.home() / ".htmlgraph" / "htmlgraph.db")
+
+        if self.rebuild_index:
+            total = build_fts_index(db_path)
+            console.print(f"[green]FTS index rebuilt:[/green] {total} rows indexed")
+
+        if self.search_events:
+            results = search_events(self.query, db_path=db_path, limit=self.limit)
+            return self._render_event_results(results)
+        else:
+            results = search_sessions(self.query, db_path=db_path, limit=self.limit)
+            return self._render_session_results(results)
+
+    def _render_session_results(self, results: list[dict]) -> CommandResult:
+        if not results:
+            console.print(f"[yellow]No sessions found matching:[/yellow] {self.query}")
+            return CommandResult(data=[], json_data=[])
+
+        table = Table(
+            title=f"Sessions matching '{self.query}'",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        table.add_column("Session ID", style="cyan", no_wrap=True)
+        table.add_column("Agent", style="yellow", max_width=20)
+        table.add_column("Status", style="green", width=12)
+        table.add_column("Created", style="white", width=19)
+        table.add_column("Snippet", style="dim", max_width=60)
+
+        for row in results:
+            snippet = row.get("snippet") or row.get("last_user_query") or ""
+            created = (row.get("created_at") or "")[:19]
+            table.add_row(
+                row.get("session_id", ""),
+                row.get("agent_assigned", ""),
+                row.get("status", ""),
+                created,
+                snippet,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]{len(results)} result(s)[/dim]")
+        return CommandResult(data=table, json_data=results)
+
+    def _render_event_results(self, results: list[dict]) -> CommandResult:
+        if not results:
+            console.print(f"[yellow]No events found matching:[/yellow] {self.query}")
+            return CommandResult(data=[], json_data=[])
+
+        table = Table(
+            title=f"Events matching '{self.query}'",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        table.add_column("Event ID", style="cyan", no_wrap=True, max_width=16)
+        table.add_column("Session ID", style="blue", no_wrap=True, max_width=16)
+        table.add_column("Tool", style="yellow", max_width=20)
+        table.add_column("Timestamp", style="white", width=19)
+        table.add_column("Snippet", style="dim", max_width=60)
+
+        for row in results:
+            snippet = row.get("snippet", "")
+            ts = (row.get("timestamp") or "")[:19]
+            table.add_row(
+                row.get("event_id", ""),
+                row.get("session_id", ""),
+                row.get("tool_name", ""),
+                ts,
+                snippet,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]{len(results)} result(s)[/dim]")
+        return CommandResult(data=table, json_data=results)

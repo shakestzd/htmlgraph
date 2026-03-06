@@ -12,6 +12,8 @@ Called by HtmlGraphDB.create_tables() in schema.py.
 import logging
 import sqlite3
 
+from htmlgraph.search import create_fts_tables
+
 logger = logging.getLogger(__name__)
 
 
@@ -366,6 +368,9 @@ def create_all_tables(cursor: sqlite3.Cursor) -> None:
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # 16. FTS5 VIRTUAL TABLES - Full-text search (sessions_fts, events_fts)
+    create_fts_tables(cursor)
 
 
 # ---------------------------------------------------------------------------
