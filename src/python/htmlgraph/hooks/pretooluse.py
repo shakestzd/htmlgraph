@@ -541,6 +541,83 @@ def create_start_event(
         return None
 
 
+def resolve_parent_task_delegation(
+    cursor: Any,
+    parent_session_id: str,
+    model_hint: str | None = None,
+) -> str | None:
+    """
+    Resolve the best active task_delegation event to attribute child events to.
+
+    Selection algorithm:
+    1. Fetch all started task_delegations for parent_session_id
+    2. If model_hint provided, narrow to rows whose model matches
+    3. Among candidates, pick the one with fewest existing children
+    4. Tiebreak by earliest timestamp (FIFO)
+    5. Return None if no active delegations exist
+
+    Args:
+        cursor: SQLite cursor (may be from any connection, including in-memory)
+        parent_session_id: Session ID of the parent (orchestrator) session
+        model_hint: Optional model string to prefer (e.g. "claude-haiku")
+
+    Returns:
+        event_id of the best matching task_delegation, or None
+    """
+    try:
+        cursor.execute(
+            """
+            SELECT event_id, model
+            FROM agent_events
+            WHERE session_id = ?
+              AND event_type = 'task_delegation'
+              AND status = 'started'
+            ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) ASC
+            """,
+            (parent_session_id,),
+        )
+        candidates = cursor.fetchall()
+    except Exception as e:
+        logger.debug(f"resolve_parent_task_delegation query failed: {e}")
+        return None
+
+    if not candidates:
+        return None
+
+    # Narrow by model_hint when provided
+    if model_hint:
+        model_hint_lower = model_hint.lower()
+        filtered = [
+            row for row in candidates if row[1] and row[1].lower() == model_hint_lower
+        ]
+        if filtered:
+            candidates = filtered
+
+    # Count existing children for each candidate
+    def child_count(event_id: str) -> int:
+        try:
+            cursor.execute(
+                "SELECT COUNT(*) FROM agent_events WHERE parent_event_id = ?",
+                (event_id,),
+            )
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception:
+            return 0
+
+    # Pick candidate with fewest children; FIFO tiebreak (list already sorted ASC)
+    best_id: str | None = None
+    best_count: int = -1
+    for row in candidates:
+        event_id = row[0]
+        count = child_count(event_id)
+        if best_id is None or count < best_count:
+            best_id = event_id
+            best_count = count
+
+    return best_id
+
+
 async def run_event_tracing(
     tool_input: dict[str, Any],
 ) -> dict[str, Any]:

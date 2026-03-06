@@ -35,6 +35,7 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     from htmlgraph.cli.work.sessions import register_session_commands
     from htmlgraph.cli.work.snapshot import SnapshotCommand
     from htmlgraph.cli.work.tracks import register_track_commands
+    from htmlgraph.cli.work.wip import register_wip_commands
 
     # Register all command groups
     register_session_commands(subparsers)
@@ -44,6 +45,7 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     register_orchestrator_commands(subparsers)
     register_claude_commands(subparsers)
     register_report_commands(subparsers)
+    register_wip_commands(subparsers)
 
     # Snapshot command
     snapshot_parser = subparsers.add_parser(
@@ -149,6 +151,7 @@ from htmlgraph.cli.work.tracks import (
     TrackPlanCommand,
     TrackSpecCommand,
 )
+from htmlgraph.cli.work.wip import WipResetCommand, WipShowCommand
 
 __all__ = [
     "register_commands",
@@ -178,6 +181,9 @@ __all__ = [
     "TrackSpecCommand",
     "TrackPlanCommand",
     "TrackDeleteCommand",
+    # WIP commands
+    "WipShowCommand",
+    "WipResetCommand",
     # Orchestration commands
     "ArchiveCreateCommand",
     "ArchiveListCommand",

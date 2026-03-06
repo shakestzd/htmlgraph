@@ -1938,8 +1938,13 @@ class SessionManager:
         # Check WIP limit
         active = self.get_active_features()
         if len(active) >= self.wip_limit and node not in active:
+            active_summary = ", ".join(f"{n.id} ({n.title[:30]})" for n in active)
             raise ValueError(
-                f"WIP limit ({self.wip_limit}) reached. Complete existing work first."
+                f"WIP limit ({self.wip_limit}) reached.\n"
+                f"Active items: {active_summary}\n"
+                f"Note: spikes (spk-*) count toward the WIP limit alongside features.\n"
+                f"Inspect with: sdk.session_manager.get_active_features()\n"
+                f"Reset stale items: edit their HTML file's data-status to 'done', or use sdk.spikes.edit()"
             )
 
         # Auto-claim if starting and not already claimed

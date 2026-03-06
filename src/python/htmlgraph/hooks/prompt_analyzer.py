@@ -118,6 +118,16 @@ GIT_KEYWORDS = [
     "stash",
 ]
 
+# WIP limit detection patterns
+WIP_LIMIT_PATTERNS = [
+    r"WIP limit.*reached",
+    r"wip limit.*exceeded",
+    r"WIP.*full",
+    r"wip.*full",
+    r"max.*WIP",
+    r"maximum work in progress",
+]
+
 
 def classify_prompt(prompt: str) -> dict[str, Any]:
     """
@@ -446,8 +456,36 @@ def generate_guidance(
     return None
 
 
+def detect_wip_limit_hit(prompt: str) -> bool:
+    """
+    Detect if prompt contains WIP limit reached message.
+
+    Checks for patterns indicating that a WIP limit has been hit
+    (useful for detecting when tool output contains error messages
+    about WIP limits being exceeded).
+
+    Args:
+        prompt: Text to check for WIP limit patterns
+
+    Returns:
+        True if WIP limit pattern detected, False otherwise
+
+    Example:
+        >>> detect_wip_limit_hit("Error: WIP limit reached for feature tracking")
+        True
+    """
+    prompt_lower = prompt.lower().strip()
+    for pattern in WIP_LIMIT_PATTERNS:
+        if re.search(pattern, prompt_lower):
+            return True
+    return False
+
+
 def generate_cigs_guidance(
-    cigs_intent: dict[str, Any], violation_count: int, waste_tokens: int
+    cigs_intent: dict[str, Any],
+    violation_count: int,
+    waste_tokens: int,
+    prompt: str = "",
 ) -> str:
     """
     Generate CIGS-specific guidance for detected violations.
@@ -459,17 +497,29 @@ def generate_cigs_guidance(
         cigs_intent: Result from classify_cigs_intent()
         violation_count: Number of violations this session
         waste_tokens: Total wasted tokens this session
+        prompt: Optional prompt text to check for WIP limit hits
 
     Returns:
         Imperative guidance string (empty if no guidance needed)
 
     Example:
         >>> cigs = classify_cigs_intent("Search for all error handling")
-        >>> guidance = generate_cigs_guidance(cigs, 0, 0)
+        >>> guidance = generate_cigs_guidance(cigs, 0, 0, "")
         >>> if guidance:
         ...     logger.info("%s", guidance)
     """
     imperatives = []
+
+    # WIP limit detection
+    if prompt and detect_wip_limit_hit(prompt):
+        imperatives.append(
+            "⚠️ WIP LIMIT HIT: Don't iterate with Bash — delegate instead.\n\n"
+            "Quick fix:\n"
+            "  uv run htmlgraph wip          # See what's counting (includes spikes!)\n"
+            "  uv run htmlgraph wip reset <id>  # Reset a stale item\n\n"
+            "Remember: spikes (spk-*) count toward WIP limit alongside features.\n"
+            "Delegate to Agent(haiku-coder) to reset stale items and start new features in one step."
+        )
 
     # Exploration guidance
     if cigs_intent["involves_exploration"]:
@@ -625,6 +675,7 @@ __all__ = [
     "get_active_work_item",
     "generate_guidance",
     "generate_cigs_guidance",
+    "detect_wip_limit_hit",
     "create_user_query_event",
     # Pattern constants for testing/extension
     "IMPLEMENTATION_PATTERNS",
@@ -634,4 +685,5 @@ __all__ = [
     "EXPLORATION_KEYWORDS",
     "CODE_CHANGE_KEYWORDS",
     "GIT_KEYWORDS",
+    "WIP_LIMIT_PATTERNS",
 ]

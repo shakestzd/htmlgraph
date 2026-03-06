@@ -183,6 +183,35 @@ spike = sdk.spikes.create('Investigation: Duplicate hooks error') \
     .save()
 ```
 
+## WIP Limit Issues
+
+**Symptom:** `ValueError: WIP limit (3) reached. Complete existing work first.`
+
+**Critical:** Do NOT iterate with multiple Bash calls to debug this. Delegate once.
+
+### What counts toward WIP limit
+- Features (`feat-*`) with `in-progress` status
+- Spikes (`spk-*`) with `in-progress` status
+- Both live in `.htmlgraph/features/` directory
+
+### Quick diagnosis
+```bash
+uv run htmlgraph wip   # Shows all active items with ages
+```
+
+Or via SDK:
+```python
+active = sdk.session_manager.get_active_features()
+print([(n.id, n.title, n.status) for n in active])
+```
+
+### Reset stale items (delegate this)
+Instead of debugging iteratively, delegate to haiku-coder:
+
+> "Reset stale WIP items [list IDs] and start feature [feat-xxx]"
+
+The coder can: edit HTML `data-status` directly → start new feature → all in one delegation.
+
 ## Documentation References
 
 **Detailed methodology:** See `reference.md` in this skill directory

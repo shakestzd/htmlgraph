@@ -79,7 +79,7 @@ def main() -> None:
 
         # 6. CIGS: Generate imperative delegation guidance (SDK)
         cigs_guidance = generate_cigs_guidance(
-            cigs_intent, violation_count, waste_tokens
+            cigs_intent, violation_count, waste_tokens, prompt
         )
 
         # 7. Combine both guidance types
