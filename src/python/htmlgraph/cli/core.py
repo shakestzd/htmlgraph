@@ -185,6 +185,46 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     )
     install_hooks_parser.set_defaults(func=InstallHooksCommand.from_args)
 
+    # ingest
+    ingest_parser = subparsers.add_parser(
+        "ingest", help="Ingest sessions from AI CLI tools (Gemini, etc.)"
+    )
+    ingest_subparsers = ingest_parser.add_subparsers(
+        dest="ingest_source", help="Source to ingest from"
+    )
+
+    # ingest gemini
+    ingest_gemini_parser = ingest_subparsers.add_parser(
+        "gemini", help="Ingest sessions from Gemini CLI"
+    )
+    ingest_gemini_parser.add_argument(
+        "--path",
+        help=(
+            "Path to Gemini session storage directory "
+            "(default: ~/.gemini/tmp or ~/.config/gemini/tmp)"
+        ),
+    )
+    ingest_gemini_parser.add_argument(
+        "--agent",
+        default="gemini",
+        help="Agent name to attribute sessions to (default: gemini)",
+    )
+    ingest_gemini_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of sessions to ingest (default: all)",
+    )
+    ingest_gemini_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse and report sessions without writing to HtmlGraph",
+    )
+    ingest_gemini_parser.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    ingest_gemini_parser.set_defaults(func=IngestGeminiCommand.from_args)
+
 
 # ============================================================================
 # Command Implementations
@@ -992,5 +1032,84 @@ class BootstrapCommand(BaseCommand):
                 "files_created": len(result["files_created"]),
                 "has_claude": result["has_claude"],
                 "plugin_installed": result["plugin_installed"],
+            },
+        )
+
+
+class IngestGeminiCommand(BaseCommand):
+    """Ingest Gemini CLI sessions into HtmlGraph."""
+
+    def __init__(
+        self,
+        *,
+        path: str | None,
+        agent: str,
+        limit: int | None,
+        dry_run: bool,
+    ) -> None:
+        super().__init__()
+        self.path = path
+        self.agent = agent
+        self.limit = limit
+        self.dry_run = dry_run
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> IngestGeminiCommand:
+        return cls(
+            path=getattr(args, "path", None),
+            agent=getattr(args, "agent", "gemini"),
+            limit=getattr(args, "limit", None),
+            dry_run=getattr(args, "dry_run", False),
+        )
+
+    def execute(self) -> CommandResult:
+        """Ingest Gemini CLI sessions into HtmlGraph."""
+        from pathlib import Path
+
+        from rich.console import Console
+
+        from htmlgraph.cli.base import TextOutputBuilder
+        from htmlgraph.ingest.gemini import ingest_gemini_sessions
+
+        console = Console()
+
+        base_path = Path(self.path) if self.path else None
+
+        dry_run_label = " (dry run)" if self.dry_run else ""
+        with console.status(
+            f"[blue]Ingesting Gemini sessions{dry_run_label}...", spinner="dots"
+        ):
+            result = ingest_gemini_sessions(
+                graph_dir=self.graph_dir,
+                agent=self.agent or "gemini",
+                base_path=base_path,
+                limit=self.limit,
+                dry_run=self.dry_run,
+            )
+
+        output = TextOutputBuilder()
+        if self.dry_run:
+            output.add_success(f"Dry run: found {result.ingested} sessions to ingest")
+        else:
+            output.add_success(f"Ingested {result.ingested} Gemini sessions")
+
+        if result.skipped:
+            output.add_field("Skipped", str(result.skipped))
+        if result.errors:
+            output.add_field("Errors", str(result.errors))
+        if result.session_ids:
+            output.add_field("Sessions", str(len(result.session_ids)))
+        if result.error_files:
+            output.add_field("Failed files", ", ".join(result.error_files[:3]))
+
+        return CommandResult(
+            text=output.build(),
+            json_data={
+                "ingested": result.ingested,
+                "skipped": result.skipped,
+                "errors": result.errors,
+                "session_ids": result.session_ids,
+                "error_files": result.error_files,
+                "dry_run": self.dry_run,
             },
         )
