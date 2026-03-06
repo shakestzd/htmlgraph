@@ -529,6 +529,31 @@ def create_start_event(
         if tool_name == "Task" and task_parent_event_id:
             os.environ["HTMLGRAPH_PARENT_EVENT"] = task_parent_event_id
 
+        # Resolve parent_tool_use_id for tool_traces nesting.
+        # When a tool call occurs inside a subagent, look up the parent
+        # task_delegation event's tool_use_id using the native agent_id.
+        parent_tool_use_id: str | None = None
+        if native_agent_id:
+            try:
+                cursor.execute(
+                    """SELECT t.tool_use_id FROM tool_traces t
+                       JOIN agent_events ae ON ae.event_id = (
+                           SELECT event_id FROM agent_events
+                           WHERE agent_id = ? AND event_type = 'task_delegation'
+                           ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) DESC
+                           LIMIT 1
+                       )
+                       WHERE t.tool_name = 'Task'
+                         AND t.session_id = ae.session_id
+                       ORDER BY t.start_time DESC LIMIT 1""",
+                    (native_agent_id,),
+                )
+                ptuid_row = cursor.fetchone()
+                if ptuid_row:
+                    parent_tool_use_id = ptuid_row[0]
+            except Exception as e:
+                logger.debug(f"Could not resolve parent_tool_use_id: {e}")
+
         # Insert into tool_traces for correlation (if table exists)
         try:
             cursor.execute(
@@ -546,7 +571,7 @@ def create_start_event(
                     json.dumps(sanitized_input),
                     start_time,
                     "started",
-                    None,  # Will be set by SubagentStop hook
+                    parent_tool_use_id,
                 ),
             )
         except Exception as e:

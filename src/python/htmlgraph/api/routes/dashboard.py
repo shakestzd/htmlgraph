@@ -213,11 +213,56 @@ async def activity_feed(
         activity_service, _, _ = deps.create_services(db)
         grouped_result = await activity_service.get_grouped_events(limit=limit)
 
+        # Build hierarchical_events list for the hierarchical template.
+        # conversation_turns from get_grouped_events are already grouped by UserQuery;
+        # each turn has a 'children' list which maps directly to the hierarchical format.
+        conversation_turns = grouped_result.get("conversation_turns", [])
+        hierarchical_events = []
+        for turn in conversation_turns:
+            user_query = turn.get("userQuery") or {}
+            children = turn.get("children", [])
+            hierarchical_events.append(
+                {
+                    "parent": {
+                        "event_id": user_query.get("event_id", ""),
+                        "agent_id": user_query.get("agent_id", "claude-code"),
+                        "event_type": "user_query",
+                        "tool_name": "UserQuery",
+                        "input_summary": user_query.get("prompt", "")
+                        or user_query.get("input_summary", ""),
+                        "output_summary": None,
+                        "status": user_query.get("status", "completed"),
+                        "timestamp": user_query.get("timestamp", ""),
+                        "cost_tokens": None,
+                        "execution_duration_seconds": turn.get("stats", {}).get(
+                            "total_duration_seconds"
+                        ),
+                    },
+                    "children": [
+                        {
+                            "event_id": c.get("event_id", ""),
+                            "agent_id": c.get("agent", "claude-code"),
+                            "event_type": "tool_call",
+                            "tool_name": c.get("tool_name"),
+                            "input_summary": c.get("summary", ""),
+                            "output_summary": None,
+                            "status": "completed",
+                            "timestamp": c.get("timestamp", ""),
+                            "cost_tokens": None,
+                            "execution_duration_seconds": c.get("duration_seconds"),
+                        }
+                        for c in children
+                    ],
+                    "has_children": len(children) > 0,
+                }
+            )
+
         return templates.TemplateResponse(
-            "partials/activity-feed.html",
+            "partials/activity-feed-hierarchical.html",
             {
                 "request": request,
-                "conversation_turns": grouped_result.get("conversation_turns", []),
+                "hierarchical_events": hierarchical_events,
+                "conversation_turns": conversation_turns,
                 "total_turns": grouped_result.get("total_turns", 0),
                 "limit": limit,
             },

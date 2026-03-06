@@ -208,15 +208,21 @@ def get_parent_event_start_time(db_path: str, parent_event_id: str) -> str | Non
         return None
 
 
-def get_parent_event_from_db(db_path: str) -> str | None:
+def get_parent_event_from_db(db_path: str, agent_id: str | None = None) -> str | None:
     """
-    Query database for the most recent task_delegation event.
+    Query database for the task_delegation event that spawned this subagent.
+
+    Prefers exact lookup by agent_id (native Claude Code field) when available,
+    falling back to most-recent heuristic only when agent_id is absent.
 
     Used when HTMLGRAPH_PARENT_EVENT environment variable is not available
     (due to inter-process communication limitations).
 
     Args:
         db_path: Path to SQLite database
+        agent_id: Native agent_id from hook input (e.g. subagent UUID). Used for
+                  exact task_delegation lookup to avoid mis-attribution when
+                  multiple subagents run in parallel.
 
     Returns:
         Parent event ID (evt-XXXXX) or None if not found
@@ -225,17 +231,34 @@ def get_parent_event_from_db(db_path: str) -> str | None:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Query for the most recent task_delegation with status='started'
-        # This is the task that spawned the current subagent
-        query = """
-            SELECT event_id FROM agent_events
-            WHERE event_type = 'task_delegation'
-            AND status = 'started'
-            ORDER BY timestamp DESC
-            LIMIT 1
-        """
+        if agent_id:
+            # Exact lookup: find the task_delegation whose agent_id matches.
+            # PreToolUse stores agent_id on task_delegation events so we can
+            # correlate SubagentStop back to the right parent even in parallel.
+            cursor.execute(
+                """
+                SELECT event_id FROM agent_events
+                WHERE event_type = 'task_delegation'
+                  AND agent_id = ?
+                  AND status = 'started'
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                (agent_id,),
+            )
+        else:
+            # Fallback heuristic: most recent started task_delegation.
+            # Only correct for single-subagent scenarios.
+            cursor.execute(
+                """
+                SELECT event_id FROM agent_events
+                WHERE event_type = 'task_delegation'
+                  AND status = 'started'
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """
+            )
 
-        cursor.execute(query)
         result = cursor.fetchone()
         conn.close()
 
@@ -243,6 +266,7 @@ def get_parent_event_from_db(db_path: str) -> str | None:
             parent_event_id: str = result[0]
             logger.debug(
                 f"Found parent task_delegation from database: {parent_event_id}"
+                + (f" (agent_id={agent_id})" if agent_id else " (heuristic)")
             )
             return parent_event_id
 
@@ -293,11 +317,16 @@ def handle_subagent_stop(hook_input: dict[str, Any]) -> dict[str, Any]:
         logger.warning(f"Error resolving database path: {e}")
         return {"continue": True}
 
-    # If parent event ID not in environment, query database
+    # If parent event ID not in environment, query database.
+    # Pass agent_id from hook input for exact lookup (avoids mis-attribution
+    # when multiple subagents run in parallel).
     if not parent_event_id:
         logger.debug("Parent event ID not in environment, querying database...")
+        native_agent_id = hook_input.get("agent_id") or None
         try:
-            parent_event_id = get_parent_event_from_db(db_path)
+            parent_event_id = get_parent_event_from_db(
+                db_path, agent_id=native_agent_id
+            )
         except Exception as e:
             logger.debug(f"Could not query database for parent event: {e}")
 
