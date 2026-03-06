@@ -110,6 +110,7 @@ def update_parent_event(
     parent_event_id: str,
     child_spike_count: int,
     completion_time: str | None = None,
+    last_assistant_message: str | None = None,
 ) -> bool:
     """
     Update parent event with completion status and child spike count.
@@ -117,13 +118,14 @@ def update_parent_event(
     Updates agent_events table:
     - status: "started" → "completed"
     - child_spike_count: Count of spikes created by subagent
-    - output_summary: JSON with completion info
+    - output_summary: JSON with completion info (includes last_assistant_message when present)
 
     Args:
         db_path: Path to SQLite database
         parent_event_id: Parent event ID to update
         child_spike_count: Number of child spikes created
         completion_time: ISO8601 timestamp (optional, defaults to now)
+        last_assistant_message: Final assistant message from Stop/SubagentStop hook input
 
     Returns:
         True if update successful, False otherwise
@@ -135,14 +137,16 @@ def update_parent_event(
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Build output summary
-        output_summary = json.dumps(
-            {
-                "status": "completed",
-                "child_spike_count": child_spike_count,
-                "completion_time": completion_time,
-            }
-        )
+        # Build output summary including last_assistant_message when present
+        summary_data: dict[str, Any] = {
+            "status": "completed",
+            "child_spike_count": child_spike_count,
+            "completion_time": completion_time,
+        }
+        if last_assistant_message:
+            summary_data["last_assistant_message"] = last_assistant_message[:2000]
+
+        output_summary = json.dumps(summary_data)
 
         # Update parent event
         query = """
@@ -312,6 +316,11 @@ def handle_subagent_stop(hook_input: dict[str, Any]) -> dict[str, Any]:
     # Count child spikes
     child_spike_count = count_child_spikes(db_path, parent_event_id, parent_start_time)
 
+    # Extract last_assistant_message if provided by Claude Code (Stop/SubagentStop hook input)
+    last_assistant_message = hook_input.get("last_assistant_message") or None
+    if last_assistant_message and not isinstance(last_assistant_message, str):
+        last_assistant_message = str(last_assistant_message)
+
     # Update parent event with completion info
     completion_time = datetime.now(timezone.utc).isoformat()
     success = update_parent_event(
@@ -319,6 +328,7 @@ def handle_subagent_stop(hook_input: dict[str, Any]) -> dict[str, Any]:
         parent_event_id,
         child_spike_count,
         completion_time,
+        last_assistant_message=last_assistant_message,
     )
 
     if success:

@@ -475,11 +475,14 @@ def get_model_from_parent_event(db_path: str | None = None) -> str | None:
     return None
 
 
-def detect_agent_from_environment() -> tuple[str, str | None]:
+def detect_agent_from_environment(
+    hook_input: dict[str, Any] | None = None,
+) -> tuple[str, str | None]:
     """
-    Detect the agent/model name from environment variables and status cache.
+    Detect the agent/model name from hook input fields and environment variables.
 
     Checks multiple sources in order of priority:
+    0. hook_input["agent_id"] / hook_input["agent_type"] - Native Claude Code fields
     1. HTMLGRAPH_AGENT - Explicit agent name set by user
     2. HTMLGRAPH_SUBAGENT_TYPE - For subagent sessions
     3. HTMLGRAPH_PARENT_AGENT - Parent agent context
@@ -491,22 +494,37 @@ def detect_agent_from_environment() -> tuple[str, str | None]:
 
     Falls back to 'claude-code' if no environment variable is set.
 
+    Args:
+        hook_input: Optional hook input dict from Claude Code. When provided,
+                    native agent_id and agent_type fields take priority over
+                    environment variable heuristics.
+
     Returns:
         Tuple of (agent_id, model_name). Model name may be None if not detected.
     """
-    # Check for explicit agent name first
+    # Priority 0: Native Claude Code hook input fields (most reliable)
     agent_id = None
-    env_vars_agent = [
-        "HTMLGRAPH_AGENT",
-        "HTMLGRAPH_SUBAGENT_TYPE",
-        "HTMLGRAPH_PARENT_AGENT",
-    ]
+    if hook_input:
+        native_agent_id = hook_input.get("agent_id")
+        if native_agent_id and str(native_agent_id).strip():
+            agent_id = str(native_agent_id).strip()
+        elif hook_input.get("agent_type"):
+            # agent_type is a fallback when agent_id is absent
+            agent_id = str(hook_input["agent_type"]).strip()
 
-    for var in env_vars_agent:
-        value = os.environ.get(var)
-        if value and value.strip():
-            agent_id = value.strip()
-            break
+    # Check for explicit agent name from environment variables
+    if not agent_id:
+        env_vars_agent = [
+            "HTMLGRAPH_AGENT",
+            "HTMLGRAPH_SUBAGENT_TYPE",
+            "HTMLGRAPH_PARENT_AGENT",
+        ]
+
+        for var in env_vars_agent:
+            value = os.environ.get(var)
+            if value and value.strip():
+                agent_id = value.strip()
+                break
 
     # Check for model name separately
     model_name = None
@@ -855,8 +873,8 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         logger.warning(f"Warning: Could not initialize SQLite database: {e}")
         # Continue without SQLite (graceful degradation)
 
-    # Detect agent and model from environment
-    detected_agent, detected_model = detect_agent_from_environment()
+    # Detect agent and model from hook input fields first, then environment
+    detected_agent, detected_model = detect_agent_from_environment(hook_input)
 
     # Also try to detect model from hook input (more specific than environment)
     model_from_input = detect_model_from_hook_input(hook_input)
@@ -1134,8 +1152,18 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
     if hook_type == "Stop":
         # Session is ending - track stop event
         try:
+            # Capture last_assistant_message if provided by Claude Code
+            last_assistant_message = hook_input.get("last_assistant_message") or None
+            if last_assistant_message and not isinstance(last_assistant_message, str):
+                last_assistant_message = str(last_assistant_message)
+
+            stop_summary = "Agent stopped"
+            stop_response: dict[str, Any] = {"content": "Agent stopped"}
+            if last_assistant_message:
+                stop_response["last_assistant_message"] = last_assistant_message[:2000]
+
             result = manager.track_activity(
-                session_id=active_session_id, tool="Stop", summary="Agent stopped"
+                session_id=active_session_id, tool="Stop", summary=stop_summary
             )
 
             # Record to SQLite if available
@@ -1145,7 +1173,7 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                     session_id=active_session_id,
                     tool_name="Stop",
                     tool_input={},
-                    tool_response={"content": "Agent stopped"},
+                    tool_response=stop_response,
                     is_error=False,
                     agent_id=detected_agent,
                     model=detected_model,
