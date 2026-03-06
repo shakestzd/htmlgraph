@@ -37,7 +37,19 @@ class TranscriptOps:
         transcript_path: str | None = None,
         git_branch: str | None = None,
     ) -> Session:
-        """Link a Claude Code transcript to a session."""
+        """Link a Claude Code transcript to a session.
+
+        Does nothing if the session already has a different transcript_id set,
+        to prevent a new session's transcript from overwriting a completed
+        session's correct transcript link.
+        """
+        if session.transcript_id:
+            logger.debug(
+                f"Session {session.id} already has transcript {session.transcript_id!r}; "
+                f"refusing to overwrite with {transcript_id!r}"
+            )
+            return session
+
         session.transcript_id = transcript_id
         session.transcript_path = transcript_path
         session.transcript_synced_at = datetime.now()

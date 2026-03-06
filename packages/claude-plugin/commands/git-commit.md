@@ -39,7 +39,7 @@ Understand the files changed — use this to write an accurate commit message.
 ### Step 2: Stage, commit, and push (one call)
 
 ```bash
-git add -A && git commit -m "your message here" && git push origin $(git branch --show-current)
+git add -A && git commit -m "your message here" && git push
 ```
 
 That's it — stage everything, commit, and push in a single Bash call.
@@ -86,7 +86,7 @@ git status
 ```bash
 # ✅ 2 calls = ~545 tokens
 git status --short   # understand what changed
-git add -A && git commit -m "feat: description" && git push origin $(git branch --show-current)
+git add -A && git commit -m "feat: description" && git push
 ```
 
 ## Output Format

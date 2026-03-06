@@ -2564,6 +2564,18 @@ class SessionManager:
         if not session:
             return None
 
+        # Do not overwrite an existing transcript_id.
+        # A session that already has a transcript linked (e.g. a completed
+        # session from a previous date) must not have its transcript replaced
+        # or re-synced just because a new Claude Code session ends and happens
+        # to call link_transcript on whatever the "active" session is.
+        if session.transcript_id:
+            logger.debug(
+                f"Session {session_id} already has transcript {session.transcript_id!r}; "
+                f"refusing to overwrite with {transcript_id!r}"
+            )
+            return session
+
         session.transcript_id = transcript_id
         session.transcript_path = transcript_path
         session.transcript_synced_at = datetime.now()
