@@ -2,7 +2,8 @@
 <div class="view-container activity-feed-view"
      hx-get="/views/activity-feed"
      hx-trigger="every 5s, refresh"
-     hx-swap="outerHTML swap:100ms"
+     hx-ext="morph"
+     hx-swap="morph:outerHTML"
      hx-target="this">
     <div class="view-header">
         <h2>Agent Activity Feed</h2>
@@ -30,10 +31,11 @@
                         <th class="col-ts">Time</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="activity-feed-tbody">
                     {% for group in hierarchical_events %}
                         <!-- Parent Event (depth-0) -->
                         <tr class="activity-row parent-row event-{{ group.parent.status }} {% if group.has_children %}has-children{% endif %}"
+                            id="{{ group.parent.event_id }}"
                             data-event-id="{{ group.parent.event_id }}"
                             {% if group.has_children %}onclick="toggleChildren(this)"{% endif %}>
 
@@ -90,6 +92,7 @@
                         {% if group.has_children %}
                             {% for child in group.children %}
                             <tr class="activity-row child-row depth-1 event-{{ child.status }} hidden {% if child.children %}has-children{% endif %}"
+                                id="{{ child.event_id }}"
                                 data-event-id="{{ child.event_id }}"
                                 data-parent="{{ group.parent.event_id }}"
                                 data-depth="1"
@@ -170,6 +173,7 @@
                             {% if child.children %}
                                 {% for grandchild in child.children %}
                                 <tr class="activity-row child-row depth-2 event-{{ grandchild.status }} hidden {% if grandchild.children %}has-children{% endif %}"
+                                    id="{{ grandchild.event_id }}"
                                     data-event-id="{{ grandchild.event_id }}"
                                     data-parent="{{ child.event_id }}"
                                     data-ancestor="{{ group.parent.event_id }}"
@@ -249,6 +253,7 @@
                                 {% if grandchild.children %}
                                     {% for ggchild in grandchild.children %}
                                     <tr class="activity-row child-row depth-3 event-{{ ggchild.status }} hidden"
+                                        id="{{ ggchild.event_id }}"
                                         data-event-id="{{ ggchild.event_id }}"
                                         data-parent="{{ grandchild.event_id }}"
                                         data-ancestor="{{ group.parent.event_id }}"
@@ -315,10 +320,6 @@
 /* Smooth HTMX feed refresh */
 .activity-feed-view {
     transition: opacity 0.15s ease;
-}
-.activity-feed-view.htmx-swapping {
-    opacity: 0;
-    transition: opacity 0.1s ease;
 }
 
 /* Fix page margins — use available width */
