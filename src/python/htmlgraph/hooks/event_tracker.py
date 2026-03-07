@@ -416,8 +416,8 @@ def detect_model_from_hook_input(hook_input: dict[str, Any]) -> str | None:
     )
     tool_input = tool_input_value if isinstance(tool_input_value, dict) else {}
 
-    # 1. Check for Task() model parameter first
-    if tool_name == "Task" and "model" in tool_input:
+    # 1. Check for Task()/Agent() model parameter first
+    if tool_name in ("Task", "Agent") and "model" in tool_input:
         model_value: Any = tool_input.get("model")
         if model_value and isinstance(model_value, str):
             model = model_value.strip().lower()
@@ -622,7 +622,7 @@ def format_tool_summary(
         pattern = str(tool_input.get("pattern", ""))
         return pattern
 
-    elif tool_name == "Task":
+    elif tool_name in ("Task", "Agent"):
         desc = str(tool_input.get("description", ""))[:50]
         agent = str(tool_input.get("subagent_type", ""))
         return f"({agent}): {desc}"
@@ -730,7 +730,7 @@ def record_event_to_sqlite(
         # Extract task_id from Tool response if not provided
         if (
             not claude_task_id
-            and tool_name == "Task"
+            and tool_name in ("Task", "Agent")
             and isinstance(tool_response, dict)
         ):
             claude_task_id = tool_response.get("task_id")
@@ -1018,7 +1018,7 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                     FROM agent_events
                     WHERE event_type = 'task_delegation'
                       AND status = 'started'
-                      AND tool_name = 'Task'
+                      AND tool_name IN ('Task', 'Agent')
                     ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) DESC
                     LIMIT 1
                     """,
@@ -1466,15 +1466,28 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         # Determine parent activity context using database-only lookup
         parent_activity_id = None
 
+        # MCP tool calls (tool_name contains "__") are always invoked directly by the
+        # orchestrator, never from inside a subagent.  HTMLGRAPH_PARENT_EVENT persists
+        # in the process after a Task() delegation and would incorrectly attribute MCP
+        # tool calls to the last Task event.  For MCP tools we only trust
+        # HTMLGRAPH_PARENT_EVENT_FOR_POST (which PreToolUse already corrects to
+        # UserQuery for MCP tools) and skip HTMLGRAPH_PARENT_EVENT entirely.
+        is_mcp_tool = "__" in tool_name
+
         # Check environment variable FIRST for cross-process parent linking
         # HTMLGRAPH_PARENT_EVENT_FOR_POST is set by PreToolUse for same-process parent
-        # HTMLGRAPH_PARENT_EVENT is set for cross-process (Task delegation)
+        # HTMLGRAPH_PARENT_EVENT is set for cross-process (Task delegation) — skip for MCP
         # HTMLGRAPH_PARENT_QUERY_EVENT is legacy fallback
-        env_parent = (
-            os.environ.get("HTMLGRAPH_PARENT_EVENT_FOR_POST")
-            or os.environ.get("HTMLGRAPH_PARENT_EVENT")
-            or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
-        )
+        if is_mcp_tool:
+            env_parent = os.environ.get(
+                "HTMLGRAPH_PARENT_EVENT_FOR_POST"
+            ) or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
+        else:
+            env_parent = (
+                os.environ.get("HTMLGRAPH_PARENT_EVENT_FOR_POST")
+                or os.environ.get("HTMLGRAPH_PARENT_EVENT")
+                or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
+            )
         if env_parent:
             parent_activity_id = env_parent
         # If we detected a Task delegation event via database detection (Method 3),
@@ -1582,9 +1595,9 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
 
             # Record to SQLite if available
             if db:
-                # Extract subagent_type for Task delegations
+                # Extract subagent_type for Task/Agent delegations
                 task_subagent_type = None
-                if tool_name == "Task":
+                if tool_name in ("Task", "Agent"):
                     task_subagent_type = tool_input_data.get(
                         "subagent_type", "general-purpose"
                     )
@@ -1618,8 +1631,8 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                         },
                     )
 
-            # If this was a Task() delegation, also record to agent_collaboration
-            if tool_name == "Task" and db:
+            # If this was a Task()/Agent() delegation, also record to agent_collaboration
+            if tool_name in ("Task", "Agent") and db:
                 subagent = tool_input_data.get("subagent_type", "general-purpose")
                 description = tool_input_data.get("description", "")
                 record_delegation_to_sqlite(

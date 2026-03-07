@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 # These are essential for coordination, orchestration, and exploration
 NEVER_BLOCK_TOOLS = {
     "Task",
+    "Agent",
     "TaskCreate",
     "TaskUpdate",
     "TaskList",
@@ -455,9 +456,9 @@ def create_start_event(
         except Exception:
             pass
 
-        # Check if this is a Task() call for parent event creation
+        # Check if this is a Task()/Agent() call for parent event creation
         task_parent_event_id = None
-        if tool_name == "Task":
+        if tool_name in ("Task", "Agent"):
             task_parent_event_id = create_task_parent_event(
                 db, tool_input, session_id, start_time
             )
@@ -548,12 +549,22 @@ def create_start_event(
                         break
 
         # Determine parent for this event (priority order)
-        if tool_name == "Task" and task_parent_event_id:
+        #
+        # MCP tool calls (tool_name contains "__", e.g. mcp__plugin_htmlgraph_chrome-devtools__navigate_page)
+        # are always invoked directly by the orchestrator, never from inside a subagent.
+        # HTMLGRAPH_PARENT_EVENT is set when a Task() delegation is created and persists in the
+        # process environment.  If we let MCP tools inherit it they get attributed to the last
+        # Task event rather than the current UserQuery, which is wrong.
+        # Solution: MCP tools skip the env_parent_event branch entirely.
+        is_mcp_tool = "__" in tool_name
+        if tool_name in ("Task", "Agent") and task_parent_event_id:
             parent_event_id = user_query_event_id  # Task links to UserQuery
         elif subagent_parent_event_id:
             parent_event_id = subagent_parent_event_id  # Subagent links to Task
-        elif env_parent_event:
-            parent_event_id = env_parent_event  # Explicit parent from env
+        elif env_parent_event and not is_mcp_tool:
+            parent_event_id = (
+                env_parent_event  # Explicit parent from env (non-MCP only)
+            )
         else:
             parent_event_id = user_query_event_id  # Fall back to UserQuery
 
@@ -561,8 +572,8 @@ def create_start_event(
         if parent_event_id:
             os.environ["HTMLGRAPH_PARENT_EVENT_FOR_POST"] = parent_event_id
 
-        # For Task() calls, reuse the task_delegation event (no duplicate)
-        if tool_name == "Task" and task_parent_event_id:
+        # For Task()/Agent() calls, reuse the task_delegation event (no duplicate)
+        if tool_name in ("Task", "Agent") and task_parent_event_id:
             event_id = task_parent_event_id
         else:
             event_id = f"evt-{generate_tool_use_id()[:8]}"
@@ -570,8 +581,8 @@ def create_start_event(
             # PostToolUse handler creates the full event with output data.
             # Only Task() needs PreToolUse event creation (for task_delegation hierarchy).
 
-        # For Task delegation, export task_parent_event_id for subagent context
-        if tool_name == "Task" and task_parent_event_id:
+        # For Task/Agent delegation, export task_parent_event_id for subagent context
+        if tool_name in ("Task", "Agent") and task_parent_event_id:
             os.environ["HTMLGRAPH_PARENT_EVENT"] = task_parent_event_id
 
         # Resolve parent_tool_use_id for tool_traces nesting.
@@ -588,7 +599,7 @@ def create_start_event(
                            ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) DESC
                            LIMIT 1
                        )
-                       WHERE t.tool_name = 'Task'
+                       WHERE t.tool_name IN ('Task', 'Agent')
                          AND t.session_id = ae.session_id
                        ORDER BY t.start_time DESC LIMIT 1""",
                     (native_agent_id,),
