@@ -217,6 +217,28 @@ async def activity_feed(
         # conversation_turns from get_grouped_events are already grouped by UserQuery;
         # each turn has a 'children' list which maps directly to the hierarchical format.
         conversation_turns = grouped_result.get("conversation_turns", [])
+
+        def build_child_node(c: dict) -> dict:
+            """Recursively build a child node, preserving nested children."""
+            node: dict = {
+                "event_id": c.get("event_id", ""),
+                "agent_id": c.get("agent", "claude-code"),
+                "event_type": "tool_call",
+                "tool_name": c.get("tool_name"),
+                "input_summary": c.get("summary", ""),
+                "output_summary": None,
+                "status": "completed",
+                "timestamp": c.get("timestamp", ""),
+                "cost_tokens": None,
+                "execution_duration_seconds": c.get("duration_seconds"),
+            }
+            nested = c.get("children")
+            if nested:
+                node["children"] = [
+                    build_child_node(grandchild) for grandchild in nested
+                ]
+            return node
+
         hierarchical_events = []
         for turn in conversation_turns:
             user_query = turn.get("userQuery") or {}
@@ -238,21 +260,7 @@ async def activity_feed(
                             "total_duration_seconds"
                         ),
                     },
-                    "children": [
-                        {
-                            "event_id": c.get("event_id", ""),
-                            "agent_id": c.get("agent", "claude-code"),
-                            "event_type": "tool_call",
-                            "tool_name": c.get("tool_name"),
-                            "input_summary": c.get("summary", ""),
-                            "output_summary": None,
-                            "status": "completed",
-                            "timestamp": c.get("timestamp", ""),
-                            "cost_tokens": None,
-                            "execution_duration_seconds": c.get("duration_seconds"),
-                        }
-                        for c in children
-                    ],
+                    "children": [build_child_node(c) for c in children],
                     "has_children": len(children) > 0,
                 }
             )
