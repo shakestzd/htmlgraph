@@ -1,7 +1,7 @@
 <link rel="stylesheet" href="/static/style-redesign.css">
 <div class="view-container activity-feed-view"
      hx-get="/views/activity-feed"
-     hx-trigger="refresh"
+     hx-trigger="every 30s, refresh"
      hx-ext="morph"
      hx-swap="morph:outerHTML"
      hx-target="this">

@@ -447,12 +447,79 @@ def create_start_event(
         # nested under the Task delegation event, not flattened to UserQuery.
         env_parent_event = os.environ.get("HTMLGRAPH_PARENT_EVENT")
 
-        # Get UserQuery event ID as fallback (for top-level tool calls)
+        # Transcript-based parent resolution (parallel-safe, restart-safe).
+        #
+        # Read the Claude Code conversation transcript to find the authoritative
+        # session_id and user turn uuid for the current tool_use_id.  This avoids
+        # relying on env var staleness checks or timestamp comparisons, both of
+        # which break under parallel sessions or resumed sessions.
+        #
+        # tool_input may contain the native tool_use_id as provided by Claude Code
+        # (e.g. "toolu_01XYZ").  If present, we use it to locate the exact
+        # assistant message in the transcript and walk up to the user turn.
+        _native_tool_use_id = tool_input.get("tool_use_id") or tool_input.get(
+            "toolUseId"
+        )
+        _transcript_session_id: str | None = None
+        _transcript_user_uuid: str | None = None
+        if _native_tool_use_id:
+            try:
+                from htmlgraph.hooks.transcript import (
+                    find_parent_user_query as _find_parent,
+                )
+
+                _transcript_session_id, _transcript_user_uuid = _find_parent(
+                    _native_tool_use_id, os.getcwd()
+                )
+                if _transcript_session_id and _transcript_session_id != session_id:
+                    logger.debug(
+                        f"Transcript resolved session_id={_transcript_session_id} "
+                        f"(was {session_id}); updating session_id"
+                    )
+                    session_id = _transcript_session_id
+            except Exception as _te:
+                logger.debug(f"Transcript lookup skipped: {_te}")
+
+        # Get UserQuery event ID as fallback (for top-level tool calls).
+        # If the transcript gave us a user_turn_uuid, try to match it against a
+        # UserQuery event in the database first (most precise).  Fall back to
+        # the most recent UserQuery in the session.
         user_query_event_id = None
         try:
             from htmlgraph.hooks.event_tracker import get_parent_user_query
 
-            user_query_event_id = get_parent_user_query(db, session_id)
+            if _transcript_user_uuid:
+                # Prefer the UserQuery whose content references the transcript uuid.
+                # The user_prompt_submit hook stores the uuid as transcript_id in
+                # agent_events metadata; try that column first.
+                try:
+                    cursor.execute(
+                        """
+                        SELECT event_id FROM agent_events
+                        WHERE session_id = ?
+                          AND tool_name = 'UserQuery'
+                          AND (metadata LIKE ? OR event_id = ?)
+                        ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) DESC
+                        LIMIT 1
+                        """,
+                        (
+                            session_id,
+                            f"%{_transcript_user_uuid}%",
+                            _transcript_user_uuid,
+                        ),
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        user_query_event_id = str(row[0])
+                        logger.debug(
+                            f"Matched UserQuery={user_query_event_id} via "
+                            f"transcript_user_uuid={_transcript_user_uuid}"
+                        )
+                except Exception as _dbe:
+                    logger.debug(f"Transcript uuid DB lookup failed: {_dbe}")
+
+            if not user_query_event_id:
+                user_query_event_id = get_parent_user_query(db, session_id)
         except Exception:
             pass
 
@@ -563,16 +630,27 @@ def create_start_event(
         # querying the database.  If the event belongs to a different session, discard it.
         is_mcp_tool = "__" in tool_name
 
-        # Validate env_parent_event belongs to the current session
+        # Validate env_parent_event belongs to the current session AND is not stale
+        # (not predating the current UserQuery).
+        # This handles the restart bug: after Claude Code restarts (resume), the env var
+        # persists with a Task event from the previous turn. The session_id is the same
+        # (it's a resumed session), but the event is stale (created before the current UQ).
         if env_parent_event and not is_mcp_tool:
             try:
                 cursor.execute(
-                    "SELECT session_id FROM agent_events WHERE event_id = ? LIMIT 1",
-                    (env_parent_event,),
+                    """
+                    SELECT ae.session_id, ae.created_at,
+                           (SELECT MAX(created_at) FROM agent_events
+                            WHERE tool_name = 'UserQuery' AND session_id = ?) as latest_uq_time
+                    FROM agent_events ae
+                    WHERE ae.event_id = ?
+                    LIMIT 1
+                    """,
+                    (session_id, env_parent_event),
                 )
                 row = cursor.fetchone()
                 if row is None or row[0] != session_id:
-                    # Stale env var from a previous session — discard it and clear the env
+                    # Event doesn't exist or belongs to a different session
                     logger.debug(
                         f"Discarding stale HTMLGRAPH_PARENT_EVENT={env_parent_event}: "
                         f"belongs to session {row[0] if row else 'unknown'}, "
@@ -580,8 +658,18 @@ def create_start_event(
                     )
                     env_parent_event = None
                     os.environ.pop("HTMLGRAPH_PARENT_EVENT", None)
+                elif row[2] is not None and row[1] <= row[2]:
+                    # Event exists in current session but was created before or at the
+                    # same time as the latest UserQuery — it's from a previous turn
+                    logger.debug(
+                        f"Discarding stale HTMLGRAPH_PARENT_EVENT={env_parent_event}: "
+                        f"created at {row[1]}, but latest UserQuery at {row[2]} "
+                        f"(event predates current turn)"
+                    )
+                    env_parent_event = None
+                    os.environ.pop("HTMLGRAPH_PARENT_EVENT", None)
             except Exception as e:
-                logger.debug(f"Could not validate env_parent_event session: {e}")
+                logger.debug(f"Could not validate env_parent_event timestamp: {e}")
 
         if tool_name in ("Task", "Agent") and task_parent_event_id:
             parent_event_id = user_query_event_id  # Task links to UserQuery
