@@ -6,10 +6,7 @@
      hx-swap="morph:outerHTML"
      hx-target="this">
     <div class="view-header">
-        <h2>Agent Activity Feed</h2>
-        <div class="view-info">
-            <small>Showing last {{ limit }} sessions • Table view of all agent activity - most recent events at top</small>
-        </div>
+        <h2>Agent Feed <span class="view-subtitle">— Showing last {{ limit }} sessions, most recent first</span></h2>
         <div class="view-filters">
             <input type="text"
                    class="filter-input"
@@ -26,7 +23,7 @@
             <table class="activity-table">
                 <thead>
                     <tr>
-                        <th class="col-activity">Activity</th>
+                        <th class="col-activity">Event</th>
                         <th class="col-status">Status</th>
                         <th class="col-ts">Time</th>
                     </tr>
@@ -134,6 +131,13 @@
     font-size: 1rem;
 }
 
+.view-subtitle {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 0.5rem;
+}
+
 .view-info { margin-bottom: 0.25rem; }
 
 .view-filters { margin-bottom: 0.5rem; }
@@ -146,6 +150,10 @@
 
 .activity-list.table-view {
     overflow-x: auto;
+    width: 100%;
+}
+
+.table-container {
     width: 100%;
 }
 
@@ -163,7 +171,7 @@
 
 /* Table header */
 .activity-table thead th {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
@@ -184,6 +192,7 @@
     padding: 0.2rem 0.5rem;
     vertical-align: middle;
     line-height: 1.4;
+    font-size: 13px;
 }
 
 /* Activity cell */
@@ -343,7 +352,7 @@
 /* Activity description text */
 .activity-desc {
     color: var(--text-secondary, #94a3b8);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
