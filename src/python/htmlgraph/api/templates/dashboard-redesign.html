@@ -122,10 +122,18 @@
         // Initialize dashboard on load
         document.addEventListener('DOMContentLoaded', function() {
             loadInitialStats();
-            htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'}).then(function() {
-                activityFeedReady = true;
-                initActivityFeedSSE();
+            // htmx.ajax() does NOT return a Promise in HTMX 1.x — use htmx:afterSettle instead.
+            document.body.addEventListener('htmx:afterSettle', function onFeedReady(evt) {
+                const target = evt.detail.target;
+                // Only fire once when the activity-feed partial first lands in #content-area
+                if (target && (target.id === 'content-area' || target.classList.contains('activity-feed-view'))) {
+                    if (!activityFeedReady) {
+                        activityFeedReady = true;
+                        initActivityFeedSSE();
+                    }
+                }
             });
+            htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'});
             connectWebSocket();
         });
 
@@ -143,10 +151,17 @@
                 if (activeView !== 'activity-feed') {
                     activityFeedReady = false;
                 } else {
-                    // Switching back to activity feed — mark ready after content loads
-                    htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'}).then(function() {
-                        activityFeedReady = true;
+                    // Switching back to activity feed — mark ready after content loads.
+                    // htmx.ajax() doesn't return a Promise in HTMX 1.x; use a one-shot
+                    // htmx:afterSettle listener instead.
+                    document.body.addEventListener('htmx:afterSettle', function onTabFeedReady(evt) {
+                        const target = evt.detail.target;
+                        if (target && (target.id === 'content-area' || target.classList.contains('activity-feed-view'))) {
+                            document.body.removeEventListener('htmx:afterSettle', onTabFeedReady);
+                            activityFeedReady = true;
+                        }
                     });
+                    htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'});
                 }
             });
         });
