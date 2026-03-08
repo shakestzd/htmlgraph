@@ -134,6 +134,7 @@ from htmlgraph.cli.work.ingest import (
     IngestCursorCommand,
     IngestGeminiCommand,
     IngestOpenCodeCommand,
+    IngestSessionCommand,
 )
 from htmlgraph.cli.work.orchestration import (
     ArchiveCreateCommand,
@@ -166,6 +167,7 @@ from htmlgraph.cli.work.wip import WipResetCommand, WipShowCommand
 __all__ = [
     "register_commands",
     # Ingest commands
+    "IngestSessionCommand",
     "IngestClaudeCodeCommand",
     "IngestGeminiCommand",
     "IngestOpenCodeCommand",

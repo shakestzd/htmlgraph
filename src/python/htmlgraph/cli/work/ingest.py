@@ -12,6 +12,7 @@ Commands for ingesting sessions from external AI tool formats:
 """
 
 import argparse
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -38,6 +39,50 @@ def register_ingest_commands(subparsers: _SubParsersAction) -> None:
         dest="ingest_command",
         help="Ingest source",
     )
+
+    # ingest session  (retroactive JSONL ingestion by session ID)
+    session_parser = ingest_subparsers.add_parser(
+        "session",
+        help=(
+            "Retroactively ingest a Claude Code session by ID, reconstructing "
+            "the full event hierarchy from the JSONL transcript and inserting "
+            "missing events into the agent_events table."
+        ),
+    )
+    session_parser.add_argument(
+        "--session",
+        "-s",
+        dest="session_id",
+        help=(
+            "Claude Code session UUID to ingest. "
+            "Looks up ~/.claude/projects/{hash}/{session_id}.jsonl"
+        ),
+    )
+    session_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="ingest_all",
+        help="Ingest ALL sessions found in ~/.claude/projects/{hash}/",
+    )
+    session_parser.add_argument(
+        "--project",
+        help=(
+            "Project directory to compute the Claude Code project hash from. "
+            "Defaults to the current working directory."
+        ),
+    )
+    session_parser.add_argument(
+        "--agent",
+        default="claude-code",
+        help="Agent name to attribute events to (default: claude-code)",
+    )
+    session_parser.add_argument(
+        "--graph-dir",
+        "-g",
+        default=DEFAULT_GRAPH_DIR,
+        help="HtmlGraph directory (default: .htmlgraph)",
+    )
+    session_parser.set_defaults(func=IngestSessionCommand.from_args)
 
     # ingest claude-code
     cc_parser = ingest_subparsers.add_parser(
@@ -279,6 +324,354 @@ def register_ingest_commands(subparsers: _SubParsersAction) -> None:
 # ============================================================================
 # Command classes
 # ============================================================================
+
+
+class IngestSessionCommand(BaseCommand):
+    """Retroactive JSONL ingestion by session ID.
+
+    Reads ``~/.claude/projects/{hash}/{session_id}.jsonl``, reconstructs the
+    full event hierarchy from ``parentUuid`` chains, and inserts missing events
+    into the ``agent_events`` and ``tool_traces`` tables.  Already-imported
+    events are skipped (idempotent — checked by ``tool_use_id`` in
+    ``tool_traces``).
+    """
+
+    def __init__(
+        self,
+        *,
+        session_id: str | None,
+        ingest_all: bool,
+        project: str | None,
+        agent: str,
+    ) -> None:
+        super().__init__()
+        self.session_id = session_id
+        self.ingest_all = ingest_all
+        self.project = project
+        self.agent = agent
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> IngestSessionCommand:
+        return cls(
+            session_id=getattr(args, "session_id", None),
+            ingest_all=getattr(args, "ingest_all", False),
+            project=getattr(args, "project", None),
+            agent=getattr(args, "agent", "claude-code"),
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _transcript_dir(self, project_path: Path) -> Path:
+        """Return ``~/.claude/projects/{hash}/`` for *project_path*."""
+        project_hash = str(project_path).replace("/", "-")
+        return Path.home() / ".claude" / "projects" / project_hash
+
+    def _find_jsonl(self, transcript_dir: Path, session_id: str) -> Path | None:
+        """Locate a specific session JSONL file in *transcript_dir*."""
+        candidate = transcript_dir / f"{session_id}.jsonl"
+        if candidate.exists():
+            return candidate
+        # Allow partial-UUID prefix match for convenience
+        matches = list(transcript_dir.glob(f"{session_id}*.jsonl"))
+        return matches[0] if matches else None
+
+    def _parse_jsonl(self, jsonl_path: Path) -> list[dict]:
+        """Parse all lines of a JSONL file; skip malformed lines."""
+        entries: list[dict] = []
+        with jsonl_path.open() as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return entries
+
+    def _build_uuid_index(self, entries: list[dict]) -> dict[str, dict]:
+        """Build a uuid → entry dict for parent chain walking."""
+        return {e["uuid"]: e for e in entries if "uuid" in e}
+
+    def _find_user_turn_uuid(
+        self, entry: dict, uuid_index: dict[str, dict]
+    ) -> str | None:
+        """Walk ``parentUuid`` chain from *entry* to the nearest user turn."""
+        current = entry
+        seen: set[str] = set()
+        while current:
+            uid: str = current.get("uuid", "")  # type: ignore
+            if uid in seen:
+                break
+            seen.add(uid)
+            entry_type = current.get("type", "")
+            message = current.get("message", {})
+            role = message.get("role", "") if isinstance(message, dict) else ""
+            content = message.get("content", []) if isinstance(message, dict) else []
+            # A genuine user turn: type=user and content is NOT purely tool_results
+            if entry_type == "user" and role == "user":
+                is_tool_result = (
+                    isinstance(content, list)
+                    and content
+                    and all(
+                        isinstance(b, dict) and b.get("type") == "tool_result"
+                        for b in content
+                    )
+                )
+                if not is_tool_result:
+                    return uid
+            parent_uid = current.get("parentUuid")
+            if not parent_uid:
+                break
+            current = uuid_index.get(parent_uid, {})
+        return None
+
+    def _ingest_jsonl(
+        self,
+        jsonl_path: Path,
+        db_path: Path,
+    ) -> dict:
+        """Ingest one JSONL file; return stats dict."""
+        import sqlite3
+        import uuid as _uuid
+        from datetime import datetime, timezone
+
+        entries = self._parse_jsonl(jsonl_path)
+        if not entries:
+            return {"skipped": 0, "inserted": 0, "errors": []}
+
+        uuid_index = self._build_uuid_index(entries)
+
+        # Derive session_id from the first entry that has one
+        raw_session_id: str = ""
+        for e in entries:
+            sid = e.get("sessionId", "")
+            if sid:
+                raw_session_id = sid
+                break
+        if not raw_session_id:
+            raw_session_id = jsonl_path.stem
+
+        stats: dict = {"skipped": 0, "inserted": 0, "errors": []}
+
+        conn = sqlite3.connect(str(db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Ensure session row exists
+            cursor.execute(
+                "SELECT 1 FROM sessions WHERE session_id = ? LIMIT 1",
+                (raw_session_id,),
+            )
+            if cursor.fetchone() is None:
+                # Extract metadata from first entry
+                first = entries[0]
+                created_at = first.get(
+                    "timestamp", datetime.now(timezone.utc).isoformat()
+                )
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO sessions
+                        (session_id, agent_assigned, status, created_at,
+                         transcript_path)
+                    VALUES (?, ?, 'completed', ?, ?)
+                    """,
+                    (
+                        raw_session_id,
+                        self.agent,
+                        created_at,
+                        str(jsonl_path),
+                    ),
+                )
+
+            # Map uuid → event_id for parent chain resolution
+            uuid_to_event_id: dict[str, str] = {}
+
+            for entry in entries:
+                entry_type = entry.get("type", "")
+                message = (
+                    entry.get("message", {})
+                    if isinstance(entry.get("message"), dict)
+                    else {}
+                )
+
+                # We only care about assistant messages that contain tool_use blocks
+                if entry_type not in ("assistant",):
+                    continue
+
+                content = message.get("content", [])
+                if not isinstance(content, list):
+                    continue
+
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") != "tool_use":
+                        continue
+
+                    tool_use_id: str = block.get("id", "")
+                    tool_name: str = block.get("name", "unknown")
+                    tool_input_raw = block.get("input", {})
+
+                    if not tool_use_id:
+                        continue
+
+                    # Idempotency check: skip if tool_use_id already in tool_traces
+                    cursor.execute(
+                        "SELECT 1 FROM tool_traces WHERE tool_use_id = ? LIMIT 1",
+                        (tool_use_id,),
+                    )
+                    if cursor.fetchone() is not None:
+                        stats["skipped"] += 1
+                        continue
+
+                    # Resolve parent event_id via user turn uuid chain
+                    user_turn_uuid = self._find_user_turn_uuid(entry, uuid_index)
+                    parent_event_id: str | None = None
+                    if user_turn_uuid:
+                        parent_event_id = uuid_to_event_id.get(user_turn_uuid)
+
+                    # Determine timestamp
+                    ts_str = entry.get("timestamp", "")
+                    try:
+                        ts = datetime.fromisoformat(
+                            ts_str.replace("Z", "+00:00")
+                        ).strftime("%Y-%m-%d %H:%M:%S")
+                    except (ValueError, AttributeError):
+                        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+                    # Determine subagent spawns via parentToolUseID in agent_progress
+                    is_task_delegation = tool_name in ("Task", "Agent")
+                    event_type = (
+                        "task_delegation" if is_task_delegation else "tool_call"
+                    )
+                    event_id = f"evt-{str(_uuid.uuid4())[:8]}"
+
+                    # Insert agent_event
+                    try:
+                        cursor.execute(
+                            """
+                            INSERT OR IGNORE INTO agent_events
+                                (event_id, agent_id, event_type, timestamp,
+                                 tool_name, input_summary, tool_input,
+                                 session_id, status, parent_event_id, source)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'recorded', ?, 'ingest')
+                            """,
+                            (
+                                event_id,
+                                self.agent,
+                                event_type,
+                                ts,
+                                tool_name,
+                                f"{tool_name}: {str(tool_input_raw)[:120]}",
+                                json.dumps(tool_input_raw),
+                                raw_session_id,
+                                parent_event_id,
+                            ),
+                        )
+                        uuid_to_event_id[entry.get("uuid", "")] = event_id
+                    except Exception as e:
+                        stats["errors"].append(f"agent_events insert: {e}")
+                        continue
+
+                    # Insert tool_trace for idempotency key
+                    try:
+                        cursor.execute(
+                            """
+                            INSERT OR IGNORE INTO tool_traces
+                                (tool_use_id, trace_id, session_id, tool_name,
+                                 tool_input, start_time, status,
+                                 parent_tool_use_id)
+                            VALUES (?, ?, ?, ?, ?, ?, 'completed', NULL)
+                            """,
+                            (
+                                tool_use_id,
+                                raw_session_id,
+                                raw_session_id,
+                                tool_name,
+                                json.dumps(tool_input_raw),
+                                ts,
+                            ),
+                        )
+                    except Exception as e:
+                        stats["errors"].append(f"tool_traces insert: {e}")
+
+                    stats["inserted"] += 1
+
+            conn.commit()
+        finally:
+            conn.close()
+
+        return stats
+
+    # ------------------------------------------------------------------
+    # execute
+    # ------------------------------------------------------------------
+
+    def execute(self) -> CommandResult:
+        from htmlgraph.cli.base import CommandResult, TextOutputBuilder
+        from htmlgraph.config import get_database_path
+
+        output = TextOutputBuilder()
+
+        if not self.session_id and not self.ingest_all:
+            raise CommandError(
+                "Specify --session SESSION_ID or --all to ingest all sessions."
+            )
+
+        project_path = Path(self.project) if self.project else Path.cwd()
+        transcript_dir = self._transcript_dir(project_path)
+
+        if not transcript_dir.exists():
+            raise CommandError(
+                f"No Claude Code sessions directory found at: {transcript_dir}\n"
+                "Check that Claude Code has been used in this project, or use --project."
+            )
+
+        db_path = Path(str(get_database_path()))
+
+        if self.ingest_all:
+            jsonl_files = sorted(transcript_dir.glob("*.jsonl"))
+            if not jsonl_files:
+                output.add_warning(f"No JSONL files found in {transcript_dir}")
+                return CommandResult(text=output.build())
+
+            total_inserted = 0
+            total_skipped = 0
+            all_errors: list[str] = []
+
+            for jf in jsonl_files:
+                stats = self._ingest_jsonl(jf, db_path)
+                total_inserted += stats["inserted"]
+                total_skipped += stats["skipped"]
+                all_errors.extend(stats["errors"])
+
+            output.add_success(
+                f"Ingested all {len(jsonl_files)} sessions from {transcript_dir}"
+            )
+            output.add_field("Events inserted", total_inserted)
+            output.add_field("Events skipped (already exist)", total_skipped)
+            if all_errors:
+                output.add_warning(f"{len(all_errors)} non-fatal error(s)")
+        else:
+            assert self.session_id is not None
+            jsonl_path = self._find_jsonl(transcript_dir, self.session_id)
+            if jsonl_path is None:
+                raise CommandError(
+                    f"Session file not found for session_id={self.session_id!r} "
+                    f"in {transcript_dir}"
+                )
+
+            stats = self._ingest_jsonl(jsonl_path, db_path)
+            output.add_success(f"Ingested session: {self.session_id}")
+            output.add_field("Events inserted", stats["inserted"])
+            output.add_field("Events skipped (already exist)", stats["skipped"])
+            if stats["errors"]:
+                output.add_warning(f"{len(stats['errors'])} non-fatal error(s)")
+
+        return CommandResult(text=output.build())
 
 
 class IngestClaudeCodeCommand(BaseCommand):
