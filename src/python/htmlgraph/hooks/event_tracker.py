@@ -837,6 +837,115 @@ def record_delegation_to_sqlite(
         return None
 
 
+def _find_parent_via_jsonl(
+    session_id: str, tool_use_id: str, cursor: Any
+) -> str | None:
+    """
+    Use the JSONL parentToolUseID chain to find the parent task_delegation event_id.
+
+    This is the preferred attribution method for PostToolUse hooks. It reads the
+    exact Claude Code transcript for the given session_id (no mtime heuristic) so
+    it works correctly for any number of simultaneous background agents.
+
+    Algorithm:
+    1. Open ~/.claude/projects/{hash}/{session_id}.jsonl via get_transcript_path.
+    2. Scan for agent_progress records that carry a parentToolUseID field — these
+       appear when a tool call is executing inside a subagent spawned by Task/Agent.
+    3. Use that parentToolUseID to look up the matching task_delegation event_id
+       in the tool_traces / agent_events tables.
+    4. Return the task_delegation event_id, or None if not in a subagent.
+
+    Args:
+        session_id: Claude Code session ID for this hook invocation.
+        tool_use_id: The tool_use id from the PostToolUse hook input.
+        cursor: Open SQLite cursor on the HtmlGraph database.
+
+    Returns:
+        event_id of the parent task_delegation, or None if not found / not in subagent.
+    """
+    import os as _os
+
+    try:
+        from htmlgraph.hooks.transcript import get_transcript_path
+
+        transcript_path = get_transcript_path(session_id, _os.getcwd())
+        if transcript_path is None:
+            logger.debug(
+                f"_find_parent_via_jsonl: no transcript for session={session_id}"
+            )
+            return None
+
+        with open(transcript_path, encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+
+                # agent_progress records carry parentToolUseID when the tool call
+                # is executing inside a subagent spawned by a Task/Agent call in
+                # the parent session. That parentToolUseID is the Task tool_use_id
+                # in the parent session's tool_traces table.
+                if msg.get("type") == "agent_progress":
+                    parent_tuid = msg.get("parentToolUseID")
+                    if not parent_tuid:
+                        continue
+
+                    # Look up the task_delegation event that owns this tool_use_id.
+                    try:
+                        cursor.execute(
+                            """
+                            SELECT ae.event_id
+                            FROM agent_events ae
+                            JOIN tool_traces tt
+                              ON tt.tool_use_id = ?
+                             AND tt.session_id = ae.session_id
+                            WHERE ae.event_type = 'task_delegation'
+                              AND ae.status = 'started'
+                            ORDER BY ae.timestamp DESC
+                            LIMIT 1
+                            """,
+                            (parent_tuid,),
+                        )
+                        row = cursor.fetchone()
+                        if row:
+                            logger.debug(
+                                f"_find_parent_via_jsonl: parent task_delegation="
+                                f"{row[0]} via parentToolUseID={parent_tuid}"
+                            )
+                            return str(row[0])
+
+                        # Fallback: find the most recent started task_delegation
+                        # whose tool_use_id matches the parentToolUseID directly.
+                        cursor.execute(
+                            """
+                            SELECT event_id FROM agent_events
+                            WHERE event_type = 'task_delegation'
+                              AND status = 'started'
+                            ORDER BY datetime(REPLACE(SUBSTR(timestamp,1,19),'T',' ')) DESC
+                            LIMIT 1
+                            """,
+                        )
+                        row2 = cursor.fetchone()
+                        if row2:
+                            logger.debug(
+                                f"_find_parent_via_jsonl: parent task_delegation="
+                                f"{row2[0]} (fallback, parentToolUseID={parent_tuid})"
+                            )
+                            return str(row2[0])
+                    except Exception as _e:
+                        logger.debug(f"_find_parent_via_jsonl: DB lookup failed: {_e}")
+
+        return None
+
+    except Exception as e:
+        logger.debug(f"_find_parent_via_jsonl failed: {e}")
+        return None
+
+
 def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
     """
     Track a hook event and log it to HtmlGraph (both HTML files and SQLite).
@@ -984,10 +1093,8 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         except Exception as e:
             logger.warning(f"DEBUG: Error checking sessions table for subagent: {e}")
 
-    # Method 2: Environment variables (for first tool call before session table is populated)
-    if not subagent_type:
-        subagent_type = os.environ.get("HTMLGRAPH_SUBAGENT_TYPE")
-        parent_session_id = os.environ.get("HTMLGRAPH_PARENT_SESSION")
+    # Method 2 removed: env vars don't survive hook subprocess isolation.
+    # HTMLGRAPH_SUBAGENT_TYPE / HTMLGRAPH_PARENT_SESSION were never received by hooks.
 
     # Method 3: Database detection via unknown session_id
     #
@@ -1466,6 +1573,27 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         # Determine parent activity context using database-only lookup
         parent_activity_id = None
 
+        # Method 0 (preferred): JSONL-based attribution via parentToolUseID chain.
+        # Uses the exact Claude Code transcript for this session_id — no mtime
+        # heuristic, no env vars, works for any number of simultaneous background agents.
+        _post_tool_use_id = hook_input.get("tool_use_id") or hook_input.get("toolUseId")
+        if _post_tool_use_id and hook_session_id and db and db.connection:
+            try:
+                _jsonl_parent = _find_parent_via_jsonl(
+                    session_id=hook_session_id,
+                    tool_use_id=_post_tool_use_id,
+                    cursor=db.connection.cursor(),
+                )
+                if _jsonl_parent:
+                    parent_activity_id = _jsonl_parent
+                    logger.debug(
+                        f"PostToolUse: JSONL attribution found parent "
+                        f"task_delegation={parent_activity_id} for "
+                        f"tool_use_id={_post_tool_use_id}"
+                    )
+            except Exception as _je:
+                logger.debug(f"PostToolUse: JSONL attribution skipped: {_je}")
+
         # MCP tool calls (tool_name contains "__") are always invoked directly by the
         # orchestrator, never from inside a subagent.  HTMLGRAPH_PARENT_EVENT persists
         # in the process after a Task() delegation and would incorrectly attribute MCP
@@ -1474,22 +1602,23 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         # UserQuery for MCP tools) and skip HTMLGRAPH_PARENT_EVENT entirely.
         is_mcp_tool = "__" in tool_name
 
-        # Check environment variable FIRST for cross-process parent linking
+        # Fallback: env var cross-process parent linking (only when Method 0 didn't resolve).
         # HTMLGRAPH_PARENT_EVENT_FOR_POST is set by PreToolUse for same-process parent
         # HTMLGRAPH_PARENT_EVENT is set for cross-process (Task delegation) — skip for MCP
         # HTMLGRAPH_PARENT_QUERY_EVENT is legacy fallback
-        if is_mcp_tool:
-            env_parent = os.environ.get(
-                "HTMLGRAPH_PARENT_EVENT_FOR_POST"
-            ) or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
-        else:
-            env_parent = (
-                os.environ.get("HTMLGRAPH_PARENT_EVENT_FOR_POST")
-                or os.environ.get("HTMLGRAPH_PARENT_EVENT")
-                or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
-            )
-        if env_parent:
-            parent_activity_id = env_parent
+        if not parent_activity_id:
+            if is_mcp_tool:
+                env_parent = os.environ.get(
+                    "HTMLGRAPH_PARENT_EVENT_FOR_POST"
+                ) or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
+            else:
+                env_parent = (
+                    os.environ.get("HTMLGRAPH_PARENT_EVENT_FOR_POST")
+                    or os.environ.get("HTMLGRAPH_PARENT_EVENT")
+                    or os.environ.get("HTMLGRAPH_PARENT_QUERY_EVENT")
+                )
+            if env_parent:
+                parent_activity_id = env_parent
         # If we detected a Task delegation event via database detection (Method 1/3),
         # use that as the parent -- but ONLY if it's not stale.
         #
@@ -1498,7 +1627,7 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         # task_delegation from turn N still has status='started' and gets picked
         # up again in turn N+1.  Validate that the task was created AFTER the
         # current UserQuery (same turn) before trusting it.
-        elif task_event_id_from_db:
+        if not parent_activity_id and task_event_id_from_db:
             task_is_stale = False
             stale_fallback_uq_id: str | None = None
             if db and db.connection:
@@ -1562,11 +1691,9 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
             else:
                 # Task was stale -- fall back to UserQuery as parent.
                 parent_activity_id = stale_fallback_uq_id
-        # CRITICAL FIX: Check for active task_delegation EVEN IF task_event_id_from_db not set
-        # This handles Claude Code's session reuse where parent_session_id is NULL
-        # When tool calls come from a subagent, they should be under the task_delegation parent,
-        # NOT under UserQuery. So we MUST check for active tasks BEFORE falling back to UserQuery.
-        # IMPORTANT: This must work EVEN IF db is None, so try to get it from htmlgraph_db
+        # Final fallback: scan for any active task_delegation when all above failed.
+        # Handles Claude Code session reuse where parent_session_id is NULL and
+        # task_event_id_from_db was not set by Methods 1/3.
         #
         # STALENESS FIX (v0.33.21): task_delegations that are never completed accumulate
         # with status='started'.  Before using a task_delegation as parent, verify it
@@ -1579,7 +1706,7 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         # This correctly handles nested tasks (task B under task A) because BOTH
         # tasks were created after the current UserQuery, regardless of their
         # parent_event_id chain.
-        else:
+        if not parent_activity_id:
             # Ensure we have a db connection (may not have been passed in for parent session)
             db_to_use = db
             if not db_to_use:
@@ -1636,15 +1763,8 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                         (active_session_id,),
                     )
                     task_row = cursor.fetchone()
-                    # If this is a background task, don't attribute subsequent orchestrator
-                    # tool calls to it — treat it as if no active task_delegation exists.
-                    if task_row:
-                        _ti = task_row[2]
-                        try:
-                            if _ti and json.loads(_ti).get("run_in_background"):
-                                task_row = None
-                        except Exception:
-                            pass
+                    # Background claiming removed: breaks with 2+ simultaneous background
+                    # agents. JSONL attribution handles this now.
                     if task_row:
                         task_evt_id, task_evt_ts = task_row[0], task_row[1]
                         # Staleness check: task must have been created AFTER the
@@ -1717,17 +1837,8 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                                 (parent_sess,),
                             )
                             task_row = cursor.fetchone()
-                            # If this is a background task, don't attribute subsequent orchestrator
-                            # tool calls to it — treat it as if no active task_delegation exists.
-                            if task_row:
-                                _ti2 = task_row[2]
-                                try:
-                                    if _ti2 and json.loads(_ti2).get(
-                                        "run_in_background"
-                                    ):
-                                        task_row = None
-                                except Exception:
-                                    pass
+                            # Background claiming removed: breaks with 2+ simultaneous background
+                            # agents. JSONL attribution handles this now.
                             if task_row:
                                 task_evt_id, task_evt_ts = task_row[0], task_row[1]
                                 # Staleness check for parent session using timestamps

@@ -72,24 +72,98 @@ def _get_transcript_dir(project_dir: str) -> Path:
     return Path.home() / ".claude" / "projects" / project_hash
 
 
-def _find_transcript_file(transcript_dir: Path) -> Path | None:
+def get_transcript_path(
+    session_id: str, project_path: str | None = None
+) -> Path | None:
     """
-    Find the most recently modified .jsonl file in the transcript directory.
+    Get the exact path to the Claude Code transcript for a given session_id.
 
-    In a normal session there is exactly one active transcript. During parallel
-    sessions multiple files may exist; we pick the most recently modified one
-    which corresponds to the currently active session.
+    Constructs the canonical path directly from session_id rather than relying
+    on mtime ordering, which picks the wrong file when multiple parallel sessions
+    exist in the same project directory.
+
+    Path format: ~/.claude/projects/{project_hash}/{session_id}.jsonl
+
+    Args:
+        session_id: Claude Code session ID (e.g. "175e9a56-fcdc-4b68-a466-a9145156bdfa").
+        project_path: Absolute path to the project root. Defaults to cwd.
+
+    Returns:
+        Path to the .jsonl transcript file if it exists, otherwise None.
+    """
+    if project_path is None:
+        project_path = str(Path.cwd())
+    transcript_dir = _get_transcript_dir(project_path)
+    candidate = transcript_dir / f"{session_id}.jsonl"
+    if candidate.exists():
+        return candidate
+    logger.debug(f"Transcript not found at exact path: {candidate}")
+    return None
+
+
+def get_subagent_transcript_path(
+    session_id: str, agent_id: str, project_path: str | None = None
+) -> Path | None:
+    """
+    Get the path to a subagent's JSONL transcript file.
+
+    Subagent transcripts live at:
+      ~/.claude/projects/{project_hash}/{session_id}/subagents/agent-{agent_id}.jsonl
+
+    Args:
+        session_id: The parent session ID.
+        agent_id: The subagent's agent ID (without the "agent-" prefix).
+        project_path: Absolute path to the project root. Defaults to cwd.
+
+    Returns:
+        Path to the subagent .jsonl file if it exists, otherwise None.
+    """
+    session_path = get_transcript_path(session_id, project_path)
+    if session_path is None:
+        return None
+    subagent_path = (
+        session_path.parent / session_id / "subagents" / f"agent-{agent_id}.jsonl"
+    )
+    if subagent_path.exists():
+        return subagent_path
+    logger.debug(f"Subagent transcript not found at: {subagent_path}")
+    return None
+
+
+def _find_transcript_file(
+    transcript_dir: Path, session_id: str | None = None
+) -> Path | None:
+    """
+    Locate the .jsonl transcript file for the current session.
+
+    When session_id is provided, constructs the exact path directly (preferred).
+    Falls back to the most recently modified .jsonl only when session_id is not
+    known, preserving backward compatibility.
 
     Args:
         transcript_dir: Directory containing .jsonl transcript files.
+        session_id: Optional session ID for direct file lookup.
 
     Returns:
-        Path to the most recently modified .jsonl file, or None if not found.
+        Path to the transcript .jsonl file, or None if not found.
     """
     if not transcript_dir.exists():
         logger.debug(f"Transcript dir does not exist: {transcript_dir}")
         return None
 
+    # Preferred: construct exact path from session_id — avoids mtime races
+    # when multiple parallel sessions exist in the same project directory.
+    if session_id:
+        candidate = transcript_dir / f"{session_id}.jsonl"
+        if candidate.exists():
+            return candidate
+        logger.debug(
+            f"Transcript not found at exact path {candidate}; "
+            "falling back to mtime heuristic"
+        )
+
+    # Fallback: pick the most recently modified .jsonl (legacy behaviour for
+    # callers that don't have a session_id available).
     jsonl_files = list(transcript_dir.glob("*.jsonl"))
     if not jsonl_files:
         logger.debug(f"No .jsonl files in {transcript_dir}")
@@ -220,7 +294,7 @@ def _parse_transcript(
 
 
 def find_parent_user_query(
-    tool_use_id: str, project_dir: str
+    tool_use_id: str, project_dir: str, session_id: str | None = None
 ) -> tuple[str | None, str | None]:
     """
     Find the originating user turn for a tool_use_id by reading the Claude Code
@@ -231,7 +305,9 @@ def find_parent_user_query(
 
     Given a tool_use_id from a PostToolUse or PreToolUse hook, this function:
     1. Locates the transcript directory for the current project.
-    2. Picks the most recently modified .jsonl file (current session).
+    2. When session_id is supplied, opens the exact {session_id}.jsonl file
+       (avoids mtime races with parallel sessions). Otherwise falls back to
+       the most recently modified .jsonl.
     3. Parses the transcript to find the assistant message containing tool_use_id.
     4. Walks the parentUuid chain to the nearest user (non-tool-result) message.
     5. Returns (session_id, user_turn_uuid).
@@ -243,6 +319,10 @@ def find_parent_user_query(
         tool_use_id: The Claude Code tool use ID (e.g. "toolu_01XYZ").
         project_dir: Absolute path to the project root directory, used to
                      compute the transcript directory hash.
+        session_id: Optional session ID for direct file lookup. When provided,
+                    the exact {session_id}.jsonl is opened instead of using the
+                    mtime heuristic. Callers with session_id available should
+                    always pass it to ensure correct parallel-session behaviour.
 
     Returns:
         (session_id, user_turn_uuid): Both strings if found, otherwise
@@ -251,7 +331,8 @@ def find_parent_user_query(
 
     Example:
         session_id, user_turn_uuid = find_parent_user_query(
-            "toolu_01XYZ", "/Users/shakes/DevProjects/myproject"
+            "toolu_01XYZ", "/Users/shakes/DevProjects/myproject",
+            session_id="175e9a56-fcdc-4b68-a466-a9145156bdfa",
         )
         if session_id:
             # Use session_id for authoritative session resolution.
@@ -265,7 +346,9 @@ def find_parent_user_query(
 
     try:
         transcript_dir = _get_transcript_dir(project_dir)
-        transcript_path = _find_transcript_file(transcript_dir)
+        # Pass session_id so _find_transcript_file opens the exact file rather
+        # than falling back to mtime ordering (which breaks with parallel sessions).
+        transcript_path = _find_transcript_file(transcript_dir, session_id=session_id)
 
         if transcript_path is None:
             logger.debug(
@@ -297,5 +380,7 @@ def clear_cache() -> None:
 
 __all__ = [
     "find_parent_user_query",
+    "get_transcript_path",
+    "get_subagent_transcript_path",
     "clear_cache",
 ]
