@@ -123,6 +123,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadInitialStats();
             // htmx.ajax() does NOT return a Promise in HTMX 1.x — use htmx:afterSettle instead.
+            // { once: true } auto-removes the listener after first fire; activityFeedReady
+            // guards re-entry for subsequent tab-switch reloads via onTabFeedReady.
             document.body.addEventListener('htmx:afterSettle', function onFeedReady(evt) {
                 const target = evt.detail.target;
                 // Only fire once when the activity-feed partial first lands in #content-area
@@ -132,7 +134,7 @@
                         initActivityFeedSSE();
                     }
                 }
-            });
+            }, { once: true });
             htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'});
             connectWebSocket();
         });
@@ -246,37 +248,23 @@
         }
 
         /**
-         * Refresh the activity feed by fetching only new rows (delta) and
-         * prepending them to the existing tbody.  This preserves expanded
-         * child rows because it never touches rows that are already in the DOM.
+         * Refresh the activity feed with a full reload into #content-area.
+         *
+         * The old delta approach (/views/activity-feed/delta?since=<event_id>)
+         * only returned rows for brand-new UserQuery events, leaving tool events
+         * within an ongoing session invisible. Full reload always shows current state.
+         *
+         * Expand state is saved/restored via the existing htmx:beforeSwap /
+         * htmx:afterSettle handlers (window._htmxFeedExpandedState).
          *
          * Called by the SSE handler when a feed-update event arrives.
          */
-        async function refreshActivityFeed() {
+        function refreshActivityFeed() {
             if (activeView !== 'activity-feed' || !activityFeedReady) return;
 
-            const tbody = document.querySelector('#activity-feed-tbody');
-            if (!tbody) return;
-
-            // Use the first parent row's event_id as the "since" anchor.
-            // Child rows (data-parent attr set) are skipped — we only anchor on top-level turns.
-            const firstParent = tbody.querySelector('.parent-row[data-event-id]');
-            const since = firstParent ? firstParent.dataset.eventId : '';
-
-            try {
-                const url = since
-                    ? `/views/activity-feed/delta?since=${encodeURIComponent(since)}`
-                    : '/views/activity-feed/delta';
-                const response = await fetch(url);
-                if (!response.ok) return;
-                const html = await response.text();
-                if (!html.trim()) return;  // no new rows
-
-                tbody.insertAdjacentHTML('afterbegin', html);
-                htmx.process(tbody);  // init htmx on new rows only
-            } catch (err) {
-                console.error('Delta feed fetch error:', err);
-            }
+            // Full reload — the htmx:beforeSwap handler saves expand state first,
+            // and htmx:afterSettle restores it after the swap completes.
+            htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'});
         }
 
         /**
@@ -786,7 +774,7 @@
             const rowClass = isChild ? 'child-row hidden' : 'parent-row';
             const borderStyle = isChild ? 'border-left: 4px solid var(--text-muted);' : 'border-left: 4px solid var(--accent-lime);';
 
-            // New column order: Agent | Tool | Input | Output | Status | Timestamp (no ID column)
+            // Column order: Agent | Tool | Input | Output | Timestamp (no ID column)
             const html = `
                 <tr class="activity-row ${rowClass} event-${eventData.status || 'pending'}"
                     data-event-id="${escapeHtml(eventData.event_id)}"
@@ -807,9 +795,6 @@
                     </td>
                     <td class="col-output">
                         ${outputSummary ? `<span class="truncate" title="${escapeHtml(eventData.output_summary)}">${escapeHtml(outputSummary)}${outputTruncated}</span>` : '<span class="text-muted">-</span>'}
-                    </td>
-                    <td class="col-status">
-                        <span class="status-badge status-${eventData.status || 'pending'}">${escapeHtml(eventData.status || 'pending')}</span>
                     </td>
                     <td class="col-timestamp">
                         <span class="timestamp-text" data-utc-time="${escapeHtml(eventData.timestamp)}">${escapeHtml(eventData.timestamp)}</span>
@@ -1239,7 +1224,6 @@
         .col-tool { width: 100px; }
         .col-input { width: auto; }
         .col-output { width: auto; }
-        .col-status { width: 100px; }
         .col-timestamp { width: 140px; }
 
         /* Make table use fixed layout for predictable column widths */
@@ -1440,7 +1424,6 @@
         @media (max-width: 1024px) {
             .col-agent { width: 100px; }
             .col-tool { width: 90px; }
-            .col-status { width: 90px; }
             .col-timestamp { width: 120px; }
 
             .activity-table th,

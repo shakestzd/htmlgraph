@@ -196,11 +196,6 @@
         {% endif %}
     </div>
 
-    <!-- Auto-refresh indicator -->
-    <div class="auto-refresh-indicator">
-        <span class="refresh-dot"></span>
-        Live updates enabled (via WebSocket)
-    </div>
 </div>
 
 <style>
@@ -640,34 +635,6 @@
 .empty-state p {
     font-size: 1rem;
     margin-bottom: 0.5rem;
-}
-
-/* ============================================
-   Auto-refresh Indicator
-   ============================================ */
-
-.auto-refresh-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    background: var(--bg-darker);
-    border-top: 1px solid var(--border-subtle);
-}
-
-.refresh-dot {
-    width: 6px;
-    height: 6px;
-    background: var(--accent-lime, #a3e635);
-    border-radius: 50%;
-    animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
 }
 
 /* ============================================
