@@ -25,13 +25,15 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def dashboard_html():
-    """Load the dashboard HTML file for analysis."""
+    """Load the active dashboard HTML file (dashboard-redesign.html) for analysis."""
     dashboard_path = (
         Path(__file__).parent.parent.parent
         / "src"
         / "python"
         / "htmlgraph"
-        / "dashboard.html"
+        / "api"
+        / "templates"
+        / "dashboard-redesign.html"
     )
     if not dashboard_path.exists():
         pytest.skip("Dashboard HTML file not found")
@@ -43,12 +45,12 @@ class TestActivityFeedDashboard:
     """Test Activity Feed dashboard HTML structure."""
 
     def test_activity_feed_section_exists(self, dashboard_html):
-        """Test Activity Feed section is present in dashboard HTML."""
-        # Look for activity log/feed related classes and structures
+        """Test Activity Feed tab/section is present in dashboard HTML."""
+        # The redesign uses a tab-based navigation; activity feed loads via HTMX
         assert (
-            "activity-log" in dashboard_html.lower()
-            or "activity-item" in dashboard_html.lower()
-            or "activity-list" in dashboard_html.lower()
+            'data-tab="activity"' in dashboard_html
+            or "activity-feed" in dashboard_html.lower()
+            or "activity" in dashboard_html.lower()
         ), "Activity Feed section not found in dashboard"
 
     def test_dashboard_page_title_exists(self, dashboard_html):

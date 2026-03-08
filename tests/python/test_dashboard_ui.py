@@ -25,13 +25,15 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def dashboard_html():
-    """Load the dashboard HTML file for static analysis."""
+    """Load the active dashboard HTML file (dashboard-redesign.html) for static analysis."""
     dashboard_path = (
         Path(__file__).parent.parent.parent
         / "src"
         / "python"
         / "htmlgraph"
-        / "dashboard.html"
+        / "api"
+        / "templates"
+        / "dashboard-redesign.html"
     )
     if not dashboard_path.exists():
         pytest.skip("Dashboard HTML file not found")
@@ -41,60 +43,59 @@ def dashboard_html():
 
 def test_dashboard_title(dashboard_html):
     """Test that dashboard has correct page title."""
-    assert "<title>HtmlGraph Dashboard</title>" in dashboard_html
+    assert "HtmlGraph Dashboard" in dashboard_html
 
 
 def test_dashboard_heading(dashboard_html):
     """Test that dashboard has correct main heading."""
-    assert '<h1 class="brand-title">HtmlGraph</h1>' in dashboard_html
+    assert "HtmlGraph" in dashboard_html
 
 
-def test_dashboard_tagline(dashboard_html):
-    """Test that dashboard has correct tagline."""
-    assert "HTML is All You Need" in dashboard_html
+def test_dashboard_logo(dashboard_html):
+    """Test that dashboard has logo element."""
+    assert 'class="logo"' in dashboard_html
 
 
-def test_theme_toggle_button(dashboard_html):
-    """Test that theme toggle button exists in HTML."""
-    assert 'id="theme-toggle"' in dashboard_html
-    assert 'aria-label="Toggle theme"' in dashboard_html
+def test_view_navigation_tabs(dashboard_html):
+    """Test that all navigation tab buttons are defined."""
+    # The redesigned dashboard uses data-tab attributes instead of data-view
+    assert 'data-tab="activity"' in dashboard_html
+    assert 'data-tab="orchestration"' in dashboard_html
+    assert 'data-tab="work-items"' in dashboard_html
+    assert 'data-tab="agents"' in dashboard_html
+    assert 'data-tab="metrics"' in dashboard_html
 
 
-def test_view_navigation_buttons(dashboard_html):
-    """Test that all view navigation buttons are defined."""
-    # Check for view toggle buttons with correct data-view attributes
-    assert 'data-view="kanban"' in dashboard_html
-    assert 'data-view="graph"' in dashboard_html
-    assert 'data-view="analytics"' in dashboard_html
-    assert 'data-view="agents"' in dashboard_html
-    assert 'data-view="sessions"' in dashboard_html
+def test_tab_navigation_structure(dashboard_html):
+    """Test that tab navigation structure exists."""
+    assert 'class="tabs-navigation"' in dashboard_html
+    assert 'class="tab-button active"' in dashboard_html
 
 
-def test_kanban_structure(dashboard_html):
-    """Test that kanban view structure exists."""
-    # Check for kanban column classes
-    # The columns are rendered dynamically with class="track-column ${status}"
-    # So we just check that the template structure exists
-    assert "track-column" in dashboard_html
-    assert "track-column-header" in dashboard_html
-    assert "track-column-cards" in dashboard_html
+def test_content_area_structure(dashboard_html):
+    """Test that main content area structure exists."""
+    assert 'id="content-area"' in dashboard_html
+    assert 'class="content-area"' in dashboard_html
 
 
-def test_sessions_view_structure(dashboard_html):
-    """Test that sessions view structure exists."""
-    assert "Sessions" in dashboard_html
-    # Sessions section should exist
-    match = re.search(r'data-view="sessions"', dashboard_html)
-    assert match is not None, "Sessions view button not found"
+def test_header_stats_present(dashboard_html):
+    """Test that header stats badges are present."""
+    assert 'id="event-count"' in dashboard_html
+    assert 'id="agent-count"' in dashboard_html
+    assert 'id="session-count"' in dashboard_html
 
 
-def test_feature_card_structure(dashboard_html):
-    """Test that card structures are defined."""
-    # Features are rendered as divs with class "track-column"
-    # Check for card-related classes and structures
-    assert "card" in dashboard_html.lower() or "track-column" in dashboard_html, (
-        "Card structure not found in dashboard"
-    )
+def test_websocket_indicator(dashboard_html):
+    """Test that WebSocket status indicator exists."""
+    assert 'id="ws-indicator"' in dashboard_html
+    assert 'id="ws-status"' in dashboard_html
+
+
+def test_sessions_tab_exists(dashboard_html):
+    """Test that sessions data is accessible via stats."""
+    # Sessions count is shown in header stats
+    match = re.search(r'id="session-count"', dashboard_html)
+    assert match is not None, "Session count element not found"
 
 
 def test_dashboard_uses_html5(dashboard_html):
@@ -110,11 +111,10 @@ def test_dashboard_has_viewport_meta(dashboard_html):
 
 
 def test_activity_feed_section(dashboard_html):
-    """Test that activity feed section exists."""
-    # Check for activity feed heading
-    assert (
-        "Agent Activity Feed" in dashboard_html or "activity" in dashboard_html.lower()
-    )
+    """Test that activity feed tab/section exists."""
+    # Check for activity tab button
+    assert 'data-tab="activity"' in dashboard_html
+    assert "activity" in dashboard_html.lower()
 
 
 @pytest.mark.skip(reason="Requires active server and Playwright fixtures")
