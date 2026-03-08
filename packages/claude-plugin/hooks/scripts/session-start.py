@@ -21,6 +21,8 @@ import json
 import logging
 import os
 import sys
+import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -55,6 +57,58 @@ except Exception as e:
     )
     print(json.dumps({}))
     sys.exit(0)
+
+
+def claim_traceparent() -> dict | None:
+    """Claim the most recent unclaimed traceparent from the queue.
+
+    Written by the parent agent's PreToolUse hook when it calls ``Task()`` or
+    ``Agent()``.  This subagent's session-start hook claims it so we know
+    which parent session and task delegation spawned us.
+
+    Entries older than 30 seconds are ignored (subagent should have started
+    by then).  Files older than 5 minutes are cleaned up.
+
+    Returns:
+        Dict with ``trace_id`` and ``parent_span_id`` keys, or ``None`` if
+        no unclaimed entry is available.
+    """
+    try:
+        queue_dir = Path(tempfile.gettempdir()) / "htmlgraph-traceparent"
+        if not queue_dir.exists():
+            return None
+
+        now = time.time()
+        candidates: list[tuple[Path, dict]] = []
+
+        for f in sorted(queue_dir.glob("tp-*.json")):
+            try:
+                data = json.loads(f.read_text())
+                age = now - data.get("timestamp", 0)
+                if not data.get("claimed") and age < 30:
+                    candidates.append((f, data))
+                elif age > 300:
+                    # Clean up entries older than 5 minutes
+                    f.unlink(missing_ok=True)
+            except Exception:
+                continue
+
+        if not candidates:
+            return None
+
+        # Claim the most recent unclaimed entry (last in sorted order)
+        queue_file, entry = candidates[-1]
+        entry["claimed"] = True
+        queue_file.write_text(json.dumps(entry))
+        logger.debug(
+            f"Claimed traceparent: {queue_file.name} "
+            f"(trace_id={entry.get('trace_id')}, "
+            f"parent_span_id={entry.get('parent_span_id')})"
+        )
+        return entry
+    except Exception as e:
+        logger.debug(f"Could not claim traceparent: {e}")
+        return None
 
 
 def _get_head_commit(project_dir: str) -> str | None:
@@ -213,6 +267,22 @@ def main() -> None:
     cwd = hook_input.get("cwd")
     project_dir = resolve_project_dir(cwd if cwd else None)
     graph_dir = Path(project_dir) / ".htmlgraph"
+
+    # Claim W3C traceparent from queue (written by parent's PreToolUse hook).
+    # If found, export parent linkage env vars so all subsequent hooks in
+    # this subagent session can attribute events to the correct parent.
+    traceparent = claim_traceparent()
+    if traceparent:
+        parent_trace_id = traceparent.get("trace_id", "")
+        parent_span_id = traceparent.get("parent_span_id", "")
+        if parent_trace_id:
+            os.environ["HTMLGRAPH_PARENT_SESSION"] = parent_trace_id
+        if parent_span_id:
+            os.environ["HTMLGRAPH_PARENT_EVENT"] = parent_span_id
+        logger.info(
+            f"Claimed traceparent: parent_session={parent_trace_id}, "
+            f"parent_event={parent_span_id}"
+        )
 
     # Install pre-commit hooks (silent, non-blocking)
     try:

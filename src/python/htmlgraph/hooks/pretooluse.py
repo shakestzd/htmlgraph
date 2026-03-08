@@ -28,8 +28,11 @@ import json
 import logging
 import os
 import sys
+import tempfile
+import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from htmlgraph.db.schema import HtmlGraphDB
@@ -76,6 +79,57 @@ def generate_tool_use_id() -> str:
         UUID v4 string (36 chars)
     """
     return str(uuid.uuid4())
+
+
+def write_traceparent_queue(session_id: str, task_event_id: str) -> None:
+    """Write traceparent to queue file for next subagent to claim.
+
+    Claude Code spawns subagents as separate OS processes.  At the moment
+    the PreToolUse hook fires for a ``Task``/``Agent`` call the subagent's
+    ``agentId`` has not been assigned yet, so we cannot write a keyed temp
+    file.  Instead, we write an *unclaimed* entry to a shared queue directory.
+    The subagent's session-start hook claims the most recent unclaimed entry
+    and stores ``parent_session_id`` / ``parent_event_id`` in its session row.
+
+    Files older than 5 minutes are cleaned up to avoid accumulation.
+
+    Args:
+        session_id: Current (parent) session ID — becomes ``trace_id`` for
+                    the W3C ``traceparent`` header.
+        task_event_id: The ``event_id`` of the ``task_delegation`` event
+                       just created — becomes ``parent_span_id``.
+    """
+    try:
+        queue_dir = Path(tempfile.gettempdir()) / "htmlgraph-traceparent"
+        queue_dir.mkdir(exist_ok=True)
+
+        # Clean up stale files (> 5 minutes old) before writing new entry
+        now = time.time()
+        for stale in queue_dir.glob("tp-*.json"):
+            try:
+                if now - stale.stat().st_mtime > 300:
+                    stale.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        entry = {
+            "trace_id": session_id,
+            "parent_span_id": task_event_id,
+            "timestamp": now,
+            "claimed": False,
+        }
+        # Millisecond-precision timestamp in name avoids collisions when
+        # multiple parallel Task() spawns happen in the same second.
+        ts = int(now * 1000)
+        queue_file = queue_dir / f"tp-{ts}.json"
+        queue_file.write_text(json.dumps(entry))
+        logger.debug(
+            f"Wrote traceparent queue entry: {queue_file.name} "
+            f"(trace_id={session_id}, parent_span_id={task_event_id})"
+        )
+    except Exception as e:
+        # Non-blocking — traceparent propagation failure must not block tools
+        logger.debug(f"Could not write traceparent queue entry: {e}")
 
 
 def get_current_session_id() -> str | None:
@@ -533,6 +587,10 @@ def create_start_event(
             task_parent_event_id = create_task_parent_event(
                 db, tool_input, session_id, start_time
             )
+            # Write W3C traceparent queue entry so the spawned subagent's
+            # session-start hook can claim it and record parent linkage.
+            if task_parent_event_id:
+                write_traceparent_queue(session_id, task_parent_event_id)
 
         # Detect if we're in a subagent session and find parent task_delegation.
         #
