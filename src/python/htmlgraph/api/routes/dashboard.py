@@ -9,6 +9,7 @@ Handles:
 - Events API endpoints
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -16,7 +17,7 @@ from datetime import datetime
 from typing import Any, cast
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi_cache.decorator import cache
 from pydantic import BaseModel
@@ -377,6 +378,165 @@ async def activity_feed_children(
         return templates.TemplateResponse(
             "partials/activity-feed-children.html",
             {"request": request, "group": target_group},
+        )
+    finally:
+        await db.close()
+
+
+@router.get("/activity-feed/stream")
+async def activity_feed_stream(request: Request) -> StreamingResponse:
+    """
+    SSE endpoint for live activity feed updates.
+
+    Polls SQLite every 3 seconds for MAX(rowid) change in agent_events.
+    When a change is detected, sends a 'feed-update' SSE event so the
+    dashboard can fetch only the delta rows instead of re-rendering the
+    full tbody.
+    """
+    deps = get_deps()
+
+    async def event_generator() -> Any:
+        last_rowid: int = 0
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                db = await deps.get_db()
+                try:
+                    async with db.execute(
+                        "SELECT MAX(rowid) FROM agent_events"
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    current_rowid: int = (
+                        int(row[0]) if (row and row[0] is not None) else 0
+                    )
+                finally:
+                    await db.close()
+
+                if current_rowid != last_rowid:
+                    last_rowid = current_rowid
+                    yield "event: feed-update\ndata: refresh\n\n"
+            except Exception as exc:
+                logger.debug(f"SSE poll error: {exc}")
+
+            await asyncio.sleep(3)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/views/activity-feed/delta", response_class=HTMLResponse)
+async def activity_feed_delta(
+    request: Request,
+    since: str | None = None,
+) -> HTMLResponse:
+    """
+    Return only NEW top-level UserQuery rows that appeared after *since*.
+
+    *since* is the event_id of the first (most-recent) row currently
+    rendered in the client tbody.  The endpoint returns the same HTML
+    fragment format as activity-feed-hierarchical.html but limited to
+    rows whose event_id is newer than *since*.
+
+    If *since* is omitted, returns the last 5 turns (initial bootstrap).
+    """
+    deps = get_deps()
+    templates = get_templates()
+    db = await deps.get_db()
+
+    try:
+        activity_service, _, _ = deps.create_services(db)
+        grouped_result = await activity_service.get_grouped_events(limit=50)
+        conversation_turns = grouped_result.get("conversation_turns", [])
+
+        def count_descendants(node: dict) -> int:
+            children = node.get("children") or []
+            return len(children) + sum(count_descendants(ch) for ch in children)
+
+        def build_child_node(c: dict) -> dict:
+            node: dict = {
+                "event_id": c.get("event_id", ""),
+                "agent_id": c.get("agent", "claude-code"),
+                "event_type": "tool_call",
+                "tool_name": c.get("tool_name"),
+                "input_summary": c.get("summary", ""),
+                "output_summary": None,
+                "status": "completed",
+                "timestamp": c.get("timestamp", ""),
+                "cost_tokens": None,
+                "execution_duration_seconds": c.get("duration_seconds"),
+                "subagent_type": c.get("subagent_type"),
+                "model": c.get("model"),
+            }
+            nested = c.get("children")
+            if nested:
+                node["children"] = [
+                    build_child_node(grandchild) for grandchild in nested
+                ]
+            node["total_count"] = count_descendants(node)
+            return node
+
+        # Build all turns in same format as the full endpoint
+        all_turns: list[dict[str, Any]] = []
+        for turn in conversation_turns:
+            user_query = turn.get("userQuery") or {}
+            children = turn.get("children", [])
+            built_children = [build_child_node(c) for c in children]
+            total_count = len(built_children) + sum(
+                count_descendants(ch) for ch in built_children
+            )
+            all_turns.append(
+                {
+                    "parent": {
+                        "event_id": user_query.get("event_id", ""),
+                        "agent_id": user_query.get("agent_id", "claude-code"),
+                        "event_type": "user_query",
+                        "tool_name": "UserQuery",
+                        "input_summary": user_query.get("prompt", "")
+                        or user_query.get("input_summary", ""),
+                        "output_summary": None,
+                        "status": user_query.get("status", "completed"),
+                        "timestamp": user_query.get("timestamp", ""),
+                        "cost_tokens": None,
+                        "execution_duration_seconds": turn.get("stats", {}).get(
+                            "total_duration_seconds"
+                        ),
+                    },
+                    "children": built_children,
+                    "has_children": len(built_children) > 0,
+                    "total_count": total_count,
+                }
+            )
+
+        # Filter to only new turns (those not yet rendered in the client)
+        if since:
+            # Return only turns that come before (i.e., newer than) the
+            # row with event_id == since in the ordered list.
+            new_turns = []
+            for turn in all_turns:
+                if turn["parent"]["event_id"] == since:
+                    break
+                new_turns.append(turn)
+            hierarchical_events = new_turns
+        else:
+            # No anchor — return last 5 turns for initial render
+            hierarchical_events = all_turns[:5]
+
+        if not hierarchical_events:
+            return HTMLResponse("")
+
+        return templates.TemplateResponse(
+            "partials/activity-feed-hierarchical-rows.html",
+            {
+                "request": request,
+                "hierarchical_events": hierarchical_events,
+            },
         )
     finally:
         await db.close()

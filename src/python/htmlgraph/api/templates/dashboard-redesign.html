@@ -93,6 +93,8 @@
         let sessionCount = 0;
         let processedEventIds = new Set();
         let wsConnected = false;
+        let activeView = 'activity-feed';
+        let activityFeedReady = false;
 
         // Load initial stats from server
         async function loadInitialStats() {
@@ -120,17 +122,32 @@
         // Initialize dashboard on load
         document.addEventListener('DOMContentLoaded', function() {
             loadInitialStats();
-            htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'});
+            htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'}).then(function() {
+                activityFeedReady = true;
+                initActivityFeedSSE();
+            });
             connectWebSocket();
         });
 
-        // Tab switching
+        // Tab switching — update activeView so refreshActivityFeed() knows which tab is visible
         document.querySelectorAll('.tab-button').forEach(button => {
             button.addEventListener('click', function() {
                 document.querySelectorAll('.tab-button').forEach(b => {
                     b.classList.remove('active');
                 });
                 this.classList.add('active');
+                const tab = this.dataset.tab;
+                // Map tab data-tab attribute to view name used by refreshActivityFeed
+                activeView = (tab === 'activity') ? 'activity-feed' : tab;
+                // Mark feed as not ready when switching away; it becomes ready after HTMX loads
+                if (activeView !== 'activity-feed') {
+                    activityFeedReady = false;
+                } else {
+                    // Switching back to activity feed — mark ready after content loads
+                    htmx.ajax('GET', '/views/activity-feed', {target: '#content-area'}).then(function() {
+                        activityFeedReady = true;
+                    });
+                }
             });
         });
 
@@ -167,12 +184,8 @@
                         badge.classList.add('pulse');
                         setTimeout(() => badge.classList.remove('pulse'), 500);
 
-                        // Only refresh feed on meaningful events, not every tool call
-                        const HIGH_SIGNAL = new Set(['UserQuery', 'task_delegation', 'completion']);
-                        const isHighSignal = HIGH_SIGNAL.has(data.event_type) || HIGH_SIGNAL.has(data.tool_name);
-                        if (isHighSignal) {
-                            debouncedFeedRefresh();
-                        }
+                        // Feed updates are now handled by SSE (/activity-feed/stream).
+                        // WebSocket is kept for presence / cost alerts only.
                     }
                 } catch (e) {
                     console.error('WebSocket message error:', e);
@@ -218,22 +231,59 @@
         }
 
         /**
-         * Refresh the activity feed via HTMX re-fetch.
-         * Called when a WebSocket event arrives — triggers the server to re-render
-         * the hierarchical activity feed partial and swap it into the content area.
+         * Refresh the activity feed by fetching only new rows (delta) and
+         * prepending them to the existing tbody.  This preserves expanded
+         * child rows because it never touches rows that are already in the DOM.
+         *
+         * Called by the SSE handler when a feed-update event arrives.
          */
-        function refreshActivityFeed() {
-            const feedContainer = document.querySelector('.activity-feed-view')
-                               || document.querySelector('[hx-get*="activity-feed"]');
-            if (feedContainer) {
-                htmx.trigger(feedContainer, 'refresh');
-            } else {
-                // Fallback: re-fetch and swap into the content area directly
-                htmx.ajax('GET', '/views/activity-feed', {
-                    target: document.querySelector('#content-area') || document.body,
-                    swap: 'innerHTML'
-                });
+        async function refreshActivityFeed() {
+            if (activeView !== 'activity-feed' || !activityFeedReady) return;
+
+            const tbody = document.querySelector('#activity-feed-tbody');
+            if (!tbody) return;
+
+            // Use the first parent row's event_id as the "since" anchor.
+            // Child rows (data-parent attr set) are skipped — we only anchor on top-level turns.
+            const firstParent = tbody.querySelector('.parent-row[data-event-id]');
+            const since = firstParent ? firstParent.dataset.eventId : '';
+
+            try {
+                const url = since
+                    ? `/views/activity-feed/delta?since=${encodeURIComponent(since)}`
+                    : '/views/activity-feed/delta';
+                const response = await fetch(url);
+                if (!response.ok) return;
+                const html = await response.text();
+                if (!html.trim()) return;  // no new rows
+
+                tbody.insertAdjacentHTML('afterbegin', html);
+                htmx.process(tbody);  // init htmx on new rows only
+            } catch (err) {
+                console.error('Delta feed fetch error:', err);
             }
+        }
+
+        /**
+         * Connect to the SSE endpoint for live activity feed updates.
+         * When the server detects new events it sends a feed-update event,
+         * which triggers refreshActivityFeed() to prepend only the new rows.
+         *
+         * Uses a reconnect loop with 5-second delay on error/close.
+         */
+        function initActivityFeedSSE() {
+            let es;
+            function connect() {
+                es = new EventSource('/activity-feed/stream');
+                es.addEventListener('feed-update', function() {
+                    debouncedFeedRefresh();
+                });
+                es.onerror = function() {
+                    es.close();
+                    setTimeout(connect, 5000);
+                };
+            }
+            connect();
         }
 
         // Preserve expansion state across HTMX feed refreshes

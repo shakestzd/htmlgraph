@@ -84,6 +84,8 @@ class HtmlGraphDB(ExtensionOps):
         self.connection = sqlite3.connect(str(self.db_path))
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")
+        self.connection.execute("PRAGMA journal_mode=WAL")
+        self.connection.execute("PRAGMA wal_autocheckpoint=1000")
         return self.connection
 
     def disconnect(self) -> None:

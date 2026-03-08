@@ -1,0 +1,64 @@
+{% for group in hierarchical_events %}
+    <!-- Parent Event (depth-0): children lazy-loaded via HTMX on click -->
+    <tr class="activity-row parent-row event-{{ group.parent.status }} {% if group.has_children %}has-children{% endif %}"
+        id="{{ group.parent.event_id }}"
+        data-event-id="{{ group.parent.event_id }}"
+        data-children-loaded="false"
+        data-static="false"
+        {% if group.has_children %}
+        hx-get="/views/activity-feed/children/{{ group.parent.event_id }}"
+        hx-trigger="click once"
+        hx-swap="afterend"
+        hx-target="this"
+        onclick="handleParentClick(this)"
+        {% endif %}>
+
+        <td class="col-activity">
+            <div class="activity-cell depth-0">
+                {% if group.has_children %}
+                    <span class="expand-icon">&#9654;</span>
+                {% else %}
+                    <span class="expand-placeholder"></span>
+                {% endif %}
+                <span class="event-dot type-{{ group.parent.event_type }}"></span>
+                {% if group.parent.tool_name and group.parent.tool_name != 'UserQuery' %}
+                    <code class="tool-chip">{{ group.parent.tool_name }}</code>
+                {% endif %}
+                {% if group.has_children %}
+                    <span class="child-count">({{ group.total_count }})</span>
+                {% endif %}
+                {% set agent_lower = group.parent.agent_id|lower %}
+                {% if agent_lower not in ['claude-code', 'claude_code', 'claude'] %}
+                    {% if agent_lower in ['gemini', 'copilot', 'openai'] %}
+                        <span class="agent-badge agent-{{ agent_lower }}">{{ group.parent.agent_id }}</span>
+                    {% else %}
+                        <span class="agent-badge agent-subagent" title="{{ group.parent.agent_id }}">{{ group.parent.agent_id[:8] }}</span>
+                    {% endif %}
+                {% endif %}
+                {% if group.parent.input_summary %}
+                    <span class="activity-desc" title="{{ group.parent.input_summary }}">{{ group.parent.input_summary[:200] }}{% if group.parent.input_summary|length > 200 %}&#8230;{% endif %}</span>
+                {% elif group.parent.output_summary %}
+                    <span class="activity-desc" title="{{ group.parent.output_summary }}">{{ group.parent.output_summary[:200] }}{% if group.parent.output_summary|length > 200 %}&#8230;{% endif %}</span>
+                {% endif %}
+                {% if group.parent.cost_tokens or group.parent.execution_duration_seconds %}
+                    <span class="detail-metrics">
+                        {% if group.parent.cost_tokens %}{{ group.parent.cost_tokens }}t{% endif %}
+                        {% if group.parent.execution_duration_seconds %} {{ "%.1f"|format(group.parent.execution_duration_seconds) }}s{% endif %}
+                    </span>
+                {% endif %}
+            </div>
+        </td>
+
+        <td class="col-status">
+            <span class="status-badge status-{{ group.parent.status }}">{{ group.parent.status }}</span>
+        </td>
+
+        <td class="col-ts">
+            <span class="timestamp-text"
+                  data-utc-time="{{ group.parent.timestamp }}"
+                  title="{{ group.parent.timestamp }}">
+                {{ group.parent.timestamp[11:19] if group.parent.timestamp|length >= 19 else group.parent.timestamp }}
+            </span>
+        </td>
+    </tr>
+{% endfor %}
