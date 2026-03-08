@@ -174,6 +174,20 @@ def get_app(db_path: str) -> FastAPI:
     Returns:
         Configured FastAPI application instance
     """
+    from htmlgraph.api.logging_config import configure_structlog
+    from htmlgraph.api.telemetry import (
+        configure_opentelemetry,
+        configure_sentry,
+        instrument_fastapi,
+        instrument_sqlite3,
+    )
+
+    # Configure observability before anything else
+    configure_structlog()
+    configure_opentelemetry()
+    instrument_sqlite3()
+    configure_sentry()
+
     # Ensure database is initialized
     _ensure_database_initialized(db_path)
 
@@ -182,6 +196,26 @@ def get_app(db_path: str) -> FastAPI:
         description="Real-time agent observability dashboard",
         version="0.1.0",
     )
+
+    # Correlation ID middleware (add early so all downstream has request ID)
+    try:
+        from asgi_correlation_id import CorrelationIdMiddleware
+
+        app.add_middleware(CorrelationIdMiddleware)
+    except ImportError:
+        pass
+
+    # Prometheus metrics
+    try:
+        from prometheus_fastapi_instrumentator import Instrumentator
+
+        Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+        logger.info("Prometheus metrics exposed at /metrics")
+    except ImportError:
+        pass
+
+    # OTel FastAPI instrumentation
+    instrument_fastapi(app)
 
     # Store database path and query cache in app state
     app.state.db_path = db_path
