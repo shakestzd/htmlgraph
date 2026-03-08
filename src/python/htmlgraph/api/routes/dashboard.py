@@ -397,6 +397,7 @@ async def activity_feed_stream(request: Request) -> StreamingResponse:
 
     async def event_generator() -> Any:
         last_rowid: int = 0
+        last_sync_signature: tuple[int, int, int, int, int] | None = None
         while True:
             if await request.is_disconnected():
                 break
@@ -410,12 +411,53 @@ async def activity_feed_stream(request: Request) -> StreamingResponse:
                     current_rowid: int = (
                         int(row[0]) if (row and row[0] is not None) else 0
                     )
+
+                    async with db.execute(
+                        "SELECT COALESCE(MAX(seq), 0) FROM oplog"
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    server_max_seq = int(row[0]) if (row and row[0] is not None) else 0
+
+                    async with db.execute(
+                        "SELECT COUNT(*) FROM sync_conflicts WHERE status != 'resolved'"
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    pending_conflicts = int(row[0]) if row else 0
+
+                    async with db.execute(
+                        "SELECT COUNT(*), COALESCE(MAX(last_seen_seq - last_acked_seq), 0), COALESCE(MIN(last_acked_seq), 0) FROM sync_cursors"
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                    consumer_count = int(row[0]) if row else 0
+                    max_consumer_lag = int(row[1]) if row else 0
+                    min_acked = int(row[2]) if row else 0
+                    pipeline_lag = (
+                        max(server_max_seq - min_acked, 0) if consumer_count > 0 else 0
+                    )
                 finally:
                     await db.close()
 
                 if current_rowid != last_rowid:
                     last_rowid = current_rowid
                     yield "event: feed-update\ndata: refresh\n\n"
+
+                sync_signature = (
+                    server_max_seq,
+                    pending_conflicts,
+                    max_consumer_lag,
+                    consumer_count,
+                    pipeline_lag,
+                )
+                if sync_signature != last_sync_signature:
+                    last_sync_signature = sync_signature
+                    sync_payload = {
+                        "server_max_seq": server_max_seq,
+                        "pending_conflicts": pending_conflicts,
+                        "max_consumer_lag": max_consumer_lag,
+                        "consumer_count": consumer_count,
+                        "pipeline_lag": pipeline_lag,
+                    }
+                    yield f"event: sync-status\ndata: {json.dumps(sync_payload)}\n\n"
             except Exception as exc:
                 logger.debug(f"SSE poll error: {exc}")
 

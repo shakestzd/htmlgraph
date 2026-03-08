@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 PRAGMA_SETTINGS: dict[str, object] = {
     "journal_mode": "WAL",
     "synchronous": "NORMAL",
+    "foreign_keys": 1,
+    "busy_timeout": 5000,
     "cache_size": -64000,  # 64MB cache
     "temp_store": "MEMORY",
     "mmap_size": 268435456,  # 256MB mmap
@@ -25,6 +27,22 @@ async def apply_async_pragmas(conn: object) -> None:
     """Apply standard PRAGMAs to an async aiosqlite connection."""
     for pragma, value in PRAGMA_SETTINGS.items():
         await conn.execute(f"PRAGMA {pragma} = {value}")  # type: ignore[attr-defined]
+
+
+def run_sync_optimize(conn: sqlite3.Connection) -> None:
+    """Run SQLite optimize hook for planner/statistics upkeep."""
+    try:
+        conn.execute("PRAGMA optimize")
+    except sqlite3.Error as exc:
+        logger.debug("PRAGMA optimize skipped: %s", exc)
+
+
+async def run_async_optimize(conn: object) -> None:
+    """Run SQLite optimize hook for async connections."""
+    try:
+        await conn.execute("PRAGMA optimize")  # type: ignore[attr-defined]
+    except Exception as exc:  # pragma: no cover - defensive, backend-specific
+        logger.debug("PRAGMA optimize skipped: %s", exc)
 
 
 def check_integrity(conn: sqlite3.Connection) -> bool:

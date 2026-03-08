@@ -18,7 +18,7 @@ from htmlgraph.api.services import (
     AnalyticsService,
     OrchestrationService,
 )
-from htmlgraph.db.pragmas import apply_async_pragmas
+from htmlgraph.db.pragmas import apply_async_pragmas, run_async_optimize
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class Dependencies:
         db = await aiosqlite.connect(self.db_path)
         db.row_factory = aiosqlite.Row
         await apply_async_pragmas(db)
+        await run_async_optimize(db)
         return db
 
     def create_services(

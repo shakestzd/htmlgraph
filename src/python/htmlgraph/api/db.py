@@ -15,7 +15,7 @@ from sqlalchemy import Connection, create_engine
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from htmlgraph.db.pragmas import apply_async_pragmas
+from htmlgraph.db.pragmas import apply_async_pragmas, run_async_optimize
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,7 @@ async def get_db(db_path: str) -> AsyncGenerator[aiosqlite.Connection, None]:
         # Configure for named column access
         db.row_factory = aiosqlite.Row
         await apply_async_pragmas(db)
+        await run_async_optimize(db)
         yield db
 
 

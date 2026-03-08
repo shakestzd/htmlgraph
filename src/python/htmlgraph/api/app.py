@@ -40,18 +40,22 @@ def _ensure_database_initialized(db_path: str) -> None:
         tables = cursor.fetchall()
         table_names = [t[0] for t in tables]
 
-        if not table_names:
-            # Database is empty, create schema
-            logger.info(f"Creating database schema at {db_path}")
-            from htmlgraph.db.schema import HtmlGraphDB
+        # Always run create_tables() to apply migrations and add any missing
+        # tables introduced by newer versions.
+        logger.info(f"Ensuring database schema at {db_path}")
+        from htmlgraph.db.schema import HtmlGraphDB
 
-            db = HtmlGraphDB(db_path)
-            db.connect()
-            db.create_tables()
-            db.disconnect()
+        db = HtmlGraphDB(db_path)
+        db.connect()
+        db.create_tables()
+        db.disconnect()
+        if not table_names:
             logger.info("Database schema created successfully")
         else:
-            logger.debug(f"Database already initialized with tables: {table_names}")
+            logger.debug(
+                "Database schema verified and migrated (existing tables: %s)",
+                table_names,
+            )
 
         conn.close()
 

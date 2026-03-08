@@ -371,7 +371,60 @@ def create_all_tables(cursor: sqlite3.Cursor) -> None:
         )
     """)
 
-    # 16. FTS5 VIRTUAL TABLES - Full-text search (sessions_fts, events_fts)
+    # 17. OPLOG TABLE - Canonical local-first sync transport
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS oplog (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id TEXT NOT NULL UNIQUE,
+            idempotency_key TEXT NOT NULL UNIQUE,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            op TEXT NOT NULL CHECK(
+                op IN ('create', 'update', 'delete', 'upsert', 'patch')
+            ),
+            payload TEXT NOT NULL,
+            actor TEXT NOT NULL,
+            ts TEXT NOT NULL,
+            field_mask TEXT,
+            session_id TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 18. SYNC_CURSORS TABLE - Per-consumer cursor tracking
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sync_cursors (
+            consumer_id TEXT PRIMARY KEY,
+            last_seen_seq INTEGER NOT NULL DEFAULT 0,
+            last_acked_seq INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CHECK(last_seen_seq >= 0),
+            CHECK(last_acked_seq >= 0),
+            CHECK(last_acked_seq <= last_seen_seq)
+        )
+    """)
+
+    # 19. SYNC_CONFLICTS TABLE - Deterministic conflict records (LWW policy)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+            conflict_id TEXT PRIMARY KEY,
+            local_entry_id TEXT NOT NULL,
+            remote_entry_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            field_set TEXT NOT NULL,
+            policy TEXT NOT NULL,
+            resolution TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'resolved' CHECK(
+                status IN ('pending_review', 'resolved')
+            ),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (local_entry_id) REFERENCES oplog(entry_id) ON DELETE CASCADE,
+            FOREIGN KEY (remote_entry_id) REFERENCES oplog(entry_id) ON DELETE CASCADE
+        )
+    """)
+
+    # 20. FTS5 VIRTUAL TABLES - Full-text search (sessions_fts, events_fts)
     create_fts_tables(cursor)
 
 
@@ -466,6 +519,16 @@ def create_all_indexes(cursor: sqlite3.Cursor) -> None:
         "CREATE INDEX IF NOT EXISTS idx_sync_operations_status ON sync_operations(status, timestamp DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sync_operations_operation ON sync_operations(operation, timestamp DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sync_operations_timestamp ON sync_operations(timestamp DESC)",
+        # oplog indexes
+        "CREATE INDEX IF NOT EXISTS idx_oplog_seq ON oplog(seq DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_oplog_entity ON oplog(entity_type, entity_id, seq DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_oplog_actor_ts ON oplog(actor, ts DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_oplog_session_seq ON oplog(session_id, seq DESC)",
+        # sync_cursors indexes
+        "CREATE INDEX IF NOT EXISTS idx_sync_cursors_updated ON sync_cursors(updated_at DESC)",
+        # sync_conflicts indexes
+        "CREATE INDEX IF NOT EXISTS idx_sync_conflicts_status ON sync_conflicts(status, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_sync_conflicts_entity ON sync_conflicts(entity_type, entity_id, created_at DESC)",
     ]
 
     for index_sql in indexes:

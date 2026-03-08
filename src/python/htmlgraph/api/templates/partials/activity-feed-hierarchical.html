@@ -452,6 +452,14 @@ function handleParentClick(row) {
     }
 }
 
+// Auto-expand the most recent UserQuery turn on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const firstTurn = document.querySelector('.parent-row.has-children');
+    if (firstTurn) {
+        handleParentClick(firstTurn);
+    }
+});
+
 // Collapse all rows
 function collapseAll() {
     document.querySelectorAll('.child-row').forEach(child => {
@@ -461,4 +469,63 @@ function collapseAll() {
         icon.classList.remove('expanded');
     });
 }
+
+// Save/restore expanded state across HTMX live updates
+document.body.addEventListener('htmx:beforeRequest', function(evt) {
+    const target = evt.detail.target;
+    if (!target || !target.classList.contains('activity-feed-view')) return;
+
+    const expandedTurns = [];
+    document.querySelectorAll('.turn-children:not(.collapsed)').forEach(el => {
+        if (el.id) expandedTurns.push(el.id.replace('children-', ''));
+    });
+
+    const expandedChildContainers = [];
+    document.querySelectorAll('.child-children:not(.collapsed)').forEach(el => {
+        if (el.id) expandedChildContainers.push(el.id.replace('children-child-', ''));
+    });
+
+    const loadedParents = [];
+    document.querySelectorAll('[data-children-loaded="true"]').forEach(el => {
+        if (el.dataset.eventId) loadedParents.push(el.dataset.eventId);
+    });
+
+    const filterValue = document.getElementById('agent-type-filter')?.value || 'all';
+    target._expandedState = { expandedTurns, expandedChildContainers, loadedParents, filterValue };
+});
+
+document.body.addEventListener('htmx:afterSettle', function(evt) {
+    const target = evt.detail.target;
+    if (!target || !target.classList.contains('activity-feed-view')) return;
+
+    const state = target._expandedState;
+    if (!state) return;
+
+    state.expandedTurns.forEach(id => {
+        const container = document.getElementById('children-' + id);
+        const toggle = document.getElementById('toggle-' + id);
+        if (container) container.classList.remove('collapsed');
+        if (toggle) toggle.classList.add('expanded');
+    });
+
+    state.expandedChildContainers.forEach(id => {
+        const container = document.getElementById('children-child-' + id);
+        const toggle = document.getElementById('toggle-child-' + id);
+        if (container) container.classList.remove('collapsed');
+        if (toggle) toggle.classList.add('expanded');
+    });
+
+    state.loadedParents.forEach(id => {
+        const row = document.querySelector('[data-event-id="' + id + '"]');
+        if (row) row.dataset.childrenLoaded = 'true';
+    });
+
+    const filterEl = document.getElementById('agent-type-filter');
+    if (filterEl && state.filterValue && state.filterValue !== 'all') {
+        filterEl.value = state.filterValue;
+        if (typeof filterByAgentType === 'function') filterByAgentType(state.filterValue);
+    }
+
+    delete target._expandedState;
+});
 </script>

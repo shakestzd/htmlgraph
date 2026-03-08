@@ -17,6 +17,8 @@ Architecture:
 import logging
 import sqlite3
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -134,18 +136,22 @@ def _ensure_database_initialized(db_path: str) -> None:
         tables = cursor.fetchall()
         table_names = [t[0] for t in tables]
 
-        if not table_names:
-            # Database is empty, create schema
-            logger.info(f"Creating database schema at {db_path}")
-            from htmlgraph.db.schema import HtmlGraphDB
+        # Always run create_tables() because it applies migrations and creates
+        # newly introduced tables with IF NOT EXISTS.
+        logger.info(f"Ensuring database schema at {db_path}")
+        from htmlgraph.db.schema import HtmlGraphDB
 
-            db = HtmlGraphDB(db_path)
-            db.connect()
-            db.create_tables()
-            db.disconnect()
+        db = HtmlGraphDB(db_path)
+        db.connect()
+        db.create_tables()
+        db.disconnect()
+        if not table_names:
             logger.info("Database schema created successfully")
         else:
-            logger.debug(f"Database already initialized with tables: {table_names}")
+            logger.debug(
+                "Database schema verified and migrated (existing tables: %s)",
+                table_names,
+            )
 
         conn.close()
 
@@ -191,10 +197,20 @@ def get_app(db_path: str) -> FastAPI:
     # Ensure database is initialized
     _ensure_database_initialized(db_path)
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        """Single startup/shutdown lifecycle for cache and sync services."""
+        from htmlgraph.api.cache import init_cache_backend
+
+        await init_cache_backend()
+        logger.info("FastAPICache initialized")
+        yield
+
     app = FastAPI(
         title="HtmlGraph Dashboard API",
         description="Real-time agent observability dashboard",
         version="0.1.0",
+        lifespan=lifespan,
     )
 
     # Correlation ID middleware (add early so all downstream has request ID)
@@ -270,16 +286,6 @@ def get_app(db_path: str) -> FastAPI:
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-    # ========== STARTUP EVENT ==========
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        """Initialize cache backend on application startup."""
-        from htmlgraph.api.cache import init_cache_backend
-
-        await init_cache_backend()
-        logger.info("FastAPICache initialized")
-
     # ========== INITIALIZE ROUTES ==========
 
     # Initialize route dependencies
@@ -294,6 +300,8 @@ def get_app(db_path: str) -> FastAPI:
     from htmlgraph.api.routes.presence import router as presence_router
     from htmlgraph.api.routes.testing import init_testing_routes
     from htmlgraph.api.routes.testing import router as testing_router
+    from htmlgraph.api.sync_routes import init_sync_routes
+    from htmlgraph.api.sync_routes import router as sync_router
 
     deps = Dependencies(db_path=db_path, query_cache=app.state.query_cache)
 
@@ -302,6 +310,7 @@ def get_app(db_path: str) -> FastAPI:
     init_orchestration_routes(templates, deps)
     init_analytics_routes(deps)
     init_presence_routes(deps, db_path)
+    init_sync_routes(db_path=db_path, manager=None)
     init_testing_routes(deps)
 
     # Include all routers
@@ -309,6 +318,7 @@ def get_app(db_path: str) -> FastAPI:
     app.include_router(orchestration_router)
     app.include_router(analytics_router)
     app.include_router(presence_router)
+    app.include_router(sync_router)
     app.include_router(testing_router)
 
     return app

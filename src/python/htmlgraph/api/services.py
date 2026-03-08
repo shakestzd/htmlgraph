@@ -81,7 +81,7 @@ class ActivityService:
             """
 
             async with self.db.execute(user_query_sql, [limit]) as cursor:
-                user_query_rows = await cursor.fetchall()
+                user_query_rows: list[Any] = list(await cursor.fetchall())
 
             conversation_turns: list[dict[str, Any]] = []
 
@@ -134,7 +134,7 @@ class ActivityService:
             """
 
             # Step 2: For each UserQuery, fetch child events
-            for uq_row in user_query_rows:
+            for uq_idx, uq_row in enumerate(user_query_rows):
                 uq_event_id = uq_row[0]
                 uq_timestamp = uq_row[1]
                 uq_input = uq_row[2] or ""
@@ -272,6 +272,136 @@ class ActivityService:
                 ) = await fetch_children_recursive(
                     uq_event_id, uq_session_id, depth=0, max_depth=4
                 )
+
+                # Step 3.1: Attach orphaned same-session events (NULL parent_event_id).
+                # Race condition: PostToolUse hooks sometimes fire before the UserQuery
+                # event is written, leaving ~8% of orchestrator events with no parent.
+                # Strategy: for each UserQuery, find same-session events with NULL parent
+                # that occurred AFTER this UserQuery and BEFORE the next UserQuery.
+                # Determine the timestamp boundary for "next" UserQuery in this turn.
+                # Note: user_query_rows is ordered DESC, so next chronologically is at uq_idx+1
+                next_uq_timestamp: str | None = None
+                if uq_idx + 1 < len(user_query_rows):
+                    next_uq_timestamp = user_query_rows[uq_idx + 1][1]
+
+                already_fetched_ids = {c["event_id"] for c in children}
+
+                orphan_sql_with_bound = """
+                    SELECT
+                        event_id,
+                        tool_name,
+                        timestamp,
+                        input_summary,
+                        execution_duration_seconds,
+                        status,
+                        agent_id,
+                        model,
+                        context,
+                        subagent_type,
+                        feature_id
+                    FROM agent_events
+                    WHERE session_id = ?
+                      AND (parent_event_id IS NULL OR parent_event_id = '')
+                      AND tool_name NOT IN ('UserQuery', 'Stop', 'SessionStart', 'SessionEnd')
+                      AND timestamp >= ?
+                      AND timestamp < ?
+                    ORDER BY timestamp ASC
+                """
+                orphan_sql_no_bound = """
+                    SELECT
+                        event_id,
+                        tool_name,
+                        timestamp,
+                        input_summary,
+                        execution_duration_seconds,
+                        status,
+                        agent_id,
+                        model,
+                        context,
+                        subagent_type,
+                        feature_id
+                    FROM agent_events
+                    WHERE session_id = ?
+                      AND (parent_event_id IS NULL OR parent_event_id = '')
+                      AND tool_name NOT IN ('UserQuery', 'Stop', 'SessionStart', 'SessionEnd')
+                      AND timestamp >= ?
+                    ORDER BY timestamp ASC
+                """
+
+                if next_uq_timestamp is not None:
+                    async with self.db.execute(
+                        orphan_sql_with_bound,
+                        [uq_session_id, uq_timestamp, next_uq_timestamp],
+                    ) as cur:
+                        orphan_rows = await cur.fetchall()
+                else:
+                    async with self.db.execute(
+                        orphan_sql_no_bound,
+                        [uq_session_id, uq_timestamp],
+                    ) as cur:
+                        orphan_rows = await cur.fetchall()
+
+                for row in orphan_rows:
+                    evt_id = row[0]
+                    if evt_id in already_fetched_ids:
+                        continue
+
+                    tool = row[1]
+                    timestamp = row[2]
+                    input_text = row[3] or ""
+                    duration = row[4] or 0.0
+                    status = row[5]
+                    agent = row[6] or "unknown"
+                    model = row[7]
+                    context_json = row[8]
+                    subagent_type = row[9]
+                    feature_id = row[10]
+
+                    spawner_type = None
+                    spawned_agent = None
+                    if context_json:
+                        try:
+                            context = json.loads(context_json)
+                            spawner_type = context.get("spawner_type")
+                            spawned_agent = context.get("spawned_agent")
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+                    if not spawner_type and subagent_type:
+                        if ":" in subagent_type:
+                            spawner_type = subagent_type.split(":")[-1]
+                        else:
+                            spawner_type = subagent_type
+                        spawned_agent = agent
+
+                    summary = input_text[:80] + ("..." if len(input_text) > 80 else "")
+
+                    orphan_dict: dict[str, Any] = {
+                        "event_id": evt_id,
+                        "tool_name": tool,
+                        "timestamp": timestamp,
+                        "summary": summary,
+                        "duration_seconds": round(duration, 2),
+                        "agent": agent,
+                        "depth": 0,
+                        "model": model,
+                        "feature_id": feature_id,
+                    }
+                    if spawner_type:
+                        orphan_dict["spawner_type"] = spawner_type
+                    if spawned_agent:
+                        orphan_dict["spawned_agent"] = spawned_agent
+                    if subagent_type:
+                        orphan_dict["subagent_type"] = subagent_type
+
+                    children.append(orphan_dict)
+                    already_fetched_ids.add(evt_id)
+
+                    if status in ("recorded", "success"):
+                        children_success += 1
+                    else:
+                        children_error += 1
+                    children_duration += duration
 
                 # Step 3.5: Session-based re-parenting - nest subagent events under their Task events
                 # Solution: Use session_id pattern matching to find sub-session events
