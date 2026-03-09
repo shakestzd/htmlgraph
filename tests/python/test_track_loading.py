@@ -62,7 +62,7 @@ def test_load_directory_based_track(temp_graph_dir, isolated_db):
     (track_dir / "index.html").write_text(track_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test that the track is loaded
     all_tracks = sdk.tracks.all()
@@ -105,7 +105,7 @@ def test_load_file_based_track(temp_graph_dir, isolated_db):
     (temp_graph_dir / "tracks" / "track-file-001.html").write_text(track_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test that the track is loaded
     all_tracks = sdk.tracks.all()
@@ -168,7 +168,7 @@ def test_load_mixed_tracks(temp_graph_dir, isolated_db):
     (temp_graph_dir / "tracks" / "track-file-002.html").write_text(file_track_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test that both tracks are loaded
     all_tracks = sdk.tracks.all()
@@ -223,7 +223,7 @@ def test_track_where_query(temp_graph_dir, isolated_db):
     (track_dir2 / "index.html").write_text(track2_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test where query
     active_tracks = sdk.tracks.where(status="active")
@@ -263,7 +263,7 @@ def test_track_get_by_id(temp_graph_dir, isolated_db):
     (track_dir / "index.html").write_text(track_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test get
     track = sdk.tracks.get("track-get-test")
@@ -297,7 +297,7 @@ def test_track_edit_context_manager(temp_graph_dir, isolated_db):
     (track_dir / "index.html").write_text(track_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test edit context manager
     with sdk.tracks.edit("track-edit-test") as track:
@@ -322,7 +322,7 @@ def test_track_edit_nonexistent_track(temp_graph_dir, isolated_db):
     from htmlgraph.exceptions import NodeNotFoundError
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Try to edit a nonexistent track
     with pytest.raises(NodeNotFoundError) as exc_info:
@@ -355,7 +355,7 @@ def test_track_edit_file_based(temp_graph_dir, isolated_db):
     (temp_graph_dir / "tracks" / "track-file-edit.html").write_text(track_html)
 
     # Initialize SDK
-    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db))
+    sdk = SDK(directory=temp_graph_dir, db_path=str(isolated_db), agent="test-agent")
 
     # Test edit on file-based track
     with sdk.tracks.edit("track-file-edit") as track:

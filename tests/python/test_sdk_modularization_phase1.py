@@ -90,6 +90,8 @@ class TestDiscoveryModule:
     def test_auto_discover_agent_fallback(self, monkeypatch: Any) -> None:
         """Test auto_discover_agent fallback when env not set."""
         monkeypatch.delenv("HTMLGRAPH_AGENT", raising=False)
+        monkeypatch.delenv("CLAUDE_AGENT_NAME", raising=False)
+        monkeypatch.delenv("CLAUDE_CODE_VERSION", raising=False)
         result = auto_discover_agent()
         # Should return some default or detected agent
         assert isinstance(result, str)
@@ -452,11 +454,13 @@ class TestErrorHandling:
         with pytest.raises(Exception):
             BaseSDK(directory=Path("/nonexistent/path"), agent="test")
 
-    def test_missing_agent_handled(self, tmp_path: Path) -> None:
+    def test_missing_agent_handled(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Test missing agent parameter is handled."""
         htmlgraph_dir = tmp_path / ".htmlgraph"
         htmlgraph_dir.mkdir()
 
+        # Set agent via environment for auto-discovery
+        monkeypatch.setenv("HTMLGRAPH_AGENT", "auto-discovered-agent")
         # Should use auto-discovery
         sdk = BaseSDK(directory=htmlgraph_dir)
         assert sdk.agent is not None or sdk.agent == "unknown"
