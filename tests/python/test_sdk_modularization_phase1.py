@@ -102,6 +102,7 @@ class TestDiscoveryModule:
 
         # Mock both detection functions to return "cli" (the fallback that gets rejected)
         from htmlgraph import agent_detection
+
         monkeypatch.setattr(agent_detection, "_is_claude_code", lambda: False)
         monkeypatch.setattr(agent_detection, "_is_gemini", lambda: False)
 

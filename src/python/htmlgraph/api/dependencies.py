@@ -8,6 +8,7 @@ This module provides dependency injection for:
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import aiosqlite
@@ -51,7 +52,12 @@ class Dependencies:
         Returns:
             Tuple of (ActivityService, OrchestrationService, AnalyticsService)
         """
-        activity_service = ActivityService(db=db, cache=self.query_cache, logger=logger)
+        activity_service = ActivityService(
+            db=db,
+            cache=self.query_cache,
+            logger=logger,
+            htmlgraph_dir=Path(self.db_path).parent,
+        )
         orch_service = OrchestrationService(
             db=db, cache=self.query_cache, logger=logger
         )

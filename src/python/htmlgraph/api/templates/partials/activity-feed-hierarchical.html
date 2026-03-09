@@ -21,7 +21,6 @@
                     <tr>
                         <th class="col-activity">Event</th>
                         <th class="col-work-item">Work Item</th>
-                        <th class="col-status">Status</th>
                         <th class="col-ts">Time</th>
                     </tr>
                 </thead>
@@ -82,15 +81,11 @@
                                    class="work-item-badge work-item-type-{{ group.work_item_type }}"
                                    title="{{ group.work_item_title }}">
                                     <span class="work-item-type-label">{{ group.work_item_type | upper }}</span>
-                                    <span class="work-item-short-id">{{ group.work_item_id[-8:] }}</span>
+                                    <span class="work-item-name">{{ group.work_item_title if group.work_item_title else group.work_item_id[-8:] }}</span>
                                 </a>
                                 {% else %}
                                 <span class="work-item-empty">—</span>
                                 {% endif %}
-                            </td>
-
-                            <td class="col-status">
-                                <span class="status-badge status-{{ group.parent.status }}">{{ group.parent.status }}</span>
                             </td>
 
                             <td class="col-ts">
@@ -112,11 +107,6 @@
         {% endif %}
     </div>
 
-    <!-- Auto-refresh indicator -->
-    <div class="auto-refresh-indicator">
-        <span class="refresh-dot"></span>
-        Live updates enabled (via WebSocket)
-    </div>
 </div>
 
 <style>
@@ -177,7 +167,6 @@
 /* Column widths */
 .activity-table .col-activity  { width: auto; }
 .activity-table .col-work-item { width: 140px; }
-.activity-table .col-status    { width: 75px; }
 .activity-table .col-ts        { width: 80px; }
 
 /* Table header */
@@ -192,7 +181,6 @@
 }
 
 .activity-table thead th.col-ts { text-align: right; }
-.activity-table thead th.col-status { text-align: center; }
 
 /* Table rows */
 .activity-table tbody tr {
@@ -380,8 +368,6 @@
     white-space: nowrap;
 }
 
-/* Status cell */
-.activity-table td.col-status { text-align: center; }
 
 /* Timestamp cell */
 .activity-table td.col-ts {
@@ -416,7 +402,7 @@
 .work-item-type-bug     { background: #3a1a1a; color: #f44336; border: 1px solid #c62828; }
 .work-item-type-spike   { background: #1a2a3a; color: #2196f3; border: 1px solid #1565c0; }
 .work-item-type-track   { background: #2a1a3a; color: #ab47bc; border: 1px solid #6a1b9a; }
-.work-item-short-id { opacity: 0.75; font-size: 9px; }
+.work-item-name { opacity: 0.9; font-size: 9px; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .work-item-empty { color: var(--text-muted); font-size: 12px; }
 
 /* Row styles */

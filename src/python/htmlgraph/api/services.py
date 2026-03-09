@@ -9,9 +9,11 @@ Provides business logic extracted from route handlers:
 
 import json
 import logging
+import re
 import time
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import aiosqlite
@@ -29,10 +31,32 @@ class ActivityService:
         db: aiosqlite.Connection,
         cache: QueryCache,
         logger: logging.Logger | None = None,
+        htmlgraph_dir: Path | None = None,
     ):
         self.db = db
         self.cache = cache
         self.logger = logger or logging.getLogger(__name__)
+        self.htmlgraph_dir = htmlgraph_dir
+
+    def _read_title_from_html(self, item_id: str) -> str | None:
+        """Read work item title from its HTML file when not present in the DB.
+
+        Features, spikes, bugs, and tracks each live in a subdirectory of
+        .htmlgraph/.  We try each in order and extract the <title> tag.
+        """
+        if not self.htmlgraph_dir:
+            return None
+        for subdir in ("features", "spikes", "bugs", "tracks"):
+            html_path = self.htmlgraph_dir / subdir / f"{item_id}.html"
+            if html_path.exists():
+                try:
+                    text = html_path.read_text(encoding="utf-8", errors="replace")
+                    m = re.search(r"<title[^>]*>([^<]+)</title>", text, re.IGNORECASE)
+                    if m:
+                        return m.group(1).strip()
+                except OSError:
+                    pass
+        return None
 
     async def get_grouped_events(
         self,
@@ -676,7 +700,12 @@ class ActivityService:
                     most_common_id = Counter(child_feature_ids).most_common(1)[0][0]
                     feat = features_map.get(most_common_id, {})
                     turn["work_item_id"] = most_common_id
-                    turn["work_item_title"] = feat.get("title", "")
+                    # Prefer DB title; fall back to parsing the HTML file directly
+                    # (many items exist only as HTML files, not in the features table)
+                    title = feat.get("title") or self._read_title_from_html(
+                        most_common_id
+                    )
+                    turn["work_item_title"] = title or ""
                     turn["work_item_type"] = feat.get("type", "feature")
                 else:
                     turn["work_item_id"] = None
