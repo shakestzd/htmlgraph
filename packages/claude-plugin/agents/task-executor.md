@@ -54,12 +54,15 @@ sdk = SDK(agent='task-executor')
 
 # Check what's currently in-progress
 active = sdk.features.where(status='in-progress')
-
-# If the task spec references a specific work item, start it:
-# sdk.features.start('feat-XXXX')
 ```
 
-2. **Record what you executed and the outcome** when complete:
+2. **Start the work item** if it is not already in-progress. The task spec will reference the target feature or bug:
+```python
+# Start the relevant work item so it is tracked as in-progress
+sdk.features.start('feat-XXXX')
+```
+
+3. **Record what you executed and the outcome** when complete:
 ```python
 # For features:
 with sdk.features.edit('feat-XXXX') as f:

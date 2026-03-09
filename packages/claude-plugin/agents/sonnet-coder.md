@@ -100,13 +100,15 @@ sdk = SDK(agent='sonnet-coder')
 
 # Check what's currently in-progress
 active = sdk.features.where(status='in-progress')
-
-# If the task description references a specific work item, start it:
-# sdk.features.start('feat-XXXX')
-# sdk.bugs.start('bug-XXXX')
 ```
 
-2. **Record what you implemented and why** when complete:
+2. **Start the work item** if it is not already in-progress. Look at the task description for clues about which feature or bug this work belongs to:
+```python
+# Start the relevant work item so it is tracked as in-progress
+sdk.features.start('feat-XXXX')  # or sdk.bugs.start('bug-XXXX')
+```
+
+3. **Record what you implemented and why** when complete:
 ```python
 # For features:
 with sdk.features.edit('feat-XXXX') as f:

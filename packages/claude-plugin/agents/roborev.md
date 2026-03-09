@@ -186,12 +186,15 @@ sdk = SDK(agent='roborev')
 
 # Check what's currently in-progress
 active = sdk.features.where(status='in-progress')
-
-# If the review targets a specific feature's commits, start it:
-# sdk.features.start('feat-XXXX')
 ```
 
-2. **Record your review results** when complete:
+2. **Start the work item** if it is not already in-progress. If the review targets a specific feature's commits, start that feature:
+```python
+# Start the relevant work item so it is tracked as in-progress
+sdk.features.start('feat-XXXX')
+```
+
+3. **Record your review results** when complete:
 ```python
 # For features:
 with sdk.features.edit('feat-XXXX') as f:

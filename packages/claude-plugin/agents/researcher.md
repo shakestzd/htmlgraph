@@ -217,13 +217,15 @@ sdk = SDK(agent='researcher')
 # Check what's currently in-progress
 active = sdk.features.where(status='in-progress')
 active_spikes = sdk.spikes.where(status='in-progress')
-
-# If the task description references a specific work item, start it:
-# sdk.features.start('feat-XXXX')
-# sdk.spikes.start('spk-XXXX')
 ```
 
-2. **Record your research findings** when complete:
+2. **Start the work item** if it is not already in-progress. Look at the task description for clues about which feature or spike this research belongs to:
+```python
+# Start the relevant work item so it is tracked as in-progress
+sdk.features.start('feat-XXXX')  # or sdk.spikes.start('spk-XXXX')
+```
+
+3. **Record your research findings** when complete:
 ```python
 # For features (research supporting a feature):
 with sdk.features.edit('feat-XXXX') as f:
