@@ -25,11 +25,11 @@ class TestSDKAgentParameterRequired:
     """Test that agent parameter is required for SDK initialization."""
 
     def test_sdk_without_agent_uses_detected_value(
-        self, tmp_htmlgraph: Path, isolated_db: Path
+        self, tmp_htmlgraph: Path, isolated_db: Path, monkeypatch
     ):
         """SDK() without explicit agent uses detect_agent_name() if not CLI."""
-        # In test environment, detect_agent_name() will return "claude-code"
-        # (because CLAUDE_CODE_VERSION is set in test environment)
+        # Use CLAUDE_AGENT_NAME env var so detection works consistently in CI
+        monkeypatch.setenv("CLAUDE_AGENT_NAME", "claude-code")
         sdk = SDK(directory=tmp_htmlgraph, db_path=str(isolated_db))
 
         # Should use detected agent
@@ -155,10 +155,11 @@ class TestSpikeBuilderWarning:
     """Test that warning is logged when spike created without agent."""
 
     def test_spike_created_always_has_agent(
-        self, tmp_htmlgraph: Path, isolated_db: Path
+        self, tmp_htmlgraph: Path, isolated_db: Path, monkeypatch
     ):
         """Spike created should always have agent_assigned from SDK."""
-        # Even without explicit agent, SDK detects one
+        # Use CLAUDE_AGENT_NAME env var so detection works consistently in CI
+        monkeypatch.setenv("CLAUDE_AGENT_NAME", "claude-code")
         sdk = SDK(directory=tmp_htmlgraph, db_path=str(isolated_db))
 
         spike = sdk.spikes.create("Test Spike").save()

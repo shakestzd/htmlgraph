@@ -372,7 +372,7 @@ class TestSDKHandoff:
     def test_feature_builder_has_complete_and_handoff(self, isolated_db):
         """Verify FeatureBuilder has complete_and_handoff method."""
         with TemporaryDirectory() as tmpdir:
-            sdk = SDK(directory=tmpdir, db_path=str(isolated_db))
+            sdk = SDK(directory=tmpdir, agent="test-agent", db_path=str(isolated_db))
 
             builder = sdk.features.create("Test Feature")
             assert hasattr(builder, "complete_and_handoff")
@@ -380,7 +380,7 @@ class TestSDKHandoff:
     def test_complete_and_handoff_sets_fields(self, isolated_db):
         """Verify complete_and_handoff sets handoff fields."""
         with TemporaryDirectory() as tmpdir:
-            sdk = SDK(directory=tmpdir, db_path=str(isolated_db))
+            sdk = SDK(directory=tmpdir, agent="test-agent", db_path=str(isolated_db))
 
             track = sdk.tracks.create("Test Track").save()
             feature = (
@@ -401,7 +401,7 @@ class TestSDKHandoff:
     def test_complete_and_handoff_with_priority(self, isolated_db):
         """Verify complete_and_handoff chains with other methods."""
         with TemporaryDirectory() as tmpdir:
-            sdk = SDK(directory=tmpdir, db_path=str(isolated_db))
+            sdk = SDK(directory=tmpdir, agent="test-agent", db_path=str(isolated_db))
 
             track = sdk.tracks.create("Test Track").save()
             feature = (
