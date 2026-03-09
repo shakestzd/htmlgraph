@@ -250,20 +250,21 @@
         /**
          * Refresh the activity feed with a full reload into #content-area.
          *
-         * The old delta approach (/views/activity-feed/delta?since=<event_id>)
-         * only returned rows for brand-new UserQuery events, leaving tool events
-         * within an ongoing session invisible. Full reload always shows current state.
-         *
-         * Expand state is saved/restored via the existing htmx:beforeSwap /
-         * htmx:afterSettle handlers (window._htmxFeedExpandedState).
+         * The server response includes ALL rows (parent + children) inline.
+         * Children are rendered with class="hidden" by default, and expand
+         * state is managed purely in JS.  Before the morph swap we save
+         * which event IDs are expanded; after the morph we restore them.
+         * This ensures expanded rows STAY expanded across live SSE updates.
          *
          * Called by the SSE handler when a feed-update event arrives.
          */
         function refreshActivityFeed() {
             if (activeView !== 'activity-feed' || !activityFeedReady) return;
 
-            // Morph swap — idiomorph diffs the DOM in-place so expanded rows
-            // are patched rather than destroyed, preserving expand state natively.
+            // Morph swap — idiomorph diffs the DOM in-place using stable
+            // id="row-{event_id}" attributes.  Expand state (CSS classes)
+            // is saved before morph and restored after via htmx:beforeMorph
+            // and htmx:afterSettle handlers in activity-feed-hierarchical.html.
             htmx.ajax('GET', '/views/activity-feed', {target: '#content-area', swap: 'morph:innerHTML'});
         }
 
@@ -289,8 +290,11 @@
             connect();
         }
 
-        // Expansion state is preserved natively by idiomorph morph swaps —
-        // no manual save/restore needed.
+        // Expand state is preserved across morph swaps by explicit JS
+        // save/restore in activity-feed-hierarchical.html (htmx:beforeMorph
+        // saves expanded event IDs, htmx:afterSettle restores them).
+        // Idiomorph alone does NOT preserve expand state because child row
+        // visibility is controlled by CSS classes, not DOM structure.
 
         /**
          * Format timestamp to readable format (HH:MM:SS)
