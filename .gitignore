@@ -68,6 +68,13 @@ CODEX.md
 .htmlgraph/parent-activity.json
 .htmlgraph/logs/errors/
 
+# HtmlGraph runtime logs (contain sensitive paths/prompts)
+.htmlgraph/hook-debug.jsonl
+.htmlgraph/errors.jsonl
+.htmlgraph/active-auto-spikes.json
+.htmlgraph/.error-spikes.json
+.htmlgraph/logs/
+
 # HtmlGraph backup and test files
 .htmlgraph/index.sqlite.backup
 .htmlgraph/*.backup
