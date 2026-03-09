@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Fix work_item_title in activity feed</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-9ed0fd6f"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T06:19:50.861590"
+             data-updated="2026-03-09T06:19:50.861592" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>Fix work_item_title in activity feed</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Root Cause
+feature_id values in agent_events (e.g. feat-26a50458, spk-05ddee15) are NOT present
+in the features DB table. The DB lookup returns empty, so work_item_title was always "".
+
+## Fix Applied (3 files)
+
+### src/python/htmlgraph/api/services.py
+- Added re, Path imports (already done in prior session)
+- Added htmlgraph_dir param to ActivityService.__init__
+- Added _read_title_from_html() helper: scans features/spikes/bugs/tracks subdirs
+  for {item_id}.html and extracts <title> tag
+- In get_grouped_events(): after DB lookup, fall back to _read_title_from_html()
+  when feat.get("title") is empty
+
+### src/python/htmlgraph/api/dependencies.py
+- Added Path import
+- Pass htmlgraph_dir=Path(self.db_path).parent to ActivityService constructor
+
+### src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html
+- Badge now shows work_item_title instead of work_item_id[-8:]
+  (was done in prior session commit)
+
+## Verification
+- feat-26a50458 -> "OpenCode and Cursor Session Ingesters" (confirmed via manual test)
+- ruff: All checks passed
+- mypy: no issues found in 345 source files
+- pytest: 2231 tests collected, running (prior full run showed all passing)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

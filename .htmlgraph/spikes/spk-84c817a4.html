@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard Live Update Architecture</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-84c817a4"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T20:43:48.017585"
+             data-updated="2026-03-07T20:43:48.017587" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Dashboard Live Update Architecture</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem Statement
+
+HtmlGraph dashboard has a brittle real-time architecture with three specific bugs:
+1. SSE fires feed-update events but /activity-feed/stream route does NOT EXIST as a registered endpoint — it is a dead reference in the template. The EventSource in initActivityFeedSSE() connects to a 404.
+2. Dual refresh paths: WebSocket (ws/events) handles individual event streaming + calls debouncedFeedRefresh on high-signal events; SSE (broken) also calls debouncedFeedRefresh. They are uncoordinated and the SSE path is dead.
+3. htmx partial swaps of #activity-feed-body wipe expanded row state. The refreshActivityFeed() function works around this manually: snapshot expanded rows → fetch → replace innerHTML → re-insert cloned children. This is fragile (clone loses htmx bindings, IDs can collide on re-render).
+
+## Current Architecture (Actual)
+
+WebSocket /ws/events:
+- Polls agent_events table every 0.3-2.0s (adaptive)
+- Polls live_events table for spawner activity
+- Sends raw JSON events to browser
+- Browser JS handles high-signal events (UserQuery, task_delegation, completion) by calling debouncedFeedRefresh()
+- debouncedFeedRefresh() calls refreshActivityFeed() after 800ms debounce
+
+refreshActivityFeed():
+- Guards: only runs if activeView === activity-feed AND activityFeedReady
+- Snapshots expanded rows (saves cloned DOM nodes)
+- fetch('/views/activity-feed') → parse response HTML
+- Replace currentTbody.innerHTML with newTbody.innerHTML
+- htmx.process(currentTbody) to re-init htmx bindings
+- Re-insert cloned children for previously expanded rows
+- Race condition: if activityFeedReady is false when SSE/WS fires, refresh is silently skipped
+
+SSE initActivityFeedSSE():
+- Connects to EventSource('/activity-feed/stream')
+- Route DOES NOT EXIST — will get 404/error response
+- EventSource auto-reconnects, creating a reconnect storm
+- Calls debouncedFeedRefresh on feed-update events (never fires)
+
+## Root Cause Analysis
+
+Bug 1 (SSE race): The SSE endpoint is missing. The comment says it was built but no route registers /activity-feed/stream in any Python file. This means the SSE path is completely dead — but also EventSource is creating a reconnect loop hitting a 404.
+
+Bug 2 (Dual paths): WebSocket already does everything SSE was meant to do. SSE was added as a second notification channel but was never wired server-side.
+
+Bug 3 (Expanded state loss): innerHTML replacement destroys htmx state. Cloning DOM nodes and re-inserting them re-creates the visual structure but not the htmx event listeners (htmx.process() is called on tbody but not on re-inserted children). The hx-get attributes on child rows may not re-bind correctly.
+
+## What Production Observability Tools Do
+
+Jaeger UI (React SPA):
+- Does NOT use real-time streaming at all for trace view
+- Traces are fetched once on demand (user searches, clicks trace)
+- No live-updating trace tree — traces are immutable after completion
+- Uses polling only for the search results list, not the tree itself
+
+Grafana:
+- Uses WebSocket for alerting state
+- Uses polling (configurable interval) for dashboard panels
+- Each panel independently polls its data source
+- Does not attempt live-updating tree views — panels show snapshots
+
+DataDog:
+- Live tail uses SSE (one-directional, server-push)
+- Trace view is static (fetched on demand, not live)
+- APM dashboards poll, not push
+
+Key insight: No production observability tool tries to live-update an expanded tree view in real time. They separate concerns: the LIST refreshes live, individual TRACE/TREE views are fetched on-demand and are static.
+
+## SSE vs WebSocket vs Polling Analysis
+
+For HtmlGraph specifically (server-push only, no client-to-server data needed):
+
+SSE advantages:
+- HTTP/1.1 compatible, works through proxies/firewalls
+- Auto-reconnect built into browser EventSource
+- Simpler server implementation (streaming HTTP response)
+- No upgrade handshake
+- FastAPI/Starlette native support via StreamingResponse
+
+SSE disadvantages:
+- Browser limit: 6 concurrent SSE connections per domain (per HTTP/1.1; unlimited with HTTP/2)
+- Text-only (UTF-8)
+- Half-duplex only
+
+WebSocket advantages:
+- Full-duplex (but HtmlGraph doesnt need client-to-server)
+- Lower latency per message
+- No 6-connection browser limit
+
+WebSocket disadvantages:
+- More complex: requires upgrade handshake, keep-alive pings, reconnect logic
+- Some corporate proxies block WS
+- Overkill for server-push-only use case
+- Already implemented but adds complexity (WebSocketManager, connection pooling, etc.)
+
+Verdict for HtmlGraph: SSE is sufficient and simpler. The current WebSocket sends data the browser doesnt need to send back. The only bidirectional interaction is the initial since= param, which can be a URL query param on the SSE request.
+
+## Polling vs Push Analysis
+
+Current approach: Server polls SQLite every 0.3-2.0s per connected WebSocket client. This is pull-at-server, push-to-client — a hybrid. For SQLite (single writer), this is fine since SQLite has no native push mechanism. The adaptive interval (0.3s when active, up to 2.0s when idle) is correct.
+
+Alternative: Pure client polling (setInterval fetch). For a single-user local dashboard this is actually simpler and eliminates the persistent connection complexity. At 2-5s intervals it is perfectly responsive for agent activity.
+
+For HtmlGraph (typically 1-3 simultaneous users of a local dashboard), either approach works. The current server-polling approach is more responsive but more complex.
+
+## Recommended Architecture
+
+### Transport: Single SSE connection (replace dual WebSocket + dead SSE)
+
+Remove: WebSocket /ws/events connection in browser JS
+Remove: Dead initActivityFeedSSE() referencing /activity-feed/stream
+Add: One SSE endpoint /api/events/stream that does what the WebSocket currently does
+Add: EventSource('/api/events/stream') in browser
+
+The SSE endpoint server-side is identical to current WebSocket poll loop, just using StreamingResponse + text/event-stream format instead of WS frames.
+
+### Feed Refresh: Server-sent HTML fragments via SSE OOB (htmx extension pattern)
+
+Instead of: SSE triggers JS fetch of full feed HTML, JS manually replaces innerHTML
+Use: SSE sends event-type=feed-update, client does targeted fetch of ONLY new items since last render
+
+Better pattern (documented htmx + SSE approach):
+- SSE sends signal: event: feed-update
+data: {last_event_id}
+- Client JS receives signal, does htmx.ajax GET /views/activity-feed/delta?since={last_event_id}
+- Server returns ONLY new conversation turns as HTML fragments
+- Client prepends fragments to top of list (insertAdjacentHTML beforebegin)
+- Expanded rows are NEVER touched — only new rows are added at top
+
+This eliminates the state-loss problem entirely: existing rows are never re-rendered.
+
+### Tree View: Static on expand, no live re-render
+
+Follow Jaeger/Grafana pattern: the tree is a snapshot.
+- User clicks to expand a conversation turn: fetch children once via htmx hx-get
+- Children are rendered and stay put
+- Live updates only add NEW conversation turns at the top
+- Existing open trees do not refresh (they represent past, completed work)
+- For the active (in-progress) turn: show a live indicator but dont re-render children
+
+This is the key architectural insight: past turns are immutable, only the current turn grows.
+
+### State Preservation
+
+For the active current turn (only one at a time):
+- Use hx-preserve on the currently-open turn container
+- OR: track the turn ID in JS, skip it during prepend operations
+
+For past turns:
+- Never re-render them — they are done
+- The only operation on the list is prepend (new items) and append-children (on expand click)
+
+### Concrete Implementation Plan
+
+1. Fix immediate bug: Remove EventSource('/activity-feed/stream') from initActivityFeedSSE() or add the missing SSE route (simple: copy the WebSocket poll loop, output as SSE)
+
+2. Unify transport: Pick ONE — recommend keeping WebSocket for now (its already working) and just removing the dead SSE EventSource. Add the missing /activity-feed/stream SSE route to make the SSE path functional as a simpler alternative.
+
+3. Fix refresh strategy: Replace full innerHTML swap with delta/prepend approach
+   - Add /views/activity-feed/delta?since= endpoint returning only new turns
+   - refreshActivityFeed() becomes: fetch delta, prepend new turns, htmx.process new turns only
+   - Zero state loss because existing DOM is never touched
+
+4. Fix activityFeedReady race: Set activityFeedReady=true in htmx:afterSettle event (not afterSwap), and queue any missed refresh signals to replay after ready
+
+5. Long-term simplification: Replace WebSocket with SSE (one less protocol), use htmx SSE extension for declarative event handling
+
+## Simplest Robust Architecture Summary
+
+Transport: ONE SSE connection /api/events/stream
+Signal type: feed-update (opaque ping, no data needed)
+On signal: fetch /views/activity-feed/delta?since=LAST_SEEN_ID (returns HTML fragment of new turns only)
+Render: insertAdjacentHTML(afterbegin) on the turns list container — prepend only
+Tree expansion: htmx hx-get on click, children fetched once, never re-rendered
+State: No state to preserve because existing DOM is never modified
+
+This is the Grafana/DataDog pattern applied to htmx: push signals, pull data, append-only rendering.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

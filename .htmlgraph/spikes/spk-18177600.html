@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Attribution Test - Codebase Analysis</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-18177600"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-08T03:36:29.618422"
+             data-updated="2026-03-08T03:36:29.618423" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Attribution Test - Codebase Analysis</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## apply_sync_pragmas — 4 files
+
+1. src/python/htmlgraph/db/pragmas.py (definition, line 20)
+2. src/python/htmlgraph/db/schema.py (import + call at line 87, inside DatabaseManager.__init__)
+3. src/python/htmlgraph/analytics/cost_monitor.py (import + call at line 195, inside CostMonitor connection setup)
+4. tests/python/test_hypothesis_sqlite.py (import + call at line 49, inside hypothesis test fixture)
+
+## apply_async_pragmas — 4 files (9 call-sites)
+
+1. src/python/htmlgraph/db/pragmas.py (definition, line 26)
+2. src/python/htmlgraph/api/dependencies.py (import + call at line 37, in async DB dependency)
+3. src/python/htmlgraph/api/db.py (import + call at line 107, in async DB pool setup)
+4. src/python/htmlgraph/api/oplog_sync.py (import + 4 calls at lines 47, 169, 234, 249 — every oplog sync connection)
+
+## from htmlgraph.db.pragmas imports — 7 files
+
+1. src/python/htmlgraph/db/pragmas.py (self — definitions)
+2. src/python/htmlgraph/db/schema.py
+3. src/python/htmlgraph/api/dependencies.py
+4. src/python/htmlgraph/api/db.py
+5. src/python/htmlgraph/api/oplog_sync.py
+6. src/python/htmlgraph/analytics/cost_monitor.py
+7. src/python/htmlgraph/analytics_index.py
+8. tests/python/test_hypothesis_sqlite.py
+
+Total: 7 non-definition files import from htmlgraph.db.pragmas (8 including the module itself).
+
+## configure_opentelemetry — 2 files
+
+1. src/python/htmlgraph/api/telemetry.py (definition, line 9)
+2. src/python/htmlgraph/api/main.py (import at line 185, called at line 193 during app startup)
+
+## CorrelationIdMiddleware — 1 file
+
+1. src/python/htmlgraph/api/main.py (lines 218-220, conditionally imported from asgi_correlation_id and added as middleware)
+
+## Key observations
+
+- PRAGMA settings are centralized in a single module (pragmas.py) with a dict PRAGMA_SETTINGS — WAL, NORMAL sync, FK enforcement, 5s busy timeout, 64MB cache, 256MB mmap.
+- Sync path (sqlite3) and async path (aiosqlite) have symmetric wrapper functions.
+- oplog_sync.py is the heaviest consumer of apply_async_pragmas (4 call-sites), suggesting each sync operation opens its own connection rather than reusing a pool.
+- configure_opentelemetry and CorrelationIdMiddleware are both guarded by try/import blocks in main.py, making telemetry and correlation IDs optional dependencies.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

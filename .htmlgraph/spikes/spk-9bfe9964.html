@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Native JSONL Ingestion Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-9bfe9964"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T20:46:38.327578"
+             data-updated="2026-03-07T20:46:38.327581" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Native JSONL Ingestion Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+Evaluate whether Claude Code native JSONL transcripts can replace hooks as the source of truth for HtmlGraph activity tracking, specifically solving attribution problems that hooks cannot.
+
+## Schema Documentation
+
+### File Locations
+- Main session transcripts: ~/.claude/projects/{project_hash}/{session_id}.jsonl
+  - project_hash = project_path with / replaced by -
+  - e.g. /Users/shakes/DevProjects/htmlgraph -> -Users-shakes-DevProjects-htmlgraph
+- Subagent transcripts: ~/.claude/projects/{project_hash}/{session_id}/subagents/agent-{agentId}.jsonl
+- Subagent meta: same dir, agent-{agentId}.meta.json (contains only {"agentType": "htmlgraph:researcher"})
+- Sessions index: ~/.claude/projects/{project_hash}/sessions-index.json (maps sessionId -> fullPath, firstPrompt, summary, messageCount, created, modified, gitBranch, projectPath, isSidechain)
+- Tool results: {session_dir}/tool-results/{id}.txt (large outputs stored separately)
+
+### Record Types (one JSON object per JSONL line)
+
+1. **user** - Human turn OR tool_result wrapper
+   - Fields: uuid, parentUuid, sessionId, isSidechain, agentId (if subagent), cwd, version, gitBranch, type, message, timestamp, userType, permissionMode
+   - message.content: string (human prompt) OR list of tool_result blocks
+   - tool_result block: {type: "tool_result", tool_use_id: "toolu_XXX", content: [...]}
+   - sourceToolAssistantUUID: links back to the assistant record that issued the tool_use
+   - toolUseResult: contains the actual structured result (for non-text tools like ToolSearch)
+
+2. **assistant** - Model response with optional tool_use blocks
+   - Fields: uuid, parentUuid, sessionId, isSidechain, agentId (if subagent), type, message, requestId, timestamp
+   - message.model, message.id (msg_XXX), message.content (array of text/thinking/tool_use blocks)
+   - message.usage: input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens, service_tier, cache_creation (ephemeral_5m/1h breakdown)
+   - message.stop_reason: "tool_use" | "end_turn" | null (streaming, appears in final record for same msg_id)
+   - tool_use block: {type: "tool_use", id: "toolu_XXX", name: "Bash"|"Read"|"Task"|"Agent"|..., input: {...}, caller: {type: "direct"}}
+   - IMPORTANT: streaming means the SAME msg_id appears across 2 consecutive assistant records - first with stop_reason=null (thinking/text), second with stop_reason="tool_use" (tool_use blocks)
+
+3. **progress** - Hook and agent activity (3 subtypes)
+   - hook_progress: {type: "hook_progress", hookEvent: "PreToolUse", hookName: "...", command: "..."}
+     - toolUseID and parentToolUseID: the toolu_XXX id this hook fired for
+   - bash_progress: streaming bash output lines
+     - toolUseID and parentToolUseID: the toolu_XXX bash call id
+   - agent_progress: subagent messages mirrored into parent session
+     - data.message: full user or assistant message from the subagent
+     - toolUseID: agent_msg_XXX (a synthetic id, NOT a toolu_XXX)
+     - parentToolUseID: the toolu_XXX of the Agent/Task tool_use that spawned this subagent
+     - parentUuid: changes per agent_progress record (walks the subagent parentUuid chain)
+
+4. **system** - Hook completion summaries, subtype="stop_hook_summary"
+   - hookCount, hookInfos: [{command, durationMs}]
+
+5. **queue-operation** - Background task notifications
+   - operation: "enqueue" | "dequeue"
+   - content: XML-like string with task-id, tool-use-id, output-file, status, summary
+   - The tool-use-id here is the toolu_XXX of the background Task/Agent call
+
+6. **file-history-snapshot** - File state tracking (no uuid, messageId only)
+
+7. **last-prompt** - Last prompt text + sessionId (no uuid, not indexable)
+
+### Subagent Records (in subagents/agent-{id}.jsonl)
+All records have: isSidechain=true, agentId={id}, sessionId={PARENT session_id}
+- First record: type=user, parentUuid=null (subagent root)
+- Subsequent: same structure as main session but all isSidechain=true
+- progress records: parentToolUseID = the toolu_XXX of the tool being called WITHIN the subagent (NOT the parent Task that spawned it)
+
+### Critical Attribution Links
+
+**Orchestrator -> Subagent linkage** (4 independent paths):
+1. agent_progress.parentToolUseID in main JSONL -> the Agent/Task tool_use_id that spawned the subagent
+2. Agent tool_result content text: "Async agent launched successfully. agentId: {agentId}" -> directly states agentId
+3. queue-operation.content XML: <tool-use-id>toolu_XXX</tool-use-id> -> links background task to its tool_use_id
+4. Task output files: /tmp/claude-501/.../tasks/{agentId}.output symlinks to subagents/agent-{agentId}.jsonl
+
+**Tool name disambiguation**: "Task" (foreground, HtmlGraph custom) vs "Agent" (background, Claude Code builtin). Both appear as tool_use blocks in assistant records.
+
+### parentUuid Chain Structure
+
+Main session chain (isSidechain=false):
+  user(prompt) -> assistant(thinking) -> assistant(tool_use) -> user(tool_result) -> assistant -> ...
+
+Walking UP from any tool_use: parentUuid chain reliably reaches the originating user turn in 2-4 hops.
+Confirmed: 3 intermediate assistant hops then non-tool_result user = originating UserQuery.
+
+Subagent chain (isSidechain=true, separate file):
+  user(null parentUuid, root prompt) -> assistant -> assistant(tool_use) -> user(tool_result) -> ...
+  Same structure as main session but isolated in separate JSONL file.
+
+## Token/Cost Data
+
+Every assistant record has usage block:
+- input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens
+- cache_creation.ephemeral_5m_input_tokens, cache_creation.ephemeral_1h_input_tokens
+- service_tier: "standard"
+- server_tool_use.web_search_requests, web_fetch_requests
+
+This data is NOT available in hooks at all. JSONL is the ONLY source for token cost attribution.
+
+## File Write Timing
+
+JSONL files are written in real-time (append-on-each-turn), not buffered at session end.
+Evidence: subagent file mtimes are within seconds of the main session mtime, showing live append behavior.
+The main session JSONL and subagent JSONLs are written concurrently and independently.
+
+## Existing HtmlGraph Usage of Transcripts
+
+transcript.py already exists at src/python/htmlgraph/hooks/transcript.py and does:
+- Walks parentUuid chain to find originating user turn for a given tool_use_id
+- Used by hooks for parallel-safe parent resolution
+- Uses "most recently modified .jsonl file" heuristic (WRONG for parallel sessions - reads most recently touched file in project dir, not the specific session file)
+- Cached per tool_use_id
+
+## Key Answers
+
+### Does parentUuid give perfect call-tree attribution with zero ambiguity?
+YES, within a single session file. The chain is deterministic: tool_use_id -> assistant record -> walk parentUuid -> user record.
+For subagents: attribution requires combining main session agent_progress.parentToolUseID with subagent JSONL agentId.
+The agentId in subagent files matches the agentId in the Agent tool_result text, providing the cross-file link.
+
+### Where does Claude Code write transcripts? Accessible in real-time?
+~/.claude/projects/{hash}/{sessionId}.jsonl - YES, accessible in real-time (append per turn).
+Subagents: {session_dir}/subagents/agent-{agentId}.jsonl - also real-time.
+File-watcher (e.g. watchdog or kqueue/FSEvents) can tail these files as they grow.
+
+### File-watcher vs hook approach?
+Hooks: synchronous, fire on every tool call, receive hook_input JSON with tool_use_id and tool_name.
+JSONL watcher: async (small latency after each turn), requires parsing, but gets ALL data hooks miss:
+  - Token counts / costs (not in hook input at all)
+  - thinking blocks (extended thinking content)
+  - Exact tool input/output pairs (hooks only get input, not result)
+  - Complete message history for reconstruction
+  - Subagent content mirrored via agent_progress (no SubagentStop hook needed)
+Latency: hooks fire ~0ms, JSONL writes appear within ~100ms of the turn completing.
+
+### Can we reconstruct complete orchestrator->subagent->tool hierarchy from JSONL alone?
+YES. Complete reconstruction algorithm:
+1. Read main session JSONL, index by uuid
+2. For each Agent/Task tool_use: find its tool_result to get agentId
+3. Open subagents/agent-{agentId}.jsonl for each agentId
+4. For each tool_use in subagent JSONL: parentUuid chain -> subagent user root
+5. agent_progress records in main JSONL contain mirrored subagent messages, cross-linked by parentToolUseID
+
+### Latency: JSONL vs hooks?
+Hooks: 0ms (synchronous, fire before/after each tool)
+JSONL: ~100-500ms per turn (file system write latency + watcher poll interval)
+For activity tracking (not real-time control), JSONL latency is acceptable.
+HtmlGraph currently polls dashboard every 100ms anyway.
+
+## Solving Attribution Problems Hooks Cannot
+
+Current hook attribution problems:
+1. transcript.py uses "most recently modified JSONL" heuristic - WRONG for parallel sessions
+2. SubagentStop hook uses HTMLGRAPH_PARENT_EVENT env var - wrong after restarts
+3. Background task attribution required special-casing in pretooluse.py
+4. Token costs are entirely absent from hook data
+
+JSONL-based ingestion solves ALL FOUR:
+1. Session file is identified by sessionId from hook_input, not by mtime heuristic
+2. Subagent -> parent link via agentId in tool_result text (deterministic, no env vars)
+3. Background vs foreground: run_in_background appears in Task tool input; Agent tool always async
+4. Token costs available directly from assistant.message.usage
+
+## Implementation Notes for feat-717bd042
+
+Implementation steps from the feature file:
+- sessions-index.json: use for discovery (has fullPath, firstPrompt, messageCount, isSidechain)
+- Parse parentUuid chains for event hierarchy (confirmed working)
+- isSidechain + agentId for subagent attribution (confirmed: all subagent records have both)
+- assistant.message.usage for token extraction (confirmed field structure)
+- compact_boundary records: not observed yet (look for type="compact_boundary" or similar)
+- Subagent transcripts: in {session_id}/subagents/ directory (confirmed)
+- CLI: htmlgraph ingest --tool claude
+- Incremental ingestion: track last-ingested mtime or uuid per session
+
+Key implementation challenge: the "most recently modified JSONL" heuristic in transcript.py is a bug for parallel sessions. Fix: use sessionId from hook_input to construct the exact path ~/.claude/projects/{hash}/{sessionId}.jsonl.
+
+## Conclusion
+
+JSONL-based ingestion: YES, it solves attribution problems hooks cannot.
+
+The parentUuid chain provides zero-ambiguity call-tree attribution within a session.
+Cross-session subagent attribution is solved by agentId in tool_result text + agent_progress.parentToolUseID.
+Token costs are exclusively available in JSONL (not hooks).
+Files are written in real-time, making a file-watcher viable.
+
+Recommended architecture: hybrid - keep hooks for low-latency event triggers, add JSONL ingestion for:
+1. Token cost attribution per UserQuery
+2. Complete tool input/output capture (result text, not just inputs)
+3. Subagent hierarchy reconstruction without env var hacks
+4. Retroactive ingestion of past sessions
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SSE Refresh Not Working</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-e42a33ff"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T17:50:54.017173"
+             data-updated="2026-03-07T17:50:54.017175" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>SSE Refresh Not Working</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+The HtmlGraph dashboard shows "Live updates enabled (via SSE)" but the activity feed does not automatically refresh. The user must manually reload the page.
+
+## Research Findings
+
+### 1. SSE Endpoint — dashboard.py lines 387–444
+The SSE endpoint at GET /activity-feed/stream is correctly implemented:
+- Polls SQLite every 3 seconds for MAX(rowid) change in agent_events
+- Sends a named event: event: feed-update
+data: refresh
+
+
+- Sends heartbeat comments (: heartbeat
+
+) when no new rows
+- Has correct SSE headers: Cache-Control: no-cache, X-Accel-Buffering: no, Connection: keep-alive
+- The SSE logic itself is sound.
+
+### 2. SSE Client — dashboard-redesign.html lines 292–303
+Function initActivityFeedSSE() is defined and looks correct:
+  var es = new EventSource("/activity-feed/stream");
+  es.addEventListener("feed-update", function() {
+      debouncedFeedRefresh();
+  });
+The function calls debouncedFeedRefresh() which debounces 800ms then calls refreshActivityFeed().
+
+### 3. Initialization — dashboard-redesign.html lines 121–127
+SSE IS wired up on DOMContentLoaded:
+  document.addEventListener("DOMContentLoaded", function() {
+      loadInitialStats();
+      htmx.ajax("GET", "/views/activity-feed", {target: "#content-area"});
+      connectWebSocket();
+      initActivityFeedSSE();
+  });
+SSE is initialized. This is NOT the bug.
+
+### 4. Root Cause: DUAL REFRESH PATHS — WebSocket shadows SSE
+
+The dashboard has TWO real-time update mechanisms running simultaneously:
+- WebSocket at /ws/events (connectWebSocket) — sends JSON events
+- SSE at /activity-feed/stream (initActivityFeedSSE) — sends feed-update signals
+
+The WebSocket handler at lines 150–182 only triggers debouncedFeedRefresh() for HIGH_SIGNAL events:
+  const HIGH_SIGNAL = new Set(["UserQuery", "task_delegation", "completion"]);
+  const isHighSignal = HIGH_SIGNAL.has(data.event_type) || HIGH_SIGNAL.has(data.tool_name);
+  if (isHighSignal) { debouncedFeedRefresh(); }
+
+The SSE endpoint (dashboard.py lines 387–444) triggers on ANY new row (MAX(rowid) change), which is correct. But the actual refresh still depends on SSE events reaching the client.
+
+### 5. The Real Bug: refreshActivityFeed() targets #activity-feed-body which may not exist
+
+refreshActivityFeed() (lines 254–285) does:
+  fetch("/views/activity-feed")
+    .then(r => r.text())
+    .then(html => {
+        var newTbody = doc.querySelector("#activity-feed-body");
+        var currentTbody = document.querySelector("#activity-feed-body");
+        if (!newTbody || !currentTbody) return;  // <-- SILENT BAIL-OUT
+        currentTbody.innerHTML = newTbody.innerHTML;
+    })
+
+The activity feed is initially loaded into #content-area via:
+  htmx.ajax("GET", "/views/activity-feed", {target: "#content-area"});
+
+This replaces #content-area contents with the partial HTML from activity-feed-hierarchical.html. That partial DOES contain <tbody id="activity-feed-body"> (line 26 of the partial).
+
+HOWEVER: if the user navigates to a different tab (Agents, Metrics, etc.), #content-area gets replaced with different partial HTML that does NOT contain #activity-feed-body. When an SSE event fires and refreshActivityFeed() runs:
+  currentTbody = document.querySelector("#activity-feed-body") => null
+  => the function silently returns with no effect
+
+So the refresh only works when the Activity Feed tab is the active view.
+
+### 6. Secondary Issue: WebSocket connection failure hides the real status
+
+The ws-indicator shows "Connected" only when WebSocket connects. If WebSocket fails (e.g., proxy stripping upgrade headers), the indicator shows "Disconnected" — but SSE is still alive. There is no SSE-specific status indicator, making it hard to diagnose whether SSE itself is working.
+
+### 7. The Partial Shows Wrong Status Message
+
+activity-feed-hierarchical.html line 103 always shows:
+  "Live updates enabled (via SSE)"
+This is hardcoded and displays regardless of whether SSE is actually connected.
+
+## Summary of Root Cause
+
+The SSE pipeline is functionally correct end-to-end:
+- Server sends feed-update events every 3 seconds when new rows appear
+- Client EventSource receives them and calls debouncedFeedRefresh()
+- refreshActivityFeed() fetches /views/activity-feed and tries to swap #activity-feed-body
+
+THE BUG: refreshActivityFeed() silently exits when #activity-feed-body is not in the DOM. This happens when:
+1. The user is on the Activity Feed tab but the initial htmx.ajax load has not yet completed (race condition)
+2. The user has navigated away to another tab (Agents, Metrics, etc.)
+
+In case 2, the SSE events are still firing server-side, the EventSource listener is still active, debouncedFeedRefresh() runs, but the DOM swap quietly does nothing because querySelector returns null.
+
+Additionally: even on the Activity Feed tab, if htmx.ajax replaces #content-area with a morph (idiomorph-ext is loaded), HTMX may strip or re-initialize the tbody in unexpected ways, but this is lower risk than the null-check bail-out.
+
+## Fix Recommendation
+
+Option A (Minimal, Correct): In refreshActivityFeed(), if #activity-feed-body is not found, fall back to swapping all of #content-area with the full partial, preserving the current tab context.
+
+Option B (Robust): Track current active tab in a JS variable. In the SSE/feed-update handler, only call refreshActivityFeed() when the activity tab is active. When switching back to the activity tab, always trigger an immediate refresh.
+
+Option C (Also needed): Update the "Live updates enabled (via SSE)" text dynamically based on actual EventSource readyState (0=connecting, 1=open, 2=closed) instead of hardcoding it.
+
+## Files
+- src/python/htmlgraph/api/templates/dashboard-redesign.html (lines 121-127, 213-285, 292-303)
+- src/python/htmlgraph/api/routes/dashboard.py (lines 387-444)
+- src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html (lines 100-104)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Plan: Production reliability hardening: FastAPI lifespan migration, SQLite PRAGMA centralization, observability stack (OTel/Prometheus/Sentry), reliability testing (schemathesis/hypothesis), and durable orchestration (temporalio/Prefect)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-cd757db6"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-07T22:04:09.370081"
+             data-updated="2026-03-08T04:03:24.973639+00:00" data-spike-type="general" data-agent-assigned="claude">
+
+        <header>
+            <h1>Plan: Production reliability hardening: FastAPI lifespan migration, SQLite PRAGMA centralization, observability stack (OTel/Prometheus/Sentry), reliability testing (schemathesis/hypothesis), and durable orchestration (temporalio/Prefect)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="7733579b-f5fd-42b2-837d-026d9df35168.html" data-relationship="implemented-in" data-since="2026-03-07T22:04:12.348352">7733579b-f5fd-42b2-837d-026d9df35168</a></li>
+                    <li><a href="dd92ff7c-512f-460c-b798-e07ac0bd05de.html" data-relationship="implemented-in" data-since="2026-03-07T22:04:38.056238">dd92ff7c-512f-460c-b798-e07ac0bd05de</a></li>
+                    <li><a href="36612c22-e716-4d2f-862a-a748dd473f84.html" data-relationship="implemented-in" data-since="2026-03-07T23:03:24.973624">36612c22-e716-4d2f-862a-a748dd473f84</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Research Completed</dt>
+                <dd data-key="research_completed" data-value="True">True</dd>
+<dt>Research Findings</dt>
+                <dd data-key="research_findings" data-value="{'topic': 'FastAPI/SQLite/observability production hardening', 'sources_count': 15, 'recommended_library': 'tenacity, opentelemetry-instrumentation-fastapi, prometheus-fastapi-instrumentator, sentry-sdk, asgi-correlation-id, schemathesis, hypothesis, temporalio', 'key_insights': ['Migrate @app.on_event startup to FastAPI lifespan context manager (main.py:241)', 'Centralize all SQLite PRAGMAs per connection - currently split across dependencies.py:38, db.py:107, schema.py:86', 'Add scheduled PRAGMA optimize and integrity_check/foreign_key_check', 'Enable pydantic strict validation on external ingress models', 'Make pydantic-settings a required runtime dependency (config.py:74 has fallback)', 'Redis backend for production cache (cache.py:140 already has fallback logic)', 'Standardize retries via tenacity (decorators.py:37 has custom decorators)', 'OTel FastAPI instrumentation for traces/metrics/log correlation', 'prometheus-fastapi-instrumentator for operational metrics', 'sentry-sdk[fastapi] for error + performance capture', 'asgi-correlation-id + structlog contextvars for end-to-end correlation IDs', 'schemathesis + hypothesis for property-based API reliability tests', 'temporalio preferred over Prefect for durable multi-agent orchestration', 'slowapi flagged as alpha quality - avoid']}">{'topic': 'FastAPI/SQLite/observability production hardening', 'sources_count': 15, 'recommended_library': 'tenacity, opentelemetry-instrumentation-fastapi, prometheus-fastapi-instrumentator, sentry-sdk, asgi-correlation-id, schemathesis, hypothesis, temporalio', 'key_insights': ['Migrate @app.on_event startup to FastAPI lifespan context manager (main.py:241)', 'Centralize all SQLite PRAGMAs per connection - currently split across dependencies.py:38, db.py:107, schema.py:86', 'Add scheduled PRAGMA optimize and integrity_check/foreign_key_check', 'Enable pydantic strict validation on external ingress models', 'Make pydantic-settings a required runtime dependency (config.py:74 has fallback)', 'Redis backend for production cache (cache.py:140 already has fallback logic)', 'Standardize retries via tenacity (decorators.py:37 has custom decorators)', 'OTel FastAPI instrumentation for traces/metrics/log correlation', 'prometheus-fastapi-instrumentator for operational metrics', 'sentry-sdk[fastapi] for error + performance capture', 'asgi-correlation-id + structlog contextvars for end-to-end correlation IDs', 'schemathesis + hypothesis for property-based API reliability tests', 'temporalio preferred over Prefect for durable multi-agent orchestration', 'slowapi flagged as alpha quality - avoid']}</dd>
+            </dl>
+        </section>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false">⏳ Research existing solutions and patterns</li>
+                <li data-completed="false">⏳ Define requirements and constraints</li>
+                <li data-completed="false">⏳ Design high-level architecture</li>
+                <li data-completed="false">⏳ Identify dependencies and risks</li>
+                <li data-completed="false">⏳ Create implementation plan</li>
+            </ol>
+        </section>
+        <section data-content>
+            <h3>Description</h3>
+            Project context:
+- 0 bottlenecks
+- 0 high-risk items
+- 152 parallel capacity
+
+Research completed:
+- Topic: FastAPI/SQLite/observability production hardening
+- Sources: 15
+- Recommended: tenacity, opentelemetry-instrumentation-fastapi, prometheus-fastapi-instrumentator, sentry-sdk, asgi-correlation-id, schemathesis, hypothesis, temporalio
+        </section>
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+            </dl>
+        </section>
+    </article>
+</body>
+</html>

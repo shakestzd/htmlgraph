@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Architecture Audit: Hook Limitations</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-25dbdf5f"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T20:43:55.363009"
+             data-updated="2026-03-07T20:43:55.363011" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Architecture Audit: Hook Limitations</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem Statement
+Why does HtmlGraph's hook-based activity tracking keep breaking? This audit identifies the fundamental architectural gaps.
+
+---
+
+## 1. JSONL Transcript Schema (Ground Truth)
+
+From empirical analysis of subagent JSONL files in ~/.claude/projects/.../subagents/:
+
+Every record has these top-level fields:
+- uuid: unique message ID (e.g. "8bc0f217-b711-434d-b300-055098ee6605")
+- parentUuid: parent message UUID (null for first message in chain)
+- sessionId: the PARENT session ID (e.g. "dd92ff7c-512f-460c-b798-e07ac0bd05de")
+- agentId: unique agent identifier (e.g. "acba5289b71835216")
+- isSidechain: true for ALL subagent messages
+- type: "user" | "assistant" | "progress"
+- message: contains role/content for user/assistant, tool_use blocks in assistant
+- toolUseID / parentToolUseID: for progress events, link bash progress to tool calls
+- cwd, gitBranch, version: context fields
+
+CRITICAL DISCOVERY: Background agents and foreground subagents have IDENTICAL schema.
+Both show isSidechain=true, both share the parent sessionId, both have unique agentId.
+The ONLY difference is whether SubagentStart fires (it does NOT for background agents).
+
+parentUuid gives a COMPLETE call tree within the transcript - every tool call can be
+walked up to its originating user turn purely from the JSONL file.
+
+---
+
+## 2. Hook Events Available vs What Is Needed
+
+hooks.json subscribes to: UserPromptSubmit, Stop, SessionEnd, PreToolUse, PostToolUse,
+SubagentStart, SubagentStop, TeammateIdle, TaskCompleted, PostToolUseFailure,
+PreCompact, InstructionsLoaded, PermissionRequest, SessionStart.
+
+CRITICAL GAPS:
+
+Gap 1 - SubagentStart does NOT fire for background agents (run_in_background=True).
+This is confirmed by both: (a) the JSONL analysis showing background agent records are
+identical in format to foreground, and (b) the task description for the bug fix commit
+in agent-a9b0fb1d27ab03bf3.jsonl which explicitly states "Claude Code does NOT fire
+SubagentStart for background agents". SubagentStart is the ONLY reliable mechanism
+to map agentId -> task_delegation, so its absence breaks the entire attribution chain
+for background agents.
+
+Gap 2 - Hook processes are ISOLATED. env vars set in PreToolUse (HTMLGRAPH_PARENT_EVENT,
+HTMLGRAPH_SUBAGENT_TYPE etc.) do NOT propagate to PostToolUse because each hook fires
+in a fresh subprocess. The comment in pretooluse.py explicitly acknowledges this:
+"NOTE: env vars don't propagate between hook processes, so this branch is effectively
+dead code in the real system."
+
+Gap 3 - No tool_use_id in PostToolUse hook input. The hook receives tool_name,
+tool_input, tool_response but NOT the toolu_01XYZ identifier that would let it
+unambiguously match the PreToolUse event that recorded the task_delegation.
+
+Gap 4 - session_id unreliable for subagent detection. For foreground Task() subagents,
+Claude Code gives the subagent a DIFFERENT session_id (unknown to the sessions table),
+enabling Method 3 detection. But for background agents (run_in_background=True),
+the agent shares the PARENT session_id - making it appear to be the main agent.
+This is confirmed by the JSONL: background agent records show sessionId=parent session.
+
+---
+
+## 3. The Three Attribution Methods and Where Each Breaks
+
+METHOD 1 (Sessions table lookup - "is this session already marked as subagent?"):
+- Works for: foreground Task() subagents on 2nd+ tool call (after Method 3 populated it)
+- Breaks for: background agents (share parent session_id, never marked as subagent)
+- Breaks for: first tool call (session not yet in table before Method 3 runs)
+
+METHOD 2 (Environment variables - HTMLGRAPH_SUBAGENT_TYPE etc.):
+- Effectively dead code. Comment in pretooluse.py confirms env vars don't cross hook
+  process boundaries. This worked when hooks ran in same process; now each hook is a
+  subprocess invocation.
+
+METHOD 3 ("unknown session_id" heuristic):
+- Works for: foreground Task() subagents (Claude gives them a new session_id not in DB)
+- Breaks for: background agents (share parent session_id, so session_known=True, skipped)
+- Breaks for: race conditions with parallel agents ("most recent started task_delegation"
+  is ambiguous when multiple tasks are in flight simultaneously)
+- Breaks for: stale task_delegations from prior turns still with status=started
+
+FIFO MATCHING in SubagentStart (subagent_start.py):
+- Correct design for foreground agents when SubagentStart fires
+- Completely bypassed for background agents since SubagentStart never fires
+
+STALENESS DETECTION (timestamp comparisons, v0.33.21 fix):
+- Attempts to discard task_delegations from prior turns
+- Breaks for parallel agents: multiple tasks created after the same UserQuery are
+  indistinguishable by timestamp alone
+- String-comparison of ISO timestamps ("T" -> " " replacement) is fragile
+
+BACKGROUND AGENT CLAIMING (PostToolUse path, latest fix):
+- Added in event_tracker.py lines 1767-1802 and pretooluse.py lines 566-599
+- Queries for unclaimed background task_delegations by json_extract(tool_input, $.run_in_background)
+- Correct direction but has race condition: first tool call from agent A claims the row,
+  but if two background agents run simultaneously, the second one finds no unclaimed row
+
+---
+
+## 4. Transcript Module: The Right Approach, Partially Implemented
+
+transcript.py (find_parent_user_query) was added to solve staleness/parallel issues.
+It reads the JSONL transcript directly to walk parentUuid chain to originating user turn.
+This is architecturally CORRECT - the transcript is the ground truth.
+
+BUT it is only used in pretooluse.py (PreToolUse hook), and only to resolve session_id
+and user_turn_uuid. It is NOT used in event_tracker.py (PostToolUse hook) which is where
+most attribution actually happens. The transcript lookup result is lost between processes.
+
+Additionally, the transcript module picks the "most recently modified .jsonl file" -
+which FAILS for parallel sessions where multiple subagent JSONL files exist simultaneously.
+Each subagent has its OWN JSONL file in the subagents/ subdirectory, not the main session
+file. The transcript module looks in the root project directory, not subagents/.
+
+---
+
+## 5. Root Architectural Problems (Summary)
+
+PROBLEM 1 - Hook isolation: Each hook fires in a fresh subprocess. State cannot be
+shared between PreToolUse and PostToolUse via env vars. All cross-hook communication
+must go through the database, adding latency and race conditions.
+
+PROBLEM 2 - Missing agentId in hook input: PreToolUse and PostToolUse hooks do NOT
+receive the agentId field that uniquely identifies which agent made the tool call.
+This field EXISTS in the JSONL transcript but is not surfaced in hook payloads.
+Without agentId, HtmlGraph cannot deterministically map "which task_delegation spawned
+this tool call" without heuristics.
+
+PROBLEM 3 - SubagentStart gap for background agents: The one reliable mapping mechanism
+(SubagentStart -> map agentId to task_delegation) does not fire for run_in_background=True
+agents. This forces fallback to json_extract(tool_input, $.run_in_background) claiming,
+which has race conditions for parallel background agents.
+
+PROBLEM 4 - Session identity ambiguity: Background agents share the parent session_id.
+Foreground agents get new session_ids. This inconsistency means there is no single
+reliable session-based signal to detect "am I in a subagent?".
+
+PROBLEM 5 - Timestamp-based staleness is fundamentally unreliable: task_delegations
+that never get status=completed (e.g., after crashes or background agents that don't
+trigger TaskCompleted) accumulate and pollute future attribution. The only fix is
+explicit lifecycle management (status=completed on SubagentStop or TaskCompleted).
+
+PROBLEM 6 - Transcript approach requires process-level caching: transcript.py has a
+module-level _cache but each hook invocation is a new process, so the cache is always
+cold. Reading and parsing the growing JSONL file on every single PreToolUse call adds
+significant latency.
+
+---
+
+## 6. What Actually Works Reliably
+
+- UserQuery attribution for main-session tool calls (simple case)
+- Foreground Task() subagent attribution when SubagentStart fires and FIFO matching
+  correctly claims the task_delegation
+- Background agent attribution for the FIRST tool call (claiming via json_extract)
+- SubagentStop completing task_delegation lifecycle
+
+## 7. Recommended Fix Direction
+
+The most robust fix would be: after SubagentStart maps agentId, PostToolUse should
+receive agentId in hook input so it can do a direct DB lookup (agentId -> task_delegation).
+This would eliminate ALL heuristics. This requires Anthropic to surface agentId in
+PostToolUse hook payloads - currently it is not provided.
+
+Short of that, the cleanest in-system fix is:
+1. Make PostToolUse read the subagent JSONL file (not the main session file) using the
+   sessionId from hook input to locate the right file
+2. Use parentToolUseID from the JSONL to walk up to the Task tool call that spawned us
+3. Map that Task tool_use_id to the task_delegation event_id via tool_traces table
+This is O(file_read) per tool call but deterministic and race-condition-free.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

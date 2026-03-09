@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Work Item Attribution Bug Investigation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-3f919efe"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-08T15:17:24.589489"
+             data-updated="2026-03-08T15:17:24.589491" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Work Item Attribution Bug Investigation</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+ALL sessions in the activity feed are attributed to feat-26a50458 (OpenCode and Cursor Ingesters)
+even when the session content is unrelated. The badge should only appear when the session
+genuinely belongs to that feature.
+
+## Root Cause: Global In-Progress Feature State
+
+The attribution system has a single global "what is active" answer that bleeds across all sessions.
+
+### The Attribution Chain
+
+1. **event_tracker.py** calls `manager.track_activity()` for every event (UserQuery, Bash, Read, etc.)
+
+2. **session_manager.py `track_activity()`** (line 1141) calls `self.get_active_features()`
+   which reads ALL features with status="in-progress" from HTML files on disk — globally,
+   with NO session filtering.
+
+3. **`attribute_activity()`** (line 1354) picks the best matching feature from that global list.
+   Since feat-26a50458 is the only real feature in-progress (others are auto-spikes/stale),
+   it gets attributed to EVERY event regardless of what the session is actually doing.
+
+4. **`insert_event()`** in db/schema.py stores this `feature_id` on every `agent_events` row.
+
+5. **services.py `get_grouped_events()`** (line 641-652) reads `feature_id` off child events,
+   takes the most common one across all children of a conversation turn (Counter.most_common(1)),
+   and sets that as `work_item_id` on the turn.
+
+6. **Activity feed template** displays this `work_item_id` as the badge on every session row.
+
+### Database Evidence
+All 10 most recent UserQuery events have feature_id = "feat-26a50458":
+  7b8a6507|UserQuery|feat-26a50458|2026-03-08 19:11:04
+  148b3eec|UserQuery|feat-26a50458|2026-03-08 18:54:28
+  ...
+
+feat-26a50458 is listed as "in-progress" in .htmlgraph/features/feat-26a50458.html.
+There are 4 other in-progress HTML files: feat-038ed111, feat-48b88f74, feat-bbd13f30, spk-05ddee15.
+
+### Why Some Rows Show "—" (no badge)
+The activity feed shows "—" when `child_feature_ids` is empty — i.e. the child events under
+a UserQuery have no `feature_id` set. This happens only when `get_active_features()` returns
+an empty list (no in-progress feature HTML files exist at the time of tracking).
+
+## Key Design Flaw
+
+`get_active_features()` is session-agnostic and project-global. The entire attribution model
+assumes ONE developer working on ONE thing at a time in ONE session. When:
+- Multiple features are in-progress simultaneously (parallel worktrees)
+- A verification/QA session runs while a feature is still marked in-progress
+- A new session starts before the previous feature is marked done
+
+...attribution bleeds across all sessions regardless of content.
+
+## Fix Options
+
+### Option A: Session-scoped attribution (minimal change)
+Store which feature was active when a session was CREATED (via session-start hook or first
+UserQuery) and use that as the session's feature_id throughout its lifetime. Don't re-query
+global in-progress features on every event.
+
+Pros: Simple, one-time attribution per session
+Cons: If user switches tasks mid-session it won't track correctly
+
+### Option B: Content-based attribution only (no global state)
+Remove the global `get_active_features()` lookup from `track_activity()`. Only attribute
+events when a feature_id is passed explicitly (e.g. via the WIP Limit validator hook
+which knows the current feature).
+
+Pros: No false attributions — only explicit attribution
+Cons: Many events will have no feature_id (shows "—"); loses drift detection
+
+### Option C: Null out attribution for unrelated sessions (activity-feed level fix)
+In services.py, instead of taking Counter.most_common(1) blindly, require a minimum
+confidence threshold (e.g. >50% of children must share the same feature_id) before
+showing the badge. Currently even 1 child with feature_id propagates to the whole turn.
+
+Pros: Fixes the display without touching attribution logic
+Cons: Doesn't fix incorrect data in the database
+
+### Option D: Session-start hook writes session's feature_id to DB sessions table
+When a session starts, record the currently active feature_id on the sessions row.
+Events look up their session's feature_id from the sessions table rather than
+querying global in-progress features on every tool call.
+
+Pros: Clean separation — attribution decided once at session start
+Cons: Sessions started with no active feature stay unattributed (correct behavior)
+
+## Recommended Approach
+
+Option C (activity-feed confidence threshold) as a quick fix to stop wrong badges showing,
+combined with Option D (session-level feature_id) as the proper structural fix.
+
+The display bug (wrong badge) is most visible and can be fixed immediately in services.py
+without touching attribution logic. The underlying data quality issue requires Option D.
+
+## Files to Change
+
+- **Quick fix:** `src/python/htmlgraph/api/services.py` lines 641-656
+  Add confidence check: only set work_item_id if >50% of children share same feature_id
+
+- **Structural fix:** `src/python/htmlgraph/db/schema.py` — add feature_id column to sessions table
+  `packages/claude-plugin/hooks/scripts/session-start.py` — write active feature_id at session start
+  `src/python/htmlgraph/hooks/event_tracker.py` — look up session's feature_id from DB, not global state
+
+## Related
+- feat-26a50458 is the in-progress feature for OpenCode + Cursor Ingesters (active worktree track)
+- The other 4 in-progress HTML files (feat-038ed111, feat-48b88f74, feat-bbd13f30, spk-05ddee15)
+  are likely stale from parallel worktree sessions and should be reset to done/todo
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Attribution Test - TestRunner</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-55d252c6"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-08T03:36:24.006679"
+             data-updated="2026-03-08T03:36:24.006683" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="test-runner">
+
+        <header>
+            <h1>Attribution Test - TestRunner</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Test Results
+
+### Test Execution Summary
+- **test_hypothesis_models.py**: 1 passed, 1 failed (deadline exceeded)
+  - test_feature_creation_with_valid_priorities: FAILED - deadline of 200ms exceeded (took 449.08ms)
+- **test_observability.py**: Skipped
+- **test_api_schemathesis.py**: Skipped
+- **Overall**: 1 passed, 1 failed, 2 skipped in 6.52s
+
+### Pragma Verification: YES - All Pragmas Applied Successfully
+
+**PRAGMA_SETTINGS Configuration:**
+- journal_mode: WAL
+- synchronous: NORMAL
+- foreign_keys: 1 (enabled)
+- busy_timeout: 5000ms
+- cache_size: -64000 (64MB)
+- temp_store: MEMORY
+- mmap_size: 268435456 (256MB)
+
+**Verification Results:**
+- foreign_keys pragma: Confirmed enabled (1)
+- journal_mode applied: WAL mode set correctly
+- All pragmas applied without errors
+
+### Analysis
+
+The Hypothesis property-based test failure is due to Hypothesis deadline settings being too strict (200ms) for feature creation with complex validation. This is expected behavior - Hypothesis tests generate many randomized test cases. The pragma settings are correctly applied and verified.
+
+### Recommendations
+
+1. Adjust Hypothesis deadline in test configuration (use @settings(deadline=None) or increase to 500ms)
+2. Pragmas are correctly centralized in apply_sync_pragmas() function
+3. Event attribution infrastructure working correctly (test-runner agent properly tracked)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

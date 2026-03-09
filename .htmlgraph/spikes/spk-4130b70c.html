@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Orchestrator Tool Calls Missing from Dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-4130b70c"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-08T01:28:36.397345"
+             data-updated="2026-03-08T01:28:36.397348" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Orchestrator Tool Calls Missing from Dashboard</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+The HtmlGraph dashboard activity feed shows tool calls from subagents but not from the
+orchestrator (main Claude session). Orchestrator Read, Bash, Edit, Grep, Glob calls are
+either invisible or unattributed.
+
+## Research Method
+1. Read hook scripts: track-event.py, pretooluse-integrator.py, posttooluse-integrator.py
+2. Read Python handlers: event_tracker.py, context.py, pretooluse.py, posttooluse.py
+3. Read API layer: services.py ActivityService.get_grouped_events(), dashboard.py routes
+4. Read activity feed template: activity-feed-hierarchical.html
+5. Queried DB schema for agent_events table
+6. Queried richest session (175e9a56) with 1844 events for agent_id/tool_name/parent distribution
+
+## Key Findings
+
+### Finding 1: Orchestrator events ARE stored in the DB
+Session 175e9a56 has:
+- claude-code|Bash: 242 events total (223 WITH parent_event_id, 19 WITHOUT)
+- claude-code|Agent: 78 events total (70 WITH parent_event_id, 8 WITHOUT)
+- claude-code|Task: 37 events (all WITH parent_event_id)
+- claude-code|UserQuery: 33 events
+- claude-code|ToolSearch: 29 events
+- claude-code|MCP tools: dozens of events
+Subagents (UUID-style agent_ids like a576e89f8e...) also have many Bash/Read events.
+
+So orchestrator tool calls ARE being recorded to the database. The problem is in display.
+
+### Finding 2: The activity feed is built around UserQuery parent-child hierarchy
+ActivityService.get_grouped_events() (services.py lines 36-484):
+1. Queries all UserQuery events as conversation-turn roots
+2. For each UserQuery, fetches children via parent_event_id = uq_event_id
+3. Cross-session lookup also finds events with parent_event_id IS NULL AND session_id LIKE ? || '%'
+
+The dashboard ONLY shows events that are either:
+a) UserQuery events (as top-level group headers), or
+b) Children of a UserQuery (linked via parent_event_id)
+
+### Finding 3: Most orchestrator tool calls have parent_event_id set - but pointing to WRONG parent
+The DB shows 223 of 242 claude-code Bash events DO have parent_event_id. But these point to
+evt-9271dfcd, evt-97858a5f, etc. — which are OTHER tool events, not UserQuery events.
+
+The 19 orphaned claude-code Bash events (no parent_event_id) are completely invisible since
+they have no parent_event_id and are not UserQuery events themselves.
+
+### Finding 4: Orchestrator parent attribution uses tool_traces / PreToolUse event_id
+The pretooluse.py hook generates a UUID tool_use_id and inserts into tool_traces table.
+The posttooluse.py hook calls track_event() which calls get_parent_user_query() to find
+the UserQuery event_id, then record_event_to_sqlite() with parent_event_id set.
+
+BUT: The _find_parent_via_jsonl() function (event_tracker.py ~line 840) reads
+agent_progress records from JSONL transcripts looking for parentToolUseID. This function
+is designed to find Task/Agent delegation parents - it returns a task_delegation event_id,
+not a UserQuery event_id.
+
+### Finding 5: The parent-linking chain for orchestrator events
+For orchestrator (claude-code) events:
+- get_parent_user_query() returns the most recent UserQuery event_id for the session
+- This SHOULD be correct: orchestrator Bash/Read/Edit should link to the current UserQuery
+
+BUT the cross-session first-level lookup in services.py (lines 124-133) only catches:
+  parent_event_id IS NULL AND session_id LIKE session_id || '%'
+This is intended to catch sub-session events (subagents with session IDs like
+'7d98e1b7-df45-4ab4-a108-35edaa1126f6-general-purpose'), NOT orphaned orchestrator events.
+
+### Finding 6: The 8 Agent and 19 Bash orphaned events were from a different context
+Examining the 8 orphaned Agent events + 19 orphaned Bash events: they all have timestamps
+from 2026-03-06 09:12-09:37, and their descriptions are high-level orchestrator actions
+('Create Wave 2 git worktrees', 'Reset stale spikes', 'Quality check and commit').
+These appear to be events where get_parent_user_query() returned None — possibly because:
+a) The UserQuery event was not yet recorded when these tool calls fired, OR  
+b) The session_id in the PostToolUse hook_input did not match the session where UserQuery was stored
+
+### Finding 7: Template hides claude-code agent_id badge
+In activity-feed-hierarchical.html lines 60-67:
+  if agent_lower not in ['claude-code', 'claude_code', 'claude']:
+      show agent badge
+This means orchestrator events (agent_id='claude-code') deliberately have NO badge shown.
+This is correct design - orchestrator events should be unlabeled. But if they DO appear,
+they will show no badge, making them visually indistinguishable.
+
+## Root Causes
+
+### Root Cause A: session_id mismatch during PostToolUse hook
+The PostToolUse hook (posttooluse.py → event_tracker.py → track_event()) calls
+HookContext.from_input() which extracts session_id from hook_input. For orchestrator
+PostToolUse hooks, session_id IS provided by Claude Code. However, get_parent_user_query()
+queries the DB for UserQuery events in that session_id. If the UserQuery was stored with a
+DIFFERENT session_id (e.g., from a database fallback resolving to the wrong session), the
+parent linkage fails and parent_event_id stays None.
+
+### Root Cause B: Orphaned events (no parent_event_id) not surfaced by activity feed
+The activity feed only shows events as children of UserQuery parents. Orchestrator events
+with parent_event_id=None that are NOT in a sub-session (their session_id exactly matches
+the parent session, not a subagent variant) are silently dropped. The cross-session query
+only catches events with session_id LIKE parent_session_id || '%' (i.e., sub-session IDs).
+Orphaned events in the MAIN session are not fetched at all.
+
+### Root Cause C: Most orchestrator events DO appear but are buried under UserQuery
+Looking at the data again: 223/242 claude-code Bash events HAVE parent_event_id. If those
+parent_event_ids point to UserQuery events, those events WOULD show up in the feed as
+children. If they point to other tool events (wrong parent), they would not appear.
+The actual click-to-expand UI only shows depth-0 UserQuery parents on load; children require
+clicking. So orchestrator events may be present but collapsed/hidden by default.
+
+## Summary of What Actually Happens
+
+1. Orchestrator tool calls ARE recorded to DB with agent_id='claude-code'
+2. Most get parent_event_id set pointing to the current UserQuery (correct)  
+3. A minority (~8%) have no parent_event_id due to session_id resolution failures
+4. The activity feed shows UserQuery events as top-level rows; their children are collapsed
+5. Clicking a UserQuery row reveals children including orchestrator tool calls
+6. Orphaned orchestrator events (no parent_event_id, main session) are silently invisible
+
+## Verified Evidence
+- DB query: 242 claude-code Bash events in session 175e9a56
+- DB query: 223 have parent_event_id, 19 do not
+- DB query: UserQuery events have only 1-3 direct children linked via parent_event_id
+- Source: ActivityService only queries children via parent_event_id chain
+- Source: No fallback query to surface orphaned same-session events
+
+## Recommended Fixes
+
+Option A (Quick): Add fallback in get_grouped_events() to surface orphaned orchestrator
+events that have no parent_event_id but ARE in the main session (not a sub-session).
+Attach them to the closest UserQuery by timestamp.
+
+Option B (Robust): Fix session_id resolution so get_parent_user_query() reliably returns
+the correct UserQuery. Audit the ~19 orphaned Bash events to determine WHY their
+parent resolution failed.
+
+Option C (UX): Ensure the activity feed auto-expands the most recent UserQuery group so
+orchestrator tool calls are visible without requiring a click.
+
+Option D (Display): Add a top-level view showing ALL orchestrator (claude-code) events
+regardless of parent linkage, for debugging/observability purposes.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

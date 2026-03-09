@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Production Reliability Research - Implementation Context</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-f64342fd"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T23:05:20.495953"
+             data-updated="2026-03-07T23:05:20.495955" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Production Reliability Research - Implementation Context</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Production Reliability Hardening - Research Findings
+
+### Track: trk-9d44f0c3 | Spike: spk-cd757db6
+
+---
+
+## Phase 1: FastAPI + SQLite Hardening (7 tasks, ~8h)
+
+### Task 1-1: Migrate startup hooks to FastAPI lifespan (1.5h)
+FILE: src/python/htmlgraph/api/main.py:241
+CURRENT STATE: @app.on_event("startup") decorator at line 241 inside get_app().
+The entire startup is one function: init_cache_backend() call + logger.
+PATTERN TO REPLACE:
+  @app.on_event("startup")
+  async def startup_event() -> None:
+      await init_cache_backend()
+REPLACE WITH: contextlib.asynccontextmanager lifespan passed to FastAPI(..., lifespan=lifespan)
+CONSTRAINT: lifespan must be defined before get_app() returns; deps/routers init happens
+  synchronously in get_app() body (not async). Only cache init is async. Keep that split.
+
+### Task 1-2: Centralize SQLite PRAGMAs (2h)
+CURRENT PRAGMA INVENTORY (all 8 files with matches):
+
+1. src/python/htmlgraph/db/schema.py:84-89 (connect() method on HtmlGraphDB)
+   - PRAGMA foreign_keys = ON
+   - PRAGMA journal_mode=WAL
+   - PRAGMA wal_autocheckpoint=1000
+
+2. src/python/htmlgraph/api/dependencies.py:38 (Dependencies.get_db())
+   - PRAGMA busy_timeout = 5000  (aiosqlite, async)
+
+3. src/python/htmlgraph/api/db.py:107 (get_db() free function)
+   - PRAGMA busy_timeout = 30000  (aiosqlite, async)
+   NOTE: Inconsistency - dependencies.py uses 5000ms, db.py uses 30000ms.
+
+4. src/python/htmlgraph/analytics_index.py:42-45 (_connect() method)
+   - PRAGMA journal_mode=WAL
+   - PRAGMA synchronous=NORMAL
+   - PRAGMA temp_store=MEMORY
+   - PRAGMA busy_timeout=3000
+
+5. src/python/htmlgraph/analytics/cost_monitor.py:193 (connect() method)
+   - PRAGMA foreign_keys = ON  (only this one, missing WAL/busy_timeout)
+
+6. src/python/htmlgraph/repositories/feature_repository_sqlite.py:107 (setup)
+   - PRAGMA foreign_keys = OFF  (intentional for test setup, uses HtmlGraphDB base)
+
+7. src/python/htmlgraph/repositories/track_repository_sqlite.py:105 (setup)
+   - PRAGMA foreign_keys = OFF  (intentional for test setup)
+
+8. src/python/htmlgraph/db/schema.py:398+428 (insert_event)
+   - PRAGMA foreign_keys=OFF / ON  (per-insert FK disable - intentional pattern)
+
+9. src/python/htmlgraph/db/ddl.py:498,545,585
+   - PRAGMA table_info(...) - introspection only, not connection config
+
+MISSING PRAGMAS ACROSS CONNECTIONS:
+- analytics_index.py: missing foreign_keys=ON
+- cost_monitor.py: missing journal_mode=WAL, busy_timeout, synchronous=NORMAL
+- dependencies.py: missing foreign_keys=ON, journal_mode=WAL, synchronous=NORMAL, cache_size
+- db.py: missing foreign_keys=ON, journal_mode=WAL, synchronous=NORMAL
+
+CENTRALIZATION PLAN:
+  Create: src/python/htmlgraph/db/pragmas.py
+  Function: apply_sync_pragmas(conn: sqlite3.Connection) -> None
+  Function: apply_async_pragmas(db: aiosqlite.Connection) -> None (coro)
+  Standard set: foreign_keys=ON, journal_mode=WAL, wal_autocheckpoint=1000,
+                busy_timeout=5000, synchronous=NORMAL, temp_store=MEMORY,
+                cache_size=-64000 (64MB), journal_size_limit=67108864 (64MB)
+
+### Task 1-3: Update callers to use centralized helper (1h)
+Files to update: db/schema.py, api/dependencies.py, api/db.py,
+  analytics_index.py, analytics/cost_monitor.py
+Keep intentional FK=OFF patterns in insert_event and repository test setup.
+
+### Task 1-4: APScheduler/asyncio PRAGMA optimize task (1h)
+PRAGMA optimize is idempotent, safe to run every 6h.
+Use asyncio task inside lifespan (after yield) for cleanup,
+or APScheduler if already a dep (it is NOT currently in pyproject.toml).
+Simplest: asyncio.create_task() loop with asyncio.sleep(6*3600) inside lifespan.
+
+### Task 1-5: Startup integrity_check + foreign_key_check (1h)
+Run synchronously in lifespan before yield (startup).
+integrity_check returns "ok" if clean.
+Alert via logger.critical() on failure (can add Sentry capture later).
+
+### Task 1-6: pydantic-settings as hard dep (0.5h)
+FILE: pyproject.toml line 24
+CURRENT: "pydantic>=2.0.0" is a hard dep, but pydantic-settings is NOT listed.
+AFFECTED FILES with try/except ImportError fallback:
+  - src/python/htmlgraph/config.py:73-79 (HtmlGraphConfig falls back to object)
+  - src/python/htmlgraph/sdk/constants.py:13-25 (SDKSettings falls back to object)
+FIX: Add "pydantic-settings>=2.0.0" to pyproject.toml dependencies[].
+Then remove try/except fallback patterns in both files.
+
+### Task 1-7: Enable strict=True on external ingress Pydantic models (1h)
+EXTERNAL INGRESS MODELS (API request bodies, not response models):
+  - src/python/htmlgraph/api/schemas.py: EventModel, FeatureModel, SessionModel
+    Currently: plain BaseModel with no model_config
+  - src/python/htmlgraph/api/main.py: EventModel, FeatureModel, SessionModel (DUPLICATE)
+    NOTE: main.py duplicates schema.py models - cleanup needed
+  - src/python/htmlgraph/api/routes/dashboard.py: has inline BaseModel subclasses
+  - src/python/htmlgraph/api/broadcast_routes.py: has inline BaseModel
+INTERNAL models (SDK/CLI): do NOT enable strict - they accept loose input from users.
+FIX: Add model_config = ConfigDict(strict=True) to API ingress schemas only.
+Use from pydantic import ConfigDict.
+
+---
+
+## Phase 2: Observability Stack (7 tasks, ~7.5h)
+
+### Task 2-1: Add OTel deps to pyproject.toml (0.5h)
+ADD: opentelemetry-sdk, opentelemetry-instrumentation-fastapi,
+     opentelemetry-exporter-otlp-proto-grpc (or -http)
+
+### Task 2-2: Instrument FastAPI with OTelMiddleware (1.5h)
+FILE: src/python/htmlgraph/api/main.py get_app()
+Pattern: FastAPIInstrumentor.instrument_app(app)
+Configure OTLP exporter in lifespan based on env var OTEL_EXPORTER_OTLP_ENDPOINT.
+No-op if not configured (zero-overhead default).
+
+### Task 2-3: SQLite3 instrumentation (1h)
+ADD: opentelemetry-instrumentation-sqlite3
+Call: SQLite3Instrumentor().instrument() in lifespan startup.
+Captures all sqlite3 module calls as spans.
+
+### Task 2-4: prometheus-fastapi-instrumentator /metrics endpoint (1h)
+ADD: prometheus-fastapi-instrumentator to deps
+Pattern: Instrumentator().instrument(app).expose(app) in get_app().
+Exposes /metrics with standard HTTP request metrics.
+
+### Task 2-5: sentry-sdk[fastapi] (1h)
+ADD: sentry-sdk[fastapi] as optional dep [observability] extra.
+Init in lifespan if SENTRY_DSN env var set.
+sentry_sdk.init(dsn=..., traces_sample_rate=0.1, integrations=[FastApiIntegration()])
+
+### Task 2-6: asgi-correlation-id + structlog contextvars (1.5h)
+ADD: asgi-correlation-id, structlog
+Middleware order matters: CorrelationIdMiddleware BEFORE logging middleware.
+Bind correlation_id to structlog contextvars on each request.
+FILE: src/python/htmlgraph/api/main.py - add middleware in get_app()
+
+### Task 2-7: Verify correlation ID propagation (1h)
+Write test that checks X-Request-ID header propagates through all log output.
+Use structlog.testing.capture_logs() context manager.
+
+---
+
+## Phase 3: Reliability Testing (6 tasks, ~8.5h)
+
+### Task 3-1: Add schemathesis + hypothesis to dev deps (0.5h)
+pyproject.toml [project.optional-dependencies] dev section (currently has pytest etc.)
+ADD: schemathesis>=3.0, hypothesis>=6.0
+
+### Task 3-2: schemathesis test suite against OpenAPI schema (2h)
+FastAPI auto-generates OpenAPI at /openapi.json.
+Pattern: schemathesis.from_uri(app_url + "/openapi.json")
+Or: schemathesis.from_wsgi("/openapi.json", app) for test client.
+Catches: missing error handling, wrong status codes, schema mismatches.
+
+### Task 3-3: hypothesis strategies for core Pydantic models (2h)
+TARGET MODELS for property-based testing:
+  - src/python/htmlgraph/models/base.py (Node, base model)
+  - src/python/htmlgraph/models/work_items.py
+  - src/python/htmlgraph/event_log.py (has field_validator - good hypothesis target)
+  - src/python/htmlgraph/pydantic_models.py
+Use: from hypothesis import given, settings; from pydantic import TypeAdapter
+
+### Task 3-4: hypothesis tests for SQLite query edge cases (1.5h)
+Target: HtmlGraphDB.insert_event() - complex query with JSON fields.
+Target: Analytics queries with arbitrary time ranges.
+Use hypothesis.strategies for generating arbitrary strings, timestamps, IDs.
+
+### Task 3-5: Integrate schemathesis into CI pipeline (1h)
+FILE: pytest.ini or pyproject.toml [tool.pytest.ini_options]
+Add schemathesis tests to test suite with appropriate markers.
+May need @pytest.mark.schemathesis and separate test run flag.
+
+### Task 3-6: Standardize retry via tenacity; replace decorators.py:37 (1.5h)
+CURRENT: src/python/htmlgraph/decorators.py has custom retry() and retry_async()
+  - sync version uses time.sleep() (blocks event loop if called from async context)
+  - async version uses asyncio.sleep() (correct)
+  - Both implement exponential backoff + jitter manually
+ADD: tenacity>=8.0 to deps
+tenacity provides: @retry(wait=wait_exponential(), stop=stop_after_attempt(3))
+MIGRATION: Replace custom retry decorators with tenacity equivalents.
+Keep RetryError for API compatibility or map to tenacity.RetryError.
+Note: decorators.py has ZERO callers found in current grep - may be dead code.
+
+---
+
+## Phase 4: Durable Orchestration Evaluation (5 tasks, ~18h)
+
+### Task 4-1: temporalio spike (4h)
+Implement sample agent workflow: feature start -> subagent delegation -> completion.
+temporalio requires temporal server running (Docker).
+Python SDK: pip install temporalio
+
+### Task 4-2: Prefect spike (3h)
+Same workflow in Prefect 3.x.
+Prefect is serverless-friendly (Prefect Cloud or self-hosted).
+Python SDK: pip install prefect
+
+### Task 4-3: Evaluation criteria (2h)
+- Failure detection: how quickly detects crashed workers?
+- Retries: automatic vs manual configuration
+- Determinism: replay safety for agent coordination
+- Adoption: infrastructure requirements, learning curve
+- Integration: how well does it fit HtmlGraph hook architecture?
+
+### Task 4-4: Document decision in AGENTS.md (1h)
+
+### Task 4-5: Implement chosen orchestrator (8h)
+Based on spike findings. Likely temporalio given research recommendation.
+
+---
+
+## Current State Summary
+
+### main.py lifespan pattern
+USES: @app.on_event("startup") - DEPRECATED in FastAPI 0.104+
+LOCATION: main.py:241 inside get_app() function body
+DEPRECATION WARNING: Will fire on every app start in newer FastAPI versions
+MIGRATION: contextlib.asynccontextmanager approach needed
+
+### PRAGMA inconsistencies
+- busy_timeout: 3 different values (3000ms, 5000ms, 30000ms)
+- journal_mode=WAL: only in schema.py and analytics_index.py (missing from others)
+- synchronous=NORMAL: only in analytics_index.py (missing from all others)
+- foreign_keys: not set in async connections (dependencies.py, db.py)
+
+### pydantic-settings
+NOT in pyproject.toml dependencies. Two files have try/except fallbacks.
+fastapi>=0.104.0 is in deps. pydantic>=2.0.0 is in deps.
+pydantic-settings is a SEPARATE package since pydantic v2.
+
+### Files needing strict validation
+- src/python/htmlgraph/api/schemas.py (3 models: EventModel, FeatureModel, SessionModel)
+- src/python/htmlgraph/api/main.py (DUPLICATE models - consolidate + add strict)
+- src/python/htmlgraph/api/routes/dashboard.py (inline models)
+- src/python/htmlgraph/api/broadcast_routes.py (inline models)
+
+### Acceptance criteria test stubs needed
+- test_lifespan_startup() - verify no DeprecationWarning on startup
+- test_pragma_consistency() - verify all connections emit same PRAGMA set
+- test_pragma_optimize_scheduled() - verify asyncio task fires
+- test_strict_validation() - verify strict models reject coerced types
+- test_otel_spans() - verify spans created per route
+- test_prometheus_metrics() - verify /metrics endpoint after requests
+- test_correlation_id_propagation() - verify X-Request-ID in all log lines
+- test_schemathesis_clean() - schemathesis finds 0 violations
+            </div>
+        </section>
+    </article>
+</body>
+</html>

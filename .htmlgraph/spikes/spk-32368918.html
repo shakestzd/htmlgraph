@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard live update bug investigation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-32368918"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T22:04:56.446173"
+             data-updated="2026-03-07T22:04:56.446174" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Dashboard live update bug investigation</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+
+When a row is expanded (toggle open) and new child events arrive via WebSocket, the children do NOT appear in the already-expanded row. Only a full page refresh shows them.
+
+## Architecture: Two Separate UI Systems
+
+There are two separate activity-feed implementations in this codebase. The ACTIVE one is:
+
+**activity-feed-hierarchical.html** — served by GET /views/activity-feed (dashboard.py line 283)
+
+The inactive one (activity-feed.html) uses a card/conversation-turn design with toggleConversationTurn(); it is NOT what the live dashboard renders.
+
+## The Active UI System (Hierarchical Table View)
+
+### Template: activity-feed-hierarchical.html
+
+Renders a flat <table> where:
+- Parent rows: .parent-row with data-event-id, data-children-loaded="false"
+- Child rows (depth-1+): loaded lazily via HTMX on first click, inserted afterend the parent row
+- ID pattern for children container: none — children are bare <tr> rows with data-parent="{parentId}"
+
+### Expand/Toggle Logic
+
+**handleParentClick(row)** — activity-feed-hierarchical.html line 435
+- Called from onclick on .parent-row.has-children
+- First click: row.dataset.childrenLoaded is "false" → HTMX fires hx-get="/views/activity-feed/children/{event_id}" (hx-trigger="click once"), sets childrenLoaded="true", listens for htmx:afterSwap to rotate expand icon
+- Subsequent clicks: calls toggleChildren(row)
+
+**toggleChildren(parentRow)** — activity-feed-hierarchical.html line 408
+- Queries DOM for [data-parent="{eventId}"] rows
+- Toggles .hidden class on direct children
+- On collapse: recursively hides all descendants via collectDescendants()
+
+**Child fetch endpoint**: GET /views/activity-feed/children/{parent_event_id} (dashboard.py line 297)
+- Returns HTML from activity-feed-children.html
+- Inserts <tr> rows with data-parent="{parent_event_id}" afterend the parent row
+- Uses hx-swap="afterend" + hx-trigger="click once"
+
+### WebSocket Message Handler
+
+**ws.onmessage** — dashboard.html line 161
+- Receives {type: "event"} messages
+- Calls insertNewEventIntoActivityFeed(data) at line 189
+
+**insertNewEventIntoActivityFeed(eventData)** — dashboard.html line 233
+- Checks for .activity-feed-view element
+- For UserQuery events: creates a new .conversation-turn via createConversationTurnHTML() and prepends to .conversation-turns-list
+- For child events (has parent_event_id): looks for [data-event-id="{parent_event_id}"] → inserts into #children-child-{parent_event_id} container
+- Falls back to findConversationTurnForEvent() → inserts into .turn-children
+
+## The Bug: Complete Mismatch Between WebSocket Handler and Active Template
+
+The WebSocket insertion code in dashboard.html was written for the INACTIVE activity-feed.html (conversation-turn card design), NOT for the active activity-feed-hierarchical.html (table design).
+
+Specific mismatches:
+
+### 1. Wrong container ID scheme
+
+WebSocket handler (dashboard.html line 293) looks for:
+  document.getElementById()
+
+Active template uses NO such element. Children in the hierarchical view are bare <tr> rows with data-parent attribute, inserted directly into the <tbody> afterend their parent row. There is no wrapper div with id="children-child-*".
+
+### 2. Wrong class selectors
+
+WebSocket handler (line 241) looks for:
+  activityFeed.querySelector(".conversation-feed")
+
+Active template has NO .conversation-feed element. It has .activity-list.table-view containing an <table class="activity-table">.
+
+### 3. Wrong turn container scheme
+
+WebSocket handler (line 364) looks for:
+  turnContainer.querySelector(".turn-children")
+
+Active template has NO .turn-children. The turn equivalent is the <tbody id="activity-feed-tbody"> and child rows are <tr> elements with data-parent.
+
+### 4. Wrong insertion method for already-expanded rows
+
+Even if the parent row IS expanded (children loaded and visible), the WebSocket handler has no code path that:
+- Finds the parent <tr> row by data-event-id
+- Inserts a new <tr> afterend any existing child rows
+- Respects the data-parent attribute that toggleChildren() depends on
+
+### 5. insertNewEventIntoActivityFeed exits early at line 236-239
+
+The function first checks for .activity-feed-view and .conversation-feed. Since .conversation-feed does not exist in the active template, the function returns immediately (line 243) and does nothing — meaning NO WebSocket-originated events are inserted into the hierarchical table at all.
+
+## Root Cause Summary
+
+insertNewEventIntoActivityFeed() silently exits at line 241-243 because .conversation-feed is not present in the active hierarchical template. Even if that guard passed, all subsequent DOM selectors (children-child-*, .turn-children, .conversation-turns-list) target the inactive card-based template. The hierarchical table's actual structure (tbody rows with data-parent attributes, lazy HTMX children loading, no wrapper divs) is completely unaddressed by the WebSocket insertion logic.
+
+## Suggested Fix Approach
+
+### Option A: Fix WebSocket handler to target the hierarchical table
+
+In insertNewEventIntoActivityFeed():
+
+1. Replace the .conversation-feed guard with .activity-list.table-view / #activity-feed-tbody check
+2. For UserQuery events: create a new <tr class="activity-row parent-row"> and prepend to <tbody id="activity-feed-tbody">
+3. For child events with a parent already in the DOM:
+   a. Find parent row: document.querySelector()
+   b. Check if row is expanded: row.dataset.childrenLoaded === "true" and expand icon has .expanded
+   c. If expanded: find the last <tr> with data-parent="{parentId}" and insert a new child <tr> afterend it (with data-parent set correctly)
+   d. If not expanded: just increment the child-count badge on the parent row — children will be fresh-fetched on next click anyway
+4. Make sure new child rows have data-parent and data-event-id attributes so toggleChildren() can manage them on subsequent collapses
+
+### Option B: Reload children on expansion if stale
+
+A simpler but less live approach:
+- Remove hx-trigger="click once" from parent rows
+- Change to hx-trigger="click" so every expand re-fetches children from the server
+- This means the second click always gets fresh data — no need for WebSocket DOM insertion
+- Tradeoff: every expand hits the server, no true live streaming
+
+Option A gives true live updates. Option B is safer and simpler.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

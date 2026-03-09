@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard Bug Fixes</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-cadfc6bc"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T06:05:07.953672"
+             data-updated="2026-03-09T06:05:07.953674" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>Dashboard Bug Fixes</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Changes made to src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html:
+
+1. Bug 1 - Removed STATUS column: Removed <th class="col-status">Status</th> header and the <td class="col-status"> cell rendering group.parent.status from the activity feed table. Also removed associated CSS rules (.activity-table .col-status, .activity-table td.col-status, .activity-table thead th.col-status).
+
+2. Bug 2 - Removed WebSocket footer: Removed the auto-refresh-indicator div containing "Live updates enabled (via WebSocket)" text from the bottom of the activity feed view.
+
+3. Bug 3 - Feature badge shows name instead of ID: Changed work-item badge to display group.work_item_title (falling back to short ID if title is empty) instead of always showing the short ID. Updated CSS class from work-item-short-id to work-item-name with appropriate truncation styles.
+
+Tests pass: yes (2194 passed, 37 skipped, ruff+mypy clean)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

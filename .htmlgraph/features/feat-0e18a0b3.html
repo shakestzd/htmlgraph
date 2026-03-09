@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Parent event attribution: fix stale task_delegation after restart/compaction</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-0e18a0b3"
+             data-type="feature"
+             data-status="done"
+             data-priority="critical"
+             data-created="2026-03-07T14:55:55.669703"
+             data-updated="2026-03-07T19:55:55.676767+00:00" data-agent-assigned="claude" data-track-id="trk-763ca773">
+
+        <header>
+            <h1>Parent event attribution: fix stale task_delegation after restart/compaction</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-critical">Critical Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-07T14:55:55.676751">sess-6c56e756</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true">✅ Add session membership validation (v0.33.17)</li>
+                <li data-completed="true">✅ Add transcript-based parent resolution via ~/.claude/projects/{hash}/*.jsonl (v0.33.19)</li>
+                <li data-completed="true">✅ Fix staleness check: use parent_event_id comparison instead of timestamp comparison (v0.33.20)</li>
+                <li data-completed="true">✅ Run tests to verify fix</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

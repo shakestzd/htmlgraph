@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Deploy script and test optimization research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-df744af5"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-07T22:39:27.263764"
+             data-updated="2026-03-07T22:39:27.263767" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Deploy script and test optimization research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+Research deploy-all.sh and pytest configuration to understand current state before optimizing.
+
+## Findings
+
+### 1. Exact pytest command in deploy-all.sh
+Line 388:
+    uv run pytest tests/ -v 2>/dev/null
+
+- Targets tests/ (ALL subdirectories)
+- No -n flag (sequential, no parallelism)
+- -v verbose
+- stderr suppressed
+- On failure: warns but continues in --no-confirm mode (lines 392-401)
+
+### 2. --skip-tests flag
+Does NOT exist. Available skip flags: --skip-pypi, --skip-plugins.
+Tests run on every full deploy unless --docs-only or --build-only.
+
+### 3. Active pytest config: pytest.ini (overrides pyproject.toml)
+testpaths = tests/python tests/benchmarks
+addopts = -v --tb=short --strict-markers --disable-warnings --color=yes -m "not external_api"
+markers: slow, benchmark, external_api, ui, backend, integration
+
+### 4. pyproject.toml [tool.pytest.ini_options] - INACTIVE (overridden by pytest.ini)
+testpaths = tests/python
+addopts includes: -n auto --cov=src/python/htmlgraph --cov-report=term-missing
+asyncio_mode = auto
+markers: serial
+NOTE: These settings do NOT apply because pytest.ini takes precedence.
+
+### 5. pytest-xdist status
+Listed in both dev optional-dependencies and dependency-groups dev.
+NOT activated: -n auto only in inactive pyproject.toml section.
+Active pytest.ini addopts has no -n flag at all.
+
+### 6. Test counts
+Total collected: 2217 tests (3 deselected: external_api marker), 111 modules.
+
+Top modules by test count:
+  56  test_snapshot_refs_integration.py
+  56  test_session_context.py
+  50  test_repo_hash.py
+  48  test_quality_gates.py
+  47  test_atomic_ops.py
+  46  test_session_graph.py
+  44  test_sdk_modularization_phase1.py
+  43  test_query_builder.py
+  43  test_cli_pydantic_models.py
+  38  test_cost_analyzer.py
+  37  test_sqlite_schema.py
+  37  test_session_registry.py
+  37  test_ids.py
+
+### 7. Slow tests / markers
+- @pytest.mark.slow: 0 occurrences (no tests tagged slow)
+- @pytest.mark.external_api: 7 in test_headless_spawner.py (already excluded)
+- Cannot skip-by-marker for slow tests because none are tagged
+
+## Key Optimization Opportunities
+1. deploy-all.sh pytest call has no -n flag; pytest-xdist is installed but unused
+2. pytest.ini addopts does not include -n auto (dead config in pyproject.toml does)
+3. deploy-all.sh uses tests/ path but pytest.ini restricts to tests/python + tests/benchmarks
+4. No --skip-tests flag exists to bypass tests during deploy
+5. Coverage disabled in active config (good)
+6. serial marker defined in pyproject.toml but not in pytest.ini markers list
+            </div>
+        </section>
+    </article>
+</body>
+</html>

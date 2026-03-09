@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard Expand Collapse Bug</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-966ea517"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-08T01:26:09.034408"
+             data-updated="2026-03-08T01:26:09.034411" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Dashboard Expand Collapse Bug</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+The dashboard auto-refreshes the activity feed every 30 seconds. When the refresh fires,
+any expanded rows (conversation turns, nested child events) snap back to collapsed/default
+state, losing the user's view.
+
+## Exact Mechanism
+
+### 1. Polling trigger (line 4-7, activity-feed-hierarchical.html)
+The outer container div declares HTMX polling:
+
+    <div class="view-container activity-feed-view"
+         hx-get="/views/activity-feed"
+         hx-trigger="every 30s, refresh"
+         hx-ext="morph"
+         hx-swap="morph:outerHTML"
+         hx-target="this">
+
+Every 30 seconds, HTMX GETs /views/activity-feed and swaps the entire outer container
+using idiomorph (morph:outerHTML). It replaces the outerHTML of .activity-feed-view —
+the entire subtree — with server-rendered HTML.
+
+### 2. Morph extension is present but insufficient
+- idiomorph-ext.min.js IS loaded (static/idiomorph-ext.min.js, line 8 of dashboard-redesign.html)
+- hx-ext="morph" and hx-swap="morph:outerHTML" are set on the container
+
+Idiomorph is a DOM-morphing library that attempts to match old and new DOM nodes by
+identity and update them in place, preserving state. HOWEVER, it only preserves state
+automatically for:
+  - Input field values
+  - Focus
+  - Scroll position (on the morphed element itself)
+
+It does NOT automatically preserve:
+  - CSS class state (e.g. collapsed class removed = expanded row)
+  - data-children-loaded="true" attributes set by JavaScript at runtime
+  - The expand-icon.expanded CSS class (set by toggleChildren/handleParentClick)
+
+### 3. Why morph fails here
+The expanded/collapsed state is encoded purely as CSS classes on DOM elements:
+  - .turn-children.collapsed — hidden when collapsed (display:none), no collapsed = expanded
+  - .expand-icon.expanded — rotates the triangle 90 degrees
+  - .expand-toggle-turn.expanded — same for conversation-turn toggles
+  - .child-children.collapsed — nested depth collapsed state
+  - data-children-loaded="true" — set by JS to mark lazy-load already done
+
+Idiomorph matches nodes by id/key. The parent row IDs are stable (event UUIDs via
+id="{{ group.parent.event_id }}"). However, the server-rendered HTML always delivers
+the child containers with class="turn-children collapsed" and no expanded classes.
+When idiomorph morphs the old expanded DOM to the new server DOM, it REMOVES the
+runtime-added classes (expanded, etc.) because morphing applies the server's attribute
+values, which never include "expanded".
+
+Additionally, data-children-loaded is always "false" in the server HTML (line 37 of
+activity-feed-hierarchical.html):
+    data-children-loaded="false"
+
+So even if a user had clicked to lazy-load children, after a morph that attribute is
+reset to false and the expand icon state is lost.
+
+### 4. Filter state also lost
+The spawner type filter (<select id="agent-type-filter">) value is also reset by
+morph:outerHTML since the entire container is replaced.
+
+## Element IDs Available for State Tracking
+
+Parent rows (depth-0 UserQuery events):
+  - id="{{ group.parent.event_id }}"  (UUID, e.g. "abc123")
+  - data-event-id="{{ group.parent.event_id }}"
+
+Child containers:
+  - id="children-{event_id}"  — .turn-children div
+  - id="toggle-{event_id}"    — .expand-toggle-turn span
+
+Nested child containers (activity-feed.html template, used by lazy-load):
+  - id="children-child-{event_id}"
+  - id="toggle-child-{event_id}"
+
+All IDs are stable UUIDs tied to event_id, which persist across refreshes since they
+come from the database.
+
+## Root Cause Summary
+morph:outerHTML replaces the server-delivered HTML (which has all rows collapsed and
+data-children-loaded=false) over the current DOM. Idiomorph matches nodes by ID but
+sets attributes/classes to match the server state, wiping all runtime-expanded state.
+
+## Recommended Fix Approaches
+
+### Option A: Save/Restore State Around Morph (Minimal JS, Recommended)
+Use htmx:beforeRequest and htmx:afterSettle events on the .activity-feed-view element
+to snapshot and restore expanded state before/after each morph cycle.
+
+Before morph:
+  - Collect IDs of all rows where .turn-children does NOT have .collapsed
+    (i.e., querySelectorAll(".turn-children:not(.collapsed)") — get data-turn-id or parent id)
+  - Collect IDs of .child-children without .collapsed
+  - Save the filter select value
+  - Save data-children-loaded=true parent IDs
+
+After morph (htmx:afterSettle):
+  - Re-apply expanded class to each saved ID (remove .collapsed from the containers,
+    add .expanded to toggles)
+  - Restore filter select value
+  - Restore data-children-loaded attributes
+
+This is ~40 lines of JS added once to dashboard-redesign.html or activity-feed-hierarchical.html.
+
+### Option B: Add hx-preserve to critical sub-elements
+Add hx-preserve attribute to the .activity-feed-view container's children that hold
+expanded state. Idiomorph/HTMX will skip morphing any element with hx-preserve and its
+subtree. But this would skip updating the feed content too — not suitable for the
+rows list.
+
+### Option C: Use CSS-only persistence (localStorage)
+On expand, write IDs to localStorage. On page load/morph, restore. More complex but
+survives page reloads too.
+
+### Option D: Disable morph, use innerHTML swap with save/restore
+Remove hx-ext="morph" and hx-swap="morph:outerHTML", use default innerHTML swap on
+a child container. The save/restore pattern from Option A still applies.
+
+## Recommended Implementation (Option A)
+
+In activity-feed-hierarchical.html, add to the <script> block:
+
+    // Capture expanded state before HTMX morph refreshes the feed
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        const target = evt.detail.target;
+        if (!target || !target.classList.contains('activity-feed-view')) return;
+
+        // Save expanded turn-children (those without collapsed class)
+        const expandedTurns = [];
+        document.querySelectorAll('.turn-children:not(.collapsed)').forEach(el => {
+            // The container id is "children-{event_id}"
+            if (el.id) expandedTurns.push(el.id.replace('children-', ''));
+        });
+
+        const expandedChildContainers = [];
+        document.querySelectorAll('.child-children:not(.collapsed)').forEach(el => {
+            if (el.id) expandedChildContainers.push(el.id.replace('children-child-', ''));
+        });
+
+        const loadedParents = [];
+        document.querySelectorAll('[data-children-loaded="true"]').forEach(el => {
+            if (el.dataset.eventId) loadedParents.push(el.dataset.eventId);
+        });
+
+        const filterValue = document.getElementById('agent-type-filter')?.value || 'all';
+
+        // Store on the element itself so it survives the swap
+        target._expandedState = { expandedTurns, expandedChildContainers, loadedParents, filterValue };
+    });
+
+    document.body.addEventListener('htmx:afterSettle', function(evt) {
+        const target = evt.detail.target;
+        if (!target || !target.classList.contains('activity-feed-view')) return;
+
+        const state = target._expandedState;
+        if (!state) return;
+
+        // Restore turn-level expanded state
+        state.expandedTurns.forEach(id => {
+            const container = document.getElementById('children-' + id);
+            const toggle = document.getElementById('toggle-' + id);
+            if (container) container.classList.remove('collapsed');
+            if (toggle) toggle.classList.add('expanded');
+        });
+
+        // Restore nested child expanded state
+        state.expandedChildContainers.forEach(id => {
+            const container = document.getElementById('children-child-' + id);
+            const toggle = document.getElementById('toggle-child-' + id);
+            if (container) container.classList.remove('collapsed');
+            if (toggle) toggle.classList.add('expanded');
+        });
+
+        // Restore data-children-loaded
+        state.loadedParents.forEach(id => {
+            const row = document.querySelector('[data-event-id="' + id + '"]');
+            if (row) row.dataset.childrenLoaded = 'true';
+        });
+
+        // Restore filter
+        const filterEl = document.getElementById('agent-type-filter');
+        if (filterEl && state.filterValue !== 'all') {
+            filterEl.value = state.filterValue;
+            filterByAgentType(state.filterValue);
+        }
+
+        delete target._expandedState;
+    });
+
+## Files to Change
+- /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html
+  Add the save/restore JS to the existing <script> block (after the collapseAll function).
+  Also: dashboard-redesign.html already loads idiomorph-ext.min.js so no dependency changes needed.
+
+## What Does NOT Need Changing
+- The morph mechanism itself (hx-ext="morph", hx-swap="morph:outerHTML") — leave it
+- The polling interval (every 30s) — leave it
+- The server routes — no server-side changes needed
+- The ID scheme — already stable and suitable for state tracking
+
+## Confidence
+HIGH — root cause is definitively confirmed by reading the template. The morph always
+delivers collapsed classes from the server and idiomorph overwrites runtime state.
+The fix is pure client-side JS ~50 lines, no server changes, and exploits the stable
+event UUID IDs already present on all elements.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

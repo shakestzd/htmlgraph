@@ -44,10 +44,23 @@ Thumbs.db
 # Local development
 *.log
 
+# Dashboard screenshot artifacts
+dashboard-*.png
+
+# pytest-hypothesis database
+.hypothesis/
+
+# Codex output
+CODEX.md
+
 # HtmlGraph analytics index (rebuildable cache)
 .htmlgraph/index.sqlite
 .htmlgraph/index.sqlite-wal
 .htmlgraph/index.sqlite-shm
+
+# SQLite WAL journal files
+.htmlgraph/htmlgraph.db-shm
+.htmlgraph/htmlgraph.db-wal
 
 # HtmlGraph session tracking artifacts (regenerable observability data)
 .htmlgraph/sessions/*.jsonl

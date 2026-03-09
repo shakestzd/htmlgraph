@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Attribution Test - Researcher</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-d0a56d2e"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-08T03:36:12.237967"
+             data-updated="2026-03-08T03:36:12.237970" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Attribution Test - Researcher</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Files Explored
+
+### src/python/htmlgraph/api/ Python files (27 total):
+- __init__.py
+- websocket.py
+- reactive_routes.py
+- broadcast.py
+- broadcast_routes.py
+- presence.py
+- templates.py
+- pagination.py
+- filters.py
+- websocket_pool.py
+- cache.py
+- broadcast_websocket.py
+- offline.py
+- cost_alerts_websocket.py
+- reactive.py
+- json_utils.py
+- logging_config.py
+- telemetry.py
+- schemas.py
+- db.py
+- dependencies.py
+- sync_routes.py
+- app.py
+- sync_models.py
+- main.py
+- services.py
+- oplog_sync.py
+
+### services.py line count: 1246 lines
+
+### tests/python/ test files: 100+ test files (truncated in output), including:
+- test_agent_attribution.py, test_dashboard_attribution.py, test_cross_agent_attribution.py
+- test_parallel_subagent_attribution.py, test_sdk_sqlite_integration.py
+- test_orchestrator_mode.py, test_session_integration.py
+- test_analytics.py, test_cost_analyzer.py, test_cost_monitor.py
+- and many more...
+
+### hooks configured in packages/claude-plugin/hooks/hooks.json:
+13 event types handled:
+1. UserPromptSubmit -> track-event.py + user-prompt-submit.py (CIGS analysis)
+2. Stop -> track-event.py
+3. SessionEnd -> session-end.py
+4. PreToolUse -> pretooluse-integrator.py (Task() routing to spawner agents)
+5. PostToolUse -> posttooluse-integrator.py
+6. SubagentStart -> subagent-start.py (agent_id to task_delegation mapping)
+7. SubagentStop -> subagent-stop.py
+8. TeammateIdle -> track-event.py
+9. TaskCompleted -> track-event.py
+10. PostToolUseFailure -> posttooluse-failure.py
+11. PreCompact -> pre-compact.py
+12. InstructionsLoaded -> instructions-loaded.py
+13. PermissionRequest -> permission-request.py
+14. SessionStart -> session-start.py (+ session-resume.py for resume matcher)
+
+### src/python/htmlgraph/db/pragmas.py first 30 lines:
+- Defines PRAGMA_SETTINGS dict with: journal_mode=WAL, synchronous=NORMAL,
+  foreign_keys=1, busy_timeout=5000, cache_size=-64000 (64MB), temp_store=MEMORY,
+  mmap_size=268435456 (256MB)
+- apply_sync_pragmas(conn) for sync sqlite3 connections
+- apply_async_pragmas(conn) for async aiosqlite connections
+
+## Tool Calls Made (5 parallel):
+1. Glob - src/python/htmlgraph/api/*.py
+2. Bash - wc -l services.py
+3. Glob - tests/python/*.py
+4. Read - packages/claude-plugin/hooks/hooks.json
+5. Read - src/python/htmlgraph/db/pragmas.py (first 30 lines)
+
+All 5 tool calls executed in parallel as children of this UserQuery.
+Event traces confirmed via hook context: toolu_01CZtuqrMR9LxWTAg9GRSdUn,
+toolu_01WBT6L73qEk5ctA2Q72NDqN, toolu_01X5QkkZJpQBWGUUHUVh6GZc,
+toolu_01SrwhqbiR6hD9StMqoD2rvV, toolu_01U4EvKvfNYFHa7vBxTra43f
+            </div>
+        </section>
+    </article>
+</body>
+</html>
