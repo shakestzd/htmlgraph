@@ -15,7 +15,7 @@ from pathlib import Path
 
 # Handle Python 3.10 compatibility for TOML parsing
 if sys.version_info >= (3, 11):
-    pass  # tomllib imported at top
+    import tomllib
 else:
     import tomli as tomllib  # type: ignore[import]
 
