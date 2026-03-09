@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Orchestrator tool calls attributed to sub-agent Task instead of orchestrator prompt</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-3d6399de"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-03-09T13:10:36.861539"
+             data-updated="2026-03-09T13:32:31.152139" data-agent-assigned="claude">
+
+        <header>
+            <h1>Orchestrator tool calls attributed to sub-agent Task instead of orchestrator prompt</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-09T13:10:39.488829">sess-6c56e756</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-09T13:32:31.152143">2026-03-09T13:32:31.152143</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.1728395061728395, 'issues': ['High retry rate: 83%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (17%)'}">{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.1728395061728395, 'issues': ['High retry rate: 83%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (17%)'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-9e624cb2">insi-9e624cb2</dd>
+            </dl>
+        </section>
+        <section data-content>
+            <h3>Description</h3>
+            After a Task() sub-agent call completes, the orchestrator'''s subsequent tool calls (Bash, Agent, etc.) appear as children of the Task event node instead of as siblings under the orchestrator'''s UserQuery prompt.
+
+Observed: Bash calls at 17:08:xx are nested inside Task(htmlgraph:sonnet-coder) which completed earlier.
+Expected: Those Bash calls should be at the same level as the Task node, parented to the orchestrator'''s (20) continue prompt.
+
+Root cause hypothesis: pretooluse-integrator or posttooluse-integrator does not reset parent_activity context after Task() PostToolUse event fires.
+        </section>
+    </article>
+</body>
+</html>

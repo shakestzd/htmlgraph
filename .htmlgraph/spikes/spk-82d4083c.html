@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Attribution Code Review</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-82d4083c"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T10:17:16.643350"
+             data-updated="2026-03-09T10:17:16.643352" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Attribution Code Review</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Attribution Code Review - Full Analysis
+
+### Files Reviewed
+- packages/claude-plugin/hooks/scripts/user-prompt-submit.py (146 lines)
+- src/python/htmlgraph/hooks/prompt_analyzer.py (843 lines)
+
+### 1. What does get_open_work_items() do?
+
+Function signature: get_open_work_items(context: HookContext) -> list[dict]
+
+It makes 4 SDK queries in sequence:
+1. sdk.features.where(status="in_progress")  - ALL in-progress features (no limit)
+2. sdk.features.where(status="todo")[:5]     - top 5 todo features (sliced)
+3. sdk.bugs.where(status="in_progress")      - ALL in-progress bugs (no limit)
+4. sdk.spikes.where(status="in_progress")    - ALL in-progress spikes (no limit)
+
+Each item is mapped to: {id, title, type, status}
+- title falls back to feat.id if feat.title is None
+- Returns empty list [] on any exception (BLE001 blanket catch)
+- The context parameter is accepted but NOT USED -- the SDK() is instantiated with
+  no args, so it discovers the graph dir from cwd/env, not from the hook context.
+  Same pattern as get_active_work_item().
+
+NOTE: todo bugs and todo spikes are NOT included. Only in_progress bugs and spikes
+are fetched. Todo features are capped at 5. This asymmetry may be intentional.
+
+### 2. What format does _build_attribution_block() produce?
+
+Function signature: _build_attribution_block(active_work, open_work_items) -> str | None
+
+Returns None early if open_work_items is empty/None.
+
+Output format (markdown):
+---
+## Work Item Attribution
+
+Open work items:
+- [in_progress] feature feat-abc123: My Feature Title
+- [todo] feature feat-def456: Another Feature
+- [in_progress] bug bug-111aaa: Bug description
+- [in_progress] spike spk-222bbb: Spike title
+
+Currently active: feat-abc123: My Feature Title
+  (or "Currently active: None" if no active_work)
+
+INSTRUCTION: Before starting work, evaluate whether this conversation matches the active work item above.
+- If the prompt matches a different work item, call `sdk.features.start("correct-id")` (or `sdk.bugs.start` / `sdk.spikes.start`) BEFORE proceeding.
+- If the task is new and untracked, call `sdk.features.create("Brief title").save()` then `sdk.features.start(new_id)`.
+- If the active item is correct, continue without changing it.
+- Use `from htmlgraph import SDK; sdk = SDK(agent="claude")` to access the SDK.
+---
+
+### 3. Is generate_guidance() correctly receiving and including open_work_items?
+
+YES - the wiring is correct end-to-end.
+
+user-prompt-submit.py main():
+  open_items = get_open_work_items(context)        # step 4b
+  workflow_guidance = generate_guidance(            # step 5
+      classification, active_work, prompt,
+      open_work_items=open_items                    # passed as kwarg -- CORRECT
+  )
+
+generate_guidance() signature:
+  def generate_guidance(classification, active_work, prompt, open_work_items=None)
+
+Internal helper _with_attribution(guidance) is a closure defined inside generate_guidance()
+that captures both active_work and open_work_items:
+  def _with_attribution(guidance: str) -> str:
+      block = _build_attribution_block(active_work, open_work_items)
+      return guidance + "\n\n" + block if block else guidance
+
+Coverage check of all return branches in generate_guidance():
+  - continuation + active_work:               returns block directly (no base guidance)
+  - implementation + spike active:            _with_attribution() -- CORRECT
+  - implementation + feature active:          _with_attribution() -- CORRECT
+  - bug_report + feature active:              _with_attribution() -- CORRECT
+  - has active work but no specific match:    _build_attribution_block() directly -- CORRECT
+  - no active work + implementation:          _with_attribution() -- CORRECT
+  - no active work + bug_report:              _with_attribution() -- CORRECT
+  - no active work + investigation:           _with_attribution() -- CORRECT
+  - low confidence (< 0.5):                  _build_attribution_block() directly, concatenated -- CORRECT
+  - fallthrough (nothing matched):            _build_attribution_block() directly -- CORRECT
+
+ALL branches correctly include the attribution block.
+
+### 4. Bugs / Issues Found
+
+BUG 1 (MINOR - asymmetric queries): todo bugs and todo spikes not fetched
+  get_open_work_items() fetches todo features (top 5) but does NOT fetch
+  todo bugs or todo spikes. If someone has a todo bug matching their current task,
+  it will not appear in the attribution list. Likely intentional but undocumented.
+
+BUG 2 (MINOR - dead param): context parameter is unused in get_open_work_items()
+  HookContext is passed in but never read. SDK() uses its own graph dir discovery
+  (cwd/env). This means if a hook fires from a different cwd than the .htmlgraph
+  dir, it silently queries the wrong graph. Low risk in practice since hooks run
+  from project root. The function signature implies it uses context -- it does not.
+
+BUG 3 (MINOR - no cap): No limit on in_progress items
+  sdk.features.where(status="in_progress") has no [:N] cap. During parallel
+  worktree development with many active features, the attribution block grows
+  unbounded, adding noise to every single prompt injection.
+
+BUG 4 (DESIGN - verbose on every turn): attribution fires for continuation prompts too
+  The continuation+active_work branch returns just the attribution block (not None).
+  A simple "ok" or "yes" prompt still gets the full list injected. By design per
+  the code, but means repeated injections on every turn -- Claude may start ignoring.
+
+BUG 5 (PERFORMANCE - no caching): 4 SDK queries fired on every prompt
+  get_open_work_items() performs 4 synchronous SDK queries per user prompt with
+  no session-level memoization. In long sessions this adds latency to every
+  user interaction.
+
+### Summary
+
+Core wiring: CORRECT. The attribution feature is properly implemented.
+- get_open_work_items() queries features/bugs/spikes via SDK
+- _build_attribution_block() formats them with currently-active item highlighted
+- generate_guidance() appends the block in all branches via _with_attribution() closure
+- user-prompt-submit.py passes open_items correctly as kwarg to generate_guidance()
+
+No critical bugs. The feature should work as designed for its primary use case.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

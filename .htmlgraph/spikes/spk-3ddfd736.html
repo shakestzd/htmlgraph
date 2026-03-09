@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Legacy Dashboard Removal</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-3ddfd736"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T08:27:59.804340"
+             data-updated="2026-03-09T08:27:59.804342" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>Legacy Dashboard Removal</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Removed:
+- deploy-all.sh: entire PRE-FLIGHT: Sync Dashboard Files block (39 lines) that copied dashboard.html -> index.html
+- dashboard-redesign.html: insertNewConversationTurn, findRootConversationTurn, findOrCreateChildrenContainer, calculateEventDepth, insertChildEvent, updateParentTurnStats functions (~370 lines of dead manual DOM construction)
+- dashboard-redesign.html: createActivityRowHTML function (~50 lines, old table row builder)
+- dashboard-redesign.html: Jaeger trace interactivity block - toggleTrace, highlightAncestors, clearAncestorHighlight, expandAllTraces, collapseAllTraces, updateBreadcrumbs, navigateToBreadcrumb, resetBreadcrumbs + breadcrumbStack state (~155 lines)
+- dashboard-redesign.html: .status-badge CSS variants (.success/.progress/.blocked/.todo/.pending/.done) - 45 lines
+- tests/operations/test_server.py: 4 sync_dashboard_files @patch decorators + test_start_server_dashboard_sync_warning test
+- src/python/htmlgraph/server.py: _serve_packaged_dashboard method, do_GET index.html fallback, sync_dashboard_files function (all removed in prior commit 13b914e6)
+- src/python/htmlgraph/operations/server.py: sync_dashboard_files import and call block (removed in prior commit 13b914e6)
+- index.html: deleted (legacy static dashboard artifact)
+- dashboard.html + .bak* files: deleted from src/python/htmlgraph/
+
+Kept:
+- All HTMX/SSE/WebSocket connection logic (connectWebSocket, initActivityFeedSSE, refreshActivityFeed, debouncedFeedRefresh)
+- Tab switching, htmx:beforeSwap/afterSettle expansion state preservation
+- convertTimestampsToLocal, formatTimestamp, escapeHtml, highlightElement, highlightRow
+- toggleChildren, expandAll, collapseAll (used by HTMX partials)
+- All activity table CSS, agent badges, child-event-row depth styles, spawner badges
+- .gitignore entry added: index.html
+
+Tests pass: yes (15/15 operations/test_server.py, ruff clean, mypy clean)
+Commit: 2102eaa5
+            </div>
+        </section>
+    </article>
+</body>
+</html>

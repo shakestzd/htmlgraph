@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Fix dashboard expand/collapse state preservation with idiomorph</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-16a1f9da"
+             data-type="feature"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-03-09T16:30:06.872176"
+             data-updated="2026-03-09T18:10:40.001804" data-agent-assigned="claude" data-track-id="trk-b5ceb449">
+
+        <header>
+            <h1>Fix dashboard expand/collapse state preservation with idiomorph</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-09T16:30:09.470241">sess-6c56e756</a></li>
+                    <li><a href="sess-b55e1899.html" data-relationship="implemented-in" data-since="2026-03-09T17:33:22.805851">sess-b55e1899</a></li>
+                    <li><a href="e979687b-2969-43db-9ae5-a628480e5e9e.html" data-relationship="implemented-in" data-since="2026-03-09T17:35:23.456674">e979687b-2969-43db-9ae5-a628480e5e9e</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Is Primary</dt>
+                <dd data-key="is_primary" data-value="True">True</dd>
+<dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-09T18:10:40.001808">2026-03-09T18:10:40.001808</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.1954022988505747, 'issues': ['High retry rate: 80%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (20%)'}">{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.1954022988505747, 'issues': ['High retry rate: 80%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (20%)'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-60a0361f">insi-60a0361f</dd>
+            </dl>
+        </section>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false">⏳ Render child rows inline in server HTML with stable ids</li>
+                <li data-completed="false">⏳ Remove server-set display:none — manage visibility only in JS</li>
+                <li data-completed="false">⏳ Update handleParentClick to toggle JS-only visibility</li>
+                <li data-completed="false">⏳ Fix data-children-loaded hardcoded false</li>
+                <li data-completed="false">⏳ Test: expand rows, trigger SSE update, confirm rows stay expanded</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Parent Activity Reset Bug Analysis</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-59818c6e"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T13:13:59.525539"
+             data-updated="2026-03-09T13:13:59.525542" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Parent Activity Reset Bug Analysis</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+After a Task() sub-agent call completes, the orchestrator's subsequent tool calls (Bash, Agent, etc.) appear as children of the Task event node instead of as siblings under the UserQuery prompt. The parent-activity context is not resetting after Task() PostToolUse fires.
+
+## Root Cause: Stale status='started' on task_delegation rows
+
+### Where parent_activity is stored
+NOT in a file. NOT in env vars (they don't persist across hook processes). The parent context is determined fresh on every PostToolUse call by querying the SQLite database (agent_events table) for active task_delegation rows.
+
+### The exact mechanism
+
+**PreToolUse for Task()** (pretooluse.py :: create_task_parent_event):
+1. Inserts a row into agent_events with event_type='task_delegation', status='started'
+2. Sets os.environ[HTMLGRAPH_PARENT_EVENT] = parent_event_id  — but this env var does NOT persist across hook processes (each hook is a fresh process)
+
+**PostToolUse for Task()** (event_tracker.py :: track_event, hook_type=PostToolUse):
+- Does NOT update the task_delegation row to status='completed'
+- Does NOT mark the task as done in any way
+- Simply records the Task tool call as a regular event
+
+**TaskCompleted hook** (event_tracker.py :: hook_type=TaskCompleted):
+- This IS supposed to update status to 'completed'
+- But it fires as a separate Claude Code hook event, not as part of PostToolUse
+- Timing: it fires when the subagent stops, which may be BEFORE the orchestrator's PostToolUse for Task() fires
+
+**The bug chain for PostToolUse on subsequent Bash call:**
+
+Method 0 (JSONL): _find_parent_via_jsonl() scans the transcript for agent_progress records with parentToolUseID. For orchestrator-level Bash calls (NOT inside a subagent), there is no agent_progress record, so Method 0 returns None.
+
+Method 1 (env var HTMLGRAPH_PARENT_EVENT_FOR_POST): PreToolUse for Bash sets HTMLGRAPH_PARENT_EVENT_FOR_POST = user_query_event_id (correct — Bash is not a Task). This SHOULD work... but only if pretooluse.py runs in the same process as posttooluse.py, which it does NOT (each hook invocation is a separate process). So this env var is also dead.
+
+Method 2 (task_event_id_from_db from Method 1 subagent detection): Queries agent_events for a row where THIS session is a subagent. Not applicable for the orchestrator session.
+
+Final fallback (lines 1709-1876): Scans agent_events for task_delegation rows with status='started' WHERE session_id = active_session_id, ordered by timestamp DESC. 
+
+**THIS IS THE BUG**: If TaskCompleted hook did NOT fire (or fired but failed), or if there is a race condition where the Bash PostToolUse fires before TaskCompleted updates the row, the task_delegation row still has status='started'. The staleness check compares task timestamp > UserQuery timestamp — and since the Task() was fired AFTER the current UserQuery, this check PASSES, making the stale Task delegation look valid. The Bash call then gets attributed as a child of the Task event instead of as a sibling under UserQuery.
+
+### The staleness check gap
+
+The staleness check at line 1780 is:
+  if current_user_query_ts and task_ts_norm > uq_ts_norm:
+      parent_activity_id = task_evt_id
+
+This is designed to discard task_delegations from PRIOR turns (their timestamp <= the current UserQuery). But it cannot distinguish between:
+- A currently-in-flight Task() from THIS turn (correct to use as parent)
+- A completed Task() from THIS SAME turn whose status was not updated to 'completed'
+
+Both have task_ts > current_user_query_ts. Both look valid to the staleness check.
+
+### Why TaskCompleted may not reliably clear the row
+
+1. TaskCompleted fires as a separate hook event — there is a race window between TaskCompleted firing and the orchestrator's next PostToolUse firing.
+2. The TaskCompleted handler (lines 1405-1485) queries for status='started' rows but uses active_session_id which in the orchestrator context is the PARENT session. If this query finds the wrong row or fails silently, the row stays at status='started'.
+3. There is no PostToolUse handler for the Task() tool itself that resets the status.
+
+## Where the Fix Should Go
+
+### Fix 1 (Correct approach): PostToolUse for Task() must update task_delegation to status='completed'
+
+In event_tracker.py, in the PostToolUse branch (around line 1527), add special handling for tool_name == Task:
+
+After recording the Task event, immediately update the task_delegation row to status='completed':
+  UPDATE agent_events SET status='completed' WHERE event_type='task_delegation' AND status='started' AND session_id=? AND event_id=?
+
+This is reliable because PostToolUse for Task() fires in the SAME process turn as the task completing, with the actual tool_use_id available for precise targeting.
+
+### Fix 2 (Defence in depth): Strengthen the staleness check
+
+The staleness check currently only looks at timestamp. It should also check: if a TaskCompleted event (event_type='task_completed') exists that references this task_delegation as parent_event_id, the task_delegation is done regardless of its status field.
+
+### Fix 3 (Root cause prevention): Use tool_use_id for precise attribution
+
+Instead of scanning for ANY started task_delegation in the session, use the tool_use_id from tool_traces to precisely identify which task_delegation corresponds to the current tool call. Method 0 (JSONL) already does this for subagent calls, but fails for orchestrator-level calls because there is no agent_progress record for direct orchestrator tool calls.
+
+## File Locations
+- Bug manifests in: src/python/htmlgraph/hooks/event_tracker.py, lines 1709-1876 (final fallback parent scan)
+- Fix should go in: src/python/htmlgraph/hooks/event_tracker.py, PostToolUse branch around line 1527, add Task() completion update
+- Supporting context: src/python/htmlgraph/hooks/pretooluse.py, create_task_parent_event() (line 292) — sets status='started' but nothing in PostToolUse resets it
+- TaskCompleted handler: event_tracker.py lines 1405-1485 — this is supposed to reset status but may race with the orchestrator's next tool call
+
+## Summary
+parent_activity is stored solely in the SQLite agent_events table as status='started' on task_delegation rows. The bug is that PostToolUse for Task() does NOT update this status to 'completed'. The TaskCompleted hook fires asynchronously and may race. When the orchestrator's next Bash/Agent call fires its PostToolUse hook, the final fallback scan finds the still-started task_delegation (correctly timestamped as after the current UserQuery), passes the staleness check, and incorrectly attributes the Bash call as a child of the completed Task.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

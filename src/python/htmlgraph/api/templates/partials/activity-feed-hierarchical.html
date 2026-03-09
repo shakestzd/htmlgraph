@@ -656,9 +656,10 @@ function handleParentClick(row) {
     toggleChildren(row);
 }
 
-// --- Expand state preservation across idiomorph morph swaps ---
-// Before a morph, we save which event IDs are expanded.
+// --- Expand state preservation across idiomorph morph swaps and page reloads ---
+// Before a morph, we save which event IDs are expanded to both memory and sessionStorage.
 // After the morph, we restore visibility so the user's expand state is preserved.
+// On page reload, sessionStorage is restored to preserve expand state in the same tab.
 window._expandedEventIds = new Set();
 
 function saveExpandState() {
@@ -667,6 +668,9 @@ function saveExpandState() {
         const eventId = row.dataset.eventId;
         if (eventId) window._expandedEventIds.add(eventId);
     });
+    // Persist to sessionStorage for page reload recovery
+    const expandedArray = Array.from(window._expandedEventIds);
+    sessionStorage.setItem('activity-feed-expanded-rows', JSON.stringify(expandedArray));
 }
 
 function restoreExpandState() {
@@ -696,13 +700,27 @@ document.addEventListener('htmx:afterSettle', function() {
     restoreExpandState();
 });
 
-// Auto-expand the most recent UserQuery turn on initial page load
-document.addEventListener('DOMContentLoaded', function() {
+// Restore expand state from sessionStorage on page load / HTMX injection
+// Runs immediately when script is executed (at HTMX injection time, rows ARE in DOM)
+(function() {
+    const savedExpandedJson = sessionStorage.getItem('activity-feed-expanded-rows');
+    if (savedExpandedJson) {
+        try {
+            const savedExpanded = JSON.parse(savedExpandedJson);
+            window._expandedEventIds = new Set(savedExpanded);
+            restoreExpandState();
+            return; // Don't auto-expand if we restored from sessionStorage
+        } catch (e) {
+            console.warn('Failed to restore expand state from sessionStorage:', e);
+        }
+    }
+
+    // Default behavior: auto-expand the most recent UserQuery turn on initial page load
     const firstTurn = document.querySelector('.parent-row.has-children');
     if (firstTurn) {
         handleParentClick(firstTurn);
     }
-});
+})();
 
 // Collapse all rows
 function collapseAll() {

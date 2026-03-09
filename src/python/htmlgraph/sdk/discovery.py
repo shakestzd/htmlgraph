@@ -20,7 +20,8 @@ def find_project_root(start_path: Path | None = None) -> Path:
     """
     Find project root by searching for .htmlgraph directory.
 
-    Searches current directory and all parent directories.
+    Searches environment variables first, then current directory and all
+    parent directories.
 
     Args:
         start_path: Starting path for search (defaults to cwd)
@@ -31,6 +32,15 @@ def find_project_root(start_path: Path | None = None) -> Path:
     Raises:
         FileNotFoundError: If no .htmlgraph directory found
     """
+    # Check env vars first — ensures subagents inherit correct project root
+    env_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get(
+        "HTMLGRAPH_PROJECT_DIR"
+    )
+    if env_dir:
+        candidate = Path(env_dir)
+        if (candidate / HTMLGRAPH_DIR).exists():
+            return candidate
+
     current = start_path or Path.cwd()
 
     # Check current directory
@@ -52,8 +62,10 @@ def discover_htmlgraph_dir(start_path: Path | None = None) -> Path:
     """
     Auto-discover .htmlgraph directory.
 
-    Searches current directory and parents. If not found, returns
-    path to .htmlgraph in current directory (may not exist yet).
+    Checks environment variables first (CLAUDE_PROJECT_DIR or
+    HTMLGRAPH_PROJECT_DIR), then searches current directory and parents.
+    If not found anywhere, returns path to .htmlgraph in current directory
+    (may not exist yet).
 
     Args:
         start_path: Starting path for search (defaults to cwd)
@@ -61,6 +73,16 @@ def discover_htmlgraph_dir(start_path: Path | None = None) -> Path:
     Returns:
         Path to .htmlgraph directory
     """
+    # Check env vars first — ensures subagents spawned via Task() use the
+    # parent project's .htmlgraph rather than defaulting to cwd or home.
+    env_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get(
+        "HTMLGRAPH_PROJECT_DIR"
+    )
+    if env_dir:
+        candidate = Path(env_dir) / HTMLGRAPH_DIR
+        if candidate.exists():
+            return candidate
+
     current = start_path or Path.cwd()
 
     # Check current directory

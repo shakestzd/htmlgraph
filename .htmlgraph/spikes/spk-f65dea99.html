@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Root Directory Cleanup</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-f65dea99"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T07:33:05.382376"
+             data-updated="2026-03-09T07:33:05.382379" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="opus-coder">
+
+        <header>
+            <h1>Root Directory Cleanup</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Root Directory Cleanup Report
+
+### Files DELETED (38 files)
+**Empty marker files:** =0.26.5, FALLBACK, Haiku, Opus, spawn_codex, spawn_copilot, spawn_gemini
+**Test scratch:** prime_numbers.txt, primes.txt, primes.py, factorial.py, test_blocking.txt, test_activity_feed_fix.html, test_spawner_broadcast.sh
+**Logs/dumps:** error.txt, server_api_fg.log (untracked), test-output.log (untracked), coverage.json
+**Screenshots (20):** activity-feed-*.png (7), activity-tab-*.png (1), screenshot-*.png (4), dashboard-*.png (10 tracked + 7 untracked)
+**One-off scripts:** fix_type_annotations.py, migrate_to_logging.py, verify_nesting_fix.py, verify_phase2.py
+**Other:** WARP.md (symlink), dashboard-snapshot.md, .session-warning-state.json, example-com-screenshot.png
+
+### Files MOVED to docs/archive/ (47 docs + 6 directories)
+**Investigation docs (5):** TASK_ID_DEBUG_FINDINGS.md, TASK_ID_FINDINGS_REPORT.txt, TASK_ID_HOOKUP_PLAN.md, TASK_ID_INVESTIGATION.md, TASK_ID_INVESTIGATION_INDEX.md
+**Phase docs (13):** PHASE1_IMPLEMENTATION_SUMMARY.md, PHASE2_FEATURE1_*.md (7), PHASE2_FEATURE3_IMPLEMENTATION.md, PHASE2_IMPLEMENTATION_SUMMARY.md, PHASE3_QUALITY_GATE_REPORT.md, PHASE5_IMPLEMENTATION_SUMMARY.md, PHASE_2_FEATURE_2_SUMMARY.md
+**Orchestrator docs (5):** ORCHESTRATOR_EXECUTIVE_SUMMARY.txt, ORCHESTRATOR_QUICK_REFERENCE.txt, orchestrator-system-prompt*.txt (3)
+**Other docs (24):** ACTIVITY_FEED_FIX.md, agent_teams.md, BROWSER_QUERY_PHASE1_PLAN.md, CLAUDE_CODE_INTEGRATION_ANALYSIS.md, CLAUDE_CODE_TECHNICAL_REFERENCE.md, COSTS_COMMAND_EXAMPLES.md, DASHBOARD_ISSUES_ROOT_CAUSE.md, DEBUG_LOGGING_PATCH.md, DUPLICATE_EVENTS_SUMMARY.txt, FEATURE_AUDIT_DETAILED.txt, hooks_reference.md, HTMLGRAPH_CLAUDE_CODE_OPPORTUNITIES.md, IMPLEMENTATION_INDEX.md, IMPLEMENTATION_SUMMARY.md, INTEGRATION_ANALYSIS_SUMMARY.txt, INTEGRITY_ANALYSIS_SUMMARY.txt, INVESTIGATION_COMPLETE.md, INVESTIGATION_SUMMARY.md, OPTIMIZATION_SUMMARY.txt, ORGANIZATION_PLAN.md, plugin-docs.md, RETRY_DECORATOR_SUMMARY.md, ROADMAP_TRACK_SUMMARY.md, ROBOREV_IMPLEMENTATION.md, SERVE_MIGRATION_EXECUTIVE_SUMMARY.txt, SUBAGENT_EVENT_VISIBILITY_DIAGRAM.txt, TRACKING_ISSUES_INVESTIGATION.md, WEBSOCKET_FIX_SUMMARY.txt, WORKTREE_GUIDE.md
+**Directories moved:** dashboard/ -> docs/archive/old-dashboard/, features/ -> docs/archive/old-features/, .agent/ -> docs/archive/old-workflows/agent/, .parallel/ -> docs/archive/old-workflows/parallel/, .plans/ -> docs/archive/old-workflows/plans/, worktrees/ -> docs/archive/old-workflows/worktrees/, _archive/ + .archive/ + .archived-templates/ -> docs/archive/old-archive/
+
+### Empty directories REMOVED (9)
+bugs/, events/, insights/, metrics/, patterns/, sessions/, todos/, tracks/, task-delegations/
+
+### Also removed from disk
+__marimo__/, .uv-cache/, site/
+
+### .gitignore updated
+Added rules to prevent re-accumulation: *.png, *.txt (except requirements*.txt), coverage.json, .session-warning-state.json, __marimo__/, .uv-cache/, .mypy_cache/
+
+### Files KEPT in root (justified)
+Standard project: pyproject.toml, uv.lock, pytest.ini, mkdocs.yml, .gitignore, .pre-commit-config.yaml
+Documentation: README.md, AGENTS.md, CLAUDE.md, GEMINI.md, CODEX.md, CONTRIBUTING.md, CHANGELOG.md, PRD.md
+Project files: index.html, agents.json, htmlgraph-deploy.toml, htmlgraph-aliases.sh
+Standard dirs: src/, tests/, docs/, scripts/, packages/, examples/, benchmarks/, .github/, .claude/, .htmlgraph/, .claude-plugin/, dist/
+            </div>
+        </section>
+    </article>
+</body>
+</html>

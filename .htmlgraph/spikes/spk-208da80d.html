@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Attribution System Investigation: How Work Items Get Credit for Session Activity</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-208da80d"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T08:13:34.420098"
+             data-updated="2026-03-09T08:13:34.420101" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Attribution System Investigation: How Work Items Get Credit for Session Activity</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Current in-progress work items (from HTML files — the source of truth):
+
+FEATURES (in-progress):
+- feat-26a50458: "OpenCode and Cursor Session Ingesters" — THIS IS THE WRONG ITEM being reported by hooks
+- feat-038ed111: title="Feature 2 (in-progress)" but data-status="todo" — stale/inconsistent
+- feat-bbd13f30: "Add htmlgraph browse command" — data-status="todo" (grep hit was in body text, not status)
+- feat-48b88f74: "Add PreCompact Workarounds for Work Preservation" — data-status="todo"
+
+BUGS (in-progress):
+- bug-73704bf0: "SDK defaults to ~/.htmlgraph/ instead of project-local .htmlgraph/ in subagents"
+
+SPIKES (contain string "in-progress" but are actually done):
+- spk-05ddee15: "Plan: Refactor CLI to Command Pattern Architecture" — data-status="done"
+- spk-69207b99: "Error Investigation: Hook Error" — data-status="done"
+
+So the ACTUAL in-progress items are:
+1. feat-26a50458 — OpenCode and Cursor Session Ingesters
+2. bug-73704bf0 — SDK defaults to wrong .htmlgraph dir
+
+Attribution mechanism — how it works:
+
+1. UserPromptSubmit hook fires on each prompt:
+   - classify_prompt() uses regex patterns to detect intent (implementation/investigation/bug/continuation)
+   - get_active_work_item() calls sdk.get_active_work_item() which scans ALL collections for items with status=in-progress
+   - Returns the FIRST real work item found (features/bugs/chores/epics take priority over auto-spikes)
+   - generate_guidance() provides workflow reminders based on classification + active item
+
+2. get_active_work_item() logic (sdk/session/info.py):
+   - Iterates: features, bugs, spikes, chores, epics
+   - Calls collection.where(status="in-progress") which reads HTML files
+   - Optionally filters by agent (filter_by_agent=False by default)
+   - Separates auto-spikes (session-init, transition, conversation-init subtypes) from real work
+   - Returns real_work_items[0] — the FIRST real item found in iteration order
+
+3. PreToolUse hook (pretooluse.py):
+   - Validates each tool call against the active work item
+   - The Validator reports "Working on feat-26a50458" in hook context messages
+   - This is just informational context, not enforced attribution
+
+4. PostToolUse / track-event.py:
+   - Calls track_event() which records tool calls to the database
+   - Links to session, but NOT to a specific work item at the event level
+   - Feature attribution at the activity level goes through session_manager.track_activity()
+
+5. Drift detection (drift_handler.py):
+   - Measures semantic distance between tool activity and active work item scope
+   - Warning threshold: 0.7, auto-classify threshold: 0.85
+   - When threshold exceeded: queues activities to drift-queue.json
+   - classification.enabled = False by default — so auto-classification does NOT fire
+   - The classification-prompt.md exists but is only used if manually triggered
+
+Root cause of wrong attribution:
+
+The system uses a POSITIONAL attribution model, not a SEMANTIC one:
+- "Active work item" = first item with status=in-progress in the HTML graph
+- There is NO semantic matching between what the session is doing and which work item it belongs to
+- feat-26a50458 (OpenCode and Cursor Ingesters) is in-progress and happens to be iterated first
+- The hooks report "Working on feat-26a50458" because it is the only real feature with in-progress status
+- The dashboard bug fixes, activity feed work, documentation rewrite, legacy cleanup, and session cross-link fix
+  were ALL done while feat-26a50458 was the only in-progress feature
+- These activities were never attributed to purpose-specific work items because:
+  a) No features/bugs were created for those specific tasks before starting work
+  b) The drift detection classification is disabled (classification.enabled=False)
+  c) Even if drift detection fired, it would only queue activities — not auto-create work items
+
+What work items SHOULD have existed for the session described:
+
+Work that was done vs what work items existed:
+1. Dashboard UI bug fixes (STATUS column, footer, feature name badge) → should be bug-xxx
+2. Activity feed filter implementation → should be feat-xxx
+3. Project positioning/documentation rewrite → should be chore-xxx or feat-xxx
+4. Legacy dashboard removal + dead JS/CSS cleanup → should be chore-xxx
+5. Session cross-link bug fix → should be bug-xxx
+
+None of these were captured because the workflow was: do work first, create tracking later (or never).
+The system can only attribute work to items that ALREADY EXIST with in-progress status.
+
+What needs to change — recommendations:
+
+1. PROCESS FIX (immediate, no code needed):
+   - Create work items BEFORE starting work, following the existing workflow guidance
+   - The hooks already prompt for this when no active work item exists
+   - The UserPromptSubmit hook generates "ORCHESTRATOR DIRECTIVE" guidance to create work items first
+   - Problem: guidance is easy to ignore; it does not block
+
+2. SEMANTIC ATTRIBUTION (medium effort):
+   - Enable drift detection auto-classification (set classification.enabled=True)
+   - The infrastructure exists: drift-queue.json, classification-prompt.md, link-activities.py
+   - Would let the system detect drift and auto-create appropriate work items
+   - Risk: auto-classification quality depends on the haiku model accuracy
+
+3. RETROSPECTIVE ATTRIBUTION (new feature needed):
+   - Add a command: htmlgraph attribute --session <id>
+   - Uses classification-prompt.md logic to analyze completed session activities
+   - Creates work items retroactively and links session activities to them
+   - Useful when work was done without proper tracking setup
+
+4. WORK ITEM CREATION AT PROMPT TIME (enhancement):
+   - When UserPromptSubmit detects implementation intent AND no active work item exists:
+     BLOCK (return decision=block) until user creates a work item
+   - Currently it only gives guidance (additionalContext) which can be ignored
+   - This would enforce the workflow rather than suggest it
+
+5. MULTI-ITEM ATTRIBUTION (architectural change):
+   - Current model: one active work item per session
+   - Real sessions span multiple concerns
+   - Need: ability to attribute individual tool calls to different work items
+   - Would require tracking active_work_item per prompt, not per session
+
+Core design gap: The attribution system is PULL-based (Claude must manually mark work items)
+not PUSH-based (system auto-creates items based on semantic understanding of what is happening).
+The drift detection machinery exists to enable push-based attribution but is disabled.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

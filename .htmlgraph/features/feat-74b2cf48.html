@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Auto-attribute prompts to work items via semantic matching in UserPromptSubmit hook</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-74b2cf48"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="high"
+             data-created="2026-03-09T18:51:01.594619"
+             data-updated="2026-03-09T18:51:05.490205" data-agent-assigned="claude" data-track-id="trk-b5ceb449">
+
+        <header>
+            <h1>Auto-attribute prompts to work items via semantic matching in UserPromptSubmit hook</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-09T18:51:05.489512">sess-6c56e756</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false">⏳ Add find_best_matching_work_item(prompt, work_items) to prompt_analyzer.py using keyword/title matching</li>
+                <li data-completed="false">⏳ In user-prompt-submit.py: if no item in-progress, auto-match from TODO/in-progress and call sdk.features.start()</li>
+                <li data-completed="false">⏳ Stamp UserQuery event with matched feature_id regardless of whether Claude acts</li>
+                <li data-completed="false">⏳ CIGS guidance: tell Claude to confirm or override auto-attribution, not to set it from scratch</li>
+                <li data-completed="false">⏳ Test: submit prompts matching different features, verify correct feature_id on UserQuery event</li>
+                <li data-completed="false">⏳ Deploy to PyPI so all users get it</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

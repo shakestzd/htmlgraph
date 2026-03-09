@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Auto Attribution Research: Automatic Work Item Attribution from Prompts</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-de183b26"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T08:40:59.641038"
+             data-updated="2026-03-09T08:40:59.641040" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Auto Attribution Research: Automatic Work Item Attribution from Prompts</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+When an AI agent receives a prompt like "fix the STATUS column in the dashboard",
+the system should automatically:
+1. Classify the type of work (bug fix, feature, investigation)
+2. Extract a structured title and description
+3. Match against existing open work items or create a new one
+4. Tag all subsequent activity under that work item
+
+Currently HtmlGraph has classify_prompt() which classifies intent categories but does
+NOT extract a title, does NOT match against existing work items, and does NOT auto-create
+or auto-link work items.
+
+---
+
+## Existing HtmlGraph Infrastructure (What We Already Have)
+
+### classify_prompt() in src/python/htmlgraph/hooks/prompt_analyzer.py
+- Pure regex/keyword matching
+- Returns: is_implementation, is_investigation, is_bug_report, is_continuation
+- Confidence: binary thresholds (0.8 for impl, 0.75 for bug, 0.7 for investigation)
+- OUTPUT: category booleans + confidence float
+- MISSING: no title extraction, no description, no work item matching
+
+### generate_guidance() 
+- Checks if active work item exists
+- If none: tells user to create one manually (no auto-creation)
+- If wrong type: guides user to switch
+- MISSING: no auto-creation, no semantic matching to existing items
+
+### Work Item Collections (SDK)
+- sdk.features.all() -> list[Node] (all features regardless of status)
+- sdk.bugs.all() -> same for bugs
+- sdk.spikes.all() -> same for spikes
+- Node has: .id, .title, .status (todo/in_progress/done), .type
+- find_by_title(title, exact=False) -> case-insensitive substring match only
+
+### Archive Search Infrastructure
+- ArchiveFTS5Index: SQLite FTS5 with porter stemming + BM25 ranking
+- Already indexes entity_id, title, description, content
+- Searches archived (done) items but NOT active items
+- No vector/embedding support yet (feat-cc787a00 in roadmap)
+
+### Current Pipeline Gap
+UserPromptSubmit -> classify_prompt() -> generate_guidance() -> text hint to user
+                                                              ^
+                                               GAP: no auto-attribution here
+
+---
+
+## Industry Research Findings
+
+### Pattern 1: Keyword/Regex ID Matching (Lowest effort, narrowest scope)
+- Azure DevOps, GitHub, Bitbucket: match #1234 or ABC-123 patterns in commit messages
+- Git hooks prepend branch name (containing ticket ID) to commit messages
+- Limitation: requires explicit ticket reference by user - zero semantic understanding
+- Relevant to HtmlGraph: could match feat-XXXXXXXX or bug-XXXXXXXX IDs in prompts
+
+### Pattern 2: LLM Structured Extraction (Best for title+type extraction)
+- Modern approach (2025): single LLM call with JSON output schema
+- Extracts: {type: bug|feature|spike, title: string, description: string, confidence: float}
+- Few-shot prompting significantly improves accuracy
+- Works well for natural language like "fix the STATUS column in the dashboard"
+- Limitation for HtmlGraph: adds latency + API cost on every prompt (hooks run synchronously)
+- Linear uses this for triage intelligence and automatic label/assignee suggestion
+
+### Pattern 3: Vector Embedding Similarity (Best for matching existing items)
+- Linear: pgvector + cosine similarity, partitioned by workspace
+- Jira: txtai library for cross-issue similarity
+- Azure AI: vector search for finding related tickets
+- Approach: embed prompt -> compare against embedded titles of open work items
+- Limitation for HtmlGraph: no embedding infrastructure yet (on roadmap as feat-cc787a00)
+- HtmlGraph constraint: local-first, offline-first -> external embedding APIs would break this
+
+### Pattern 4: Hybrid (Industry best practice 2025)
+- Rasa: hybrid NLU + LLM with fallback to human when confidence < threshold
+- Voiceflow: LLM classification with structured JSON output
+- Key insight: use fast regex for high-confidence cases (continuation, explicit IDs),
+  fall back to LLM extraction for ambiguous/complex prompts
+
+### GitHub Copilot Spaces
+- Requires explicit issue linking (user must link issue to space)
+- Does NOT auto-detect issues from code context
+- Relevant: shows even Copilot requires explicit association, not fully automatic
+
+---
+
+## Recommended Approach for HtmlGraph
+
+### Core Design: Two-Phase Attribution
+
+**Phase 1: Fast Path (regex, zero cost)**
+- Detect explicit work item IDs in prompt (feat-XXXXXXXX, bug-XXXXXXXX, spk-XXXXXXXX)
+- Detect continuation patterns (already done in classify_prompt)
+- If active work item exists + continuation detected: reuse it (already partially done)
+- Confidence threshold: >= 0.85 -> auto-attribute, no user confirmation needed
+
+**Phase 2: Extraction + Matching (LLM, per-prompt)**
+- Extract structured data from prompt using claude-haiku (cheapest, fastest)
+  Output schema: {type: bug|feature|spike, title: string, description: string}
+- Title is already sufficient for fuzzy matching against sdk.features.all()
+- Fuzzy match algorithm: token overlap ratio (no embeddings needed yet)
+  - Split extracted title and existing item titles into word sets
+  - Jaccard similarity: |intersection| / |union|
+  - Threshold: >= 0.5 jaccard -> likely match, present to user for confirmation
+  - Threshold: >= 0.75 jaccard -> high confidence, auto-attribute
+- If no match: auto-create work item using extracted title+type
+
+### Why NOT pure embeddings (yet)
+- feat-cc787a00 (FTS5 Full-Text Search) is not yet complete
+- Embeddings require either: (a) local model [heavy dependency] or (b) API call [breaks offline]
+- Jaccard token overlap achieves ~80% of embedding quality for short titles (< 10 words)
+- Can add embedding layer later when feat-cc787a00 lands
+
+### Why NOT pure LLM classification (alone)
+- classify_prompt() already handles the categorization cheaply via regex
+- LLM call should only be triggered when regex confidence < 0.6 OR when we need title extraction
+- Avoid LLM overhead for simple continuations and explicit ID references
+
+### Confidence Threshold Design
+- 0.0 - 0.50: Too ambiguous -> no auto-attribution, show reminder only
+- 0.50 - 0.75: Extracted but uncertain match -> propose work item, ask for confirmation
+- 0.75 - 0.85: Good match -> auto-attribute but show notification
+- 0.85 - 1.00: Near-certain (explicit ID or continuation) -> silent auto-attribution
+
+### When to Create vs Match
+- CREATE: no existing item with jaccard >= 0.5 AND classification confidence >= 0.75
+- MATCH: jaccard >= 0.5 to existing open (todo/in_progress) work item
+- SKIP: classification confidence < 0.5 (unclear prompt - not all prompts are work)
+- KEY: only match against OPEN items (status == todo or in_progress), not done items
+
+---
+
+## Implementation Plan
+
+### Step 1: Add extract_work_item_from_prompt() to prompt_analyzer.py
+Input: prompt string
+Output: {type: str, title: str, description: str, confidence: float} | None
+Logic:
+- If classify_prompt() confidence >= 0.8: use regex classification for type
+- Extract title heuristically: strip imperative verbs + filler words
+  e.g., "fix the STATUS column in dashboard" -> "STATUS column in dashboard"
+  e.g., "implement user authentication feature" -> "user authentication feature"
+- No LLM call needed for title extraction in most cases (heuristic suffices)
+- Reserve LLM call only for very long/complex prompts (> 50 words)
+
+### Step 2: Add find_matching_work_item() to prompt_analyzer.py
+Input: extracted title, work_type (bug/feature/spike), sdk instance
+Output: Node | None (best match above threshold)
+Logic:
+- Load all open items of matching type: sdk.{type}s.all() filtered by status in [todo, in_progress]
+- Compute jaccard similarity between tokenized extracted_title and each item title
+- Return highest scoring item if score >= 0.5
+
+### Step 3: Add auto_attribute_or_create() to prompt_analyzer.py
+Input: classification dict, extracted work item, found match, sdk
+Output: AttributionResult {action: matched|created|skipped, work_item_id, confidence}
+Logic: apply the confidence threshold table above
+
+### Step 4: Extend generate_guidance() to use attribution result
+- If auto-attributed: prepend "Attributed to: {work_item_id} ({title})" to guidance
+- If created: prepend "Created work item: {work_item_id}" 
+- If proposed match: show confirmation request in guidance
+
+### Step 5: Store attribution in UserQuery event
+- Add work_item_id field to UserQuery event context
+- This enables the posttooluse hook to link all tool calls to the work item
+
+---
+
+## Key Design Decisions
+
+1. HEURISTIC title extraction first, LLM as fallback (cost-sensitive)
+   Reasoning: most prompts are short and imperative, simple NLP suffices
+
+2. JACCARD similarity not embeddings (local-first constraint)
+   Reasoning: no external API, no heavy model, good enough for titles < 15 words
+
+3. ONLY match against open items (not done/archived)
+   Reasoning: matching against closed items would reopen them incorrectly
+
+4. SILENT attribution only for high confidence (>= 0.85)
+   Reasoning: surprising auto-attribution is worse than explicit prompting
+
+5. NO blocking: attribution happens async or as additionalContext, never blocks prompt
+   Reasoning: hooks must not delay user interaction
+
+6. GRACEFUL degradation: all attribution steps wrapped in try/except
+   Reasoning: classification failure must not break normal Claude Code operation
+
+7. SEPARATE the extraction concern from the guidance concern
+   extract_work_item_from_prompt() is pure, stateless, testable
+   Auto-attribution side effects happen in generate_guidance() only
+
+---
+
+## Files to Modify
+- src/python/htmlgraph/hooks/prompt_analyzer.py (add extraction + matching functions)
+- packages/claude-plugin/hooks/scripts/user-prompt-submit.py (wire up attribution result)
+- src/python/htmlgraph/hooks/context.py (add work_item_id to UserQuery event)
+
+## Files NOT to modify
+- Any .htmlgraph/ directory files (auto-managed)
+- .claude/ directory (auto-synced from plugin)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

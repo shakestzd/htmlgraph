@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Auto Attribution Engine Design (feat-e4a74a2c)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-79f42c16"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-09T08:41:17.458447"
+             data-updated="2026-03-09T08:41:17.458449" data-spike-type="general" data-agent-assigned="opus-coder">
+
+        <header>
+            <h1>Auto Attribution Engine Design (feat-e4a74a2c)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <section data-content>
+            <h3>Description</h3>
+            ## Current State Analysis
+
+### How attribution works today (prompt_analyzer.py + user-prompt-submit.py)
+
+1. **classify_prompt(prompt)** - Regex pattern matching against 4 categories:
+   - Implementation (8 patterns): "implement", "add feature", "fix bug", etc.
+   - Investigation (4 patterns): "investigate", "why not working", etc.
+   - Bug report (4 patterns): "bug", "broken", "not working", etc.
+   - Continuation (3 patterns): "continue", "ok", "go ahead", etc.
+   - Returns: {is_implementation, is_investigation, is_bug_report, is_continuation, confidence}
+
+2. **get_active_work_item(context)** - Returns the FIRST in-progress work item found:
+   - Calls sdk.get_active_work_item() which iterates features, bugs, spikes, chores, epics
+   - Returns first in-progress item (real work prioritized over auto-spikes)
+   - NO semantic matching between prompt and work item
+   - NO consideration of title, description, or content similarity
+
+3. **generate_guidance(classification, active_work, prompt)** - Produces workflow suggestions:
+   - If continuation + active work -> no guidance
+   - If implementation + spike active -> suggests creating feature
+   - If implementation + feature active -> reminds to delegate
+   - If bug + feature active -> suggests creating bug
+   - If no active work -> suggests creating appropriate item
+
+### Key problems
+- Everything gets attributed to whatever happens to be in-progress first
+- If 3 features are in-progress, the first one found always wins regardless of prompt content
+- New work that does not match any existing item still gets attributed to the wrong item
+- No auto-creation: user must manually create work items before starting
+- No confidence threshold: even a terrible match gets attributed
+
+### SDK API surface available
+- sdk.features.all() / sdk.features.where(status="in-progress") -> list[Node]
+- sdk.bugs.all() / sdk.bugs.where(status="in-progress") -> list[Node]
+- sdk.spikes.all() / sdk.spikes.where(status="in-progress") -> list[Node]
+- sdk.features.create(title).save() -> Node (with builder pattern)
+- sdk.features.set_primary(node_id) -> sets is_primary property
+- Node fields: id, title, type, status, content, steps[].description, track_id, properties
+
+---
+
+## Architecture Design
+
+### COMPONENT: PromptAttributionEngine
+
+MODULE: htmlgraph.hooks.attribution
+FILE: src/python/htmlgraph/hooks/attribution.py
+
+### Interface
+
+```python
+@dataclass
+class AttributionResult:
+    work_item_id: str | None
+    work_item_title: str | None
+    work_item_type: str  # feature/bug/spike/chore
+    confidence: float    # 0.0 - 1.0
+    action: Literal["matched", "created", "continued", "none"]
+    reason: str          # human-readable explanation
+
+
+def attribute_prompt(
+    prompt: str,
+    context: HookContext,
+    classification: dict[str, Any],  # from classify_prompt()
+) -> AttributionResult:
+    INPUT: prompt text, existing work items (title + description + status), current session
+    OUTPUT: {work_item_id, confidence, action: matched|created|continued|none}
+```
+
+### Algorithm (4-phase pipeline)
+
+**Phase 1: Short-circuit for continuations**
+
+IF classification.is_continuation:
+    last_item = get_last_attributed_work_item(context.session_id, db)
+    IF last_item exists:
+        RETURN AttributionResult(work_item_id=last_item.id, confidence=0.95, action="continued")
+    ELSE:
+        fall through to Phase 2
+
+**Phase 2: Gather candidates**
+
+candidates = []
+FOR collection IN [features, bugs, spikes, chores]:
+    FOR item IN collection.where(status="in-progress"):
+        candidates.append(item)
+    FOR item IN collection.where(status="todo"):
+        candidates.append(item)
+
+# Also include recently completed items (last 24h) for follow-up prompts
+FOR collection IN [features, bugs]:
+    FOR item IN collection.where(status="done"):
+        IF item.updated > now - 24h:
+            candidates.append(item)
+
+**Phase 3: Score each candidate against the prompt**
+
+scores = []
+FOR candidate IN candidates:
+    score = compute_similarity(prompt, candidate)
+    scores.append((candidate, score))
+
+scores.sort(by=score, descending=True)
+best_match = scores[0] if scores else None
+
+The compute_similarity() function uses a multi-signal weighted score:
+
+```python
+def compute_similarity(prompt: str, candidate: Node) -> float:
+    prompt_lower = prompt.lower()
+
+    # Signal 1: Title token overlap (weight: 0.40)
+    prompt_tokens = set(tokenize(prompt_lower))
+    title_tokens = set(tokenize(candidate.title.lower()))
+    title_overlap = jaccard(prompt_tokens, title_tokens)
+
+    # Signal 2: Step description overlap (weight: 0.20)
+    step_texts = [s.description.lower() for s in candidate.steps]
+    step_score = max(
+        (jaccard(prompt_tokens, set(tokenize(st))) for st in step_texts),
+        default=0.0
+    )
+
+    # Signal 3: Content/description overlap (weight: 0.15)
+    content_tokens = set(tokenize(candidate.content.lower())) if candidate.content else set()
+    content_score = jaccard(prompt_tokens, content_tokens) if content_tokens else 0.0
+
+    # Signal 4: Status recency bonus (weight: 0.15)
+    status_bonus = {"in-progress": 1.0, "todo": 0.3, "done": 0.1}.get(candidate.status, 0.0)
+
+    # Signal 5: Primary feature bonus (weight: 0.10)
+    primary_bonus = 1.0 if candidate.properties.get("is_primary") else 0.0
+
+    return (0.40 * title_overlap + 0.20 * step_score + 0.15 * content_score
+            + 0.15 * status_bonus + 0.10 * primary_bonus)
+```
+
+Helper: tokenize(text) - re.findall(r"[a-z0-9]+", text), remove stopwords, filter len > 1
+Helper: jaccard(set_a, set_b) - len(intersection) / len(union), handles empty sets
+
+**Phase 4: Decision logic**
+
+CONFIDENCE_THRESHOLDS:
+    STRONG_MATCH  = 0.45   # Confident attribution
+    WEAK_MATCH    = 0.25   # Marginal - use but warn
+
+IF best_match AND best_match.score >= STRONG_MATCH:
+    set_primary(best_match.candidate.id)
+    RETURN AttributionResult(action="matched", confidence=score)
+
+ELIF best_match AND best_match.score >= WEAK_MATCH:
+    RETURN AttributionResult(action="matched", confidence=score, reason="Weak match, consider new item")
+
+ELIF classification.is_implementation OR classification.is_bug_report:
+    title = extract_title_from_prompt(prompt)
+    new_item = auto_create_work_item(context, work_type, title)
+    RETURN AttributionResult(action="created", confidence=0.7)
+
+ELSE:
+    RETURN AttributionResult(action="none", confidence=0.0)
+
+### Helper: extract_title_from_prompt(prompt)
+1. Take first sentence (up to first period, question mark, or newline)
+2. Strip prefixes: "Can you", "Please", "I need to", "Let's", etc.
+3. Capitalize and truncate to 80 chars
+
+### Helper: get_last_attributed_work_item(session_id, db)
+Query agent_events WHERE session_id=? AND tool_name='UserQuery' AND context LIKE '%work_item_id%' ORDER BY timestamp DESC LIMIT 1
+
+### Helper: auto_create_work_item(context, work_type, title)
+Creates feature/bug via SDK with status="todo", properties["auto_created"]=True
+
+---
+
+## Changes Needed
+
+### 1. NEW FILE: src/python/htmlgraph/hooks/attribution.py
+- AttributionResult dataclass
+- attribute_prompt() main entry point
+- compute_similarity() scoring function
+- tokenize() and jaccard() helpers
+- extract_title_from_prompt() title extractor
+- get_last_attributed_work_item() session history query
+- auto_create_work_item() item creation helper
+- CONFIDENCE_THRESHOLDS constants
+
+### 2. MODIFY: packages/claude-plugin/hooks/scripts/user-prompt-submit.py
+- Import attribute_prompt from new module
+- After classify_prompt + get_active_work_item, call attribute_prompt()
+- Store attribution result in UserQuery event context
+- Use attribution to set primary work item
+- Include attribution info in hookSpecificOutput for downstream hooks
+
+### 3. MODIFY: src/python/htmlgraph/hooks/prompt_analyzer.py
+- Modify create_user_query_event() to accept and store attribution context
+
+### 4. NEW FILE: tests/hooks/test_attribution.py
+- 16+ test cases covering: exact match, partial overlap, step matching, no match,
+  continuation, auto-create feature, auto-create bug, no auto-create for investigation,
+  primary boost, status boost, done deprioritized, title extraction, tokenization,
+  Jaccard similarity, empty candidates
+
+---
+
+## Edge Cases
+
+1. **No work items exist** -> Auto-create for implementation/bug, "none" for investigations
+2. **Multiple items tie on score** -> Stable sort: features > bugs > spikes > chores
+3. **Very short prompts ("fix it")** -> Continuation patterns catch; else low overlap = weak/no match
+4. **Very long prompts** -> Jaccard handles variable-length naturally
+5. **Done item follow-up** -> 24h recency window for recently completed items
+6. **WIP limit during auto-create** -> Creates with status=todo, does not trigger WIP limits
+7. **No UserQuery history for continuation** -> Falls through to Phase 2 scoring
+8. **Hook performance** -> All pure Python, O(n*m), sub-millisecond for typical workloads
+
+---
+
+## Design Decisions and Rationale
+
+**Why Jaccard instead of TF-IDF or embeddings?**
+- Zero dependencies, sub-millisecond latency, good enough for short distinctive titles
+
+**Why auto-create only for implementation and bug_report?**
+- Investigations may not warrant items; false positive creation worse than missing creation
+
+**Why include done items within 24h?**
+- Common follow-up pattern after completing work
+
+**Why set_primary() on strong match?**
+- Primary feature drives downstream hooks (PreToolUse validation, drift detection)
+- Replaces "first in-progress wins" with intelligent selection
+
+---
+
+## Implementation Steps (ordered)
+
+1. Create src/python/htmlgraph/hooks/attribution.py with all functions
+2. Create tests/hooks/test_attribution.py with 16+ test cases
+3. Run tests: uv run pytest tests/hooks/test_attribution.py
+4. Modify user-prompt-submit.py to call attribute_prompt()
+5. Modify prompt_analyzer.py create_user_query_event to store attribution
+6. Run full test suite: uv run pytest
+7. Run quality gates: uv run ruff check --fix && uv run ruff format && uv run mypy src/
+8. Manual integration test in live session
+
+        </section>
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+            </dl>
+        </section>
+    </article>
+</body>
+</html>

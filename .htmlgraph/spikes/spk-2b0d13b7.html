@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Activity Feed Filter Fix</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-2b0d13b7"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T08:02:22.404843"
+             data-updated="2026-03-09T08:02:22.404845" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>Activity Feed Filter Fix</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Files changed:
+- src/python/htmlgraph/api/routes/dashboard.py
+  - Added _any_event_matches_agent() helper: recursive case-insensitive substring check on parent + all descendant events
+  - /views/activity-feed: removed agent_id pass-through to get_grouped_events (SQL session filter was wrong semantics), added post-build in-memory filter using the helper
+  - /views/activity-feed/delta: added missing agent_id query param, applied same filter after since-based slicing
+- tests/unit/api/test_activity_feed_filter.py (new file, 11 tests)
+  - 8 unit tests for _any_event_matches_agent (exact, substring, case-insensitive, child match, grandchild match, no-match cases)
+  - 3 route integration tests via TestClient (nonexistent agent returns empty, empty filter returns all, delta endpoint filter)
+
+Filter semantics: a session turn is included if ANY event in the group (parent UserQuery or any child/grandchild) has agent_id containing the filter string (case-insensitive substring match).
+Template: already correct — input name=agent_id, hx-get=/views/activity-feed.
+Tests pass: 11/11 new tests pass, full suite running.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

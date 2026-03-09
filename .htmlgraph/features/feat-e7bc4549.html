@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>No-flicker live updates + remove STATUS column from child rows</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-e7bc4549"
+             data-type="feature"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-03-09T13:04:36.792417"
+             data-updated="2026-03-09T13:32:24.363817" data-agent-assigned="claude" data-track-id="trk-7be3f319">
+
+        <header>
+            <h1>No-flicker live updates + remove STATUS column from child rows</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-09T13:04:39.547778">sess-6c56e756</a></li>
+                    <li><a href="ce7e0ad7-480b-42c7-ab79-4300aa3b23db.html" data-relationship="implemented-in" data-since="2026-03-09T13:04:43.041926">ce7e0ad7-480b-42c7-ab79-4300aa3b23db</a></li>
+                    <li><a href="sess-b55e1899.html" data-relationship="implemented-in" data-since="2026-03-09T13:19:30.069399">sess-b55e1899</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-09T13:32:24.363836">2026-03-09T13:32:24.363836</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.17500000000000004, 'issues': ['High retry rate: 82%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (18%)'}">{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.17500000000000004, 'issues': ['High retry rate: 82%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (18%)'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-1d52a988">insi-1d52a988</dd>
+            </dl>
+        </section>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true">✅ Add idiomorph to dashboard-redesign.html, switch htmx.ajax swap to morph:innerHTML</li>
+                <li data-completed="true">✅ Remove col-status td from activity-feed-children.html child rows</li>
+                <li data-completed="true">✅ Remove col-status from activity-feed-hierarchical-rows.html if mismatched</li>
+                <li data-completed="true">✅ Test: expand rows, trigger SSE update, verify rows stay open without flicker</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

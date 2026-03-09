@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SDK Path Resolution Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-791ccdcb"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T09:43:36.358365"
+             data-updated="2026-03-09T09:43:36.358367" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>SDK Path Resolution Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+Subagents spawned via Task() write to ~/.htmlgraph/htmlgraph.db instead of the
+project-local .htmlgraph/htmlgraph.db, causing their events to be invisible in
+the project dashboard.
+
+## Research Sources
+
+### 1. SDK.__init__ in src/python/htmlgraph/sdk/__init__.py (lines 145-291)
+
+The SDK class has TWO constructors that diverge on db_path resolution:
+
+**SDK.__init__ (sdk/__init__.py, lines 199-203) - CURRENT (fixed):**
+  resolved_db_path = db_path or str(self._directory / "htmlgraph.db")
+  self._db = HtmlGraphDB(resolved_db_path)
+
+This resolves the DB path relative to the discovered .htmlgraph directory.
+
+**BaseSDK.__init__ (sdk/base.py, lines 108-111) - OLD (broken):**
+  self._db = HtmlGraphDB(
+      db_path or str(Path.home() / ".htmlgraph" / "htmlgraph.db")
+  )
+
+BaseSDK hardcodes ~/.htmlgraph/htmlgraph.db as the default when db_path is None.
+
+### 2. HtmlGraphDB.__init__ in src/python/htmlgraph/db/schema.py (lines 60-76)
+
+  def __init__(self, db_path: str | None = None):
+      if db_path is None:
+          db_path = str(Path.home() / ".htmlgraph" / "htmlgraph.db")
+
+HtmlGraphDB itself also defaults to ~/.htmlgraph/htmlgraph.db when db_path is None.
+So any code that calls HtmlGraphDB() directly without a path also hits this issue.
+
+### 3. Directory discovery in src/python/htmlgraph/sdk/discovery.py (lines 51-76)
+
+  def discover_htmlgraph_dir(start_path: Path | None = None) -> Path:
+      current = start_path or Path.cwd()
+      if (current / HTMLGRAPH_DIR).exists():
+          return current / HTMLGRAPH_DIR
+      for parent in current.parents:
+          if (parent / HTMLGRAPH_DIR).exists():
+              return parent / HTMLGRAPH_DIR
+      return current / HTMLGRAPH_DIR  # fallback: cwd/.htmlgraph (may not exist)
+
+This walks up from cwd looking for .htmlgraph. This part works correctly IF cwd
+is within the project tree.
+
+### 4. Hook bootstrap in packages/claude-plugin/hooks/bootstrap.py (lines 25-58)
+
+  def resolve_project_dir(cwd: str | None = None) -> str:
+      env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+      if env_dir: return env_dir
+      start_dir = cwd or os.getcwd()
+      # tries: git rev-parse --show-toplevel
+      # falls back to: start_dir
+
+Hooks get cwd from hook_input["cwd"] (provided by Claude Code). For the main
+session this is the project root. For subagents spawned via Task(), Claude Code
+sets cwd to a temp directory (e.g. /tmp or the agent work dir), NOT the original
+project directory.
+
+### 5. MCP server in src/python/htmlgraph/mcp_server.py (lines 42-63)
+
+  def _resolve_project_dir(cwd=None):
+      env_dir = os.environ.get("HTMLGRAPH_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR")
+      if env_dir: return Path(env_dir)
+      # tries: git rev-parse --show-toplevel from cwd
+      # falls back to: cwd
+
+The MCP server also checks HTMLGRAPH_PROJECT_DIR and CLAUDE_PROJECT_DIR.
+
+### 6. What env vars exist
+
+DOCUMENTED env vars that influence path resolution:
+- CLAUDE_PROJECT_DIR: Checked by hook bootstrap AND mcp_server._resolve_project_dir()
+- HTMLGRAPH_PROJECT_DIR: Checked by mcp_server._resolve_project_dir() only
+- HTMLGRAPH_DIR: Used as constant name (.htmlgraph) in discovery.py, NOT as env var
+- HTMLGRAPH_SESSION_ID: Session ID propagation, not path
+- HTMLGRAPH_PARENT_SESSION: Parent session linkage, not path
+- HTMLGRAPH_DISABLE_TRACKING: Disable tracking
+- HTMLGRAPH_PARENT_ACTIVITY: Parent event ID for hierarchical linking
+
+NO env var exists to override the database path directly (no HTMLGRAPH_DB_PATH).
+
+## Root Cause
+
+**The problem has two layers:**
+
+**Layer 1 - SDK db_path default (PARTIALLY FIXED in SDK.__init__):**
+SDK.__init__ now resolves db_path relative to the discovered .htmlgraph directory:
+  resolved_db_path = db_path or str(self._directory / "htmlgraph.db")
+
+But BaseSDK.__init__ still uses the old hardcoded fallback:
+  str(Path.home() / ".htmlgraph" / "htmlgraph.db")
+
+So if code uses BaseSDK directly (or old cached code), it still hits ~/.htmlgraph.
+
+**Layer 2 - Subagent cwd (ROOT CAUSE for Task() subagents):**
+When a subagent is spawned via Task(), Claude Code sets its cwd to a temp/work
+directory that is NOT within the project tree. The SDK"s discover_htmlgraph_dir()
+starts from cwd and walks up, so it never finds the project"s .htmlgraph directory.
+It falls back to creating a NEW .htmlgraph in the temp cwd.
+
+For hooks, the hook_input["cwd"] is the subagent"s cwd. resolve_project_dir() tries
+git rev-parse from that cwd. If the temp dir is not inside a git repo, it falls back
+to the temp cwd. The .htmlgraph then resolves to temp-dir/.htmlgraph.
+
+**Layer 3 - Missing env var propagation:**
+The session-start.py hook sets HTMLGRAPH_SESSION_ID and HTMLGRAPH_PARENT_SESSION,
+but does NOT set CLAUDE_PROJECT_DIR or any path env var. So subagents launched by
+Task() inherit no path context from the parent session"s hooks.
+
+## Solution Options
+
+### Option A: Propagate CLAUDE_PROJECT_DIR from session-start hook (RECOMMENDED)
+In session-start.py"s _setup_env_vars(), also write:
+  export CLAUDE_PROJECT_DIR=/path/to/project
+
+This is the highest-priority env var checked by both bootstrap modules.
+Cost: trivial change to one hook script.
+Risk: low - CLAUDE_PROJECT_DIR is already part of the resolution hierarchy.
+
+### Option B: Add HTMLGRAPH_DB_PATH env var support to SDK and HtmlGraphDB
+Add env var: HTMLGRAPH_DB_PATH or HTMLGRAPH_DIR
+SDK.__init__ checks this before doing directory discovery.
+Cost: touches SDK core and HtmlGraphDB.
+Risk: medium - adds new env var surface area.
+
+### Option C: Fix BaseSDK to match SDK (cleanup)
+Update BaseSDK.__init__ to use the same db_path logic as SDK.__init__.
+This is a cleanup fix - BaseSDK should not be used directly, but harmonizing
+prevents future confusion.
+Cost: trivial, one line change.
+Risk: none.
+
+### Option D: SDK walks git root regardless of cwd
+In discover_htmlgraph_dir(), if .htmlgraph not found by parent walk, try
+  git rev-parse --show-toplevel  from cwd
+as a fallback before returning cwd/.htmlgraph.
+Cost: adds subprocess call to SDK init.
+Risk: low but adds latency for every SDK() call in non-git contexts.
+
+## Recommended Fix
+
+**Immediate fix (Option A + Option C):**
+
+1. In session-start.py _setup_env_vars(), add:
+   f.write(f"export CLAUDE_PROJECT_DIR={project_dir}\n")
+
+2. In sdk/base.py BaseSDK.__init__, change line 109:
+   db_path or str(Path.home() / ".htmlgraph" / "htmlgraph.db")
+   TO:
+   db_path or str(self._directory / "htmlgraph.db")
+
+**Why Option A is the correct root-cause fix:**
+The hook bootstrap already checks CLAUDE_PROJECT_DIR first. If the session-start
+hook exports it into CLAUDE_ENV_FILE, Claude Code inherits it for all subagents,
+making the entire resolution chain point at the correct project directory. This
+fixes both the HTML graph directory AND the database path in one shot.
+
+## Verification After Fix
+
+After setting CLAUDE_PROJECT_DIR correctly:
+  discover_htmlgraph_dir() -> /project/.htmlgraph  (not /tmp/.../.htmlgraph)
+  resolved_db_path -> /project/.htmlgraph/htmlgraph.db  (not ~/.htmlgraph/htmlgraph.db)
+  Subagent events appear in project dashboard.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

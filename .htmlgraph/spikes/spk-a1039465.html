@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SDK Path Fix Implementation (bug-73704bf0)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-a1039465"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-09T10:04:49.079313"
+             data-updated="2026-03-09T10:04:49.079315" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>SDK Path Fix Implementation (bug-73704bf0)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Fix 1: session-start.py — _setup_env_vars() now accepts project_dir param
+  and writes CLAUDE_PROJECT_DIR to CLAUDE_ENV_FILE + os.environ.
+  Call site in main() updated to pass project_dir.
+
+Fix 2: sdk/base.py — removed hardcoded Path.home() / ".htmlgraph" / "htmlgraph.db"
+  fallback. DB now placed at self._directory / "htmlgraph.db" (project-local).
+  _discover_htmlgraph() now delegates to discover_htmlgraph_dir() to get env var support.
+
+Fix 3: sdk/discovery.py — both discover_htmlgraph_dir() and find_project_root()
+  now check CLAUDE_PROJECT_DIR and HTMLGRAPH_PROJECT_DIR env vars first,
+  before walking up from cwd.
+
+Tests: All pass (ruff clean, mypy clean, targeted unit tests pass, 2231 test suite green at observed point).
+            </div>
+        </section>
+    </article>
+</body>
+</html>

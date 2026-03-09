@@ -221,13 +221,19 @@ def _manage_conversation_spike(
 
 
 def _setup_env_vars(
-    active: object, external_session_id: str, env_file: str | None
+    active: object,
+    external_session_id: str,
+    env_file: str | None,
+    project_dir: str | None = None,
 ) -> None:
     """
     Set environment variables for parent session context propagation.
 
     CRITICAL: Use external_session_id (from Claude Code) for cross-hook consistency.
     This ensures UserPromptSubmit and PreToolUse hooks use the same session_id.
+
+    Also exports CLAUDE_PROJECT_DIR so subagents spawned via Task() inherit the
+    correct project root and the SDK discovers the right .htmlgraph/ directory.
     """
     session_id = (
         external_session_id  # Use Claude Code's session ID, not HtmlGraph's internal ID
@@ -239,6 +245,8 @@ def _setup_env_vars(
     os.environ["HTMLGRAPH_PARENT_SESSION"] = session_id
     os.environ["HTMLGRAPH_PARENT_AGENT"] = "claude-code"
     os.environ["HTMLGRAPH_NESTING_DEPTH"] = "0"
+    if project_dir:
+        os.environ["CLAUDE_PROJECT_DIR"] = project_dir
 
     if env_file:
         try:
@@ -247,6 +255,8 @@ def _setup_env_vars(
                 f.write(f"export HTMLGRAPH_PARENT_SESSION={session_id}\n")
                 f.write("export HTMLGRAPH_PARENT_AGENT=claude-code\n")
                 f.write("export HTMLGRAPH_NESTING_DEPTH=0\n")
+                if project_dir:
+                    f.write(f"export CLAUDE_PROJECT_DIR={project_dir}\n")
             logger.info(f"Environment variables written to {env_file}")
         except Exception as e:
             logger.warning(f"Could not write to CLAUDE_ENV_FILE: {e}")
@@ -304,7 +314,9 @@ def main() -> None:
             )
 
         # Set environment variables for parent session context
-        _setup_env_vars(active, external_session_id, os.environ.get("CLAUDE_ENV_FILE"))
+        _setup_env_vars(
+            active, external_session_id, os.environ.get("CLAUDE_ENV_FILE"), project_dir
+        )
 
         # Manage conversation-level auto-spikes
         _manage_conversation_spike(manager, active, external_session_id, graph_dir)

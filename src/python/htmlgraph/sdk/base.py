@@ -105,9 +105,9 @@ class BaseSDK:
         self._parent_session = parent_session or os.getenv("HTMLGRAPH_PARENT_SESSION")
 
         # Initialize SQLite database (Phase 2)
-        self._db = HtmlGraphDB(
-            db_path or str(Path.home() / ".htmlgraph" / "htmlgraph.db")
-        )
+        # Use db_path if explicitly provided; otherwise place alongside the discovered
+        # .htmlgraph directory so subagents always use the project-local database.
+        self._db = HtmlGraphDB(db_path or str(self._directory / "htmlgraph.db"))
         self._db.connect()
         self._db.create_tables()
 
@@ -215,21 +215,14 @@ class BaseSDK:
         """
         Auto-discover .htmlgraph directory.
 
-        Searches current directory and parents.
+        Delegates to discover_htmlgraph_dir() which checks environment
+        variables (CLAUDE_PROJECT_DIR, HTMLGRAPH_PROJECT_DIR) first,
+        then walks up from cwd. This ensures subagents spawned via
+        Task() use the parent project's .htmlgraph directory.
         """
-        current = Path.cwd()
+        from htmlgraph.sdk.discovery import discover_htmlgraph_dir
 
-        # Check current directory
-        if (current / ".htmlgraph").exists():
-            return current / ".htmlgraph"
-
-        # Check parent directories
-        for parent in current.parents:
-            if (parent / ".htmlgraph").exists():
-                return parent / ".htmlgraph"
-
-        # Default to current directory
-        return current / ".htmlgraph"
+        return discover_htmlgraph_dir()
 
     @property
     def agent(self) -> str | None:
