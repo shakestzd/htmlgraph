@@ -94,3 +94,20 @@ docs/api/*.js
 
 .contextune/
 .claude/settings.local.json
+
+# Prevent root clutter from accumulating
+# Screenshots and temp images
+*.png
+# One-off scratch/test files
+*.txt
+!requirements*.txt
+# Coverage artifacts
+coverage.json
+# Session state
+.session-warning-state.json
+# Marimo sessions
+__marimo__/
+# UV cache
+.uv-cache/
+# Mypy cache
+.mypy_cache/
