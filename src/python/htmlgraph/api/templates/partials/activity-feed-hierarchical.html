@@ -677,18 +677,24 @@ function restoreExpandState() {
     const expanded = window._expandedEventIds;
     if (!expanded || expanded.size === 0) return;
 
-    expanded.forEach(eventId => {
-        const row = document.querySelector(`[data-event-id="${eventId}"]`);
-        if (row) {
-            const expandIcon = row.querySelector('.expand-icon');
-            if (expandIcon) expandIcon.classList.add('expanded');
-            row.classList.add('expanded');
-            // Show direct children only
-            const directChildren = document.querySelectorAll(`[data-parent="${eventId}"]`);
-            directChildren.forEach(child => {
-                child.classList.remove('hidden');
-            });
-        }
+    // Process rows in DOM order (top to bottom) so that a parent row is made
+    // visible before we attempt to un-hide its children.  Without this ordering,
+    // a depth-1 Task row could be processed before its depth-0 UserQuery parent,
+    // leaving the Task row still hidden and its depth-2 grandchildren dangling.
+    const allRows = document.querySelectorAll('[data-event-id]');
+    allRows.forEach(row => {
+        const eventId = row.dataset.eventId;
+        if (!eventId || !expanded.has(eventId)) return;
+
+        const expandIcon = row.querySelector('.expand-icon');
+        if (expandIcon) expandIcon.classList.add('expanded');
+        row.classList.add('expanded');
+        // Reveal only direct children; their own children stay hidden until
+        // their own entry in the expanded set is processed below.
+        const directChildren = document.querySelectorAll(`[data-parent="${eventId}"]`);
+        directChildren.forEach(child => {
+            child.classList.remove('hidden');
+        });
     });
 }
 
