@@ -401,6 +401,10 @@ def _build_attribution_block(
     attribution and call the appropriate SDK method to correct it if needed.
     Returns None if open_work_items is empty or None.
 
+    The attribution instruction is a HARD BLOCKING GATE placed at the top of
+    Claude's response. Claude must call the appropriate SDK method to set
+    correct attribution BEFORE proceeding with any other work.
+
     Args:
         active_work: Currently active work item dict (id, title, type) or None
         open_work_items: List of open work item dicts from get_open_work_items()
@@ -411,7 +415,33 @@ def _build_attribution_block(
     if not open_work_items:
         return None
 
-    lines = ["## Work Item Attribution", "", "Open work items:"]
+    lines = [
+        "## ⛔ MANDATORY FIRST STEP — DO NOT SKIP",
+        "",
+        "Before writing ANY response or taking ANY action:",
+        "",
+        "1. Read the prompt and identify what work item this belongs to",
+        '2. Call `sdk.features.start("id")` / `sdk.bugs.start("id")` / `sdk.spikes.start("id")`',
+        "3. THEN proceed with your response",
+        "",
+        "If no existing item matches, create one:",
+        "",
+        "```python",
+        "from htmlgraph import SDK",
+        'sdk = SDK(agent="claude")',
+        'f = sdk.features.create("Brief title").set_track("trk-...").save()',
+        "sdk.features.start(f.id)",
+        "```",
+        "",
+        "**Why this is non-negotiable:** Turn 1's UserQuery is already in the DB unattributed. "
+        "Calling `start()` retroactively fixes it. If you skip this, that entire conversation "
+        'shows "—" in the dashboard forever.',
+        "",
+        "═══════════════════════════════════════════════════════════",
+        "",
+        "## Open Work Items (Pick from these if applicable):",
+        "",
+    ]
     for item in open_work_items:
         lines.append(
             f"- [{item['status']}] {item['type']} {item['id']}: {item['title']}"
@@ -424,23 +454,6 @@ def _build_attribution_block(
         lines.append(f"Currently active: {active_id}: {active_title}")
     else:
         lines.append("Currently active: None")
-
-    lines.extend(
-        [
-            "",
-            "INSTRUCTION: Before starting work, evaluate whether this conversation "
-            "matches the active work item above.",
-            "- If the prompt matches a different work item, call "
-            '`sdk.features.start("correct-id")` (or `sdk.bugs.start` / '
-            "`sdk.spikes.start`) BEFORE proceeding.",
-            "- If the task is new and untracked, call "
-            '`sdk.features.create("Brief title").save()` then '
-            "`sdk.features.start(new_id)`.",
-            "- If the active item is correct, continue without changing it.",
-            '- Use `from htmlgraph import SDK; sdk = SDK(agent="claude")` '
-            "to access the SDK.",
-        ]
-    )
 
     return "\n".join(lines)
 

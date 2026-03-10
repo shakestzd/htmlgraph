@@ -17,11 +17,9 @@ import pytest
 from htmlgraph.hooks.context import HookContext
 from htmlgraph.hooks.prompt_analyzer import (
     EXPLORATION_KEYWORDS,
-    _extract_meaningful_words,
     classify_cigs_intent,
     classify_prompt,
     create_user_query_event,
-    find_best_matching_work_item,
     generate_cigs_guidance,
     generate_guidance,
     get_active_work_item,
