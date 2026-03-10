@@ -40,42 +40,12 @@ from htmlgraph.hooks.context import HookContext
 from htmlgraph.hooks.prompt_analyzer import (
     classify_cigs_intent,
     classify_prompt,
-    find_best_matching_work_item,
     generate_cigs_guidance,
     generate_guidance,
     get_active_work_item,
     get_open_work_items,
     get_session_violation_count,
 )
-
-
-def _start_matched_item(item: dict) -> None:
-    """Start a semantically matched work item so it becomes active.
-
-    Calls the appropriate SDK collection's ``start()`` method based on the
-    item's ``type`` field (feature, bug, or spike). Failures are silently
-    ignored — attribution is best-effort and must never block the hook.
-
-    Args:
-        item: Dict with at least ``id`` and ``type`` keys.
-    """
-    try:
-        from htmlgraph import SDK  # noqa: PLC0415
-
-        sdk = SDK()
-        item_type = item.get("type", "feature")
-        item_id = item.get("id", "")
-        if not item_id:
-            return
-
-        if item_type == "bug":
-            sdk.bugs.start(item_id)
-        elif item_type == "spike":
-            sdk.spikes.start(item_id)
-        else:
-            sdk.features.start(item_id)
-    except Exception:  # noqa: BLE001
-        pass  # Best-effort: never block the hook
 
 
 def main() -> None:
@@ -105,20 +75,7 @@ def main() -> None:
         # 4. Get active work item (SDK)
         active_work = get_active_work_item(context)
 
-        # 4b. Semantic matching: if no active work item, find best match
-        #     by keyword overlap between prompt and open work item titles.
-        if not active_work:
-            try:
-                matched = find_best_matching_work_item(prompt, context)
-                if matched:
-                    # Start the matched item so it becomes the active work item
-                    _start_matched_item(matched)
-                    # Use the matched item as active work for guidance
-                    active_work = matched
-            except Exception:  # noqa: BLE001
-                pass  # Attribution must never break the hook
-
-        # 4c. Get all open work items for attribution guidance (SDK)
+        # 4b. Get all open work items for attribution guidance (SDK)
         open_items = get_open_work_items(context)
 
         # 5. Generate workflow guidance (SDK)

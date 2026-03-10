@@ -1760,7 +1760,9 @@ class SessionManager:
             title=f"Auto session ({agent})",
         )
 
-    def _backfill_turn1_userquery(self, session_id: str, feature_id: str) -> None:
+    def _backfill_turn1_userquery(
+        self, session_id: str | None, feature_id: str
+    ) -> None:
         """
         Retroactively attribute the most recent unattributed UserQuery event in
         the current session to the given feature.
@@ -1773,8 +1775,16 @@ class SessionManager:
         Only updates a single row — the latest NULL-feature_id UserQuery — to avoid
         accidentally backfilling historical turns from previous conversations.
 
+        When called from a subprocess (e.g. ``uv run python -c "sdk.features.start(...)"``),
+        the caller may not know the current Claude session ID.  In that case pass
+        ``session_id=None`` and this method will fall back to querying the DB for the
+        most recent UserQuery event with ``feature_id IS NULL`` across *all* sessions.
+        This works because the UserPromptSubmit hook writes the UserQuery immediately
+        before Claude's response, so the globally-most-recent unattributed UserQuery is
+        always the one we want to stamp.
+
         Args:
-            session_id: Current session ID
+            session_id: Current session ID, or None to use DB fallback.
             feature_id: Feature to attribute the UserQuery to
         """
         import sqlite3
@@ -1785,21 +1795,50 @@ class SessionManager:
         try:
             conn = sqlite3.connect(str(db_path))
             try:
-                conn.execute(
-                    """
-                    UPDATE agent_events
-                    SET feature_id = ?
-                    WHERE event_id = (
-                        SELECT event_id FROM agent_events
-                        WHERE session_id = ?
-                          AND tool_name = 'UserQuery'
-                          AND feature_id IS NULL
-                        ORDER BY timestamp DESC
-                        LIMIT 1
+                updated = 0
+                if session_id:
+                    # Fast path: we know the session — only look within it.
+                    cursor = conn.execute(
+                        """
+                        UPDATE agent_events
+                        SET feature_id = ?
+                        WHERE event_id = (
+                            SELECT event_id FROM agent_events
+                            WHERE session_id = ?
+                              AND tool_name = 'UserQuery'
+                              AND feature_id IS NULL
+                            ORDER BY timestamp DESC
+                            LIMIT 1
+                        )
+                        """,
+                        (feature_id, session_id),
                     )
-                    """,
-                    (feature_id, session_id),
-                )
+                    updated = cursor.rowcount
+
+                if not session_id or updated == 0:
+                    # Fallback: no session_id (e.g. called from subprocess), or the
+                    # session-scoped query found nothing (stale/wrong session_id).
+                    # Find the most-recent unattributed UserQuery across all sessions —
+                    # this is always Turn 1 of the current conversation.
+                    try:
+                        conn.execute(
+                            """
+                            UPDATE agent_events
+                            SET feature_id = ?
+                            WHERE event_id = (
+                                SELECT event_id FROM agent_events
+                                WHERE tool_name = 'UserQuery'
+                                  AND feature_id IS NULL
+                                ORDER BY timestamp DESC
+                                LIMIT 1
+                            )
+                            """,
+                            (feature_id,),
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        logger.debug(
+                            f"_backfill_turn1_userquery fallback: non-fatal error: {e}"
+                        )
                 conn.commit()
             finally:
                 conn.close()
@@ -2029,8 +2068,14 @@ class SessionManager:
         # event before Claude can call sdk.features.start(), so Turn 1's event lands
         # with feature_id IS NULL. This UPDATE retroactively stamps it with the correct
         # feature so it shows up attributed in the dashboard.
-        if active_session:
-            self._backfill_turn1_userquery(active_session.id, feature_id)
+        #
+        # Pass session_id=None when active_session is unknown (e.g. called from a
+        # subprocess) so _backfill_turn1_userquery falls back to the DB-wide most-recent
+        # unattributed UserQuery instead of silently skipping backfill.
+        self._backfill_turn1_userquery(
+            active_session.id if active_session else None,
+            feature_id,
+        )
 
         if log_activity and agent:
             self._maybe_log_work_item_action(

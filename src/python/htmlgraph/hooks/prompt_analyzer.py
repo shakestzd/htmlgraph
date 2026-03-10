@@ -390,169 +390,6 @@ def get_open_work_items(context: HookContext) -> list[dict]:
         return []
 
 
-# Stop words to exclude from keyword matching — common English words and
-# generic action verbs that appear in almost every prompt and would produce
-# false-positive matches against work item titles.
-_STOP_WORDS: frozenset[str] = frozenset(
-    {
-        "the",
-        "a",
-        "an",
-        "is",
-        "to",
-        "of",
-        "in",
-        "for",
-        "and",
-        "or",
-        "fix",
-        "add",
-        "implement",
-        "create",
-        "update",
-        "with",
-        "on",
-        "at",
-        "by",
-        "from",
-        "it",
-        "this",
-        "that",
-        "be",
-        "as",
-        "are",
-        "was",
-        "were",
-        "been",
-        "has",
-        "have",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "could",
-        "should",
-        "may",
-        "might",
-        "can",
-        "not",
-        "but",
-        "if",
-        "so",
-        "all",
-        "each",
-        "every",
-        "no",
-        "any",
-        "my",
-        "your",
-        "our",
-        "its",
-        "we",
-        "you",
-        "i",
-        "me",
-        "us",
-        "new",
-        "make",
-        "use",
-        "via",
-    }
-)
-
-
-def _extract_meaningful_words(text: str) -> set[str]:
-    """Extract meaningful (non-stop) words from text, lowercased.
-
-    Splits on non-alphanumeric boundaries and filters out stop words and
-    single-character tokens.
-
-    Args:
-        text: Input text to tokenize
-
-    Returns:
-        Set of lowercase meaningful words
-    """
-    words = set(re.split(r"[^a-zA-Z0-9]+", text.lower()))
-    return {w for w in words if len(w) > 1 and w not in _STOP_WORDS}
-
-
-def find_best_matching_work_item(
-    prompt_text: str,
-    context: HookContext,
-) -> dict[str, str] | None:
-    """Find the best matching open work item for a prompt using keyword matching.
-
-    Scores each open work item by counting how many meaningful words from its
-    title appear in the prompt text.  In-progress items receive a +2 bonus so
-    that work already underway is preferred over backlog items.
-
-    Tie-breaking order:
-        1. Highest score
-        2. In-progress items first
-        3. Most recently created (last in the list returned by SDK)
-
-    Args:
-        prompt_text: The user's prompt
-        context: HookContext with session and graph directory info
-
-    Returns:
-        Dict with keys ``id``, ``title``, ``type``, ``status`` of the best
-        match, or ``None`` if no work item scores above zero.
-
-    Example:
-        >>> match = find_best_matching_work_item("Fix the dashboard layout", ctx)
-        >>> if match:
-        ...     print(match["id"], match["title"])
-    """
-    try:
-        open_items = get_open_work_items(context)
-        if not open_items:
-            return None
-
-        prompt_words = _extract_meaningful_words(prompt_text)
-        if not prompt_words:
-            return None
-
-        best: dict[str, str] | None = None
-        best_score = 0
-
-        for item in open_items:
-            title = item.get("title", "")
-            title_words = _extract_meaningful_words(title)
-
-            # Score = count of title words that appear in the prompt
-            score = len(title_words & prompt_words)
-
-            # Bonus for already in-progress items
-            if item.get("status") == "in-progress":
-                score += 2
-
-            if score > best_score:
-                best_score = score
-                best = item
-            elif score == best_score and score > 0:
-                # Tie-break: prefer in-progress over todo
-                if (
-                    item.get("status") == "in-progress"
-                    and best
-                    and best.get("status") != "in-progress"
-                ):
-                    best = item
-                # Otherwise keep the later item (more recently created)
-                elif best and item.get("status") == best.get("status"):
-                    best = item
-
-        return best if best_score > 0 else None
-
-    except Exception:  # noqa: BLE001
-        # Attribution must never break the hook
-        logger.debug("find_best_matching_work_item failed", exc_info=True)
-        return None
-
-
 def _build_attribution_block(
     active_work: dict[str, Any] | None,
     open_work_items: list[dict] | None,
@@ -978,20 +815,10 @@ def create_user_query_event(context: HookContext, prompt: str) -> str | None:
             # Prepare event details
             input_summary = prompt[:200]
 
-            # Look up active work item for automatic attribution
+            # Look up active work item for automatic attribution.
+            # Claude handles attribution via sdk.features.start(); the hook
+            # only reads the current in-progress item — no keyword matching.
             active_feature_id = _get_active_feature_id()
-
-            # Fallback: semantic keyword matching against open work items
-            if not active_feature_id:
-                try:
-                    matched = find_best_matching_work_item(prompt, context)
-                    if matched:
-                        active_feature_id = matched.get("id")
-                        logger.debug(
-                            f"Semantic match attributed UserQuery to: {active_feature_id}"
-                        )
-                except Exception:  # noqa: BLE001
-                    pass  # Attribution must never break event creation
 
             if active_feature_id:
                 logger.debug(
@@ -1039,13 +866,11 @@ __all__ = [
     "get_session_violation_count",
     "get_active_work_item",
     "get_open_work_items",
-    "find_best_matching_work_item",
     "generate_guidance",
     "generate_cigs_guidance",
     "detect_wip_limit_hit",
     "create_user_query_event",
     "_get_active_feature_id",
-    "_extract_meaningful_words",
     # Pattern constants for testing/extension
     "IMPLEMENTATION_PATTERNS",
     "INVESTIGATION_PATTERNS",
