@@ -1,6 +1,6 @@
 [project]
 name = "htmlgraph"
-version = "0.33.48"
+version = "0.33.49"
 description = "Local-first observability and coordination platform for AI-assisted development. Document-backed work items with SQLite-indexed runtime state, live FastAPI/HTMX dashboard, and multi-agent session tracking."
 authors = [{name = "Shakes", email = "shakestzd@gmail.com"}]
 readme = "README.md"
@@ -50,6 +50,7 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-timeout>=2.0.0",
     "pytest-xdist>=3.0.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
@@ -107,8 +108,10 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --cov=src/python/htmlgraph --cov-report=term-missing -n auto"
 asyncio_mode = "auto"
+timeout = 30
 markers = [
     "serial: marks tests as needing to run serially (deselect with '-m \"not serial\"')",
+    "slow: marks tests as slow (may take >30s, deselect with '-m \"not slow\"')",
 ]
 
 [tool.black]
@@ -164,4 +167,5 @@ dev = [
     "pytest-xdist>=3.0.0",
     "schemathesis>=3.29.0",
     "hypothesis>=6.0.0",
+    "pytest-timeout>=2.4.0",
 ]
