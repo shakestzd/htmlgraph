@@ -7,8 +7,8 @@ echo "🔍 Running pre-commit checks..."
 
 # Check for incomplete systematic changes
 echo "  → checking for incomplete systematic changes..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-uv run "$SCRIPT_DIR/check-systematic-changes.py" || true
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+uv run "$REPO_ROOT/scripts/hooks/check-systematic-changes.py" || true
 
 # Run ruff linting
 echo "  → ruff check..."
