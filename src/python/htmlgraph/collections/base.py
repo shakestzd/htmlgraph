@@ -848,23 +848,27 @@ class BaseCollection(Generic[CollectionT]):
             ...     # someone else got there first
             ...     pass
         """
+        import sqlite3
+
         if agent is None:
             agent = self._sdk.agent or "unknown"
 
-        db = self._sdk._db
-        if db.connection is None:
-            db.connect()
+        # Use SDK's database path from the DB object
+        db_path = self._sdk._db.db_path
+        conn = sqlite3.connect(str(db_path), timeout=2.0, check_same_thread=False)
+        try:
+            cursor = conn.execute(
+                "UPDATE features SET assignee = ? WHERE id = ? AND (assignee IS NULL OR assignee = ?)",
+                (agent, node_id, agent),
+            )
+            conn.commit()
 
-        cursor = db.connection.execute(  # type: ignore[union-attr]
-            "UPDATE features SET assignee = ? WHERE id = ? AND (assignee IS NULL OR assignee = ?)",
-            (agent, node_id, agent),
-        )
-        db.connection.commit()  # type: ignore[union-attr]
-
-        if cursor.rowcount == 1:
-            self._update_html_assignee(node_id, agent)
-            return True
-        return False
+            if cursor.rowcount == 1:
+                self._update_html_assignee(node_id, agent)
+                return True
+            return False
+        finally:
+            conn.close()
 
     def atomic_unclaim(self, node_id: str) -> None:
         """
@@ -880,15 +884,17 @@ class BaseCollection(Generic[CollectionT]):
         Example:
             >>> sdk.features.atomic_unclaim('feat-abc123')
         """
-        db = self._sdk._db
-        if db.connection is None:
-            db.connect()
+        import sqlite3
 
-        db.connection.execute(  # type: ignore[union-attr]
-            "UPDATE features SET assignee = NULL WHERE id = ?", (node_id,)
-        )
-        db.connection.commit()  # type: ignore[union-attr]
-        self._update_html_assignee(node_id, None)
+        # Use SDK's database path from the DB object
+        db_path = self._sdk._db.db_path
+        conn = sqlite3.connect(str(db_path), timeout=2.0, check_same_thread=False)
+        try:
+            conn.execute("UPDATE features SET assignee = NULL WHERE id = ?", (node_id,))
+            conn.commit()
+            self._update_html_assignee(node_id, None)
+        finally:
+            conn.close()
 
     def _update_html_assignee(self, node_id: str, agent: str | None) -> None:
         """
