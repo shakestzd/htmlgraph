@@ -1,6 +1,6 @@
 {
   "name": "htmlgraph",
-  "version": "0.33.74",
+  "version": "0.33.75",
   "description": "HtmlGraph session tracking and documentation for Gemini CLI. Ensures proper activity attribution, feature awareness, and continuous work tracking.",
   "author": "Shakes",
   "license": "MIT",
