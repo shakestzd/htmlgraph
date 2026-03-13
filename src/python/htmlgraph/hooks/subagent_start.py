@@ -59,7 +59,14 @@ def handle_subagent_start(hook_input: dict[str, Any]) -> dict[str, Any]:
         # that matches the agent_type, ordered by timestamp ASC (FIFO).
         # PreToolUse writes agent_id='claude-code' as a placeholder; treat that
         # as "unmatched" alongside NULL/''.
-        # Scope to the current session to avoid matching stale rows from old sessions.
+        #
+        # SESSION_ID CORRECTNESS NOTE (roborev-259, Finding 1):
+        # Claude Code passes the PARENT/orchestrator session_id to SubagentStart hooks,
+        # NOT a separate subagent session_id. This is confirmed by Claude Code behavior:
+        # "All subagents share the same session_id" (see subagent-stop.py plugin docs).
+        # Since task_delegation rows are written by PreToolUse in the parent session,
+        # they carry the same session_id. Therefore this filter correctly scopes to
+        # the current orchestrator session, avoiding stale rows from old sessions.
         if session_id:
             cursor.execute(
                 """

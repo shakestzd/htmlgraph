@@ -139,6 +139,12 @@ class ActivityService:
             # 'Agent' tool events are PostToolUse echoes of Task delegations — the Task
             # node (from SubagentStart) carries the meaningful nested children, so we
             # exclude Agent from display at all depths to avoid redundant rows.
+            #
+            # NUANCE (roborev-259, Finding 2): We only suppress Agent events that
+            # are PostToolUse echoes (event_type='tool_call'). Transcript ingestion
+            # records legitimate delegations as tool_name='Agent' with
+            # event_type='task_delegation' — those must be shown when no sibling
+            # Task event exists. The condition below keeps task_delegation Agents.
             children_sql = """
                 SELECT
                     event_id,
@@ -156,14 +162,15 @@ class ActivityService:
                     event_type
                 FROM agent_events
                 WHERE parent_event_id = ?
-                AND tool_name != 'Agent'
+                AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
                 ORDER BY timestamp DESC
             """
 
             # First-level children query (includes cross-session lookup)
-            # 'Agent' tool events are PostToolUse echoes of Task delegations — the Task
-            # node (from SubagentStart) carries the meaningful nested children, so we
-            # exclude Agent from the display to avoid duplicate top-level rows.
+            # 'Agent' tool events that are PostToolUse echoes (event_type='tool_call')
+            # are suppressed to avoid duplicate top-level rows. Agent events from
+            # transcript ingestion (event_type='task_delegation') are kept because
+            # they represent legitimate delegations with no sibling Task node.
             first_level_children_sql = """
                 SELECT
                     event_id,
@@ -189,7 +196,7 @@ class ActivityService:
                         AND tool_name != 'UserQuery'
                     )
                 )
-                AND tool_name != 'Agent'
+                AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
                 ORDER BY timestamp DESC
             """
 
@@ -350,6 +357,8 @@ class ActivityService:
 
                 already_fetched_ids = {c["event_id"] for c in children}
 
+                # Orphan queries: exclude system events and Agent PostToolUse echoes,
+                # but keep Agent events from transcript ingestion (task_delegation).
                 orphan_sql_with_bound = """
                     SELECT
                         event_id,
@@ -366,7 +375,8 @@ class ActivityService:
                     FROM agent_events
                     WHERE session_id = ?
                       AND (parent_event_id IS NULL OR parent_event_id = '')
-                      AND tool_name NOT IN ('UserQuery', 'Stop', 'SessionStart', 'SessionEnd', 'Agent')
+                      AND tool_name NOT IN ('UserQuery', 'Stop', 'SessionStart', 'SessionEnd')
+                      AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
                       AND timestamp >= ?
                       AND timestamp < ?
                     ORDER BY timestamp ASC
@@ -387,7 +397,8 @@ class ActivityService:
                     FROM agent_events
                     WHERE session_id = ?
                       AND (parent_event_id IS NULL OR parent_event_id = '')
-                      AND tool_name NOT IN ('UserQuery', 'Stop', 'SessionStart', 'SessionEnd', 'Agent')
+                      AND tool_name NOT IN ('UserQuery', 'Stop', 'SessionStart', 'SessionEnd')
+                      AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
                       AND timestamp >= ?
                     ORDER BY timestamp ASC
                 """
@@ -495,16 +506,17 @@ class ActivityService:
                         # Build sub-session ID
                         sub_session_id = f"{uq_session_id}-{agent_name}"
 
-                        # Query ALL events from that sub-session, excluding Agent tool
-                        # events which are PostToolUse echoes of Task delegations — the
-                        # Task node (from SubagentStart) carries the meaningful children.
+                        # Query ALL events from that sub-session, excluding Agent
+                        # PostToolUse echoes (event_type='tool_call'). Agent events
+                        # from transcript ingestion (event_type='task_delegation')
+                        # are kept as legitimate delegation records.
                         sub_session_query = """
                             SELECT event_id, tool_name, timestamp, input_summary,
                                    execution_duration_seconds, status, agent_id, model,
                                    context, subagent_type, feature_id, parent_event_id
                             FROM agent_events
                             WHERE session_id = ?
-                            AND tool_name != 'Agent'
+                            AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
                             ORDER BY timestamp ASC
                         """
 

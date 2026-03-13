@@ -223,6 +223,14 @@ def get_parent_event_from_db(
     Used when HTMLGRAPH_PARENT_EVENT environment variable is not available
     (due to inter-process communication limitations).
 
+    SESSION_ID CORRECTNESS NOTE (roborev-259, Finding 1):
+    Claude Code passes the PARENT/orchestrator session_id to SubagentStop hooks,
+    NOT a separate subagent session_id. This is confirmed by Claude Code behavior:
+    "All subagents share the same session_id" (see subagent-stop.py plugin docs).
+    Since task_delegation rows are written by PreToolUse in the parent session,
+    they carry the same session_id. Therefore the session_id filter correctly
+    scopes to the current orchestrator session, avoiding cross-session pollution.
+
     Args:
         db_path: Path to SQLite database
         agent_id: Native agent_id from hook input (e.g. subagent UUID). Used for
