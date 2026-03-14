@@ -267,7 +267,7 @@ defmodule HtmlgraphDashboard.Activity do
     FROM agent_events
     WHERE parent_event_id = ?
       AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
-    ORDER BY timestamp ASC
+    ORDER BY timestamp DESC
     """
 
     rows =
@@ -315,7 +315,7 @@ defmodule HtmlgraphDashboard.Activity do
       WHERE session_id LIKE ?
         AND tool_name != 'UserQuery'
         AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
-      ORDER BY timestamp ASC
+      ORDER BY timestamp DESC
       """
 
       case Repo.query_maps(sql, [pattern]) do
@@ -381,7 +381,7 @@ defmodule HtmlgraphDashboard.Activity do
            AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
            AND timestamp >= ?
            AND timestamp < ?
-         ORDER BY timestamp ASC
+         ORDER BY timestamp DESC
          """, [session_id, uq_timestamp, next_uq["timestamp"]]}
       else
         {"""
@@ -395,7 +395,7 @@ defmodule HtmlgraphDashboard.Activity do
            AND tool_name != 'UserQuery'
            AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
            AND timestamp >= ?
-         ORDER BY timestamp ASC
+         ORDER BY timestamp DESC
          """, [session_id, uq_timestamp]}
       end
 
@@ -418,10 +418,10 @@ defmodule HtmlgraphDashboard.Activity do
   # --- Helpers ---
 
   defp merge_children_by_timestamp(list_a, list_b) do
-    # Deduplicate by event_id, then sort by timestamp ascending
+    # Deduplicate by event_id, then sort by timestamp descending
     (list_a ++ list_b)
     |> Enum.uniq_by(fn e -> e["event_id"] end)
-    |> Enum.sort_by(fn e -> e["timestamp"] end)
+    |> Enum.sort_by(fn e -> e["timestamp"] end, :desc)
   end
 
   defp count_descendants(children) do
