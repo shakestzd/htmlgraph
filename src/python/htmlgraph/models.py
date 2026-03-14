@@ -76,18 +76,21 @@ class Step(BaseModel):
     completed: bool = False
     agent: str | None = None
     timestamp: datetime | None = None
+    step_id: str | None = None
 
     def to_html(self) -> str:
         """Convert step to HTML list item."""
         status = "✅" if self.completed else "⏳"
         agent_attr = f' data-agent="{self.agent}"' if self.agent else ""
         completed_attr = f' data-completed="{str(self.completed).lower()}"'
-        return f"<li{completed_attr}{agent_attr}>{status} {self.description}</li>"
+        step_id_attr = f' data-step-id="{self.step_id}"' if self.step_id else ""
+        return f"<li{completed_attr}{agent_attr}{step_id_attr}>{status} {self.description}</li>"
 
     def to_context(self) -> str:
         """Lightweight context for AI agents."""
         status = "[x]" if self.completed else "[ ]"
-        return f"{status} {self.description}"
+        prefix = f"[{self.step_id}] " if self.step_id else ""
+        return f"{prefix}{status} {self.description}"
 
     def __getitem__(self, key: str) -> Any:
         """

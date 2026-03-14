@@ -651,6 +651,64 @@ def format_tool_summary(
         return str(tool_input)[:50]
 
 
+def resolve_active_step(
+    feature_id: str | None,
+    db_path: str | None = None,
+) -> str | None:
+    """
+    Resolve the active (first incomplete) step_id for a given feature.
+
+    Loads the feature's HTML file from .htmlgraph/features/ and parses it
+    to find the first incomplete step with a step_id.
+
+    Uses a lightweight file-read approach (not SessionManager) to avoid
+    circular imports and keep hook performance fast.
+
+    Args:
+        feature_id: Feature ID to look up steps for
+        db_path: Optional path to database (unused, kept for future use)
+
+    Returns:
+        step_id of the first incomplete step, or None if all steps are
+        complete, no steps exist, or the feature file is not found.
+    """
+    if not feature_id:
+        return None
+
+    try:
+        # Find the feature HTML file in .htmlgraph/features/
+        graph_dir = Path.cwd() / ".htmlgraph" / "features"
+        if not graph_dir.exists():
+            return None
+
+        # Try direct filename match first
+        feature_file = graph_dir / f"{feature_id}.html"
+        if not feature_file.exists():
+            # Scan directory for matching file
+            for f in graph_dir.glob("*.html"):
+                if feature_id in f.stem:
+                    feature_file = f
+                    break
+            else:
+                return None
+
+        # Parse the HTML to extract steps
+        from htmlgraph.parser import HtmlParser
+
+        parser = HtmlParser.from_file(feature_file)
+        steps = parser.get_steps()
+
+        # Return the step_id of the first incomplete step
+        for step in steps:
+            if not step.get("completed", False) and step.get("step_id"):
+                return str(step.get("step_id")) if step.get("step_id") else None
+
+        return None
+    except Exception as e:
+        logger.debug(f"Could not resolve active step for {feature_id}: {e}")
+        return None
+
+
 def record_event_to_sqlite(
     db: HtmlGraphDB,
     session_id: str,
@@ -665,6 +723,7 @@ def record_event_to_sqlite(
     model: str | None = None,
     feature_id: str | None = None,
     claude_task_id: str | None = None,
+    step_id: str | None = None,
 ) -> str | None:
     """
     Record a tool call event to SQLite database for dashboard queries.
@@ -683,6 +742,7 @@ def record_event_to_sqlite(
         model: Claude model name (e.g., claude-haiku, claude-opus) (optional)
         feature_id: Feature ID for attribution (optional)
         claude_task_id: Claude Code's internal task ID for tool attribution (optional)
+        step_id: Step ID for step-level attribution (optional)
 
     Returns:
         event_id if successful, None otherwise
@@ -752,6 +812,7 @@ def record_event_to_sqlite(
             model=model,
             feature_id=feature_id,
             claude_task_id=claude_task_id,
+            step_id=step_id,
         )
 
         if success:
@@ -1957,6 +2018,10 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                         "subagent_type", "general-purpose"
                     )
 
+                # Resolve step-level attribution
+                resolved_feature_id = result.feature_id if result else None
+                resolved_step_id = resolve_active_step(resolved_feature_id)
+
                 event_id = record_event_to_sqlite(
                     db=db,
                     session_id=active_session_id,
@@ -1969,7 +2034,8 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                     agent_id=detected_agent,
                     subagent_type=task_subagent_type,
                     model=detected_model,
-                    feature_id=result.feature_id if result else None,
+                    feature_id=resolved_feature_id,
+                    step_id=resolved_step_id,
                 )
 
                 # Update presence

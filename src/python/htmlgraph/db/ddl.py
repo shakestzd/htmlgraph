@@ -57,6 +57,7 @@ def create_all_tables(cursor: sqlite3.Cursor) -> None:
             model TEXT,
             claude_task_id TEXT,
             source TEXT DEFAULT 'hook',
+            step_id TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -458,6 +459,7 @@ def create_all_indexes(cursor: sqlite3.Cursor) -> None:
         "CREATE INDEX IF NOT EXISTS idx_agent_events_session_tool ON agent_events(session_id, tool_name)",
         "CREATE INDEX IF NOT EXISTS idx_agent_events_timestamp ON agent_events(timestamp DESC)",
         "CREATE INDEX IF NOT EXISTS idx_agent_events_claude_task_id ON agent_events(claude_task_id)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_events_step_id ON agent_events(step_id)",
         # features indexes
         "CREATE INDEX IF NOT EXISTS idx_features_status_priority ON features(status, priority DESC, created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_features_track_priority ON features(track_id, priority DESC, created_at DESC)",
@@ -575,6 +577,7 @@ def migrate_agent_events(cursor: sqlite3.Cursor) -> None:
         ("claude_task_id", "TEXT"),
         ("tool_input", "JSON"),
         ("source", "TEXT"),
+        ("step_id", "TEXT"),
     ]
 
     for col_name, col_type in migrations:

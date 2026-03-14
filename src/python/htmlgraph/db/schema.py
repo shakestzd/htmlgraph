@@ -359,6 +359,7 @@ class HtmlGraphDB(ExtensionOps):
         feature_id: str | None = None,
         claude_task_id: str | None = None,
         source: str = "hook",
+        step_id: str | None = None,
     ) -> bool:
         """
         Insert an agent event into the database.
@@ -401,8 +402,9 @@ class HtmlGraphDB(ExtensionOps):
                 INSERT INTO agent_events
                 (event_id, agent_id, event_type, session_id, feature_id, tool_name,
                  input_summary, tool_input, output_summary, context, parent_agent_id,
-                 parent_event_id, cost_tokens, execution_duration_seconds, subagent_type, model, claude_task_id, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 parent_event_id, cost_tokens, execution_duration_seconds, subagent_type,
+                 model, claude_task_id, source, step_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     event_id,
@@ -423,6 +425,7 @@ class HtmlGraphDB(ExtensionOps):
                     model,
                     claude_task_id,
                     source,
+                    step_id,
                 ),
             )
             cursor.execute("PRAGMA foreign_keys=ON")

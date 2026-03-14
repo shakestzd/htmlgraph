@@ -340,7 +340,14 @@ class FeatureWorkflow:
                 "created": datetime.now().isoformat(),
                 "updated": datetime.now().isoformat(),
                 "content": description,
-                "steps": [{"description": s, "completed": False} for s in steps],
+                "steps": [
+                    {
+                        "description": s,
+                        "completed": False,
+                        "step_id": f"step-{node_id}-{i}",
+                    }
+                    for i, s in enumerate(steps)
+                ],
                 "properties": {},
                 "edges": {},
             }

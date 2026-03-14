@@ -101,9 +101,9 @@ class BaseBuilder(Generic[BuilderT]):
         self._data["status"] = status
         return self  # type: ignore
 
-    def add_step(self, description: str) -> BuilderT:
+    def add_step(self, description: str, step_id: str | None = None) -> BuilderT:
         """Add a single implementation step."""
-        self._data["steps"].append(Step(description=description))
+        self._data["steps"].append(Step(description=description, step_id=step_id))
         return self  # type: ignore
 
     def add_steps(self, descriptions: list[str]) -> BuilderT:
@@ -172,6 +172,12 @@ class BaseBuilder(Generic[BuilderT]):
                 node_type=self._data.get("type", self.node_type),
                 title=self._data.get("title", ""),
             )
+
+        # Auto-assign step_ids to any steps that don't have one yet
+        node_id = self._data["id"]
+        for i, step in enumerate(self._data.get("steps", [])):
+            if isinstance(step, Step) and not step.step_id:
+                step.step_id = f"step-{node_id}-{i}"
 
         # Validate track_id requirement for features
         node_type = self._data.get("type", self.node_type)

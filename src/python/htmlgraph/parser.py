@@ -294,19 +294,22 @@ class HtmlParser:
         for item in step_items:
             completed = item.attrs.get("data-completed", "false").lower() == "true"
             agent = item.attrs.get("data-agent")
+            step_id = item.attrs.get("data-step-id")
 
             # Extract description (remove emoji prefix if present)
             text = item.to_text().strip() if item else ""
             # Remove common status emojis
             text = re.sub(r"^[✅⏳❌🔄]\s*", "", text)
 
-            steps.append(
-                {
-                    "description": text,
-                    "completed": completed,
-                    "agent": agent,
-                }
-            )
+            step_dict: dict[str, Any] = {
+                "description": text,
+                "completed": completed,
+                "agent": agent,
+            }
+            if step_id:
+                step_dict["step_id"] = step_id
+
+            steps.append(step_dict)
 
         return steps
 
