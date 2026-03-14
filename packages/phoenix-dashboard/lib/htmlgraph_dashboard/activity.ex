@@ -191,29 +191,13 @@ defmodule HtmlgraphDashboard.Activity do
     end)
   end
 
-  # Check if an event has meaningful content (not just empty summaries).
-  # Filters out PreToolUse events that have no useful summary.
+  # Check if an event has meaningful content.
+  # Only filters out known noise events.
+  # A Bash/Edit/Read/Task event with an empty summary after sanitization is still real work.
   defp has_meaningful_content(event) do
-    input_summary = event["input_summary"] || ""
-    output_summary = event["output_summary"] || ""
-
-    # Filter out noise tool names that never carry useful content
-    noise_tool = event["tool_name"] in ["Stop", "SessionResume", "InstructionsLoaded"]
-
-    if noise_tool do
-      false
-    else
-      # Keep events that have at least one meaningful summary
-      (String.trim(input_summary) != "" or String.trim(output_summary) != "") and
-        not is_empty_pretooluse(event)
-    end
-  end
-
-  defp is_empty_pretooluse(event) do
-    # Filter out PreToolUse events with no real content
-    event["event_type"] == "start" and
-      (event["input_summary"] == nil or event["input_summary"] == "" or event["input_summary"] == "{}") and
-      (event["output_summary"] == nil or event["output_summary"] == "")
+    tool = event["tool_name"] || ""
+    # Only filter out known noise events
+    tool not in ["Stop", "SessionResume", "InstructionsLoaded", "SessionStart", "SessionEnd"]
   end
 
   # --- Private: Data fetching ---
