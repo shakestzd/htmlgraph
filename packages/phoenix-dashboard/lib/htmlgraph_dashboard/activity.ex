@@ -457,13 +457,62 @@ defmodule HtmlgraphDashboard.Activity do
     sql = """
     SELECT session_id, agent_assigned, status, created_at, completed_at,
            total_events, total_tokens_used, is_subagent, last_user_query,
-           NULL AS model
+           model
     FROM sessions
     WHERE session_id = ?
     """
 
     case Repo.query_maps(sql, [session_id]) do
-      {:ok, [session]} -> session
+      {:ok, [session]} -> derive_session_status(session)
+      _ -> nil
+    end
+  end
+
+  defp derive_session_status(session) do
+    cond do
+      # If completed_at is set, it's completed
+      session["completed_at"] != nil ->
+        Map.put(session, "status", "completed")
+
+      # If status is already explicitly set to something other than active, keep it
+      session["status"] not in [nil, "active"] ->
+        session
+
+      # Check if the session's last event is older than 30 minutes
+      true ->
+        case last_event_timestamp(session["session_id"]) do
+          nil ->
+            session
+
+          ts_string ->
+            case NaiveDateTime.from_iso8601(ts_string) do
+              {:ok, last_event_ts} ->
+                cutoff = NaiveDateTime.add(NaiveDateTime.utc_now(), -30, :minute)
+
+                if NaiveDateTime.compare(last_event_ts, cutoff) == :lt do
+                  Map.put(session, "status", "idle")
+                else
+                  session
+                end
+
+              _ ->
+                session
+            end
+        end
+    end
+  end
+
+  defp last_event_timestamp(nil), do: nil
+
+  defp last_event_timestamp(session_id) do
+    sql = """
+    SELECT MAX(timestamp) AS last_ts
+    FROM agent_events
+    WHERE session_id = ?
+    """
+
+    case Repo.query_maps(sql, [session_id]) do
+      {:ok, [%{"last_ts" => ts}]} -> ts
       _ -> nil
     end
   end

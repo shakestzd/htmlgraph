@@ -105,6 +105,17 @@ body {
   gap: 12px;
 }
 
+.session-subtitle {
+  background: var(--bg-secondary);
+  padding: 4px 16px 8px 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
 /* Activity List (replaces table for flexible nesting) */
 .activity-list {
   width: 100%;
@@ -278,8 +289,13 @@ body {
 }
 
 .badge-status-completed {
-  background: rgba(139, 148, 158, 0.15);
-  color: var(--text-secondary);
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.badge-status-idle {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
 }
 
 .badge-feature {

@@ -25,7 +25,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
       socket
       |> assign(:session_filter, session_id)
       |> assign(:expanded, MapSet.new())
-      |> assign(:new_event_ids, MapSet.new())
+      |> assign(:reload_timer, nil)
       |> load_feed()
 
     {:ok, socket}
@@ -72,22 +72,24 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   end
 
   @impl true
-  def handle_info({:new_event, event}, socket) do
-    new_ids = MapSet.put(socket.assigns.new_event_ids, event["event_id"])
+  def handle_info({:new_event, _event}, socket) do
+    # Debounce: schedule a single reload 500ms from now
+    # Cancel any existing pending reload to avoid redundant work
+    if socket.assigns[:reload_timer] do
+      Process.cancel_timer(socket.assigns.reload_timer)
+    end
 
-    socket =
-      socket
-      |> assign(:new_event_ids, new_ids)
-      |> load_feed()
-
-    Process.send_after(self(), {:clear_new, event["event_id"]}, 3_000)
-
-    {:noreply, socket}
+    timer = Process.send_after(self(), :do_reload, 500)
+    {:noreply, assign(socket, :reload_timer, timer)}
   end
 
-  def handle_info({:clear_new, event_id}, socket) do
-    new_ids = MapSet.delete(socket.assigns.new_event_ids, event_id)
-    {:noreply, assign(socket, :new_event_ids, new_ids)}
+  def handle_info(:do_reload, socket) do
+    socket =
+      socket
+      |> assign(:reload_timer, nil)
+      |> load_feed()
+
+    {:noreply, socket}
   end
 
   defp load_feed(socket) do
@@ -184,10 +186,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     MapSet.member?(expanded, event_id)
   end
 
-  defp is_new?(new_event_ids, event_id) do
-    MapSet.member?(new_event_ids, event_id)
-  end
-
   defp session_expanded?(expanded, session_id) do
     MapSet.member?(expanded, "session:#{session_id}")
   end
@@ -225,6 +223,54 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     end
   end
 
+  defp session_title(group) do
+    # Prefer last_user_query from the session record
+    lq = group.session && group.session["last_user_query"]
+
+    if is_binary(lq) and String.trim(lq) != "" do
+      truncate(String.trim(lq), 80)
+    else
+      # Fall back to first turn's prompt text
+      case group.turns do
+        [first | _] ->
+          text = first.user_query["input_summary"] || ""
+
+          if String.trim(text) != "" do
+            truncate(text, 80)
+          else
+            truncate(group.session_id, 12)
+          end
+
+        [] ->
+          truncate(group.session_id, 12)
+      end
+    end
+  end
+
+  defp agent_label(nil), do: nil
+  defp agent_label("system"), do: nil
+  defp agent_label(""), do: nil
+  defp agent_label(name), do: name
+
+  defp format_relative_time(nil), do: ""
+
+  defp format_relative_time(ts) when is_binary(ts) do
+    case NaiveDateTime.from_iso8601(ts) do
+      {:ok, ndt} ->
+        diff = NaiveDateTime.diff(NaiveDateTime.utc_now(), ndt, :second)
+
+        cond do
+          diff < 60 -> "just now"
+          diff < 3600 -> "#{div(diff, 60)}m ago"
+          diff < 86400 -> "#{div(diff, 3600)}h ago"
+          true -> "#{div(diff, 86400)}d ago"
+        end
+
+      _ ->
+        format_timestamp(ts)
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -252,7 +298,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
         </div>
       <% else %>
         <%= for group <- @feed do %>
-          <div class="session-group">
+          <div class="session-group" phx-key={"session-#{group.session_id}"}>
             <!-- Session Header -->
             <div
               class="session-header"
@@ -265,16 +311,16 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
                     &#9654;
                   </span>
                 </span>
-                <span class="badge badge-session">
-                  <%= truncate(group.session_id, 12) %>
+                <span class="summary-text prompt">
+                  <%= session_title(group) %>
                 </span>
                 <%= if group.session do %>
                   <span class={"badge badge-status-#{group.session["status"] || "active"}"}>
                     <%= group.session["status"] || "active" %>
                   </span>
-                  <%= if group.session["agent_assigned"] do %>
+                  <%= if agent_label(group.session["agent_assigned"]) do %>
                     <span class="badge badge-agent">
-                      <%= group.session["agent_assigned"] %>
+                      <%= agent_label(group.session["agent_assigned"]) %>
                     </span>
                   <% end %>
                 <% end %>
@@ -291,6 +337,24 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
               </div>
             </div>
 
+            <!-- Session subtitle: time + session ID -->
+            <div
+              class="session-subtitle"
+              style={unless(session_expanded?(@expanded, group.session_id) || @session_filter, do: "display: none")}
+            >
+              <%= if group.session do %>
+                <span class="timestamp">
+                  Started: <%= format_relative_time(group.session["created_at"]) %>
+                </span>
+                <span class="badge badge-session" style="font-size: 10px;">
+                  <%= truncate(group.session_id, 16) %>
+                </span>
+                <%= if group.session["model"] do %>
+                  <span class="badge badge-model"><%= group.session["model"] %></span>
+                <% end %>
+              <% end %>
+            </div>
+
             <!-- Activity Table (shown when session expanded or no filter) -->
             <div
               class="activity-list"
@@ -298,10 +362,10 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
             >
               <%= for turn <- group.turns do %>
                 <!-- UserQuery Parent Row -->
-                <div class={[
-                  "activity-row parent-row",
-                  is_new?(@new_event_ids, turn.user_query["event_id"]) && "new-event"
-                ]}>
+                <div
+                  class="activity-row parent-row"
+                  phx-key={"turn-#{turn.user_query["event_id"]}"}
+                >
                   <div class="row-toggle">
                     <%= if length(turn.children) > 0 do %>
                       <button
@@ -354,7 +418,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
                     <.event_row
                       event={child}
                       expanded={@expanded}
-                      new_event_ids={@new_event_ids}
                     />
                   <% end %>
                 <% end %>
@@ -369,13 +432,14 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
 
   defp event_row(assigns) do
     ~H"""
-    <div class={[
-      "activity-row child-row",
-      depth_class(@event["depth"] || 0),
-      row_border_class(@event),
-      is_new?(@new_event_ids, @event["event_id"]) && "new-event"
-    ]}
-    style={"padding-left: #{((@event["depth"] || 0) + 1) * 1.25}rem"}
+    <div
+      class={[
+        "activity-row child-row",
+        depth_class(@event["depth"] || 0),
+        row_border_class(@event)
+      ]}
+      style={"padding-left: #{((@event["depth"] || 0) + 1) * 1.25}rem"}
+      phx-key={"event-#{@event["event_id"]}"}
     >
       <div class="row-toggle">
         <%= if has_children?(@event) do %>
@@ -436,7 +500,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
         <.event_row
           event={child}
           expanded={@expanded}
-          new_event_ids={@new_event_ids}
         />
       <% end %>
     <% end %>
