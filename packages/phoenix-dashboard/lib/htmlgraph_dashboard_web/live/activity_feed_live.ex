@@ -73,7 +73,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
 
   @impl true
   def handle_info({:new_event, event}, socket) do
-    # Mark the new event for flash animation
     new_ids = MapSet.put(socket.assigns.new_event_ids, event["event_id"])
 
     socket =
@@ -81,7 +80,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
       |> assign(:new_event_ids, new_ids)
       |> load_feed()
 
-    # Clear the flash after 3 seconds
     Process.send_after(self(), {:clear_new, event["event_id"]}, 3_000)
 
     {:noreply, socket}
@@ -109,18 +107,22 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
 
   # --- Template Helpers ---
 
-  defp tool_badge_class(tool_name) do
+  defp tool_chip_class(tool_name) do
     case tool_name do
-      "UserQuery" -> "badge-userquery"
-      "Task" -> "badge-task"
-      "Agent" -> "badge-agent"
-      "Bash" -> "badge-tool"
-      "Read" -> "badge-tool"
-      "Write" -> "badge-tool"
-      "Edit" -> "badge-tool"
-      "Glob" -> "badge-tool"
-      "Grep" -> "badge-tool"
-      _ -> "badge-tool"
+      "Bash" -> "tool-chip tool-chip-bash"
+      "Read" -> "tool-chip tool-chip-read"
+      "Edit" -> "tool-chip tool-chip-edit"
+      "Write" -> "tool-chip tool-chip-write"
+      "Grep" -> "tool-chip tool-chip-grep"
+      "Glob" -> "tool-chip tool-chip-glob"
+      "Task" -> "tool-chip tool-chip-task"
+      "Agent" -> "tool-chip tool-chip-task"
+      "TodoWrite" -> "tool-chip tool-chip-edit"
+      "TodoRead" -> "tool-chip tool-chip-read"
+      "TaskCreate" -> "tool-chip tool-chip-task"
+      "TaskOutput" -> "tool-chip tool-chip-task"
+      "Stop" -> "tool-chip tool-chip-stop"
+      _ -> "tool-chip tool-chip-default"
     end
   end
 
@@ -137,7 +139,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   defp format_timestamp(nil), do: ""
 
   defp format_timestamp(ts) when is_binary(ts) do
-    # Extract HH:MM:SS from ISO timestamp
     case Regex.run(~r/(\d{2}:\d{2}:\d{2})/, ts) do
       [_, time] -> time
       _ -> ts
@@ -145,8 +146,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   end
 
   defp format_duration(nil), do: ""
-  defp format_duration(0), do: ""
-  defp format_duration(0.0), do: ""
+  defp format_duration(+0.0), do: ""
 
   defp format_duration(seconds) when is_number(seconds) do
     cond do
@@ -155,11 +155,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
       true -> "#{round(seconds / 60)}m"
     end
   end
-
-  defp format_tokens(nil), do: ""
-  defp format_tokens(0), do: ""
-  defp format_tokens(tokens) when tokens > 1000, do: "#{Float.round(tokens / 1000, 1)}k"
-  defp format_tokens(tokens), do: "#{tokens}"
 
   defp truncate(nil, _), do: ""
 
@@ -174,6 +169,10 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   defp has_children?(event) do
     children = event["children"] || []
     length(children) > 0
+  end
+
+  defp descendant_count(event) do
+    event["descendant_count"] || child_count(event)
   end
 
   defp child_count(event) do
@@ -202,12 +201,27 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     end
   end
 
-  defp tree_connector(depth) do
-    case depth do
-      0 -> "├─"
-      1 -> "│ ├─"
-      2 -> "│ │ ├─"
-      _ -> "│ │ │ ├─"
+  defp is_task_event?(event) do
+    event["event_type"] == "task_delegation" or
+      (event["tool_name"] == "Task" and event["subagent_type"] != nil)
+  end
+
+  defp row_border_class(event) do
+    cond do
+      is_task_event?(event) -> "border-task"
+      event["event_type"] == "error" -> "border-error"
+      true -> ""
+    end
+  end
+
+  defp summary_text(event) do
+    input = event["input_summary"] || ""
+    output = event["output_summary"] || ""
+
+    cond do
+      input != "" -> input
+      output != "" -> output
+      true -> ""
     end
   end
 
@@ -248,7 +262,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
               <div class="session-info">
                 <span class="toggle-btn">
                   <span class={["arrow", session_expanded?(@expanded, group.session_id) && "expanded"]}>
-                    ▶
+                    &#9654;
                   </span>
                 </span>
                 <span class="badge badge-session">
@@ -261,11 +275,6 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
                   <%= if group.session["agent_assigned"] do %>
                     <span class="badge badge-agent">
                       <%= group.session["agent_assigned"] %>
-                    </span>
-                  <% end %>
-                  <%= if group.session["model"] do %>
-                    <span class="badge badge-model">
-                      <%= group.session["model"] %>
                     </span>
                   <% end %>
                 <% end %>
@@ -283,100 +292,74 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
             </div>
 
             <!-- Activity Table (shown when session expanded or no filter) -->
-            <table
-              class="activity-table"
+            <div
+              class="activity-list"
               style={unless(session_expanded?(@expanded, group.session_id) || @session_filter, do: "display: none")}
             >
-              <thead>
-                <tr>
-                  <th style="width: 40px"></th>
-                  <th>Event</th>
-                  <th>Summary</th>
-                  <th>Badges</th>
-                  <th style="width: 80px">Time</th>
-                  <th style="width: 70px">Duration</th>
-                  <th style="width: 60px">Tokens</th>
-                </tr>
-              </thead>
-              <tbody>
-                <%= for turn <- group.turns do %>
-                  <!-- UserQuery Parent Row -->
-                  <tr class={[
-                    "activity-row parent-row",
-                    is_new?(@new_event_ids, turn.user_query["event_id"]) && "new-event"
-                  ]}>
-                    <td>
-                      <%= if length(turn.children) > 0 do %>
-                        <button
-                          class="toggle-btn"
-                          phx-click="toggle"
-                          phx-value-event-id={turn.user_query["event_id"]}
-                        >
-                          <span class={["arrow", is_expanded?(@expanded, turn.user_query["event_id"]) && "expanded"]}>
-                            ▶
-                          </span>
-                        </button>
-                      <% end %>
-                    </td>
-                    <td>
-                      <span class="event-dot tool_call"></span>
-                      <span class="badge badge-userquery">UserQuery</span>
-                    </td>
-                    <td>
+              <%= for turn <- group.turns do %>
+                <!-- UserQuery Parent Row -->
+                <div class={[
+                  "activity-row parent-row",
+                  is_new?(@new_event_ids, turn.user_query["event_id"]) && "new-event"
+                ]}>
+                  <div class="row-toggle">
+                    <%= if length(turn.children) > 0 do %>
+                      <button
+                        class="toggle-btn"
+                        phx-click="toggle"
+                        phx-value-event-id={turn.user_query["event_id"]}
+                      >
+                        <span class={["arrow", is_expanded?(@expanded, turn.user_query["event_id"]) && "expanded"]}>
+                          &#9654;
+                        </span>
+                      </button>
+                    <% end %>
+                  </div>
+                  <div class="row-content">
+                    <div class="row-summary">
                       <span class="summary-text prompt">
                         <%= truncate(turn.user_query["input_summary"], 100) %>
                       </span>
-                    </td>
-                    <td>
-                      <div class="stats-badges">
-                        <span class="badge badge-count">
-                          <%= turn.stats.tool_count %> tools
+                    </div>
+                    <div class="row-meta">
+                      <span class="badge badge-count">
+                        <%= turn.stats.tool_count %> tools
+                      </span>
+                      <%= if turn.stats.error_count > 0 do %>
+                        <span class="badge badge-error">
+                          <%= turn.stats.error_count %> errors
                         </span>
-                        <%= if turn.stats.error_count > 0 do %>
-                          <span class="badge badge-error">
-                            <%= turn.stats.error_count %> errors
-                          </span>
-                        <% end %>
-                        <%= if turn.work_item do %>
-                          <span class="badge badge-feature">
-                            <%= truncate(turn.work_item["title"], 30) %>
-                          </span>
-                        <% end %>
-                        <%= for model <- turn.stats.models do %>
-                          <span class="badge badge-model"><%= model %></span>
-                        <% end %>
-                      </div>
-                    </td>
-                    <td>
+                      <% end %>
+                      <%= if turn.work_item do %>
+                        <span class="badge badge-feature">
+                          <%= truncate(turn.work_item["title"], 30) %>
+                        </span>
+                      <% end %>
+                      <%= for model <- turn.stats.models do %>
+                        <span class="badge badge-model"><%= model %></span>
+                      <% end %>
                       <span class="timestamp">
                         <%= format_timestamp(turn.user_query["timestamp"]) %>
                       </span>
-                    </td>
-                    <td>
                       <span class="duration">
                         <%= format_duration(turn.stats.total_duration) %>
                       </span>
-                    </td>
-                    <td>
-                      <span class="duration">
-                        <%= format_tokens(turn.stats.total_tokens) %>
-                      </span>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
+                </div>
 
-                  <!-- Child Events (nested, collapsible) -->
-                  <%= if is_expanded?(@expanded, turn.user_query["event_id"]) do %>
-                    <%= for child <- turn.children do %>
-                      <.event_row
-                        event={child}
-                        expanded={@expanded}
-                        new_event_ids={@new_event_ids}
-                      />
-                    <% end %>
+                <!-- Child Events (nested, collapsible) -->
+                <%= if is_expanded?(@expanded, turn.user_query["event_id"]) do %>
+                  <%= for child <- turn.children do %>
+                    <.event_row
+                      event={child}
+                      expanded={@expanded}
+                      new_event_ids={@new_event_ids}
+                    />
                   <% end %>
                 <% end %>
-              </tbody>
-            </table>
+              <% end %>
+            </div>
           </div>
         <% end %>
       <% end %>
@@ -386,12 +369,15 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
 
   defp event_row(assigns) do
     ~H"""
-    <tr class={[
-      "activity-row child-row expanded",
+    <div class={[
+      "activity-row child-row",
       depth_class(@event["depth"] || 0),
+      row_border_class(@event),
       is_new?(@new_event_ids, @event["event_id"]) && "new-event"
-    ]}>
-      <td>
+    ]}
+    style={"padding-left: #{((@event["depth"] || 0) + 1) * 1.25}rem"}
+    >
+      <div class="row-toggle">
         <%= if has_children?(@event) do %>
           <button
             class="toggle-btn"
@@ -399,30 +385,23 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
             phx-value-event-id={@event["event_id"]}
           >
             <span class={["arrow", is_expanded?(@expanded, @event["event_id"]) && "expanded"]}>
-              ▶
+              &#9654;
             </span>
           </button>
         <% end %>
-      </td>
-      <td>
-        <div class={"depth-indicator #{depth_class(@event["depth"] || 0)}"}>
-          <span class="depth-indent">
-            <span class="tree-connector"><%= tree_connector(@event["depth"] || 0) %></span>
-            <span class={"event-dot #{event_dot_class(@event["event_type"])}"}>
-            </span>
-            <span class={"badge #{tool_badge_class(@event["tool_name"])}"}>
-              <%= @event["tool_name"] %>
-            </span>
+      </div>
+      <div class="row-content">
+        <div class="row-summary">
+          <span class={"event-dot #{event_dot_class(@event["event_type"])}"}>
+          </span>
+          <span class={tool_chip_class(@event["tool_name"])}>
+            <%= @event["tool_name"] %>
+          </span>
+          <span class="summary-text">
+            <%= truncate(summary_text(@event), 80) %>
           </span>
         </div>
-      </td>
-      <td>
-        <span class="summary-text">
-          <%= truncate(@event["input_summary"] || @event["output_summary"], 80) %>
-        </span>
-      </td>
-      <td>
-        <div class="stats-badges">
+        <div class="row-meta">
           <%= if @event["subagent_type"] do %>
             <span class="badge badge-subagent">
               <%= @event["subagent_type"] %>
@@ -438,27 +417,18 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
           <% end %>
           <%= if has_children?(@event) do %>
             <span class="badge badge-count">
-              <%= child_count(@event) %>
+              (<%= descendant_count(@event) %>)
             </span>
           <% end %>
+          <span class="timestamp">
+            <%= format_timestamp(@event["timestamp"]) %>
+          </span>
+          <span class="duration">
+            <%= format_duration(@event["execution_duration_seconds"]) %>
+          </span>
         </div>
-      </td>
-      <td>
-        <span class="timestamp">
-          <%= format_timestamp(@event["timestamp"]) %>
-        </span>
-      </td>
-      <td>
-        <span class="duration">
-          <%= format_duration(@event["execution_duration_seconds"]) %>
-        </span>
-      </td>
-      <td>
-        <span class="duration">
-          <%= format_tokens(@event["cost_tokens"]) %>
-        </span>
-      </td>
-    </tr>
+      </div>
+    </div>
 
     <!-- Recursive children -->
     <%= if is_expanded?(@expanded, @event["event_id"]) do %>

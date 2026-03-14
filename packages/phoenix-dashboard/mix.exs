@@ -21,11 +21,11 @@ defmodule HtmlgraphDashboard.MixProject do
 
   defp deps do
     [
-      {:phoenix, "~> 1.7.0"},
-      {:phoenix_html, "~> 3.3"},
-      {:phoenix_live_view, "~> 0.20.0"},
-      {:phoenix_live_reload, "~> 1.4", only: :dev},
-      {:phoenix_live_dashboard, "~> 0.8.0"},
+      {:phoenix, "~> 1.8"},
+      {:phoenix_html, "~> 4.2"},
+      {:phoenix_live_view, "~> 1.1"},
+      {:phoenix_live_reload, "~> 1.6", only: :dev},
+      {:phoenix_live_dashboard, "~> 0.8"},
       {:exqlite, "~> 0.13"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6"},

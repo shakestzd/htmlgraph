@@ -108,85 +108,108 @@ defmodule HtmlgraphDashboardWeb.Styles do
       gap: 12px;
     }
 
-    /* Activity Table */
-    .activity-table {
+    /* Activity List (replaces table for flexible nesting) */
+    .activity-list {
       width: 100%;
-      border-collapse: collapse;
     }
 
-    .activity-table th {
-      background: var(--bg-tertiary);
-      padding: 6px 12px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-secondary);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 49px;
-      z-index: 10;
-    }
-
-    /* Row styles */
+    /* Row styles — flex layout for nesting */
     .activity-row {
+      display: flex;
+      align-items: center;
       border-bottom: 1px solid var(--border);
       transition: background 0.15s;
+      padding: 0 12px;
+      min-height: 36px;
     }
 
     .activity-row:hover {
       background: var(--bg-hover);
     }
 
-    .activity-row td {
-      padding: 6px 12px;
-      vertical-align: middle;
-      white-space: nowrap;
+    .row-toggle {
+      width: 32px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .row-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+      padding: 6px 0;
+      gap: 12px;
+    }
+
+    .row-summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .row-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
     /* Parent row (UserQuery) */
     .activity-row.parent-row {
       background: var(--bg-secondary);
+      border-left: 3px solid var(--accent-blue);
     }
 
     .activity-row.parent-row:hover {
       background: var(--bg-tertiary);
     }
 
-    .activity-row.parent-row td {
-      padding: 10px 12px;
+    .activity-row.parent-row .row-content {
+      padding: 8px 0;
+    }
+
+    .activity-row.parent-row .summary-text {
       font-weight: 500;
     }
 
-    /* Child rows — depth indentation */
-    .activity-row.child-row { display: none; }
-    .activity-row.child-row.expanded { display: table-row; }
-
-    .depth-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
+    /* Child rows — depth indentation + progressive darkening */
+    .activity-row.child-row {
+      border-left: 3px solid rgba(148,163,184,0.3);
     }
 
-    .depth-guide {
-      display: inline-block;
-      width: 20px;
-      border-left: 2px solid var(--border);
-      height: 100%;
-      margin-right: 0;
+    .activity-row.child-row.depth-0 {
+      background: rgba(0,0,0,0.15);
+      border-left-color: rgba(148,163,184,0.3);
     }
 
-    .depth-0 .depth-indent { padding-left: 24px; }
-    .depth-1 .depth-indent { padding-left: 48px; }
-    .depth-2 .depth-indent { padding-left: 72px; }
-    .depth-3 .depth-indent { padding-left: 96px; }
+    .activity-row.child-row.depth-1 {
+      background: rgba(0,0,0,0.25);
+      border-left-color: rgba(148,163,184,0.2);
+    }
 
-    .tree-connector {
-      color: var(--text-muted);
-      margin-right: 6px;
-      font-family: var(--font-mono);
-      font-size: 12px;
+    .activity-row.child-row.depth-2 {
+      background: rgba(0,0,0,0.35);
+      border-left-color: rgba(100,116,139,0.15);
+    }
+
+    .activity-row.child-row.depth-3 {
+      background: rgba(0,0,0,0.45);
+      border-left-color: rgba(100,116,139,0.1);
+    }
+
+    /* Task/error border overrides */
+    .activity-row.child-row.border-task {
+      border-left-color: var(--accent-pink);
+    }
+
+    .activity-row.child-row.border-error {
+      border-left-color: var(--accent-red);
     }
 
     /* Toggle button */
@@ -211,6 +234,7 @@ defmodule HtmlgraphDashboardWeb.Styles do
     .toggle-btn .arrow {
       display: inline-block;
       transition: transform 0.2s;
+      font-size: 10px;
     }
 
     .toggle-btn .arrow.expanded {
@@ -229,28 +253,6 @@ defmodule HtmlgraphDashboardWeb.Styles do
       white-space: nowrap;
     }
 
-    .badge-tool {
-      background: rgba(88, 166, 255, 0.15);
-      color: var(--accent-blue);
-      font-family: var(--font-mono);
-      font-size: 11px;
-    }
-
-    .badge-userquery {
-      background: rgba(188, 140, 255, 0.15);
-      color: var(--accent-purple);
-    }
-
-    .badge-task {
-      background: rgba(247, 120, 186, 0.15);
-      color: var(--accent-pink);
-    }
-
-    .badge-agent {
-      background: rgba(57, 210, 192, 0.15);
-      color: var(--accent-cyan);
-    }
-
     .badge-error {
       background: rgba(248, 81, 73, 0.15);
       color: var(--accent-red);
@@ -264,6 +266,7 @@ defmodule HtmlgraphDashboardWeb.Styles do
     .badge-model {
       background: rgba(210, 153, 34, 0.15);
       color: var(--accent-orange);
+      font-size: 10px;
     }
 
     .badge-session {
@@ -286,6 +289,7 @@ defmodule HtmlgraphDashboardWeb.Styles do
       background: rgba(210, 153, 34, 0.1);
       color: var(--accent-orange);
       border: 1px solid rgba(210, 153, 34, 0.2);
+      font-size: 10px;
     }
 
     .badge-subagent {
@@ -294,11 +298,74 @@ defmodule HtmlgraphDashboardWeb.Styles do
       border: 1px solid rgba(57, 210, 192, 0.2);
     }
 
+    .badge-agent {
+      background: rgba(57, 210, 192, 0.15);
+      color: var(--accent-cyan);
+    }
+
     .badge-count {
       background: var(--bg-tertiary);
       color: var(--text-secondary);
       min-width: 20px;
       text-align: center;
+    }
+
+    /* Tool chip colors */
+    .tool-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .tool-chip-bash {
+      background: rgba(34,197,94,0.2);
+      color: #4ade80;
+    }
+
+    .tool-chip-read {
+      background: rgba(96,165,250,0.2);
+      color: #60a5fa;
+    }
+
+    .tool-chip-edit {
+      background: rgba(250,204,21,0.2);
+      color: #fbbf24;
+    }
+
+    .tool-chip-write {
+      background: rgba(34,211,238,0.2);
+      color: #22d3ee;
+    }
+
+    .tool-chip-grep {
+      background: rgba(251,146,60,0.2);
+      color: #fb923c;
+    }
+
+    .tool-chip-glob {
+      background: rgba(168,85,247,0.2);
+      color: #a855f7;
+    }
+
+    .tool-chip-task {
+      background: rgba(236,72,153,0.2);
+      color: #ec4899;
+    }
+
+    .tool-chip-stop {
+      background: rgba(139,148,158,0.2);
+      color: #8b949e;
+    }
+
+    .tool-chip-default {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent-blue);
     }
 
     /* Stats row */
@@ -314,7 +381,6 @@ defmodule HtmlgraphDashboardWeb.Styles do
       height: 8px;
       border-radius: 50%;
       display: inline-block;
-      margin-right: 6px;
       flex-shrink: 0;
     }
 
@@ -332,7 +398,8 @@ defmodule HtmlgraphDashboardWeb.Styles do
       font-size: 13px;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 500px;
+      white-space: nowrap;
+      min-width: 0;
     }
 
     .summary-text.prompt {
@@ -343,15 +410,17 @@ defmodule HtmlgraphDashboardWeb.Styles do
     /* Timestamp */
     .timestamp {
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
+      white-space: nowrap;
     }
 
     /* Duration */
     .duration {
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-secondary);
+      white-space: nowrap;
     }
 
     /* New event flash animation */

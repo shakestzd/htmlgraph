@@ -13,7 +13,7 @@ defmodule HtmlgraphDashboard.Repo do
     path = Application.get_env(:htmlgraph_dashboard, :db_path, "../../.htmlgraph/htmlgraph.db")
 
     if Path.type(path) == :relative do
-      Path.join(Application.app_dir(:htmlgraph_dashboard, ""), path)
+      Path.join(File.cwd!(), path)
       |> Path.expand()
     else
       path
@@ -92,8 +92,8 @@ defmodule HtmlgraphDashboard.Repo do
 
   defp bind_params(_conn, _stmt, []), do: :ok
 
-  defp bind_params(conn, stmt, params) do
-    Exqlite.Sqlite3.bind(conn, stmt, params)
+  defp bind_params(_conn, stmt, params) do
+    Exqlite.Sqlite3.bind(stmt, params)
   end
 
   defp collect_rows(conn, stmt) do
@@ -109,11 +109,9 @@ defmodule HtmlgraphDashboard.Repo do
   end
 
   defp get_columns(conn, stmt) do
-    count = Exqlite.Sqlite3.column_count(conn, stmt)
-
-    Enum.map(0..(count - 1), fn i ->
-      {:ok, name} = Exqlite.Sqlite3.column_name(conn, stmt, i)
-      name
-    end)
+    case Exqlite.Sqlite3.columns(conn, stmt) do
+      {:ok, column_names} -> column_names
+      {:error, _reason} -> []
+    end
   end
 end
