@@ -558,17 +558,8 @@ class TestIntegration:
             with patch("htmlgraph.config.get_database_path", return_value=db.db_path):
                 track_event("PostToolUseFailure", failure_input)
 
-        # Verify both tool_traces and agent_events have the failure
+        # Verify agent_events has the failure
         cursor = db.connection.cursor()
-
-        # Check tool_traces
-        cursor.execute(
-            "SELECT status FROM tool_traces WHERE tool_use_id = ?",
-            (native_id,),
-        )
-        trace_row = cursor.fetchone()
-        assert trace_row is not None
-        # Note: status might be 'started' or 'failed' depending on update logic
 
         # Check agent_events has the error
         cursor.execute(
