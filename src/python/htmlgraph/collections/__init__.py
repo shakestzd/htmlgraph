@@ -17,6 +17,7 @@ from htmlgraph.collections.phase import PhaseCollection
 from htmlgraph.collections.spike import SpikeCollection
 from htmlgraph.collections.task_delegation import TaskDelegationCollection
 from htmlgraph.collections.todo import TodoCollection
+from htmlgraph.collections.wisp import Wisp, WispCollection
 
 __all__ = [
     "BaseCollection",
@@ -31,4 +32,6 @@ __all__ = [
     "MetricCollection",
     "TodoCollection",
     "TaskDelegationCollection",
+    "WispCollection",
+    "Wisp",
 ]

@@ -26,6 +26,7 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     """
     from htmlgraph.cli.work.browse import BrowseCommand
     from htmlgraph.cli.work.features import register_feature_commands
+    from htmlgraph.cli.work.graph import register_graph_commands
     from htmlgraph.cli.work.ingest import register_ingest_commands
     from htmlgraph.cli.work.orchestration import (
         register_archive_commands,
@@ -41,6 +42,7 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     # Register all command groups
     register_session_commands(subparsers)
     register_feature_commands(subparsers)
+    register_graph_commands(subparsers)
     register_track_commands(subparsers)
     register_archive_commands(subparsers)
     register_orchestrator_commands(subparsers)
@@ -119,6 +121,8 @@ def register_commands(subparsers: _SubParsersAction) -> None:
 # Re-export all command classes for backward compatibility
 from htmlgraph.cli.work.browse import BrowseCommand
 from htmlgraph.cli.work.features import (
+    FeatureAtomicClaimCommand,
+    FeatureAtomicUnclaimCommand,
     FeatureClaimCommand,
     FeatureCompleteCommand,
     FeatureCreateCommand,
@@ -192,6 +196,8 @@ __all__ = [
     "FeatureStartCommand",
     "FeatureCompleteCommand",
     "FeatureClaimCommand",
+    "FeatureAtomicClaimCommand",
+    "FeatureAtomicUnclaimCommand",
     "FeatureReleaseCommand",
     "FeaturePrimaryCommand",
     # Track commands

@@ -428,6 +428,20 @@ def create_all_tables(cursor: sqlite3.Cursor) -> None:
     # 20. FTS5 VIRTUAL TABLES - Full-text search (sessions_fts, events_fts)
     create_fts_tables(cursor)
 
+    # 21. WISPS TABLE - Ephemeral coordination signals with TTL
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS wisps (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            message TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'general',
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_wisps_expires ON wisps(expires_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_wisps_category ON wisps(category)")
+
 
 # ---------------------------------------------------------------------------
 # CREATE INDEX
@@ -530,6 +544,9 @@ def create_all_indexes(cursor: sqlite3.Cursor) -> None:
         # sync_conflicts indexes
         "CREATE INDEX IF NOT EXISTS idx_sync_conflicts_status ON sync_conflicts(status, created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sync_conflicts_entity ON sync_conflicts(entity_type, entity_id, created_at DESC)",
+        # wisps indexes
+        "CREATE INDEX IF NOT EXISTS idx_wisps_expires ON wisps(expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_wisps_category ON wisps(category)",
     ]
 
     for index_sql in indexes:
@@ -678,6 +695,9 @@ def migrate_features(cursor: sqlite3.Cursor) -> None:
 
     migrations = [
         ("assignee", "TEXT DEFAULT NULL"),
+        ("compacted_tier", "INTEGER DEFAULT 0"),
+        ("compacted_summary", "TEXT"),
+        ("compacted_at", "TEXT"),
     ]
 
     for col_name, col_type in migrations:

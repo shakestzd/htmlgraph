@@ -125,6 +125,21 @@ class BaseBuilder(Generic[BuilderT]):
         """Add blocked-by relationship (this node is blocked by another)."""
         return self._add_edge("blocked_by", node_id)  # type: ignore
 
+    def relates_to(self, other_id: str, rel_type: str) -> BuilderT:
+        """Add a typed relationship edge to another node.
+
+        Args:
+            other_id: Target node ID
+            rel_type: Relationship type string (e.g., 'depends_on', 'related_to')
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            >>> feature.relates_to("feat-001", "depends_on").relates_to("feat-002", "related_to")
+        """
+        return self._add_edge(rel_type, other_id)  # type: ignore
+
     def set_track(self, track_id: str) -> BuilderT:
         """Link to a track."""
         self._data["track_id"] = track_id

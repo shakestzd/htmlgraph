@@ -99,6 +99,32 @@ def transitive_deps(
     return deps
 
 
+def get_dependencies(
+    graph: HtmlGraph, node_id: str, rel_type: str = "blocked_by"
+) -> set[str]:
+    """
+    Get all transitive dependencies of a node, filtered by relationship type.
+
+    Alias for transitive_deps() with a named rel_type parameter for clarity.
+    When rel_type is specified, only edges of that type are traversed.
+
+    Args:
+        graph: HtmlGraph instance
+        node_id: Starting node ID
+        rel_type: Edge relationship type to follow (default: blocked_by)
+
+    Returns:
+        Set of all dependency node IDs reachable via edges of rel_type
+
+    Example:
+        # Only follow blocked_by edges
+        deps = get_dependencies(graph, "feat-001", rel_type="blocked_by")
+        # Only follow depends_on edges
+        deps = get_dependencies(graph, "feat-001", rel_type="depends_on")
+    """
+    return transitive_deps(graph, node_id, relationship=rel_type)
+
+
 def dependents(
     graph: HtmlGraph, node_id: str, relationship: str = "blocked_by"
 ) -> set[str]:

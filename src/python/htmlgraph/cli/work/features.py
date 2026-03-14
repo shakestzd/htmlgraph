@@ -132,6 +132,46 @@ def register_feature_commands(subparsers: _SubParsersAction) -> None:
     )
     feature_release.set_defaults(func=FeatureReleaseCommand.from_args)
 
+    # feature atomic-claim
+    feature_atomic_claim = feature_subparsers.add_parser(
+        "atomic-claim",
+        help="Atomically claim a feature using SQL compare-and-swap",
+    )
+    feature_atomic_claim.add_argument("id", help="Feature ID")
+    feature_atomic_claim.add_argument(
+        "--collection", default="features", help="Collection name"
+    )
+    feature_atomic_claim.add_argument(
+        "--agent", default="claude-code", help="Agent name"
+    )
+    feature_atomic_claim.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    feature_atomic_claim.add_argument(
+        "--format", choices=["json", "text"], default="text", help="Output format"
+    )
+    feature_atomic_claim.set_defaults(func=FeatureAtomicClaimCommand.from_args)
+
+    # feature atomic-unclaim
+    feature_atomic_unclaim = feature_subparsers.add_parser(
+        "atomic-unclaim",
+        help="Release an atomic claim on a feature",
+    )
+    feature_atomic_unclaim.add_argument("id", help="Feature ID")
+    feature_atomic_unclaim.add_argument(
+        "--collection", default="features", help="Collection name"
+    )
+    feature_atomic_unclaim.add_argument(
+        "--agent", default="claude-code", help="Agent name"
+    )
+    feature_atomic_unclaim.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    feature_atomic_unclaim.add_argument(
+        "--format", choices=["json", "text"], default="text", help="Output format"
+    )
+    feature_atomic_unclaim.set_defaults(func=FeatureAtomicUnclaimCommand.from_args)
+
     # feature primary
     feature_primary = feature_subparsers.add_parser(
         "primary", help="Set primary feature"
@@ -527,6 +567,82 @@ class FeatureReleaseCommand(BaseCommand):
             data=node_to_dict(node),
             text=output.build(),
             json_data=node_to_dict(node),
+        )
+
+
+class FeatureAtomicClaimCommand(BaseCommand):
+    """Atomically claim a feature using SQL compare-and-swap."""
+
+    def __init__(self, *, feature_id: str, collection: str, agent: str) -> None:
+        super().__init__()
+        self.feature_id = feature_id
+        self.collection = collection
+        self.agent = agent
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> FeatureAtomicClaimCommand:
+        return cls(
+            feature_id=args.id,
+            collection=args.collection,
+            agent=args.agent,
+        )
+
+    def execute(self) -> CommandResult:
+        """Atomically claim a feature."""
+        sdk = self.get_sdk()
+        collection = getattr(sdk, self.collection, None)
+        self.require_collection(collection, self.collection)
+        assert collection is not None  # Type narrowing for mypy
+
+        claimed = collection.atomic_claim(self.feature_id, agent=self.agent)
+
+        from htmlgraph.cli.base import TextOutputBuilder
+
+        output = TextOutputBuilder()
+        if claimed:
+            output.add_success(f"Claimed: {self.feature_id} (agent={self.agent})")
+        else:
+            output.add_field(
+                "Result", f"Already claimed by another agent: {self.feature_id}"
+            )
+
+        return CommandResult(
+            data={"id": self.feature_id, "claimed": claimed, "agent": self.agent},
+            text=output.build(),
+            json_data={"id": self.feature_id, "claimed": claimed, "agent": self.agent},
+        )
+
+
+class FeatureAtomicUnclaimCommand(BaseCommand):
+    """Release an atomic claim on a feature."""
+
+    def __init__(self, *, feature_id: str, collection: str) -> None:
+        super().__init__()
+        self.feature_id = feature_id
+        self.collection = collection
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> FeatureAtomicUnclaimCommand:
+        return cls(feature_id=args.id, collection=args.collection)
+
+    def execute(self) -> CommandResult:
+        """Release an atomic claim."""
+        sdk = self.get_sdk()
+        collection = getattr(sdk, self.collection, None)
+        self.require_collection(collection, self.collection)
+        assert collection is not None  # Type narrowing for mypy
+
+        collection.atomic_unclaim(self.feature_id)
+
+        from htmlgraph.cli.base import TextOutputBuilder
+
+        output = TextOutputBuilder()
+        output.add_success(f"Unclaimed: {self.feature_id}")
+
+        return CommandResult(
+            data={"id": self.feature_id, "unclaimed": True},
+            text=output.build(),
+            json_data={"id": self.feature_id, "unclaimed": True},
         )
 
 

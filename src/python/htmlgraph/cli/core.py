@@ -244,6 +244,45 @@ def register_commands(subparsers: _SubParsersAction) -> None:
     )
     export_otel_parser.set_defaults(func=ExportOtelCommand.from_args)
 
+    # compact
+    compact_parser = subparsers.add_parser(
+        "compact", help="Semantic compaction: shrink old work items with AI summaries"
+    )
+    compact_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview what would be compacted without making changes",
+    )
+    compact_parser.add_argument(
+        "--tier1-days",
+        type=int,
+        default=30,
+        help="Days before tier-1 compaction (default: 30)",
+    )
+    compact_parser.add_argument(
+        "--tier2-days",
+        type=int,
+        default=90,
+        help="Days before tier-2 compaction (default: 90)",
+    )
+    compact_parser.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    compact_parser.set_defaults(func=CompactCommand.from_args)
+
+    # restore (from compaction archive)
+    restore_parser = subparsers.add_parser(
+        "restore", help="Restore a compacted work item from its archive"
+    )
+    restore_parser.add_argument(
+        "item_id",
+        help="ID of the work item to restore",
+    )
+    restore_parser.add_argument(
+        "--graph-dir", "-g", default=DEFAULT_GRAPH_DIR, help="Graph directory"
+    )
+    restore_parser.set_defaults(func=RestoreCommand.from_args)
+
 
 # ============================================================================
 # Command Implementations
@@ -1368,4 +1407,145 @@ class IngestCodexCommand(BaseCommand):
                 "error_files": result.error_files,
                 "dry_run": self.dry_run,
             },
+        )
+
+
+class CompactCommand(BaseCommand):
+    """Semantic compaction: shrink old work items with AI summaries."""
+
+    def __init__(
+        self, *, dry_run: bool, tier1_days: int, tier2_days: int, graph_dir: str
+    ) -> None:
+        super().__init__()
+        self.dry_run = dry_run
+        self.tier1_days = tier1_days
+        self.tier2_days = tier2_days
+        self.graph_dir = graph_dir
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> CompactCommand:
+        return cls(
+            dry_run=getattr(args, "dry_run", False),
+            tier1_days=getattr(args, "tier1_days", 30),
+            tier2_days=getattr(args, "tier2_days", 90),
+            graph_dir=getattr(args, "graph_dir", DEFAULT_GRAPH_DIR),
+        )
+
+    def execute(self) -> CommandResult:
+        """Run semantic compaction on old work items."""
+        from pathlib import Path
+
+        from htmlgraph.archive.compactor import SemanticCompactor
+        from htmlgraph.cli.base import TextOutputBuilder
+        from htmlgraph.cli.constants import DEFAULT_DATABASE_NAME
+
+        output = TextOutputBuilder()
+        graph_dir = Path(self.graph_dir or DEFAULT_GRAPH_DIR)
+        db_path = graph_dir / DEFAULT_DATABASE_NAME
+
+        if not graph_dir.is_dir():
+            output.add_error(f"Graph directory not found: {graph_dir}")
+            return CommandResult(text=output.build(), exit_code=1)
+
+        compactor = SemanticCompactor(
+            db_path=db_path,
+            htmlgraph_dir=graph_dir,
+            dry_run=self.dry_run,
+        )
+        result = compactor.compact(
+            tier1_days=self.tier1_days,
+            tier2_days=self.tier2_days,
+        )
+
+        if self.dry_run:
+            output.add_info("Dry-run mode — no changes made")
+        else:
+            output.add_success("Compaction complete")
+
+        output.add_field("Tier 1 compacted", len(result.tier1_compacted))
+        output.add_field("Tier 2 compacted", len(result.tier2_compacted))
+        output.add_field("Skipped", len(result.skipped))
+        if result.errors:
+            output.add_warning(f"{len(result.errors)} errors:")
+            for err in result.errors:
+                output.add_field("  Error", err)
+
+        if result.tier1_compacted:
+            output.add_blank()
+            output.add_dim("Tier 1 items:")
+            for item_id in result.tier1_compacted:
+                output.add_field("  ", item_id)
+
+        if result.tier2_compacted:
+            output.add_blank()
+            output.add_dim("Tier 2 items:")
+            for item_id in result.tier2_compacted:
+                output.add_field("  ", item_id)
+
+        return CommandResult(
+            text=output.build(),
+            json_data={
+                "tier1_compacted": result.tier1_compacted,
+                "tier2_compacted": result.tier2_compacted,
+                "skipped": result.skipped,
+                "errors": result.errors,
+                "dry_run": result.dry_run,
+                "total_compacted": result.total_compacted,
+            },
+        )
+
+
+class RestoreCommand(BaseCommand):
+    """Restore a compacted work item from its archive."""
+
+    def __init__(self, *, item_id: str, graph_dir: str) -> None:
+        super().__init__()
+        self.item_id = item_id
+        self.graph_dir = graph_dir
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> RestoreCommand:
+        return cls(
+            item_id=getattr(args, "item_id", ""),
+            graph_dir=getattr(args, "graph_dir", DEFAULT_GRAPH_DIR),
+        )
+
+    def execute(self) -> CommandResult:
+        """Restore a compacted work item."""
+        from pathlib import Path
+
+        from htmlgraph.archive.compactor import SemanticCompactor
+        from htmlgraph.cli.base import TextOutputBuilder
+        from htmlgraph.cli.constants import DEFAULT_DATABASE_NAME
+
+        output = TextOutputBuilder()
+        graph_dir = Path(self.graph_dir or DEFAULT_GRAPH_DIR)
+        db_path = graph_dir / DEFAULT_DATABASE_NAME
+
+        if not graph_dir.is_dir():
+            output.add_error(f"Graph directory not found: {graph_dir}")
+            return CommandResult(text=output.build(), exit_code=1)
+
+        if not self.item_id:
+            output.add_error("Item ID is required")
+            return CommandResult(text=output.build(), exit_code=1)
+
+        compactor = SemanticCompactor(
+            db_path=db_path,
+            htmlgraph_dir=graph_dir,
+        )
+        restored = compactor.restore(self.item_id)
+
+        if restored:
+            output.add_success(f"Restored {self.item_id} from archive")
+        else:
+            output.add_error(f"Could not restore {self.item_id}: archive not found")
+
+        return CommandResult(
+            text=output.build(),
+            json_data={
+                "restored": restored,
+                "item_id": self.item_id,
+            },
+            exit_code=0 if restored else 1,
         )

@@ -50,6 +50,7 @@ from htmlgraph.collections.insight import InsightCollection
 from htmlgraph.collections.metric import MetricCollection
 from htmlgraph.collections.pattern import PatternCollection
 from htmlgraph.collections.session import SessionCollection
+from htmlgraph.collections.wisp import WispCollection
 from htmlgraph.db.schema import HtmlGraphDB
 from htmlgraph.graph import HtmlGraph
 from htmlgraph.sdk.analytics import AnalyticsRegistry
@@ -246,6 +247,9 @@ class SDK(
 
         # Task delegation collection (observability for spawned agents)
         self.task_delegations = TaskDelegationCollection(self)
+
+        # Ephemeral coordination signals
+        self.wisps = WispCollection(self)
 
         # Create learning directories if needed
         (self._directory / "patterns").mkdir(exist_ok=True)

@@ -412,6 +412,127 @@ def get_open_work_items(context: HookContext) -> list[dict]:
     return items
 
 
+def get_active_wisps(context: HookContext) -> list[dict]:
+    """Get active (non-expired) wisps from SQLite for CIGS injection.
+
+    Runs lazy expiry (deletes expired rows) then returns remaining wisps.
+    Results are not cached because wisps are ephemeral and change rapidly.
+
+    Args:
+        context: HookContext with session and graph directory info
+
+    Returns:
+        List of dicts with keys: id, agent_id, message, category (max 10 items).
+        Returns empty list if database is unavailable or no active wisps.
+
+    Example:
+        >>> wisps = get_active_wisps(context)
+        >>> for w in wisps:
+        ...     logger.info(f"Wisp from {w['agent_id']}: {w['message']}")
+    """
+    db_path = Path(context.graph_dir) / "htmlgraph.db"
+    if not db_path.exists():
+        return []
+
+    wisps: list[dict] = []
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=2.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            cursor = conn.cursor()
+            # Check table exists first; it may not exist on older installs
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='wisps'"
+            )
+            if not cursor.fetchone():
+                return []
+
+            # Lazy expiry
+            cursor.execute(
+                "DELETE FROM wisps WHERE datetime(expires_at) < datetime('now')"
+            )
+            conn.commit()
+
+            # Fetch up to 10 active wisps
+            cursor.execute(
+                """
+                SELECT id, agent_id, message, category, expires_at
+                FROM wisps
+                ORDER BY created_at ASC
+                LIMIT 10
+                """
+            )
+            for row in cursor.fetchall():
+                wisps.append(
+                    {
+                        "id": row["id"],
+                        "agent_id": row["agent_id"],
+                        "message": row["message"],
+                        "category": row["category"] or "general",
+                        "expires_at": row["expires_at"],
+                    }
+                )
+        finally:
+            conn.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"CIGS wisps query failed: {exc}")
+
+    return wisps
+
+
+def _build_wisps_block(wisps: list[dict]) -> str | None:
+    """Build a CIGS block for active wisps.
+
+    Returns None if there are no active wisps (avoids empty noise).
+
+    Args:
+        wisps: List of wisp dicts from get_active_wisps()
+
+    Returns:
+        Formatted wisps block string, or None if no wisps
+    """
+    if not wisps:
+        return None
+
+    now = datetime.now(timezone.utc)
+
+    lines = [
+        "## Active Coordination Wisps",
+        "",
+        "Other agents have broadcast the following ephemeral signals:",
+        "",
+    ]
+    for w in wisps:
+        category = w.get("category", "general")
+        agent = w.get("agent_id", "?")
+        message = w.get("message", "")
+        expires_raw = w.get("expires_at", "")
+        # Compute human-readable "expires in Xm" label
+        expires_label = expires_raw
+        try:
+            exp_dt = datetime.fromisoformat(expires_raw)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            remaining = exp_dt - now
+            total_secs = int(remaining.total_seconds())
+            if total_secs <= 0:
+                expires_label = "expired"
+            elif total_secs < 60:
+                expires_label = f"expires in {total_secs}s"
+            else:
+                minutes = total_secs // 60
+                expires_label = f"expires in {minutes}m"
+        except (ValueError, TypeError):
+            expires_label = expires_raw
+        lines.append(f"- [{category}] {agent}: {message}  ({expires_label})")
+
+    lines.append("")
+    lines.append(
+        "Use `sdk.wisps.signal(...)` to broadcast your own coordination signals."
+    )
+    return "\n".join(lines)
+
+
 def invalidate_work_items_cache(db_path: str | Path | None = None) -> None:
     """Invalidate the in-process work items cache.
 
@@ -500,6 +621,7 @@ def generate_guidance(
     active_work: dict[str, Any] | None,
     prompt: str,
     open_work_items: list[dict] | None = None,
+    active_wisps: list[dict] | None = None,
 ) -> str | None:
     """
     Generate workflow guidance based on classification and context.
@@ -528,15 +650,27 @@ def generate_guidance(
         ...     logger.info("%s", guidance)
     """
 
-    # Helper to optionally append attribution block to a guidance string
+    # Helper to optionally append attribution + wisps blocks to a guidance string
     def _with_attribution(guidance: str) -> str:
-        block = _build_attribution_block(active_work, open_work_items)
-        return guidance + "\n\n" + block if block else guidance
+        parts = [guidance]
+        attr_block = _build_attribution_block(active_work, open_work_items)
+        if attr_block:
+            parts.append(attr_block)
+        wisps_block = _build_wisps_block(active_wisps or [])
+        if wisps_block:
+            parts.append(wisps_block)
+        return "\n\n".join(parts)
 
-    # If continuing and has active work, only inject attribution if needed
+    # If continuing and has active work, only inject attribution/wisps if needed
     if classification["is_continuation"] and active_work:
-        block = _build_attribution_block(active_work, open_work_items)
-        return block if block else None
+        parts = []
+        attr_block = _build_attribution_block(active_work, open_work_items)
+        if attr_block:
+            parts.append(attr_block)
+        wisps_block = _build_wisps_block(active_wisps or [])
+        if wisps_block:
+            parts.append(wisps_block)
+        return "\n\n".join(parts) if parts else None
 
     # If has active work item, check if it matches intent
     if active_work:
@@ -595,9 +729,15 @@ def generate_guidance(
                 f"  sdk.bugs.start(bug.id)\n"
             )
 
-        # Has appropriate work item - only inject attribution if open items exist
-        block = _build_attribution_block(active_work, open_work_items)
-        return block if block else None
+        # Has appropriate work item - only inject attribution/wisps if open items exist
+        parts = []
+        attr_block = _build_attribution_block(active_work, open_work_items)
+        if attr_block:
+            parts.append(attr_block)
+        wisps_block = _build_wisps_block(active_wisps or [])
+        if wisps_block:
+            parts.append(wisps_block)
+        return "\n\n".join(parts) if parts else None
 
     # No active work item - provide guidance based on intent
     if classification["is_implementation"]:
@@ -648,14 +788,24 @@ def generate_guidance(
             "- Bug: sdk.bugs.create('Title').save()\n"
             "- Spike: sdk.spikes.create('Title').save()\n"
         )
+        parts = [base_guidance]
         attribution_block = _build_attribution_block(active_work, open_work_items)
         if attribution_block:
-            return base_guidance + "\n\n" + attribution_block
-        return base_guidance
+            parts.append(attribution_block)
+        wisps_block = _build_wisps_block(active_wisps or [])
+        if wisps_block:
+            parts.append(wisps_block)
+        return "\n\n".join(parts)
 
-    # No specific guidance — but still inject attribution block if there are open items
+    # No specific guidance — but still inject attribution/wisps blocks if present
+    parts = []
     attribution_block = _build_attribution_block(active_work, open_work_items)
-    return attribution_block if attribution_block else None
+    if attribution_block:
+        parts.append(attribution_block)
+    wisps_block = _build_wisps_block(active_wisps or [])
+    if wisps_block:
+        parts.append(wisps_block)
+    return "\n\n".join(parts) if parts else None
 
 
 def detect_wip_limit_hit(prompt: str) -> bool:
@@ -916,12 +1066,14 @@ __all__ = [
     "get_session_violation_count",
     "get_active_work_item",
     "get_open_work_items",
+    "get_active_wisps",
     "invalidate_work_items_cache",
     "generate_guidance",
     "generate_cigs_guidance",
     "detect_wip_limit_hit",
     "create_user_query_event",
     "_get_active_feature_id",
+    "_build_wisps_block",
     # Pattern constants for testing/extension
     "IMPLEMENTATION_PATTERNS",
     "INVESTIGATION_PATTERNS",
