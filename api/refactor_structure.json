@@ -1,0 +1,143 @@
+{
+  "track": {
+    "id": "trk-363ef420",
+    "title": "FastAPI API Refactor - Modularization & Performance",
+    "priority": "high"
+  },
+  "features": [
+    {
+      "id": "feat-ae9755c3",
+      "title": "Performance Optimizations & Behavior Improvements",
+      "phase": null,
+      "parallel_group": null,
+      "estimated_tokens": null,
+      "steps": null,
+      "complexity": null
+    },
+    {
+      "id": "feat-fe7e2626",
+      "title": "Service Layer & Business Logic Aggregation",
+      "phase": null,
+      "parallel_group": null,
+      "estimated_tokens": null,
+      "steps": null,
+      "complexity": null
+    },
+    {
+      "id": "feat-b1dcbaf5",
+      "title": "Module Architecture & Dependencies Setup",
+      "phase": null,
+      "parallel_group": null,
+      "estimated_tokens": null,
+      "steps": null,
+      "complexity": null
+    },
+    {
+      "id": "feat-cdfebbe5",
+      "title": "Comprehensive Testing & Validation",
+      "phase": null,
+      "parallel_group": null,
+      "estimated_tokens": null,
+      "steps": null,
+      "complexity": null
+    },
+    {
+      "id": "feat-c34ab9e3",
+      "title": "FastSQLA Integration & Repository Pattern",
+      "phase": null,
+      "parallel_group": null,
+      "estimated_tokens": null,
+      "steps": null,
+      "complexity": null
+    },
+    {
+      "id": "feat-6c64cdd2",
+      "title": "FastAPI-Cache2 Integration & Cache Migration",
+      "phase": null,
+      "parallel_group": null,
+      "estimated_tokens": null,
+      "steps": null,
+      "complexity": null
+    }
+  ],
+  "execution_plan": {
+    "phase_1_foundation": {
+      "features": [
+        "feat-b1dcbaf5"
+      ],
+      "blocking": true,
+      "estimated_tokens": 15000
+    },
+    "phase_2_parallel": {
+      "features": [
+        "feat-c34ab9e3",
+        "feat-6c64cdd2",
+        "feat-fe7e2626",
+        "feat-ae9755c3"
+      ],
+      "parallel": true,
+      "max_concurrent": 4,
+      "estimated_tokens": 113000
+    },
+    "phase_3_validation": {
+      "features": [
+        "feat-cdfebbe5"
+      ],
+      "blocking": true,
+      "estimated_tokens": 25000
+    }
+  },
+  "total_tokens": 153000,
+  "planning_output": {
+    "can_parallelize": true,
+    "max_parallelism": 142,
+    "ready_tasks": [
+      "feat-4490b89b",
+      "feat-a8fc7a4b",
+      "feat-eb50bb20",
+      "feat-4d2a6e2f"
+    ],
+    "blocked_tasks": [],
+    "speedup_factor": 4.0,
+    "recommendation": "Parallelize 4 tasks for 4.0x speedup.",
+    "warnings": [
+      "High token cost: ~15x per agent"
+    ],
+    "prompts": [
+      {
+        "prompt": "Work on feature feat-4490b89b: \"Phase 1: Record UserQuery events to SQLite\"\nPriority: high\n\n## Steps\n1. \u2705 Modify event_tracker.py to record UserQuery to SQLite\n2. \u2705 Add parent_event_id linking for tool calls\n3. \u23f3 Test UserQuery recording with sample events\n4. \u23f3 Verify data appears in SQLite database\n\n\n\n\n## Efficiency Guidelines\n- Use Grep before Read (search then read, not read everything)\n- Batch Edit operations (multiple changes in one edit)\n- Use Glob to find files (not repeated Read attempts)\n- Check cached context before reading shared files\n- Mark feature file as complete when done\n\n\n## Required Output\nReturn a summary including:\n1. What changes were made\n2. Files modified\n3. Any blockers or issues found\n4. Whether the feature is complete\n",
+        "description": "feat-4490b89b: Phase 1: Record UserQuery even",
+        "subagent_type": "general-purpose"
+      },
+      {
+        "prompt": "Work on feature feat-a8fc7a4b: \"Extract lazy-loading pattern for hook context\"\nPriority: high\n\nComplete this feature according to its description.\n\n\n\n\n## Efficiency Guidelines\n- Use Grep before Read (search then read, not read everything)\n- Batch Edit operations (multiple changes in one edit)\n- Use Glob to find files (not repeated Read attempts)\n- Check cached context before reading shared files\n- Mark feature file as complete when done\n\n\n## Required Output\nReturn a summary including:\n1. What changes were made\n2. Files modified\n3. Any blockers or issues found\n4. Whether the feature is complete\n",
+        "description": "feat-a8fc7a4b: Extract lazy-loading pattern f",
+        "subagent_type": "general-purpose"
+      },
+      {
+        "prompt": "Work on feature feat-eb50bb20: \"Phase 2.3: SDK Migration to Repository Pattern\"\nPriority: high\n\n## Steps\n1. \u23f3 Audit current SDK data access patterns\n2. \u23f3 Design SDK refactoring strategy (backward compatibility)\n3. \u23f3 Refactor SDK base class to use repositories\n4. \u23f3 Migrate SDK collections to use repositories\n5. \u23f3 Migrate analytics to use repositories\n6. \u23f3 Update all SDK methods to use new pattern\n7. \u23f3 Verify backward compatibility with existing code\n8. \u23f3 Run full integration tests\n\n\n\n\n## Efficiency Guidelines\n- Use Grep before Read (search then read, not read everything)\n- Batch Edit operations (multiple changes in one edit)\n- Use Glob to find files (not repeated Read attempts)\n- Check cached context before reading shared files\n- Mark feature file as complete when done\n\n\n## Required Output\nReturn a summary including:\n1. What changes were made\n2. Files modified\n3. Any blockers or issues found\n4. Whether the feature is complete\n",
+        "description": "feat-eb50bb20: Phase 2.3: SDK Migration to Re",
+        "subagent_type": "general-purpose"
+      },
+      {
+        "prompt": "Work on feature feat-4d2a6e2f: \"Add Systematic Change Checklist to PR Template\"\nPriority: low\n\n## Steps\n1. \u23f3 Create .github/PULL_REQUEST_TEMPLATE.md\n2. \u23f3 Add systematic change checklist section\n3. \u23f3 Add examples of verification commands\n4. \u23f3 Link to RULES.md systematic change workflow\n5. \u23f3 Test template with mock PR\n\n\n\n\n## Efficiency Guidelines\n- Use Grep before Read (search then read, not read everything)\n- Batch Edit operations (multiple changes in one edit)\n- Use Glob to find files (not repeated Read attempts)\n- Check cached context before reading shared files\n- Mark feature file as complete when done\n\n\n## Required Output\nReturn a summary including:\n1. What changes were made\n2. Files modified\n3. Any blockers or issues found\n4. Whether the feature is complete\n",
+        "description": "feat-4d2a6e2f: Add Systematic Change Checklis",
+        "subagent_type": "general-purpose"
+      }
+    ],
+    "task_count": 4,
+    "guidelines": {
+      "dispatch": "Send ALL Task calls in a SINGLE message for true parallelism",
+      "patterns": [
+        "Grep \u2192 Read (search before reading)",
+        "Read \u2192 Edit \u2192 Bash (read, modify, test)",
+        "Glob \u2192 Read (find files first)"
+      ],
+      "avoid": [
+        "Sequential Task calls (loses parallelism)",
+        "Read \u2192 Read \u2192 Read (cache instead)",
+        "Edit \u2192 Edit \u2192 Edit (batch edits)"
+      ]
+    }
+  }
+}

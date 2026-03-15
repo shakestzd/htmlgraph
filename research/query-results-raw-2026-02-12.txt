@@ -1,0 +1,257 @@
+# Raw Query Results - File Read Pattern Analysis
+# Date: 2026-02-12
+# Database: .htmlgraph/htmlgraph.db
+
+================================================================================
+DATABASE OVERVIEW
+================================================================================
+
+Total Sessions: 237
+Date Range: 2026-01-13 21:31:36 to 2026-02-13 01:22:50
+All sessions status: active
+
+================================================================================
+TOOL USAGE DISTRIBUTION (Total Events: 6,459)
+================================================================================
+
+Bash|2871
+Read|1378
+Edit|580
+Grep|336
+Task|315
+Glob|163
+Stop|135
+UserQuery|100
+TaskUpdate|92
+Write|72
+TaskOutput|68
+TaskCreate|43
+mcp__plugin_htmlgraph_chrome-devtools__evaluate_script|37
+mcp__plugin_htmlgraph_chrome-devtools__take_screenshot|35
+mcp__plugin_htmlgraph_chrome-devtools__take_snapshot|25
+ToolSearch|25
+mcp__plugin_htmlgraph_chrome-devtools__click|24
+mcp__plugin_htmlgraph_chrome-devtools__navigate_page|20
+mcp__plugin_playwright_playwright__browser_navigate|16
+TaskList|15
+mcp__plugin_playwright_playwright__browser_take_screenshot|11
+mcp__plugin_htmlgraph_chrome-devtools__new_page|10
+WebSearch|9
+WebFetch|9
+TodoWrite|6
+mcp__plugin_playwright_playwright__browser_wait_for|5
+mcp__plugin_playwright_playwright__browser_click|5
+mcp__plugin_playwright_playwright__browser_snapshot|3
+TaskGet|2
+Skill|2
+mcp__plugin_htmlgraph_chrome-devtools__list_pages|1
+mcp__plugin_htmlgraph_chrome-devtools__list_network_requests|1
+mcp__plugin_htmlgraph_chrome-devtools__list_console_messages|1
+
+================================================================================
+MOST READ FILES ACROSS ALL SESSIONS (Top 30)
+Using json_extract(tool_input, '$.file_path')
+================================================================================
+
+|594
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|75
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py|53
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/pretooluse.py|50
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/services.py|48
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/activity-feed.html|37
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/dashboard.py|27
+/Users/shakes/DevProjects/htmlgraph/tests/python/test_pretooluse_event_hierarchy.py|18
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/hooks.json|16
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/pretooluse-integrator.py|15
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py|14
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/user-prompt-submit.py|13
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/track-event.py|13
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_context.py|11
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/dashboard.html|10
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/dashboard.html|10
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/orchestration.py|10
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/claude_launcher.py|8
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/__init__.py|7
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py|6
+/Users/shakes/DevProjects/htmlgraph/scripts/deploy-all.sh|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/posttooluse-integrator.py|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/agents/test-runner.md|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/agents/researcher.md|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/agents/debugger.md|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/system-prompt-default.md|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/plugin.json|6
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/subagent_stop.py|5
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/presence.py|5
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/analytics.py|5
+
+================================================================================
+FILES READ MULTIPLE TIMES IN SAME SESSION (Top 50)
+Format: session_id|file_path|read_count
+================================================================================
+
+6f0ea23f-d7f6-4779-995b-d775e06d2155||126
+7d98e1b7-df45-4ab4-a108-35edaa1126f6||101
+7d98e1b7-df45-4ab4-a108-35edaa1126f6-general-purpose||90
+d62c4f67-7779-4ec1-9cf3-97540d3f7129||53
+76ace32b-693a-48c6-b476-4b1229f33702||52
+d62c4f67-7779-4ec1-9cf3-97540d3f7129-general-purpose||48
+nonexistent-session||46
+6f0ea23f-d7f6-4779-995b-d775e06d2155-general-purpose||44
+ce37a5ff-beff-4bd7-9180-a85d98df3079|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|22
+76ace32b-693a-48c6-b476-4b1229f33702-general-purpose||17
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:haiku-coder|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|17
+6d85f8bb-24bd-4c86-961a-5366171ca853|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/pretooluse.py|15
+ce37a5ff-beff-4bd7-9180-a85d98df3079|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/activity-feed.html|15
+6d85f8bb-24bd-4c86-961a-5366171ca853|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py|13
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:sonnet-coder|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/services.py|13
+0dc5adb6-48a4-42e8-b7c3-30e8421ee1cc-general-purpose|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py|12
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:sonnet-coder|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|12
+eab55c77-90f3-4d92-8bed-957b2d5d1580-general-purpose|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|10
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:researcher|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|9
+f60b03ca-b2c2-4784-a483-d20513eefb58-Explore|/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_context.py|9
+
+================================================================================
+READ STATISTICS
+================================================================================
+
+Total Read Events: 1378
+Unique Sessions with Reads: 54
+Empty/Null File Path Reads: 594 (43.1%)
+Reads with "Read:" prefix: 261
+Reads without "Read:" prefix: 1119
+
+================================================================================
+FILES READ ACROSS MOST SESSIONS (Cache Candidates)
+Format: file_path|session_count|total_reads
+================================================================================
+
+{"file_path": "/tmp/test.txt"}|17|62
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/services.py|14|48
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py|13|53
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/pretooluse.py|12|50
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/activity-feed.html|12|37
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/dashboard.py|10|27
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/hooks.json|10|16
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/pretooluse-integrator.py|9|15
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py|8|14
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/track-event.py|8|13
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/dashboard.html|7|10
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|7|75
+/Users/shakes/DevProjects/htmlgraph/tests/python/test_pretooluse_event_hierarchy.py|5|18
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/dashboard.html|5|10
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py|5|6
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/orchestration.py|5|10
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/user-prompt-submit.py|5|13
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/posttooluse-integrator.py|5|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/agents/test-runner.md|5|6
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/agents/researcher.md|5|6
+
+================================================================================
+SESSIONS WITH MOST EVENTS (Top 20)
+================================================================================
+
+ce37a5ff-beff-4bd7-9180-a85d98df3079|944
+6f0ea23f-d7f6-4779-995b-d775e06d2155|738
+7d98e1b7-df45-4ab4-a108-35edaa1126f6|426
+6d85f8bb-24bd-4c86-961a-5366171ca853|354
+d62c4f67-7779-4ec1-9cf3-97540d3f7129|354
+76ace32b-693a-48c6-b476-4b1229f33702|322
+7d98e1b7-df45-4ab4-a108-35edaa1126f6-general-purpose|286
+d62c4f67-7779-4ec1-9cf3-97540d3f7129-general-purpose|269
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:researcher|262
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:sonnet-coder|242
+0dc5adb6-48a4-42e8-b7c3-30e8421ee1cc-general-purpose|219
+6f0ea23f-d7f6-4779-995b-d775e06d2155-general-purpose|182
+f60b03ca-b2c2-4784-a483-d20513eefb58|173
+cd1cc782-e97a-4224-aa5d-9783d1122d7b|160
+97e4f1d4-154c-4d99-9c9c-8693037e5931|125
+0dc5adb6-48a4-42e8-b7c3-30e8421ee1cc|114
+b5fdbfed-abea-45ab-9596-155a3fd8b8c9-htmlgraph:researcher|114
+f60b03ca-b2c2-4784-a483-d20513eefb58-Explore|111
+eab55c77-90f3-4d92-8bed-957b2d5d1580-general-purpose|95
+06dfa976-ca7e-48a3-ad92-dff4e2d31dd4-general-purpose|82
+
+Average Events Per Session: 42.56
+
+================================================================================
+SUBAGENT SESSIONS (Top 20 by Event Count)
+================================================================================
+
+7d98e1b7-df45-4ab4-a108-35edaa1126f6-general-purpose|general-purpose-spawner|1||286
+d62c4f67-7779-4ec1-9cf3-97540d3f7129-general-purpose|general-purpose-spawner|1||269
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:researcher|htmlgraph:researcher-spawner|1||263
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:sonnet-coder|htmlgraph:sonnet-coder-spawner|1||242
+0dc5adb6-48a4-42e8-b7c3-30e8421ee1cc-general-purpose|general-purpose-spawner|1||219
+6f0ea23f-d7f6-4779-995b-d775e06d2155-general-purpose|general-purpose-spawner|1||182
+b5fdbfed-abea-45ab-9596-155a3fd8b8c9-htmlgraph:researcher|htmlgraph:researcher-spawner|1||114
+f60b03ca-b2c2-4784-a483-d20513eefb58-Explore|Explore-spawner|1||111
+eab55c77-90f3-4d92-8bed-957b2d5d1580-general-purpose|general-purpose-spawner|1||95
+06dfa976-ca7e-48a3-ad92-dff4e2d31dd4-general-purpose|general-purpose-spawner|1||82
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:haiku-coder|htmlgraph:haiku-coder-spawner|1||73
+06dfa976-ca7e-48a3-ad92-dff4e2d31dd4-Explore|Explore-spawner|1||49
+b5fdbfed-abea-45ab-9596-155a3fd8b8c9-htmlgraph:test-runner|htmlgraph:test-runner-spawner|1||47
+f60b03ca-b2c2-4784-a483-d20513eefb58-claude-code-guide|claude-code-guide-spawner|1||42
+ce37a5ff-beff-4bd7-9180-a85d98df3079-general-purpose|general-purpose-spawner|1||41
+f60b03ca-b2c2-4784-a483-d20513eefb58-htmlgraph:researcher|htmlgraph:researcher-spawner|1||39
+74539b77-49ba-40ab-a7e4-557954569904-general-purpose|general-purpose-spawner|1||35
+97e4f1d4-154c-4d99-9c9c-8693037e5931-htmlgraph:test-runner|htmlgraph:test-runner-spawner|1||29
+76ace32b-693a-48c6-b476-4b1229f33702-general-purpose|general-purpose-spawner|1||27
+eab55c77-90f3-4d92-8bed-957b2d5d1580-Explore|Explore-spawner|1||26
+
+Note: All subagent sessions have parent_session_id = NULL (potential data issue)
+
+================================================================================
+MOST READ FILES BY SUBAGENTS (Top 30)
+================================================================================
+
+|199
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py|50
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/services.py|28
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py|25
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/pretooluse.py|20
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/dashboard.py|17
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/activity-feed.html|13
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/hooks.json|13
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_context.py|11
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/dashboard.html|10
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py|9
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/claude_launcher.py|8
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/__init__.py|7
+/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/dashboard.html|7
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/user-prompt-submit.py|7
+/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/pretooluse-integrator.py|7
+
+Total Subagent Reads: 672 (48.8% of all reads)
+
+================================================================================
+MODEL DISTRIBUTION
+================================================================================
+
+Opus 4.6|2102 (48.2%)
+Haiku 4.5|2016 (46.2%)
+Sonnet 4.5|250 (5.7%)
+
+================================================================================
+DAILY EVENT ACTIVITY
+================================================================================
+
+2026-02-13|225
+2026-02-12|1033
+2026-02-11|617
+2026-02-10|1040
+2026-02-09|823
+2026-02-03|581
+2026-02-02|1220
+2026-01-13|920
+
+================================================================================
+COST TRACKING STATUS
+================================================================================
+
+Total Cost Events: 0
+Total Tokens Tracked: (NULL)
+Total Cost: (NULL)
+
+Status: cost_events table exists but is empty - not yet deployed
+
+================================================================================
