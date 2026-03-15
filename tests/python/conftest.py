@@ -109,9 +109,9 @@ def isolated_graph_dir_full(tmp_path: Path) -> Path:
     Create isolated .htmlgraph directory with complete subdirectory structure.
 
     Creates all standard subdirectories expected by SDK and tests:
-    - Work items: features, bugs, spikes, chores, epics, phases, tracks
+    - Work items: features, bugs, spikes, tracks
     - Sessions: sessions
-    - Learning: patterns, insights, metrics, todos, task-delegations
+    - Events: events
     - Archive: archives, archive-index
     - Agents: agents
     - Events: events
@@ -132,35 +132,33 @@ def isolated_graph_dir_full(tmp_path: Path) -> Path:
     graph_dir = tmp_path / ".htmlgraph"
     graph_dir.mkdir()
 
-    # Standard subdirectories
+    # Standard subdirectories — mirrors DEFAULT_COLLECTIONS + ADDITIONAL_DIRECTORIES
+    # in src/python/htmlgraph/operations/initialization.py
     for subdir in [
         # Work item types
         "features",
         "bugs",
-        "spikes",
         "chores",
+        "spikes",
         "epics",
-        "phases",
         "tracks",
         # Sessions
         "sessions",
-        # Learning collections (SDK creates these, but explicit is better)
-        "patterns",
+        # Analytics
         "insights",
         "metrics",
-        "todos",
-        "task-delegations",
-        # Archive
-        "archives",
-        "archive-index",
-        # Agents
-        "agents",
-        # Events
-        "events",
         # CIGS
         "cigs",
-        # Logs
+        # SDK collections
+        "patterns",
+        "todos",
+        "task-delegations",
+        # Events / logs
+        "events",
         "logs",
+        # Archives
+        "archive-index",
+        "archives",
     ]:
         (graph_dir / subdir).mkdir()
 

@@ -48,8 +48,6 @@ class HtmlGraphDB(ExtensionOps):
                get_features_by_status
 
     Auxiliary methods (inherited from ExtensionOps):
-    - Traces: insert_tool_trace, update_tool_trace, get_tool_trace,
-              get_session_tool_traces
     - Live events: insert_live_event, get_pending_live_events,
                    mark_live_events_broadcast, cleanup_old_live_events
     - Collaboration: record_collaboration, record_delegation_event,

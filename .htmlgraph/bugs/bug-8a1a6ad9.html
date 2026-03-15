@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard refresh collapses expanded subagent sections (regression from v0.33.48 fix)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-8a1a6ad9"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-03-10T12:27:35.138746"
+             data-updated="2026-03-10T14:23:29.844007" data-agent-assigned="claude">
+
+        <header>
+            <h1>Dashboard refresh collapses expanded subagent sections (regression from v0.33.48 fix)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-10T12:27:35.145163">sess-6c56e756</a></li>
+                    <li><a href="1487a35d-e583-4cc9-91ab-148498958ad5.html" data-relationship="implemented-in" data-since="2026-03-10T13:42:18.432633">1487a35d-e583-4cc9-91ab-148498958ad5</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-10T14:23:29.844014">2026-03-10T14:23:29.844014</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': '1487a35d-e583-4cc9-91ab-148498958ad5', 'anti_patterns': [{'sequence': ['Bash', 'Bash', 'Bash'], 'count': 12, 'description': 'Command spam - plan commands before executing'}, {'sequence': ['Read', 'Read', 'Read'], 'count': 2, 'description': 'Excessive reading - take notes or use grep to find specific content'}, {'sequence': ['Edit', 'Edit', 'Edit'], 'count': 1, 'description': 'Multiple edits without testing - run tests between changes'}], 'errors': [], 'error_count': 0, 'efficiency': 0.46341463414634143, 'issues': ['High retry rate: 45%', 'Excessive context rebuilds: 7'], 'recommendations': ['Consider reading more context before acting', 'Cache file contents or take notes'], 'test_runs': [{'command': 'Check pytest output so far', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check if pytest has finished', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Wait 10s then check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}], 'test_summary': '✓ 4 test runs', 'summary': '⚠️ Issues: 15 anti-pattern occurrences, low efficiency (46%), ✓ 4 test runs'}">{'session_id': '1487a35d-e583-4cc9-91ab-148498958ad5', 'anti_patterns': [{'sequence': ['Bash', 'Bash', 'Bash'], 'count': 12, 'description': 'Command spam - plan commands before executing'}, {'sequence': ['Read', 'Read', 'Read'], 'count': 2, 'description': 'Excessive reading - take notes or use grep to find specific content'}, {'sequence': ['Edit', 'Edit', 'Edit'], 'count': 1, 'description': 'Multiple edits without testing - run tests between changes'}], 'errors': [], 'error_count': 0, 'efficiency': 0.46341463414634143, 'issues': ['High retry rate: 45%', 'Excessive context rebuilds: 7'], 'recommendations': ['Consider reading more context before acting', 'Cache file contents or take notes'], 'test_runs': [{'command': 'Check pytest output so far', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check if pytest has finished', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Wait 10s then check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}], 'test_summary': '✓ 4 test runs', 'summary': '⚠️ Issues: 15 anti-pattern occurrences, low efficiency (46%), ✓ 4 test runs'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-48358512">insi-48358512</dd>
+            </dl>
+        </section>
+        <section data-content>
+            <h3>Description</h3>
+            ## Problem
+When SSE auto-refresh fires (~10 seconds via WebSocket), expanded parent rows in the activity feed collapse back to closed state. Users lose their place.
+
+## Root Cause
+saveExpandState()/restoreExpandState() saves expanded event_ids to a JS Set, then restores after htmx morph. Fails because:
+1. DOM structure changes when new events arrive (new rows inserted, event counts change)
+2. restoreExpandState() fires via setTimeout(150ms) but morphed DOM may not be settled
+3. State keys may not match new DOM elements after server re-render
+
+## Reproduction
+1. Open dashboard, click parent row to expand child events
+2. Wait 10-15 seconds for SSE auto-refresh (or run a Bash command)
+3. Expanded section collapses back
+
+## Key Files
+- src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html (saveExpandState/restoreExpandState JS + htmx morph handlers)
+- src/python/htmlgraph/api/templates/dashboard-redesign.html (refreshActivityFeed() + SSE handler)
+
+## Suggested Fix
+Option A: Move expand state to CSS classes that survive idiomorph merge
+Option B: Use htmx:beforeMorph to save + htmx:afterSettle to restore with data-event-id matching
+Option C: Don't re-render expanded sections, only append new events to existing expanded DOM
+
+## Verified Failing
+v0.33.57, 2026-03-10. Screenshots: check2-before-refresh.png, check2-after-refresh-FAILED.png
+        </section>
+    </article>
+</body>
+</html>

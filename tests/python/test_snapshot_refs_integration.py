@@ -38,10 +38,6 @@ def temp_graph_dir() -> Generator[Path, None, None]:
             "tracks",
             "bugs",
             "spikes",
-            "chores",
-            "epics",
-            "todos",
-            "phases",
         ]:
             (graph_dir / collection).mkdir()
 

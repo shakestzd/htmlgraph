@@ -503,9 +503,6 @@ class FeatureWorkflow:
             learning = LearningPersistence(sdk)
             analysis = learning.analyze_for_orchestrator(session.id)
             node.properties["completion_analysis"] = analysis
-            insight_id = learning.persist_session_insight(session.id)
-            if insight_id:
-                node.properties["insight_id"] = insight_id
             pattern_ids = learning.persist_patterns()
             if pattern_ids:
                 logger.debug(f"Persisted {len(pattern_ids)} patterns")

@@ -565,6 +565,32 @@ class HtmlGraph(TransactionMixin, ChunkedLoadingMixin, MetricsMixin):
 
         return algorithms.transitive_deps(self, node_id, relationship)
 
+    def get_transitive_dependencies(
+        self, node_id: str, rel_type: str = "blocked_by"
+    ) -> set[str]:
+        """
+        Get all transitive dependencies of a node, filtered by relationship type.
+
+        When rel_type is specified, only traverses edges of that type.
+        This is the typed-relationship-aware version of transitive_deps().
+
+        Args:
+            node_id: Starting node ID
+            rel_type: Relationship type to follow (default: blocked_by)
+
+        Returns:
+            Set of all dependency node IDs reachable via edges of rel_type
+
+        Example:
+            # Only traverse blocked_by edges
+            deps = graph.get_transitive_dependencies("feat-001", rel_type="blocked_by")
+            # Only traverse depends_on edges
+            deps = graph.get_transitive_dependencies("feat-001", rel_type="depends_on")
+        """
+        from . import algorithms
+
+        return algorithms.get_dependencies(self, node_id, rel_type=rel_type)
+
     def dependents(self, node_id: str, relationship: str = "blocked_by") -> set[str]:
         """Find all nodes that depend on this node (O(1) lookup)."""
         from . import algorithms

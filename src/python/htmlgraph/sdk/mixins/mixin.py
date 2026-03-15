@@ -92,10 +92,6 @@ class CoreMixin:
             "t": self.tracks,
             "b": self.bugs,
             "s": self.spikes,
-            "c": self.chores,
-            "e": self.epics,
-            "d": self.todos,
-            "p": self.phases,
         }
 
         collection = collection_map.get(prefix)

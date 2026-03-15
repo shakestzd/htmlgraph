@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Fix SessionEnd Hook Cancellation Bug</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-3a4c7e42"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T00:51:19.858372"
+             data-updated="2026-03-10T00:51:19.858374" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>Fix SessionEnd Hook Cancellation Bug</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Starting implementation of two fixes:
+- Fix A: Remove unnecessary read_session() call from session-end.py
+- Fix B: Fix TranscriptReader.read_session() to use direct path construction
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "session_id": "test-session-001",
+  "violations": {
+    "session_id": "test-session-001",
+    "total_violations": 0,
+    "violations_by_type": {},
+    "total_waste_tokens": 0,
+    "circuit_breaker_triggered": false,
+    "compliance_rate": 1.0,
+    "violations": []
+  },
+  "patterns": [],
+  "costs": {
+    "total_tokens": 0,
+    "optimal_tokens": 0,
+    "waste_tokens": 0,
+    "waste_percentage": 0.0,
+    "efficiency_score": 100.0
+  },
+  "autonomy_recommendation": {
+    "level": "observer",
+    "messaging_intensity": "minimal",
+    "enforcement_mode": "guidance",
+    "reason": "Excellent compliance (100%). Minimal guidance needed.",
+    "based_on_violations": 0,
+    "based_on_patterns": []
+  }
+}

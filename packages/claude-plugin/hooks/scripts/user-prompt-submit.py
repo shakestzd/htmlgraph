@@ -80,7 +80,10 @@ def main() -> None:
 
         # 5. Generate workflow guidance (SDK)
         workflow_guidance = generate_guidance(
-            classification, active_work, prompt, open_work_items=open_items
+            classification,
+            active_work,
+            prompt,
+            open_work_items=open_items,
         )
 
         # 6. CIGS: Generate imperative delegation guidance (SDK)

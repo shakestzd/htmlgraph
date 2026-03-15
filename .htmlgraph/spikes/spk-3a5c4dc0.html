@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Hook filtering + active session display</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-3a5c4dc0"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T10:27:20.933155"
+             data-updated="2026-03-10T10:27:20.933156" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Hook filtering + active session display</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Issue 1: Only Bash events tracked (not Read, Grep, Glob, Agent, MCP tools)
+
+### Root Cause: NOT a filtering problem — event_tracker tracks ALL tools
+
+NEVER_BLOCK_TOOLS (pretooluse.py:53-69) includes Read, Grep, Glob, Task, Agent.
+This set controls BLOCKING only. Event tracing (tool_traces insert) still runs for all
+these tools (pretooluse.py:1155-1158: "Still run event tracing for hierarchy tracking").
+
+PostToolUse: event_tracker.py:1538-1541 skips only AskUserQuestion.
+All other tools go to record_event_to_sqlite at line 1930 unconditionally.
+hooks.json PostToolUse matcher="" fires for all tools (no tool filter).
+
+### Key architectural detail
+pretooluse.py:784-788: Non-Task tools SKIP agent_events insert at PreToolUse time.
+Only Task() gets a PreToolUse agent_events row. All tools get a tool_traces row.
+PostToolUse (event_tracker.py:1930) writes ALL tools to agent_events.
+
+### Why DB shows only Bash for session e114fee5 — diagnosis steps
+The write path is correct. Two possible explanations:
+A) posttooluse hook silently failing for non-Bash tools. Verify with:
+   sqlite3 .htmlgraph/htmlgraph.db "SELECT tool_name, COUNT(*) FROM agent_events
+   WHERE session_id LIKE 'e114fee5%' GROUP BY tool_name;"
+B) Read/Grep/Glob events ARE in agent_events but have parent_event_id=NULL or wrong
+   parent, so they do not appear as children of any UserQuery in the activity feed.
+   The activity feed only shows events that are children of a UserQuery row.
+
+### Key file/line references
+- pretooluse.py:53-69 — NEVER_BLOCK_TOOLS (blocking only, not tracking)
+- pretooluse.py:784-788 — non-Task tools skip PreToolUse agent_events insert
+- pretooluse.py:819-840 — ALL tools get tool_traces insert at PreToolUse
+- event_tracker.py:1538-1541 — only AskUserQuestion is skipped in PostToolUse
+- event_tracker.py:1930 — record_event_to_sqlite for all non-skipped tools
+- hooks.json:54-64 — PostToolUse matcher="" fires for all tools
+
+## Issue 2: Active sessions not showing in dashboard activity feed
+
+### Root Cause: Activity feed queries agent_events.UserQuery, NOT sessions table
+
+/views/activity-feed (dashboard.py:222-327) calls get_grouped_events() which queries:
+  agent_events WHERE tool_name = 'UserQuery' ORDER BY timestamp DESC LIMIT 15
+There is ZERO filter on session status. Active vs completed is irrelevant.
+
+The active session appears in the feed if and only if its UserQuery events exist in
+agent_events. The sessions table status column plays no role.
+
+### Why the active session may not appear at the top
+A) UserQuery events not written: user-prompt-submit track-event hook may have failed.
+B) UserQuery written to different session_id: event_tracker.py:1329-1361 strips subagent
+   suffixes, potentially writing to a different session_id than e114fee5.
+C) Cache: services.py:86-95 + cache.py:30 caches activity feed for 60 seconds.
+   A new session's UserQuery rows may not appear until cache expires.
+
+### Verification
+sqlite3 .htmlgraph/htmlgraph.db "SELECT session_id, COUNT(*), MAX(timestamp)
+FROM agent_events WHERE tool_name='UserQuery'
+GROUP BY session_id ORDER BY MAX(timestamp) DESC LIMIT 10;"
+
+### Key file/line references
+- dashboard.py:222-228 — /views/activity-feed handler, default limit=15
+- services.py:99-131 — UserQuery SQL query, no session.status filter
+- services.py:86-95 — 1-minute result cache
+- cache.py:30 — activity_feed TTL = 60 seconds
+- event_tracker.py:1315-1323 — task-notification prompts skipped (not user queries)
+- event_tracker.py:1329-1361 — UserQuery session_id may be rewritten to parent session
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -73,6 +73,9 @@ def html_to_node(filepath: Path | str) -> Node:
             description=s["description"],
             completed=s.get("completed", False),
             agent=s.get("agent"),
+            timestamp=s.get("timestamp"),
+            step_id=s.get("step_id"),
+            depends_on=s.get("depends_on", []),
         )
         for s in data.get("steps", [])
     ]

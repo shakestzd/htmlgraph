@@ -365,10 +365,6 @@ class TestCollectionSpecificTrackRequirement:
         spike = sdk.spikes.create("No Track Spike").save()
         assert spike.id is not None
 
-        # Chores don't require track
-        chore = sdk.chores.create("No Track Chore").save()
-        assert chore.id is not None
-
         # Only features require track
         with pytest.raises(ValueError):
             sdk.features.create("Must Have Track Feature").save()

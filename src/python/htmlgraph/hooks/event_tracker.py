@@ -984,10 +984,8 @@ def _find_parent_via_jsonl(
                             """
                             SELECT ae.event_id
                             FROM agent_events ae
-                            JOIN tool_traces tt
-                              ON tt.tool_use_id = ?
-                             AND tt.session_id = ae.session_id
                             WHERE ae.event_type = 'task_delegation'
+                              AND ae.claude_task_id = ?
                             ORDER BY ae.timestamp DESC
                             LIMIT 1
                             """,

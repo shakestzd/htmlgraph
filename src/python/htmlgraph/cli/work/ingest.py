@@ -331,9 +331,8 @@ class IngestSessionCommand(BaseCommand):
 
     Reads ``~/.claude/projects/{hash}/{session_id}.jsonl``, reconstructs the
     full event hierarchy from ``parentUuid`` chains, and inserts missing events
-    into the ``agent_events`` and ``tool_traces`` tables.  Already-imported
-    events are skipped (idempotent — checked by ``tool_use_id`` in
-    ``tool_traces``).
+    into the ``agent_events`` table.  Already-imported events are skipped
+    (idempotent — checked by ``tool_use_id`` stored in ``claude_task_id``).
     """
 
     def __init__(
@@ -518,9 +517,14 @@ class IngestSessionCommand(BaseCommand):
                     if not tool_use_id:
                         continue
 
-                    # Idempotency check: skip if tool_use_id already in tool_traces
+                    # Idempotency check: skip if tool_use_id already in agent_events
                     cursor.execute(
-                        "SELECT 1 FROM tool_traces WHERE tool_use_id = ? LIMIT 1",
+                        "SELECT 1 FROM agent_events WHERE tool_name = ? AND session_id = ? AND input_summary LIKE ? LIMIT 1",
+                        (tool_name, raw_session_id, f"{tool_name}:%"),
+                    )
+                    # Use claude_task_id for exact idempotency when available
+                    cursor.execute(
+                        "SELECT 1 FROM agent_events WHERE claude_task_id = ? LIMIT 1",
                         (tool_use_id,),
                     )
                     if cursor.fetchone() is not None:
@@ -556,8 +560,9 @@ class IngestSessionCommand(BaseCommand):
                             INSERT OR IGNORE INTO agent_events
                                 (event_id, agent_id, event_type, timestamp,
                                  tool_name, input_summary, tool_input,
-                                 session_id, status, parent_event_id, source)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'recorded', ?, 'ingest')
+                                 session_id, status, parent_event_id, source,
+                                 claude_task_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'recorded', ?, 'ingest', ?)
                             """,
                             (
                                 event_id,
@@ -569,34 +574,13 @@ class IngestSessionCommand(BaseCommand):
                                 json.dumps(tool_input_raw),
                                 raw_session_id,
                                 parent_event_id,
+                                tool_use_id,
                             ),
                         )
                         uuid_to_event_id[entry.get("uuid", "")] = event_id
                     except Exception as e:
                         stats["errors"].append(f"agent_events insert: {e}")
                         continue
-
-                    # Insert tool_trace for idempotency key
-                    try:
-                        cursor.execute(
-                            """
-                            INSERT OR IGNORE INTO tool_traces
-                                (tool_use_id, trace_id, session_id, tool_name,
-                                 tool_input, start_time, status,
-                                 parent_tool_use_id)
-                            VALUES (?, ?, ?, ?, ?, ?, 'completed', NULL)
-                            """,
-                            (
-                                tool_use_id,
-                                raw_session_id,
-                                raw_session_id,
-                                tool_name,
-                                json.dumps(tool_input_raw),
-                                ts,
-                            ),
-                        )
-                    except Exception as e:
-                        stats["errors"].append(f"tool_traces insert: {e}")
 
                     stats["inserted"] += 1
 

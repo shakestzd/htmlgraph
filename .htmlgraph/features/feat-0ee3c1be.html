@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Add SDK work attribution to all agent system prompts</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-0ee3c1be"
+             data-type="feature"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-03-09T19:51:57.136808"
+             data-updated="2026-03-09T20:00:07.248497" data-agent-assigned="claude" data-track-id="trk-b5ceb449">
+
+        <header>
+            <h1>Add SDK work attribution to all agent system prompts</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-09T19:51:59.878037">sess-6c56e756</a></li>
+                    <li><a href="e979687b-2969-43db-9ae5-a628480e5e9e.html" data-relationship="implemented-in" data-since="2026-03-09T19:52:03.855066">e979687b-2969-43db-9ae5-a628480e5e9e</a></li>
+                    <li><a href="sess-b55e1899.html" data-relationship="implemented-in" data-since="2026-03-09T19:59:09.869213">sess-b55e1899</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-09T20:00:07.248506">2026-03-09T20:00:07.248506</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.25531914893617025, 'issues': ['High retry rate: 74%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (26%)'}">{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.25531914893617025, 'issues': ['High retry rate: 74%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (26%)'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-21fd1ac7">insi-21fd1ac7</dd>
+            </dl>
+        </section>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false">⏳ Audit all agent definitions in packages/claude-plugin/agents/ and core agents</li>
+                <li data-completed="false">⏳ Design standard attribution block: check open work items, start relevant one, record findings</li>
+                <li data-completed="false">⏳ Update every agent system prompt with imperative SDK attribution instructions</li>
+                <li data-completed="false">⏳ Test: spawn agents and verify their tool calls appear attributed in dashboard</li>
+                <li data-completed="false">⏳ Deploy updated plugin</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Test Results: bug-acfb2b69 - Quality Gate Results</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-5f1f82f3"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-11T12:27:52.703791"
+             data-updated="2026-03-11T12:27:52.703792" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="test-runner">
+
+        <header>
+            <h1>Test Results: bug-acfb2b69 - Quality Gate Results</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Quality Gate Test Suite
+
+### STEP 1: ruff check --fix
+✅ **PASS** - All checks passed!
+
+### STEP 2: ruff format  
+✅ **PASS** - 652 files left unchanged
+
+### STEP 3: mypy src/
+✅ **PASS** - No issues found in 345 source files
+
+### STEP 4: pytest -x -q
+✅ **PASS** - 2194 passed, 37 skipped, 3 deselected, 13 warnings in 770.08s (12m 50s)
+
+## Summary
+**ALL QUALITY GATES PASSED** - Code is ready for commit/deployment
+
+## Test Breakdown
+- Unit tests: 2194 passed
+- Skipped: 37 (intentional, marked with @pytest.mark.skip)
+- Deselected: 3 (not selected by testpaths)
+- Execution time: 12 minutes 50 seconds
+
+## Work Item
+Bug: bug-acfb2b69 - Orchestrator tool calls nest under Task node after delegation returns
+            </div>
+        </section>
+    </article>
+</body>
+</html>

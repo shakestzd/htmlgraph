@@ -36,19 +36,10 @@ from typing import Any
 from htmlgraph.agent_detection import detect_agent_name
 from htmlgraph.agents import AgentInterface
 from htmlgraph.collections import (
-    BaseCollection,
     BugCollection,
-    ChoreCollection,
-    EpicCollection,
     FeatureCollection,
-    PhaseCollection,
     SpikeCollection,
-    TaskDelegationCollection,
-    TodoCollection,
 )
-from htmlgraph.collections.insight import InsightCollection
-from htmlgraph.collections.metric import MetricCollection
-from htmlgraph.collections.pattern import PatternCollection
 from htmlgraph.collections.session import SessionCollection
 from htmlgraph.db.schema import HtmlGraphDB
 from htmlgraph.graph import HtmlGraph
@@ -98,17 +89,9 @@ class SDK(
     Available Collections:
         - features: Feature work items with builder support
         - bugs: Bug reports
-        - chores: Maintenance and chore tasks
         - spikes: Investigation and research spikes
-        - epics: Large bodies of work
-        - phases: Project phases
         - sessions: Agent sessions
         - tracks: Work tracks
-        - agents: Agent information
-        - todos: Persistent task tracking (mirrors TodoWrite API)
-        - patterns: Workflow patterns (optimal/anti-pattern)
-        - insights: Session health insights
-        - metrics: Aggregated time-series metrics
 
     This SDK class is a thin composition layer that inherits from specialized mixins:
     - AnalyticsRegistry: analytics, dep_analytics, context, pattern_learning properties
@@ -221,38 +204,16 @@ class SDK(
             self._directory / "features", agent_id=agent
         )
 
-        # Collection interfaces - all work item types (all with builder support)
+        # Collection interfaces - core work item types
         self.features = FeatureCollection(self)
         self.bugs = BugCollection(self)
-        self.chores = ChoreCollection(self)
         self.spikes = SpikeCollection(self)
-        self.epics = EpicCollection(self)
-        self.phases = PhaseCollection(self)
 
         # Non-work collections
         self.sessions: SessionCollection = SessionCollection(self)
         self.tracks: TrackCollection = TrackCollection(
             self
         )  # Use specialized collection with builder support
-        self.agents: BaseCollection[Any] = BaseCollection(self, "agents", "agent")
-
-        # Learning collections (Active Learning Persistence)
-        self.patterns = PatternCollection(self)
-        self.insights = InsightCollection(self)
-        self.metrics = MetricCollection(self)
-
-        # Todo collection (persistent task tracking)
-        self.todos = TodoCollection(self)
-
-        # Task delegation collection (observability for spawned agents)
-        self.task_delegations = TaskDelegationCollection(self)
-
-        # Create learning directories if needed
-        (self._directory / "patterns").mkdir(exist_ok=True)
-        (self._directory / "insights").mkdir(exist_ok=True)
-        (self._directory / "metrics").mkdir(exist_ok=True)
-        (self._directory / "todos").mkdir(exist_ok=True)
-        (self._directory / "task-delegations").mkdir(exist_ok=True)
 
         # Initialize RefManager and set on all collections
         from htmlgraph.refs import RefManager
@@ -262,12 +223,8 @@ class SDK(
         # Set ref manager on all work item collections
         self.features.set_ref_manager(self.refs)
         self.bugs.set_ref_manager(self.refs)
-        self.chores.set_ref_manager(self.refs)
         self.spikes.set_ref_manager(self.refs)
-        self.epics.set_ref_manager(self.refs)
-        self.phases.set_ref_manager(self.refs)
         self.tracks.set_ref_manager(self.refs)
-        self.todos.set_ref_manager(self.refs)
 
         # Analytics engine (centralized analytics management with lazy loading)
         from htmlgraph.sdk.analytics.helpers import create_analytics_engine

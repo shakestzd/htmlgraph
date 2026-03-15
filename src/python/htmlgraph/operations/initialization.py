@@ -45,8 +45,6 @@ DEFAULT_COLLECTIONS = [
 
 # Additional directories
 ADDITIONAL_DIRECTORIES = [
-    "events",
-    "logs",
     "archive-index",
     "archives",
 ]
@@ -141,12 +139,6 @@ def create_directory_structure(base_dir: Path) -> list[str]:
         if not add_dir.exists():
             add_dir.mkdir(parents=True)
             created.append(str(add_dir))
-
-    # Create logs subdirectory for errors
-    logs_errors = graph_dir / "logs" / "errors"
-    if not logs_errors.exists():
-        logs_errors.mkdir(parents=True)
-        created.append(str(logs_errors))
 
     return created
 
@@ -301,12 +293,6 @@ def create_config_files(graph_dir: Path) -> list[str]:
         auto_spikes.write_text(json.dumps({}, indent=2))
         created.append(str(auto_spikes))
 
-    # Create .gitkeep for events directory
-    events_gitkeep = graph_dir / "events" / ".gitkeep"
-    if not events_gitkeep.exists():
-        events_gitkeep.touch()
-        created.append(str(events_gitkeep))
-
     return created
 
 
@@ -397,11 +383,7 @@ def update_gitignore(base_dir: Path) -> str | None:
         ".htmlgraph/index.sqlite",
         ".htmlgraph/index.sqlite.backup",
         ".htmlgraph/database.db",
-        ".htmlgraph/sessions/*.jsonl",
-        ".htmlgraph/events/*.jsonl",
         ".htmlgraph/parent-activity.json",
-        ".htmlgraph/hook-debug.jsonl",
-        ".htmlgraph/errors.jsonl",
     ]
 
     # Append to existing .gitignore

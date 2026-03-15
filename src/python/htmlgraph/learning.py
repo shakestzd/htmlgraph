@@ -10,7 +10,7 @@ Analyzes sessions and persists patterns, insights, and metrics to the graph.
 
 from collections import Counter
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from htmlgraph.sdk import SDK
@@ -28,50 +28,6 @@ class LearningPersistence:
 
     def __init__(self, sdk: SDK):
         self.sdk = sdk
-
-    def persist_session_insight(self, session_id: str) -> str | None:
-        """Analyze a session and persist insight to graph.
-
-        Args:
-            session_id: Session to analyze
-
-        Returns:
-            Insight ID if created, None if session not found
-        """
-        # Use session_manager to get full Session object with activity_log
-        # (sdk.sessions.get returns generic Node without activity_log)
-        session = self.sdk.session_manager.get_session(session_id)
-        if not session:
-            return None
-
-        # Calculate health metrics from activity log
-        health = self._calculate_health(session)
-
-        # Create insight using builder pattern
-        # Add issues and recommendations BEFORE save() since Node objects are immutable
-        builder = (
-            self.sdk.insights.create(f"Session Analysis: {session_id}")
-            .for_session(session_id)
-            .set_health_scores(
-                efficiency=health.get("efficiency", 0.0),
-                retry_rate=health.get("retry_rate", 0.0),
-                context_rebuilds=health.get("context_rebuilds", 0),
-                tool_diversity=health.get("tool_diversity", 0.0),
-                error_recovery=health.get("error_recovery", 0.0),
-            )
-        )
-
-        # Add issues via builder
-        for issue in health.get("issues", []):
-            builder.add_issue(issue)
-
-        # Add recommendations via builder
-        for rec in health.get("recommendations", []):
-            builder.add_recommendation(rec)
-
-        # Save and return
-        insight = builder.save()
-        return cast(str, insight.id)
 
     def _calculate_health(self, session: Any) -> dict[str, Any]:
         """Calculate health metrics from session activity log."""
@@ -387,92 +343,6 @@ class LearningPersistence:
         else:
             return "neutral"
 
-    def persist_metrics(self, period: str = "weekly") -> str | None:
-        """Aggregate and persist metrics for the current period.
-
-        Args:
-            period: "daily", "weekly", or "monthly"
-
-        Returns:
-            Metric ID if created
-        """
-        from datetime import timedelta
-
-        now = datetime.now()
-
-        # Calculate period boundaries
-        if period == "daily":
-            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            end = start + timedelta(days=1)
-        elif period == "weekly":
-            start = now - timedelta(days=now.weekday())
-            start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-            end = start + timedelta(days=7)
-        else:  # monthly
-            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            if now.month == 12:
-                end = start.replace(year=now.year + 1, month=1)
-            else:
-                end = start.replace(month=now.month + 1)
-
-        # Collect insights for this period
-        insights = list(self.sdk.insights.all())
-        period_insights = [
-            i
-            for i in insights
-            if hasattr(i, "analyzed_at")
-            and i.analyzed_at
-            and start <= i.analyzed_at <= end
-        ]
-
-        if not period_insights:
-            # Use all insights if none in period
-            period_insights = insights
-
-        if not period_insights:
-            return None
-
-        # Calculate aggregate metrics
-        efficiency_scores = [
-            getattr(i, "efficiency_score", 0.0)
-            for i in period_insights
-            if getattr(i, "efficiency_score", None)
-        ]
-        avg_efficiency = (
-            sum(efficiency_scores) / len(efficiency_scores)
-            if efficiency_scores
-            else 0.0
-        )
-
-        # Create metric
-        metric = (
-            self.sdk.metrics.create(
-                f"Efficiency Metric: {period} ending {end.strftime('%Y-%m-%d')}"
-            )
-            .set_scope("session")
-            .set_period(period, start, end)
-            .set_metrics(
-                {
-                    "avg_efficiency": avg_efficiency,
-                    "sessions_analyzed": len(period_insights),
-                }
-            )
-            .save()
-        )
-
-        # Note: After save(), metric is a Node object
-        # The sessions_in_period is tracked in metric_values
-        metric.properties = metric.properties or {}
-        metric.properties["data_points_count"] = len(period_insights)
-        metric.properties["sessions_in_period"] = [
-            getattr(i, "session_id", i.id)
-            for i in period_insights
-            if hasattr(i, "session_id") or hasattr(i, "id")
-        ]
-        self.sdk.metrics.update(metric)
-
-        return cast(str, metric.id)
-
     def analyze_for_orchestrator(self, session_id: str) -> dict[str, Any]:
         """Analyze session and return compact feedback for orchestrator.
 
@@ -754,14 +624,12 @@ def auto_persist_on_session_end(sdk: SDK, session_id: str) -> dict:
     """Convenience function to auto-persist learning data when session ends.
 
     Returns:
-        Dict with insight_id, pattern_ids, metric_id
+        Dict with pattern_ids
     """
     learning = LearningPersistence(sdk)
 
-    result = {
-        "insight_id": learning.persist_session_insight(session_id),
+    result: dict[str, object] = {
         "pattern_ids": learning.persist_patterns(),
-        "metric_id": learning.persist_metrics(),
     }
 
     return result

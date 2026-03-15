@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Track: Beads Convergence: Graph Scheduling + Compaction + Coordination</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        /* HtmlGraph Dashboard Design System - Consolidated Track */
+        :root {
+            --bg-primary: #151518;
+            --bg-secondary: #1C1C20;
+            --bg-tertiary: #252528;
+            --text-primary: #E0DED8;
+            --text-secondary: #A0A0A0;
+            --text-muted: #707070;
+            --border: #333338;
+            --border-strong: #606068;
+            --accent: #CDFF00;
+            --accent-text: #0A0A0A;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+            padding: 2rem;
+            max-width: 1200px;
+            margin-inline: auto;
+        }
+
+        .track-nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2rem;
+            border: 2px solid var(--border-strong);
+            width: fit-content;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-right: 2px solid var(--border-strong);
+            transition: all 0.15s;
+        }
+
+        .nav-link:last-child { border-right: none; }
+        .nav-link:hover {
+            color: var(--accent);
+            background: var(--bg-tertiary);
+        }
+
+        article {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-strong);
+        }
+
+        header {
+            padding: 2rem;
+            border-bottom: 2px solid var(--border-strong);
+            background: var(--bg-tertiary);
+        }
+
+        h1 {
+            margin: 0 0 1rem 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        h2 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin: 0 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h4 { margin: 0; font-size: 0.875rem; }
+
+        .metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .badge {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.75rem;
+            border: 1px solid var(--border);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.7rem;
+        }
+
+        .status-planned { color: var(--text-muted); }
+        .priority-high { color: #f59e0b; border-color: #f59e0b; }
+        .priority-medium { color: var(--text-secondary); }
+        .priority-critical { color: #ef4444; border-color: #ef4444; }
+
+        section {
+            padding: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        section:last-child { border-bottom: none; }
+
+        p { margin: 0; line-height: 1.8; }
+
+        .requirements-list .requirement {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .criteria-list {
+            list-style: none;
+            counter-reset: criteria;
+            padding: 0;
+            margin: 0;
+        }
+
+        .criteria-list li {
+            counter-increment: criteria;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            padding: 1rem 1rem 1rem 3rem;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .criteria-list li::before {
+            content: counter(criteria);
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            background: var(--accent);
+            color: var(--accent-text);
+            width: 1.25rem;
+            height: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.7rem;
+        }
+
+        .progress-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .progress-label { color: var(--accent); font-weight: 600; }
+        .progress-count { color: var(--text-secondary); }
+
+        .progress-bar {
+            width: 100%;
+            height: 0.5rem;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-strong);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+        }
+
+        details {
+            border: 1px solid var(--border);
+            margin-bottom: 0.75rem;
+            background: var(--bg-tertiary);
+        }
+
+        summary {
+            padding: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.8rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        summary:hover { color: var(--accent); }
+
+        [data-task] {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        [data-task]:last-child { border-bottom: none; }
+
+        .estimate {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-left: auto;
+        }
+
+        code {
+            background: var(--bg-primary);
+            padding: 0.125rem 0.375rem;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    
+        <nav class="track-nav">
+            <a href="#top" class="nav-link">Track</a><a href="#overview" class="nav-link">Spec</a><a href="#plan" class="nav-link">Plan</a>
+        </nav>
+    <article id="trk-5fc61026" data-type="track" data-status="todo" data-priority="high">
+        <header id="top">
+            <h1>Beads Convergence: Graph Scheduling + Compaction + Coordination</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Planned</span>
+                <span class="badge priority-high">High Priority</span>
+                <span class="badge">Created: 2026-03-13</span>
+            </div>
+        </header>
+
+        <section data-section="description">
+            <p>Achieve all benefits of Beads (dependency graph, semantic compaction, multi-agent coordination, context management) while preserving HtmlGraph strengths (real-time observability, event system, dashboard, hooks, HTML format)</p>
+        </section>
+        
+            <section data-section="overview" id="overview">
+                <h2>Overview</h2>
+                <p>Port key Beads capabilities into HtmlGraph architecture: dependency-aware scheduling, atomic claim, CIGS scaling, semantic compaction, wisps, and rich relationship types.</p>
+            </section>
+            <section data-section="context" id="context">
+                <h2>Context</h2>
+                <p>HtmlGraph has ~60% of infrastructure already (graph engine, archival manager, WIP limits) but none of it receives data. Beads uses Dolt+SQL for dependency graph and scheduling. HtmlGraph can achieve the same with SQLite + existing graph.py code.</p>
+            </section>
+            <section data-section="requirements" id="requirements">
+                <h2>Requirements</h2>
+                <div class="requirements-list">
+                    
+                <article class="requirement priority-must-have" data-requirement="req-1" data-priority="must-have">
+                    <h4>⏳ SQLite-backed CIGS queries replacing HTML file scanning</h4>
+                    <span class="badge">must-have</span>
+                </article>
+                <article class="requirement priority-must-have" data-requirement="req-2" data-priority="must-have">
+                    <h4>⏳ SDK blocked_by() edge writing + ready queue CLI</h4>
+                    <span class="badge">must-have</span>
+                </article>
+                <article class="requirement priority-must-have" data-requirement="req-3" data-priority="must-have">
+                    <h4>⏳ Atomic claim primitive for multi-agent coordination</h4>
+                    <span class="badge">must-have</span>
+                </article>
+                <article class="requirement priority-should-have" data-requirement="req-4" data-priority="should-have">
+                    <h4>⏳ Tiered semantic compaction with Claude Haiku</h4>
+                    <span class="badge">should-have</span>
+                </article>
+                <article class="requirement priority-should-have" data-requirement="req-5" data-priority="should-have">
+                    <h4>⏳ Ephemeral wisp signals between agents</h4>
+                    <span class="badge">should-have</span>
+                </article>
+                <article class="requirement priority-nice-to-have" data-requirement="req-6" data-priority="nice-to-have">
+                    <h4>⏳ Rich relationship types beyond blocked_by</h4>
+                    <span class="badge">nice-to-have</span>
+                </article>
+                </div>
+            </section>
+            <section data-section="acceptance-criteria" id="acceptance">
+                <h2>Acceptance Criteria</h2>
+                <ol class="criteria-list">
+                    <li>⏳ CIGS guidance generated from SQLite in <50ms (not file I/O) <code>test_cigs_sqlite_performance</code></li><li>⏳ htmlgraph ready lists unblocked items <code>test_ready_queue</code></li><li>⏳ sdk.features.claim() is atomic compare-and-swap <code>test_atomic_claim</code></li><li>⏳ 30-day items compacted to ~30% original size <code>test_tier1_compaction</code></li><li>⏳ Wisps expire after TTL and appear in CIGS <code>test_wisp_lifecycle</code></li><li>⏳ blocked_by edges traversed by graph engine <code>test_dependency_traversal</code></li>
+                </ol>
+            </section>
+            <section data-section="plan" id="plan">
+                <h2>Implementation Plan</h2>
+                <div class="progress-container">
+                    <div class="progress-info">
+                        <span class="progress-label">0% Complete</span>
+                        <span class="progress-count">(0/32 tasks)</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="phases-container">
+                    
+                <details open data-phase="phase-1">
+                    <summary>Phase 1: Phase 1: CIGS Scaling Fix (P0) (0/4 tasks)</summary>
+                    
+                    <div data-task="task-1-1" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Replace HTML file scanning in get_open_work_items() with SQLite queries</strong>
+                        </div>
+                         <span class="estimate">(2.0h)</span>
+                    </div>
+                    <div data-task="task-1-2" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Cap CIGS output to top-10 items by priority + recency</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-1-3" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Add 30s in-memory cache for repeated prompt submissions</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-1-4" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Benchmark: <50ms for CIGS generation vs current O(n) file I/O</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                </details>
+                <details  data-phase="phase-2">
+                    <summary>Phase 2: Phase 2: Wire the Graph Engine (P1) (0/6 tasks)</summary>
+                    
+                    <div data-task="task-2-1" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: feature.blocked_by(other_id) writes edge to HTML + SQLite dependencies table</strong>
+                        </div>
+                         <span class="estimate">(3.0h)</span>
+                    </div>
+                    <div data-task="task-2-2" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: feature.unblock(other_id) removes edge from both stores</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-2-3" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph ready - query graph for zero-unresolved-dep nodes</strong>
+                        </div>
+                         <span class="estimate">(2.0h)</span>
+                    </div>
+                    <div data-task="task-2-4" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph blocked - show blocking relationships via find_bottlenecks()</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-2-5" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CIGS: include ready items in prompt guidance</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-2-6" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Dashboard: dependency graph visualization widget</strong>
+                        </div>
+                         <span class="estimate">(3.0h)</span>
+                    </div>
+                </details>
+                <details  data-phase="phase-3">
+                    <summary>Phase 3: Phase 3: Atomic Claim (P1) (0/5 tasks)</summary>
+                    
+                    <div data-task="task-3-1" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: sdk.features.claim(feat_id, agent=X) with SQL compare-and-swap</strong>
+                        </div>
+                         <span class="estimate">(2.0h)</span>
+                    </div>
+                    <div data-task="task-3-2" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: sdk.features.unclaim(feat_id) release primitive</strong>
+                        </div>
+                         <span class="estimate">(0.5h)</span>
+                    </div>
+                    <div data-task="task-3-3" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph claim <id> wrapper</strong>
+                        </div>
+                         <span class="estimate">(0.5h)</span>
+                    </div>
+                    <div data-task="task-3-4" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph ready --claim atomic pick-next</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-3-5" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Dashboard: claimed-by column and agent indicators</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                </details>
+                <details  data-phase="phase-4">
+                    <summary>Phase 4: Phase 4: Semantic Compaction (P2) (0/6 tasks)</summary>
+                    
+                    <div data-task="task-4-1" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Enable ArchiveManager with auto_archive=True and age thresholds</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-4-2" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Tier 1 compaction (30 days): strip verbose content, keep summary via Haiku</strong>
+                        </div>
+                         <span class="estimate">(4.0h)</span>
+                    </div>
+                    <div data-task="task-4-3" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Tier 2 compaction (90 days): reduce to one-liner + metadata, archive full content</strong>
+                        </div>
+                         <span class="estimate">(2.0h)</span>
+                    </div>
+                    <div data-task="task-4-4" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph compact [--dry-run] manual trigger</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-4-5" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph restore <id> retrieves full content from archive</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-4-6" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ FTS5 index for compacted items (link to feat-cc787a00)</strong>
+                        </div>
+                         <span class="estimate">(2.0h)</span>
+                    </div>
+                </details>
+                <details  data-phase="phase-5">
+                    <summary>Phase 5: Phase 5: Wisps (P2) (0/6 tasks)</summary>
+                    
+                    <div data-task="task-5-1" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SQLite table: wisps (id, agent_id, message, category, created_at, expires_at)</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-5-2" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: sdk.wisps.signal(message, ttl=3600) create wisp</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-5-3" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: sdk.wisps.active() list non-expired wisps</strong>
+                        </div>
+                         <span class="estimate">(0.5h)</span>
+                    </div>
+                    <div data-task="task-5-4" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Auto-expire: lazy expiry on read + periodic cleanup</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-5-5" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CIGS: include active wisps in prompt guidance</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-5-6" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Dashboard: ephemeral notification bar for active wisps</strong>
+                        </div>
+                         <span class="estimate">(1.5h)</span>
+                    </div>
+                </details>
+                <details  data-phase="phase-6">
+                    <summary>Phase 6: Phase 6: Rich Relationship Types (P3) (0/5 tasks)</summary>
+                    
+                    <div data-task="task-6-1" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SDK: feature.relates_to(other_id, rel_type) generic edge API</strong>
+                        </div>
+                         <span class="estimate">(2.0h)</span>
+                    </div>
+                    <div data-task="task-6-2" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ SQLite: add rel_type column to dependencies table</strong>
+                        </div>
+                         <span class="estimate">(0.5h)</span>
+                    </div>
+                    <div data-task="task-6-3" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Graph: traverse by edge type filter</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                    <div data-task="task-6-4" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ Dashboard: color-coded edges by relationship type</strong>
+                        </div>
+                         <span class="estimate">(1.5h)</span>
+                    </div>
+                    <div data-task="task-6-5" data-status="todo">
+                        <input type="checkbox"  disabled>
+                        <div>
+                            <strong>○ CLI: htmlgraph graph <id> show node neighborhood</strong>
+                        </div>
+                         <span class="estimate">(1.0h)</span>
+                    </div>
+                </details>
+                </div>
+            </section>
+    </article>
+</body>
+</html>

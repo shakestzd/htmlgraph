@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>PreToolUse hook attributes to wrong active feature when multiple features in-progress</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-17f8eb8a"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-10T13:38:10.252504"
+             data-updated="2026-03-10T18:23:41.038106+00:00" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>PreToolUse hook attributes to wrong active feature when multiple features in-progress</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="a4aba0ab-c485-42fd-a2aa-3e0525aeec51.html" data-relationship="implemented-in" data-since="2026-03-10T13:38:12.992630">a4aba0ab-c485-42fd-a2aa-3e0525aeec51</a></li>
+                    <li><a href="1487a35d-e583-4cc9-91ab-148498958ad5.html" data-relationship="implemented-in" data-since="2026-03-10T14:23:41.038089">1487a35d-e583-4cc9-91ab-148498958ad5</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-10T14:23:41.027103">2026-03-10T14:23:41.027103</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': '1487a35d-e583-4cc9-91ab-148498958ad5', 'anti_patterns': [{'sequence': ['Bash', 'Bash', 'Bash'], 'count': 12, 'description': 'Command spam - plan commands before executing'}, {'sequence': ['Read', 'Read', 'Read'], 'count': 2, 'description': 'Excessive reading - take notes or use grep to find specific content'}, {'sequence': ['Edit', 'Edit', 'Edit'], 'count': 1, 'description': 'Multiple edits without testing - run tests between changes'}], 'errors': [], 'error_count': 0, 'efficiency': 0.45238095238095233, 'issues': ['High retry rate: 46%', 'Excessive context rebuilds: 7'], 'recommendations': ['Consider reading more context before acting', 'Cache file contents or take notes'], 'test_runs': [{'command': 'Check pytest output so far', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check if pytest has finished', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Wait 10s then check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}], 'test_summary': '✓ 4 test runs', 'summary': '⚠️ Issues: 15 anti-pattern occurrences, low efficiency (45%), ✓ 4 test runs'}">{'session_id': '1487a35d-e583-4cc9-91ab-148498958ad5', 'anti_patterns': [{'sequence': ['Bash', 'Bash', 'Bash'], 'count': 12, 'description': 'Command spam - plan commands before executing'}, {'sequence': ['Read', 'Read', 'Read'], 'count': 2, 'description': 'Excessive reading - take notes or use grep to find specific content'}, {'sequence': ['Edit', 'Edit', 'Edit'], 'count': 1, 'description': 'Multiple edits without testing - run tests between changes'}], 'errors': [], 'error_count': 0, 'efficiency': 0.45238095238095233, 'issues': ['High retry rate: 46%', 'Excessive context rebuilds: 7'], 'recommendations': ['Consider reading more context before acting', 'Cache file contents or take notes'], 'test_runs': [{'command': 'Check pytest output so far', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check if pytest has finished', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Wait 10s then check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}], 'test_summary': '✓ 4 test runs', 'summary': '⚠️ Issues: 15 anti-pattern occurrences, low efficiency (45%), ✓ 4 test runs'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-b59aa9e8">insi-b59aa9e8</dd>
+            </dl>
+        </section>
+        <section data-content>
+            <h3>Description</h3>
+            ## Problem
+When sdk.features.start('feat-X') is called, UserQuery backfill correctly stamps feat-X. But subsequent PreToolUse hooks attribute tool events to a DIFFERENT in-progress feature (feat-Y).
+
+## Evidence (2026-03-10, v0.33.57)
+Called sdk.features.start('feat-74b2cf48'). DB shows:
+- UserQuery events: feat-74b2cf48 (correct)
+- All tool events: feat-5922d683 (WRONG)
+
+## Root Cause
+PreToolUse hook determines active feature independently from SDK start(). It queries features table for most recently updated in-progress feature. With multiple features in-progress, picks wrong one.
+
+## Key Files
+- src/python/htmlgraph/hooks/pretooluse.py (how feature_id determined for tool events)
+- src/python/htmlgraph/hooks/context.py (get_active_feature or similar)
+- src/python/htmlgraph/sessions/features.py (start_feature + _backfill_turn1_userquery)
+
+## Fix Direction
+PreToolUse hook should query for the feature most recently started via sdk.features.start() in the CURRENT SESSION, not just any in-progress feature. Could use primary_feature marker in session record or last-started timestamp.
+        </section>
+    </article>
+</body>
+</html>

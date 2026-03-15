@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Backfill Attribution Fix Implementation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-8ff881bd"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T00:49:47.809823"
+             data-updated="2026-03-10T00:49:47.809824" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="sonnet-coder">
+
+        <header>
+            <h1>Backfill Attribution Fix Implementation</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                FILES CHANGED:
+- src/python/htmlgraph/session_manager.py: Fixed _backfill_turn1_userquery() to:
+  (1) Upsert work item into SQLite features table before UPDATE (INSERT OR IGNORE) to satisfy FK constraint
+  (2) Add PRAGMA foreign_keys=OFF/ON around both UPDATE statements (belt-and-suspenders, same pattern as insert_event())
+  (3) Use bugs_graph for bug-* IDs, features_graph for everything else when loading node title/status
+
+- src/python/htmlgraph/sessions/features.py: Added _backfill_turn1_userquery() call to FeatureWorkflow.start_feature()
+  This was the primary missing link: sdk.features.start() routes through FeatureWorkflow.start_feature(), 
+  not session_manager.start_feature(), so backfill was never called.
+
+ROOT CAUSES FIXED:
+RC1: FK constraint on agent_events.feature_id -> features(id) caused silent failures for spikes (spk-*)
+     not in the SQLite features table. Fixed by INSERT OR IGNORE upsert + PRAGMA foreign_keys=OFF.
+RC2: FeatureWorkflow.start_feature() (the actual SDK code path) never called _backfill_turn1_userquery().
+     Only session_manager.start_feature() did, which is not called by sdk.features.start().
+RC3: DB-wide fallback already existed and is correct once RC1 is fixed.
+
+TESTS: 2187 passed, 51 targeted attribution/backfill tests all pass.
+Pre-existing failures: 5 timeout tests in test_user_prompt_submit_cigs.py, 1 benchmark regression (unrelated).
+RESULT: All three attribution backfill bugs fixed.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

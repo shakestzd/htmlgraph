@@ -204,16 +204,12 @@ class TestSDKCollectionDelete:
         bug = Node(id="test-bug", title="Test Bug", type="bug")
         sdk.bugs._ensure_graph().add(bug)
 
-        chore = Node(id="test-chore", title="Test Chore", type="chore")
-        sdk.chores._ensure_graph().add(chore)
-
         spike = Node(id="test-spike", title="Test Spike", type="spike")
         sdk.spikes._ensure_graph().add(spike)
 
         collections = {
             "features": (sdk.features, feature.id),
             "bugs": (sdk.bugs, "test-bug"),
-            "chores": (sdk.chores, "test-chore"),
             "spikes": (sdk.spikes, "test-spike"),
         }
 

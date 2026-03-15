@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Backfill Attribution Bug Analysis</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-e7037550"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T00:42:19.523208"
+             data-updated="2026-03-10T00:42:19.523210" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Backfill Attribution Bug Analysis</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+sdk.spikes.start('spk-28b40c41') and sdk.features.start() do NOT backfill the Turn 1 UserQuery event's feature_id column. All UserQuery events for session f6fd307b-29a4-430e-bcf2-f227e4253946 show feature_id=NULL.
+
+## Call Path (Confirmed by Source Code)
+1. sdk.spikes.start(node_id) -> BaseCollection.start() [collections/base.py:611]
+2. -> SessionManager.start_feature(feature_id, collection, agent, log_activity) [session_manager.py:1990]
+3. -> _backfill_turn1_userquery(active_session.id if active_session else None, feature_id) [session_manager.py:2075]
+4. _backfill_turn1_userquery() runs UPDATE agent_events SET feature_id=? WHERE tool_name=UserQuery AND feature_id IS NULL
+
+The backfill function EXISTS and IS CALLED. The bug is in the inputs.
+
+## Root Cause 1 (PRIMARY): Foreign Key Constraint Silently Blocks UPDATE
+The agent_events DDL defines: FOREIGN KEY (feature_id) REFERENCES features(id)
+The SQLite features table has 185 rows (feat-* and bug-* types only).
+Spikes (spk-*) live as HTML files in .htmlgraph/features/ but are NEVER synced to the SQLite features table.
+So 'spk-28b40c41' is NOT in features(id). The UPDATE is rejected by SQLite FK enforcement.
+The exception is caught by a broad except block and logged only at DEBUG level:
+  'except Exception as e: logger.debug(...)'
+Result: The UPDATE silently fails, feature_id stays NULL, no warning shown.
+
+Confirmed: SELECT id FROM features WHERE id='spk-28b40c41' returns empty.
+
+## Root Cause 2: Wrong session_id in active_session lookup
+In start_feature(), active_session = get_active_session_for_agent('researcher').
+This reads HTML session files via session_converter.load_all().
+The current session HTML (f6fd307b-...) has data-agent='claude-code', not 'researcher'.
+So get_active_session_for_agent('researcher') returns None.
+Then _ensure_session_for_agent('researcher') creates a NEW session with a different session_id.
+The backfill receives this wrong session_id; the session-scoped fast path finds 0 UserQuery rows.
+Control falls to the DB-wide fallback, which still fails due to Root Cause 1.
+
+## Root Cause 3: SDK does not know the real Claude Code session_id
+BaseSDK._log_event() uses: session_id = self._parent_session or 'cli-session'
+SDK(agent='researcher') initialized without parent_session defaults to 'cli-session'.
+The SDK is disconnected from the real Claude Code session (f6fd307b-...).
+All sessions in SQLite show agent_assigned='system' (written by the hook, not the SDK).
+
+## Evidence from Database
+- All UserQuery events have feature_id=NULL
+- spk-28b40c41 absent from features SQLite table
+- All sessions have agent_assigned='system' (not 'researcher' or 'claude-code')
+- Current session HTML has data-agent='claude-code'
+- features table has 185 rows, all feat-* or bug-* types
+
+## Solution Options
+Option A (Proper Fix): Upsert spike into features SQLite table on sdk.spikes.start()
+  - Insert/upsert the spike record into features(id, type, title, status) before calling backfill
+  - Makes the FK constraint satisfiable for all spike-type work items
+
+Option B (Quick Fix): Disable FK in _backfill_turn1_userquery like insert_event() does
+  - Add PRAGMA foreign_keys=OFF before the UPDATE, re-enable after
+  - db/schema.py insert_event() already uses this pattern at line 398
+  - Allows orphaned feature_id but unblocks attribution immediately
+
+Option C (Session Fix): Pass real Claude Code session_id to SDK
+  - Write CLAUDE_SESSION_ID to env or a known file in the UserPromptSubmit hook
+  - SDK reads it on init so session-scoped fast path works correctly
+  - Fixes Root Cause 2 and 3 but not Root Cause 1
+
+## Recommended Fix
+Apply Option B immediately (1 line change in _backfill_turn1_userquery).
+Apply Option A as proper fix (sync spike to features table in start_feature() when collection='spikes' or when id starts with 'spk-').
+Option C is desirable longer-term but not strictly required since the DB-wide fallback already handles the session_id problem IF the FK issue is resolved.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

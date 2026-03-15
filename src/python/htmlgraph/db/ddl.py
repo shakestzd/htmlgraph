@@ -225,80 +225,7 @@ def create_all_tables(cursor: sqlite3.Cursor) -> None:
         )
     """)
 
-    # 9. TOOL_TRACES TABLE - Detailed tool execution tracing
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tool_traces (
-            tool_use_id TEXT PRIMARY KEY,
-            trace_id TEXT NOT NULL,
-            session_id TEXT NOT NULL,
-            tool_name TEXT NOT NULL,
-            tool_input JSON,
-            tool_output JSON,
-            start_time TIMESTAMP NOT NULL,
-            end_time TIMESTAMP,
-            duration_ms INTEGER,
-            status TEXT NOT NULL DEFAULT 'started' CHECK(
-                status IN ('started', 'completed', 'failed', 'timeout', 'cancelled')
-            ),
-            error_message TEXT,
-            parent_tool_use_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-            FOREIGN KEY (parent_tool_use_id) REFERENCES tool_traces(tool_use_id)
-        )
-    """)
-
-    # 10. HANDOFF_TRACKING TABLE - Track handoff effectiveness
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS handoff_tracking (
-            handoff_id TEXT PRIMARY KEY,
-            from_session_id TEXT NOT NULL,
-            to_session_id TEXT,
-            items_in_context INTEGER DEFAULT 0,
-            items_accessed INTEGER DEFAULT 0,
-            time_to_resume_seconds INTEGER DEFAULT 0,
-            user_rating INTEGER CHECK(user_rating BETWEEN 1 AND 5),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            resumed_at DATETIME,
-            FOREIGN KEY (from_session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
-            FOREIGN KEY (to_session_id) REFERENCES sessions(session_id) ON DELETE SET NULL
-        )
-    """)
-
-    # 11. COST_EVENTS TABLE - Real-time cost monitoring & alerts
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS cost_events (
-            event_id TEXT PRIMARY KEY,
-            session_id TEXT NOT NULL,
-            timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-            -- Token tracking
-            tool_name TEXT,
-            model TEXT,
-            input_tokens INTEGER DEFAULT 0,
-            output_tokens INTEGER DEFAULT 0,
-            total_tokens INTEGER DEFAULT 0,
-            cost_usd REAL DEFAULT 0.0,
-
-            -- Agent tracking
-            agent_id TEXT,
-            subagent_type TEXT,
-
-            -- Alert tracking
-            alert_type TEXT,
-            message TEXT,
-            current_cost_usd REAL,
-            budget_usd REAL,
-            predicted_cost_usd REAL,
-            severity TEXT,
-            acknowledged BOOLEAN DEFAULT 0,
-
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-        )
-    """)
-
-    # 12. AGENT_PRESENCE TABLE - Cross-Agent Presence Tracking
+    # 9. AGENT_PRESENCE TABLE - Cross-Agent Presence Tracking
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS agent_presence (
             agent_id TEXT PRIMARY KEY,
@@ -317,116 +244,7 @@ def create_all_tables(cursor: sqlite3.Cursor) -> None:
         )
     """)
 
-    # 13. OFFLINE_EVENTS TABLE - Offline-First Merge
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS offline_events (
-            event_id TEXT PRIMARY KEY,
-            agent_id TEXT NOT NULL,
-            resource_id TEXT NOT NULL,
-            resource_type TEXT NOT NULL,
-            operation TEXT NOT NULL CHECK(
-                operation IN ('create', 'update', 'delete')
-            ),
-            timestamp TEXT NOT NULL,
-            payload TEXT NOT NULL,
-            status TEXT DEFAULT 'local_only' CHECK(
-                status IN ('local_only', 'synced', 'conflict', 'resolved')
-            ),
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # 14. CONFLICT_LOG TABLE - Conflict tracking and resolution
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS conflict_log (
-            conflict_id TEXT PRIMARY KEY,
-            local_event_id TEXT NOT NULL,
-            remote_event_id TEXT,
-            resource_id TEXT NOT NULL,
-            conflict_type TEXT NOT NULL,
-            local_timestamp TEXT NOT NULL,
-            remote_timestamp TEXT NOT NULL,
-            resolution_strategy TEXT NOT NULL,
-            resolution TEXT,
-            status TEXT DEFAULT 'pending_review' CHECK(
-                status IN ('pending_review', 'resolved')
-            ),
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (local_event_id) REFERENCES offline_events(event_id) ON DELETE CASCADE
-        )
-    """)
-
-    # 15. SYNC_OPERATIONS TABLE - Git sync tracking
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sync_operations (
-            sync_id TEXT PRIMARY KEY,
-            operation TEXT NOT NULL CHECK(operation IN ('push', 'pull')),
-            status TEXT NOT NULL CHECK(
-                status IN ('idle', 'pushing', 'pulling', 'success', 'error', 'conflict')
-            ),
-            timestamp DATETIME NOT NULL,
-            files_changed INTEGER DEFAULT 0,
-            conflicts TEXT,
-            message TEXT,
-            hostname TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # 17. OPLOG TABLE - Canonical local-first sync transport
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS oplog (
-            seq INTEGER PRIMARY KEY AUTOINCREMENT,
-            entry_id TEXT NOT NULL UNIQUE,
-            idempotency_key TEXT NOT NULL UNIQUE,
-            entity_type TEXT NOT NULL,
-            entity_id TEXT NOT NULL,
-            op TEXT NOT NULL CHECK(
-                op IN ('create', 'update', 'delete', 'upsert', 'patch')
-            ),
-            payload TEXT NOT NULL,
-            actor TEXT NOT NULL,
-            ts TEXT NOT NULL,
-            field_mask TEXT,
-            session_id TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # 18. SYNC_CURSORS TABLE - Per-consumer cursor tracking
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sync_cursors (
-            consumer_id TEXT PRIMARY KEY,
-            last_seen_seq INTEGER NOT NULL DEFAULT 0,
-            last_acked_seq INTEGER NOT NULL DEFAULT 0,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            CHECK(last_seen_seq >= 0),
-            CHECK(last_acked_seq >= 0),
-            CHECK(last_acked_seq <= last_seen_seq)
-        )
-    """)
-
-    # 19. SYNC_CONFLICTS TABLE - Deterministic conflict records (LWW policy)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sync_conflicts (
-            conflict_id TEXT PRIMARY KEY,
-            local_entry_id TEXT NOT NULL,
-            remote_entry_id TEXT NOT NULL,
-            entity_type TEXT NOT NULL,
-            entity_id TEXT NOT NULL,
-            field_set TEXT NOT NULL,
-            policy TEXT NOT NULL,
-            resolution TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'resolved' CHECK(
-                status IN ('pending_review', 'resolved')
-            ),
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (local_entry_id) REFERENCES oplog(entry_id) ON DELETE CASCADE,
-            FOREIGN KEY (remote_entry_id) REFERENCES oplog(entry_id) ON DELETE CASCADE
-        )
-    """)
-
-    # 20. FTS5 VIRTUAL TABLES - Full-text search (sessions_fts, events_fts)
+    # 11. FTS5 VIRTUAL TABLES - Full-text search (sessions_fts, events_fts)
     create_fts_tables(cursor)
 
 
@@ -486,52 +304,13 @@ def create_all_indexes(cursor: sqlite3.Cursor) -> None:
         "CREATE INDEX IF NOT EXISTS idx_edges_from ON graph_edges(from_node_id)",
         "CREATE INDEX IF NOT EXISTS idx_edges_to ON graph_edges(to_node_id)",
         "CREATE INDEX IF NOT EXISTS idx_edges_type ON graph_edges(relationship_type)",
-        # tool_traces indexes
-        "CREATE INDEX IF NOT EXISTS idx_tool_traces_trace_id ON tool_traces(trace_id, start_time DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_tool_traces_session ON tool_traces(session_id, start_time DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_tool_traces_tool_name ON tool_traces(tool_name, status)",
-        "CREATE INDEX IF NOT EXISTS idx_tool_traces_status ON tool_traces(status, start_time DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_tool_traces_start_time ON tool_traces(start_time DESC)",
         # live_events indexes
         "CREATE INDEX IF NOT EXISTS idx_live_events_pending ON live_events(broadcast_at) WHERE broadcast_at IS NULL",
         "CREATE INDEX IF NOT EXISTS idx_live_events_created ON live_events(created_at DESC)",
-        # handoff_tracking indexes
-        "CREATE INDEX IF NOT EXISTS idx_handoff_from_session ON handoff_tracking(from_session_id, created_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_handoff_to_session ON handoff_tracking(to_session_id, resumed_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_handoff_rating ON handoff_tracking(user_rating, created_at DESC)",
-        # cost_events indexes
-        "CREATE INDEX IF NOT EXISTS idx_cost_events_session_ts ON cost_events(session_id, timestamp DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_cost_events_alert_type ON cost_events(alert_type, timestamp DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_cost_events_model ON cost_events(model, session_id)",
-        "CREATE INDEX IF NOT EXISTS idx_cost_events_tool ON cost_events(tool_name, session_id)",
-        "CREATE INDEX IF NOT EXISTS idx_cost_events_severity ON cost_events(severity, timestamp DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_cost_events_timestamp ON cost_events(timestamp DESC)",
         # agent_presence indexes
         "CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status, last_activity DESC)",
         "CREATE INDEX IF NOT EXISTS idx_agent_presence_feature ON agent_presence(current_feature_id, last_activity DESC)",
         "CREATE INDEX IF NOT EXISTS idx_agent_presence_activity ON agent_presence(last_activity DESC)",
-        # offline_events indexes
-        "CREATE INDEX IF NOT EXISTS idx_offline_events_status ON offline_events(status, timestamp DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_offline_events_resource ON offline_events(resource_id, resource_type)",
-        "CREATE INDEX IF NOT EXISTS idx_offline_events_agent ON offline_events(agent_id, timestamp DESC)",
-        # conflict_log indexes
-        "CREATE INDEX IF NOT EXISTS idx_conflict_log_status ON conflict_log(status, created_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_conflict_log_resource ON conflict_log(resource_id, created_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_conflict_log_local_event ON conflict_log(local_event_id)",
-        # sync_operations indexes
-        "CREATE INDEX IF NOT EXISTS idx_sync_operations_status ON sync_operations(status, timestamp DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_sync_operations_operation ON sync_operations(operation, timestamp DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_sync_operations_timestamp ON sync_operations(timestamp DESC)",
-        # oplog indexes
-        "CREATE INDEX IF NOT EXISTS idx_oplog_seq ON oplog(seq DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_oplog_entity ON oplog(entity_type, entity_id, seq DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_oplog_actor_ts ON oplog(actor, ts DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_oplog_session_seq ON oplog(session_id, seq DESC)",
-        # sync_cursors indexes
-        "CREATE INDEX IF NOT EXISTS idx_sync_cursors_updated ON sync_cursors(updated_at DESC)",
-        # sync_conflicts indexes
-        "CREATE INDEX IF NOT EXISTS idx_sync_conflicts_status ON sync_conflicts(status, created_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_sync_conflicts_entity ON sync_conflicts(entity_type, entity_id, created_at DESC)",
     ]
 
     for index_sql in indexes:

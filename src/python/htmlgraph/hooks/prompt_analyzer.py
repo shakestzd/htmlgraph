@@ -500,6 +500,7 @@ def generate_guidance(
     active_work: dict[str, Any] | None,
     prompt: str,
     open_work_items: list[dict] | None = None,
+    active_wisps: list[dict] | None = None,
 ) -> str | None:
     """
     Generate workflow guidance based on classification and context.
@@ -516,6 +517,7 @@ def generate_guidance(
         prompt: Original user prompt
         open_work_items: Optional list from get_open_work_items(). When non-empty,
             an attribution block is appended to the returned guidance.
+        active_wisps: Deprecated, ignored. Kept for backward compatibility.
 
     Returns:
         Guidance string to display to user, or None if no guidance needed
@@ -668,12 +670,11 @@ def generate_guidance(
         )
         attribution_block = _build_attribution_block(active_work, open_work_items)
         if attribution_block:
-            return base_guidance + "\n\n" + attribution_block
+            return f"{base_guidance}\n\n{attribution_block}"
         return base_guidance
 
-    # No specific guidance — but still inject attribution block if there are open items
-    attribution_block = _build_attribution_block(active_work, open_work_items)
-    return attribution_block if attribution_block else None
+    # No specific guidance — but still inject attribution block if present
+    return _build_attribution_block(active_work, open_work_items)
 
 
 def detect_wip_limit_hit(prompt: str) -> bool:

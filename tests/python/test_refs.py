@@ -26,10 +26,6 @@ def temp_graph_dir():
             "tracks",
             "bugs",
             "spikes",
-            "chores",
-            "epics",
-            "todos",
-            "phases",
         ]:
             (graph_dir / collection).mkdir()
 
@@ -350,12 +346,8 @@ class TestSDKIntegration:
         collections = [
             sdk.features,
             sdk.bugs,
-            sdk.chores,
             sdk.spikes,
-            sdk.epics,
-            sdk.phases,
             sdk.tracks,
-            sdk.todos,
         ]
 
         for collection in collections:

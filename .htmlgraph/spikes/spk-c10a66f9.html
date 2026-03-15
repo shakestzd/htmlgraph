@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Nesting bug root cause: post-Task orchestrator Bash calls parent Task instead of UserQuery</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-c10a66f9"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-11T08:05:38.502508"
+             data-updated="2026-03-11T08:05:38.502509" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="debugger">
+
+        <header>
+            <h1>Nesting bug root cause: post-Task orchestrator Bash calls parent Task instead of UserQuery</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Root Cause — Exact Diagnosis
+
+### The Bug
+After a Task delegation completes, subsequent orchestrator Bash calls (agent_id='claude-code',
+session_known=True) get parent_event_id set to the Task's event_id instead of the UserQuery's
+event_id.
+
+### Code Path Traced
+
+**File: src/python/htmlgraph/hooks/event_tracker.py — Method 0 (_find_parent_via_jsonl)**
+
+Lines 1604-1620 (PostToolUse path):
+  _post_tool_use_id = hook_input.get("tool_use_id") or hook_input.get("toolUseId")
+  if _post_tool_use_id and hook_session_id and db and db.connection:
+      _jsonl_parent = _find_parent_via_jsonl(session_id, tool_use_id, cursor)
+      if _jsonl_parent:
+          parent_activity_id = _jsonl_parent   # <-- wins immediately, no further checks
+
+The _find_parent_via_jsonl function (lines 840-948) scans the JSONL transcript for
+"type": "agent_progress" records with a "parentToolUseID" field.
+
+**THE BUG IS IN THE FALLBACK at lines 927-941:**
+
+  cursor.execute(
+      """
+      SELECT event_id FROM agent_events
+      WHERE event_type = 'task_delegation'
+      ORDER BY datetime(REPLACE(SUBSTR(timestamp,1,19),'T',' ')) DESC
+      LIMIT 1
+      """
+  )
+  row2 = cursor.fetchone()
+  if row2:
+      return str(row2[0])   # <-- returns MOST RECENT task_delegation GLOBALLY
+
+This fallback fires when:
+1. An agent_progress record IS found in the JSONL (meaning it found a parentToolUseID)
+2. BUT the primary JOIN query (tt.tool_use_id = parentToolUseID AND tt.session_id = ae.session_id)
+   found NO matching row (tool_traces entry missing or session_id mismatch)
+
+When that JOIN fails, instead of returning None, the code falls through to a query that
+returns the most recently created task_delegation event — which is the Task that just
+completed. This is wrong for orchestrator tool calls.
+
+**WHY THE JOIN FAILS for orchestrator post-Task Bash calls:**
+
+The JSONL for the orchestrator session contains agent_progress records from the subagent
+(the Task's execution). These agent_progress records carry parentToolUseID pointing to the
+Task's tool_use_id. After the Task completes, subsequent orchestrator Bash calls get
+PostToolUse fired. Method 0 scans the SAME JSONL transcript and finds those agent_progress
+records that were written during the Task's execution. The JOIN:
+
+  JOIN tool_traces tt ON tt.tool_use_id = parentToolUseID AND tt.session_id = ae.session_id
+
+...fails or is ambiguous, so the fallback query fires and returns the most recent
+task_delegation — the Task that just finished. This incorrectly nests the orchestrator's
+Bash under the Task.
+
+**Alternate/contributing path in pretooluse.py:**
+
+pretooluse.py lines 636-679 (subagent detection):
+- session_known = True for orchestrator (session IS in sessions table)
+- No suffix match either (agent_id='claude-code', session is canonical)
+- So subagent_parent_event_id = None
+
+Lines 768-775 (parent assignment):
+  if tool_name in ("Task", "Agent") and task_parent_event_id:
+      parent_event_id = user_query_event_id        # Not a Task call
+  elif subagent_parent_event_id:                    # None — skip
+      ...
+  elif env_parent_event and not is_mcp_tool and not session_known:  # session_known=True — skip
+      ...
+  else:
+      parent_event_id = user_query_event_id         # CORRECT in pretooluse
+
+PreToolUse correctly assigns parent_event_id = user_query_event_id for orchestrator Bash.
+But PostToolUse via Method 0 (JSONL) OVERRIDES this with the Task event_id via the bad fallback.
+
+### Exact Fix
+
+**File: src/python/htmlgraph/hooks/event_tracker.py**
+**Lines 924-941** — the fallback inside _find_parent_via_jsonl
+
+CURRENT (buggy):
+  # Fallback: find the most recent task_delegation whose
+  # tool_use_id matches the parentToolUseID directly.
+  # NOTE: No status filter — see note above.
+  cursor.execute(
+      """
+      SELECT event_id FROM agent_events
+      WHERE event_type = 'task_delegation'
+      ORDER BY datetime(REPLACE(SUBSTR(timestamp,1,19),'T',' ')) DESC
+      LIMIT 1
+      """
+  )
+  row2 = cursor.fetchone()
+  if row2:
+      return str(row2[0])
+
+PROBLEM: This fallback ignores the parentToolUseID entirely and returns ANY recent
+task_delegation. An orchestrator Bash call after a Task also triggers this because the
+JSONL still contains agent_progress records from the (now-completed) Task subagent.
+
+THE FIX — two options:
+
+Option A (safest): Remove the fallback entirely. If the JOIN on tool_traces fails,
+return None instead of guessing. Let Method 1 (env var) or the final fallback handle it.
+
+  # DELETE lines 924-941 entirely
+
+Option B (correct fallback): Only return if the parentToolUseID actually matches the
+tool call currently being processed (the tool_use_id parameter), not just ANY agent_progress:
+
+  # Before the loop, store the current tool_use_id being looked up
+  # Only fire fallback when we have high confidence (the parentToolUseID matches
+  # a tool_use_id that belongs to the subagent session, not the orchestrator)
+
+**Recommended fix: Option A** — just delete the fallback block (lines 924-941).
+
+The JOIN on tool_traces is the correct attribution. If it fails (tool_traces entry missing),
+the right behavior is to return None and let the outer fallback chain (env var → final
+scan with staleness check) handle it. The unconstrained "most recent task_delegation"
+fallback is what causes the bug: it fires for orchestrator calls that happen to have
+agent_progress records in their JSONL from a prior (completed) subagent.
+
+### Secondary check needed
+
+Also verify: does the orchestrator Bash JSONL at PostToolUse time contain agent_progress
+records from the completed subagent? If yes, the _find_parent_via_jsonl scan will always
+find them and hit the fallback. The fix (remove fallback) ensures these stale agent_progress
+records don't corrupt attribution.
+
+### Files to change
+
+- src/python/htmlgraph/hooks/event_tracker.py: lines 924-941, delete the fallback block
+  inside _find_parent_via_jsonl
+
+No changes needed to pretooluse.py — its logic is correct (returns UserQuery for
+orchestrator Bash). The bug is entirely in the PostToolUse Method 0 fallback.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Nesting bug root cause: post-Task orchestrator Bash calls parent Task instead of UserQuery</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-d22ca74f"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-11T08:05:56.452823"
+             data-updated="2026-03-11T08:05:56.452824" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="debugger">
+
+        <header>
+            <h1>Nesting bug root cause: post-Task orchestrator Bash calls parent Task instead of UserQuery</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                Root Cause — Exact Diagnosis
+
+THE BUG IS IN: src/python/htmlgraph/hooks/event_tracker.py, function _find_parent_via_jsonl, lines 924-941
+
+WHAT HAPPENS:
+PostToolUse Method 0 (_find_parent_via_jsonl) scans the JSONL transcript for agent_progress records
+with parentToolUseID. The orchestrator JSONL still contains agent_progress records from the
+previously-completed subagent (Task). So after the Task completes, when the orchestrator fires
+the next Bash PreToolUse/PostToolUse:
+
+1. _find_parent_via_jsonl scans the JSONL
+2. It finds agent_progress records from the completed Task (parentToolUseID = Task tool_use_id)
+3. The primary JOIN query fails (tool_traces entry missing or session mismatch)
+4. The fallback at lines 924-941 fires: SELECT event_id FROM agent_events WHERE event_type=task_delegation ORDER BY timestamp DESC LIMIT 1
+5. This returns the most recent task_delegation globally — the Task that just completed
+6. parent_activity_id = that Task event_id
+7. Orchestrator Bash gets nested under Task instead of UserQuery
+
+THE FALLBACK (lines 924-941) is the root cause:
+  cursor.execute(SELECT event_id FROM agent_events WHERE event_type=task_delegation ORDER BY timestamp DESC LIMIT 1)
+  row2 = cursor.fetchone()
+  if row2: return str(row2[0])
+
+This ignores parentToolUseID entirely and returns ANY recent task_delegation.
+
+PreToolUse correctly assigns parent_event_id = user_query_event_id for orchestrator Bash
+(session_known=True, subagent_parent_event_id=None, falls to else branch at line 775).
+But PostToolUse Method 0 overrides this via the bad fallback.
+
+THE FIX: Delete lines 924-941 in _find_parent_via_jsonl.
+If the tool_traces JOIN fails, return None. Let the outer fallback chain handle it.
+The unconstrained most-recent-task_delegation query is what corrupts attribution.
+
+Files to change:
+- src/python/htmlgraph/hooks/event_tracker.py: delete lines 924-941 (the fallback block inside _find_parent_via_jsonl)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

@@ -2185,13 +2185,6 @@ class SessionManager:
                 analysis = learning.analyze_for_orchestrator(session.id)
                 node.properties["completion_analysis"] = analysis
 
-                # PERSIST learning insights to graph (not just ephemeral properties)
-                # This creates queryable SessionInsight and Pattern nodes
-                insight_id = learning.persist_session_insight(session.id)
-                if insight_id:
-                    node.properties["insight_id"] = insight_id
-                    logger.debug(f"Persisted learning insight: {insight_id}")
-
                 # Persist patterns detected across sessions
                 pattern_ids = learning.persist_patterns()
                 if pattern_ids:

@@ -69,17 +69,8 @@ class TestNativeToolUseId:
             )
 
         # Should return the native tool_use_id
+        # (agent_events row is written by PostToolUse, not PreToolUse)
         assert result == "toolu_01ABC123"
-
-        # Verify it's stored in tool_traces
-        cursor = db.connection.cursor()
-        cursor.execute(
-            "SELECT tool_use_id FROM tool_traces WHERE tool_use_id = ?",
-            ("toolu_01ABC123",),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert row[0] == "toolu_01ABC123"
 
     def test_uuid_fallback_when_no_native_id(self):
         """When hook_input has no tool_use_id, should fall back to generated UUID."""
@@ -105,21 +96,13 @@ class TestNativeToolUseId:
             )
 
         # Should return a UUID (36 characters with dashes)
+        # (agent_events row is written by PostToolUse, not PreToolUse)
         assert result is not None
         assert len(result) == 36
         assert result.count("-") == 4  # UUID format
 
-        # Verify it's stored in tool_traces
-        cursor = db.connection.cursor()
-        cursor.execute(
-            "SELECT tool_use_id FROM tool_traces WHERE tool_use_id = ?",
-            (result,),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-
-    def test_native_id_stored_in_tool_traces(self):
-        """Verify toolu_01XXX format ID is stored in tool_traces table."""
+    def test_native_id_stored_in_agent_events(self):
+        """Verify toolu_01XXX format ID is stored as claude_task_id in agent_events."""
         from htmlgraph.hooks.pretooluse import create_start_event
 
         db = create_test_db()
@@ -136,22 +119,14 @@ class TestNativeToolUseId:
         }
 
         with patch("htmlgraph.config.get_database_path", return_value=db.db_path):
-            create_start_event(
+            result = create_start_event(
                 tool_name="Grep",
                 tool_input=tool_input,
                 session_id=session_id,
             )
 
-        # Query tool_traces for the native ID
-        cursor = db.connection.cursor()
-        cursor.execute(
-            "SELECT tool_name, status FROM tool_traces WHERE tool_use_id = ?",
-            (native_id,),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert row[0] == "Grep"
-        assert row[1] == "started"
+        # PreToolUse returns the native tool_use_id; agent_events row is written by PostToolUse.
+        assert result == native_id
 
 
 # ============================================================================
@@ -583,17 +558,8 @@ class TestIntegration:
             with patch("htmlgraph.config.get_database_path", return_value=db.db_path):
                 track_event("PostToolUseFailure", failure_input)
 
-        # Verify both tool_traces and agent_events have the failure
+        # Verify agent_events has the failure
         cursor = db.connection.cursor()
-
-        # Check tool_traces
-        cursor.execute(
-            "SELECT status FROM tool_traces WHERE tool_use_id = ?",
-            (native_id,),
-        )
-        trace_row = cursor.fetchone()
-        assert trace_row is not None
-        # Note: status might be 'started' or 'failed' depending on update logic
 
         # Check agent_events has the error
         cursor.execute(

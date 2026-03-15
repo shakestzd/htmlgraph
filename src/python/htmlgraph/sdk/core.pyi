@@ -10,19 +10,10 @@ from typing import Any
 from htmlgraph.agents import AgentInterface
 from htmlgraph.analytics import Analytics, CrossSessionAnalytics, DependencyAnalytics
 from htmlgraph.collections import (
-    BaseCollection,
     BugCollection,
-    ChoreCollection,
-    EpicCollection,
     FeatureCollection,
-    PhaseCollection,
     SpikeCollection,
-    TaskDelegationCollection,
-    TodoCollection,
 )
-from htmlgraph.collections.insight import InsightCollection
-from htmlgraph.collections.metric import MetricCollection
-from htmlgraph.collections.pattern import PatternCollection
 from htmlgraph.collections.session import SessionCollection
 from htmlgraph.context_analytics import ContextAnalytics
 from htmlgraph.db.schema import HtmlGraphDB
@@ -70,18 +61,9 @@ class SDK:
     # Collection interfaces
     features: FeatureCollection
     bugs: BugCollection
-    chores: ChoreCollection
     spikes: SpikeCollection
-    epics: EpicCollection
-    phases: PhaseCollection
     sessions: SessionCollection
     tracks: TrackCollection
-    agents: BaseCollection[Any]
-    patterns: PatternCollection
-    insights: InsightCollection
-    metrics: MetricCollection
-    todos: TodoCollection
-    task_delegations: TaskDelegationCollection
 
     # Session manager
     session_manager: SessionManager

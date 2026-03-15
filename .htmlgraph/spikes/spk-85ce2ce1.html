@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Bug 2 Verification: Sibling nesting for orchestrator tool calls</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-85ce2ce1"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T14:45:01.075481"
+             data-updated="2026-03-10T14:45:01.075484" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Bug 2 Verification: Sibling nesting for orchestrator tool calls</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Bug 2 Verification: Orchestrator Tool Calls as Siblings to Task Nodes
+
+### Status: PASS ✅
+
+### Test Scenario
+Verified that when the orchestrator (Claude Code main agent with `session_known=True`) runs tool calls directly (Bash, Read, Grep), those events appear as SIBLINGS to Task delegation nodes in the activity feed—NOT nested inside them.
+
+### Database Evidence
+
+Latest session events show correct nesting structure:
+
+```
+evt-a4e5be9a (UserQuery - root)
+├── evt-4c7759ce (Task)
+│   ├── evt-edfb826d (Bash, agent_id='ad4130492f50bf3cd')  ← Subagent, nested under Task
+│   ├── evt-68b7329c (Bash, agent_id='ad4130492f50bf3cd')  ← Subagent, nested under Task
+│   ├── evt-810bdcac (Read, agent_id='ad4130492f50bf3cd')  ← Subagent, nested under Task
+│   ├── evt-e61b66b0 (Read, agent_id='ad4130492f50bf3cd')  ← Subagent, nested under Task
+│   └── evt-35a200da (Read, agent_id='ad4130492f50bf3cd')  ← Subagent, nested under Task
+├── evt-246e550c (Bash, agent_id='claude-code')           ← Orchestrator, SIBLING to Task ✓
+├── evt-e41a3cfb (Bash, agent_id='claude-code')           ← Orchestrator, SIBLING to Task ✓
+├── evt-1de1c3a6 (Bash, agent_id='claude-code')           ← Orchestrator, SIBLING to Task ✓
+└── [MCP calls, agent_id='claude-code']                    ← Orchestrator, SIBLING to Task ✓
+```
+
+### Root Cause Analysis
+
+The fix is in `pretooluse.py` line 770:
+
+```python
+if tool_name in ("Task", "Agent") and task_parent_event_id:
+    parent_event_id = user_query_event_id  # Task links to UserQuery
+elif subagent_parent_event_id and not session_known:  # Line 770
+    parent_event_id = subagent_parent_event_id  # Subagent links to Task
+elif env_parent_event and not is_mcp_tool and not session_known:
+    parent_event_id = env_parent_event
+else:
+    parent_event_id = user_query_event_id  # Fall back to UserQuery
+```
+
+**Key insight:** The `session_known` variable determines behavior:
+- `session_known = True` (orchestrator context): Conditions at lines 770 and 772 FAIL, falls through to line 775
+- `session_known = False` (subagent context): Conditions succeed, links to Task
+
+**How session_known is determined** (lines 628-634):
+```python
+cursor.execute(
+    "SELECT 1 FROM sessions WHERE session_id = ? LIMIT 1",
+    (session_id,),
+)
+session_known = cursor.fetchone() is not None
+```
+
+- Orchestrator: session_id EXISTS in sessions table → `session_known = True` → orchestrator tools link to UserQuery (siblings to Task)
+- Subagent: session_id DOESN'T EXIST → `session_known = False` → subagent tools link to Task (nested under Task)
+
+### Template Rendering
+
+The activity-feed-hierarchical.html template correctly renders this structure:
+- Depth-0 parent rows (UserQuery): line 30
+- Depth-1 children (Task, orchestrator Bash): line 98 with `data-parent="{{ group.parent.event_id }}"`
+- Depth-2+ grandchildren (subagent Bash/Read): line 172+ with `data-parent="{{ child.event_id }}"`
+
+The `data-parent` attribute establishes the DOM hierarchy, which JavaScript then uses for expand/collapse logic (lines 612-657).
+
+### Verification Steps Performed
+
+1. ✅ Read pretooluse.py line 770: Confirmed `not session_known` guard on subagent parent linking
+2. ✅ Read activity-feed-hierarchical.html: Confirmed `data-parent` attribute establishes hierarchy
+3. ✅ Queried latest session events: Confirmed database reflects correct nesting
+4. ✅ Cross-checked agent_id values: Subagent UUID vs orchestrator 'claude-code'
+
+### Conclusion
+
+The fix correctly enforces:
+- **Subagent tool calls** (unknown session_id) nest under their Task node
+- **Orchestrator tool calls** (known session_id) appear as siblings to Task nodes
+- Both share the same UserQuery parent, with Task at depth-1 and orchestrator tools also at depth-1
+
+Bug 2 test PASSES. The orchestrator sibling nesting behavior is working as designed.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

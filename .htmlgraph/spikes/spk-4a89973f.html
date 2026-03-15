@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Beads Phase 4-6 Research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-4a89973f"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-13T14:09:11.586574"
+             data-updated="2026-03-13T14:09:11.586577" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Beads Phase 4-6 Research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Research: Beads Phase 4-6 Feature Specs
+
+---
+
+## FEATURE 1: feat-09d485ae -- Semantic Compaction (tiered Haiku archival)
+Phase 4, Priority: medium (should-have), 6 tasks, ~11h estimated
+
+### What It Is
+Two-tier automatic compaction of old work items using Claude Haiku as summarizer:
+- Tier 1 (30 days): strip verbose content, keep AI-generated summary (~30% original size)
+- Tier 2 (90 days): reduce to one-liner + metadata, archive full content separately
+
+### SDK Methods
+None at SDK collection level -- driven via CLI or ArchiveManager directly.
+
+### CLI Commands (new)
+- htmlgraph compact [--dry-run] -- triggers tiered compaction manually
+- htmlgraph restore ID -- retrieves full content from archive
+
+### DB Schema Changes
+No new tables needed. Needs new columns on features table:
+  compacted_tier INTEGER (1 or 2)
+  compacted_summary TEXT (Haiku-generated summary)
+  compacted_at DATETIME
+
+### ArchiveManager Extension
+CRITICAL: The existing ArchiveManager MOVES items into consolidated HTML files (deletes originals).
+Semantic compaction is DIFFERENT -- it modifies live HTML in-place (shrinks content).
+Needs a NEW code path -- a SemanticCompactor class, not an extension of ArchiveManager.
+
+### Existing Files to Modify
+1. src/python/htmlgraph/archive/manager.py -- add compact_item(), is_compaction_eligible()
+2. src/python/htmlgraph/archive/__init__.py -- export new methods
+3. src/python/htmlgraph/db/ddl.py -- add compacted_tier/summary/at columns; update migrate_features()
+4. src/python/htmlgraph/db/schema.py -- add get_compaction_candidates() helper
+5. src/python/htmlgraph/cli_commands/feature.py -- add compact and restore commands
+
+### New Files to Create
+1. src/python/htmlgraph/archive/compactor.py -- SemanticCompactor class with Haiku integration
+2. tests/test_compaction.py -- unit tests
+
+### Tests to Write
+- test_tier1_compaction: item older than 30 days gets summary, content reduced to ~30%
+- test_tier2_compaction: item older than 90 days reduced to one-liner, full content archived
+- test_compact_dry_run: shows what would be compacted without executing
+- test_restore_compacted_item: restores full content from archive
+- test_compaction_fts_index: compacted items still searchable via FTS5
+- test_compaction_age_threshold: items younger than threshold not touched
+
+### Estimated Complexity: MEDIUM-HIGH
+Files touched: ~6-7. New files: 1-2. External dep: Anthropic API (Haiku).
+
+---
+
+## FEATURE 2: feat-0e2a937a -- Wisps (ephemeral coordination signals)
+Phase 5, Priority: medium (should-have), 6 tasks, ~6h estimated
+
+### What It Is
+Lightweight ephemeral signals agents broadcast to each other with a TTL.
+They expire automatically and appear in CIGS guidance. Pattern from Beads coordination model.
+
+### DB Schema (new table -- GREENFIELD, nothing exists)
+wisps (id TEXT PK, agent_id TEXT NOT NULL, message TEXT NOT NULL,
+        category TEXT DEFAULT 'general', created_at DATETIME, expires_at DATETIME NOT NULL)
+
+### SDK Methods (new collection)
+- sdk.wisps.signal(message, ttl=3600, category='general') -- create wisp
+- sdk.wisps.active() -- list non-expired wisps (lazy expiry: deletes stale on read)
+
+### CIGS Integration
+prompt_analyzer.py already has get_open_work_items() and generate_guidance().
+Add get_active_wisps(context) and include wisps block in generate_guidance() output.
+Same pattern as work item attribution block added in v0.33.41.
+
+### Existing Files to Modify
+1. src/python/htmlgraph/db/ddl.py -- add wisps table to create_all_tables(), add index
+2. src/python/htmlgraph/db/schema.py -- add insert_wisp(), get_active_wisps(), expire_wisps()
+3. src/python/htmlgraph/hooks/prompt_analyzer.py -- add wisp guidance block
+4. packages/claude-plugin/hooks/scripts/user-prompt-submit.py -- include wisps in CIGS
+5. src/python/htmlgraph/dashboard.html -- wisps notification bar
+6. src/python/htmlgraph/__init__.py -- expose sdk.wisps on SDK class
+
+### New Files to Create
+1. src/python/htmlgraph/collections/wisp.py -- WispCollection with signal() and active()
+2. src/python/htmlgraph/api/templates/partials/wisps.html -- dashboard partial
+3. tests/test_wisps.py -- unit tests
+
+### Tests to Write
+- test_wisp_signal_creates_row: wisp inserted with correct expires_at
+- test_wisp_active_filters_expired: expired wisps not returned
+- test_wisp_lazy_expiry: expired wisps deleted on .active() call
+- test_wisp_ttl_default: default TTL is 3600s
+- test_wisp_lifecycle: create, appear in CIGS, expire (acceptance test)
+- test_wisp_cigs_inclusion: active wisps appear in CIGS guidance output
+
+### Estimated Complexity: LOW-MEDIUM
+Files touched: ~6-7. New files: ~3. No external dependencies.
+
+---
+
+## FEATURE 3: feat-18b3bd0a -- Rich Relationship Types
+Phase 6, Priority: low (nice-to-have), 5 tasks, ~6h estimated
+
+### What It Is
+Extend graph edges beyond blocked_by/blocks to support arbitrary typed edges:
+depends_on, implements, supersedes, related_to, duplicates, etc.
+Enables graph traversal filtered by edge type.
+
+### KEY FINDING: graph_edges table already supports this
+DDL has NO 'dependencies' table. Edges live in graph_edges (table 6) which ALREADY has:
+  relationship_type TEXT NOT NULL
+  idx_edges_type index already built
+The phase-6 'rel_type column on dependencies table' refers to graph_edges.relationship_type.
+NO schema work needed IF phase 2 uses graph_edges for blocked_by edges.
+
+### SDK Methods
+- builder.blocked_by(node_id) ALREADY EXISTS at builders/base.py line 124
+- New: builder.relates_to(other_id, rel_type) -- generic typed edge
+- New: sdk.features.edges(feat_id, rel_type=None) -- query edges by type
+
+### Graph Traversal Extension
+- graph/algorithms.py get_dependencies() at line 68: add rel_type filter param
+- graph/core.py get_transitive_dependencies() at line 563: add rel_type filter
+
+### Existing Files to Modify
+1. src/python/htmlgraph/builders/base.py -- add relates_to(other_id, rel_type) next to blocked_by()
+2. src/python/htmlgraph/graph/algorithms.py -- add rel_type filter to traversal functions
+3. src/python/htmlgraph/graph/core.py -- add rel_type filter to get_transitive_dependencies()
+4. src/python/htmlgraph/db/schema.py -- add get_edges_by_type(node_id, rel_type) query
+5. src/python/htmlgraph/cli_commands/ -- add htmlgraph graph ID command
+6. src/python/htmlgraph/dashboard.html -- color-coded edge rendering
+
+### New Files to Create
+1. tests/test_rich_relationships.py -- unit tests only (no new src files needed)
+
+### Tests to Write
+- test_relates_to_writes_edge: feature.relates_to(other_id, 'supersedes') writes typed edge
+- test_edge_type_filter: traversal filtered by rel_type returns only matching edges
+- test_dependency_traversal_by_type: blocked_by not mixed with implements edges
+- test_graph_cli_neighborhood: htmlgraph graph ID returns correct neighbors
+- test_dashboard_edge_colors: different rel_types get different CSS classes
+
+### Estimated Complexity: LOW
+Files touched: ~5-6. New files: ~1 (tests only). Storage layer already supports it.
+
+---
+
+## CROSS-CUTTING FINDINGS
+
+1. ARCHIVE vs COMPACT: ArchiveManager is a move-and-delete pattern.
+   Semantic compaction is in-place shrinking. Completely different code paths.
+   Do NOT extend ArchiveManager for compaction -- create SemanticCompactor.
+
+2. WISPS ARE GREENFIELD: No table, no collection, no references anywhere.
+   Closest existing pattern: agent_presence table (ephemeral per-agent state).
+
+3. CIGS EXTENSION POINTS READY: prompt_analyzer.py generate_guidance() already
+   has the attribution block pattern from v0.33.41. Both wisps and compaction
+   status should add new sections via the same pattern.
+
+4. graph_edges ALREADY HAS relationship_type: Phase 6 is mostly SDK sugar + CLI.
+   The storage layer is ready. No schema migration needed.
+
+5. RECOMMENDED BUILD ORDER (within phase 4-6):
+   Step 1: Wisps (Phase 5) -- cleanest, no external deps, validates CIGS extension
+   Step 2: Rich Relationships (Phase 6) -- uses graph_edges wired in phase 2
+   Step 3: Semantic Compaction (Phase 4) -- most complex, Haiku API, build last
+   NOTE: Track labels phases as 4=Compaction, 5=Wisps, 6=RichRel.
+   Recommended BUILD order swaps 4 and 5 due to Haiku API complexity.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

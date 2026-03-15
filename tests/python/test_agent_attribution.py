@@ -203,15 +203,6 @@ class TestOtherCollectionsWithAgent:
         assert hasattr(bug, "agent_assigned")
         assert bug.agent_assigned == "tester"
 
-    def test_chore_has_agent_assigned(self, tmp_htmlgraph: Path, isolated_db: Path):
-        """Chore created via SDK should have agent_assigned."""
-        sdk = SDK(directory=tmp_htmlgraph, agent="coder", db_path=str(isolated_db))
-
-        chore = sdk.chores.create("Update dependencies").save()
-
-        assert hasattr(chore, "agent_assigned")
-        assert chore.agent_assigned == "coder"
-
 
 class TestSpikeRetrieval:
     """Test that spikes can be retrieved and agent is preserved."""

@@ -19,19 +19,10 @@ from htmlgraph.agent_detection import detect_agent_name
 from htmlgraph.agents import AgentInterface
 from htmlgraph.analytics import Analytics, CrossSessionAnalytics, DependencyAnalytics
 from htmlgraph.collections import (
-    BaseCollection,
     BugCollection,
-    ChoreCollection,
-    EpicCollection,
     FeatureCollection,
-    PhaseCollection,
     SpikeCollection,
-    TaskDelegationCollection,
-    TodoCollection,
 )
-from htmlgraph.collections.insight import InsightCollection
-from htmlgraph.collections.metric import MetricCollection
-from htmlgraph.collections.pattern import PatternCollection
 from htmlgraph.collections.session import SessionCollection
 from htmlgraph.context_analytics import ContextAnalytics
 from htmlgraph.db.schema import HtmlGraphDB
@@ -131,38 +122,16 @@ class BaseSDK:
         # Cast self to SDK for type checking - BaseSDK is only used via SDK subclass
         sdk_self = cast("SDK", self)
 
-        # Collection interfaces - all work item types (all with builder support)
+        # Collection interfaces - core work item types
         self.features = FeatureCollection(sdk_self)
         self.bugs = BugCollection(sdk_self)
-        self.chores = ChoreCollection(sdk_self)
         self.spikes = SpikeCollection(sdk_self)
-        self.epics = EpicCollection(sdk_self)
-        self.phases = PhaseCollection(sdk_self)
 
         # Non-work collections
         self.sessions: SessionCollection = SessionCollection(sdk_self)
         self.tracks: TrackCollection = TrackCollection(
             sdk_self
         )  # Use specialized collection with builder support
-        self.agents: BaseCollection[Any] = BaseCollection(sdk_self, "agents", "agent")
-
-        # Learning collections (Active Learning Persistence)
-        self.patterns = PatternCollection(sdk_self)
-        self.insights = InsightCollection(sdk_self)
-        self.metrics = MetricCollection(sdk_self)
-
-        # Todo collection (persistent task tracking)
-        self.todos = TodoCollection(sdk_self)
-
-        # Task delegation collection (observability for spawned agents)
-        self.task_delegations = TaskDelegationCollection(sdk_self)
-
-        # Create learning directories if needed
-        (self._directory / "patterns").mkdir(exist_ok=True)
-        (self._directory / "insights").mkdir(exist_ok=True)
-        (self._directory / "metrics").mkdir(exist_ok=True)
-        (self._directory / "todos").mkdir(exist_ok=True)
-        (self._directory / "task-delegations").mkdir(exist_ok=True)
 
         # Initialize RefManager and set on all collections
         from htmlgraph.refs import RefManager
@@ -172,12 +141,8 @@ class BaseSDK:
         # Set ref manager on all work item collections
         self.features.set_ref_manager(self.refs)
         self.bugs.set_ref_manager(self.refs)
-        self.chores.set_ref_manager(self.refs)
         self.spikes.set_ref_manager(self.refs)
-        self.epics.set_ref_manager(self.refs)
-        self.phases.set_ref_manager(self.refs)
         self.tracks.set_ref_manager(self.refs)
-        self.todos.set_ref_manager(self.refs)
 
         # Analytics interface (Phase 2: Work Type Analytics)
         self.analytics = Analytics(sdk_self)

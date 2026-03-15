@@ -68,10 +68,7 @@ def create_gitignore_template() -> str:
     """
     return """# HtmlGraph cache and regenerable files
 .htmlgraph/htmlgraph.db
-.htmlgraph/sessions/*.jsonl
-.htmlgraph/events/*.jsonl
 .htmlgraph/parent-activity.json
-.htmlgraph/logs/
 """
 
 
@@ -114,9 +111,6 @@ def create_bootstrap_structure(project_dir: Path) -> dict[str, list[str]]:
         "features",
         "spikes",
         "tracks",
-        "events",
-        "logs",
-        "logs/errors",
     ]
 
     for subdir in subdirs:

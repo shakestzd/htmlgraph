@@ -89,8 +89,6 @@ class TestSDKDir:
             "features",
             "bugs",
             "spikes",
-            "chores",
-            "epics",
             "sessions",
         ]
         for collection in priority_collections:
@@ -223,8 +221,6 @@ class TestSDKDiscoverabilityIntegration:
             "features",
             "bugs",
             "spikes",
-            "chores",
-            "epics",
             "spawn_explorer",
             "spawn_coder",
             "help",

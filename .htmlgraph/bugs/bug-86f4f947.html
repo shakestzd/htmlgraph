@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Orchestrator tool calls misattributed as subagent children in pretooluse hook</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-86f4f947"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-03-10T12:27:35.130178"
+             data-updated="2026-03-10T18:23:36.797537+00:00" data-agent-assigned="claude">
+
+        <header>
+            <h1>Orchestrator tool calls misattributed as subagent children in pretooluse hook</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-10T12:27:35.138032">sess-6c56e756</a></li>
+                    <li><a href="1487a35d-e583-4cc9-91ab-148498958ad5.html" data-relationship="implemented-in" data-since="2026-03-10T14:23:36.797518">1487a35d-e583-4cc9-91ab-148498958ad5</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-10T14:23:36.790412">2026-03-10T14:23:36.790412</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': '1487a35d-e583-4cc9-91ab-148498958ad5', 'anti_patterns': [{'sequence': ['Bash', 'Bash', 'Bash'], 'count': 12, 'description': 'Command spam - plan commands before executing'}, {'sequence': ['Read', 'Read', 'Read'], 'count': 2, 'description': 'Excessive reading - take notes or use grep to find specific content'}, {'sequence': ['Edit', 'Edit', 'Edit'], 'count': 1, 'description': 'Multiple edits without testing - run tests between changes'}], 'errors': [], 'error_count': 0, 'efficiency': 0.45783132530120485, 'issues': ['High retry rate: 46%', 'Excessive context rebuilds: 7'], 'recommendations': ['Consider reading more context before acting', 'Cache file contents or take notes'], 'test_runs': [{'command': 'Check pytest output so far', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check if pytest has finished', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Wait 10s then check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}], 'test_summary': '✓ 4 test runs', 'summary': '⚠️ Issues: 15 anti-pattern occurrences, low efficiency (46%), ✓ 4 test runs'}">{'session_id': '1487a35d-e583-4cc9-91ab-148498958ad5', 'anti_patterns': [{'sequence': ['Bash', 'Bash', 'Bash'], 'count': 12, 'description': 'Command spam - plan commands before executing'}, {'sequence': ['Read', 'Read', 'Read'], 'count': 2, 'description': 'Excessive reading - take notes or use grep to find specific content'}, {'sequence': ['Edit', 'Edit', 'Edit'], 'count': 1, 'description': 'Multiple edits without testing - run tests between changes'}], 'errors': [], 'error_count': 0, 'efficiency': 0.45783132530120485, 'issues': ['High retry rate: 46%', 'Excessive context rebuilds: 7'], 'recommendations': ['Consider reading more context before acting', 'Cache file contents or take notes'], 'test_runs': [{'command': 'Check pytest output so far', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Check if pytest has finished', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}, {'command': 'Wait 10s then check final pytest output', 'success': True, 'passed': None, 'failed': None, 'skipped': None, 'errors': None}], 'test_summary': '✓ 4 test runs', 'summary': '⚠️ Issues: 15 anti-pattern occurrences, low efficiency (46%), ✓ 4 test runs'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-ef06d14c">insi-ef06d14c</dd>
+            </dl>
+        </section>
+        <section data-content>
+            <h3>Description</h3>
+            ## Problem
+When orchestrator launches subagents via Task()/Agent(), the orchestrator's own subsequent tool calls (Bash, browser_wait_for, etc.) get incorrectly nested UNDER the Task node in the dashboard activity feed. They should be siblings of the Task node, not children.
+
+## Visual Evidence
+Dashboard shows Task htmlgraph:researcher (6) expanded with:
+- mcp__plugin_playwright browser_wait_for — THIS IS ORCHESTRATOR'S CALL (wrong parent)
+- Bash "Check attribution" — THIS IS ORCHESTRATOR'S CALL (wrong parent)  
+- Grep, Read, Agent — These ARE the researcher's calls (correct nesting)
+
+## Root Cause
+pretooluse.py assigns parent_event_id by querying most recent task_delegation row. When orchestrator makes tool calls AFTER spawning a Task(), the hook finds that Task's delegation record and incorrectly assigns it as parent.
+
+Cannot distinguish orchestrator direct calls from subagent calls because:
+- Claude Code does NOT send agent_id in PreToolUse hook_input
+- Both orchestrator and subagent share the same session_id
+- No way to tell "this Bash call is from the orchestrator" vs "this Bash call is from the subagent"
+
+## Key Files
+- packages/claude-plugin/hooks/scripts/pretooluse-integrator.py (PreToolUse hook entry)
+- src/python/htmlgraph/hooks/pretooluse.py (assigns parent_event_id, look for task_delegation query)
+- src/python/htmlgraph/hooks/event_tracker.py (tracks task_delegation records)
+
+## Suggested Fix
+Option A: Timing — if Task has a SubagentStop event (completed), subsequent calls should NOT be children
+Option B: Check if Task is still running — only nest if Task hasn't completed yet
+Option C: Use agent_id from event — if it matches orchestrator agent, don't nest under Task
+
+## Verified
+v0.33.57, 2026-03-10
+        </section>
+    </article>
+</body>
+</html>

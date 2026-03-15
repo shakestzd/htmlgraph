@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Pytest speed optimization research</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-12100e13"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-11T09:29:31.458852"
+             data-updated="2026-03-11T09:29:31.458854" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Pytest speed optimization research</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Context
+- 2,231 tests collected across 116 test files in tests/python/
+- Suite runs ~83 seconds wall-clock with uv run pytest
+- pytest-xdist is already installed (pyproject.toml dev dep) but NOT enabled in addopts
+- pytest.ini already has: testpaths, --strict-markers, slow/integration markers defined
+- autouse fixture cleanup_env_vars runs on every single test (harmless, ~0 overhead)
+- conftest.py already has pytest_collection_modifyitems wiring @pytest.mark.serial -> xdist_group
+
+## Sleep Hotspots Found (concrete time waste)
+
+1. test_orchestration.py:142 — time.sleep(2) in test_get_results_by_task_id_polling_behavior
+   - Waits for a background thread to create a delayed spike
+   - Real fix: reduce poll_interval param or parametrize with smaller delays in tests
+   - Mark @pytest.mark.slow
+
+2. test_cross_agent_attribution.py:16 — time.sleep(1.1) in test_cross_agent_attribution
+   - Comment says "Avoid ID collision" — IDs are likely timestamp-based
+   - Real fix: inject a frozen/mock clock so IDs are deterministic without sleeping
+   - Quick fix: reduce to time.sleep(0.01) if IDs only need ordering not 1s gaps
+   - Mark @pytest.mark.slow or fix the ID generation
+
+3. test_cost_monitor.py:358 — time.sleep(0.1) repeated in loop
+   - Fix: mock time.time() so you control timestamps without real sleeping
+
+4. test_session_registry.py:272,304,555,616 — multiple time.sleep(0.001) and 0.01
+   - Tiny, but autouse fixture means 2231 × overhead still adds up
+   - Fix: mock datetime or use monkeypatch
+
+5. test_orchestration.py poll_interval=1 — total polling adds ~2-10s for that test
+
+## Biggest Wins (ranked by expected impact)
+
+### 1. Enable pytest-xdist (already installed — zero install cost)
+Expected: 3-4x speedup on modern multi-core Mac (8-12 cores)
+Add to pytest.ini addopts:
+    -n auto --dist loadfile
+Or safer first step:
+    -n 4
+CRITICAL: Tests use isolated_db (tmp_path per test) so SQLite isolation is already correct.
+The serial marker + xdist_group wiring is already in conftest.py.
+Tests that need ordering should get @pytest.mark.serial.
+
+### 2. Enable sys.monitoring coverage (Python 3.12+)
+Expected: 53% reduction IF coverage is running during tests
+Set env var before running: COVERAGE_CORE=sysmon uv run pytest
+Or in .env / CI config
+
+### 3. Fix/mark the 2s + 1.1s sleeps
+Expected: saves ~3-4 seconds per full suite run
+- test_orchestration.py poll test: mark @pytest.mark.slow OR reduce poll_interval to 0.1 in test
+- test_cross_agent_attribution.py: investigate if ID collision is still real; use mock clock
+
+### 4. Use --lf / --ff for development feedback loop
+Not a full-suite speedup, but transforms debugging experience:
+  uv run pytest --lf           # only last-failed tests
+  uv run pytest --ff           # failed-first, then rest
+  uv run pytest -x             # stop on first failure
+
+### 5. Split fast vs slow for deploy gate
+Add to pytest.ini markers (already registered):
+  slow: marks tests as slow (deselect with -m "not slow")
+
+Deploy command uses: uv run pytest -m "not slow"
+Full suite run: uv run pytest (or uv run pytest -m slow for slow-only)
+
+Candidates for @pytest.mark.slow:
+  - test_orchestration.py::test_get_results_by_task_id_polling_behavior (2s sleep)
+  - test_cross_agent_attribution.py::test_cross_agent_attribution (1.1s sleep)
+  - Any test with scope="session" that touches real filesystem/network
+  - tests/python/test_api_schemathesis.py (property-based, already marked schemathesis)
+  - tests/python/test_*_ui.py (Playwright, already marked ui)
+
+### 6. Optimize testpaths / norecursedirs
+Already done: testpaths = tests/python tests/benchmarks
+Collection takes ~1.5s for 2231 tests — acceptable, no immediate gain here.
+
+### 7. uv run overhead
+~70ms one-time overhead for env resolution. Negligible vs 83s suite.
+No benefit switching to direct pytest call.
+
+### 8. Disable unused plugins at startup
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 then -p only needed plugins
+Saves ~40% of startup time (~0.15s on a 0.4s startup)
+Minor win given 83s total, but useful for tight TDD loops
+
+### 9. pytest-testmon (coverage-based incremental)
+Only reruns tests whose source files changed since last run.
+Install: uv pip install pytest-testmon
+Usage: uv run pytest --testmon
+Best for: local TDD where you touch 1-2 files and want <5s feedback
+
+## Recommended pytest.ini Changes
+
+[pytest]
+addopts =
+    -v
+    --tb=short
+    --strict-markers
+    --disable-warnings
+    --color=yes
+    -m "not external_api"
+    -n auto              # ADD THIS — enables parallel execution
+    --dist loadfile      # ADD THIS — keeps file-level test groups together
+
+## Quick Action Checklist (ordered by ROI)
+
+1. Add -n auto --dist loadfile to pytest.ini addopts (5 min, ~3-4x speedup)
+2. Mark test_orchestration polling test and test_cross_agent_attribution as @pytest.mark.slow (10 min)
+3. Add COVERAGE_CORE=sysmon to CI env if coverage is enabled (2 min)
+4. Add uv run pytest -m "not slow" as fast deploy gate (5 min)
+5. Investigate mock-clock fix for 1.1s ID collision sleep (30 min, eliminates it entirely)
+
+## Sources
+- https://blog.trailofbits.com/2025/05/01/making-pypis-test-suite-81-faster/
+- https://github.com/zupo/awesome-pytest-speedup
+- https://pytest-xdist.readthedocs.io/en/stable/distribution.html
+- https://gmpy.dev/blog/2025/speedup-pytest-startup
+- https://pytest-with-eric.com/pytest-advanced/pytest-improve-runtime/
+            </div>
+        </section>
+    </article>
+</body>
+</html>

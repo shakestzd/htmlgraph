@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Expand state handler check</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-739c87f2"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T10:07:57.492338"
+             data-updated="2026-03-10T10:07:57.492347" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Expand state handler check</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## File
+src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html
+
+## 1. htmx:beforeMorph and htmx:afterSettle event listeners
+
+PRESENT. Both listeners are registered via document.addEventListener at lines 702-707:
+
+  Line 702-704:
+    document.addEventListener("htmx:beforeMorph", function() {
+        saveExpandState();
+    });
+
+  Line 705-707:
+    document.addEventListener("htmx:afterSettle", function() {
+        restoreExpandState();
+    });
+
+## 2. saveExpandState() and restoreExpandState() calls
+
+saveExpandState() is called:
+- Line 703: inside the htmx:beforeMorph listener (saves to window._expandedEventIds and sessionStorage)
+
+restoreExpandState() is called:
+- Line 706: inside the htmx:afterSettle listener
+- Line 717: inside the IIFE (on initial page load / HTMX injection, after restoring from sessionStorage)
+
+Both functions are defined:
+- saveExpandState(): lines 665-674 — collects all .expanded rows, writes to window._expandedEventIds and sessionStorage key "activity-feed-expanded-rows"
+- restoreExpandState(): lines 676-699 — reads window._expandedEventIds, iterates all [data-event-id] rows in DOM order, removes .hidden from direct children of each expanded row
+
+## 3. IIFE / page-load state restoration block
+
+PRESENT at lines 711-729. It is an immediately-invoked function expression (IIFE) that:
+- Runs at script injection time (NOT DOMContentLoaded — intentional, rows are already in DOM at that point)
+- Reads sessionStorage key "activity-feed-expanded-rows"
+- If found, parses the JSON array, sets window._expandedEventIds = new Set(savedExpanded), calls restoreExpandState(), then returns early
+- If NOT found (e.g. fresh page load), auto-expands the first .parent-row.has-children via handleParentClick()
+
+## Summary
+
+All three mechanisms are present and correctly wired:
+- htmx:beforeMorph -> saveExpandState()
+- htmx:afterSettle -> restoreExpandState()
+- IIFE at injection time -> restoreExpandState() from sessionStorage (or auto-expand first row)
+- window._expandedEventIds (in-memory Set, lines 663, 666-669, 742)
+- sessionStorage persistence (lines 672-673, 714-718)
+            </div>
+        </section>
+    </article>
+</body>
+</html>

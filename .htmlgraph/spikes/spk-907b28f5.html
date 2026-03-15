@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SessionEnd Hook Cancellation Root Cause</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-907b28f5"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T00:47:07.769815"
+             data-updated="2026-03-10T00:47:07.769818" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>SessionEnd Hook Cancellation Root Cause</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+SessionEnd hook fails with 'Hook cancelled'.
+
+## Root Cause (Multi-layered)
+
+### Finding 1: Hook timeout is 600s (not the immediate cause)
+Official Claude Code docs confirm command hook default timeout = 600 seconds (600000ms).
+The SessionEnd hook in hooks.json has no timeout field -- uses the 600s default.
+'Hook cancelled' means the process was killed, either by timeout OR by Claude Code shutting down.
+
+### Finding 2: TranscriptReader.read_session() scans 2,270 files = primary bottleneck
+session-end.py calls TranscriptReader().read_session(external_session_id).
+read_session() calls list_transcript_files() with NO project_path argument.
+list_transcript_files() with no argument does: self.claude_dir.rglob('*.jsonl')
+This scans ALL ~/.claude/projects/ across all 20 project directories.
+Total files: 2,270 JSONL files, total size: 2.4 GB.
+Largest file: 107 MB. For a session_id not found in the first file, all 2,270 are scanned.
+
+### Finding 3: Shutdown race condition is the actual trigger
+SessionEnd fires when the user closes Claude Code (session termination).
+Claude Code kills child processes as part of shutdown.
+session-end.py is still scanning 2,270 files when Claude Code kills it.
+Result: 'Hook cancelled'.
+
+### Finding 4: No async flag on SessionEnd hook
+If async:true were set, the hook would return immediately and run in background.
+But background processes also get killed on shutdown.
+
+## Fix Options
+
+Option A (safest, immediate): Remove TranscriptReader call from session-end.py.
+The script comment already says transcript linking happens at git commit time.
+Removing read_session() makes the hook complete in <1s. Zero risk.
+
+Option B (correct long-term): Fix TranscriptReader.read_session() to use direct path.
+Construct: ~/.claude/projects/[encoded-cwd]/[session_id].jsonl directly.
+No filesystem scan. Falls back to rglob only if direct path misses.
+Makes session-end.py complete in <100ms regardless of transcript volume.
+
+Option C: Pass project_path to list_transcript_files() in session-end.py.
+Reduces from 2,270 files to ~1,544 (htmlgraph project only). Better but not ideal.
+
+## Recommended
+Apply Option A immediately (remove read_session call from session-end.py).
+Apply Option B as the proper fix in TranscriptReader.
+The two fixes are complementary and both should be applied.
+            </div>
+        </section>
+    </article>
+</body>
+</html>

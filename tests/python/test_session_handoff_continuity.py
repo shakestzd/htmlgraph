@@ -15,7 +15,6 @@ from htmlgraph.session_manager import SessionManager
 from htmlgraph.sessions.handoff import (
     ContextRecommender,
     HandoffBuilder,
-    HandoffTracker,
     SessionResume,
 )
 
@@ -201,95 +200,6 @@ class TestSessionResume:
             assert "Waiting for review" in prompt
             assert "src/auth.py" in prompt
             assert "2 hours ago" in prompt
-
-
-class TestHandoffTracker:
-    """Test handoff effectiveness tracking."""
-
-    def test_create_handoff(self, isolated_db):
-        """Test creating handoff tracking record."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            graph_dir = Path(tmpdir) / ".htmlgraph"
-            graph_dir.mkdir()
-
-            sdk = SDK(directory=graph_dir, agent="alice", db_path=str(isolated_db))
-            manager = SessionManager(graph_dir)
-            session = manager.start_session("test-session", agent="alice")
-
-            tracker = HandoffTracker(sdk)
-            handoff_id = tracker.create_handoff(
-                from_session_id=session.id, items_in_context=5
-            )
-
-            assert handoff_id is not None
-            assert handoff_id.startswith("hand-")
-
-    def test_resume_handoff(self, isolated_db):
-        """Test updating handoff with resumption data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            graph_dir = Path(tmpdir) / ".htmlgraph"
-            graph_dir.mkdir()
-
-            sdk = SDK(directory=graph_dir, agent="alice", db_path=str(isolated_db))
-            manager = SessionManager(graph_dir)
-            session1 = manager.start_session("sess-1", agent="alice")
-            session2 = manager.start_session("sess-2", agent="alice")
-
-            tracker = HandoffTracker(sdk)
-            handoff_id = tracker.create_handoff(
-                from_session_id=session1.id, items_in_context=5
-            )
-
-            success = tracker.resume_handoff(
-                handoff_id=handoff_id,
-                to_session_id=session2.id,
-                items_accessed=3,
-                time_to_resume_seconds=120,
-            )
-
-            assert success is True
-
-    def test_rate_handoff(self, isolated_db):
-        """Test rating handoff effectiveness."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            graph_dir = Path(tmpdir) / ".htmlgraph"
-            graph_dir.mkdir()
-
-            sdk = SDK(directory=graph_dir, agent="alice", db_path=str(isolated_db))
-            manager = SessionManager(graph_dir)
-            session = manager.start_session("test-session", agent="alice")
-
-            tracker = HandoffTracker(sdk)
-            handoff_id = tracker.create_handoff(
-                from_session_id=session.id, items_in_context=5
-            )
-
-            success = tracker.rate_handoff(handoff_id, rating=4)
-            assert success is True
-
-            # Test invalid rating
-            with pytest.raises(ValueError):
-                tracker.rate_handoff(handoff_id, rating=6)
-
-    def test_get_handoff_metrics(self, isolated_db):
-        """Test retrieving handoff metrics."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            graph_dir = Path(tmpdir) / ".htmlgraph"
-            graph_dir.mkdir()
-
-            sdk = SDK(directory=graph_dir, agent="alice", db_path=str(isolated_db))
-            manager = SessionManager(graph_dir)
-            session = manager.start_session("test-session", agent="alice")
-
-            tracker = HandoffTracker(sdk)
-            handoff_id = tracker.create_handoff(
-                from_session_id=session.id, items_in_context=5
-            )
-
-            metrics = tracker.get_handoff_metrics(limit=10)
-            assert len(metrics) == 1
-            assert metrics[0].handoff_id == handoff_id
-            assert metrics[0].items_in_context == 5
 
 
 class TestSessionManagerHandoff:

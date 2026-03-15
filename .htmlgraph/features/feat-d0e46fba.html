@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Atomic Claim: compare-and-swap for multi-agent coordination</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-d0e46fba"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="high"
+             data-created="2026-03-13T12:25:02.295324"
+             data-updated="2026-03-14T08:15:25.792240+00:00" data-agent-assigned="claude" data-track-id="trk-5fc61026">
+
+        <header>
+            <h1>Atomic Claim: compare-and-swap for multi-agent coordination</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented-in">
+                <h3>Implemented-In:</h3>
+                <ul>
+                    <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-03-13T12:25:02.301887">sess-6c56e756</a></li>
+                    <li><a href="sess-6cafaa64.html" data-relationship="implemented-in" data-since="2026-03-13T12:29:58.025328">sess-6cafaa64</a></li>
+                    <li><a href="sess-b55e1899.html" data-relationship="implemented-in" data-since="2026-03-13T13:16:27.893393">sess-b55e1899</a></li>
+                    <li><a href="888ff3dd-d082-4ce3-af96-8bdf40c60f29.html" data-relationship="implemented-in" data-since="2026-03-13T14:00:56.496549">888ff3dd-d082-4ce3-af96-8bdf40c60f29</a></li>
+                    <li><a href="026c6913-aded-4c45-8673-b617c544fb8a.html" data-relationship="implemented-in" data-since="2026-03-13T14:04:14.875029">026c6913-aded-4c45-8673-b617c544fb8a</a></li>
+                    <li><a href="abfaeabd-c6e6-4109-a575-06e0b9548eb7.html" data-relationship="implemented-in" data-since="2026-03-14T04:15:25.792223">abfaeabd-c6e6-4109-a575-06e0b9548eb7</a></li>
+                </ul>
+            </section>
+        </nav>
+        <section data-properties>
+            <h3>Properties</h3>
+            <dl>
+                <dt>Completed At</dt>
+                <dd data-key="completed_at" data-value="2026-03-13T13:56:25.642274">2026-03-13T13:56:25.642274</dd>
+<dt>Completion Analysis</dt>
+                <dd data-key="completion_analysis" data-value="{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.22499999999999998, 'issues': ['High retry rate: 78%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (22%)'}">{'session_id': 'sess-6c56e756', 'anti_patterns': [], 'errors': [], 'error_count': 0, 'efficiency': 0.22499999999999998, 'issues': ['High retry rate: 78%'], 'recommendations': ['Consider reading more context before acting'], 'test_runs': [], 'test_summary': None, 'summary': '⚠️ Issues: low efficiency (22%)'}</dd>
+<dt>Insight Id</dt>
+                <dd data-key="insight_id" data-value="insi-efc6eb9d">insi-efc6eb9d</dd>
+<dt>Is Primary</dt>
+                <dd data-key="is_primary" data-value="True">True</dd>
+            </dl>
+        </section>
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false">⏳ SDK: sdk.features.claim(feat_id, agent=X) with SQL CAS</li>
+                <li data-completed="false">⏳ SDK: sdk.features.unclaim(feat_id)</li>
+                <li data-completed="false">⏳ CLI: htmlgraph claim and htmlgraph ready --claim</li>
+                <li data-completed="false">⏳ Dashboard: claimed-by column</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

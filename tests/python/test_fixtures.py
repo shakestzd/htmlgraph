@@ -25,25 +25,25 @@ def test_isolated_graph_dir_full_creates_all_subdirs(
 ) -> None:
     """Verify isolated_graph_dir_full creates all subdirectories."""
     expected_dirs = [
+        # Work item types (DEFAULT_COLLECTIONS)
         "features",
         "bugs",
-        "spikes",
         "chores",
+        "spikes",
         "epics",
-        "phases",
         "tracks",
         "sessions",
-        "patterns",
         "insights",
         "metrics",
+        "cigs",
+        "patterns",
         "todos",
         "task-delegations",
-        "archives",
-        "archive-index",
-        "agents",
+        # Additional directories (ADDITIONAL_DIRECTORIES)
         "events",
-        "cigs",
         "logs",
+        "archive-index",
+        "archives",
     ]
 
     for subdir in expected_dirs:

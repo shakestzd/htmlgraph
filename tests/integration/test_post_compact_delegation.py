@@ -428,32 +428,20 @@ class TestAllBuilderEnforceAgent:
         # Create track first (required for features, bugs, chores, epics, phases)
         track = sdk.tracks.create("Test Track").save()
 
-        # Verify all collections are accessible
+        # Verify core collections are accessible
         assert sdk.features is not None
         assert sdk.bugs is not None
-        assert sdk.chores is not None
         assert sdk.spikes is not None
-        assert sdk.epics is not None
-        assert sdk.phases is not None
 
-        # Verify all collections have builder support and assign agent
+        # Verify core collections have builder support and assign agent
         feature = sdk.features.create("Test Feature").set_track(track.id).save()
         assert feature.agent_assigned == "test-agent"
 
         bug = sdk.bugs.create("Test Bug").set_track(track.id).save()
         assert bug.agent_assigned == "test-agent"
 
-        chore = sdk.chores.create("Test Chore").set_track(track.id).save()
-        assert chore.agent_assigned == "test-agent"
-
         spike = sdk.spikes.create("Test Spike").save()
         assert spike.agent_assigned == "test-agent"
-
-        epic = sdk.epics.create("Test Epic").set_track(track.id).save()
-        assert epic.agent_assigned == "test-agent"
-
-        phase = sdk.phases.create("Test Phase").set_track(track.id).save()
-        assert phase.agent_assigned == "test-agent"
 
 
 class TestPostCompactSkillActivation:

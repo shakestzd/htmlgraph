@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Check B: Dashboard serves from correct DB</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-dddde784"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T11:33:57.272873"
+             data-updated="2026-03-10T11:33:57.272877" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="haiku-coder">
+
+        <header>
+            <h1>Check B: Dashboard serves from correct DB</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                **Test Results: Check B - Dashboard DB Path**
+
+✅ **Server Started:** uv run htmlgraph serve --port 8082
+   - Process: 80207 (Python/htmlgraph)
+   - Port: 8082
+   - Status: Running successfully
+
+✅ **API Response:** GET http://localhost:8082/api/sessions
+   - HTTP Status: 200 OK
+   - Content-Type: application/json
+   - Response valid JSON
+
+✅ **Database Content Check:**
+   - Total sessions in database: 580
+   - Sessions with created_at='2026-03-10': 11
+   - Result: TODAY'S SESSIONS FOUND ✅
+
+✅ **Conclusion:**
+The dashboard server IS reading from the correct .htmlgraph/htmlgraph.db database.
+The fix in v0.33.55 (`_resolve_project_dir()` call from `htmlgraph.mcp_server`) is working correctly.
+The server no longer defaults to ~/.htmlgraph/ — it uses the project-local database as expected.
+
+**Evidence:**
+- Latest sessions in API response:
+  1. 8b225463-a087... (2026-03-10T15:28:56)
+  2. 325a904b-a942... (2026-03-10T15:25:49)
+  3. test-session-1630eebb (2026-03-10 15:07:42)
+- All have today's date (2026-03-10)
+- All have correct timestamps from recent activity
+
+**Check B Status: PASS**
+            </div>
+        </section>
+    </article>
+</body>
+</html>

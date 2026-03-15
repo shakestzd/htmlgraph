@@ -474,11 +474,7 @@ def create_start_event(
         # Use native tool_use_id from Claude Code if present (e.g. toolu_01ABC123),
         # otherwise generate a UUID for correlation.
         tool_use_id = tool_input.get("tool_use_id") or generate_tool_use_id()
-        trace_id = os.environ.get("HTMLGRAPH_TRACE_ID", tool_use_id)
         start_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
-        # Sanitize input before storing
-        sanitized_input = sanitize_tool_input(tool_input)
 
         # Connect to database (use project's .htmlgraph/htmlgraph.db, not home directory)
         from htmlgraph.config import get_database_path
@@ -790,54 +786,6 @@ def create_start_event(
         # For Task/Agent delegation, export task_parent_event_id for subagent context
         if tool_name in ("Task", "Agent") and task_parent_event_id:
             os.environ["HTMLGRAPH_PARENT_EVENT"] = task_parent_event_id
-
-        # Resolve parent_tool_use_id for tool_traces nesting.
-        # When a tool call occurs inside a subagent, look up the parent
-        # task_delegation event's tool_use_id using the native agent_id.
-        parent_tool_use_id: str | None = None
-        if native_agent_id:
-            try:
-                cursor.execute(
-                    """SELECT t.tool_use_id FROM tool_traces t
-                       JOIN agent_events ae ON ae.event_id = (
-                           SELECT event_id FROM agent_events
-                           WHERE agent_id = ? AND event_type = 'task_delegation'
-                           ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) DESC
-                           LIMIT 1
-                       )
-                       WHERE t.tool_name IN ('Task', 'Agent')
-                         AND t.session_id = ae.session_id
-                       ORDER BY t.start_time DESC LIMIT 1""",
-                    (native_agent_id,),
-                )
-                ptuid_row = cursor.fetchone()
-                if ptuid_row:
-                    parent_tool_use_id = ptuid_row[0]
-            except Exception as e:
-                logger.debug(f"Could not resolve parent_tool_use_id: {e}")
-
-        # Insert into tool_traces for correlation (if table exists)
-        try:
-            cursor.execute(
-                """
-                INSERT INTO tool_traces
-                (tool_use_id, trace_id, session_id, tool_name, tool_input,
-                 start_time, status, parent_tool_use_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    tool_use_id,
-                    trace_id,
-                    session_id,
-                    tool_name,
-                    json.dumps(sanitized_input),
-                    start_time,
-                    "started",
-                    parent_tool_use_id,
-                ),
-            )
-        except Exception as e:
-            logger.debug(f"Could not insert into tool_traces: {e}")
 
         db.connection.commit()  # type: ignore[union-attr]
         db.disconnect()

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Parent-Child Nesting Gap Analysis</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-7bf53833"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-10T02:24:03.544597"
+             data-updated="2026-03-10T02:24:03.544598" data-spike-type="general" data-timebox-hours="4" data-agent-assigned="researcher">
+
+        <header>
+            <h1>Parent-Child Nesting Gap Analysis</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+    
+        <section data-spike-metadata>
+            <h3>Spike Metadata</h3>
+            <dl>
+                <dt>Type</dt>
+                <dd>General</dd>
+                <dt>Timebox</dt>
+                <dd>4 hours</dd>
+            </dl>
+        </section>
+        <section data-findings>
+            <h3>Findings</h3>
+            <div class="findings-content">
+                ## Problem
+subagent tool calls (Bash, Read, Grep from htmlgraph:researcher or htmlgraph:haiku-coder)
+are never nested under their parent Task node in the dashboard.
+parent_event_id and claude_task_id are empty in agent_events for subagent tool calls.
+
+## Evidence from DB
+
+Session f6fd307b (current researcher session):
+  Task delegation evt-c1f226d0:
+    agent_id=claude-code (SubagentStart never updated it)
+    parent_event_id=NULL  (should point to UserQuery)
+    subagent_type=htmlgraph:researcher, status=started
+
+  Subagent tool events: all have parent_event_id=NULL
+
+Session e979687b (older, working):
+  task_delegation evt-3a1e9bd5 -> parent evt-c25d6bf3  (populated correctly)
+
+## Root Cause: Four Compounding Failures
+
+### Failure 1: task_delegation rows get NULL parent_event_id
+create_task_parent_event() calls get_parent_user_query(db, session_id) to
+find the UserQuery to link to. But session f6fd307b has ZERO UserQuery events.
+This means user-prompt-submit.py either wrote the UserQuery under a different
+session_id, or it silently failed. Result: parent_event_id_for_insertion=None,
+so the task_delegation is inserted with NULL parent_event_id.
+
+### Failure 2: SubagentStart does not update agent_id on task_delegation
+SubagentStart maps spawned agent_id to the task_delegation via:
+  UPDATE agent_events SET agent_id=? WHERE event_id=?
+But evt-c1f226d0 still shows agent_id=claude-code (the original default).
+This means SubagentStart either did not fire, or matched the wrong event.
+SubagentStart only queries events WHERE agent_id IS NULL OR agent_id = ''.
+The task_delegation was inserted with agent_id='claude-code', so SubagentStart
+can never match it. This is the agent_id mismatch bug.
+
+### Failure 3: Subagent tool events cannot detect they are subagents
+pretooluse.py resolves parent_event_id for non-Task tool calls via:
+  if native_agent_id:  # Claude Code does NOT send agent_id in PreToolUse
+      ...             # This branch is always dead
+  else:
+      # Check if session_id is in sessions table
+      session_known = cursor.fetchone() is not None
+      if not session_known:
+          # Find most-recent started task_delegation -> subagent_parent_event_id
+
+The researcher agent runs in the SAME session as the orchestrator
+(session_id=f6fd307b). That session IS in the sessions table (is_subagent=0),
+so session_known=True. The code never enters the subagent detection branch.
+subagent_parent_event_id stays None.
+
+Priority ordering then falls to env_parent_event (HTMLGRAPH_PARENT_EVENT),
+but that branch is guarded by "and not session_known" -- so it is also skipped.
+
+Final fallback: parent_event_id = user_query_event_id = None (no UserQuery found).
+All subagent tool events get NULL parent_event_id.
+
+The fundamental broken assumption: the hook architecture assumes Task() spawns
+subagents as SEPARATE OS processes with distinct session_ids. When the agent
+(htmlgraph:researcher) runs in the same Claude Code process/session, the
+session_known=False detection mechanism never triggers.
+
+### Failure 4: Dashboard cross-session fallback also misses same-session subagents
+services.py first_level_children_sql:
+  WHERE parent_event_id = ?
+  OR (parent_event_id IS NULL
+      AND session_id LIKE parent_session_id || '%'
+      AND session_id != parent_session_id)   <-- excludes same session
+
+The OR clause is designed for subagents with their own session_id (a suffix of
+parent_session_id). When subagent runs in the SAME session, session_id equals
+parent_session_id, so the clause (session_id != parent_session_id) excludes them.
+
+## What Worked in Session e979687b
+That session had populated parent_event_id on task_delegation events. The working
+condition was: user-prompt-submit.py successfully wrote a UserQuery event under
+that session_id, so get_parent_user_query() returned a valid event_id. The subagent
+tool calls in that session may have run in a separate session_id, triggering the
+session_known=False path correctly.
+
+## Recommended Fixes (Priority Order)
+
+### Fix 1 (High impact, low risk): Remove session_known guard on env_parent_event
+In pretooluse.py lines ~768-775, the priority ordering is:
+  elif env_parent_event and not is_mcp_tool and not session_known:
+      parent_event_id = env_parent_event
+Change to:
+  elif env_parent_event and not is_mcp_tool:
+      parent_event_id = env_parent_event
+The staleness validation block above already guards against stale env vars from
+prior turns. This single line change enables same-session subagent nesting.
+
+### Fix 2 (Required for Fix 1 to work): Fix task_delegation agent_id insertion
+create_task_parent_event() inserts agent_id='claude-code' on the task_delegation.
+SubagentStart searches for WHERE agent_id IS NULL OR agent_id = ''.
+Fix: insert agent_id=NULL on task_delegation so SubagentStart can match it.
+
+### Fix 3 (Root cause for NULL parent_event_id on task_delegation): Fix UserQuery lookup
+Investigate why session f6fd307b has zero UserQuery events. The user-prompt-submit
+hook must be writing UserQuery events under a different session_id than the one
+PreToolUse sees. Verify the session_id resolution in user-prompt-submit.py matches
+the session_id in PreToolUse hook_input.
+            </div>
+        </section>
+    </article>
+</body>
+</html>
