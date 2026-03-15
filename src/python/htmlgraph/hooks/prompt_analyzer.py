@@ -528,15 +528,28 @@ def generate_guidance(
         ...     logger.info("%s", guidance)
     """
 
-    # Helper to optionally append attribution block to a guidance string
+    # Compute the active step line once for use throughout this function
+    active_step_line = _get_active_step_line(active_work)
+
+    # Helper to optionally append active step + attribution block to guidance
     def _with_attribution(guidance: str) -> str:
+        parts = [guidance]
+        if active_step_line:
+            parts.append(active_step_line)
         block = _build_attribution_block(active_work, open_work_items)
-        return guidance + "\n\n" + block if block else guidance
+        if block:
+            parts.append(block)
+        return "\n\n".join(parts) if len(parts) > 1 else parts[0]
 
     # If continuing and has active work, only inject attribution if needed
     if classification["is_continuation"] and active_work:
+        parts: list[str] = []
+        if active_step_line:
+            parts.append(active_step_line)
         block = _build_attribution_block(active_work, open_work_items)
-        return block if block else None
+        if block:
+            parts.append(block)
+        return "\n\n".join(parts) if parts else None
 
     # If has active work item, check if it matches intent
     if active_work:
@@ -595,9 +608,14 @@ def generate_guidance(
                 f"  sdk.bugs.start(bug.id)\n"
             )
 
-        # Has appropriate work item - only inject attribution if open items exist
+        # Has appropriate work item - inject step line + attribution if open items exist
+        step_block_parts: list[str] = []
+        if active_step_line:
+            step_block_parts.append(active_step_line)
         block = _build_attribution_block(active_work, open_work_items)
-        return block if block else None
+        if block:
+            step_block_parts.append(block)
+        return "\n\n".join(step_block_parts) if step_block_parts else None
 
     # No active work item - provide guidance based on intent
     if classification["is_implementation"]:
@@ -773,6 +791,33 @@ def generate_cigs_guidance(
     return "\n".join(guidance_parts)
 
 
+def _get_active_step_line(active_work: dict[str, Any] | None) -> str | None:
+    """Return a formatted active step line for CIGS guidance injection.
+
+    Finds the first incomplete step in ``active_work['steps']`` (a list of
+    dicts with ``description`` and ``completed`` keys).  Returns a string like
+    ``Active step: "Step N: <description>"`` where N is the 1-based step index,
+    or ``None`` when there are no steps or all are complete.
+
+    Args:
+        active_work: dict with at least a ``steps`` key (list of step dicts),
+            or ``None``.
+
+    Returns:
+        Formatted active step string, or ``None``.
+    """
+    if not active_work:
+        return None
+    steps = active_work.get("steps")
+    if not steps:
+        return None
+    for idx, step in enumerate(steps, start=1):
+        if not step.get("completed", False):
+            desc = step.get("description", "")
+            return f'Active step: "Step {idx}: {desc}"'
+    return None
+
+
 def _get_active_feature_id() -> str | None:
     """
     Query HtmlGraph for the currently active (in-progress) work item ID.
@@ -922,6 +967,7 @@ __all__ = [
     "detect_wip_limit_hit",
     "create_user_query_event",
     "_get_active_feature_id",
+    "_get_active_step_line",
     # Pattern constants for testing/extension
     "IMPLEMENTATION_PATTERNS",
     "INVESTIGATION_PATTERNS",

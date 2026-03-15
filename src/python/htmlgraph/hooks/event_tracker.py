@@ -696,14 +696,33 @@ def resolve_active_step(
         from htmlgraph.parser import HtmlParser
 
         parser = HtmlParser.from_file(feature_file)
-        steps = parser.get_steps()
+        raw_steps = parser.get_steps()
 
-        # Return the step_id of the first incomplete step
-        for step in steps:
-            if not step.get("completed", False) and step.get("step_id"):
-                return str(step.get("step_id")) if step.get("step_id") else None
+        # Determine if any step has dependency info
+        has_deps = any(step.get("depends_on") for step in raw_steps)
 
-        return None
+        if has_deps:
+            # Use dependency-aware ready step resolution
+            from htmlgraph.models import Step
+
+            steps = [Step(**s) for s in raw_steps]
+            completed_ids: set[str] = {
+                s.step_id for s in steps if s.completed and s.step_id
+            }
+            for step in steps:
+                if step.completed:
+                    continue
+                if step.step_id and all(
+                    dep in completed_ids for dep in step.depends_on
+                ):
+                    return step.step_id
+            return None
+        else:
+            # Fallback: first incomplete step with a step_id
+            for raw_step in raw_steps:
+                if not raw_step.get("completed", False) and raw_step.get("step_id"):
+                    return str(raw_step["step_id"])
+            return None
     except Exception as e:
         logger.debug(f"Could not resolve active step for {feature_id}: {e}")
         return None

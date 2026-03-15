@@ -571,6 +571,78 @@ class FeatureWorkflow:
             )
         return node
 
+    def auto_create_divergent_feature(
+        self,
+        current_feature_id: str,
+        description: str,
+        agent: str | None = None,
+        track_id: str | None = None,
+    ) -> str:
+        """Create a new feature that diverged from an existing one.
+
+        Creates a new feature with a ``spawned_from`` edge pointing at the
+        parent feature, immediately starts it as ``in-progress``, and inherits
+        the parent's ``track_id`` when none is explicitly provided.
+
+        Args:
+            current_feature_id: The parent feature this work diverged from.
+            description: Title/description for the new feature.
+            agent: Optional agent identifier to assign the new feature.
+            track_id: Optional track to assign; inherits from parent if omitted.
+
+        Returns:
+            The new feature's ID.
+        """
+        from htmlgraph.models import Edge
+
+        # Resolve track_id: explicit overrides parent, parent is fallback
+        resolved_track_id = track_id
+        if resolved_track_id is None:
+            parent = self._m.features_graph.get(current_feature_id)
+            if parent is not None:
+                resolved_track_id = parent.track_id
+
+        # Create the new feature (uses default steps)
+        new_node = self.create_feature(
+            title=description,
+            collection="features",
+            agent=agent,
+        )
+
+        # Attach track_id if resolved
+        if resolved_track_id is not None:
+            new_node.track_id = resolved_track_id
+            self._m.features_graph.update(new_node)
+
+        # Add spawned_from edge to the new node
+        new_node.add_edge(
+            Edge(
+                target_id=current_feature_id,
+                relationship="spawned_from",
+            )
+        )
+        self._m.features_graph.update(new_node)
+
+        # Start the new feature immediately (bypass WIP limit — divergent work is urgent)
+        new_node.status = "in-progress"
+        self._m.features_graph.update(new_node)
+        self._m._features_cache_dirty = True
+
+        if agent:
+            self._m._maybe_log_work_item_action(
+                agent=agent,
+                tool="FeatureCreate",
+                summary=f"Auto-diverged: features/{new_node.id} from {current_feature_id}",
+                feature_id=new_node.id,
+                payload={
+                    "collection": "features",
+                    "action": "auto_diverge",
+                    "parent_feature_id": current_feature_id,
+                },
+            )
+
+        return new_node.id
+
     def check_completion(self, feature_id: str, tool: str, success: bool) -> bool:
         node = self._m.features_graph.get(feature_id) or self._m.bugs_graph.get(
             feature_id

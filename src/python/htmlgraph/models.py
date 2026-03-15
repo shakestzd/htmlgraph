@@ -94,6 +94,7 @@ class Step(BaseModel):
     agent: str | None = None
     timestamp: datetime | None = None
     step_id: str | None = None
+    depends_on: list[str] = Field(default_factory=list)
 
     def to_html(self) -> str:
         """Convert step to HTML list item."""
@@ -101,13 +102,17 @@ class Step(BaseModel):
         agent_attr = f' data-agent="{self.agent}"' if self.agent else ""
         completed_attr = f' data-completed="{str(self.completed).lower()}"'
         step_id_attr = f' data-step-id="{self.step_id}"' if self.step_id else ""
-        return f"<li{completed_attr}{agent_attr}{step_id_attr}>{status} {self.description}</li>"
+        depends_on_attr = (
+            f' data-depends-on="{",".join(self.depends_on)}"' if self.depends_on else ""
+        )
+        return f"<li{completed_attr}{agent_attr}{step_id_attr}{depends_on_attr}>{status} {self.description}</li>"
 
     def to_context(self) -> str:
         """Lightweight context for AI agents."""
         status = "[x]" if self.completed else "[ ]"
         prefix = f"[{self.step_id}] " if self.step_id else ""
-        return f"{prefix}{status} {self.description}"
+        deps = f" (depends_on: {', '.join(self.depends_on)})" if self.depends_on else ""
+        return f"{prefix}{status} {self.description}{deps}"
 
     def __getitem__(self, key: str) -> Any:
         """
@@ -267,9 +272,38 @@ class Node(BaseModel):
         completed = sum(1 for s in self.steps if s.completed)
         return int((completed / len(self.steps)) * 100)
 
+    def get_ready_steps(self) -> list[Step]:
+        """
+        Return steps whose dependencies are all met and which are not yet completed.
+
+        A step is "ready" when:
+        - It is not completed
+        - All step_ids listed in its depends_on are completed
+
+        Steps with no depends_on are always ready (if not completed).
+        """
+        completed_ids: set[str] = {
+            s.step_id for s in self.steps if s.completed and s.step_id
+        }
+        ready = []
+        for step in self.steps:
+            if step.completed:
+                continue
+            if all(dep in completed_ids for dep in step.depends_on):
+                ready.append(step)
+        return ready
+
     @property
     def next_step(self) -> Step | None:
-        """Get the next incomplete step."""
+        """Get the next ready (dependency-unblocked) incomplete step.
+
+        Returns the first step from get_ready_steps(). Falls back to the
+        first incomplete step when no dependency information is present.
+        """
+        ready = self.get_ready_steps()
+        if ready:
+            return ready[0]
+        # Fallback: first incomplete step (no dependency info)
         for step in self.steps:
             if not step.completed:
                 return step

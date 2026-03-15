@@ -301,6 +301,13 @@ class HtmlParser:
             # Remove common status emojis
             text = re.sub(r"^[✅⏳❌🔄]\s*", "", text)
 
+            depends_on_raw = item.attrs.get("data-depends-on", "")
+            depends_on = (
+                [d.strip() for d in depends_on_raw.split(",") if d.strip()]
+                if depends_on_raw
+                else []
+            )
+
             step_dict: dict[str, Any] = {
                 "description": text,
                 "completed": completed,
@@ -308,6 +315,8 @@ class HtmlParser:
             }
             if step_id:
                 step_dict["step_id"] = step_id
+            if depends_on:
+                step_dict["depends_on"] = depends_on
 
             steps.append(step_dict)
 
