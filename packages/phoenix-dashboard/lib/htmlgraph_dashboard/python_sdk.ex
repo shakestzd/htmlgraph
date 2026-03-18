@@ -323,35 +323,36 @@ result
   def handle_call(:get_kanban_data, _from, state) do
     code = """
 import json
-import os
-os.chdir(graph_dir.decode() if isinstance(graph_dir, bytes) else graph_dir)
-from htmlgraph import SDK
+import sqlite3
 
-sdk = SDK(agent='phoenix-dashboard')
+db_path_str = db_path.decode() if isinstance(db_path, bytes) else db_path
+conn = sqlite3.connect(db_path_str)
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
 features = []
 for status in ['todo', 'in-progress', 'blocked', 'done']:
-    try:
-        items = sdk.features.where(status=status)
-        for f in items[:50]:
-            steps = f.steps or []
-            features.append({
-                'id': f.id,
-                'title': f.title,
-                'status': f.status,
-                'priority': getattr(f, 'priority', 'medium'),
-                'type': getattr(f, 'type', 'feature'),
-                'steps_total': len(steps),
-                'steps_completed': sum(1 for s in steps if s.completed),
-                'track_id': getattr(f, 'track_id', None),
-            })
-    except Exception:
-        pass
-
-result = json.dumps(features, default=str)
-result
+    cursor.execute(\"\"\"
+        SELECT id, title, status, priority, type, steps_total, steps_completed
+        FROM features
+        WHERE status = ? AND type IN ('feature', 'bug')
+        ORDER BY priority DESC, title ASC
+        LIMIT 50
+    \"\"\", (status,))
+    for row in cursor.fetchall():
+        features.append({
+            'id': row['id'],
+            'title': row['title'],
+            'status': row['status'],
+            'priority': row['priority'] or 'medium',
+            'type': row['type'] or 'feature',
+            'steps_total': row['steps_total'] or 0,
+            'steps_completed': row['steps_completed'] or 0,
+        })
+conn.close()
+json.dumps(features)
 """
 
-    {result, _} = Pythonx.eval(code, %{"graph_dir" => state.graph_dir})
+    {result, _} = Pythonx.eval(code, %{"db_path" => state.db_path})
     decoded = result |> Pythonx.decode() |> Jason.decode!()
 
     {:reply, {:ok, decoded}, state}
