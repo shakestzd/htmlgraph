@@ -4,8 +4,8 @@ Tests for UserPromptSubmit hook with CIGS integration.
 Tests cover:
 1. CIGS intent classification (exploration, code changes, git)
 2. Violation count integration
-3. Imperative guidance generation
-4. Combined workflow + CIGS guidance
+3. Imperative guidance generation (generate_cigs_guidance called directly)
+4. Hook output structure (compact attribution block only, no per-turn imperatives)
 5. Edge cases and error handling
 
 These tests call the Python functions directly (no subprocess) so they run
@@ -13,12 +13,16 @@ without network access, without an API key, and complete in well under 10
 seconds.  Database-touching helpers (create_user_query_event,
 get_active_work_item, get_open_work_items, get_session_violation_count) are
 patched with lightweight fakes.
+
+NOTE: The hook script no longer calls generate_cigs_guidance() per-turn.
+Static delegation imperatives now live in the system prompt to reduce context
+bloat (~800 tokens/turn → ~60 tokens/turn, bug-f8fb4174).
+generate_cigs_guidance() is tested directly here to preserve coverage.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 from htmlgraph.hooks.prompt_analyzer import (
     classify_cigs_intent,
     classify_prompt,
@@ -26,11 +30,11 @@ from htmlgraph.hooks.prompt_analyzer import (
     generate_guidance,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers that replicate the hook's assembly logic so tests can check the
 # combined output structure without spawning a subprocess.
 # ---------------------------------------------------------------------------
+
 
 def _make_hook_context() -> MagicMock:
     """Return a minimal HookContext mock (no real DB)."""
@@ -54,6 +58,9 @@ def _run_hook_logic(
 
     Patches out all I/O and returns the same dict structure that the
     hook script would print to stdout.
+
+    NOTE: Mirrors the simplified hook that no longer calls
+    generate_cigs_guidance() per-turn (static rules now in system prompt).
     """
     if not prompt:
         return {}
@@ -64,16 +71,13 @@ def _run_hook_logic(
     classification = classify_prompt(prompt)
     cigs_intent = classify_cigs_intent(prompt)
 
+    # Hook no longer calls generate_cigs_guidance() per-turn.
+    # Static delegation imperatives live in the system prompt.
     workflow_guidance = generate_guidance(
         classification, active_work, prompt, open_work_items=open_items
     )
-    cigs_guidance = generate_cigs_guidance(
-        cigs_intent, violation_count, waste_tokens, prompt
-    )
 
     combined_guidance = []
-    if cigs_guidance:
-        combined_guidance.append(cigs_guidance)
     if workflow_guidance:
         combined_guidance.append(workflow_guidance)
 
@@ -108,6 +112,7 @@ def _run_hook_logic(
 # Test classes
 # ---------------------------------------------------------------------------
 
+
 class TestCIGSIntentClassification:
     """Test CIGS intent classification for delegation guidance."""
 
@@ -127,14 +132,19 @@ class TestCIGSIntentClassification:
             )
 
     def test_exploration_guidance_contains_imperatives(self):
-        """Exploration intent should produce imperative guidance text."""
+        """Exploration intent should produce imperative guidance via generate_cigs_guidance.
+
+        NOTE: The hook no longer injects CIGS imperatives per-turn (they live in the
+        system prompt). This test verifies generate_cigs_guidance() still produces
+        correct output when called directly.
+        """
         for prompt in [
             "Search for all files containing 'authentication'",
             "Find the implementation of the login function",
         ]:
-            output = _run_hook_logic(prompt)
-            if "hookSpecificOutput" in output:
-                guidance = output["hookSpecificOutput"]["additionalContext"]
+            cigs_intent = classify_cigs_intent(prompt)
+            guidance = generate_cigs_guidance(cigs_intent, 0, 0, prompt)
+            if guidance:
                 assert "IMPERATIVE" in guidance, (
                     f"Missing imperative in guidance for: {prompt}"
                 )
@@ -157,10 +167,16 @@ class TestCIGSIntentClassification:
             )
 
     def test_code_changes_guidance_contains_imperatives(self):
-        """Code change intent should produce imperative guidance text."""
-        output = _run_hook_logic("Implement the user authentication feature")
-        if "hookSpecificOutput" in output:
-            guidance = output["hookSpecificOutput"]["additionalContext"]
+        """Code change intent should produce imperative guidance via generate_cigs_guidance.
+
+        NOTE: The hook no longer injects CIGS imperatives per-turn (they live in the
+        system prompt). This test verifies generate_cigs_guidance() still produces
+        correct output when called directly.
+        """
+        prompt = "Implement the user authentication feature"
+        cigs_intent = classify_cigs_intent(prompt)
+        guidance = generate_cigs_guidance(cigs_intent, 0, 0, prompt)
+        if guidance:
             assert "IMPERATIVE" in guidance
             assert "spawn_codex" in guidance or "Task()" in guidance
 
@@ -175,15 +191,19 @@ class TestCIGSIntentClassification:
 
         for prompt in prompts:
             result = classify_cigs_intent(prompt)
-            assert result["involves_git"], (
-                f"Failed to detect git in: {prompt}"
-            )
+            assert result["involves_git"], f"Failed to detect git in: {prompt}"
 
     def test_git_guidance_contains_imperatives(self):
-        """Git intent should produce imperative guidance text."""
-        output = _run_hook_logic("Commit these changes with a descriptive message")
-        if "hookSpecificOutput" in output:
-            guidance = output["hookSpecificOutput"]["additionalContext"]
+        """Git intent should produce imperative guidance via generate_cigs_guidance.
+
+        NOTE: The hook no longer injects CIGS imperatives per-turn (they live in the
+        system prompt). This test verifies generate_cigs_guidance() still produces
+        correct output when called directly.
+        """
+        prompt = "Commit these changes with a descriptive message"
+        cigs_intent = classify_cigs_intent(prompt)
+        guidance = generate_cigs_guidance(cigs_intent, 0, 0, prompt)
+        if guidance:
             assert "IMPERATIVE" in guidance
             assert "spawn_copilot" in guidance or "git" in guidance.lower()
 
@@ -223,7 +243,9 @@ class TestViolationWarnings:
 
     def test_violation_count_included_in_output(self):
         """Violation count should be reflected in the assembled output dict."""
-        output = _run_hook_logic("Implement user authentication", violation_count=2, waste_tokens=500)
+        output = _run_hook_logic(
+            "Implement user authentication", violation_count=2, waste_tokens=500
+        )
         if "cigs_session_status" in output:
             assert output["cigs_session_status"]["violation_count"] == 2
             assert output["cigs_session_status"]["waste_tokens"] == 500
@@ -237,7 +259,9 @@ class TestViolationWarnings:
 
     def test_violation_values_are_non_negative(self):
         """Violation count and waste tokens must always be >= 0."""
-        output = _run_hook_logic("Find the login function", violation_count=0, waste_tokens=0)
+        output = _run_hook_logic(
+            "Find the login function", violation_count=0, waste_tokens=0
+        )
         if "cigs_session_status" in output:
             assert output["cigs_session_status"]["violation_count"] >= 0
             assert output["cigs_session_status"]["waste_tokens"] >= 0
@@ -280,24 +304,36 @@ class TestGuidanceGeneration:
 
 
 class TestCombinedGuidance:
-    """Test combined workflow + CIGS guidance."""
+    """Test hook output guidance (compact attribution block only).
+
+    NOTE: Per-turn CIGS imperatives were removed from hook output in bug-f8fb4174.
+    Static delegation rules now live in the system prompt. The hook only
+    injects the compact attribution block (~60 tokens) per turn.
+    """
 
     def test_implementation_with_no_work_item(self):
-        """Implementation without work item should show both guidances."""
+        """Implementation without work item should include workflow guidance."""
         output = _run_hook_logic("Implement user login feature")
 
         if "hookSpecificOutput" in output:
             guidance = output["hookSpecificOutput"]["additionalContext"]
-            assert "CIGS PRE-RESPONSE GUIDANCE" in guidance or "IMPERATIVE" in guidance
-            assert "work item" in guidance.lower() or "feature" in guidance.lower()
+            # Should reference work items or SDK calls (compact attribution block)
+            assert (
+                "work item" in guidance.lower()
+                or "sdk" in guidance.lower()
+                or "feature" in guidance.lower()
+            )
 
     def test_exploration_request(self):
-        """Exploration request should have clear CIGS guidance."""
+        """Exploration request: hook produces attribution block, not CIGS imperatives."""
         output = _run_hook_logic("Find all files that use the database connection")
 
+        # The hook may or may not produce output for pure exploration with no open items
+        # When it does, it should be the compact attribution block format
         if "hookSpecificOutput" in output:
             guidance = output["hookSpecificOutput"]["additionalContext"]
-            assert "exploration" in guidance.lower() or "spawn_gemini" in guidance
+            # Compact block: should NOT contain the old verbose CIGS header
+            assert "CIGS PRE-RESPONSE GUIDANCE" not in guidance
 
 
 class TestEdgeCases:

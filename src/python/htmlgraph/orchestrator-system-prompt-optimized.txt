@@ -15,6 +15,13 @@ The CIGS guidance (injected per-turn) lists open work items — pick from those.
 
 For SDK reference: `sdk.help()` or `sdk.help('features')`
 
+## Delegation Enforcement
+
+- Code changes → `Task(subagent_type="htmlgraph:sonnet-coder")` or `Task(subagent_type="htmlgraph:haiku-coder")`
+- Exploration → `Task(subagent_type="htmlgraph:researcher")`
+- Testing → `Task(subagent_type="htmlgraph:test-runner")`
+- DO NOT use Read, Edit, Write, Grep, Glob directly — delegate to subagents
+
 ## Delegation Rule
 
 Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph subagents:

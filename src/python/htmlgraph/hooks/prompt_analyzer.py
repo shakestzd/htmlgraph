@@ -431,83 +431,53 @@ def _build_attribution_block(
     active_work: dict[str, Any] | None,
     open_work_items: list[dict] | None,
 ) -> str | None:
-    """
-    Build the Work Item Attribution block for injection into guidance.
+    """Build a compact Work Item Attribution block for per-turn injection.
 
-    Returns a formatted block instructing Claude to self-evaluate work item
-    attribution and call the appropriate SDK method to correct it if needed.
-    Returns None if open_work_items is empty or None.
-
-    The attribution instruction is a HARD BLOCKING GATE placed at the top of
-    Claude's response. Claude must call the appropriate SDK method to set
-    correct attribution BEFORE proceeding with any other work.
+    Produces a minimal 3-line block (~60 tokens) listing the active item and
+    up to 5 open items.  Static instructions live in the system prompt.
 
     Args:
         active_work: Currently active work item dict (id, title, type) or None
         open_work_items: List of open work item dicts from get_open_work_items()
 
     Returns:
-        Formatted attribution block string, or None if no open items
+        Compact attribution string, or None if no open items and no active work
     """
     if not open_work_items:
-        return "\n".join(
-            [
-                "## ⛔ MANDATORY FIRST STEP — DO NOT SKIP",
-                "",
-                "No open work items found. Before doing ANY work, create one:",
-                "",
-                "```python",
-                "from htmlgraph import SDK",
-                'sdk = SDK(agent="claude")',
-                'f = sdk.features.create("Brief description of what you\'re doing").save()',
-                "sdk.features.start(f.id)",
-                "```",
-                "",
-                "This ensures all tool calls are attributed to a work item.",
-            ]
+        return (
+            "No open items. Create one: "
+            "sdk.features.create('title').save() then sdk.features.start(id)"
         )
 
-    lines = [
-        "## ⛔ MANDATORY FIRST STEP — DO NOT SKIP",
-        "",
-        "Before writing ANY response or taking ANY action:",
-        "",
-        "1. Read the prompt and identify what work item this belongs to",
-        '2. Call `sdk.features.start("id")` / `sdk.bugs.start("id")` / `sdk.spikes.start("id")`',
-        "3. THEN proceed with your response",
-        "",
-        "If no existing item matches, create one:",
-        "",
-        "```python",
-        "from htmlgraph import SDK",
-        'sdk = SDK(agent="claude")',
-        'f = sdk.features.create("Brief title").set_track("trk-...").save()',
-        "sdk.features.start(f.id)",
-        "```",
-        "",
-        "**Why this is non-negotiable:** Turn 1's UserQuery is already in the DB unattributed. "
-        "Calling `start()` retroactively fixes it. If you skip this, that entire conversation "
-        'shows "—" in the dashboard forever.',
-        "",
-        "═══════════════════════════════════════════════════════════",
-        "",
-        "## Open Work Items (Pick from these if applicable):",
-        "",
-    ]
-    for item in open_work_items:
-        lines.append(
-            f"- [{item['status']}] {item['type']} {item['id']}: {item['title']}"
-        )
-
-    lines.append("")
+    # Active item line
     if active_work:
         active_id = active_work.get("id", "unknown")
-        active_title = active_work.get("title", "")
-        lines.append(f"Currently active: {active_id}: {active_title}")
+        active_title = (active_work.get("title", "") or "")[:40]
+        active_str = f"{active_id}: {active_title}"
     else:
-        lines.append("Currently active: None")
+        active_str = "None"
 
-    return "\n".join(lines)
+    # Compact open items list (max 5)
+    items = []
+    for item in open_work_items[:5]:
+        status_short = (
+            "ip"
+            if item.get("status") == "in-progress"
+            else (item.get("status", "?") or "?")[:4]
+        )
+        type_short = (item.get("type", "feat") or "feat")[:4]
+        items.append(f"{type_short} {item['id']}({status_short})")
+
+    remaining = len(open_work_items) - 5
+    items_str = " | ".join(items)
+    if remaining > 0:
+        items_str += f" +{remaining} more"
+
+    return (
+        f"ACTIVE: {active_str}\n"
+        f"OPEN: {items_str}\n"
+        "Call sdk.*.start(id) before any tool calls."
+    )
 
 
 def generate_guidance(

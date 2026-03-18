@@ -84,21 +84,20 @@ def main() -> None:
         # 4b. Get all open work items for attribution guidance (SDK)
         open_items = get_open_work_items(context)
 
-        # 5. Generate workflow guidance (SDK)
+        # 5. Generate workflow guidance (SDK) — compact attribution block only.
+        # Static delegation imperatives live in the system prompt; per-turn
+        # injection is the compact attribution block (~60 tokens) only.
         workflow_guidance = generate_guidance(
             classification, active_work, prompt, open_work_items=open_items
         )
 
-        # 6. CIGS: Generate imperative delegation guidance (SDK)
-        cigs_guidance = generate_cigs_guidance(
-            cigs_intent, violation_count, waste_tokens, prompt
-        )
+        # 6. CIGS imperative guidance suppressed per-turn: static rules are now
+        # in orchestrator-system-prompt-optimized.txt. Calling generate_cigs_guidance
+        # here would add ~500 tokens/turn unnecessarily.
+        # cigs_guidance = generate_cigs_guidance(cigs_intent, violation_count, waste_tokens, prompt)
 
-        # 7. Combine both guidance types
+        # 7. Assemble combined guidance (attribution block only)
         combined_guidance = []
-
-        if cigs_guidance:
-            combined_guidance.append(cigs_guidance)
 
         if workflow_guidance:
             combined_guidance.append(workflow_guidance)
