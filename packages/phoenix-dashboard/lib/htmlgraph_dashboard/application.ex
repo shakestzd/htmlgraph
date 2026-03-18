@@ -10,7 +10,7 @@ defmodule HtmlgraphDashboard.Application do
     name = "htmlgraph-dashboard"
     version = "0.0.0"
     requires-python = ">=3.10"
-    dependencies = ["htmlgraph>=0.33.79"]
+    dependencies = ["htmlgraph>=0.33.80"]
     """)
 
     children = [

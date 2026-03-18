@@ -51,7 +51,7 @@ defmodule HtmlgraphDashboard.PythonSDK do
         Path.join(File.cwd!(), db_path)
       end
 
-    graph_dir = Path.dirname(abs_path)
+    graph_dir = abs_path |> Path.dirname() |> Path.dirname()
 
     {:ok, %{db_path: abs_path, graph_dir: graph_dir}}
   end
@@ -107,7 +107,9 @@ result
   def handle_call({:get_work_item, feature_id}, _from, state) do
     code = """
 import json
+import os
 from htmlgraph import SDK
+os.chdir(graph_dir)
 sdk = SDK(agent='phoenix-dashboard')
 feature_id = feature_id.decode() if isinstance(feature_id, bytes) else feature_id
 try:
@@ -128,7 +130,7 @@ except Exception:
 result
 """
 
-    {result, _} = Pythonx.eval(code, %{"feature_id" => feature_id})
+    {result, _} = Pythonx.eval(code, %{"feature_id" => feature_id, "graph_dir" => state.graph_dir})
     decoded = result |> Pythonx.decode() |> Jason.decode!()
 
     {:reply, {:ok, decoded}, state}
@@ -140,7 +142,9 @@ result
   def handle_call(:get_graph_stats, _from, state) do
     code = """
 import json
+import os
 from htmlgraph import SDK
+os.chdir(graph_dir)
 sdk = SDK(agent='phoenix-dashboard')
 gm = sdk.graph
 G = gm.G
@@ -157,7 +161,7 @@ result = json.dumps(stats, default=str)
 result
 """
 
-    {result, _} = Pythonx.eval(code, %{})
+    {result, _} = Pythonx.eval(code, %{"graph_dir" => state.graph_dir})
     decoded = result |> Pythonx.decode() |> Jason.decode!()
 
     {:reply, {:ok, decoded}, state}
@@ -169,7 +173,9 @@ result
   def handle_call({:get_work_item_titles, feature_ids}, _from, state) do
     code = """
 import json
+import os
 from htmlgraph import SDK
+os.chdir(graph_dir)
 sdk = SDK(agent='phoenix-dashboard')
 feature_ids = [f.decode() if isinstance(f, bytes) else f for f in feature_ids]
 titles = {}
@@ -184,7 +190,7 @@ result = json.dumps(titles)
 result
 """
 
-    {result, _} = Pythonx.eval(code, %{"feature_ids" => feature_ids})
+    {result, _} = Pythonx.eval(code, %{"feature_ids" => feature_ids, "graph_dir" => state.graph_dir})
     decoded = result |> Pythonx.decode() |> Jason.decode!()
 
     {:reply, {:ok, decoded}, state}
