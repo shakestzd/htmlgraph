@@ -481,8 +481,11 @@ class FeatureWorkflow:
                 logger.warning(
                     f"Failed to auto-import transcript on feature completion: {e}"
                 )
-        if session:
-            self._m._spikes.create_transition_spike(session, from_feature_id=feature_id)
+        # Disabled: transition spike auto-creation pollutes dashboard with meaningless items.
+        # CIGS guidance handles prompting the agent to pick the next work item.
+        # See bug-63423134 for context.
+        # if session:
+        #     self._m._spikes.create_transition_spike(session, from_feature_id=feature_id)
         if session:
             self._run_completion_analysis(node, feature_id, session, graph, agent)
         return node

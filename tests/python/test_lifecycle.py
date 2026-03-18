@@ -4,9 +4,8 @@ Integration tests for full feature→session→spike lifecycle.
 Tests the complete workflow:
 1. Session start → session-init spike created
 2. Feature start → session-init spike completes
-3. Feature complete → transition spike created
-4. Next feature start → transition spike completes
-5. Session end → all spikes finalized
+3. Feature complete → (no transition spike — disabled in bug-63423134)
+4. Session end → all spikes finalized
 """
 
 import pytest
@@ -44,14 +43,12 @@ class TestFullLifecycle:
         assert init_spike.status == "done"
         assert init_spike.to_feature_id == feature.id
 
-        # 3. Complete feature → transition spike created
+        # 3. Complete feature → no transition spike (disabled, bug-63423134)
         manager.complete_feature(feature.id, agent="test-agent")
 
         spikes = spike_converter.load_all()
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
-        assert len(transition_spikes) == 1
-        assert transition_spikes[0].status == "in-progress"
-        assert transition_spikes[0].from_feature_id == feature.id
+        assert len(transition_spikes) == 0
 
         # 4. End session
         manager.end_session(session.id)
@@ -110,23 +107,13 @@ class TestFullLifecycle:
         spike_converter = NodeConverter(graph_dir / "spikes")
         spikes = spike_converter.load_all()
 
-        # Should have: 1 session-init (done) + 3 transition spikes (2 done, 1 in-progress)
+        # Should have: 1 session-init (done), no transition spikes (disabled, bug-63423134)
         init_spikes = [s for s in spikes if s.spike_subtype == "session-init"]
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
 
         assert len(init_spikes) == 1
         assert init_spikes[0].status == "done"
-
-        # After completing 3 features, we should have 3 transition spikes
-        # (one after each feature completion)
-        assert len(transition_spikes) == 3
-
-        # The last transition spike should be in-progress (nothing after it yet)
-        last_transition = sorted(
-            transition_spikes, key=lambda s: s.created, reverse=True
-        )[0]
-        assert last_transition.status == "in-progress"
-        assert last_transition.from_feature_id == feature3.id
+        assert len(transition_spikes) == 0
 
         # End session
         manager.end_session(session.id)
@@ -164,11 +151,11 @@ class TestFullLifecycle:
         manager.complete_feature(feature2.id, agent="test-agent")
         manager.complete_feature(feature3.id, agent="test-agent")
 
-        # Should have transition spikes for each completion
+        # No transition spikes should be created (disabled, bug-63423134)
         spike_converter = NodeConverter(graph_dir / "spikes")
         spikes = spike_converter.load_all()
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
-        assert len(transition_spikes) == 3
+        assert len(transition_spikes) == 0
 
     def test_activity_attribution_with_spikes(
         self, isolated_graph_dir_full, isolated_db
@@ -348,7 +335,7 @@ class TestEdgeCases:
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
 
         assert len(init_spikes) == 1
-        assert len(transition_spikes) == 1
+        assert len(transition_spikes) == 0  # disabled, bug-63423134
         assert init_spikes[0].status == "done"
 
 

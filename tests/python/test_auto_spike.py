@@ -90,10 +90,15 @@ class TestSessionInitSpike:
 
 
 class TestTransitionSpike:
-    """Test transition spike auto-creation."""
+    """Test transition spike auto-creation (disabled — see bug-63423134)."""
 
-    def test_transition_spike_created_on_feature_complete(self, tmp_path):
-        """Test that transition spike is created when feature completes."""
+    def test_transition_spike_not_created_on_feature_complete(self, tmp_path):
+        """Test that transition spike is NOT created when feature completes.
+
+        Transition spike auto-creation was disabled in bug-63423134 because
+        it polluted the dashboard with meaningless work items. CIGS guidance
+        handles prompting the agent to pick the next work item instead.
+        """
         graph_dir = tmp_path / ".htmlgraph"
         graph_dir.mkdir()
 
@@ -107,25 +112,17 @@ class TestTransitionSpike:
         manager.start_feature(feature.id, agent="test-agent")
         manager.complete_feature(feature.id, agent="test-agent")
 
-        # Check that transition spike was created
+        # Check that NO transition spike was created
         spike_converter = NodeConverter(graph_dir / "spikes")
         spikes = spike_converter.load_all()
 
         transition_spikes = [
             s for s in spikes if s.spike_subtype == "transition" and s.auto_generated
         ]
-        assert len(transition_spikes) == 1
+        assert len(transition_spikes) == 0
 
-        spike = transition_spikes[0]
-        assert spike.type == "spike"
-        assert spike.spike_subtype == "transition"
-        assert spike.auto_generated is True
-        assert spike.status == "in-progress"
-        assert spike.from_feature_id == feature.id
-        assert "Transition from" in spike.title
-
-    def test_transition_spike_linked_to_session(self, tmp_path):
-        """Test that transition spike is linked to session."""
+    def test_no_transition_spike_linked_to_session(self, tmp_path):
+        """Test that completing a feature does not add a transition spike to the session."""
         graph_dir = tmp_path / ".htmlgraph"
         graph_dir.mkdir()
 
@@ -140,14 +137,15 @@ class TestTransitionSpike:
         converter = SessionConverter(graph_dir / "sessions")
         reloaded_session = converter.load(session.id)
 
-        # Find transition spike
+        # No transition spike should exist
         spike_converter = NodeConverter(graph_dir / "spikes")
         spikes = spike_converter.load_all()
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
 
-        assert len(transition_spikes) == 1
-        spike = transition_spikes[0]
-        assert spike.id in reloaded_session.worked_on
+        assert len(transition_spikes) == 0
+        # session.worked_on should only contain session-init spike (if any)
+        for item_id in reloaded_session.worked_on:
+            assert "transition" not in item_id
 
 
 class TestAutoSpikeCompletion:
@@ -179,8 +177,8 @@ class TestAutoSpikeCompletion:
         assert init_spike.status == "done"
         assert init_spike.to_feature_id == feature.id
 
-    def test_transition_spike_completes_on_next_feature_start(self, tmp_path):
-        """Test that transition spike completes when next feature starts."""
+    def test_no_transition_spike_between_features(self, tmp_path):
+        """Test that no transition spike is created between features (disabled, bug-63423134)."""
         graph_dir = tmp_path / ".htmlgraph"
         graph_dir.mkdir()
 
@@ -188,31 +186,27 @@ class TestAutoSpikeCompletion:
 
         manager.start_session(agent="test-agent", title="Test Session")
 
-        # Complete first feature (creates transition spike)
+        # Complete first feature — should NOT create transition spike
         feature1 = manager.create_feature("Feature 1", agent="test-agent")
         manager.start_feature(feature1.id, agent="test-agent")
         manager.complete_feature(feature1.id, agent="test-agent")
 
-        # Verify transition spike exists and is in-progress
+        # Verify NO transition spike was created
         spike_converter = NodeConverter(graph_dir / "spikes")
         spikes = spike_converter.load_all()
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
-        assert len(transition_spikes) == 1
-        assert transition_spikes[0].status == "in-progress"
+        assert len(transition_spikes) == 0
 
-        # Start second feature (should complete transition spike)
+        # Start second feature — still no transition spike
         feature2 = manager.create_feature("Feature 2", agent="test-agent")
         manager.start_feature(feature2.id, agent="test-agent")
 
-        # Reload and verify transition spike is completed
         spikes = spike_converter.load_all()
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
-        assert len(transition_spikes) == 1
-        assert transition_spikes[0].status == "done"
-        assert transition_spikes[0].to_feature_id == feature2.id
+        assert len(transition_spikes) == 0
 
-    def test_multiple_auto_spikes_complete_together(self, tmp_path):
-        """Test that all active auto-spikes complete when feature starts."""
+    def test_session_init_spike_completes_without_transition_spike(self, tmp_path):
+        """Test that session-init completes when feature starts, with no transition spike after."""
         graph_dir = tmp_path / ".htmlgraph"
         graph_dir.mkdir()
 
@@ -230,17 +224,16 @@ class TestAutoSpikeCompletion:
         feature1 = manager.create_feature("Feature 1", agent="test-agent")
         manager.start_feature(feature1.id, agent="test-agent")
 
-        # Complete first feature (creates transition spike)
+        # Complete first feature — no transition spike created
         manager.complete_feature(feature1.id, agent="test-agent")
 
-        # Verify we now have session-init (done) and transition (in-progress)
+        # Verify we have session-init (done) and NO transition spike
         spikes = spike_converter.load_all()
         init_spikes = [s for s in spikes if s.spike_subtype == "session-init"]
         transition_spikes = [s for s in spikes if s.spike_subtype == "transition"]
         assert len(init_spikes) == 1
         assert init_spikes[0].status == "done"
-        assert len(transition_spikes) == 1
-        assert transition_spikes[0].status == "in-progress"
+        assert len(transition_spikes) == 0
 
 
 class TestSessionConverterAutoSpikeFields:

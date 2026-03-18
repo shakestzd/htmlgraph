@@ -110,11 +110,13 @@ class SessionManager:
         self.sessions_dir = self.graph_dir / "sessions"
         self.features_dir = self.graph_dir / "features"
         self.bugs_dir = self.graph_dir / "bugs"
+        self.spikes_dir = self.graph_dir / "spikes"
 
         # Ensure directories exist
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.features_dir.mkdir(parents=True, exist_ok=True)
         self.bugs_dir.mkdir(parents=True, exist_ok=True)
+        self.spikes_dir.mkdir(parents=True, exist_ok=True)
 
         # Session converter
         self.session_converter = SessionConverter(self.sessions_dir)
@@ -131,6 +133,7 @@ class SessionManager:
             if bugs_graph is not None
             else HtmlGraph(self.bugs_dir, auto_load=False)
         )
+        self.spikes_graph = HtmlGraph(self.spikes_dir, auto_load=False)
 
         # Claiming service (handles feature claims/releases)
         self.claiming_service = ClaimingService(
@@ -2166,11 +2169,11 @@ class SessionManager:
                     f"Failed to auto-import transcript on feature completion: {e}"
                 )
 
-        # Auto-create transition spike for post-completion activities
-        # This captures work between features. Completed when next feature starts,
-        # or when a new conversation starts (completing previous conversation's spike).
-        if session:
-            self._create_transition_spike(session, from_feature_id=feature_id)
+        # Disabled: transition spike auto-creation pollutes dashboard with meaningless items.
+        # CIGS guidance handles prompting the agent to pick the next work item.
+        # See bug-63423134 for context.
+        # if session:
+        #     self._create_transition_spike(session, from_feature_id=feature_id)
 
         # Analyze session for anti-patterns and errors on completion
         # This surfaces feedback to the orchestrator about mistakes made
@@ -2609,12 +2612,16 @@ class SessionManager:
         """Get graph for a collection."""
         if collection == "bugs":
             return self.bugs_graph
+        if collection == "spikes":
+            return self.spikes_graph
         return self.features_graph
 
     def _get_graph_for_node(self, node: Node) -> HtmlGraph:
         """Get the graph that contains a node."""
         if node.type == "bug":
             return self.bugs_graph
+        if node.type == "spike":
+            return self.spikes_graph
         return self.features_graph
 
     def _get_current_commit(self) -> str | None:
