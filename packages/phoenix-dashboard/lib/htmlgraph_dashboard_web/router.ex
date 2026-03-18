@@ -18,5 +18,7 @@ defmodule HtmlgraphDashboardWeb.Router do
 
     live "/", ActivityFeedLive, :index
     live "/session/:session_id", ActivityFeedLive, :session
+    live "/graph", GraphLive, :index
+    live "/kanban", KanbanLive, :index
   end
 end

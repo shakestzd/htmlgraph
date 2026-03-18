@@ -149,9 +149,48 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     feed = Activity.list_activity_feed(opts)
     total_events = feed |> Enum.map(fn g -> length(g.turns) end) |> Enum.sum()
 
+    # Collect all unique feature_ids across turns and their children
+    feature_ids =
+      feed
+      |> Enum.flat_map(fn group ->
+        group.turns
+        |> Enum.flat_map(fn turn ->
+          turn_id = turn.user_query["feature_id"]
+          child_ids = collect_feature_ids(turn.children)
+          [turn_id | child_ids]
+        end)
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    work_item_titles =
+      if feature_ids == [] do
+        %{}
+      else
+        try do
+          case PythonSDK.get_work_item_titles(feature_ids) do
+            {:ok, titles} -> titles
+            {:error, _} -> %{}
+          end
+        rescue
+          _ -> %{}
+        catch
+          :exit, _ -> %{}
+        end
+      end
+
     socket
     |> assign(:feed, feed)
     |> assign(:total_events, total_events)
+    |> assign(:work_item_titles, work_item_titles)
+  end
+
+  defp collect_feature_ids(events) do
+    Enum.flat_map(events, fn event ->
+      id = event["feature_id"]
+      children = event["children"] || []
+      [id | collect_feature_ids(children)]
+    end)
   end
 
   # --- Template Helpers ---
@@ -324,7 +363,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     <div class="header">
       <div class="header-title">
         <span class="dot"></span>
-        HtmlGraph Activity Feed
+        HtmlGraph Dashboard
       </div>
       <div style="display: flex; align-items: center; gap: 16px;">
         <div class="live-indicator">
@@ -336,6 +375,12 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
         </div>
       </div>
     </div>
+
+    <nav class="dashboard-nav">
+      <a href="/" class="nav-tab active">Activity Feed</a>
+      <a href="/graph" class="nav-tab">Graph</a>
+      <a href="/kanban" class="nav-tab">Kanban</a>
+    </nav>
 
     <div class="graph-stats-bar">
       <div class="stat-card">
@@ -479,14 +524,16 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
                           <%= turn.stats.error_count %> errors
                         </span>
                       <% end %>
-                      <%= if turn.work_item do %>
+                      <%= if turn.user_query["feature_id"] && @work_item_titles[turn.user_query["feature_id"]] do %>
+                        <% wi = @work_item_titles[turn.user_query["feature_id"]] %>
+                        <% wi_type = wi["type"] || "feature" %>
                         <span
-                          class="badge badge-feature"
-                          style="cursor: pointer"
+                          class={"badge badge-workitem badge-workitem-#{wi_type}"}
                           phx-click="select_work_item"
-                          phx-value-id={turn.work_item["id"]}
+                          phx-value-id={turn.user_query["feature_id"]}
+                          title={turn.user_query["feature_id"]}
                         >
-                          <%= truncate(turn.work_item["title"], 30) %>
+                          <%= truncate(wi["title"] || "", 30) %>
                         </span>
                       <% end %>
                       <%= for model <- turn.stats.models do %>
