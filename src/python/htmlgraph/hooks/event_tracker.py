@@ -2220,6 +2220,26 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
 
                 # Resolve step-level attribution
                 resolved_feature_id = result.feature_id if result else None
+
+                # Fallback: if no feature, check for in-progress bugs then spikes
+                if not resolved_feature_id and graph_dir:
+                    try:
+                        from pathlib import Path
+                        gd = Path(str(graph_dir))
+                        for subdir, prefix in [("bugs", "bug-"), ("spikes", "spk-"), ("features", "spk-")]:
+                            search = gd / subdir
+                            if not search.exists():
+                                continue
+                            for html_file in search.glob(f"{prefix}*.html"):
+                                content = html_file.read_text(errors="ignore")
+                                if 'data-status="in-progress"' in content:
+                                    resolved_feature_id = html_file.stem
+                                    break
+                            if resolved_feature_id:
+                                break
+                    except Exception:
+                        pass
+
                 resolved_step_id = resolve_active_step(resolved_feature_id)
 
                 event_id = record_event_to_sqlite(
