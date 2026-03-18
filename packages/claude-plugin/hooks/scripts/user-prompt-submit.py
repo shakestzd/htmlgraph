@@ -40,6 +40,7 @@ from htmlgraph.hooks.context import HookContext
 from htmlgraph.hooks.prompt_analyzer import (
     classify_cigs_intent,
     classify_prompt,
+    create_user_query_event,
     generate_cigs_guidance,
     generate_guidance,
     get_active_work_item,
@@ -62,6 +63,11 @@ def main() -> None:
 
         # Build HookContext for SDK functions that require it
         context = HookContext.from_input(hook_input)
+
+        # 0. Create UserQuery event with automatic attribution to active work item
+        # This ensures the user's prompt is recorded in the database and attributed
+        # to the currently active feature/bug/spike (via fallback logic in _get_active_feature_id)
+        create_user_query_event(context, prompt)
 
         # 1. Classify the prompt (SDK)
         classification = classify_prompt(prompt)
