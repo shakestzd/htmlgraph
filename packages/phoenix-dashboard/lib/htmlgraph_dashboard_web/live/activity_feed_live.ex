@@ -276,6 +276,17 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     MapSet.member?(expanded, "session:#{session_id}")
   end
 
+  defp infer_work_item_type(id) when is_binary(id) do
+    cond do
+      String.starts_with?(id, "feat-") -> "feature"
+      String.starts_with?(id, "bug-") -> "bug"
+      String.starts_with?(id, "spk-") -> "spike"
+      true -> "feature"
+    end
+  end
+
+  defp infer_work_item_type(_), do: "feature"
+
   defp depth_class(depth) do
     case depth do
       0 -> "depth-0"
@@ -526,7 +537,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
                       <% end %>
                       <%= if turn.user_query["feature_id"] && @work_item_titles[turn.user_query["feature_id"]] do %>
                         <% wi = @work_item_titles[turn.user_query["feature_id"]] %>
-                        <% wi_type = wi["type"] || "feature" %>
+                        <% wi_type = wi["type"] || infer_work_item_type(turn.user_query["feature_id"]) %>
                         <span
                           class={"badge badge-workitem badge-workitem-#{wi_type}"}
                           phx-click="select_work_item"
