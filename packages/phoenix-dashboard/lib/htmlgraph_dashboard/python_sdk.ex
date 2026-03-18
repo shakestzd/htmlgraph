@@ -183,24 +183,45 @@ result
   def handle_call({:get_work_item_titles, feature_ids}, _from, state) do
     code = """
 import json
+import sqlite3
 import os
-from htmlgraph import SDK
-os.chdir(graph_dir)
-sdk = SDK(agent='phoenix-dashboard')
+import re
+
+db_path_str = db_path.decode() if isinstance(db_path, bytes) else db_path
+graph_dir_str = graph_dir.decode() if isinstance(graph_dir, bytes) else graph_dir
 feature_ids = [f.decode() if isinstance(f, bytes) else f for f in feature_ids]
+
+conn = sqlite3.connect(db_path_str)
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
 titles = {}
+
 for fid in feature_ids:
-    try:
-        f = sdk.features.get(fid)
-        if f:
-            titles[fid] = {'title': f.title, 'type': getattr(f, 'type', 'feature')}
-    except Exception:
-        pass
+    cursor.execute("SELECT id, title, type FROM features WHERE id = ?", (fid,))
+    row = cursor.fetchone()
+    if row:
+        titles[fid] = {'title': row['title'], 'type': row['type'] or 'feature'}
+    else:
+        # Fallback: try reading from HTML file
+        for subdir in ['features', 'bugs', 'spikes']:
+            html_path = os.path.join(graph_dir_str, '.htmlgraph', subdir, fid + '.html')
+            if os.path.exists(html_path):
+                try:
+                    content = open(html_path).read()
+                    title_match = re.search(r'<title>(.*?)</title>', content)
+                    if title_match:
+                        item_type = 'spike' if fid.startswith('spk-') else 'bug' if fid.startswith('bug-') else 'feature'
+                        titles[fid] = {'title': title_match.group(1).strip(), 'type': item_type}
+                except Exception:
+                    pass
+                break
+
+conn.close()
 result = json.dumps(titles)
 result
 """
 
-    {result, _} = Pythonx.eval(code, %{"feature_ids" => feature_ids, "graph_dir" => state.graph_dir})
+    {result, _} = Pythonx.eval(code, %{"feature_ids" => feature_ids, "db_path" => state.db_path, "graph_dir" => state.graph_dir})
     decoded = result |> Pythonx.decode() |> Jason.decode!()
 
     {:reply, {:ok, decoded}, state}
