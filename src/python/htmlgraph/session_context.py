@@ -1475,6 +1475,7 @@ class SessionContextBuilder:
         self,
         session_id: str,
         compute_async: bool = True,
+        launched_by_htmlgraph: bool = False,
     ) -> str:
         """
         Build complete session start context.
@@ -1486,6 +1487,9 @@ class SessionContextBuilder:
         Args:
             session_id: Current session ID
             compute_async: Use parallel async operations for performance
+            launched_by_htmlgraph: When True, omit static directives already
+                present in the --append-system-prompt injected by the CLI.
+                Saves ~1,280 tokens per session start.
 
         Returns:
             Complete formatted Markdown context string
@@ -1509,7 +1513,23 @@ class SessionContextBuilder:
 
         # No features case - return minimal context
         if not features:
-            context = f"""{HTMLGRAPH_PROCESS_NOTICE}
+            if launched_by_htmlgraph:
+                context = f"""{HTMLGRAPH_PROCESS_NOTICE}
+
+---
+
+## No Features Found
+
+Initialize HtmlGraph in this project:
+```bash
+uv pip install htmlgraph
+htmlgraph init
+```
+
+Or create features manually in `.htmlgraph/features/`
+"""
+            else:
+                context = f"""{HTMLGRAPH_PROCESS_NOTICE}
 
 ---
 
@@ -1559,9 +1579,12 @@ Or create features manually in `.htmlgraph/features/`
         context_parts.append(
             self._build_orchestrator_status(orchestrator_active, orchestrator_level)
         )
-        context_parts.append(ORCHESTRATOR_DIRECTIVES)
-        context_parts.append(TRACKER_WORKFLOW)
-        context_parts.append(RESEARCH_FIRST_DEBUGGING)
+        # Skip static directives when launched via htmlgraph CLI — they are
+        # already present in the --append-system-prompt injected at launch time.
+        if not launched_by_htmlgraph:
+            context_parts.append(ORCHESTRATOR_DIRECTIVES)
+            context_parts.append(TRACKER_WORKFLOW)
+            context_parts.append(RESEARCH_FIRST_DEBUGGING)
 
         # Previous session
         prev_session_section = self.build_previous_session_section()

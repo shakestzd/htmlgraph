@@ -59,6 +59,40 @@ except Exception as e:
     sys.exit(0)
 
 
+def _is_htmlgraph_launched(graph_dir: str) -> bool:
+    """Check if Claude was launched via htmlgraph CLI (marker file exists and is valid).
+
+    The marker file is written by ClaudeLauncher._write_launch_marker() just
+    before exec'ing ``claude``.  It contains the launcher PID so we can detect
+    stale markers left over from a previous (now-dead) process.
+
+    Args:
+        graph_dir: Path to the .htmlgraph/ directory
+
+    Returns:
+        True if a fresh, valid marker exists; False otherwise
+    """
+    marker_path = os.path.join(graph_dir, ".launch-mode")
+    if not os.path.exists(marker_path):
+        return False
+    try:
+        with open(marker_path) as f:
+            marker = json.load(f)
+        # Check PID is still alive (os.kill(pid, 0) raises if dead)
+        pid = marker.get("pid", 0)
+        try:
+            os.kill(pid, 0)
+        except (OSError, ProcessLookupError):
+            return False  # PID is dead — marker is stale
+        # Check timestamp is within 24 hours
+        ts = marker.get("timestamp", 0)
+        if time.time() - ts > 86400:
+            return False  # Older than 24 h, stale
+        return True
+    except Exception:
+        return False
+
+
 def claim_traceparent() -> dict | None:
     """Claim the most recent unclaimed traceparent from the queue.
 
@@ -300,6 +334,9 @@ def main() -> None:
     except Exception:
         pass
 
+    # Detect whether Claude was launched via htmlgraph CLI (read once, used twice below)
+    launched = _is_htmlgraph_launched(str(graph_dir))
+
     # Ensure a single stable HtmlGraph session exists for this agent
     active = None
     try:
@@ -314,9 +351,16 @@ def main() -> None:
             )
 
         # Set environment variables for parent session context
-        _setup_env_vars(
-            active, external_session_id, os.environ.get("CLAUDE_ENV_FILE"), project_dir
-        )
+        env_file = os.environ.get("CLAUDE_ENV_FILE")
+        _setup_env_vars(active, external_session_id, env_file, project_dir)
+
+        # Propagate htmlgraph launch mode to downstream hooks
+        if launched and env_file:
+            try:
+                with open(env_file, "a") as f:
+                    f.write("export HTMLGRAPH_LAUNCHED=1\n")
+            except Exception as e:
+                logger.warning(f"Could not write HTMLGRAPH_LAUNCHED to env file: {e}")
 
         # Manage conversation-level auto-spikes
         _manage_conversation_spike(manager, active, external_session_id, graph_dir)
@@ -332,6 +376,7 @@ def main() -> None:
     context = builder.build(
         session_id=session_id,
         compute_async=True,
+        launched_by_htmlgraph=launched,
     )
 
     # Build status summary for terminal

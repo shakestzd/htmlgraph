@@ -6,9 +6,12 @@ Coordinates launching Claude Code with various HtmlGraph integration options.
 """
 
 import argparse
+import json
 import logging
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from htmlgraph.orchestration.command_builder import ClaudeCommandBuilder
@@ -57,6 +60,28 @@ class ClaudeLauncher:
             logger.warning(f"Error: Failed to start Claude Code: {e}")
             sys.exit(1)
 
+    def _write_launch_marker(self, mode: str) -> None:
+        """Write a self-expiring launch mode marker to .htmlgraph/.
+
+        This marker lets the SessionStart hook detect that Claude was launched
+        via the htmlgraph CLI, so it can skip ~1,280 tokens of static directives
+        that are already injected via --append-system-prompt.
+
+        Args:
+            mode: Launch mode string ("dev", "init", "continue", "default")
+        """
+        marker_path = Path.cwd() / ".htmlgraph" / ".launch-mode"
+        marker = {
+            "mode": mode,
+            "pid": os.getpid(),
+            "timestamp": time.time(),
+        }
+        try:
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            marker_path.write_text(json.dumps(marker))
+        except Exception:
+            pass  # Don't block launch on marker write failure
+
     def _launch_orchestrator_mode(self) -> None:
         """Launch with orchestrator prompt (--init).
 
@@ -75,6 +100,9 @@ class ClaudeLauncher:
 
         # Build command
         cmd = ClaudeCommandBuilder().with_system_prompt(prompt).build()
+
+        # Write launch marker before handing off to Claude
+        self._write_launch_marker("init")
 
         # Execute
         SubprocessRunner.run_claude_command(cmd)
@@ -100,6 +128,9 @@ class ClaudeLauncher:
 
         # Build command (no --plugin-dir, uses marketplace)
         cmd = ClaudeCommandBuilder().with_resume().with_system_prompt(prompt).build()
+
+        # Write launch marker before handing off to Claude
+        self._write_launch_marker("continue")
 
         # Execute
         SubprocessRunner.run_claude_command(cmd)
@@ -147,6 +178,9 @@ class ClaudeLauncher:
             .build()
         )
 
+        # Write launch marker before handing off to Claude
+        self._write_launch_marker("dev")
+
         # Execute
         SubprocessRunner.run_claude_command(cmd)
 
@@ -164,6 +198,9 @@ class ClaudeLauncher:
 
         # Build command
         cmd = ClaudeCommandBuilder().with_system_prompt(prompt).build()
+
+        # Write launch marker before handing off to Claude
+        self._write_launch_marker("default")
 
         # Execute
         SubprocessRunner.run_claude_command(cmd)
