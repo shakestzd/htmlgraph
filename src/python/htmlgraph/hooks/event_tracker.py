@@ -1862,9 +1862,22 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
         # SubagentStart stamps the real agent_id on the Task event in agent_events.
         # This is exact, unambiguous, and race-condition-free since SubagentStart
         # fires before any subagent tool calls.
+        # agent_type is used as a secondary check: if agent_type is not "main" or "",
+        # this is a subagent and we look up by agent_id.
         if not parent_activity_id and db and db.connection:
             hook_agent_id = hook_input.get("agent_id", "")
-            if hook_agent_id and hook_agent_id != "claude-code":
+            hook_agent_type = hook_input.get("agent_type", "")
+            # Treat "main" and "claude-code" as the orchestrator (not a subagent).
+            _is_subagent = bool(hook_agent_id) and hook_agent_id not in (
+                "main",
+                "claude-code",
+                "",
+            )
+            if not _is_subagent and hook_agent_type:
+                _is_subagent = hook_agent_type not in ("main", "")
+            if _is_subagent:
+                # Prefer agent_id for the lookup; fall back to agent_type when agent_id absent
+                _lookup_agent_id = hook_agent_id or hook_agent_type
                 try:
                     _aid_cursor = db.connection.cursor()
                     _aid_cursor.execute(
@@ -1875,7 +1888,7 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                         ORDER BY timestamp DESC
                         LIMIT 1
                         """,
-                        (hook_agent_id,),
+                        (_lookup_agent_id,),
                     )
                     _aid_row = _aid_cursor.fetchone()
                     if _aid_row:
@@ -1883,7 +1896,7 @@ def track_event(hook_type: str, hook_input: dict[str, Any]) -> dict[str, Any]:
                         logger.debug(
                             f"PostToolUse: agent_id lookup found parent "
                             f"task_delegation={parent_activity_id} for "
-                            f"agent_id={hook_agent_id}"
+                            f"agent_id={_lookup_agent_id}"
                         )
                 except Exception as _ae:
                     logger.debug(f"PostToolUse: agent_id lookup failed: {_ae}")

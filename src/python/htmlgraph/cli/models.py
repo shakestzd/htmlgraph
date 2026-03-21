@@ -553,6 +553,123 @@ class BootstrapConfig(BaseModel):
 # ============================================================================
 
 
+# ============================================================================
+# Args Models (named for task-spec compatibility, wrapping config models)
+# ============================================================================
+
+
+class FeatureCreateArgs(BaseModel):
+    """Pydantic model for 'feature create' CLI arguments.
+
+    Attributes:
+        title: Feature title (required, 1-200 chars)
+        priority: Feature priority (low, medium, high, critical)
+        track_id: Optional track to link the feature to
+        description: Optional feature description
+        steps: Optional number of steps (1-100)
+        collection: Collection name (default: features)
+        agent: Agent name (default: claude-code)
+    """
+
+    title: str = Field(..., min_length=1, max_length=200, description="Feature title")
+    priority: Literal["critical", "high", "medium", "low"] = Field(
+        default="medium", description="Feature priority"
+    )
+    track_id: str | None = Field(default=None, description="Track to link to")
+    description: str | None = Field(default=None, description="Feature description")
+    steps: int | None = Field(default=None, ge=1, le=100, description="Number of steps")
+    collection: str = Field(default="features", description="Collection name")
+    agent: str = Field(default="claude-code", description="Agent name")
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        """Validate title is not empty or whitespace only."""
+        if not v.strip():
+            raise ValueError("Feature title cannot be empty or whitespace only")
+        return v.strip()
+
+
+class ServeArgs(BaseModel):
+    """Pydantic model for 'serve' CLI arguments.
+
+    Attributes:
+        port: Port to bind to (1024-65535, default: 8080)
+        host: Host to bind to (default: 0.0.0.0)
+        db_path: Optional path to SQLite database file
+        graph_dir: Graph directory path
+        static_dir: Static files directory
+        no_watch: Disable file watching
+        auto_port: Auto-find available port
+    """
+
+    port: int = Field(default=8080, ge=1024, le=65535, description="Port number")
+    host: str = Field(default="0.0.0.0", description="Host to bind to")
+    db_path: str | None = Field(default=None, description="SQLite database file path")
+    graph_dir: str = Field(default=".htmlgraph", description="Graph directory")
+    static_dir: str = Field(default=".", description="Static files directory")
+    no_watch: bool = Field(default=False, description="Disable file watching")
+    auto_port: bool = Field(default=False, description="Auto-find available port")
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, v: str) -> str:
+        """Validate host is not empty."""
+        if not v or not v.strip():
+            raise ValueError("Host cannot be empty")
+        return v.strip()
+
+
+class StatusArgs(BaseModel):
+    """Pydantic model for 'status' CLI arguments.
+
+    Attributes:
+        format: Output format (text, json, html)
+        verbose: Enable verbose output
+        graph_dir: Graph directory path
+    """
+
+    format: str = Field(
+        default="text",
+        pattern="^(text|json|html)$",
+        description="Output format",
+    )
+    verbose: bool = Field(default=False, description="Enable verbose output")
+    graph_dir: str = Field(default=".htmlgraph", description="Graph directory")
+
+
+class SnapshotArgs(BaseModel):
+    """Pydantic model for 'snapshot' CLI arguments.
+
+    Attributes:
+        summary: Show counts and progress summary instead of listing all items
+        format: Output format (text, json, refs)
+        type: Filter by type (feature, track, bug, spike, chore, epic, all)
+        status: Filter by status (todo, in_progress, blocked, done, all)
+        track: Show only items in a specific track
+        active: Show only TODO/IN_PROGRESS items
+        blockers: Show only critical/blocked items
+        my_work: Show items assigned to current agent
+    """
+
+    summary: bool = Field(
+        default=False, description="Show summary instead of full list"
+    )
+    format: str = Field(
+        default="refs",
+        pattern="^(text|json|refs)$",
+        description="Output format",
+    )
+    type: str | None = Field(default=None, description="Filter by type")
+    status: str | None = Field(default=None, description="Filter by status")
+    track: str | None = Field(default=None, description="Filter by track ID or ref")
+    active: bool = Field(default=False, description="Show only active items")
+    blockers: bool = Field(
+        default=False, description="Show only critical/blocked items"
+    )
+    my_work: bool = Field(default=False, description="Show items for current agent")
+
+
 def validate_args(model: type[T], args: Any) -> T:
     """Convert argparse Namespace to validated Pydantic model.
 

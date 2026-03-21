@@ -341,14 +341,21 @@ def create_task_parent_event(
                 if model and not model.startswith("claude-"):
                     model = f"claude-{model}"
 
-        # Extract parent session ID using native agent_id when available,
+        # Extract parent session ID using native agent_id/agent_type when available,
         # falling back to suffix-stripping heuristics.
-        # When agent_id is present in hook_input, it means we ARE the subagent —
-        # the session_id passed here is the PARENT session (Claude Code behavior),
-        # so no stripping is needed. Suffix heuristics are only needed when
+        # When agent_id is present in hook_input and is not "main", it means we ARE
+        # the subagent — the session_id passed here is the PARENT session (Claude Code
+        # behavior), so no stripping is needed. Suffix heuristics are only needed when
         # agent_id is absent and the session_id still carries the subagent suffix.
+        native_hook_agent_id = tool_input.get("agent_id") or ""
+        # is_subagent_hook: True when hook input identifies us as a subagent
+        is_subagent_hook = bool(native_hook_agent_id) and native_hook_agent_id not in (
+            "main",
+            "claude-code",
+            "",
+        )
         parent_session_id = session_id  # Default: same session (it IS the parent)
-        if not tool_input.get("agent_id"):
+        if not is_subagent_hook:
             known_suffixes = ["-general-purpose", "-Explore", "-Bash", "-Plan"]
             for suffix in known_suffixes:
                 if session_id.endswith(suffix):
@@ -408,7 +415,8 @@ def create_task_parent_event(
         """,
             (
                 parent_event_id,
-                "claude-code",  # Main orchestrator agent
+                native_hook_agent_id
+                or "claude-code",  # Use real agent_id from hook input
                 "task_delegation",
                 start_time,
                 "Task",
@@ -600,20 +608,40 @@ def create_start_event(
         #    kept for forward compatibility).
         subagent_parent_event_id = None
         session_known = True  # Default: assume known (orchestrator). Updated below if session lookup succeeds.
-        native_agent_id = tool_input.get("agent_id")
-        if native_agent_id:
-            # Use the agent_id already mapped to a task_delegation by SubagentStart hook
+        # Use native agent_id/agent_type from hook input (most reliable subagent detection).
+        # agent_id is a unique subagent identifier (e.g. "agent-abc123") when Claude Code
+        # sends PreToolUse for a subagent tool call.
+        # agent_type is the named agent type (e.g. "htmlgraph:sonnet-coder", "main").
+        native_agent_id = tool_input.get("agent_id") or ""
+        native_agent_type = tool_input.get("agent_type") or ""
+        # is_subagent: True when hook input identifies this as a non-main (subagent) context
+        is_subagent_context = bool(native_agent_id) and native_agent_id not in (
+            "main",
+            "claude-code",
+            "",
+        )
+        if not is_subagent_context and native_agent_type:
+            # agent_type fallback: if agent_type is set and not "main", treat as subagent
+            is_subagent_context = native_agent_type not in ("main", "")
+        if is_subagent_context:
+            # Use the agent_id already mapped to a task_delegation by SubagentStart hook.
+            # Prefer agent_id for the lookup (exact match); fall back to agent_type.
+            lookup_agent_id = native_agent_id or native_agent_type
             try:
                 cursor.execute(
                     """SELECT event_id FROM agent_events
                        WHERE agent_id = ?
                          AND event_type = 'task_delegation'
                        ORDER BY datetime(REPLACE(SUBSTR(timestamp, 1, 19), 'T', ' ')) DESC LIMIT 1""",
-                    (native_agent_id,),
+                    (lookup_agent_id,),
                 )
                 row = cursor.fetchone()
                 if row:
                     subagent_parent_event_id = row[0]
+                    logger.debug(
+                        f"Subagent detected via native agent_id={lookup_agent_id}: "
+                        f"parent task_delegation={subagent_parent_event_id}"
+                    )
             except Exception:
                 pass
         else:
@@ -945,22 +973,28 @@ async def run_orchestrator_check(tool_input: dict[str, Any]) -> dict[str, Any]:
     Run orchestrator enforcement check (async wrapper).
 
     Args:
-        tool_input: Hook input with tool name and parameters
+        tool_input: Hook input with tool name and parameters (the full hook stdin JSON)
 
     Returns:
         Orchestrator response: {"continue": bool, "hookSpecificOutput": {...}}
     """
     try:
+        import functools
+
         loop = asyncio.get_event_loop()
         tool_name = tool_input.get("name", "") or tool_input.get("tool_name", "")
         tool_params = tool_input.get("input", {}) or tool_input.get("tool_input", {})
 
-        # Run in thread pool since it's CPU-bound
+        # Pass hook_input so enforce_orchestrator_mode can use native agent_id/agent_type
+        # for reliable subagent detection instead of env var heuristics.
         return await loop.run_in_executor(
             None,
-            enforce_orchestrator_mode,
-            tool_name,
-            tool_params,
+            functools.partial(
+                enforce_orchestrator_mode,
+                tool_name,
+                tool_params,
+                hook_input=tool_input,
+            ),
         )
     except Exception:
         # Graceful degradation - allow on error
@@ -972,12 +1006,14 @@ async def run_validation_check(tool_input: dict[str, Any]) -> dict[str, Any]:
     Run work validation check (async wrapper).
 
     Args:
-        tool_input: Hook input with tool name and parameters
+        tool_input: Hook input with tool name and parameters (the full hook stdin JSON)
 
     Returns:
         Validator response: {"decision": "allow"|"deny", "guidance": "...", ...}
     """
     try:
+        import functools
+
         loop = asyncio.get_event_loop()
 
         tool_name = tool_input.get("name", "") or tool_input.get("tool", "")
@@ -990,14 +1026,18 @@ async def run_validation_check(tool_input: dict[str, Any]) -> dict[str, Any]:
             None, lambda: validator_load_history(session_id)
         )
 
-        # Run validation
+        # Pass hook_input so validate_tool_call can use native agent_id/agent_type
+        # for reliable subagent detection instead of env var heuristics.
         return await loop.run_in_executor(
             None,
-            validate_tool_call,
-            tool_name,
-            tool_params,
-            config,
-            history,
+            functools.partial(
+                validate_tool_call,
+                tool_name,
+                tool_params,
+                config,
+                history,
+                hook_input=tool_input,
+            ),
         )
     except Exception:
         # Graceful degradation - allow on error
