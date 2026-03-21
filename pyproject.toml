@@ -1,7 +1,7 @@
 [project]
 name = "htmlgraph"
-version = "0.33.96"
-description = "Local-first observability and coordination platform for AI-assisted development. Document-backed work items with SQLite-indexed runtime state, live FastAPI/HTMX dashboard, and multi-agent session tracking."
+version = "0.34.0"
+description = "Local-first observability and coordination platform for AI-assisted development. Document-backed work items with SQLite-indexed runtime state, and multi-agent session tracking."
 authors = [{name = "Shakes", email = "shakestzd@gmail.com"}]
 readme = "README.md"
 license = {text = "MIT"}
@@ -27,21 +27,7 @@ dependencies = [
     "rich>=13.0.0",
     "jinja2>=3.1.0",
     "typing_extensions>=4.0.0; python_version < '3.11'",
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "aiosqlite>=0.19.0",
     "pyyaml>=6.0",
-    "fastapi-sqla>=0.3.0",
-    "alembic>=1.13.0",
-    "fastapi-cache2>=0.2.1",
-    "orjson>=3.9.0",
-    "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-instrumentation-fastapi>=0.41b0",
-    "opentelemetry-instrumentation-sqlite3>=0.41b0",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20.0",
-    "prometheus-fastapi-instrumentator>=6.0.0",
-    "asgi-correlation-id>=4.0.0",
-    "structlog>=23.0.0",
     "tenacity>=8.0",
     "networkx>=3.4.2",
 ]
@@ -60,12 +46,6 @@ dev = [
     "pdoc>=14.0.0",
     "tomli>=2.0.0; python_version < '3.11'",
     "sentry-sdk[fastapi]>=1.40.0",
-]
-observability = [
-    "sentry-sdk[fastapi]>=1.40.0",
-]
-sqlite = [
-    "aiosqlite>=0.19.0",
 ]
 deploy = [
     "invoke>=2.2.0",
@@ -90,7 +70,6 @@ packages = ["src/python/htmlgraph"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "src/python/htmlgraph/styles.css" = "htmlgraph/styles.css"
-"src/python/htmlgraph/dashboard.html" = "htmlgraph/dashboard.html"
 "src/python/htmlgraph/templates/AGENTS.md.template" = "htmlgraph/templates/AGENTS.md.template"
 "src/python/htmlgraph/templates/CLAUDE.md.template" = "htmlgraph/templates/CLAUDE.md.template"
 "src/python/htmlgraph/templates/GEMINI.md.template" = "htmlgraph/templates/GEMINI.md.template"
