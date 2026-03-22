@@ -223,6 +223,7 @@ defmodule HtmlgraphDashboard.Activity do
            execution_duration_seconds, feature_id, context
     FROM agent_events
     WHERE tool_name = 'UserQuery'
+      AND agent_id = 'user'
     ORDER BY timestamp DESC
     LIMIT ?
     """
@@ -240,7 +241,9 @@ defmodule HtmlgraphDashboard.Activity do
            subagent_type, model, status, cost_tokens,
            execution_duration_seconds, feature_id, context
     FROM agent_events
-    WHERE tool_name = 'UserQuery' AND session_id = ?
+    WHERE tool_name = 'UserQuery'
+      AND agent_id = 'user'
+      AND session_id = ?
     ORDER BY timestamp DESC
     LIMIT ?
     """
