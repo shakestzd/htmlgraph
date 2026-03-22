@@ -1,6 +1,6 @@
 [project]
 name = "htmlgraph"
-version = "0.34.13"
+version = "0.34.14"
 description = "Local-first observability and coordination platform for AI-assisted development. Document-backed work items with SQLite-indexed runtime state, and multi-agent session tracking."
 authors = [{name = "Shakes", email = "shakestzd@gmail.com"}]
 readme = "README.md"
