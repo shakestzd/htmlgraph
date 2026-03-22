@@ -11,10 +11,9 @@ RUN mix local.hex --force && mix local.rebar --force
 # Set build env
 ENV MIX_ENV=prod
 
-# Install deps
+# Copy mix files first for dependency caching
 COPY mix.exs mix.lock ./
-COPY deps deps
-RUN mix deps.get --only prod || true
+RUN mix deps.get --only prod
 RUN mix deps.compile
 
 # Copy app source

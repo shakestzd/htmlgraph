@@ -1,4 +1,5 @@
 _build/
+deps/
 .git
 .htmlgraph/
 *.md
