@@ -1,8 +1,10 @@
 # HtmlGraph
 
-**"HTML is All You Need"**
+**Local-first observability and coordination platform for AI-assisted development.**
 
-A lightweight graph database framework built entirely on web standards. Use HTML files as nodes, hyperlinks as edges, and CSS selectors as the query language.
+No external infrastructure required — no Postgres, no Redis, no cloud sync. HTML files as nodes, hyperlinks as edges, SQLite for fast local queries, and a FastAPI + HTMX live dashboard out of the box.
+
+> **Design philosophy:** "HTML is All You Need" — work items are standard HTML files readable in any browser, diffable in git, and editable without tooling.
 
 ## Why HtmlGraph?
 
@@ -126,16 +128,17 @@ HtmlGraph nodes are standard HTML files:
 
 ## Features
 
-- **Zero dependencies** beyond `justhtml` and `pydantic`
-- **CSS selector queries** - no new query language to learn
-- **Version control friendly** - git diff works perfectly
-- **Human readable** - open in any browser
-- **AI agent optimized** - lightweight context generation
+- **No external infrastructure** — 10 runtime deps (justhtml, pydantic, jinja2, rich, watchdog, pyyaml, tenacity, networkx, pydantic-settings, typing_extensions), no Postgres/Redis/cloud required
+- **HTML canonical store** - work items are standard HTML files, git-diffable and browser-readable
+- **SQLite operational layer** - fast local queries, dashboard analytics, rebuild from HTML source
+- **FastAPI + HTMX live dashboard** - real-time activity feed, no frontend build step
+- **Multi-AI agent support** - Claude, Gemini, Codex, Copilot coordination out of the box
+- **Event-driven hook system** - Claude Code hooks record all tool calls and session events
+- **SDK for programmatic access** - features, bugs, spikes, tracks with fluent API
+- **Version control friendly** - git diff works perfectly on all artifacts
 - **Graph algorithms** - BFS, shortest path, cycle detection, topological sort
 - **Agent Handoff** - Context-preserving task transfers between agents
-- **Capability Routing** - Automatic task assignment based on agent skills
 - **Deployment Automation** - One-command releases with version management
-- **Unified Backend** - Operations layer shared by CLI and SDK for consistency
 
 ## Orchestrator Architecture: Flexible Multi-Agent Coordination
 
@@ -172,7 +175,7 @@ Task(subagent_type="claude-spawner",    # Deep reasoning
 - **Codex Spawner** - Code generation, coding completions
 - **Claude Spawner** - Deep reasoning, analysis, strategic planning (any Claude model)
 
-→ [Complete Orchestrator Architecture Guide](docs/orchestrator-architecture.md) - Detailed patterns, cost optimization, decision framework, and advanced examples
+→ [Complete Orchestrator Architecture Guide](docs/architecture/orchestrator-architecture.md) - Detailed patterns, cost optimization, decision framework, and advanced examples
 
 ## Comparison
 
@@ -200,7 +203,7 @@ HtmlGraph is developed using HtmlGraph itself (dogfooding). This means:
 - ✅ We use the SDK, CLI, and plugins - not custom scripts
 - ✅ Our development workflow IS the documentation
 
-**See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for:**
+**See [`docs/archive/DEVELOPMENT.md`](docs/archive/DEVELOPMENT.md) for:**
 - Dogfooding principles
 - Replicable workflows
 - Environment setup (PyPI tokens, etc.)
@@ -232,10 +235,10 @@ MIT
 
 For Claude Code users and teams using HtmlGraph for AI agent coordination:
 
-- **[System Prompt Quick Start](docs/SYSTEM_PROMPT_QUICK_START.md)** - Setup your system prompt in 5 minutes (start here!)
-- **[System Prompt Architecture](docs/SYSTEM_PROMPT_ARCHITECTURE.md)** - Technical deep dive + troubleshooting
-- **[Delegation Enforcement Admin Guide](docs/DELEGATION_ENFORCEMENT_ADMIN_GUIDE.md)** - Setup cost-optimal delegation for your team
-- **[System Prompt Developer Guide](docs/SYSTEM_PROMPT_DEVELOPER_GUIDE.md)** - Extend with custom layers, hooks, and skills
+- **[System Prompt Quick Start](docs/archive/system-prompts/SYSTEM_PROMPT_QUICK_START.md)** - Setup your system prompt in 5 minutes (start here!)
+- **[System Prompt Architecture](docs/architecture/system-prompt-architecture.md)** - Technical deep dive + troubleshooting
+- **[Delegation Enforcement Admin Guide](docs/contributing/DELEGATION_ENFORCEMENT_ADMIN_GUIDE.md)** - Setup cost-optimal delegation for your team
+- **[System Prompt Developer Guide](docs/archive/system-prompts/SYSTEM_PROMPT_DEVELOPER_GUIDE.md)** - Extend with custom layers, hooks, and skills
 
 ## Links
 

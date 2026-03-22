@@ -488,7 +488,7 @@ graph.add(node)
 
 ## Debugging & Quality
 
-**See [DEBUGGING.md](./DEBUGGING.md) for the complete debugging guide**
+**See [.claude/rules/debugging.md](./.claude/rules/debugging.md) for the complete debugging guide**
 
 HtmlGraph provides specialized debugging agents for systematic problem-solving:
 
@@ -1871,7 +1871,6 @@ sessions = sdk.find_proximate_sessions(
 
 For complete details, see:
 - [Git Continuity Architecture](./docs/GIT_CONTINUITY_ARCHITECTURE.md) - Technical deep-dive
-- [Migration Guide](./docs/MIGRATION_GUIDE.md) - Migrating from old tracking
 - [Git Hooks Guide](./docs/GIT_HOOKS.md) - Hook installation and config
 
 ---
