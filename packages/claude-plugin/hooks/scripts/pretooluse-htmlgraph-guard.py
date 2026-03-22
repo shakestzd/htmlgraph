@@ -13,6 +13,13 @@ import json
 import re
 import sys
 
+try:
+    from htmlgraph.hooks.version_check import check_hook_version
+
+    check_hook_version("0.34.14")
+except Exception:
+    pass
+
 # --- Constants ---
 
 BLOCK_MESSAGE = """BLOCKED: Direct .htmlgraph/ file modification detected. Use the HtmlGraph SDK instead.

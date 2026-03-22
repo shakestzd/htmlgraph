@@ -46,6 +46,9 @@ from htmlgraph.hooks.prompt_analyzer import (
     get_open_work_items,
     get_session_violation_count,
 )
+from htmlgraph.hooks.version_check import check_hook_version
+
+check_hook_version("0.34.14")
 
 
 def main() -> None:

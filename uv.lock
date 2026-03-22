@@ -445,7 +445,7 @@ wheels = [
 
 [[package]]
 name = "htmlgraph"
-version = "0.34.12"
+version = "0.34.14"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },

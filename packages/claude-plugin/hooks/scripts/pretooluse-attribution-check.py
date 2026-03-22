@@ -33,6 +33,13 @@ import os
 import sqlite3
 import sys
 
+try:
+    from htmlgraph.hooks.version_check import check_hook_version
+
+    check_hook_version("0.34.14")
+except Exception:
+    pass
+
 
 def _db_path(project_dir: str) -> str:
     return os.path.join(project_dir, ".htmlgraph", "htmlgraph.db")

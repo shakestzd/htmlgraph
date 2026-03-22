@@ -30,7 +30,10 @@ bootstrap_pythonpath(project_dir_for_import)
 from pathlib import Path
 
 try:
+    from htmlgraph.hooks.version_check import check_hook_version
     from htmlgraph.session_manager import SessionManager
+
+    check_hook_version("0.34.14")
 except Exception as e:
     print(
         f"Warning: HtmlGraph not available ({e}). Install with: pip install htmlgraph",

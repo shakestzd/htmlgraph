@@ -41,6 +41,9 @@ bootstrap_pythonpath(project_dir_for_import)
 
 try:
     from htmlgraph.hooks.post_tool_use_failure import run as track_failure
+    from htmlgraph.hooks.version_check import check_hook_version
+
+    check_hook_version("0.34.14")
 except Exception as e:
     # Do not break Claude execution if the dependency isn't installed.
     print(

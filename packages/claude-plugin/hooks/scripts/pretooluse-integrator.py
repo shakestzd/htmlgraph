@@ -25,6 +25,13 @@ from bootstrap import bootstrap_pythonpath, resolve_project_dir
 project_dir_for_import = resolve_project_dir()
 bootstrap_pythonpath(project_dir_for_import)
 
+try:
+    from htmlgraph.hooks.version_check import check_hook_version
+
+    check_hook_version("0.34.14")
+except Exception:
+    pass
+
 from htmlgraph.hooks.pretooluse import main
 
 if __name__ == "__main__":

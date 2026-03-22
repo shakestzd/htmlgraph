@@ -45,11 +45,14 @@ if os.environ.get("HTMLGRAPH_DISABLE_TRACKING") == "1":
 
 try:
     from htmlgraph import generate_id
+    from htmlgraph.hooks.version_check import check_hook_version
     from htmlgraph.session_context import (
         GitHooksInstaller,
         SessionContextBuilder,
     )
     from htmlgraph.session_manager import SessionManager
+
+    check_hook_version("0.34.14")
 except Exception as e:
     print(
         f"Warning: HtmlGraph not available ({e}). Install with: uv pip install htmlgraph",
