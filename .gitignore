@@ -121,3 +121,7 @@ __marimo__/
 .uv-cache/
 # Mypy cache
 .mypy_cache/
+
+# Build artifacts
+_build/
+archive/
