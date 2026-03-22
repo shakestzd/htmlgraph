@@ -407,23 +407,46 @@ class TestAgentFilterNuance:
 # ===========================================================================
 
 
+def _get_script_path():
+    """Return the absolute path to check-systematic-changes.py, or None if not found."""
+    from pathlib import Path
+
+    # Walk up from this test file to find the repo root (contains pyproject.toml)
+    candidate = Path(__file__).resolve()
+    for _ in range(10):
+        candidate = candidate.parent
+        script = candidate / "scripts" / "hooks" / "check-systematic-changes.py"
+        if script.exists():
+            return script
+    return None
+
+
+def _import_check_systematic_changes():
+    """Import check-systematic-changes.py; return module or raise SkipTest."""
+    import importlib.util
+    import sys
+
+    import pytest
+
+    script_path = _get_script_path()
+    if script_path is None:
+        pytest.skip("scripts/hooks/check-systematic-changes.py not found in repo")
+
+    spec = importlib.util.spec_from_file_location(
+        "check_systematic_changes", str(script_path)
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["check_systematic_changes"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
 class TestShouldSkipSymbol:
     """Tests for should_skip_symbol() in check-systematic-changes.py."""
 
     def _import_module(self):
         """Import the check-systematic-changes module."""
-        import importlib.util
-        import sys
-
-        spec = importlib.util.spec_from_file_location(
-            "check_systematic_changes",
-            "/Users/shakes/DevProjects/htmlgraph/scripts/hooks/check-systematic-changes.py",
-        )
-        mod = importlib.util.module_from_spec(spec)
-        # Temporarily add to sys.modules so the import works
-        sys.modules["check_systematic_changes"] = mod
-        spec.loader.exec_module(mod)
-        return mod
+        return _import_check_systematic_changes()
 
     def test_short_names_skipped(self):
         """Names shorter than MIN_NAME_LEN (5) are skipped."""
@@ -464,17 +487,7 @@ class TestGetSearchCommand:
 
     def _import_module(self):
         """Import the check-systematic-changes module."""
-        import importlib.util
-        import sys
-
-        spec = importlib.util.spec_from_file_location(
-            "check_systematic_changes",
-            "/Users/shakes/DevProjects/htmlgraph/scripts/hooks/check-systematic-changes.py",
-        )
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules["check_systematic_changes"] = mod
-        spec.loader.exec_module(mod)
-        return mod
+        return _import_check_systematic_changes()
 
     def test_rg_command_when_available(self):
         """Returns rg-based command when rg is available."""
