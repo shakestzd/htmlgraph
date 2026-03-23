@@ -21,5 +21,6 @@ defmodule HtmlgraphDashboardWeb.Router do
     live "/graph", GraphLive, :index
     live "/kanban", KanbanLive, :index
     live "/costs", CostsLive, :index
+    live "/projects", ProjectsLive, :index
   end
 end

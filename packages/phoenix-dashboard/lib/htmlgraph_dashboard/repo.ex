@@ -29,10 +29,11 @@ defmodule HtmlgraphDashboard.Repo do
 
   @doc """
   Execute a read-only query against the HtmlGraph database.
+  Accepts an optional `project_id` to query a specific project's database.
   Returns {:ok, rows} or {:error, reason}.
   """
-  def query(sql, params \\ []) do
-    path = db_path()
+  def query(sql, params \\ [], project_id \\ nil) do
+    path = resolve_db_path(project_id)
 
     case Exqlite.Sqlite3.open(path, [:readonly]) do
       {:ok, conn} ->
@@ -49,9 +50,10 @@ defmodule HtmlgraphDashboard.Repo do
 
   @doc """
   Execute a query and return rows as maps with column name keys.
+  Accepts an optional `project_id` to query a specific project's database.
   """
-  def query_maps(sql, params \\ []) do
-    path = db_path()
+  def query_maps(sql, params \\ [], project_id \\ nil) do
+    path = resolve_db_path(project_id)
 
     case Exqlite.Sqlite3.open(path, [:readonly]) do
       {:ok, conn} ->
@@ -81,6 +83,15 @@ defmodule HtmlgraphDashboard.Repo do
 
       {:error, reason} ->
         {:error, {:open_failed, reason, path}}
+    end
+  end
+
+  defp resolve_db_path(nil), do: db_path()
+
+  defp resolve_db_path(project_id) do
+    case HtmlgraphDashboard.ProjectRegistry.get_project(project_id) do
+      %{db_path: path} -> path
+      nil -> db_path()
     end
   end
 

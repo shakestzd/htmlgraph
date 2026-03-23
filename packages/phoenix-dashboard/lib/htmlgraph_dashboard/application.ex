@@ -14,6 +14,7 @@ defmodule HtmlgraphDashboard.Application do
     """)
 
     children = [
+      HtmlgraphDashboard.ProjectRegistry,
       HtmlgraphDashboard.PythonSDK,
       {Phoenix.PubSub, name: HtmlgraphDashboard.PubSub},
       HtmlgraphDashboardWeb.Endpoint,
