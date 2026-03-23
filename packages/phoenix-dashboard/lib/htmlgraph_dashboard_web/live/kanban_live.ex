@@ -230,6 +230,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       <a href="/graph" class="nav-tab">Graph</a>
       <a href="/kanban" class="nav-tab active">Kanban</a>
       <a href="/costs" class="nav-tab">Costs</a>
+      <a href="/projects" class="nav-tab">Projects</a>
       <%= if length(@projects) > 1 do %>
         <div class="project-selector" style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
           <span style="color: #888; font-size: 0.8rem;">Project:</span>
