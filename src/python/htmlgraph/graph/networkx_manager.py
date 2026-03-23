@@ -102,9 +102,10 @@ class GraphManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            # Load features as nodes
+            # Load features as nodes (exclude spikes and chores — investigation docs, not work items)
             cursor.execute(
                 "SELECT id, title, status, priority, type, track_id FROM features"
+                " WHERE type NOT IN ('spike', 'chore')"
             )
             for row in cursor.fetchall():
                 row_dict = dict(row)

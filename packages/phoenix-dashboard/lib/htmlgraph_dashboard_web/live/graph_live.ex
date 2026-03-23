@@ -22,6 +22,10 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
   def mount(_params, _session, socket) do
     graph_data = load_dependency_graph()
 
+    if connected?(socket) do
+      :timer.send_interval(30_000, self(), :refresh_graph)
+    end
+
     socket =
       socket
       |> assign(:active_tab, :graph)
@@ -29,6 +33,12 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
       |> assign(:selected_node, nil)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_info(:refresh_graph, socket) do
+    graph_data = load_dependency_graph()
+    {:noreply, assign(socket, :graph_data, graph_data)}
   end
 
   @impl true

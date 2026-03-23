@@ -296,6 +296,21 @@ gm = sdk.graph
 
 # Get graph data
 G = gm.G
+
+# Filter to non-done items for readable graph
+active_nodes = [n for n, d in G.nodes(data=True) if d.get('status') != 'done']
+G = G.subgraph(active_nodes).copy()
+
+# Cap at 50 nodes, prioritising in-progress > todo > blocked
+if len(G.nodes()) > 50:
+    status_priority = {'in-progress': 0, 'todo': 1, 'blocked': 2}
+    sorted_nodes = sorted(
+        G.nodes(data=True),
+        key=lambda x: status_priority.get(x[1].get('status', 'todo'), 3),
+    )
+    keep = [n for n, _ in sorted_nodes[:50]]
+    G = G.subgraph(keep).copy()
+
 critical_path_ids = set(gm.critical_path())
 bottleneck_ids = set(b['id'] for b in gm.bottlenecks(top_n=10))
 
