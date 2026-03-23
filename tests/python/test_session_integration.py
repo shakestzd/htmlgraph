@@ -172,10 +172,14 @@ class TestSessionHookIntegration:
 
         from htmlgraph.session_hooks import finalize_session
 
-        # Use a fixed instance ID to avoid flakiness from different instance ID generation
         instance_id = "inst-test-finalize-fixed"
 
-        # Manually register session with fixed instance ID
+        # Mock get_instance_id to return our fixed ID so finalize can find the registration
+        monkeypatch.setattr(
+            "htmlgraph.session_registry.SessionRegistry.get_instance_id",
+            lambda self: instance_id,
+        )
+
         registry = SessionRegistry()
         from datetime import datetime, timezone
 
@@ -187,7 +191,6 @@ class TestSessionHookIntegration:
         }
         session_id = f"sess-{__import__('uuid').uuid4().hex[:8]}"
 
-        # Write session directly with fixed instance_id
         session_data = {
             "instance_id": instance_id,
             "session_id": session_id,
@@ -205,15 +208,13 @@ class TestSessionHookIntegration:
         with open(reg_file, "w") as f:
             json_module.dump(session_data, f, indent=2)
 
-        # Verify session is active
         active_before = registry.read_session(instance_id)
         assert active_before is not None
 
-        # Finalize session
         success = finalize_session(session_id)
 
         assert success
-        assert not registry.read_session(instance_id)  # No longer in active
+        assert not registry.read_session(instance_id)
         assert (registry.archive_dir / f"{instance_id}.json").exists()
 
     def test_heartbeat_updates_timestamp(self, tmp_path, monkeypatch):
