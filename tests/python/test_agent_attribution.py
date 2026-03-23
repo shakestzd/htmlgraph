@@ -62,11 +62,13 @@ class TestSDKAgentParameterRequired:
             "agent-123",
         ]
 
+        from htmlgraph.sdk import normalize_agent_name
+
         for agent_name in agent_names:
             sdk = SDK(
                 directory=tmp_htmlgraph, agent=agent_name, db_path=str(isolated_db)
             )
-            assert sdk._agent_id == agent_name
+            assert sdk._agent_id == normalize_agent_name(agent_name)
 
     def test_sdk_with_claude_agent_name_env(
         self, tmp_htmlgraph: Path, isolated_db: Path, monkeypatch
