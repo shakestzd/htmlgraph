@@ -8,6 +8,7 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
   """
   use HtmlgraphDashboardWeb, :live_view
 
+  alias HtmlgraphDashboard.ProjectRegistry
   alias HtmlgraphDashboard.PythonSDK
 
   @default_graph %{
@@ -19,18 +20,24 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
   }
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     graph_data = load_dependency_graph()
 
     if connected?(socket) do
       :timer.send_interval(30_000, self(), :refresh_graph)
     end
 
+    projects = ProjectRegistry.list_projects()
+    selected_project_id = params["project"] || (List.first(projects, %{}) |> Map.get(:id))
+    selected_project = Enum.find(projects, List.first(projects), &(&1.id == selected_project_id))
+
     socket =
       socket
       |> assign(:active_tab, :graph)
       |> assign(:graph_data, graph_data)
       |> assign(:selected_node, nil)
+      |> assign(:projects, projects)
+      |> assign(:selected_project, selected_project)
 
     {:ok, socket}
   end
@@ -60,6 +67,19 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
 
     socket =
       socket
+      |> assign(:graph_data, graph_data)
+      |> assign(:selected_node, nil)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("select_project", %{"project_id" => project_id}, socket) do
+    project = Enum.find(socket.assigns.projects, &(&1.id == project_id))
+    graph_data = load_dependency_graph()
+
+    socket =
+      socket
+      |> assign(:selected_project, project)
       |> assign(:graph_data, graph_data)
       |> assign(:selected_node, nil)
 
@@ -171,6 +191,20 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
       <a href="/graph" class="nav-tab active">Graph</a>
       <a href="/kanban" class="nav-tab">Kanban</a>
       <a href="/costs" class="nav-tab">Costs</a>
+      <%= if length(@projects) > 1 do %>
+        <div class="project-selector" style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: #888; font-size: 0.8rem;">Project:</span>
+          <form phx-change="select_project" style="margin: 0;">
+            <select name="project_id" style="background: #1C1C20; color: #e0ded8; border: 1px solid #333; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+              <%= for project <- @projects do %>
+                <option value={project.id} selected={@selected_project && project.id == @selected_project.id}>
+                  <%= project.name %>
+                </option>
+              <% end %>
+            </select>
+          </form>
+        </div>
+      <% end %>
     </nav>
 
     <div class="graph-stats-bar">

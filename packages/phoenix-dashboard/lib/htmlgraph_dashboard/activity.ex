@@ -17,20 +17,21 @@ defmodule HtmlgraphDashboard.Activity do
   def list_activity_feed(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     session_id = Keyword.get(opts, :session_id, nil)
+    project_id = Keyword.get(opts, :project_id, nil)
 
     # Fetch UserQuery events (conversation turns) — these are the top-level entries
-    user_queries = fetch_user_queries(limit, session_id)
+    user_queries = fetch_user_queries(limit, session_id, project_id)
 
     # For each UserQuery, recursively fetch children + adopt orphans
     turns =
       Enum.map(user_queries, fn uq ->
-        children = fetch_children_with_subagents(uq["event_id"], uq["session_id"], 0)
+        children = fetch_children_with_subagents(uq["event_id"], uq["session_id"], 0, project_id)
 
         # Adopt orphan events that belong to this UserQuery's time window
-        orphans = fetch_orphan_events(uq, user_queries)
+        orphans = fetch_orphan_events(uq, user_queries, project_id)
         all_children = merge_children_by_timestamp(children, orphans)
 
-        work_item = if uq["feature_id"], do: fetch_feature(uq["feature_id"]), else: nil
+        work_item = if uq["feature_id"], do: fetch_feature(uq["feature_id"], project_id), else: nil
 
         displayed_children =
           all_children
@@ -51,7 +52,7 @@ defmodule HtmlgraphDashboard.Activity do
     turns
     |> Enum.group_by(fn t -> t.user_query["session_id"] end)
     |> Enum.map(fn {sid, session_turns} ->
-      session = fetch_session(sid)
+      session = fetch_session(sid, project_id)
 
       %{
         session_id: sid,
@@ -73,7 +74,7 @@ defmodule HtmlgraphDashboard.Activity do
   @doc """
   Fetch a single event by ID with its full subtree.
   """
-  def get_event_tree(event_id) do
+  def get_event_tree(event_id, project_id \\ nil) do
     sql = """
     SELECT event_id, tool_name, event_type, timestamp, input_summary,
            output_summary, session_id, agent_id, parent_event_id,
@@ -83,9 +84,9 @@ defmodule HtmlgraphDashboard.Activity do
     WHERE event_id = ?
     """
 
-    case Repo.query_maps(sql, [event_id]) do
+    case Repo.query_maps(sql, [event_id], project_id) do
       {:ok, [event]} ->
-        children = fetch_children_with_subagents(event_id, event["session_id"], 0)
+        children = fetch_children_with_subagents(event_id, event["session_id"], 0, project_id)
         {:ok, Map.put(event, "children", children)}
 
       {:ok, []} ->
@@ -215,7 +216,7 @@ defmodule HtmlgraphDashboard.Activity do
 
   # --- Private: Data fetching ---
 
-  defp fetch_user_queries(limit, nil) do
+  defp fetch_user_queries(limit, nil, project_id) do
     sql = """
     SELECT event_id, tool_name, event_type, timestamp, input_summary,
            output_summary, session_id, agent_id, parent_event_id,
@@ -228,13 +229,13 @@ defmodule HtmlgraphDashboard.Activity do
     LIMIT ?
     """
 
-    case Repo.query_maps(sql, [limit]) do
+    case Repo.query_maps(sql, [limit], project_id) do
       {:ok, rows} -> rows
       {:error, _} -> []
     end
   end
 
-  defp fetch_user_queries(limit, session_id) do
+  defp fetch_user_queries(limit, session_id, project_id) do
     sql = """
     SELECT event_id, tool_name, event_type, timestamp, input_summary,
            output_summary, session_id, agent_id, parent_event_id,
@@ -248,16 +249,17 @@ defmodule HtmlgraphDashboard.Activity do
     LIMIT ?
     """
 
-    case Repo.query_maps(sql, [session_id, limit]) do
+    case Repo.query_maps(sql, [session_id, limit], project_id) do
       {:ok, rows} -> rows
       {:error, _} -> []
     end
   end
 
-  defp fetch_children_with_subagents(_parent_id, _session_id, depth) when depth >= @max_depth,
-    do: []
+  defp fetch_children_with_subagents(_parent_id, _session_id, depth, _project_id)
+       when depth >= @max_depth,
+       do: []
 
-  defp fetch_children_with_subagents(parent_id, session_id, depth) do
+  defp fetch_children_with_subagents(parent_id, session_id, depth, project_id) do
     # Fetch direct children by parent_event_id
     sql = """
     SELECT event_id, tool_name, event_type, timestamp, input_summary,
@@ -271,7 +273,7 @@ defmodule HtmlgraphDashboard.Activity do
     """
 
     rows =
-      case Repo.query_maps(sql, [parent_id]) do
+      case Repo.query_maps(sql, [parent_id], project_id) do
         {:ok, rows} -> rows
         {:error, _} -> []
       end
@@ -281,12 +283,12 @@ defmodule HtmlgraphDashboard.Activity do
         if row["event_type"] == "task_delegation" do
           # For task delegations, also pull subagent session events
           subagent_children =
-            fetch_subagent_events(row["event_id"], session_id, row["subagent_type"], depth + 1)
+            fetch_subagent_events(row["event_id"], session_id, row["subagent_type"], depth + 1, project_id)
 
-          direct = fetch_children_with_subagents(row["event_id"], session_id, depth + 1)
+          direct = fetch_children_with_subagents(row["event_id"], session_id, depth + 1, project_id)
           merge_children_by_timestamp(direct, subagent_children)
         else
-          fetch_children_with_subagents(row["event_id"], session_id, depth + 1)
+          fetch_children_with_subagents(row["event_id"], session_id, depth + 1, project_id)
         end
 
       row
@@ -296,11 +298,11 @@ defmodule HtmlgraphDashboard.Activity do
     end)
   end
 
-  defp fetch_subagent_events(_task_event_id, _parent_session_id, _subagent_type, depth)
+  defp fetch_subagent_events(_task_event_id, _parent_session_id, _subagent_type, depth, _project_id)
        when depth >= @max_depth,
        do: []
 
-  defp fetch_subagent_events(_task_event_id, parent_session_id, subagent_type, depth) do
+  defp fetch_subagent_events(_task_event_id, parent_session_id, subagent_type, depth, project_id) do
     # Subagent sessions follow the pattern: {parent_session_id}-{agent_name}
     # Try multiple patterns to find subagent events
     patterns = build_subagent_session_patterns(parent_session_id, subagent_type)
@@ -318,7 +320,7 @@ defmodule HtmlgraphDashboard.Activity do
       ORDER BY timestamp DESC
       """
 
-      case Repo.query_maps(sql, [pattern]) do
+      case Repo.query_maps(sql, [pattern], project_id) do
         {:ok, rows} ->
           # Only include events that don't already have a parent pointing elsewhere
           # (they may already be fetched via parent_event_id)
@@ -350,7 +352,7 @@ defmodule HtmlgraphDashboard.Activity do
 
   # --- Orphan Adoption ---
 
-  defp fetch_orphan_events(user_query, all_user_queries) do
+  defp fetch_orphan_events(user_query, all_user_queries, project_id \\ nil) do
     session_id = user_query["session_id"]
     uq_timestamp = user_query["timestamp"]
     uq_event_id = user_query["event_id"]
@@ -399,7 +401,7 @@ defmodule HtmlgraphDashboard.Activity do
          """, [session_id, uq_timestamp]}
       end
 
-    case Repo.query_maps(sql, params) do
+    case Repo.query_maps(sql, params, project_id) do
       {:ok, rows} ->
         rows
         |> Enum.map(fn row ->
@@ -462,9 +464,9 @@ defmodule HtmlgraphDashboard.Activity do
     end)
   end
 
-  defp fetch_session(nil), do: nil
+  defp fetch_session(nil, _project_id), do: nil
 
-  defp fetch_session(session_id) do
+  defp fetch_session(session_id, project_id) do
     sql = """
     SELECT session_id, agent_assigned, status, created_at, completed_at,
            total_events, total_tokens_used, is_subagent, last_user_query,
@@ -473,13 +475,13 @@ defmodule HtmlgraphDashboard.Activity do
     WHERE session_id = ?
     """
 
-    case Repo.query_maps(sql, [session_id]) do
-      {:ok, [session]} -> derive_session_status(session)
+    case Repo.query_maps(sql, [session_id], project_id) do
+      {:ok, [session]} -> derive_session_status(session, project_id)
       _ -> nil
     end
   end
 
-  defp derive_session_status(session) do
+  defp derive_session_status(session, project_id \\ nil) do
     cond do
       # If completed_at is set, it's completed
       session["completed_at"] != nil ->
@@ -491,7 +493,7 @@ defmodule HtmlgraphDashboard.Activity do
 
       # Check if the session's last event is older than 30 minutes
       true ->
-        case last_event_timestamp(session["session_id"]) do
+        case last_event_timestamp(session["session_id"], project_id) do
           nil ->
             session
 
@@ -513,31 +515,31 @@ defmodule HtmlgraphDashboard.Activity do
     end
   end
 
-  defp last_event_timestamp(nil), do: nil
+  defp last_event_timestamp(nil, _project_id), do: nil
 
-  defp last_event_timestamp(session_id) do
+  defp last_event_timestamp(session_id, project_id) do
     sql = """
     SELECT MAX(timestamp) AS last_ts
     FROM agent_events
     WHERE session_id = ?
     """
 
-    case Repo.query_maps(sql, [session_id]) do
+    case Repo.query_maps(sql, [session_id], project_id) do
       {:ok, [%{"last_ts" => ts}]} -> ts
       _ -> nil
     end
   end
 
-  defp fetch_feature(nil), do: nil
+  defp fetch_feature(nil, _project_id), do: nil
 
-  defp fetch_feature(feature_id) do
+  defp fetch_feature(feature_id, project_id) do
     sql = """
     SELECT id, type, title, status, priority
     FROM features
     WHERE id = ?
     """
 
-    case Repo.query_maps(sql, [feature_id]) do
+    case Repo.query_maps(sql, [feature_id], project_id) do
       {:ok, [feature]} -> feature
       _ -> nil
     end

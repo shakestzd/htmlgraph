@@ -12,6 +12,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
 
   alias HtmlgraphDashboard.Activity
   alias HtmlgraphDashboard.EventPoller
+  alias HtmlgraphDashboard.ProjectRegistry
   alias HtmlgraphDashboard.PythonSDK
   alias HtmlgraphDashboard.Repo
 
@@ -32,7 +33,11 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
 
     session_id = params["session_id"]
 
-    activity_stats = load_activity_stats()
+    projects = ProjectRegistry.list_projects()
+    selected_project_id = params["project"] || (List.first(projects, %{}) |> Map.get(:id))
+    selected_project = Enum.find(projects, List.first(projects), &(&1.id == selected_project_id))
+
+    activity_stats = load_activity_stats(selected_project && selected_project.id)
 
     socket =
       socket
@@ -41,6 +46,8 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
       |> assign(:reload_timer, nil)
       |> assign(:activity_stats, activity_stats)
       |> assign(:selected_work_item, nil)
+      |> assign(:projects, projects)
+      |> assign(:selected_project, selected_project)
       |> load_feed()
 
     {:ok, socket}
@@ -106,6 +113,19 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     {:noreply, assign(socket, :selected_work_item, nil)}
   end
 
+  def handle_event("select_project", %{"project_id" => project_id}, socket) do
+    project = Enum.find(socket.assigns.projects, &(&1.id == project_id))
+    project_id_val = project && project.id
+
+    socket =
+      socket
+      |> assign(:selected_project, project)
+      |> assign(:activity_stats, load_activity_stats(project_id_val))
+      |> load_feed()
+
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_info({:new_event, _event}, socket) do
     # Debounce: schedule a single reload 500ms from now
@@ -119,16 +139,18 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   end
 
   def handle_info(:do_reload, socket) do
+    project_id = socket.assigns[:selected_project] && socket.assigns.selected_project.id
+
     socket =
       socket
       |> assign(:reload_timer, nil)
-      |> assign(:activity_stats, load_activity_stats())
+      |> assign(:activity_stats, load_activity_stats(project_id))
       |> load_feed()
 
     {:noreply, socket}
   end
 
-  defp load_activity_stats do
+  defp load_activity_stats(project_id \\ nil) do
     queries = [
       {"sessions", "SELECT COUNT(DISTINCT session_id) as v FROM agent_events"},
       {"events", "SELECT COUNT(*) as v FROM agent_events"},
@@ -140,7 +162,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     ]
 
     Enum.reduce(queries, @default_activity_stats, fn {key, sql}, acc ->
-      case Repo.query_maps(sql) do
+      case Repo.query_maps(sql, [], project_id) do
         {:ok, [%{"v" => val} | _]} -> Map.put(acc, key, val || 0)
         _ -> acc
       end
@@ -148,10 +170,12 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   end
 
   defp load_feed(socket) do
+    project_id = socket.assigns[:selected_project] && socket.assigns.selected_project.id
+
     opts =
       case socket.assigns[:session_filter] do
-        nil -> [limit: 50]
-        sid -> [limit: 50, session_id: sid]
+        nil -> [limit: 50, project_id: project_id]
+        sid -> [limit: 50, session_id: sid, project_id: project_id]
       end
 
     feed = Activity.list_activity_feed(opts)
@@ -412,6 +436,20 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
       <a href="/graph" class="nav-tab">Graph</a>
       <a href="/kanban" class="nav-tab">Kanban</a>
       <a href="/costs" class="nav-tab">Costs</a>
+      <%= if length(@projects) > 1 do %>
+        <div class="project-selector" style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: #888; font-size: 0.8rem;">Project:</span>
+          <form phx-change="select_project" style="margin: 0;">
+            <select name="project_id" style="background: #1C1C20; color: #e0ded8; border: 1px solid #333; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+              <%= for project <- @projects do %>
+                <option value={project.id} selected={@selected_project && project.id == @selected_project.id}>
+                  <%= project.name %>
+                </option>
+              <% end %>
+            </select>
+          </form>
+        </div>
+      <% end %>
     </nav>
 
     <div class="graph-stats-bar">

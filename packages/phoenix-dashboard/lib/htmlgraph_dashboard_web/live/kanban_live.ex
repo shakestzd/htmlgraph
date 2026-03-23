@@ -7,6 +7,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
   """
   use HtmlgraphDashboardWeb, :live_view
 
+  alias HtmlgraphDashboard.ProjectRegistry
   alias HtmlgraphDashboard.PythonSDK
   alias HtmlgraphDashboard.Repo
 
@@ -18,8 +19,12 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
   ]
 
   @impl true
-  def mount(_params, _session, socket) do
-    items = load_kanban_data()
+  def mount(params, _session, socket) do
+    projects = ProjectRegistry.list_projects()
+    selected_project_id = params["project"] || (List.first(projects, %{}) |> Map.get(:id))
+    selected_project = Enum.find(projects, List.first(projects), &(&1.id == selected_project_id))
+
+    items = load_kanban_data(selected_project && selected_project.id)
 
     socket =
       socket
@@ -27,6 +32,8 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       |> assign(:items, items)
       |> assign(:columns, @columns)
       |> assign(:selected_card, nil)
+      |> assign(:projects, projects)
+      |> assign(:selected_project, selected_project)
 
     {:ok, socket}
   end
@@ -50,7 +57,8 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
   end
 
   def handle_event("refresh_kanban", _params, socket) do
-    items = load_kanban_data()
+    project_id = socket.assigns[:selected_project] && socket.assigns.selected_project.id
+    items = load_kanban_data(project_id)
 
     socket =
       socket
@@ -60,7 +68,20 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
     {:noreply, socket}
   end
 
-  defp load_kanban_data do
+  def handle_event("select_project", %{"project_id" => project_id}, socket) do
+    project = Enum.find(socket.assigns.projects, &(&1.id == project_id))
+    items = load_kanban_data(project && project.id)
+
+    socket =
+      socket
+      |> assign(:selected_project, project)
+      |> assign(:items, items)
+      |> assign(:selected_card, nil)
+
+    {:noreply, socket}
+  end
+
+  defp load_kanban_data(project_id \\ nil) do
     sql = """
     SELECT
       id,
@@ -83,7 +104,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       title ASC
     """
 
-    case Repo.query_maps(sql) do
+    case Repo.query_maps(sql, [], project_id) do
       {:ok, rows} ->
         Enum.map(rows, fn row ->
           %{
@@ -209,6 +230,20 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       <a href="/graph" class="nav-tab">Graph</a>
       <a href="/kanban" class="nav-tab active">Kanban</a>
       <a href="/costs" class="nav-tab">Costs</a>
+      <%= if length(@projects) > 1 do %>
+        <div class="project-selector" style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: #888; font-size: 0.8rem;">Project:</span>
+          <form phx-change="select_project" style="margin: 0;">
+            <select name="project_id" style="background: #1C1C20; color: #e0ded8; border: 1px solid #333; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+              <%= for project <- @projects do %>
+                <option value={project.id} selected={@selected_project && project.id == @selected_project.id}>
+                  <%= project.name %>
+                </option>
+              <% end %>
+            </select>
+          </form>
+        </div>
+      <% end %>
     </nav>
 
     <div class="kanban-toolbar">

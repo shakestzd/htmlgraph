@@ -8,6 +8,7 @@ defmodule HtmlgraphDashboardWeb.CostsLive do
   """
   use HtmlgraphDashboardWeb, :live_view
 
+  alias HtmlgraphDashboard.ProjectRegistry
   alias HtmlgraphDashboard.Repo
 
   @cost_query """
@@ -33,8 +34,12 @@ defmodule HtmlgraphDashboardWeb.CostsLive do
   @cost_per_million 3.0
 
   @impl true
-  def mount(_params, _session, socket) do
-    features = load_cost_data()
+  def mount(params, _session, socket) do
+    projects = ProjectRegistry.list_projects()
+    selected_project_id = params["project"] || (List.first(projects, %{}) |> Map.get(:id))
+    selected_project = Enum.find(projects, List.first(projects), &(&1.id == selected_project_id))
+
+    features = load_cost_data(selected_project && selected_project.id)
     totals = compute_totals(features)
 
     socket =
@@ -42,13 +47,16 @@ defmodule HtmlgraphDashboardWeb.CostsLive do
       |> assign(:active_tab, :costs)
       |> assign(:features, features)
       |> assign(:totals, totals)
+      |> assign(:projects, projects)
+      |> assign(:selected_project, selected_project)
 
     {:ok, socket}
   end
 
   @impl true
   def handle_event("refresh_costs", _params, socket) do
-    features = load_cost_data()
+    project_id = socket.assigns[:selected_project] && socket.assigns.selected_project.id
+    features = load_cost_data(project_id)
     totals = compute_totals(features)
 
     socket =
@@ -59,8 +67,22 @@ defmodule HtmlgraphDashboardWeb.CostsLive do
     {:noreply, socket}
   end
 
-  defp load_cost_data do
-    case Repo.query_maps(@cost_query) do
+  def handle_event("select_project", %{"project_id" => project_id}, socket) do
+    project = Enum.find(socket.assigns.projects, &(&1.id == project_id))
+    features = load_cost_data(project && project.id)
+    totals = compute_totals(features)
+
+    socket =
+      socket
+      |> assign(:selected_project, project)
+      |> assign(:features, features)
+      |> assign(:totals, totals)
+
+    {:noreply, socket}
+  end
+
+  defp load_cost_data(project_id \\ nil) do
+    case Repo.query_maps(@cost_query, [], project_id) do
       {:ok, rows} ->
         Enum.map(rows, fn row ->
           event_count = row["event_count"] || 0
@@ -168,6 +190,20 @@ defmodule HtmlgraphDashboardWeb.CostsLive do
       <a href="/graph" class="nav-tab">Graph</a>
       <a href="/kanban" class="nav-tab">Kanban</a>
       <a href="/costs" class="nav-tab active">Costs</a>
+      <%= if length(@projects) > 1 do %>
+        <div class="project-selector" style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: #888; font-size: 0.8rem;">Project:</span>
+          <form phx-change="select_project" style="margin: 0;">
+            <select name="project_id" style="background: #1C1C20; color: #e0ded8; border: 1px solid #333; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+              <%= for project <- @projects do %>
+                <option value={project.id} selected={@selected_project && project.id == @selected_project.id}>
+                  <%= project.name %>
+                </option>
+              <% end %>
+            </select>
+          </form>
+        </div>
+      <% end %>
     </nav>
 
     <div class="graph-stats-bar">
