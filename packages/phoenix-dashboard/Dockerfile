@@ -46,7 +46,8 @@ RUN mkdir -p /storage
 EXPOSE 4000
 
 # Set env vars
-ENV HTMLGRAPH_DB_PATH=/storage/htmlgraph.db
+ENV HTMLGRAPH_WORKSPACE=/workspace
+ENV HTMLGRAPH_DB_PATH=/workspace/.htmlgraph/htmlgraph.db
 ENV PHX_HOST=localhost
 ENV PORT=4000
 

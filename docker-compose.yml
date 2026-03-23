@@ -6,9 +6,10 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./.htmlgraph:/storage
+      - ${HTMLGRAPH_WORKSPACE:-.}:/workspace:ro
     environment:
-      - HTMLGRAPH_DB_PATH=/storage/htmlgraph.db
+      - HTMLGRAPH_WORKSPACE=/workspace
+      - HTMLGRAPH_DB_PATH=/workspace/.htmlgraph/htmlgraph.db
       - PHX_HOST=localhost
       - SECRET_KEY_BASE=dev-only-secret-key-base-that-is-at-least-64-bytes-long-for-phoenix
     healthcheck:

@@ -1307,6 +1307,7 @@ def serve(
     auto_port: bool = False,
     show_progress: bool = False,
     quiet: bool = False,
+    workspace: str | None = None,
 ) -> None:
     """
     Start the HtmlGraph server (FastAPI-based with WebSocket support).
