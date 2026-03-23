@@ -63,20 +63,27 @@ defmodule HtmlgraphDashboard.ProjectRegistry do
   @app_root Path.expand("../../", __DIR__)
 
   defp discover_workspace_root do
-    case System.get_env("HTMLGRAPH_WORKSPACE") do
-      nil ->
-        # Default: parent of the Phoenix app root (i.e. the repo workspace)
-        Path.expand("../../..", @app_root)
-
-      path ->
-        path
-    end
+    System.get_env("HTMLGRAPH_WORKSPACE") ||
+      System.get_env("CLAUDE_PROJECT_DIR") ||
+      File.cwd!()
   end
 
   defp scan_projects(workspace_root) do
-    workspace_root
-    |> Path.join("*/.htmlgraph/htmlgraph.db")
-    |> Path.wildcard()
+    # Check workspace root itself
+    root_db = Path.join([workspace_root, ".htmlgraph", "htmlgraph.db"])
+
+    # Scan one level deep (sibling projects)
+    child_dbs =
+      Path.join([workspace_root, "*", ".htmlgraph", "htmlgraph.db"])
+      |> Path.wildcard()
+
+    all_dbs =
+      if File.exists?(root_db),
+        do: [root_db | child_dbs],
+        else: child_dbs
+
+    all_dbs
+    |> Enum.uniq()
     |> Enum.map(fn db_path ->
       project_dir = db_path |> Path.dirname() |> Path.dirname()
       project_name = Path.basename(project_dir)

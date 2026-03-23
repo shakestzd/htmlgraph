@@ -123,9 +123,9 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
 
   defp node_radius(node) do
     cond do
-      node["is_bottleneck"] -> 22
-      node["is_critical"] -> 18
-      true -> 14
+      node["is_bottleneck"] -> 24
+      node["is_critical"] -> 20
+      true -> 16
     end
   end
 
@@ -247,11 +247,11 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
             </p>
           </div>
         <% else %>
-          <div style="overflow: auto; max-height: 600px;">
+          <div style="overflow: auto; padding: 1rem;">
             <svg
               viewBox={"0 0 #{@graph_data["viewbox_width"] || 920} #{@graph_data["viewbox_height"] || 460}"}
               width="100%"
-              style={"min-height: 200px; height: #{@graph_data["viewbox_height"] || 460}px; max-height: 600px; background: transparent;"}
+              style={"min-height: 500px; height: #{@graph_data["viewbox_height"] || 460}px; background: transparent;"}
               xmlns="http://www.w3.org/2000/svg"
             >
               <defs>
@@ -339,7 +339,7 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
                     x={node["x"] + node_radius(node) + 8}
                     y={node["y"] + 5}
                     fill="#1a1a2e"
-                    font-size="13"
+                    font-size="14"
                     font-weight="600"
                     stroke="#1a1a2e"
                     stroke-width="4"
@@ -352,7 +352,7 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
                     x={node["x"] + node_radius(node) + 8}
                     y={node["y"] + 5}
                     fill="#e2e8f0"
-                    font-size="13"
+                    font-size="14"
                     font-weight="600"
                     style="pointer-events: none;"
                   >
