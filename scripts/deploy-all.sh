@@ -856,9 +856,82 @@ else
 fi
 
 # ============================================================================
+# STEP 9: Verify CI Pipeline
+# ============================================================================
+CI_STATUS="skipped"
+if [ "$SKIP_GIT" != true ] && [ "$BUILD_ONLY" != true ] && [ "$DRY_RUN" != true ]; then
+    if ! command -v gh &> /dev/null; then
+        log_section "Step 9: Verifying CI Pipeline"
+        log_warning "GitHub CLI (gh) not found — skipping CI verification"
+        log_info "Install with: brew install gh"
+        CI_STATUS="skipped"
+    else
+        log_section "Step 9: Verifying CI Pipeline"
+
+        log_info "Waiting for CI to start..."
+        sleep 10
+
+        # Get the latest CI run ID
+        CI_RUN_ID=$(gh run list --workflow=ci.yml --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
+
+        if [ -z "$CI_RUN_ID" ]; then
+            log_warning "Could not find CI run. Check manually: gh run list --workflow=ci.yml"
+            CI_STATUS="pending"
+        else
+            log_info "Monitoring CI run $CI_RUN_ID..."
+
+            # Wait up to 5 minutes for CI to complete
+            TIMEOUT=300
+            ELAPSED=0
+            INTERVAL=15
+
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+                CI_RUN_STATUS=$(gh run view "$CI_RUN_ID" --json status,conclusion --jq '.status' 2>/dev/null)
+                CI_CONCLUSION=$(gh run view "$CI_RUN_ID" --json status,conclusion --jq '.conclusion' 2>/dev/null)
+
+                if [ "$CI_RUN_STATUS" = "completed" ]; then
+                    if [ "$CI_CONCLUSION" = "success" ]; then
+                        log_success "CI pipeline passed"
+                        CI_STATUS="passed"
+                    else
+                        log_error "CI pipeline failed (conclusion: $CI_CONCLUSION)"
+                        log_info "View failures: gh run view $CI_RUN_ID --log-failed"
+                        log_warning "Package is already published — fix CI and redeploy if needed"
+                        CI_STATUS="failed"
+                    fi
+                    break
+                fi
+
+                log_info "CI status: $CI_RUN_STATUS (${ELAPSED}/${TIMEOUT}s)..."
+                sleep $INTERVAL
+                ELAPSED=$((ELAPSED + INTERVAL))
+            done
+
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+                log_warning "CI timed out after ${TIMEOUT}s. Check manually:"
+                log_info "  gh run view $CI_RUN_ID"
+                CI_STATUS="pending"
+            fi
+        fi
+    fi
+elif [ "$DRY_RUN" = true ]; then
+    log_info "[DRY-RUN] Would verify CI pipeline after GitHub release"
+else
+    log_info "⏭️  Skipping CI Verification (--build-only or --docs-only)"
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 log_section "Deployment Complete! 🎉"
+
+# Format CI status line for summary
+case "$CI_STATUS" in
+    passed)  CI_SUMMARY="✅ CI pipeline: Passed" ;;
+    failed)  CI_SUMMARY="❌ CI pipeline: Failed — check: gh run list --workflow=ci.yml" ;;
+    pending) CI_SUMMARY="⚠️  CI pipeline: Pending — check: gh run list --workflow=ci.yml" ;;
+    *)       CI_SUMMARY="⏭️  CI pipeline: Skipped" ;;
+esac
 
 echo ""
 echo "Summary:"
@@ -871,6 +944,7 @@ echo "✅ GitHub release: https://github.com/shakestzd/htmlgraph/releases/tag/v$
 echo "✅ Local install: $INSTALLED_VERSION"
 echo "✅ Claude plugin: Updated"
 echo "✅ Gemini extension: Updated"
+echo "$CI_SUMMARY"
 echo ""
 log_success "All deployment steps completed successfully!"
 echo ""
