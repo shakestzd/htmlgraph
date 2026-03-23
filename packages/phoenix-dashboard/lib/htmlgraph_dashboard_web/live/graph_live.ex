@@ -14,8 +14,8 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
     "nodes" => [],
     "edges" => [],
     "critical_path" => [],
-    "viewbox_width" => 800,
-    "viewbox_height" => 400
+    "viewbox_width" => 920,
+    "viewbox_height" => 460
   }
 
   @impl true
@@ -108,13 +108,13 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
     end
   end
 
-  defp edge_class(edge) do
-    case edge["relationship"] do
-      "blocks" -> "graph-edge edge-blocks"
-      "blocked_by" -> "graph-edge edge-blocks"
-      "relates_to" -> "graph-edge edge-relates_to"
-      "spawned_from" -> "graph-edge edge-spawned_from"
-      _ -> "graph-edge"
+  defp node_status_color(node) do
+    case node["status"] do
+      "in-progress" -> "#22c55e"
+      "todo" -> "#3b82f6"
+      "done" -> "#6b7280"
+      "blocked" -> "#ef4444"
+      _ -> "#8b5cf6"
     end
   end
 
@@ -203,90 +203,107 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
             </p>
           </div>
         <% else %>
-          <svg
-            viewBox={"0 0 #{@graph_data["viewbox_width"] || 800} #{@graph_data["viewbox_height"] || 400}"}
-            class="graph-svg"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="7"
-                      refX="10" refY="3.5" orient="auto" fill="#475569">
-                <polygon points="0 0, 10 3.5, 0 7" />
-              </marker>
-              <marker id="arrowhead-blocks" markerWidth="10" markerHeight="7"
-                      refX="10" refY="3.5" orient="auto" fill="#f87171">
-                <polygon points="0 0, 10 3.5, 0 7" />
-              </marker>
-              <marker id="arrowhead-relates" markerWidth="10" markerHeight="7"
-                      refX="10" refY="3.5" orient="auto" fill="#60a5fa">
-                <polygon points="0 0, 10 3.5, 0 7" />
-              </marker>
-              <marker id="arrowhead-spawned" markerWidth="10" markerHeight="7"
-                      refX="10" refY="3.5" orient="auto" fill="#a78bfa">
-                <polygon points="0 0, 10 3.5, 0 7" />
-              </marker>
-              <filter id="glow-critical">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+          <div style="overflow: auto; max-height: 600px;">
+            <svg
+              viewBox={"0 0 #{@graph_data["viewbox_width"] || 920} #{@graph_data["viewbox_height"] || 460}"}
+              width="100%"
+              style={"min-height: 200px; height: #{@graph_data["viewbox_height"] || 460}px; max-height: 600px; background: transparent;"}
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6"
+                        refX="8" refY="3" orient="auto" fill="#475569">
+                  <polygon points="0 0, 8 3, 0 6" />
+                </marker>
+                <marker id="arrowhead-blocks" markerWidth="8" markerHeight="6"
+                        refX="8" refY="3" orient="auto" fill="#f87171">
+                  <polygon points="0 0, 8 3, 0 6" />
+                </marker>
+                <marker id="arrowhead-relates" markerWidth="8" markerHeight="6"
+                        refX="8" refY="3" orient="auto" fill="#60a5fa">
+                  <polygon points="0 0, 8 3, 0 6" />
+                </marker>
+                <marker id="arrowhead-spawned" markerWidth="8" markerHeight="6"
+                        refX="8" refY="3" orient="auto" fill="#a78bfa">
+                  <polygon points="0 0, 8 3, 0 6" />
+                </marker>
+                <filter id="glow-critical">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
 
-            <!-- Edges -->
-            <%= for edge <- @graph_data["edges"] || [] do %>
-              <line
-                x1={edge["x1"]}
-                y1={edge["y1"]}
-                x2={edge["x2"]}
-                y2={edge["y2"]}
-                class={edge_class(edge)}
-                marker-end={edge_marker(edge)}
-              />
-            <% end %>
+              <!-- Edges (drawn first so nodes render on top) -->
+              <%= for edge <- @graph_data["edges"] || [] do %>
+                <line
+                  x1={edge["x1"]}
+                  y1={edge["y1"]}
+                  x2={edge["x2"]}
+                  y2={edge["y2"]}
+                  stroke="#4b5563"
+                  stroke-width="1.5"
+                  opacity="0.5"
+                  marker-end={edge_marker(edge)}
+                />
+              <% end %>
 
-            <!-- Nodes -->
-            <%= for node <- @graph_data["nodes"] || [] do %>
-              <g
-                class={"graph-node #{node_status_class(node)} #{if node["is_critical"], do: "node-critical"} #{if node["is_bottleneck"], do: "node-bottleneck"}"}
-                phx-click="select_node"
-                phx-value-id={node["id"]}
-                style="cursor: pointer;"
-              >
-                <%= if node["is_critical"] do %>
+              <!-- Nodes -->
+              <%= for node <- @graph_data["nodes"] || [] do %>
+                <g
+                  class={"graph-node #{node_status_class(node)} #{if node["is_critical"], do: "node-critical"} #{if node["is_bottleneck"], do: "node-bottleneck"}"}
+                  phx-click="select_node"
+                  phx-value-id={node["id"]}
+                  style="cursor: pointer;"
+                >
+                  <%= if node["is_critical"] do %>
+                    <circle
+                      cx={node["x"]}
+                      cy={node["y"]}
+                      r={node_radius(node) + 5}
+                      fill="none"
+                      stroke="#fbbf24"
+                      stroke-width="2"
+                      opacity="0.6"
+                      filter="url(#glow-critical)"
+                    />
+                  <% end %>
                   <circle
                     cx={node["x"]}
                     cy={node["y"]}
-                    r={node_radius(node) + 4}
-                    class="critical-glow"
-                    filter="url(#glow-critical)"
+                    r={node_radius(node)}
+                    fill={node["color"] || node_status_color(node)}
+                    stroke={if node["is_bottleneck"], do: "#f87171", else: "rgba(255,255,255,0.2)"}
+                    stroke-width={if node["is_bottleneck"], do: "2.5", else: "1"}
                   />
-                <% end %>
-                <circle
-                  cx={node["x"]}
-                  cy={node["y"]}
-                  r={node_radius(node)}
-                />
-                <text
-                  x={node["x"]}
-                  y={node["y"] + node_radius(node) + 14}
-                  text-anchor="middle"
-                  class="node-label"
-                >
-                  <%= truncate_label(node["title"]) %>
-                </text>
-                <text
-                  x={node["x"]}
-                  y={node["y"] + 4}
-                  text-anchor="middle"
-                  class="node-type-label"
-                >
-                  <%= String.first(type_label(node["type"]) || "f") %>
-                </text>
-              </g>
-            <% end %>
-          </svg>
+                  <!-- Type initial inside circle -->
+                  <text
+                    x={node["x"]}
+                    y={node["y"] + 4}
+                    text-anchor="middle"
+                    fill="white"
+                    font-size="9"
+                    font-weight="bold"
+                    style="pointer-events: none;"
+                  >
+                    <%= String.upcase(String.first(type_label(node["type"]) || "f")) %>
+                  </text>
+                  <!-- Label to the right of the node -->
+                  <text
+                    x={node["x"] + node_radius(node) + 6}
+                    y={node["y"] + 4}
+                    fill="#d1d5db"
+                    font-size="11"
+                    style="pointer-events: none;"
+                  >
+                    <%= truncate_label(node["title"]) %>
+                  </text>
+                </g>
+              <% end %>
+            </svg>
+          </div>
         <% end %>
       </div>
 

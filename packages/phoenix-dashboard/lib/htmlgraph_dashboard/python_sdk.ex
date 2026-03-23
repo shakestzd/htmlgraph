@@ -286,6 +286,7 @@ result
   def handle_call(:get_dependency_graph, _from, state) do
     code = """
 import json
+import math
 import os
 os.chdir(graph_dir.decode() if isinstance(graph_dir, bytes) else graph_dir)
 from htmlgraph import SDK
@@ -335,64 +336,56 @@ if len(G.nodes()) > 0:
 critical_path_ids = set(gm.critical_path())
 bottleneck_ids = set(b['id'] for b in gm.bottlenecks(top_n=10))
 
-# Build topological depth map for layout
-try:
-    import networkx as nx
-    if nx.is_directed_acyclic_graph(G):
-        topo_order = list(nx.topological_sort(G))
-    else:
-        # Break cycles for layout purposes
-        G_copy = G.copy()
-        for cycle in nx.simple_cycles(G):
-            if len(cycle) >= 2 and G_copy.has_edge(cycle[-1], cycle[0]):
-                G_copy.remove_edge(cycle[-1], cycle[0])
-            if nx.is_directed_acyclic_graph(G_copy):
-                break
-        topo_order = list(nx.topological_sort(G_copy))
-except Exception:
-    topo_order = list(G.nodes)
+# Grid layout: arrange nodes in a readable grid instead of a single column
+nodes_list = list(G.nodes(data=True))
+n = len(nodes_list)
 
-# Compute depth (longest path from any root to this node)
-depth_map = {}
-for node in topo_order:
-    preds = list(G.predecessors(node))
-    if not preds:
-        depth_map[node] = 0
-    else:
-        depth_map[node] = max(depth_map.get(p, 0) for p in preds) + 1
+# Sort nodes so in-progress first, then todo, then blocked, then done
+status_order = {'in-progress': 0, 'todo': 1, 'blocked': 2, 'done': 3}
+nodes_list.sort(key=lambda x: status_order.get(x[1].get('status', 'todo'), 1))
 
-# Layout: group by depth, stack vertically
-depth_groups = {}
-for node, d in depth_map.items():
-    depth_groups.setdefault(d, []).append(node)
-
-max_depth = max(depth_map.values()) if depth_map else 0
-col_width = 220
 margin_x = 80
-margin_y = 60
-row_height = 80
+margin_y = 80
+col_width = 280
+row_height = 100
+
+if n > 0:
+    cols = max(3, int(math.ceil(math.sqrt(n))))
+    rows = math.ceil(n / cols)
+else:
+    cols = 3
+    rows = 1
+
+color_map = {
+    'in-progress': '#22c55e',
+    'todo': '#3b82f6',
+    'done': '#6b7280',
+    'blocked': '#ef4444',
+}
 
 nodes = []
 node_positions = {}
-for depth_level, node_list in depth_groups.items():
-    for idx, node_id in enumerate(node_list):
-        x = margin_x + depth_level * col_width
-        y = margin_y + idx * row_height
-        data = G.nodes[node_id]
-        pos = {'x': x, 'y': y}
-        node_positions[node_id] = pos
-        nodes.append({
-            'id': node_id,
-            'title': data.get('title', ''),
-            'status': data.get('status', 'todo'),
-            'type': data.get('type', 'feature'),
-            'priority': data.get('priority', 'medium'),
-            'x': x,
-            'y': y,
-            'is_critical': node_id in critical_path_ids,
-            'is_bottleneck': node_id in bottleneck_ids,
-            'depth': depth_level,
-        })
+for idx, (node_id, data) in enumerate(nodes_list):
+    row = idx // cols
+    col = idx % cols
+    x = margin_x + col * col_width
+    y = margin_y + row * row_height
+    node_positions[node_id] = {'x': x, 'y': y}
+    status = data.get('status', 'todo')
+    title = data.get('title', node_id)
+    nodes.append({
+        'id': node_id,
+        'title': title,
+        'status': status,
+        'type': data.get('type', 'feature'),
+        'priority': data.get('priority', 'medium'),
+        'x': x,
+        'y': y,
+        'color': color_map.get(status, '#8b5cf6'),
+        'is_critical': node_id in critical_path_ids,
+        'is_bottleneck': node_id in bottleneck_ids,
+        'depth': 0,
+    })
 
 edges = []
 for u, v, edge_data in G.edges(data=True):
@@ -407,16 +400,16 @@ for u, v, edge_data in G.edges(data=True):
             'y2': node_positions[v]['y'],
         })
 
-# Compute SVG viewBox dimensions
-max_x = max((n['x'] for n in nodes), default=200) + margin_x + 100
-max_y = max((n['y'] for n in nodes), default=200) + margin_y + 60
+# Compute SVG dimensions from grid
+svg_width = margin_x * 2 + cols * col_width
+svg_height = margin_y * 2 + rows * row_height
 
 result = json.dumps({
     'nodes': nodes,
     'edges': edges,
     'critical_path': list(critical_path_ids),
-    'viewbox_width': max_x,
-    'viewbox_height': max_y,
+    'viewbox_width': svg_width,
+    'viewbox_height': svg_height,
 }, default=str)
 result
 """
