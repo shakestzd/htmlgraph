@@ -116,7 +116,7 @@ defmodule HtmlgraphDashboardWeb.ProjectComponents do
     assigns = assign(assigns, :color, color)
 
     ~H"""
-    <div class="project-card" style={"--project-active: #{@color}; border-top-color: #{@color}"}>
+    <div class="project-card" style={"--project-active: #{@color}; border-top-color: #{@color}"} phx-click="select_project" phx-value-project_id={@project.id}>
       <div class="card-body">
         <div class="card-header">
           <span class="project-color-dot" style={"background: #{@color}"}></span>
