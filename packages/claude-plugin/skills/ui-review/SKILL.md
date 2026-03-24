@@ -1,121 +1,85 @@
-# UI Review Skill
+---
+name: ui-review
+description: Run visual QA on a web application — screenshots pages and reports layout, readability, and correctness issues
+user_invocable: true
+---
 
-Run a visual quality review of the HtmlGraph Phoenix LiveView dashboard. Screenshots all pages using browser automation and reports layout, readability, and data correctness issues.
+# /htmlgraph:ui-review
+
+Run a visual quality review of a web application.
 
 ## Usage
-
 ```
-/htmlgraph:ui-review [page]
+/htmlgraph:ui-review [url] [--pages /path1,/path2,...]
 ```
 
 ## Parameters
+- `url` (optional): Base URL to review (e.g., http://localhost:3000). Auto-detects if not provided.
+- `--pages` (optional): Comma-separated paths to review. Discovers from navigation if not provided.
 
-- `page` (optional): Specific page to review. One of: `activity`, `graph`, `kanban`, `costs`. Default: all pages.
+## Examples
 
-## What This Does
+```bash
+/htmlgraph:ui-review
+```
+Auto-detect dev server and review all discoverable pages.
 
-1. Ensures the Phoenix dashboard is running at `http://localhost:4000`
-2. Creates the screenshot output directory: `ui-review/`
-3. Delegates to the `ui-reviewer` agent which:
-   - Navigates to each dashboard page via chrome-devtools MCP
-   - Takes viewport and full-page screenshots
-   - Analyzes each page for visual quality issues
-   - Reports findings with CRITICAL/MAJOR/MINOR/OK severity
-4. Presents findings with screenshot paths
+```bash
+/htmlgraph:ui-review http://localhost:5173
+```
+Review a Vite app.
+
+```bash
+/htmlgraph:ui-review http://localhost:4000 --pages /,/kanban,/costs
+```
+Review specific pages.
 
 ## Instructions for Claude
 
-### Step 1: Check dashboard is running
+### Step 1: Determine target URL
+
+If URL provided, use it. Otherwise auto-detect:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:4000
+for port in 5173 3000 4000 8080 8000 3001 4200; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$port" 2>/dev/null)
+  if [ "$code" = "200" ]; then
+    echo "http://localhost:$port"
+    break
+  fi
+done
 ```
 
-If the response is not `200`, inform the user:
-> The Phoenix dashboard is not running at http://localhost:4000. Start it with `mix phx.server` in the `dashboard/` directory, then run `/htmlgraph:ui-review` again.
+If no server found, tell the user to start their dev server.
 
 ### Step 2: Create output directory
 
 ```bash
-mkdir -p /Users/shakes/DevProjects/htmlgraph/ui-review/
+mkdir -p ui-review/
 ```
 
-### Step 3: Determine scope
+### Step 3: Delegate to ui-reviewer agent
 
-- If `page` argument is provided, map it to the URL:
-  - `activity` → `http://localhost:4000`
-  - `graph` → `http://localhost:4000/graph`
-  - `kanban` → `http://localhost:4000/kanban`
-  - `costs` → `http://localhost:4000/costs`
-- If no argument, review all four pages.
+**DELEGATION REQUIRED**: Always use `Agent(subagent_type="htmlgraph:ui-reviewer")`.
 
-### Step 4: Delegate to ui-reviewer agent
-
-**DELEGATION REQUIRED**: Always use `Agent(subagent_type="htmlgraph:ui-reviewer")` for the actual review work.
-
-Prompt to pass to the agent:
-
+Prompt:
 ```
-Review the following dashboard page(s): [list pages to review].
-
-For each page:
-1. Navigate to the URL
-2. Wait for the page to fully load
-3. Take a viewport screenshot and a full-page screenshot
-4. Save screenshots to /Users/shakes/DevProjects/htmlgraph/ui-review/
-5. Analyze for layout, readability, data correctness, and visual hierarchy issues
-6. Report findings using the CRITICAL/MAJOR/MINOR/OK severity scale
-
-Start with the work item attribution step before taking any screenshots.
+Review the web application at {url}.
+{If --pages: "Review these pages: {pages}"}
+{If no --pages: "Discover pages from navigation and review all of them."}
+Save screenshots to ui-review/.
 ```
 
-### Step 5: Present results
+### Step 4: Present results
 
-Show the agent's findings to the user, including:
-- Per-page severity rating
-- List of issues with severity
-- Screenshot file paths
-- Summary table across all reviewed pages
-
-## Example Output
-
-```
-Running visual QA on 4 dashboard pages...
-
-## Activity Feed — OK
-Screenshot: ui-review/activity-20260322-230600.png
-Looks Good: Session groups clean, feature badges visible, nesting correct.
-
-## Graph — MAJOR
-Screenshot: ui-review/graph-20260322-230612.png
-Issues:
-  1. [MAJOR] Stats bar shows 0 nodes despite 12 features in DB
-  2. [MINOR] Node labels truncated at 15 chars — cut off for long feature titles
-
-## Kanban — OK
-Screenshot: ui-review/kanban-20260322-230624.png
-Looks Good: All three columns rendered, cards readable.
-
-## Costs — MINOR
-Screenshot: ui-review/costs-20260322-230636.png
-Issues:
-  1. [MINOR] Totals row missing bottom border — blends into last data row
-
-## Summary
-| Page | Status | Issues |
-|------|--------|--------|
-| Activity Feed | OK | 0 |
-| Graph | MAJOR | 2 |
-| Kanban | OK | 0 |
-| Costs | MINOR | 1 |
-```
+Show the agent's findings: per-page severity, issues list, screenshot paths, summary table.
 
 ## When to Use
 
-Run this skill after any change to:
-- Phoenix LiveView templates (`dashboard/lib/**/*_live.ex`, `dashboard/lib/**/*.html.heex`)
-- CSS/styling files
-- Dashboard data queries that affect what is displayed
-- Layout or component structure changes
+Run after any UI change:
+- Template/component changes
+- CSS/styling updates
+- Data query changes affecting display
+- Layout or navigation changes
 
 This is a quality gate — do not mark UI work as done without passing this review.
