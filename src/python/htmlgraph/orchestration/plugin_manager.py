@@ -73,7 +73,7 @@ class PluginManager:
             if verbose:
                 logger.info("  Updating plugin to latest version...")
             result = subprocess.run(
-                ["claude", "plugin", "update", "htmlgraph"],
+                ["claude", "plugin", "update", "htmlgraph@htmlgraph"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -90,7 +90,7 @@ class PluginManager:
                     if verbose:
                         logger.info("    ℹ Plugin not yet installed, installing...")
                     install_result = subprocess.run(
-                        ["claude", "plugin", "install", "htmlgraph"],
+                        ["claude", "plugin", "install", "htmlgraph@htmlgraph"],
                         capture_output=True,
                         text=True,
                         check=False,
