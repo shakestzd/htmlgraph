@@ -156,18 +156,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
     end
   end
 
-  defp project_graph_opts(nil), do: %{}
-
-  defp project_graph_opts(project) do
-    case ProjectRegistry.get_project(project.id) do
-      %{db_path: db_path} ->
-        graph_dir = db_path |> Path.dirname() |> Path.dirname()
-        %{db_path: db_path, graph_dir: graph_dir}
-
-      nil ->
-        %{}
-    end
-  end
+  defdelegate project_graph_opts(project), to: HtmlgraphDashboardWeb.ProjectHelpers
 
   defp load_work_item_detail(id, project) do
     opts = project_graph_opts(project)

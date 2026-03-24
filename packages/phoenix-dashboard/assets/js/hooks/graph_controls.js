@@ -150,7 +150,11 @@ const GraphControls = {
 
   _onWheel(e) {
     e.preventDefault();
-    const delta = -e.deltaY * WHEEL_SENSITIVITY * 50;
+    // Normalize deltaY across browsers (deltaMode: 0=pixels, 1=lines, 2=pages)
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 30;
+    if (e.deltaMode === 2) dy *= 300;
+    const delta = Math.max(-0.15, Math.min(0.15, -dy * 0.002));
     this._zoom(delta, e.clientX, e.clientY);
   },
 

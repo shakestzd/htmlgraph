@@ -198,7 +198,7 @@ defmodule HtmlgraphDashboardWeb.ProjectComponents do
   def sparkline(assigns) do
     points = build_sparkline_points(assigns.data, assigns.width, assigns.height)
     fill_points = build_sparkline_fill(points, assigns.width, assigns.height)
-    gradient_id = "spark-grad-#{:erlang.phash2(assigns.data)}"
+    gradient_id = "spark-grad-#{System.unique_integer([:positive])}"
 
     assigns =
       assigns

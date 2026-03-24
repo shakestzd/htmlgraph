@@ -36,17 +36,7 @@ defmodule HtmlgraphDashboardWeb.ProjectsLive do
   @impl true
   def handle_event("refresh_projects", _params, socket) do
     ProjectRegistry.refresh()
-    Process.sleep(100)
-    projects = ProjectRegistry.list_projects()
-    project_data = load_all_project_data(projects)
-    aggregates = compute_aggregates(project_data)
-
-    socket =
-      socket
-      |> assign(:projects, projects)
-      |> assign(:project_data, project_data)
-      |> assign(:aggregates, aggregates)
-
+    send(self(), :reload_projects)
     {:noreply, socket}
   end
 
@@ -63,6 +53,21 @@ defmodule HtmlgraphDashboardWeb.ProjectsLive do
      socket
      |> assign(:picker_open, false)
      |> redirect(to: "/?project=#{project_id}")}
+  end
+
+  @impl true
+  def handle_info(:reload_projects, socket) do
+    projects = ProjectRegistry.list_projects()
+    project_data = load_all_project_data(projects)
+    aggregates = compute_aggregates(project_data)
+
+    socket =
+      socket
+      |> assign(:projects, projects)
+      |> assign(:project_data, project_data)
+      |> assign(:aggregates, aggregates)
+
+    {:noreply, socket}
   end
 
   # ------------------------------------------------------------------

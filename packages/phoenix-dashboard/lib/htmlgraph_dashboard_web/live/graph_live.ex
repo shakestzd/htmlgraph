@@ -108,16 +108,7 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
   # Private — data loading
   # ---------------------------------------------------------------------------
 
-  defp project_graph_opts(nil), do: %{}
-
-  defp project_graph_opts(project) do
-    case ProjectRegistry.get_project(project.id) do
-      %{db_path: db_path} ->
-        %{db_path: db_path, graph_dir: db_path |> Path.dirname() |> Path.dirname()}
-      nil ->
-        %{}
-    end
-  end
+  defdelegate project_graph_opts(project), to: HtmlgraphDashboardWeb.ProjectHelpers
 
   defp load_dependency_graph(opts) do
     try do
