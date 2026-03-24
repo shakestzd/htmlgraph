@@ -40,6 +40,34 @@ class PluginManager:
         if verbose:
             logger.info("\n📦 Installing/upgrading HtmlGraph plugin...\n")
 
+        # Step 0: Check if plugin is already installed and enabled
+        try:
+            result = subprocess.run(
+                ["claude", "plugin", "list"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                # Check for any htmlgraph plugin (marketplace or local-marketplace)
+                if "htmlgraph" in result.stdout:
+                    if verbose:
+                        logger.info(
+                            "  ✓ Plugin already installed and enabled, skipping install"
+                        )
+                    return
+            else:
+                if verbose:
+                    logger.info(
+                        f"    ⚠ Could not check plugin list: {result.stderr.strip()}"
+                    )
+        except FileNotFoundError:
+            if verbose:
+                logger.info("    ⚠ 'claude' command not found")
+        except Exception as e:
+            if verbose:
+                logger.info(f"    ⚠ Error checking plugin list: {e}")
+
         # Step 1: Update marketplace
         try:
             if verbose:
