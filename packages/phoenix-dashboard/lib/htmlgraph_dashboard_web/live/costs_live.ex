@@ -100,7 +100,7 @@ defmodule HtmlgraphDashboardWeb.CostsLive do
     {:noreply, push_patch(socket, to: "/costs?project=#{project_id}")}
   end
 
-  defp load_cost_data(project_id \\ nil) do
+  defp load_cost_data(project_id) do
     case Repo.query_maps(@cost_query, [], project_id) do
       {:ok, rows} ->
         Enum.map(rows, fn row ->

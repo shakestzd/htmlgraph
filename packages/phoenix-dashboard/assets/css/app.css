@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./components/multi-project.css";
 
 :root {
   --bg-primary: #0d1117;
@@ -855,13 +856,15 @@ body {
   gap: 12px;
   padding: 0 24px 24px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   min-height: 500px;
-  max-width: 1400px;
-  margin: 0 auto;
+  /* Remove max-width so all columns are always reachable via scroll */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .kanban-column {
-  flex: 1;
+  flex: 0 0 280px;
   min-width: 260px;
   max-width: 360px;
   background: rgba(0, 0, 0, 0.2);
@@ -869,6 +872,8 @@ body {
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  /* Prevent columns from growing to 242k px — body scrolls internally */
+  max-height: calc(100vh - 160px);
 }
 
 .kanban-column-header {
@@ -912,6 +917,27 @@ body {
   padding: 24px 12px;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.kanban-show-more {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 4px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.kanban-show-more:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
 }
 
 /* Kanban Cards */
@@ -1168,4 +1194,163 @@ body {
 
 .costs-total-row .costs-cost {
   color: var(--accent-orange);
+}
+
+/* ========================================
+   Graph SVG Wrapper & Zoom Controls
+   ======================================== */
+.graph-svg-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Floating zoom/pan control panel */
+.graph-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+
+.graph-ctrl-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border-radius: 4px;
+  transition: all 0.15s;
+  user-select: none;
+  line-height: 1;
+}
+
+.graph-ctrl-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.graph-ctrl-btn:active {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+}
+
+/* ========================================
+   Graph Node Hover & Label Improvements
+   ======================================== */
+
+/* Stronger hover glow on node circles */
+.graph-node:hover circle:not([fill="none"]) {
+  filter: drop-shadow(0 0 6px rgba(88, 166, 255, 0.5));
+  stroke-width: 2.5;
+}
+
+.node-in-progress:hover circle:not([fill="none"]) {
+  filter: drop-shadow(0 0 6px rgba(63, 185, 80, 0.6));
+}
+
+.node-blocked:hover circle:not([fill="none"]) {
+  filter: drop-shadow(0 0 6px rgba(248, 81, 73, 0.6));
+}
+
+.node-bottleneck:hover circle:not([fill="none"]) {
+  filter: drop-shadow(0 0 8px rgba(248, 129, 74, 0.7));
+}
+
+/* ========================================
+   Graph Detail Panel — Connected Nodes
+   ======================================== */
+.graph-detail-connections {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.graph-detail-conn-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.graph-detail-conn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.graph-detail-conn-row:hover {
+  background: var(--bg-hover);
+}
+
+.graph-conn-rel {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.graph-conn-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-detail-conn-row:hover .graph-conn-title {
+  color: var(--text-primary);
+}
+
+/* ========================================
+   Graph Detail Panel — Quick Links
+   ======================================== */
+.graph-detail-links {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.graph-detail-link {
+  font-size: 11px;
+  color: var(--accent-blue);
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: 4px;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
+}
+
+.graph-detail-link:hover {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
 }

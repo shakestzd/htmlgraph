@@ -1,24 +1,34 @@
 defmodule HtmlgraphDashboardWeb.ProjectsLive do
   @moduledoc """
-  Lists all HtmlGraph projects discovered in the workspace.
+  Multi-project Command Center overview.
 
-  Projects are found by scanning for .htmlgraph/htmlgraph.db files under the
-  configured HTMLGRAPH_WORKSPACE directory (or the parent workspace root by
-  default). Each project card links to the Activity, Kanban, and Costs views
-  for that project via the ?project=<id> query param.
+  Displays all discovered HtmlGraph projects as cards with live stats,
+  sparkline activity graphs, and navigation links. Uses the Command Center
+  design system (sharp edges, monospace, scanline textures, project colors).
+
+  Stats per project: total events, feature count, session count, estimated cost.
+  Sparkline: 7-day activity (events per day).
   """
   use HtmlgraphDashboardWeb, :live_view
 
+  import HtmlgraphDashboardWeb.ProjectComponents
+
   alias HtmlgraphDashboard.ProjectRegistry
+  alias HtmlgraphDashboard.Repo
 
   @impl true
   def mount(_params, _session, socket) do
     projects = ProjectRegistry.list_projects()
+    project_data = load_all_project_data(projects)
+    aggregates = compute_aggregates(project_data)
 
     socket =
       socket
       |> assign(:active_tab, :projects)
       |> assign(:projects, projects)
+      |> assign(:project_data, project_data)
+      |> assign(:aggregates, aggregates)
+      |> assign(:picker_open, false)
 
     {:ok, socket}
   end
@@ -26,16 +36,45 @@ defmodule HtmlgraphDashboardWeb.ProjectsLive do
   @impl true
   def handle_event("refresh_projects", _params, socket) do
     ProjectRegistry.refresh()
-    # Give the GenServer a moment to finish scanning, then re-read
     Process.sleep(100)
     projects = ProjectRegistry.list_projects()
-    {:noreply, assign(socket, :projects, projects)}
+    project_data = load_all_project_data(projects)
+    aggregates = compute_aggregates(project_data)
+
+    socket =
+      socket
+      |> assign(:projects, projects)
+      |> assign(:project_data, project_data)
+      |> assign(:aggregates, aggregates)
+
+    {:noreply, socket}
   end
+
+  def handle_event("toggle_project_picker", _params, socket) do
+    {:noreply, assign(socket, :picker_open, !socket.assigns.picker_open)}
+  end
+
+  def handle_event("close_project_picker", _params, socket) do
+    {:noreply, assign(socket, :picker_open, false)}
+  end
+
+  def handle_event("select_project", %{"project_id" => project_id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:picker_open, false)
+     |> redirect(to: "/?project=#{project_id}")}
+  end
+
+  # ------------------------------------------------------------------
+  # Render
+  # ------------------------------------------------------------------
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="header">
+    <.identity_stripe project={nil} />
+
+    <div class="header" style="margin-top: 3px;">
       <div class="header-title">
         <span class="dot"></span>
         HtmlGraph Dashboard
@@ -59,51 +98,180 @@ defmodule HtmlgraphDashboardWeb.ProjectsLive do
       <a href="/projects" class="nav-tab active">Projects</a>
     </nav>
 
-    <div style="padding: 1.5rem 1.5rem 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-      <h2 style="margin: 0; font-size: 1.1rem; color: var(--text-primary, #e2e8f0);">
-        Discovered Projects
-      </h2>
-      <button phx-click="refresh_projects" class="graph-refresh-btn">
-        Refresh
-      </button>
+    <div class="projects-header">
+      <div class="projects-header-left">
+        <div class="projects-title">Projects</div>
+        <div class="projects-subtitle">
+          <%= length(@projects) %> discovered project(s) &middot;
+          <%= @aggregates.total_events %> total events
+        </div>
+      </div>
+      <div class="projects-header-right">
+        <div class="projects-aggregate-stats">
+          <.stat_badge label="Events" value={format_number(@aggregates.total_events)} />
+          <.stat_badge label="Features" value={"#{@aggregates.total_features}"} />
+          <.stat_badge label="Sessions" value={"#{@aggregates.total_sessions}"} />
+          <.stat_badge label="Est. Cost" value={@aggregates.total_cost} />
+        </div>
+        <button phx-click="refresh_projects" class="projects-refresh-btn">
+          Refresh
+        </button>
+      </div>
     </div>
 
-    <div style="padding: 0.5rem 1.5rem 1.5rem;">
-      <%= if @projects == [] do %>
-        <div class="empty-state">
-          <h2>No projects discovered</h2>
-          <p>Set <code>HTMLGRAPH_WORKSPACE</code> to your workspace root directory,</p>
-          <p>or projects will be auto-discovered from the parent directory.</p>
-          <p style="margin-top: 1rem; font-size: 0.85rem; color: #64748b;">
-            Each project must have a <code>.htmlgraph/htmlgraph.db</code> file.
-          </p>
-        </div>
-      <% else %>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-          <%= for project <- @projects do %>
-            <div style="background: var(--surface, #1C1C20); border: 1px solid var(--border, #333); padding: 1.5rem; border-radius: 4px;">
-              <h3 style="margin: 0 0 0.4rem; color: #CDFF00; font-size: 1rem;">
-                <%= project.name %>
-              </h3>
-              <p style="color: #64748b; font-size: 0.75rem; margin: 0 0 1rem; word-break: break-all;">
-                <%= project.path %>
-              </p>
-              <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                <a href={"/?project=#{project.id}"} class="nav-tab" style="font-size: 0.8rem; padding: 4px 10px;">
-                  Activity
-                </a>
-                <a href={"/kanban?project=#{project.id}"} class="nav-tab" style="font-size: 0.8rem; padding: 4px 10px;">
-                  Kanban
-                </a>
-                <a href={"/costs?project=#{project.id}"} class="nav-tab" style="font-size: 0.8rem; padding: 4px 10px;">
-                  Costs
-                </a>
-              </div>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
+    <%= if @projects == [] do %>
+      <div class="projects-empty">
+        <h2>No projects discovered</h2>
+        <p>Set <code>HTMLGRAPH_WORKSPACE</code> to your workspace root directory,</p>
+        <p>or projects will be auto-discovered from the parent directory.</p>
+        <p>Each project must have a <code>.htmlgraph/htmlgraph.db</code> file.</p>
+      </div>
+    <% else %>
+      <div class="projects-grid">
+        <%= for project <- @projects do %>
+          <% data = Map.get(@project_data, project.id, default_project_data()) %>
+          <.project_card
+            project={project}
+            stats={data.stats}
+            active_sessions={data.active_sessions}
+            sparkline_data={data.sparkline}
+          />
+        <% end %>
+      </div>
+    <% end %>
     """
+  end
+
+  # ------------------------------------------------------------------
+  # Data Loading
+  # ------------------------------------------------------------------
+
+  defp load_all_project_data(projects) do
+    Map.new(projects, fn project ->
+      {project.id, load_project_data(project.id)}
+    end)
+  end
+
+  defp load_project_data(project_id) do
+    stats = load_project_stats(project_id)
+    active = load_active_sessions(project_id)
+    sparkline = load_sparkline(project_id)
+
+    %{
+      stats: stats,
+      active_sessions: active,
+      sparkline: sparkline
+    }
+  end
+
+  defp load_project_stats(project_id) do
+    events = query_scalar("SELECT COUNT(*) FROM agent_events", project_id)
+    features = query_scalar("SELECT COUNT(*) FROM features WHERE type = 'feature'", project_id)
+    sessions = query_scalar("SELECT COUNT(DISTINCT session_id) FROM agent_events", project_id)
+    cost = estimate_cost(events)
+
+    %{events: events, features: features, sessions: sessions, cost: cost}
+  end
+
+  defp load_active_sessions(project_id) do
+    query_scalar(
+      "SELECT COUNT(*) FROM sessions WHERE status = 'active'",
+      project_id
+    )
+  end
+
+  defp load_sparkline(project_id) do
+    sql = """
+    SELECT date(timestamp) as day, count(*) as events
+    FROM agent_events
+    WHERE timestamp >= datetime('now', '-7 days')
+    GROUP BY date(timestamp)
+    ORDER BY day
+    """
+
+    case Repo.query_maps(sql, [], project_id) do
+      {:ok, rows} ->
+        fill_sparkline_gaps(rows)
+
+      _ ->
+        []
+    end
+  end
+
+  # ------------------------------------------------------------------
+  # Aggregates
+  # ------------------------------------------------------------------
+
+  defp compute_aggregates(project_data) do
+    values = Map.values(project_data)
+
+    total_events = values |> Enum.map(& &1.stats.events) |> Enum.sum()
+    total_features = values |> Enum.map(& &1.stats.features) |> Enum.sum()
+    total_sessions = values |> Enum.map(& &1.stats.sessions) |> Enum.sum()
+
+    %{
+      total_events: total_events,
+      total_features: total_features,
+      total_sessions: total_sessions,
+      total_cost: estimate_cost(total_events)
+    }
+  end
+
+  # ------------------------------------------------------------------
+  # Helpers
+  # ------------------------------------------------------------------
+
+  defp query_scalar(sql, project_id) do
+    case Repo.query(sql, [], project_id) do
+      {:ok, [[val] | _]} when is_integer(val) -> val
+      _ -> 0
+    end
+  end
+
+  defp estimate_cost(event_count) do
+    # Rough estimate: avg ~3000 tokens per event, $3.00 per 1M tokens
+    dollars = event_count * 3000 * 3.0 / 1_000_000
+    format_cost(dollars)
+  end
+
+  defp format_cost(dollars) when dollars < 0.01, do: "$0.00"
+  defp format_cost(dollars) when dollars < 1.0, do: "$#{Float.round(dollars, 2)}"
+  defp format_cost(dollars) when dollars < 100.0, do: "$#{Float.round(dollars, 1)}"
+  defp format_cost(dollars), do: "$#{round(dollars)}"
+
+  defp format_number(n) when is_integer(n) and n >= 1_000_000 do
+    "#{Float.round(n / 1_000_000, 1)}M"
+  end
+
+  defp format_number(n) when is_integer(n) and n >= 1000 do
+    "#{Float.round(n / 1000, 1)}k"
+  end
+
+  defp format_number(n), do: "#{n}"
+
+  defp default_project_data do
+    %{
+      stats: %{events: 0, features: 0, sessions: 0, cost: "$0.00"},
+      active_sessions: 0,
+      sparkline: []
+    }
+  end
+
+  defp fill_sparkline_gaps(rows) do
+    today = Date.utc_today()
+    seven_days_ago = Date.add(today, -6)
+
+    # Build a map of day_string => event_count from query results
+    day_map =
+      Map.new(rows, fn row ->
+        {row["day"], row["events"] || 0}
+      end)
+
+    # Generate all 7 days, filling gaps with 0
+    Date.range(seven_days_ago, today)
+    |> Enum.map(fn date ->
+      key = Date.to_iso8601(date)
+      (day_map[key] || 0) * 1.0
+    end)
   end
 end

@@ -59,9 +59,6 @@ defmodule HtmlgraphDashboard.ProjectRegistry do
 
   # Private helpers
 
-  # Compile-time anchor so path resolution is stable regardless of beam cwd.
-  @app_root Path.expand("../../", __DIR__)
-
   defp discover_workspace_root do
     System.get_env("HTMLGRAPH_WORKSPACE") ||
       System.get_env("CLAUDE_PROJECT_DIR") ||

@@ -18,6 +18,8 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
     %{key: "done", label: "Done", color: "#34d399"}
   ]
 
+  @page_size 25
+
   @impl true
   def mount(params, _session, socket) do
     projects = ProjectRegistry.list_projects()
@@ -34,6 +36,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       |> assign(:selected_card, nil)
       |> assign(:projects, projects)
       |> assign(:selected_project, selected_project)
+      |> assign(:items_shown, default_items_shown())
 
     {:ok, socket}
   end
@@ -52,17 +55,19 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
          socket
          |> assign(:selected_project, project)
          |> assign(:items, items)
-         |> assign(:selected_card, nil)}
+         |> assign(:selected_card, nil)
+         |> assign(:items_shown, default_items_shown())}
     end
   end
 
   @impl true
   def handle_event("select_card", %{"id" => card_id}, socket) do
     card = Enum.find(socket.assigns.items, fn i -> i["id"] == card_id end)
+    project = socket.assigns[:selected_project]
 
     detail =
       if card do
-        load_work_item_detail(card_id) || card
+        load_work_item_detail(card_id, project) || card
       else
         nil
       end
@@ -82,6 +87,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       socket
       |> assign(:items, items)
       |> assign(:selected_card, nil)
+      |> assign(:items_shown, default_items_shown())
 
     {:noreply, socket}
   end
@@ -95,11 +101,18 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
       |> assign(:selected_project, project)
       |> assign(:items, items)
       |> assign(:selected_card, nil)
+      |> assign(:items_shown, default_items_shown())
 
     {:noreply, push_patch(socket, to: "/kanban?project=#{project_id}")}
   end
 
-  defp load_kanban_data(project_id \\ nil) do
+  def handle_event("show_more", %{"column" => column_key}, socket) do
+    current = Map.get(socket.assigns.items_shown, column_key, @page_size)
+    updated = Map.put(socket.assigns.items_shown, column_key, current + @page_size)
+    {:noreply, assign(socket, :items_shown, updated)}
+  end
+
+  defp load_kanban_data(project_id) do
     sql = """
     SELECT
       id,
@@ -143,9 +156,24 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
     end
   end
 
-  defp load_work_item_detail(id) do
+  defp project_graph_opts(nil), do: %{}
+
+  defp project_graph_opts(project) do
+    case ProjectRegistry.get_project(project.id) do
+      %{db_path: db_path} ->
+        graph_dir = db_path |> Path.dirname() |> Path.dirname()
+        %{db_path: db_path, graph_dir: graph_dir}
+
+      nil ->
+        %{}
+    end
+  end
+
+  defp load_work_item_detail(id, project) do
+    opts = project_graph_opts(project)
+
     try do
-      case PythonSDK.get_work_item(id) do
+      case PythonSDK.get_work_item(id, opts) do
         {:ok, item} when is_map(item) -> item
         _ -> nil
       end
@@ -156,8 +184,18 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
     end
   end
 
+  defp default_items_shown do
+    Enum.into(@columns, %{}, fn col -> {col.key, @page_size} end)
+  end
+
   defp items_for_column(items, status) do
     Enum.filter(items, fn i -> i["status"] == status end)
+  end
+
+  defp visible_items_for_column(items, status, items_shown) do
+    all = items_for_column(items, status)
+    limit = Map.get(items_shown, status, @page_size)
+    Enum.take(all, limit)
   end
 
   defp column_count(items, status) do
@@ -288,7 +326,7 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
             <%= if items_for_column(@items, col.key) == [] do %>
               <div class="kanban-empty">No items</div>
             <% else %>
-              <%= for item <- items_for_column(@items, col.key) do %>
+              <%= for item <- visible_items_for_column(@items, col.key, @items_shown) do %>
                 <div
                   class={priority_class(item["priority"])}
                   phx-click="select_card"
@@ -320,6 +358,15 @@ defmodule HtmlgraphDashboardWeb.KanbanLive do
                     </div>
                   <% end %>
                 </div>
+              <% end %>
+              <%= if column_count(@items, col.key) > Map.get(@items_shown, col.key, 25) do %>
+                <button
+                  class="kanban-show-more"
+                  phx-click="show_more"
+                  phx-value-column={col.key}
+                >
+                  Show <%= column_count(@items, col.key) - Map.get(@items_shown, col.key, 25) %> more
+                </button>
               <% end %>
             <% end %>
           </div>

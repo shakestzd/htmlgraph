@@ -1,0 +1,542 @@
+/* === MULTI-PROJECT DESIGN SYSTEM ===
+ * Command Center aesthetic: Bloomberg Terminal meets spacecraft HUD.
+ * Sharp edges, monospace grid, scanline textures, glow accents.
+ */
+
+/* --- Design Tokens --- */
+:root {
+  /* Project Color Palette (8 rotating, deterministic by project hash) */
+  --project-0: #58a6ff;
+  --project-1: #3fb950;
+  --project-2: #d29922;
+  --project-3: #bc8cff;
+  --project-4: #f778ba;
+  --project-5: #39d2c0;
+  --project-6: #f85149;
+  --project-7: #db6d28;
+
+  /* Active project color (set dynamically via inline style) */
+  --project-active: var(--project-0);
+
+  /* 8px spacing grid */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* Type scale */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+
+  /* Mono font stack */
+  --font-mono-full: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+
+
+/* ========================================
+   1. Identity Stripe
+   ======================================== */
+.identity-stripe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--project-active);
+  z-index: 1000;
+  box-shadow: 0 0 8px var(--project-active);
+}
+
+
+/* ========================================
+   2. Project Switcher (nav compact display)
+   ======================================== */
+.project-switcher {
+  position: relative;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.project-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font-mono-full);
+  font-size: var(--text-sm);
+  border-radius: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.project-switcher-btn:hover {
+  border-color: var(--project-active);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--project-active) 25%, transparent);
+}
+
+.project-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.project-switcher-chevron {
+  font-size: 8px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.project-switcher-chevron.open {
+  transform: rotate(180deg);
+}
+
+
+/* ========================================
+   2b. Project Picker Overlay
+   ======================================== */
+.project-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 900;
+  animation: fade-in 0.15s ease-out;
+}
+
+.project-picker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  width: 520px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 950;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: fade-slide-in 0.2s ease-out;
+}
+
+.project-picker-header {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.project-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-family: var(--font-mono-full);
+}
+
+.project-picker-row:last-child {
+  border-bottom: none;
+}
+
+.project-picker-row:hover {
+  background: var(--bg-hover);
+}
+
+.project-picker-row.active {
+  background: rgba(88, 166, 255, 0.08);
+  box-shadow: inset 3px 0 0 var(--project-active);
+}
+
+.project-picker-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-picker-name {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.project-picker-path {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-picker-stats {
+  display: flex;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+
+/* ========================================
+   3. Project Cards Grid
+   ======================================== */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.project-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--project-active);
+  border-radius: 0;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+/* CRT scanline texture overlay */
+.project-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+  animation: scanline 8s linear infinite;
+}
+
+.project-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3),
+              0 0 15px color-mix(in srgb, var(--project-active) 20%, transparent);
+}
+
+.card-body {
+  position: relative;
+  z-index: 2;
+  padding: var(--sp-4);
+}
+
+/* Card Header */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+.card-project-name {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-project-path {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--sp-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Active session pulse */
+.card-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  flex-shrink: 0;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Card Stats 2x2 grid */
+.card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.stat-box {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-box-label {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.stat-box-value {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card Sparkline area */
+.card-sparkline {
+  margin-bottom: var(--sp-3);
+  height: 48px;
+  overflow: hidden;
+}
+
+.card-sparkline svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Card Actions row */
+.card-actions {
+  display: flex;
+  gap: var(--sp-2);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+}
+
+.card-action-link {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 0;
+  transition: all 0.15s;
+  cursor: pointer;
+  background: none;
+}
+
+.card-action-link:hover {
+  color: var(--project-active);
+  border-color: var(--project-active);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--project-active) 25%, transparent);
+}
+
+
+/* ========================================
+   4. Stat Badge (compact inline)
+   ======================================== */
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stat-badge-icon {
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+
+
+/* ========================================
+   5. Nav Project Context
+   ======================================== */
+.nav-project-context {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: var(--sp-4);
+  padding-left: var(--sp-4);
+  border-left: 1px solid var(--border);
+  font-family: var(--font-mono-full);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+
+/* ========================================
+   6. Projects Page Header
+   ======================================== */
+.projects-header {
+  padding: var(--sp-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.projects-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.projects-title {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.projects-subtitle {
+  font-family: var(--font-mono-full);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.projects-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+}
+
+.projects-aggregate-stats {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.projects-refresh-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: 0;
+  cursor: pointer;
+  font-family: var(--font-mono-full);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.projects-refresh-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+
+/* ========================================
+   7. Animations
+   ======================================== */
+
+/* Pulsing glow for active sessions */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 4px var(--accent-green);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: 0 0 8px var(--accent-green);
+  }
+}
+
+/* Fade-in for backdrop */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slide-in for project picker */
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Scanline animation -- very subtle downward drift */
+@keyframes scanline {
+  from { background-position: 0 0; }
+  to { background-position: 0 4px; }
+}
+
+
+/* ========================================
+   8. Empty State Override (projects page)
+   ======================================== */
+.projects-empty {
+  text-align: center;
+  padding: var(--sp-8) var(--sp-5);
+  color: var(--text-secondary);
+  font-family: var(--font-mono-full);
+}
+
+.projects-empty h2 {
+  font-size: var(--text-xl);
+  color: var(--text-primary);
+  margin-bottom: var(--sp-2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.projects-empty p {
+  font-size: var(--text-sm);
+  margin-bottom: var(--sp-1);
+}
+
+.projects-empty code {
+  color: var(--accent-blue);
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+}

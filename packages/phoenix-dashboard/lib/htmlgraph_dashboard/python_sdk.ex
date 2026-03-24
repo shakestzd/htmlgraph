@@ -20,14 +20,14 @@ defmodule HtmlgraphDashboard.PythonSDK do
     GenServer.call(__MODULE__, {:list_activity_feed, opts}, 30_000)
   end
 
-  @doc "Get work item detail by ID"
-  def get_work_item(feature_id) do
-    GenServer.call(__MODULE__, {:get_work_item, feature_id}, 10_000)
+  @doc "Get work item detail by ID. Pass opts map with :db_path/:graph_dir to override project."
+  def get_work_item(feature_id, opts \\ %{}) do
+    GenServer.call(__MODULE__, {:get_work_item, feature_id, opts}, 10_000)
   end
 
-  @doc "Get work item titles for a list of IDs"
-  def get_work_item_titles(feature_ids) do
-    GenServer.call(__MODULE__, {:get_work_item_titles, feature_ids}, 10_000)
+  @doc "Get work item titles for a list of IDs. Pass opts map with :db_path/:graph_dir to override project."
+  def get_work_item_titles(feature_ids, opts \\ %{}) do
+    GenServer.call(__MODULE__, {:get_work_item_titles, feature_ids, opts}, 10_000)
   end
 
   @doc "Get graph stats: nodes, edges, cycles, critical path"
@@ -120,7 +120,9 @@ result
   end
 
   @impl true
-  def handle_call({:get_work_item, feature_id}, _from, state) do
+  def handle_call({:get_work_item, feature_id, opts}, _from, state) do
+    db_path = Map.get(opts, :db_path, state.db_path)
+    graph_dir = Map.get(opts, :graph_dir, state.graph_dir)
     code = """
 import json
 import sqlite3
@@ -190,8 +192,8 @@ result
     {result, _} =
       Pythonx.eval(code, %{
         "feature_id" => feature_id,
-        "db_path" => state.db_path,
-        "graph_dir" => state.graph_dir
+        "db_path" => db_path,
+        "graph_dir" => graph_dir
       })
 
     decoded = result |> Pythonx.decode() |> Jason.decode!()
@@ -235,7 +237,9 @@ result
   end
 
   @impl true
-  def handle_call({:get_work_item_titles, feature_ids}, _from, state) do
+  def handle_call({:get_work_item_titles, feature_ids, opts}, _from, state) do
+    db_path = Map.get(opts, :db_path, state.db_path)
+    graph_dir = Map.get(opts, :graph_dir, state.graph_dir)
     code = """
 import json
 import sqlite3
@@ -276,7 +280,7 @@ result = json.dumps(titles)
 result
 """
 
-    {result, _} = Pythonx.eval(code, %{"feature_ids" => feature_ids, "db_path" => state.db_path, "graph_dir" => state.graph_dir})
+    {result, _} = Pythonx.eval(code, %{"feature_ids" => feature_ids, "db_path" => db_path, "graph_dir" => graph_dir})
     decoded = result |> Pythonx.decode() |> Jason.decode!()
 
     {:reply, {:ok, decoded}, state}

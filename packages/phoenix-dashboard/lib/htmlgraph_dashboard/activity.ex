@@ -352,7 +352,7 @@ defmodule HtmlgraphDashboard.Activity do
 
   # --- Orphan Adoption ---
 
-  defp fetch_orphan_events(user_query, all_user_queries, project_id \\ nil) do
+  defp fetch_orphan_events(user_query, all_user_queries, project_id) do
     session_id = user_query["session_id"]
     uq_timestamp = user_query["timestamp"]
     uq_event_id = user_query["event_id"]
@@ -481,7 +481,7 @@ defmodule HtmlgraphDashboard.Activity do
     end
   end
 
-  defp derive_session_status(session, project_id \\ nil) do
+  defp derive_session_status(session, project_id) do
     cond do
       # If completed_at is set, it's completed
       session["completed_at"] != nil ->

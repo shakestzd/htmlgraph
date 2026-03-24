@@ -5,8 +5,12 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
 
   Layout uses topological sorting to position nodes left-to-right by
   dependency depth, rendered as SVG within the LiveView.
+
+  Rendering helpers and function components live in GraphComponents.
   """
   use HtmlgraphDashboardWeb, :live_view
+
+  import HtmlgraphDashboardWeb.GraphComponents
 
   alias HtmlgraphDashboard.ProjectRegistry
   alias HtmlgraphDashboard.PythonSDK
@@ -70,11 +74,7 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
 
   @impl true
   def handle_event("select_node", %{"id" => node_id}, socket) do
-    node =
-      Enum.find(socket.assigns.graph_data["nodes"] || [], fn n ->
-        n["id"] == node_id
-      end)
-
+    node = Enum.find(socket.assigns.graph_data["nodes"] || [], &(&1["id"] == node_id))
     {:noreply, assign(socket, :selected_node, node)}
   end
 
@@ -86,41 +86,40 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
     project = socket.assigns[:selected_project]
     graph_data = load_dependency_graph(project_graph_opts(project))
 
-    socket =
-      socket
-      |> assign(:graph_data, graph_data)
-      |> assign(:selected_node, nil)
-
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(:graph_data, graph_data)
+     |> assign(:selected_node, nil)}
   end
 
   def handle_event("select_project", %{"project_id" => project_id}, socket) do
     project = Enum.find(socket.assigns.projects, &(&1.id == project_id))
     graph_data = load_dependency_graph(project_graph_opts(project))
 
-    socket =
-      socket
-      |> assign(:selected_project, project)
-      |> assign(:graph_data, graph_data)
-      |> assign(:selected_node, nil)
-
-    {:noreply, push_patch(socket, to: "/graph?project=#{project_id}")}
+    {:noreply,
+     socket
+     |> assign(:selected_project, project)
+     |> assign(:graph_data, graph_data)
+     |> assign(:selected_node, nil)
+     |> push_patch(to: "/graph?project=#{project_id}")}
   end
+
+  # ---------------------------------------------------------------------------
+  # Private — data loading
+  # ---------------------------------------------------------------------------
 
   defp project_graph_opts(nil), do: %{}
 
   defp project_graph_opts(project) do
-    case HtmlgraphDashboard.ProjectRegistry.get_project(project.id) do
+    case ProjectRegistry.get_project(project.id) do
       %{db_path: db_path} ->
-        graph_dir = db_path |> Path.dirname() |> Path.dirname()
-        %{db_path: db_path, graph_dir: graph_dir}
-
+        %{db_path: db_path, graph_dir: db_path |> Path.dirname() |> Path.dirname()}
       nil ->
         %{}
     end
   end
 
-  defp load_dependency_graph(opts \\ %{}) do
+  defp load_dependency_graph(opts) do
     try do
       case PythonSDK.get_dependency_graph(opts) do
         {:ok, data} when is_map(data) -> Map.merge(@default_graph, data)
@@ -143,66 +142,21 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Private — statistics (used in template)
+  # ---------------------------------------------------------------------------
+
   defp node_count(graph_data), do: length(graph_data["nodes"] || [])
   defp edge_count(graph_data), do: length(graph_data["edges"] || [])
-
-  defp critical_count(graph_data) do
-    length(graph_data["critical_path"] || [])
-  end
+  defp critical_count(graph_data), do: length(graph_data["critical_path"] || [])
 
   defp bottleneck_count(graph_data) do
-    (graph_data["nodes"] || [])
-    |> Enum.count(fn n -> n["is_bottleneck"] == true end)
+    Enum.count(graph_data["nodes"] || [], & &1["is_bottleneck"] == true)
   end
 
-  defp node_radius(node) do
-    cond do
-      node["is_bottleneck"] -> 24
-      node["is_critical"] -> 20
-      true -> 16
-    end
-  end
-
-  defp node_status_class(node) do
-    case node["status"] do
-      "done" -> "node-done"
-      "in-progress" -> "node-in-progress"
-      "blocked" -> "node-blocked"
-      _ -> "node-todo"
-    end
-  end
-
-  defp node_status_color(node) do
-    case node["status"] do
-      "in-progress" -> "#22c55e"
-      "todo" -> "#3b82f6"
-      "done" -> "#6b7280"
-      "blocked" -> "#ef4444"
-      _ -> "#8b5cf6"
-    end
-  end
-
-  defp truncate_label(nil), do: ""
-
-  defp truncate_label(text) when is_binary(text) do
-    if String.length(text) > 25 do
-      String.slice(text, 0, 25) <> "..."
-    else
-      text
-    end
-  end
-
-  defp status_badge_class(status) do
-    case status do
-      "done" -> "badge badge-status-completed"
-      "in-progress" -> "badge badge-status-active"
-      "blocked" -> "badge badge-error"
-      _ -> "badge badge-count"
-    end
-  end
-
-  defp type_label(nil), do: "feature"
-  defp type_label(type), do: type
+  # ---------------------------------------------------------------------------
+  # Render
+  # ---------------------------------------------------------------------------
 
   @impl true
   def render(assigns) do
@@ -262,12 +216,7 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
         </span>
       </div>
       <div class="stat-card" style="margin-left: auto;">
-        <button
-          phx-click="refresh_graph"
-          class="graph-refresh-btn"
-        >
-          Refresh
-        </button>
+        <button phx-click="refresh_graph" class="graph-refresh-btn">Refresh</button>
       </div>
     </div>
 
@@ -276,204 +225,18 @@ defmodule HtmlgraphDashboardWeb.GraphLive do
         <%= if node_count(@graph_data) == 0 do %>
           <div class="empty-state">
             <h2>No dependency graph</h2>
-            <p>
-              Work items with relationships will appear here.
-              Create features with dependency edges to see the graph.
-            </p>
+            <p>Work items with relationships will appear here.
+              Create features with dependency edges to see the graph.</p>
           </div>
         <% else %>
-          <div style="overflow: auto; padding: 1rem;">
-            <svg
-              viewBox={"0 0 #{@graph_data["viewbox_width"] || 920} #{@graph_data["viewbox_height"] || 460}"}
-              width="100%"
-              style={"min-height: 500px; height: #{@graph_data["viewbox_height"] || 460}px; background: transparent;"}
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7"
-                        refX="10" refY="3.5" orient="auto" fill="#94a3b8">
-                  <polygon points="0 0, 10 3.5, 0 7" />
-                </marker>
-                <marker id="arrowhead-blocks" markerWidth="10" markerHeight="7"
-                        refX="10" refY="3.5" orient="auto" fill="#f87171">
-                  <polygon points="0 0, 10 3.5, 0 7" />
-                </marker>
-                <marker id="arrowhead-relates" markerWidth="10" markerHeight="7"
-                        refX="10" refY="3.5" orient="auto" fill="#60a5fa">
-                  <polygon points="0 0, 10 3.5, 0 7" />
-                </marker>
-                <marker id="arrowhead-spawned" markerWidth="10" markerHeight="7"
-                        refX="10" refY="3.5" orient="auto" fill="#a78bfa">
-                  <polygon points="0 0, 10 3.5, 0 7" />
-                </marker>
-                <filter id="glow-critical">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              <!-- Edges (drawn first so nodes render on top) -->
-              <%= for edge <- @graph_data["edges"] || [] do %>
-                <line
-                  x1={edge["x1"]}
-                  y1={edge["y1"]}
-                  x2={edge["x2"]}
-                  y2={edge["y2"]}
-                  stroke={edge_stroke_color(edge)}
-                  stroke-width="2"
-                  opacity="0.65"
-                  marker-end={edge_marker(edge)}
-                />
-              <% end %>
-
-              <!-- Nodes -->
-              <%= for node <- @graph_data["nodes"] || [] do %>
-                <g
-                  class={"graph-node #{node_status_class(node)} #{if node["is_critical"], do: "node-critical"} #{if node["is_bottleneck"], do: "node-bottleneck"}"}
-                  phx-click="select_node"
-                  phx-value-id={node["id"]}
-                  style="cursor: pointer;"
-                >
-                  <%= if node["is_critical"] do %>
-                    <circle
-                      cx={node["x"]}
-                      cy={node["y"]}
-                      r={node_radius(node) + 6}
-                      fill="none"
-                      stroke="#fbbf24"
-                      stroke-width="2"
-                      opacity="0.6"
-                      filter="url(#glow-critical)"
-                    />
-                  <% end %>
-                  <circle
-                    cx={node["x"]}
-                    cy={node["y"]}
-                    r={node_radius(node)}
-                    fill={node["color"] || node_status_color(node)}
-                    stroke={if node["is_bottleneck"], do: "#f87171", else: "rgba(255,255,255,0.3)"}
-                    stroke-width={if node["is_bottleneck"], do: "3", else: "1.5"}
-                  />
-                  <!-- Type initial inside circle -->
-                  <text
-                    x={node["x"]}
-                    y={node["y"] + 5}
-                    text-anchor="middle"
-                    fill="white"
-                    font-size="11"
-                    font-weight="bold"
-                    style="pointer-events: none;"
-                  >
-                    <%= String.upcase(String.first(type_label(node["type"]) || "f")) %>
-                  </text>
-                  <!-- Label to the right of the node — text shadow via stroke trick -->
-                  <text
-                    x={node["x"] + node_radius(node) + 8}
-                    y={node["y"] + 5}
-                    fill="#1a1a2e"
-                    font-size="14"
-                    font-weight="600"
-                    stroke="#1a1a2e"
-                    stroke-width="4"
-                    paint-order="stroke"
-                    style="pointer-events: none;"
-                  >
-                    <%= truncate_label(node["title"]) %>
-                  </text>
-                  <text
-                    x={node["x"] + node_radius(node) + 8}
-                    y={node["y"] + 5}
-                    fill="#e2e8f0"
-                    font-size="14"
-                    font-weight="600"
-                    style="pointer-events: none;"
-                  >
-                    <%= truncate_label(node["title"]) %>
-                  </text>
-                </g>
-              <% end %>
-            </svg>
-          </div>
+          <.svg_graph graph_data={@graph_data} />
         <% end %>
       </div>
 
-      <!-- Detail Panel -->
       <%= if @selected_node do %>
-        <div class="graph-detail-panel">
-          <div class="graph-detail-header">
-            <span class="graph-detail-title">
-              <%= @selected_node["title"] || "Untitled" %>
-            </span>
-            <button phx-click="close_detail" class="graph-detail-close">
-              &#10005;
-            </button>
-          </div>
-
-          <div class="graph-detail-body">
-            <div class="graph-detail-row">
-              <span class="graph-detail-label">ID</span>
-              <span class="badge badge-session" style="font-size: 10px;">
-                <%= @selected_node["id"] %>
-              </span>
-            </div>
-            <div class="graph-detail-row">
-              <span class="graph-detail-label">Status</span>
-              <span class={status_badge_class(@selected_node["status"])}>
-                <%= @selected_node["status"] || "todo" %>
-              </span>
-            </div>
-            <div class="graph-detail-row">
-              <span class="graph-detail-label">Type</span>
-              <span class="badge badge-count">
-                <%= type_label(@selected_node["type"]) %>
-              </span>
-            </div>
-            <div class="graph-detail-row">
-              <span class="graph-detail-label">Priority</span>
-              <span class={"badge priority-badge-#{@selected_node["priority"] || "medium"}"}>
-                <%= @selected_node["priority"] || "medium" %>
-              </span>
-            </div>
-            <div class="graph-detail-row">
-              <span class="graph-detail-label">Depth</span>
-              <span class="badge badge-count"><%= @selected_node["depth"] || 0 %></span>
-            </div>
-
-            <%= if @selected_node["is_critical"] do %>
-              <div class="graph-detail-flag">
-                <span class="badge badge-critical-path">On Critical Path</span>
-              </div>
-            <% end %>
-            <%= if @selected_node["is_bottleneck"] do %>
-              <div class="graph-detail-flag">
-                <span class="bottleneck-warning">Bottleneck Node</span>
-              </div>
-            <% end %>
-          </div>
-        </div>
+        <.detail_panel node={@selected_node} graph_data={@graph_data} />
       <% end %>
     </div>
     """
-  end
-
-  defp edge_marker(edge) do
-    case edge["relationship"] do
-      "blocks" -> "url(#arrowhead-blocks)"
-      "relates_to" -> "url(#arrowhead-relates)"
-      "spawned_from" -> "url(#arrowhead-spawned)"
-      _ -> "url(#arrowhead)"
-    end
-  end
-
-  defp edge_stroke_color(edge) do
-    case edge["relationship"] do
-      "blocks" -> "#f87171"
-      "relates_to" -> "#60a5fa"
-      "spawned_from" -> "#a78bfa"
-      _ -> "#94a3b8"
-    end
   end
 end

@@ -109,9 +109,12 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
   end
 
   def handle_event("select_work_item", %{"id" => work_item_id}, socket) do
+    project = socket.assigns[:selected_project]
+    opts = if project, do: project_graph_opts(project), else: %{}
+
     work_item =
       try do
-        case PythonSDK.get_work_item(work_item_id) do
+        case PythonSDK.get_work_item(work_item_id, opts) do
           {:ok, item} -> item
           _ -> nil
         end
@@ -165,7 +168,7 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     {:noreply, socket}
   end
 
-  defp load_activity_stats(project_id \\ nil) do
+  defp load_activity_stats(project_id) do
     queries = [
       {"sessions", "SELECT COUNT(DISTINCT session_id) as v FROM agent_events"},
       {"events", "SELECT COUNT(*) as v FROM agent_events"},
@@ -210,12 +213,15 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
       |> Enum.reject(&is_nil/1)
       |> Enum.uniq()
 
+    project = socket.assigns[:selected_project]
+    sdk_opts = if project, do: project_graph_opts(project), else: %{}
+
     work_item_titles =
       if feature_ids == [] do
         %{}
       else
         try do
-          case PythonSDK.get_work_item_titles(feature_ids) do
+          case PythonSDK.get_work_item_titles(feature_ids, sdk_opts) do
             {:ok, titles} -> titles
             {:error, _} -> %{}
           end
@@ -230,6 +236,19 @@ defmodule HtmlgraphDashboardWeb.ActivityFeedLive do
     |> assign(:feed, feed)
     |> assign(:total_events, total_events)
     |> assign(:work_item_titles, work_item_titles)
+  end
+
+  defp project_graph_opts(nil), do: %{}
+
+  defp project_graph_opts(project) do
+    case ProjectRegistry.get_project(project.id) do
+      %{db_path: db_path} ->
+        graph_dir = db_path |> Path.dirname() |> Path.dirname()
+        %{db_path: db_path, graph_dir: graph_dir}
+
+      nil ->
+        %{}
+    end
   end
 
   defp collect_feature_ids(events) do
