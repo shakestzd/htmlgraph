@@ -24,6 +24,15 @@ uv run pytest               # Run tests
 git commit -m "..."
 ```
 
+## Research First
+
+**Before implementing anything new:**
+
+- Search PyPI/stdlib for existing libraries before writing custom implementations
+- Check `pyproject.toml` for what is already available as a dependency
+- Check `src/python/htmlgraph/utils/` for shared utilities before duplicating logic
+- Prefer well-maintained packages over one-off custom code
+
 ## Philosophy
 
 **CRITICAL: Fix ALL errors with every commit, regardless of when introduced.**

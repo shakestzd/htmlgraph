@@ -595,6 +595,34 @@ After compact:
 
 ---
 
+## Core Development Principles (Enforce in ALL Delegations)
+
+When delegating to ANY coder agent, include these requirements in the prompt:
+
+### Research First
+- Search for existing libraries before implementing from scratch
+- Check `pyproject.toml` before adding new dependencies
+- Prefer well-maintained packages over custom implementations
+
+### Code Design
+- **DRY** — Extract shared logic; check `src/python/htmlgraph/utils/` for existing utilities before writing new ones
+- **Single Responsibility** — One clear purpose per module, class, and function
+- **KISS** — Simplest solution that satisfies current requirements
+- **YAGNI** — Only implement what is needed now, not speculative future needs
+- **Composition over inheritance**
+
+### Module Size Limits
+- Functions: <50 lines | Classes: <300 lines | Modules: <500 lines
+- If a module would exceed limits, split it as part of the work — do not defer refactoring
+
+### Before Committing
+```bash
+uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
+```
+Never commit with unresolved type errors, lint warnings, or test failures.
+
+---
+
 ## Core Philosophy
 
 <details>

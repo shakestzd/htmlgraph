@@ -29,6 +29,10 @@ Local-first observability and coordination platform for AI-assisted development.
 
 **For complete patterns:** Use `/htmlgraph:orchestrator-directives-skill`
 
+### Development Principles
+
+All delegated work must follow: DRY, SRP, KISS, YAGNI. Research existing libraries before implementing. Module size limits enforced (functions <50 lines, modules <500 lines). See agent system prompts for full details.
+
 ---
 
 ## Code Quality
