@@ -49,7 +49,7 @@ class PluginManager:
                 check=False,
             )
             if result.returncode == 0:
-                # Check for any htmlgraph plugin (marketplace or local-marketplace)
+                # Check if htmlgraph plugin is installed
                 if "htmlgraph" in result.stdout:
                     if verbose:
                         logger.info(
@@ -68,37 +68,7 @@ class PluginManager:
             if verbose:
                 logger.info(f"    ⚠ Error checking plugin list: {e}")
 
-        # Step 1: Update marketplace
-        try:
-            if verbose:
-                logger.info("  Updating marketplace...")
-            result = subprocess.run(
-                ["claude", "plugin", "marketplace", "update", "htmlgraph"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if result.returncode == 0:
-                if verbose:
-                    logger.info("    ✓ Marketplace updated")
-            else:
-                # Non-blocking errors
-                if (
-                    "not found" in result.stderr.lower()
-                    or "no marketplace" in result.stderr.lower()
-                ):
-                    if verbose:
-                        logger.info("    ℹ Marketplace not configured (OK, continuing)")
-                elif verbose:
-                    logger.info(f"    ⚠ Marketplace update: {result.stderr.strip()}")
-        except FileNotFoundError:
-            if verbose:
-                logger.info("    ⚠ 'claude' command not found")
-        except Exception as e:
-            if verbose:
-                logger.info(f"    ⚠ Error updating marketplace: {e}")
-
-        # Step 2: Try update, fallback to install
+        # Step 1: Try update, fallback to install
         try:
             if verbose:
                 logger.info("  Updating plugin to latest version...")
