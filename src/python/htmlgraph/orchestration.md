@@ -14,7 +14,10 @@
 Launch multiple independent Task() calls in a single message for maximum throughput.
 
 ## Error Handling
-If a subagent fails, escalate the model (haiku → sonnet → opus) rather than retrying at the same level.
+If an operator agent fails, fall back to the corresponding Claude agent:
+- gemini-operator fails → delegate to researcher
+- codex-operator fails → delegate to sonnet-coder (escalate haiku → sonnet → opus)
+- copilot-operator fails → it handles own git fallback internally
 
 ## Quality Gates
 - After UI changes → delegate to `htmlgraph:ui-reviewer` for visual validation
@@ -22,6 +25,15 @@ If a subagent fails, escalate the model (haiku → sonnet → opus) rather than 
 - Before committing → `uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest`
 
 ## Available Agents
+
+### Tier 1: Operator Agents (External CLI delegation)
+| Agent | Purpose | CLI Tool |
+|-------|---------|----------|
+| htmlgraph:gemini-operator | Research, large-context analysis | Gemini (FREE) |
+| htmlgraph:codex-operator | Code generation, sandboxed execution | Codex (gpt-4.1-mini) |
+| htmlgraph:copilot-operator | Git operations, PRs, commits | Copilot (Sonnet 4.5) |
+
+### Tier 2: Claude Agents (Internal)
 | Agent | Purpose |
 |-------|---------|
 | htmlgraph:researcher | Exploration, documentation research |

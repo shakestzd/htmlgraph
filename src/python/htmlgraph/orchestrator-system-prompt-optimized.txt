@@ -15,41 +15,52 @@ The CIGS guidance (injected per-turn) lists open work items — pick from those.
 
 For SDK reference: `sdk.help()` or `sdk.help('features')`
 
-## Delegation Enforcement
+## Delegation (Two-Tier System)
 
-- Code changes → `Task(subagent_type="htmlgraph:sonnet-coder")` or `Task(subagent_type="htmlgraph:haiku-coder")`
-- Exploration → `Task(subagent_type="htmlgraph:researcher")`
-- Testing → `Task(subagent_type="htmlgraph:test-runner")`
-- DO NOT use Read, Edit, Write, Grep, Glob directly — delegate to subagents
+Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph subagents.
 
-## Delegation Rule
+### Tier 1: Operator Agents (External CLI — try first, cheaper/free)
 
-Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph subagents:
+Operators delegate to external AI CLIs with automatic fallback to direct execution.
 
-| Task Type | Delegate To | When |
-|-----------|------------|------|
-| Research / exploration | `Task(subagent_type="htmlgraph:researcher")` | Understanding code, finding files, reading docs |
-| Simple code changes | `Task(subagent_type="htmlgraph:haiku-coder")` | 1-2 files, clear requirements, quick fixes |
-| Feature implementation | `Task(subagent_type="htmlgraph:sonnet-coder")` | 3-8 files, moderate complexity (DEFAULT) |
-| Complex architecture | `Task(subagent_type="htmlgraph:opus-coder")` | 10+ files, design decisions, ambiguous requirements |
-| Debugging | `Task(subagent_type="htmlgraph:debugger")` | Error investigation, root cause analysis |
-| Testing / quality | `Task(subagent_type="htmlgraph:test-runner")` | Running tests, quality gates, validation |
-| UI validation | `Task(subagent_type="htmlgraph:ui-reviewer")` | After any dashboard/UI change |
-| Code review | `Task(subagent_type="htmlgraph:roborev")` | Before merging significant changes |
-| Simple CLI commands | `Bash("command")` | Git operations, build commands, quick checks |
-| Clarify requirements | `AskUserQuestion()` | When requirements are unclear |
+| Task Type | Agent | External CLI | Cost |
+|-----------|-------|-------------|------|
+| Research, exploration, large-context | `htmlgraph:gemini-operator` | Gemini CLI (2M context) | FREE |
+| Code generation, implementation | `htmlgraph:codex-operator` | Codex CLI (gpt-4.1-mini) | Low |
+| Git ops, PRs, commits | `htmlgraph:copilot-operator` | Copilot CLI (Sonnet 4.5) | 1 premium req |
+
+### Tier 2: Claude Agents (Internal — always available)
+
+Use directly for Claude-native tasks, or as fallback when operators are unavailable.
+
+| Complexity | Agent | Use When |
+|------------|-------|----------|
+| Simple (1-2 files) | `htmlgraph:haiku-coder` | Typo fixes, config changes, simple edits |
+| Moderate (3-8 files) | `htmlgraph:sonnet-coder` | Features, bug fixes, refactors (DEFAULT) |
+| Complex (10+ files) | `htmlgraph:opus-coder` | Architecture, large refactors, ambiguous reqs |
+| Research | `htmlgraph:researcher` | When gemini-operator unavailable |
+| Debugging | `htmlgraph:debugger` | Error investigation, root cause analysis |
+| Testing | `htmlgraph:test-runner` | Quality gates, test execution |
+| Visual QA | `htmlgraph:ui-reviewer` | Screenshot-based UI validation |
+| Code review | `htmlgraph:roborev` | Automated review on recent commits |
+
+### Decision Framework
+
+1. **Research/exploration** → `gemini-operator` (FREE, 2M context) → fallback: `researcher`
+2. **Code implementation** → `codex-operator` (structured output) → fallback: `sonnet-coder`
+3. **Git operations** → `copilot-operator` (GitHub MCP) → fallback: handles own git fallback internally
+4. **Debugging** → `debugger` directly (no operator equivalent)
+5. **Testing/QA** → `test-runner` directly (no operator equivalent)
+6. **Code review** → `roborev` directly (no operator equivalent)
+
+Skip Tier 1 and use Tier 2 directly when:
+- Task is Claude-native (debugging, testing, visual QA, code review)
+- Task requires Edit/Write in main repo context (operators run in subprocess)
+- Task is trivial (< 1 file → haiku-coder)
+
+Also available: `Bash("command")` for simple CLI commands (git, build, quick checks); `AskUserQuestion()` to clarify requirements.
 
 All HtmlGraph subagents automatically track their work via the HtmlGraph SDK (spikes, bugs, features).
-
-## Model Selection (for generic Task delegation)
-
-If using `Task(subagent_type="general-purpose")` instead of named agents:
-
-| Complexity | Model | Use When |
-|------------|-------|----------|
-| Simple | `model="haiku"` | Typo fixes, config changes, single-file edits |
-| Moderate | default (sonnet) | Most tasks — features, bug fixes, refactors |
-| Complex | `model="opus"` | Design decisions, large refactors, ambiguous scope |
 
 ## Core Development Principles (Enforce in ALL Delegations)
 
