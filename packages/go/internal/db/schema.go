@@ -1,0 +1,310 @@
+package db
+
+import (
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	_ "modernc.org/sqlite"
+)
+
+// Open opens (or creates) an HtmlGraph SQLite database at the given path,
+// applies performance PRAGMAs, and ensures the schema exists.
+func Open(dbPath string) (*sql.DB, error) {
+	dir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("creating db directory: %w", err)
+	}
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+
+	if err := ApplyPragmas(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("applying pragmas: %w", err)
+	}
+
+	if err := CreateAllTables(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("creating tables: %w", err)
+	}
+
+	if err := CreateAllIndexes(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("creating indexes: %w", err)
+	}
+
+	return db, nil
+}
+
+// CreateAllTables creates every HtmlGraph table if it does not already exist.
+// Mirrors create_all_tables() from Python ddl.py.
+func CreateAllTables(db *sql.DB) error {
+	stmts := []string{
+		// 1. agent_events
+		`CREATE TABLE IF NOT EXISTS agent_events (
+			event_id TEXT PRIMARY KEY,
+			agent_id TEXT NOT NULL,
+			event_type TEXT NOT NULL CHECK(
+				event_type IN ('tool_call','tool_result','error','delegation',
+				               'completion','start','end','check_point','task_delegation',
+				               'teammate_idle','task_completed')
+			),
+			timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			tool_name TEXT,
+			input_summary TEXT,
+			tool_input JSON,
+			output_summary TEXT,
+			context JSON,
+			session_id TEXT NOT NULL,
+			feature_id TEXT,
+			parent_agent_id TEXT,
+			parent_event_id TEXT,
+			subagent_type TEXT,
+			child_spike_count INTEGER DEFAULT 0,
+			cost_tokens INTEGER DEFAULT 0,
+			execution_duration_seconds REAL DEFAULT 0.0,
+			status TEXT DEFAULT 'recorded',
+			model TEXT,
+			claude_task_id TEXT,
+			source TEXT DEFAULT 'hook',
+			step_id TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY (parent_event_id) REFERENCES agent_events(event_id) ON DELETE SET NULL ON UPDATE CASCADE,
+			FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE SET NULL ON UPDATE CASCADE
+		)`,
+
+		// 2. features
+		`CREATE TABLE IF NOT EXISTS features (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL CHECK(
+				type IN ('feature','bug','spike','chore','epic','task')
+			),
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL DEFAULT 'todo' CHECK(
+				status IN ('todo','in-progress','blocked','done','active','ended','stale')
+			),
+			priority TEXT DEFAULT 'medium' CHECK(
+				priority IN ('low','medium','high','critical')
+			),
+			assigned_to TEXT,
+			assignee TEXT DEFAULT NULL,
+			track_id TEXT,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			steps_total INTEGER DEFAULT 0,
+			steps_completed INTEGER DEFAULT 0,
+			parent_feature_id TEXT,
+			tags JSON,
+			metadata JSON,
+			FOREIGN KEY (track_id) REFERENCES tracks(id),
+			FOREIGN KEY (parent_feature_id) REFERENCES features(id)
+		)`,
+
+		// 3. sessions
+		`CREATE TABLE IF NOT EXISTS sessions (
+			session_id TEXT PRIMARY KEY,
+			agent_assigned TEXT NOT NULL,
+			parent_session_id TEXT,
+			parent_event_id TEXT,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			total_events INTEGER DEFAULT 0,
+			total_tokens_used INTEGER DEFAULT 0,
+			context_drift REAL DEFAULT 0.0,
+			status TEXT NOT NULL DEFAULT 'active' CHECK(
+				status IN ('active','completed','paused','failed')
+			),
+			transcript_id TEXT,
+			transcript_path TEXT,
+			transcript_synced DATETIME,
+			start_commit TEXT,
+			end_commit TEXT,
+			is_subagent BOOLEAN DEFAULT FALSE,
+			features_worked_on JSON,
+			metadata JSON,
+			last_user_query_at DATETIME,
+			last_user_query TEXT,
+			handoff_notes TEXT,
+			recommended_next TEXT,
+			blockers JSON,
+			recommended_context JSON,
+			continued_from TEXT,
+			cost_budget REAL,
+			cost_threshold_breached INTEGER DEFAULT 0,
+			predicted_cost REAL DEFAULT 0.0,
+			model TEXT,
+			active_feature_id TEXT,
+			FOREIGN KEY (parent_session_id) REFERENCES sessions(session_id) ON DELETE SET NULL ON UPDATE CASCADE,
+			FOREIGN KEY (parent_event_id) REFERENCES agent_events(event_id) ON DELETE SET NULL ON UPDATE CASCADE,
+			FOREIGN KEY (continued_from) REFERENCES sessions(session_id) ON DELETE SET NULL ON UPDATE CASCADE
+		)`,
+
+		// 4. tracks
+		`CREATE TABLE IF NOT EXISTS tracks (
+			id TEXT PRIMARY KEY,
+			type TEXT DEFAULT 'track',
+			title TEXT NOT NULL,
+			description TEXT,
+			priority TEXT DEFAULT 'medium' CHECK(
+				priority IN ('low','medium','high','critical')
+			),
+			status TEXT NOT NULL DEFAULT 'todo' CHECK(
+				status IN ('todo','in-progress','blocked','done','active','ended','stale')
+			),
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			features JSON,
+			metadata JSON
+		)`,
+
+		// 5. agent_collaboration
+		`CREATE TABLE IF NOT EXISTS agent_collaboration (
+			handoff_id TEXT PRIMARY KEY,
+			from_agent TEXT NOT NULL,
+			to_agent TEXT NOT NULL,
+			timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			feature_id TEXT,
+			session_id TEXT,
+			handoff_type TEXT CHECK(
+				handoff_type IN ('delegation','parallel','sequential','fallback')
+			),
+			status TEXT DEFAULT 'pending' CHECK(
+				status IN ('pending','accepted','rejected','completed','failed')
+			),
+			reason TEXT,
+			context JSON,
+			result JSON,
+			FOREIGN KEY (feature_id) REFERENCES features(id),
+			FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+		)`,
+
+		// 6. graph_edges
+		`CREATE TABLE IF NOT EXISTS graph_edges (
+			edge_id TEXT PRIMARY KEY,
+			from_node_id TEXT NOT NULL,
+			from_node_type TEXT NOT NULL,
+			to_node_id TEXT NOT NULL,
+			to_node_type TEXT NOT NULL,
+			relationship_type TEXT NOT NULL,
+			weight REAL DEFAULT 1.0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			metadata JSON
+		)`,
+
+		// 7. event_log_archive
+		`CREATE TABLE IF NOT EXISTS event_log_archive (
+			archive_id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			agent_id TEXT NOT NULL,
+			event_date DATE NOT NULL,
+			event_count INTEGER DEFAULT 0,
+			total_tokens INTEGER DEFAULT 0,
+			summary TEXT,
+			archived_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+		)`,
+
+		// 8. live_events
+		`CREATE TABLE IF NOT EXISTS live_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			event_type TEXT NOT NULL,
+			event_data TEXT NOT NULL,
+			parent_event_id TEXT,
+			session_id TEXT,
+			spawner_type TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			broadcast_at TIMESTAMP
+		)`,
+
+		// 9. agent_presence
+		`CREATE TABLE IF NOT EXISTS agent_presence (
+			agent_id TEXT PRIMARY KEY,
+			status TEXT NOT NULL DEFAULT 'offline' CHECK(
+				status IN ('active','idle','offline')
+			),
+			current_feature_id TEXT,
+			last_tool_name TEXT,
+			last_activity DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			total_tools_executed INTEGER DEFAULT 0,
+			total_cost_tokens INTEGER DEFAULT 0,
+			session_id TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (current_feature_id) REFERENCES features(id) ON DELETE SET NULL,
+			FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE SET NULL
+		)`,
+	}
+
+	for _, stmt := range stmts {
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("exec DDL: %w\nSQL: %.120s", err, stmt)
+		}
+	}
+	return nil
+}
+
+// CreateAllIndexes creates performance indexes matching Python ddl.py.
+func CreateAllIndexes(db *sql.DB) error {
+	indexes := []string{
+		// agent_events
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_session_ts_desc ON agent_events(session_id, timestamp DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_agent_ts_desc ON agent_events(agent_id, timestamp DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_agent ON agent_events(agent_id)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_type ON agent_events(event_type)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_parent_event ON agent_events(parent_event_id)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_task_delegation ON agent_events(event_type, subagent_type, timestamp DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_session_tool ON agent_events(session_id, tool_name)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_timestamp ON agent_events(timestamp DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_claude_task_id ON agent_events(claude_task_id)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_events_step_id ON agent_events(step_id)",
+		// features
+		"CREATE INDEX IF NOT EXISTS idx_features_status_priority ON features(status, priority DESC, created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_features_track_priority ON features(track_id, priority DESC, created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_features_assigned ON features(assigned_to)",
+		"CREATE INDEX IF NOT EXISTS idx_features_parent ON features(parent_feature_id)",
+		"CREATE INDEX IF NOT EXISTS idx_features_type ON features(type)",
+		"CREATE INDEX IF NOT EXISTS idx_features_created ON features(created_at DESC)",
+		// sessions
+		"CREATE INDEX IF NOT EXISTS idx_sessions_agent_created ON sessions(agent_assigned, created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_sessions_status_created ON sessions(status, created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id, created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at DESC)",
+		// tracks
+		"CREATE INDEX IF NOT EXISTS idx_tracks_status_created ON tracks(status, created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_tracks_priority ON tracks(priority DESC)",
+		// collaboration
+		"CREATE INDEX IF NOT EXISTS idx_collaboration_session ON agent_collaboration(session_id, timestamp DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_collaboration_from_agent ON agent_collaboration(from_agent)",
+		"CREATE INDEX IF NOT EXISTS idx_collaboration_to_agent ON agent_collaboration(to_agent)",
+		"CREATE INDEX IF NOT EXISTS idx_collaboration_agents ON agent_collaboration(from_agent, to_agent)",
+		"CREATE INDEX IF NOT EXISTS idx_collaboration_feature ON agent_collaboration(feature_id)",
+		"CREATE INDEX IF NOT EXISTS idx_collaboration_handoff_type ON agent_collaboration(handoff_type, timestamp DESC)",
+		// graph_edges
+		"CREATE INDEX IF NOT EXISTS idx_edges_from ON graph_edges(from_node_id)",
+		"CREATE INDEX IF NOT EXISTS idx_edges_to ON graph_edges(to_node_id)",
+		"CREATE INDEX IF NOT EXISTS idx_edges_type ON graph_edges(relationship_type)",
+		// live_events
+		"CREATE INDEX IF NOT EXISTS idx_live_events_pending ON live_events(broadcast_at) WHERE broadcast_at IS NULL",
+		"CREATE INDEX IF NOT EXISTS idx_live_events_created ON live_events(created_at DESC)",
+		// agent_presence
+		"CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status, last_activity DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_presence_feature ON agent_presence(current_feature_id, last_activity DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_agent_presence_activity ON agent_presence(last_activity DESC)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := db.Exec(idx); err != nil {
+			// Non-fatal: log and continue (matches Python behaviour).
+			fmt.Fprintf(os.Stderr, "warning: index creation: %v\n", err)
+		}
+	}
+	return nil
+}
