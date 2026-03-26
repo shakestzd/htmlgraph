@@ -67,6 +67,15 @@ func TestSchemaCreationAndCRUD(t *testing.T) {
 		t.Errorf("model: got %q, want %q", got.Model, "opus-4.6")
 	}
 
+	// Insert track first (FK requirement for features).
+	_, err = database.Exec(
+		`INSERT INTO tracks (id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"trk-001", "Test Track", "todo", now.Format("2006-01-02T15:04:05Z07:00"), now.Format("2006-01-02T15:04:05Z07:00"),
+	)
+	if err != nil {
+		t.Fatalf("Insert track: %v", err)
+	}
+
 	// Test Feature CRUD.
 	feat := &db.Feature{
 		ID:        "feat-test-001",
