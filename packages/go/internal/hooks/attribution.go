@@ -94,6 +94,25 @@ func claimTraceparent() *traceparentEntry {
 	return best
 }
 
+// writeSubagentEnvVars writes HTMLGRAPH_PARENT_EVENT and HTMLGRAPH_AGENT_ID
+// to CLAUDE_ENV_FILE so the subagent's hooks know their parent delegation
+// and agent identity. Claude Code propagates CLAUDE_ENV_FILE to child processes.
+func writeSubagentEnvVars(parentEventID, agentType string) {
+	envFile := os.Getenv("CLAUDE_ENV_FILE")
+	if envFile == "" {
+		return
+	}
+	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	lines := fmt.Sprintf("export HTMLGRAPH_PARENT_EVENT=%s\nexport HTMLGRAPH_AGENT_ID=%s\n",
+		parentEventID, agentType)
+	f.WriteString(lines)
+}
+
 // ApplyTraceparent reads a traceparent from the queue and exports env vars
 // for parent session / parent event linkage. Called during session-start.
 func ApplyTraceparent() (parentSession, parentEvent string) {

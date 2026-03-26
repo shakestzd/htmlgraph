@@ -30,7 +30,17 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	featureID := GetActiveFeatureID(database, sessionID)
 	parentEventID := os.Getenv("HTMLGRAPH_PARENT_EVENT")
-	// Fall back to most recent UserQuery in this session (enables tree nesting)
+
+	// Multi-method parent resolution (matches Python event_tracker.py):
+	// 1. Env var HTMLGRAPH_PARENT_EVENT (set by SubagentStart for subagent processes)
+	// 2. Most recent started task_delegation in this session (for subagent tool calls)
+	// 3. Most recent UserQuery in this session (for top-level tool calls)
+	if parentEventID == "" {
+		_ = database.QueryRow(
+			`SELECT event_id FROM agent_events WHERE session_id = ? AND event_type IN ('task_delegation', 'delegation') AND status = 'started' ORDER BY timestamp DESC LIMIT 1`,
+			sessionID,
+		).Scan(&parentEventID)
+	}
 	if parentEventID == "" {
 		_ = database.QueryRow(
 			`SELECT event_id FROM agent_events WHERE session_id = ? AND tool_name = 'UserQuery' ORDER BY timestamp DESC LIMIT 1`,
