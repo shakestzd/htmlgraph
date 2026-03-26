@@ -96,7 +96,7 @@ func fetchChildren(database *sql.DB, parentID, sessionID string, depth int) []ma
 		FROM agent_events
 		WHERE parent_event_id = ?
 		  AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
-		ORDER BY timestamp ASC`, parentID)
+		ORDER BY timestamp DESC`, parentID)
 	if err != nil {
 		return nil
 	}
@@ -151,7 +151,7 @@ func fetchSubagentOrphans(
 		WHERE session_id LIKE ?
 		  AND (parent_event_id IS NULL OR parent_event_id = '')
 		  AND tool_name != 'UserQuery'
-		ORDER BY timestamp ASC`, pattern)
+		ORDER BY timestamp DESC`, pattern)
 	if err != nil {
 		return nil
 	}
