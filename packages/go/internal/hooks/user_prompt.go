@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	featureID := GetActiveFeatureID(database, sessionID)
 
-	promptSummary := event.Prompt
+	promptSummary := sanitizePrompt(event.Prompt)
 	if len(promptSummary) > 300 {
 		promptSummary = promptSummary[:300] + "…"
 	}
@@ -136,6 +137,27 @@ func activeFeatureOrNone(id string) string {
 		return "none"
 	}
 	return id
+}
+
+// sanitizePrompt strips XML notification/reminder blocks from prompt text.
+func sanitizePrompt(s string) string {
+	for _, tag := range []string{"task-notification", "system-reminder", "command-message", "local-command-caveat"} {
+		open := "<" + tag + ">"
+		close := "</" + tag + ">"
+		for {
+			i := strings.Index(s, open)
+			if i == -1 {
+				break
+			}
+			j := strings.Index(s[i:], close)
+			if j == -1 {
+				s = s[:i]
+				break
+			}
+			s = s[:i] + s[i+j+len(close):]
+		}
+	}
+	return strings.TrimSpace(s)
 }
 
 func joinLines(lines []string) string {
