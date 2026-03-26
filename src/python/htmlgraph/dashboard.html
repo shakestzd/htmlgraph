@@ -810,23 +810,11 @@ class HgEventTree extends HTMLElement {
       setVal('sv-events', stats.total_events);
     }
 
-    if (data.tool_name === 'UserQuery') {
-      this.turns.unshift({
-        session_id: data.session_id,
-        user_query: data,
-        children: [],
-        stats: { tool_count: 0, error_count: 0, models: [] }
-      });
-      this.updateCount();
-      this.render();
-      return;
-    }
-    // Increment stats on most recent turn
-    if (this.turns.length > 0) {
-      this.turns[0].stats.tool_count++;
-      this.updateCount();
-      this.render();
-    }
+    // Debounced re-fetch: SSE events arrive as flat objects without tree
+    // structure. Rather than trying to place them client-side, re-fetch
+    // the full tree from the API after a short debounce.
+    if (this._reloadTimer) clearTimeout(this._reloadTimer);
+    this._reloadTimer = setTimeout(() => this.load(), 500);
   }
 
   render() {
