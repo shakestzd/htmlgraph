@@ -33,9 +33,10 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	// Multi-method parent resolution (matches Python event_tracker.py):
 	// 1. Env var HTMLGRAPH_PARENT_EVENT (set by SubagentStart for subagent processes)
-	// 2. Most recent started task_delegation in this session (for subagent tool calls)
-	// 3. Most recent UserQuery in this session (for top-level tool calls)
-	if parentEventID == "" {
+	// 2. If this IS a subagent (HTMLGRAPH_AGENT_ID set): find parent task_delegation
+	// 3. Most recent UserQuery in this session (for top-level orchestrator tool calls)
+	if parentEventID == "" && os.Getenv("HTMLGRAPH_AGENT_ID") != "" {
+		// This is a subagent — link to the task_delegation that spawned us
 		_ = database.QueryRow(
 			`SELECT event_id FROM agent_events WHERE session_id = ? AND event_type IN ('task_delegation', 'delegation') AND status = 'started' ORDER BY timestamp DESC LIMIT 1`,
 			sessionID,
