@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 )
 
 // respondJSON encodes v as JSON and writes it with status 200.
@@ -141,58 +144,118 @@ func sessionsHandler(database *sql.DB) http.HandlerFunc {
 }
 
 // featuresHandler returns up to 50 features, in-progress first.
-func featuresHandler(database *sql.DB) http.HandlerFunc {
+// Falls back to scanning HTML files when SQLite features table is empty.
+func featuresHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.Query(`
-			SELECT id, type, title, status, priority,
-			       COALESCE(track_id, ''), created_at,
-			       steps_total, steps_completed
-			FROM features
-			ORDER BY
-			    CASE status WHEN 'in-progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END,
-			    created_at DESC
-			LIMIT 50`)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		features := featuresFromDB(database)
+		if len(features) == 0 {
+			features = featuresFromHTML(projectDir)
 		}
-		defer rows.Close()
-
-		features := make([]map[string]any, 0, 50)
-		for rows.Next() {
-			var id, ftype, title, status, priority, trackID, created string
-			var stepsTotal, stepsCompleted int
-			if err := rows.Scan(&id, &ftype, &title, &status, &priority, &trackID,
-				&created, &stepsTotal, &stepsCompleted); err != nil {
-				continue
-			}
-			features = append(features, map[string]any{
-				"id":              id,
-				"type":            ftype,
-				"title":           title,
-				"status":          status,
-				"priority":        priority,
-				"track_id":        trackID,
-				"created_at":      created,
-				"steps_total":     stepsTotal,
-				"steps_completed": stepsCompleted,
-			})
-		}
-
 		respondJSON(w, features)
 	}
 }
 
+func featuresFromDB(database *sql.DB) []map[string]any {
+	rows, err := database.Query(`
+		SELECT id, type, title, status, priority,
+		       COALESCE(track_id, ''), created_at,
+		       steps_total, steps_completed
+		FROM features
+		ORDER BY
+		    CASE status WHEN 'in-progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END,
+		    created_at DESC
+		LIMIT 50`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	features := make([]map[string]any, 0, 50)
+	for rows.Next() {
+		var id, ftype, title, status, priority, trackID, created string
+		var stepsTotal, stepsCompleted int
+		if err := rows.Scan(&id, &ftype, &title, &status, &priority, &trackID,
+			&created, &stepsTotal, &stepsCompleted); err != nil {
+			continue
+		}
+		features = append(features, map[string]any{
+			"id":              id,
+			"type":            ftype,
+			"title":           title,
+			"status":          status,
+			"priority":        priority,
+			"track_id":        trackID,
+			"created_at":      created,
+			"steps_total":     stepsTotal,
+			"steps_completed": stepsCompleted,
+		})
+	}
+	return features
+}
+
+// featuresFromHTML scans .htmlgraph/features/*.html, .htmlgraph/bugs/*.html,
+// .htmlgraph/spikes/*.html, .htmlgraph/tracks/*.html and parses each file.
+func featuresFromHTML(projectDir string) []map[string]any {
+	features := make([]map[string]any, 0, 100)
+	for _, subdir := range []string{"features", "bugs", "spikes", "tracks"} {
+		pattern := filepath.Join(projectDir, subdir, "*.html")
+		files, _ := filepath.Glob(pattern)
+		for _, f := range files {
+			node, err := htmlparse.ParseFile(f)
+			if err != nil || node == nil {
+				continue
+			}
+			completed := 0
+			for _, s := range node.Steps {
+				if s.Completed {
+					completed++
+				}
+			}
+			features = append(features, map[string]any{
+				"id":              node.ID,
+				"type":            node.Type,
+				"title":           node.Title,
+				"status":          string(node.Status),
+				"priority":        string(node.Priority),
+				"track_id":        node.TrackID,
+				"created_at":      node.CreatedAt.Format(time.RFC3339),
+				"steps_total":     len(node.Steps),
+				"steps_completed": completed,
+			})
+		}
+	}
+	return features
+}
+
 // statsHandler returns a summary of counts from the database.
-func statsHandler(database *sql.DB) http.HandlerFunc {
+// Falls back to HTML files for feature counts when SQLite features table is empty.
+func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var total, inProgress, done, todo int
 		var activeSessions, totalEvents int
 
 		database.QueryRow(`SELECT COUNT(*) FROM features`).Scan(&total)
-		database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='in-progress'`).Scan(&inProgress)
-		database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'`).Scan(&done)
-		database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='todo'`).Scan(&todo)
+
+		// If SQLite has no features, count from HTML files
+		if total == 0 {
+			items := featuresFromHTML(projectDir)
+			total = len(items)
+			for _, item := range items {
+				switch item["status"] {
+				case "in-progress":
+					inProgress++
+				case "done":
+					done++
+				case "todo":
+					todo++
+				}
+			}
+		} else {
+			database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='in-progress'`).Scan(&inProgress)
+			database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'`).Scan(&done)
+			database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='todo'`).Scan(&todo)
+		}
+
 		database.QueryRow(`SELECT COUNT(*) FROM sessions WHERE status='active'`).Scan(&activeSessions)
 		database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents)
 

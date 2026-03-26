@@ -48,8 +48,8 @@ func runServer(port int) error {
 	mux.Handle("/api/events/recent", corsMiddleware(recentEventsHandler(database)))
 	mux.Handle("/api/events/stream", corsMiddleware(sseHandler(database)))
 	mux.Handle("/api/sessions", corsMiddleware(sessionsHandler(database)))
-	mux.Handle("/api/features", corsMiddleware(featuresHandler(database)))
-	mux.Handle("/api/stats", corsMiddleware(statsHandler(database)))
+	mux.Handle("/api/features", corsMiddleware(featuresHandler(database, htmlgraphDir)))
+	mux.Handle("/api/stats", corsMiddleware(statsHandler(database, htmlgraphDir)))
 	mux.Handle("/api/initial-stats", corsMiddleware(initialStatsHandler(database)))
 
 	// Static Python-package assets (components.js, CSS) when running from project root.
