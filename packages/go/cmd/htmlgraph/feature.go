@@ -10,6 +10,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/pkg/sdk"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +21,9 @@ func featureCmd() *cobra.Command {
 	}
 	cmd.AddCommand(featureListCmd())
 	cmd.AddCommand(featureShowCmd())
+	cmd.AddCommand(featureStartCmd())
+	cmd.AddCommand(featureCompleteCmd())
+	cmd.AddCommand(featureCreateCmd())
 	return cmd
 }
 
@@ -124,6 +128,109 @@ func resolveNodePath(htmlgraphDir, id string) string {
 		}
 	}
 	return ""
+}
+
+// featureStartCmd marks a feature as in-progress.
+func featureStartCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "start <id>",
+		Short: "Mark a feature as in-progress",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runFeatureStart(args[0])
+		},
+	}
+}
+
+func runFeatureStart(id string) error {
+	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	s, err := sdk.New(dir, "claude-code")
+	if err != nil {
+		return fmt.Errorf("open SDK: %w", err)
+	}
+	defer s.Close()
+
+	node, err := s.Features.Start(id)
+	if err != nil {
+		return fmt.Errorf("start feature: %w", err)
+	}
+	fmt.Printf("Started: %s  %s\n", node.ID, node.Title)
+	return nil
+}
+
+// featureCompleteCmd marks a feature as done.
+func featureCompleteCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "complete <id>",
+		Short: "Mark a feature as done",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runFeatureComplete(args[0])
+		},
+	}
+}
+
+func runFeatureComplete(id string) error {
+	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	s, err := sdk.New(dir, "claude-code")
+	if err != nil {
+		return fmt.Errorf("open SDK: %w", err)
+	}
+	defer s.Close()
+
+	node, err := s.Features.Complete(id)
+	if err != nil {
+		return fmt.Errorf("complete feature: %w", err)
+	}
+	fmt.Printf("Completed: %s  %s\n", node.ID, node.Title)
+	return nil
+}
+
+// featureCreateCmd creates a new feature.
+func featureCreateCmd() *cobra.Command {
+	var trackID, priority string
+
+	cmd := &cobra.Command{
+		Use:   "create <title>",
+		Short: "Create a new feature",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runFeatureCreate(args[0], trackID, priority)
+		},
+	}
+	cmd.Flags().StringVar(&trackID, "track", "", "track ID to link to")
+	cmd.Flags().StringVar(&priority, "priority", "medium", "priority (low|medium|high|critical)")
+	return cmd
+}
+
+func runFeatureCreate(title, trackID, priority string) error {
+	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	s, err := sdk.New(dir, "claude-code")
+	if err != nil {
+		return fmt.Errorf("open SDK: %w", err)
+	}
+	defer s.Close()
+
+	opts := []sdk.FeatureOption{sdk.FeatWithPriority(priority)}
+	if trackID != "" {
+		opts = append(opts, sdk.FeatWithTrack(trackID))
+	}
+
+	node, err := s.Features.Create(title, opts...)
+	if err != nil {
+		return fmt.Errorf("create feature: %w", err)
+	}
+	fmt.Printf("Created: %s  %s\n", node.ID, node.Title)
+	return nil
 }
 
 func printNodeDetail(n *models.Node) {

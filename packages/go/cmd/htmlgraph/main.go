@@ -26,6 +26,8 @@ func main() {
 	rootCmd.AddCommand(statusCmd())
 	rootCmd.AddCommand(serveCmd())
 	rootCmd.AddCommand(featureCmd())
+	rootCmd.AddCommand(spikeCmd())
+	rootCmd.AddCommand(bugCmd())
 	rootCmd.AddCommand(snapshotCmd())
 	rootCmd.AddCommand(hookCmd())
 	rootCmd.AddCommand(claudeCmd())
