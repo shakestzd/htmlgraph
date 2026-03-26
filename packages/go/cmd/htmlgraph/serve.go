@@ -53,12 +53,16 @@ func runServer(port int) error {
 	mux.Handle("/api/stats", corsMiddleware(statsHandler(database, htmlgraphDir)))
 	mux.Handle("/api/initial-stats", corsMiddleware(initialStatsHandler(database)))
 
-	// Static Python-package assets (components.js, CSS) when running from project root.
-	staticDir := filepath.Join(root, "src/python/htmlgraph/static")
-	if info, err := os.Stat(staticDir); err == nil && info.IsDir() {
-		mux.Handle("/static/", corsMiddleware(
-			http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))),
-		))
+	// Serve dashboard from Go plugin directory (primary) or project root (fallback).
+	// Also serve static assets (components.js, CSS) from the Go plugin.
+	pluginDir := resolvePluginDir()
+	if pluginDir != "" {
+		staticDir := filepath.Join(pluginDir, "static")
+		if info, err := os.Stat(staticDir); err == nil && info.IsDir() {
+			mux.Handle("/static/", corsMiddleware(
+				http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))),
+			))
+		}
 	}
 
 	// .htmlgraph/ files accessible under /htmlgraph/
@@ -77,6 +81,21 @@ func runServer(port int) error {
 	fmt.Println("Press Ctrl+C to stop.")
 
 	return http.ListenAndServe(addr, mux)
+}
+
+// resolvePluginDir finds the go-plugin directory relative to the binary.
+func resolvePluginDir() string {
+	binPath, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	// Binary at packages/go-plugin/hooks/bin/htmlgraph-hooks → plugin at ../..
+	pluginDir := filepath.Join(filepath.Dir(binPath), "..", "..")
+	pluginDir, _ = filepath.Abs(pluginDir)
+	if _, err := os.Stat(filepath.Join(pluginDir, ".claude-plugin", "plugin.json")); err == nil {
+		return pluginDir
+	}
+	return ""
 }
 
 // corsMiddleware adds permissive CORS headers so in-browser HTML files can
