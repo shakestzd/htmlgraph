@@ -21,14 +21,14 @@ Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph suba
 
 | Task Type | Delegate To | When |
 |-----------|------------|------|
-| Research / exploration | `Task(subagent_type="htmlgraph-go:researcher")` | Understanding code, finding files, reading docs |
-| Simple code changes | `Task(subagent_type="htmlgraph-go:haiku-coder")` | 1-2 files, clear requirements, quick fixes |
-| Feature implementation | `Task(subagent_type="htmlgraph-go:sonnet-coder")` | 3-8 files, moderate complexity (DEFAULT) |
-| Complex architecture | `Task(subagent_type="htmlgraph-go:opus-coder")` | 10+ files, design decisions, ambiguous requirements |
-| Debugging | `Task(subagent_type="htmlgraph-go:debugger")` | Error investigation, root cause analysis |
-| Testing / quality | `Task(subagent_type="htmlgraph-go:test-runner")` | Running tests, quality gates, validation |
-| UI validation | `Task(subagent_type="htmlgraph-go:ui-reviewer")` | After any dashboard/UI change |
-| Code review | `Task(subagent_type="htmlgraph-go:roborev")` | Before merging significant changes |
+| Research / exploration | `Task(subagent_type="htmlgraph:researcher")` | Understanding code, finding files, reading docs |
+| Simple code changes | `Task(subagent_type="htmlgraph:haiku-coder")` | 1-2 files, clear requirements, quick fixes |
+| Feature implementation | `Task(subagent_type="htmlgraph:sonnet-coder")` | 3-8 files, moderate complexity (DEFAULT) |
+| Complex architecture | `Task(subagent_type="htmlgraph:opus-coder")` | 10+ files, design decisions, ambiguous requirements |
+| Debugging | `Task(subagent_type="htmlgraph:debugger")` | Error investigation, root cause analysis |
+| Testing / quality | `Task(subagent_type="htmlgraph:test-runner")` | Running tests, quality gates, validation |
+| UI validation | `Task(subagent_type="htmlgraph:ui-reviewer")` | After any dashboard/UI change |
+| Code review | `Task(subagent_type="htmlgraph:roborev")` | Before merging significant changes |
 | Simple CLI commands | `Bash("command")` | Git operations, build commands, quick checks |
 | Clarify requirements | `AskUserQuestion()` | When requirements are unclear |
 
@@ -88,22 +88,22 @@ Never commit with unresolved type errors, lint warnings, or test failures.
 - `Task` — delegate work to subagents
 
 ### What You NEVER Execute Directly
-- `Read`, `Grep`, `Glob` — delegate to htmlgraph-go:researcher
-- `Edit`, `Write` — delegate to htmlgraph-go:haiku-coder, sonnet-coder, or opus-coder
+- `Read`, `Grep`, `Glob` — delegate to htmlgraph:researcher
+- `Edit`, `Write` — delegate to htmlgraph:haiku-coder, sonnet-coder, or opus-coder
 - `NotebookEdit` — delegate to a coder agent
 
 ### Available Agents
 | Agent | Purpose |
 |-------|---------|
-| htmlgraph-go:researcher | Exploration, documentation research |
-| htmlgraph-go:haiku-coder | Quick fixes, 1-2 files |
-| htmlgraph-go:sonnet-coder | Features, 3-8 files (DEFAULT) |
-| htmlgraph-go:opus-coder | Architecture, 10+ files |
-| htmlgraph-go:debugger | Error investigation |
-| htmlgraph-go:test-runner | Testing, quality gates |
-| htmlgraph-go:ui-reviewer | Visual QA via chrome-devtools |
-| htmlgraph-go:roborev | Automated code review |
-| htmlgraph-go:copilot-operator | Git/GitHub operations |
+| htmlgraph:researcher | Exploration, documentation research |
+| htmlgraph:haiku-coder | Quick fixes, 1-2 files |
+| htmlgraph:sonnet-coder | Features, 3-8 files (DEFAULT) |
+| htmlgraph:opus-coder | Architecture, 10+ files |
+| htmlgraph:debugger | Error investigation |
+| htmlgraph:test-runner | Testing, quality gates |
+| htmlgraph:ui-reviewer | Visual QA via chrome-devtools |
+| htmlgraph:roborev | Automated code review |
+| htmlgraph:copilot-operator | Git/GitHub operations |
 
 ---
 
