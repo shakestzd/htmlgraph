@@ -15,9 +15,11 @@ var version = "dev"
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "htmlgraph",
-		Short: "Local-first observability for AI-assisted development",
-		Long:  "HtmlGraph — local-first observability and coordination platform for AI-assisted development.",
+		Use:           "htmlgraph",
+		Short:         "Local-first observability for AI-assisted development",
+		Long:          "HtmlGraph — local-first observability and coordination platform for AI-assisted development.",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 
 	rootCmd.AddCommand(versionCmd())
@@ -29,7 +31,6 @@ func main() {
 	rootCmd.AddCommand(claudeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

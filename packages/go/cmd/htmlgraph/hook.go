@@ -11,8 +11,10 @@ import (
 // hookCmd returns the "htmlgraph hook" parent command with all subcommands.
 func hookCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "hook",
-		Short: "Claude Code hook handlers (replaces Python hook scripts)",
+		Use:           "hook",
+		Short:         "Claude Code hook handlers (replaces Python hook scripts)",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		Long: `Hook subcommands read a CloudEvent JSON payload from stdin and write a
 JSON result to stdout. They replace the Python hook scripts, eliminating the
 ~500ms uv cold-start cost per hook invocation.
