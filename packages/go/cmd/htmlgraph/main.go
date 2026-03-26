@@ -1,11 +1,11 @@
 // Package main is the entry point for the htmlgraph CLI.
-//
-// Subcommands are scaffolded here and will be fleshed out in later waves.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
@@ -23,6 +23,9 @@ func main() {
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(statusCmd())
 	rootCmd.AddCommand(serveCmd())
+	rootCmd.AddCommand(featureCmd())
+	rootCmd.AddCommand(snapshotCmd())
+	rootCmd.AddCommand(hookCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -40,26 +43,32 @@ func versionCmd() *cobra.Command {
 	}
 }
 
-func statusCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show work item status summary",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			// Placeholder: will be fleshed out in Wave 3 (feat-35d26c62).
-			fmt.Println("htmlgraph status — not yet implemented (see feat-35d26c62)")
-			return nil
-		},
+// findHtmlgraphDir walks up from cwd looking for a .htmlgraph directory.
+func findHtmlgraphDir() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get working directory: %w", err)
 	}
+
+	for {
+		candidate := filepath.Join(dir, ".htmlgraph")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", errors.New("no .htmlgraph directory found (run from within an htmlgraph project)")
 }
 
-func serveCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "serve",
-		Short: "Start the dashboard server",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			// Placeholder: will be fleshed out in Wave 5.
-			fmt.Println("htmlgraph serve — not yet implemented")
-			return nil
-		},
+// truncate shortens s to maxLen characters, appending "…" if cut.
+func truncate(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
 	}
+	return string(runes[:maxLen-1]) + "…"
 }
