@@ -26,6 +26,7 @@ func main() {
 	rootCmd.AddCommand(featureCmd())
 	rootCmd.AddCommand(snapshotCmd())
 	rootCmd.AddCommand(hookCmd())
+	rootCmd.AddCommand(claudeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
