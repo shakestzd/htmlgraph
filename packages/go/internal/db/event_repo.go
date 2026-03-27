@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -159,6 +160,140 @@ func ListEventsBySessionAsc(db *sql.DB, sessionID string, limit int) ([]models.A
 	}
 	return events, rows.Err()
 }
+
+// InsertLineageTrace inserts a new lineage trace row.
+func InsertLineageTrace(db *sql.DB, trace *models.LineageTrace) error {
+	pathJSON, err := json.Marshal(trace.Path)
+	if err != nil {
+		return fmt.Errorf("marshal lineage path: %w", err)
+	}
+	_, err = db.Exec(`
+		INSERT INTO agent_lineage_trace
+			(trace_id, root_session_id, session_id, agent_name, depth, path,
+			 feature_id, started_at, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		trace.TraceID, trace.RootSessionID, nullStr(trace.SessionID),
+		nullStr(trace.AgentName), trace.Depth, string(pathJSON),
+		nullStr(trace.FeatureID),
+		trace.StartedAt.UTC().Format(time.RFC3339),
+		trace.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("insert lineage trace %s: %w", trace.TraceID, err)
+	}
+	return nil
+}
+
+// GetLineageByRoot returns all lineage traces rooted at a given session,
+// ordered by depth ascending.
+func GetLineageByRoot(db *sql.DB, rootSessionID string) ([]models.LineageTrace, error) {
+	rows, err := db.Query(`
+		SELECT trace_id, root_session_id, session_id, agent_name, depth, path,
+		       feature_id, started_at, completed_at, status
+		FROM agent_lineage_trace
+		WHERE root_session_id = ?
+		ORDER BY depth ASC`, rootSessionID)
+	if err != nil {
+		return nil, fmt.Errorf("get lineage by root %s: %w", rootSessionID, err)
+	}
+	defer rows.Close()
+	return scanLineageRows(rows)
+}
+
+// GetLineageBySession returns the lineage trace for a specific session, if any.
+func GetLineageBySession(db *sql.DB, sessionID string) (*models.LineageTrace, error) {
+	row := db.QueryRow(`
+		SELECT trace_id, root_session_id, session_id, agent_name, depth, path,
+		       feature_id, started_at, completed_at, status
+		FROM agent_lineage_trace
+		WHERE session_id = ?
+		LIMIT 1`, sessionID)
+	traces, err := scanLineageRows(singleRowToRows(row))
+	if err != nil {
+		return nil, fmt.Errorf("get lineage by session %s: %w", sessionID, err)
+	}
+	if len(traces) == 0 {
+		return nil, nil
+	}
+	return &traces[0], nil
+}
+
+// CompleteLineageTrace marks a session's lineage trace as completed.
+func CompleteLineageTrace(db *sql.DB, sessionID string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := db.Exec(`
+		UPDATE agent_lineage_trace
+		SET status = 'completed', completed_at = ?
+		WHERE session_id = ?`,
+		now, sessionID,
+	)
+	return err
+}
+
+// scanLineageRows scans a set of lineage rows into a slice of LineageTrace.
+func scanLineageRows(rows lineageScanner) ([]models.LineageTrace, error) {
+	var traces []models.LineageTrace
+	for rows.Next() {
+		var t models.LineageTrace
+		var sessionID, agentName, featureID, completedAt sql.NullString
+		var startedStr, pathJSON string
+
+		if err := rows.Scan(
+			&t.TraceID, &t.RootSessionID, &sessionID, &agentName,
+			&t.Depth, &pathJSON, &featureID, &startedStr, &completedAt, &t.Status,
+		); err != nil {
+			return nil, err
+		}
+		t.SessionID = sessionID.String
+		t.AgentName = agentName.String
+		t.FeatureID = featureID.String
+		t.StartedAt, _ = time.Parse(time.RFC3339, startedStr)
+		if completedAt.Valid && completedAt.String != "" {
+			ts, _ := time.Parse(time.RFC3339, completedAt.String)
+			t.CompletedAt = &ts
+		}
+		_ = json.Unmarshal([]byte(pathJSON), &t.Path)
+		traces = append(traces, t)
+	}
+	return traces, rows.Err()
+}
+
+// lineageScanner abstracts *sql.Rows so scanLineageRows works for both
+// multi-row queries and the single-row wrapper.
+type lineageScanner interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}
+
+// singleRowResult wraps *sql.Row into the lineageScanner interface.
+type singleRowResult struct {
+	row     *sql.Row
+	scanned bool
+	err     error
+}
+
+func singleRowToRows(row *sql.Row) lineageScanner {
+	return &singleRowResult{row: row}
+}
+
+func (s *singleRowResult) Next() bool {
+	if s.scanned {
+		return false
+	}
+	return true
+}
+
+func (s *singleRowResult) Scan(dest ...any) error {
+	s.scanned = true
+	s.err = s.row.Scan(dest...)
+	if s.err == sql.ErrNoRows {
+		s.err = nil
+	}
+	return s.err
+}
+
+func (s *singleRowResult) Err() error { return s.err }
 
 // MostRecentSession returns the session_id of the latest session (any status),
 // or ("", nil) if the table is empty.

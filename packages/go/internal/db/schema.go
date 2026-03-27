@@ -225,7 +225,21 @@ func CreateAllTables(db *sql.DB) error {
 			broadcast_at TIMESTAMP
 		)`,
 
-		// 9. agent_presence
+		// 9. agent_lineage_trace
+		`CREATE TABLE IF NOT EXISTS agent_lineage_trace (
+			trace_id TEXT PRIMARY KEY,
+			root_session_id TEXT NOT NULL,
+			session_id TEXT,
+			agent_name TEXT,
+			depth INTEGER DEFAULT 0,
+			path TEXT,
+			feature_id TEXT,
+			started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			status TEXT DEFAULT 'active'
+		)`,
+
+		// 10. agent_presence
 		`CREATE TABLE IF NOT EXISTS agent_presence (
 			agent_id TEXT PRIMARY KEY,
 			status TEXT NOT NULL DEFAULT 'offline' CHECK(
@@ -294,6 +308,9 @@ func CreateAllIndexes(db *sql.DB) error {
 		// live_events
 		"CREATE INDEX IF NOT EXISTS idx_live_events_pending ON live_events(broadcast_at) WHERE broadcast_at IS NULL",
 		"CREATE INDEX IF NOT EXISTS idx_live_events_created ON live_events(created_at DESC)",
+		// agent_lineage_trace
+		"CREATE INDEX IF NOT EXISTS idx_lineage_root ON agent_lineage_trace(root_session_id)",
+		"CREATE INDEX IF NOT EXISTS idx_lineage_session ON agent_lineage_trace(session_id)",
 		// agent_presence
 		"CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status, last_activity DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_agent_presence_feature ON agent_presence(current_feature_id, last_activity DESC)",
