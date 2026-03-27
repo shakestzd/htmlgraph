@@ -56,6 +56,7 @@ func main() {
 	rootCmd.AddCommand(findCmd())
 	rootCmd.AddCommand(checkCmd())
 	rootCmd.AddCommand(healthCmd())
+	rootCmd.AddCommand(budgetCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
