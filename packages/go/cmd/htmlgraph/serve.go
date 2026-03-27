@@ -87,6 +87,10 @@ func resolvePluginDir() string {
 	if err != nil {
 		return ""
 	}
+	// Resolve symlinks (e.g., .venv/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph)
+	if resolved, err := filepath.EvalSymlinks(binPath); err == nil {
+		binPath = resolved
+	}
 	// Binary at packages/go-plugin/hooks/bin/htmlgraph → plugin at ../..
 	pluginDir := filepath.Join(filepath.Dir(binPath), "..", "..")
 	pluginDir, _ = filepath.Abs(pluginDir)

@@ -1,0 +1,39 @@
+#!/bin/sh
+# Pre-commit hook: Go quality gates
+#
+# Install: htmlgraph install-hooks
+#          (sets core.hooksPath = .githooks)
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+GO_PKG="$REPO_ROOT/packages/go"
+
+echo "Running pre-commit checks..."
+
+# Only run Go checks if Go files are staged or if the Go package exists
+if git diff --cached --name-only | grep -q '\.go$' || [ -d "$GO_PKG" ]; then
+    if [ ! -d "$GO_PKG" ]; then
+        echo "  Warning: no packages/go directory found, skipping Go checks."
+    else
+        echo "  -> go build..."
+        if ! (cd "$GO_PKG" && go build ./...) ; then
+            echo "FAIL: go build failed. Fix compilation errors before committing."
+            exit 1
+        fi
+
+        echo "  -> go vet..."
+        if ! (cd "$GO_PKG" && go vet ./...) ; then
+            echo "FAIL: go vet failed. Fix issues before committing."
+            exit 1
+        fi
+
+        echo "  -> go test..."
+        if ! (cd "$GO_PKG" && go test ./...) ; then
+            echo "FAIL: go test failed. Fix failing tests before committing."
+            exit 1
+        fi
+    fi
+fi
+
+echo "All pre-commit checks passed!"

@@ -40,6 +40,7 @@ func main() {
 	rootCmd.AddCommand(installHooksCmd())
 	rootCmd.AddCommand(buildCmd())
 	rootCmd.AddCommand(devCmd())
+	rootCmd.AddCommand(reportCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

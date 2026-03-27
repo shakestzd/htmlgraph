@@ -119,3 +119,59 @@ func ListEventsBySession(db *sql.DB, sessionID string, limit int) ([]models.Agen
 	}
 	return events, rows.Err()
 }
+
+// ListEventsBySessionAsc returns events for a session ordered by timestamp ASC
+// including parent_event_id for hierarchy reconstruction.
+func ListEventsBySessionAsc(db *sql.DB, sessionID string, limit int) ([]models.AgentEvent, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	rows, err := db.Query(`
+		SELECT event_id, agent_id, event_type, timestamp, tool_name,
+			session_id, feature_id, parent_event_id, status, model
+		FROM agent_events
+		WHERE session_id = ?
+		ORDER BY timestamp ASC
+		LIMIT ?`, sessionID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list events asc for session %s: %w", sessionID, err)
+	}
+	defer rows.Close()
+
+	var events []models.AgentEvent
+	for rows.Next() {
+		var e models.AgentEvent
+		var tsStr string
+		var toolName, featID, parentEvt, model sql.NullString
+
+		if err := rows.Scan(
+			&e.EventID, &e.AgentID, &e.EventType, &tsStr, &toolName,
+			&e.SessionID, &featID, &parentEvt, &e.Status, &model,
+		); err != nil {
+			return nil, err
+		}
+		e.Timestamp, _ = time.Parse(time.RFC3339, tsStr)
+		e.ToolName = toolName.String
+		e.FeatureID = featID.String
+		e.ParentEventID = parentEvt.String
+		e.Model = model.String
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
+// MostRecentSession returns the session_id of the latest session (any status),
+// or ("", nil) if the table is empty.
+func MostRecentSession(db *sql.DB) (string, error) {
+	row := db.QueryRow(`
+		SELECT session_id FROM sessions
+		ORDER BY created_at DESC LIMIT 1`)
+	var id string
+	if err := row.Scan(&id); err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("most recent session: %w", err)
+	}
+	return id, nil
+}
