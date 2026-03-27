@@ -1,72 +1,69 @@
 ---
 name: htmlgraph:parallel-status
-description: Monitor the status of parallel execution across git worktrees. Activate when asked for parallel status, worktree progress, or execution monitoring.
+description: Monitor parallel execution progress — task dependency status, worktree state, and merge readiness. Activate when asked for parallel status, task progress, or execution monitoring.
 ---
 
 # HtmlGraph Parallel Status
 
-Use this skill to monitor parallel execution progress across worktrees.
+Use this skill to monitor parallel execution progress across tasks and worktrees.
 
-**Trigger keywords:** parallel status, worktree status, execution progress, monitor tasks, check progress
+**Trigger keywords:** parallel status, task status, worktree status, execution progress, monitor tasks, check progress
 
 ---
 
 ## Quick Status
 
-```bash
-# Show all worktree status
-uv run htmlgraph worktree status
+```
+# Task dependency graph status
+TaskList()
+# Shows: id, subject, status, owner, blockedBy for each task
 
-# Or use the shell script directly
-./scripts/worktree-status.sh
+# Worktree status
+git worktree list
+
+# Recent commits across all branches
+git for-each-ref --sort=-committerdate refs/heads/ \
+  --format='%(refname:short) %(committerdate:relative) %(subject)' | head -20
 ```
 
 ---
 
-## Detailed Monitoring
+## Status Categories
 
-### Worktree Status
+### Ready to Dispatch
+Tasks that are `pending` with empty `blockedBy` — can be dispatched immediately.
 
-```bash
-# Table view of all worktrees
-uv run htmlgraph worktree status
+### In Progress
+Tasks that are `in_progress` — agents are working on them in worktrees.
 
-# Git-level view
-git worktree list
+### Blocked
+Tasks that are `pending` with non-empty `blockedBy` — waiting for dependencies.
 
-# Recent commits across all branches
-git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short) %(committerdate:relative) %(subject)'
+### Completed
+Tasks marked `completed` — branches merged, quality gates passed.
+
+---
+
+## Interpreting the Dependency Graph
+
 ```
+TaskList() output example:
 
-### HtmlGraph Feature Status
+#1  [completed]   Add check command
+#2  [completed]   Add budget command
+#3  [in_progress] Add health command         (worktree: agent-abc123)
+#4  [pending]     Spec compliance scoring    blockedBy: [5]
+#5  [in_progress] Feature spec generator     (worktree: agent-def456)
+#6  [pending]     Session timeline dashboard blockedBy: [3, 5]
 
-```bash
-# Show all features and their status
-uv run htmlgraph feature list
-
-# Show specific feature
-uv run htmlgraph feature show <id>
-```
-
-### Wave Progress
-
-```python
-from htmlgraph import SDK
-sdk = SDK()
-
-# Check feature statuses
-features = sdk.features.all()
-done = [f for f in features if getattr(f, 'status', '') == 'done']
-in_progress = [f for f in features if getattr(f, 'status', '') == 'in_progress']
-todo = [f for f in features if getattr(f, 'status', '') == 'todo']
-
-print(f"Done: {len(done)} | In Progress: {len(in_progress)} | Todo: {len(todo)}")
+Status: 2 completed | 2 in progress | 2 blocked
+Next dispatch: #4 unblocks when #5 completes. #6 unblocks when #3 and #5 complete.
 ```
 
 ---
 
 ## Related Skills
 
-- **[/htmlgraph:plan](/htmlgraph:plan)** - Create execution plans
-- **[/htmlgraph:execute](/htmlgraph:execute)** - Execute plans
+- **[/htmlgraph:plan](/htmlgraph:plan)** - Create the dependency graph
+- **[/htmlgraph:execute](/htmlgraph:execute)** - Run the dispatch loop
 - **[/htmlgraph:cleanup](/htmlgraph:cleanup)** - Clean up after completion

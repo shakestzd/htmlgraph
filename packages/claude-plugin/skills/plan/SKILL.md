@@ -1,6 +1,6 @@
 ---
 name: htmlgraph:plan
-description: Create a parallelized development plan with research synthesis and worktree-based execution. Activate when asked to create a plan, parallelize work, or organize development tasks.
+description: Create a dependency-first parallel plan using native TaskCreate with addBlockedBy. Maximizes parallelism by dispatching ALL independent tasks simultaneously. Activate when asked to create a plan, parallelize work, or organize development tasks.
 ---
 
 # HtmlGraph Parallel Plan
@@ -11,253 +11,234 @@ Use this skill when asked to plan development work, create a parallel execution 
 
 ---
 
-## Core Principle: Plan Before Executing
+## Core Principle: Maximum Parallelism via Dependency Graph
 
-A good parallel plan has three properties:
-1. **Independent tasks** run in the same wave (no file conflicts)
-2. **Dependent tasks** run in later waves (after blockers complete)
-3. **File conflicts** are detected and resolved before dispatch
+Do NOT manually assign tasks to waves. Instead:
 
----
+1. **Identify real dependencies** between tasks (Task B imports Task A's output)
+2. **Detect file conflicts** (two tasks editing the same file)
+3. **Create native tasks** with `TaskCreate` + `addBlockedBy` for real dependencies
+4. **Dispatch ALL unblocked tasks** in a single message — the dependency graph determines ordering, not manual wave assignment
 
-## Step 1: Analyze the Conversation for Tasks
+```
+Traditional (wrong):          Dependency-first (correct):
 
-Extract all tasks from the conversation. For each task, identify:
-- What files it touches
-- What other tasks it depends on
-- How complex it is (haiku for well-defined, sonnet for complex)
-- Its priority (blocker > high > medium > low)
+Wave 1: [A] [B] [C]          All independent: [A] [B] [C] [D] [E] [F]
+Wave 2: [D] [E]              Blocked on A:    [G] (addBlockedBy: [A])
+Wave 3: [F]                  Blocked on G:    [H] (addBlockedBy: [G])
 
----
-
-## Step 2: Spawn 5 Parallel Research Agents
-
-Before building the plan, gather evidence. Spawn all five simultaneously (single message):
-
-```python
-# Agent 1: Similar solutions in codebase
-Task(
-    subagent_type="gemini",
-    description="Find similar existing implementations",
-    prompt="""
-    Search the codebase for patterns similar to [task description].
-    Look for: existing patterns, naming conventions, module structure.
-    Report file paths and relevant code snippets.
-    """
-)
-
-# Agent 2: Library and dependency analysis
-Task(
-    subagent_type="gemini",
-    description="Analyze available libraries and dependencies",
-    prompt="""
-    Check pyproject.toml and existing imports for relevant libraries.
-    What tools are already available for [task domain]?
-    Report: available packages, their usage patterns in codebase.
-    """
-)
-
-# Agent 3: Codebase patterns and conventions
-Task(
-    subagent_type="gemini",
-    description="Identify codebase patterns and conventions",
-    prompt="""
-    Search for coding conventions relevant to [task domain].
-    Check: type annotation style, error handling patterns, test structure.
-    Report patterns with file examples.
-    """
-)
-
-# Agent 4: Spec validation
-Task(
-    subagent_type="gemini",
-    description="Validate task specifications for completeness",
-    prompt="""
-    Review the task requirements:
-    [task list]
-
-    For each task, identify:
-    - Missing requirements or ambiguities
-    - Edge cases not addressed
-    - Potential conflicts between tasks
-    Report findings concisely.
-    """
-)
-
-# Agent 5: Dependency and file conflict analysis
-Task(
-    subagent_type="gemini",
-    description="Analyze file dependencies and conflict risks",
-    prompt="""
-    For these tasks: [task list]
-    Analyze which files each task would likely touch.
-    Identify: shared files that multiple tasks edit, circular dependencies.
-    Report conflict risks.
-    """
-)
+Artificial sequencing         Only real dependencies block
 ```
 
 ---
 
-## Step 3: Synthesize Research Findings
+## Step 1: Gather All Tasks
 
-After all five agents complete, read their findings and synthesize:
+Extract every task from the conversation, track, or feature list. For each task, determine:
 
-- Which tasks share files (potential merge conflicts)
-- Which patterns to follow (consistency)
-- Which tasks have unresolved ambiguities (resolve before planning)
-- Library choices already available (avoid adding deps)
+| Field | How to Determine |
+|-------|-----------------|
+| **Files it creates/edits** | Analyze the spec — what new files, what existing files modified |
+| **Real dependencies** | Does this task need another task's OUTPUT? (import, schema, API) |
+| **File conflicts** | Does another task also edit the same file? (not a dependency — a merge concern) |
+| **Complexity** | haiku: single-file, clear spec. sonnet: multi-file, design needed. opus: architecture |
+
+### Dependency vs File Conflict
+
+**Dependency** (use `addBlockedBy`): Task B literally cannot be written until Task A exists.
+- Task B imports a module Task A creates
+- Task B tests an API Task A implements
+- Task B extends a schema Task A defines
+
+**File conflict** (handle at merge time, NOT with `addBlockedBy`): Both tasks edit the same file but don't depend on each other's logic.
+- Both tasks add a line to `main.go` registering their command
+- Both tasks add an entry to a config file
+- Both tasks import from the same module
+
+File conflicts are resolved at merge time, not by serializing tasks.
 
 ---
 
-## Step 4: Build the Plan with PlanBuilder
+## Step 2: Research (Parallel Agents)
 
-```python
-from htmlgraph.planning import PlanBuilder
-from htmlgraph import SDK
+Spawn research agents in a single message to gather evidence:
 
-sdk = SDK(agent="claude-code")
-builder = PlanBuilder(sdk, name="[Descriptive Plan Name]")
+```
+Agent(description="Find existing patterns", subagent_type="Explore", prompt="...")
+Agent(description="Check dependencies", subagent_type="Explore", prompt="...")
+Agent(description="Detect file conflicts", subagent_type="Explore", prompt="...")
+```
 
-# Add tasks with dependencies and metadata
-builder.add_task(
-    id="task-001",
-    title="[Task title]",
-    description="[Detailed spec including: files to create/edit, expected output, acceptance criteria]",
-    priority="blocker",          # blocker | high | medium | low
-    agent_type="haiku",          # haiku for well-defined, sonnet for complex
-    files=["src/module/file.py"] # Files this task touches (for conflict detection)
-)
+Research should answer:
+- What existing patterns should tasks follow?
+- Which files will each task touch? (for conflict detection)
+- Are there shared registration points? (e.g., `main.go`, `hooks.json`)
 
-builder.add_task(
-    id="task-002",
-    title="[Task title]",
-    description="[Detailed spec]",
-    priority="high",
-    agent_type="sonnet",
-    files=["src/module/other.py"],
-    depends_on=["task-001"]      # Only add when there's a real dependency
-)
+---
 
-# Build and display
-plan = builder.build()
-print(plan.summary())
+## Step 3: Build the Dependency Graph
+
+After research, classify every task pair:
+
+```
+For each pair (A, B):
+  if B needs A's output → B.addBlockedBy(A)
+  if both edit same file → note as FILE_CONFLICT (resolve at merge)
+  else → independent (both dispatch immediately)
+```
+
+### Shared Registration Files
+
+Many projects have "registration files" that multiple tasks edit (e.g., `main.go` adding commands, `hooks.json` adding handlers). These are NOT dependencies — they're predictable merge conflicts.
+
+**Strategy:** Identify shared registration files upfront. Tell each agent: "Add your registration to [file] — expect a merge conflict that the orchestrator will resolve."
+
+---
+
+## Step 4: Create Native Tasks
+
+Use `TaskCreate` for each task. Use `TaskUpdate` with `addBlockedBy` for real dependencies only.
+
+```
+# Independent tasks — no blockers, dispatch immediately
+TaskCreate(subject="feat-001: Add check command", description="...",
+           metadata={"files": ["check.go", "main.go"], "agent": "sonnet-coder", "feature_id": "feat-41114e5d"})
+
+TaskCreate(subject="feat-002: Add budget command", description="...",
+           metadata={"files": ["budget.go", "main.go"], "agent": "sonnet-coder", "feature_id": "feat-9ef589b4"})
+
+TaskCreate(subject="feat-003: Add health command", description="...",
+           metadata={"files": ["health.go", "main.go"], "agent": "sonnet-coder", "feature_id": "feat-e745f68f"})
+
+# Dependent task — needs feat-001's quality gate infrastructure
+TaskCreate(subject="feat-004: Spec compliance scoring", description="...",
+           metadata={"files": ["compliance.go"], "agent": "sonnet-coder", "feature_id": "feat-abb438f5"})
+
+# Link the dependency
+TaskUpdate(taskId="4", addBlockedBy=["1"])  # feat-004 needs feat-001
+```
+
+### Task Description Template
+
+Each task description must be self-contained (agents have no shared context):
+
+```
+## Goal
+[One sentence: what this task produces]
+
+## Files to Create/Edit
+- NEW: path/to/new_file.go
+- EDIT: path/to/existing_file.go (add registration line)
+
+## Shared Files (expect merge conflict)
+- main.go: Add `rootCmd.AddCommand(yourCmd())` — orchestrator resolves conflicts
+
+## Acceptance Criteria
+1. [Specific, testable criterion]
+2. [Specific, testable criterion]
+
+## Quality Gate
+cd packages/go && go build ./... && go vet ./... && go test ./...
+
+## Commit
+git commit -m "feat(scope): description (feat-XXXXXXXX)"
 ```
 
 ---
 
-## Step 5: Task Classification Rules
+## Step 5: Analyze Parallelism
 
-**Independent tasks (same wave):**
-- Touch different files
-- No logical dependency on each other
-- Could be completed in any order
+Before presenting, compute the parallelism profile:
 
-**Dependent tasks (later waves):**
-- Task B imports from Task A
-- Task B tests Task A's output
-- Task A creates a schema Task B uses
-
-**Agent type selection:**
-- `haiku`: Single-file change, clear spec, < 50 lines, no design decisions
-- `sonnet`: Multi-file, requires reading existing code to understand context, moderate complexity
-- `opus`: Architecture decisions, complex algorithm design (use sparingly)
-
-**Priority levels:**
-- `blocker`: Other tasks cannot start without this
-- `high`: Core functionality, needed soon
-- `medium`: Important but not urgent
-- `low`: Nice to have, can defer
-
----
-
-## Step 6: File Conflict Detection
-
-Before finalizing the plan, check for conflicts:
-
-```python
-# Check for tasks touching the same files
-conflicts = plan.detect_conflicts()
-
-if conflicts:
-    for conflict in conflicts:
-        print(f"WARNING: Tasks {conflict.task_a} and {conflict.task_b} both edit {conflict.file}")
-        print(f"  Resolution: Move {conflict.task_b} to wave after {conflict.task_a}")
+```
+Total tasks:        N
+Independent:        X (dispatch immediately)
+Blocked:            Y (wait for dependencies)
+Max parallel:       X (first round)
+File conflicts:     Z (handled at merge)
+Merge rounds:       ceil(Y / batch_size) + 1
 ```
 
-Resolve conflicts by:
-1. Making one task depend on the other (sequential)
-2. Splitting the file into separate concerns (parallel)
-3. Assigning one task as owner of the file (parallel with communication)
+If most tasks are independent, nearly everything runs in the first dispatch. Only genuinely blocked tasks wait.
 
 ---
 
-## Step 7: Present the Plan
+## Step 6: Present the Plan
 
-Show the user:
+Show the dependency graph, NOT waves:
 
 ```
 Plan: [Name]
-Total tasks: N | Waves: W | Estimated speedup: Xx
+Total tasks: 13 | Independent: 10 | Blocked: 3 | File conflicts: 5
 
-Wave 1 (parallel):
-  - task-001 [haiku] [blocker] - Title
-  - task-003 [haiku] [high]    - Title
+DISPATCH IMMEDIATELY (10 tasks, all parallel):
+  #1  feat-001 [sonnet] Add check command          files: check.go, main.go
+  #2  feat-002 [sonnet] Add budget command          files: budget.go, main.go
+  #3  feat-003 [sonnet] Add health command          files: health.go, main.go
+  #4  feat-004 [sonnet] Research gate               files: research.go, main.go
+  #5  feat-005 [sonnet] Feature spec generator      files: specgen.go, main.go
+  #6  feat-006 [sonnet] TDD test case generator     files: tdd.go, main.go
+  #7  feat-007 [sonnet] Worktree isolation          files: yolo.go
+  #8  feat-008 [sonnet] Commit attribution          files: hook.go, hooks.json
+  #9  feat-009 [sonnet] Diff review gate            files: review.go
+  #10 feat-010 [sonnet] Agent lineage tracking      files: lineage.go
 
-Wave 2 (parallel, after Wave 1):
-  - task-002 [sonnet] [high]   - Title (depends on: task-001)
-  - task-004 [haiku] [medium]  - Title (depends on: task-003)
+BLOCKED (3 tasks, dispatch after dependencies complete):
+  #11 feat-011 [sonnet] Spec compliance scoring     blocked-by: #5 (needs spec generator)
+  #12 feat-012 [sonnet] Session timeline dashboard  blocked-by: #8, #10 (needs tracking data)
+  #13 feat-013 [sonnet] UI validation               blocked-by: #12 (needs dashboard)
 
-Wave 3 (parallel, after Wave 2):
-  - task-005 [sonnet] [medium] - Title (depends on: task-002, task-004)
+FILE CONFLICTS (resolved at merge, not by serialization):
+  main.go:   tasks #1-#6 all add registrations — merge sequentially
+  hooks.json: task #8 — single owner, no conflict
 
-Conflict warnings:
-  [none | list any detected]
+Merge strategy:
+  Round 1: Merge all 10 independent branches, resolve main.go conflicts
+  Round 2: Dispatch #11 after #5 merges. Dispatch #12 after #8+#10 merge.
+  Round 3: Dispatch #13 after #12 merges.
 
 To execute: /htmlgraph:execute
 ```
 
 ---
 
-## Step 8: Set Up Worktrees
+## Step 7: Agent Type Selection
 
-After plan approval, prepare the execution environment:
+| Agent | When to Use | Cost |
+|-------|------------|------|
+| `htmlgraph:haiku-coder` | Single-file, clear spec, <50 lines, no design decisions | Lowest |
+| `htmlgraph:sonnet-coder` | Multi-file, needs codebase context, moderate complexity | Medium |
+| `htmlgraph:opus-coder` | Architecture decisions, complex algorithms, novel design | Highest |
 
-```bash
-# Set up isolated worktrees for each task
-uv run htmlgraph worktree setup
-
-# Verify worktrees are ready
-git worktree list
-```
-
-Each task gets its own worktree branch `feature/<task-id>` so agents work in isolation without conflicts.
+**Default to sonnet** unless the task is trivially simple (haiku) or requires deep reasoning (opus).
 
 ---
 
-## Integration with HtmlGraph
+## Decision Rules
 
-```python
-from htmlgraph import SDK
-sdk = SDK(agent="claude-code")
+### When to add `addBlockedBy`
 
-# Track plan creation
-spike = sdk.spikes.create("Plan: [plan name]")
-spike.set_findings(f"""
-Research synthesis:
-- Patterns found: [summary]
-- Conflicts detected: [summary]
-- Ambiguities resolved: [summary]
+Add ONLY when:
+- Task B imports/uses a module that Task A creates from scratch
+- Task B extends an interface that Task A defines
+- Task B's test fixtures depend on Task A's schema
 
-Plan: {plan.summary()}
-""").save()
-```
+Do NOT add when:
+- Both tasks edit the same file (file conflict, not dependency)
+- Tasks are in the same domain but logically independent
+- "It would be nice" to have A before B but B could technically be written first
+
+### When to split a task
+
+Split when:
+- Task touches >10 files (YOLO budget advisory)
+- Task has >300 new lines (YOLO budget advisory)
+- Task mixes unrelated concerns (e.g., CLI command + hook + dashboard)
 
 ---
 
 ## Related Skills
 
-- **[/htmlgraph:execute](/htmlgraph:execute)** - Execute the created plan
+- **[/htmlgraph:execute](/htmlgraph:execute)** - Execute the plan with dependency-driven dispatch
 - **[/htmlgraph:parallel-status](/htmlgraph:parallel-status)** - Monitor execution progress
-- **[/htmlgraph:cleanup](/htmlgraph:cleanup)** - Clean up after completion
-- **[/strategic-planning](/strategic-planning)** - Analytics for prioritization
+- **[/htmlgraph:cleanup](/htmlgraph:cleanup)** - Clean up worktrees after completion

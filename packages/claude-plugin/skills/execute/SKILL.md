@@ -1,274 +1,288 @@
 ---
 name: htmlgraph:execute
-description: Execute a parallelized plan using git worktrees and multiple Claude agents. Activate when asked to run a plan, execute tasks in parallel, or start parallel development.
+description: Execute a parallel plan using dependency-driven dispatch. Dispatches ALL unblocked tasks simultaneously, merges completed work, then dispatches newly unblocked tasks. No manual wave sequencing.
 ---
 
 # HtmlGraph Parallel Execute
 
-Use this skill when asked to execute a plan, run tasks in parallel, or start multi-agent development work.
+Use this skill to execute development tasks in parallel using dependency-driven dispatch and worktree isolation.
 
 **Trigger keywords:** execute plan, run plan, run tasks, parallelize work, work in parallel, start execution, dispatch agents
 
 ---
 
-## Core Principle: Wave-Based Execution
+## Core Principle: Dependency-Driven Dispatch Loop
 
-Tasks in the same wave run concurrently in isolated worktrees. Each wave must complete (with quality gates) before the next wave starts.
+Do NOT execute in manual waves. Instead, run a dispatch loop:
 
 ```
-Wave 1: [task-A] [task-B] [task-C]  ← all in parallel
-           ↓ quality gates ↓
-Wave 2: [task-D] [task-E]           ← depends on Wave 1
-           ↓ quality gates ↓
-Wave 3: [task-F]                    ← depends on Wave 2
+LOOP:
+  1. Query: which tasks are unblocked? (pending + no blockedBy)
+  2. Dispatch ALL unblocked tasks in a single message (parallel agents)
+  3. Wait for agents to complete
+  4. Merge completed branches to main
+  5. Run quality gates on merged result
+  6. Check: are there newly unblocked tasks? → LOOP
+  7. No more tasks? → DONE
 ```
+
+This maximizes parallelism automatically. If 10 of 13 tasks are independent, all 10 run in the first dispatch — no artificial wave boundaries.
 
 ---
 
-## Step 1: Load the Plan
+## Step 1: Query Unblocked Tasks
 
-```python
-from htmlgraph import SDK
-sdk = SDK(agent="claude-code")
+Use `TaskList()` to find all tasks ready for dispatch:
 
-# Load the plan created by /htmlgraph:plan
-track = sdk.tracks.get_latest()
-plan = track.get_plan()
-
-print(plan.summary())
-print(f"Waves: {len(plan.waves)}")
-print(f"Tasks: {plan.task_count}")
 ```
+TaskList()
+
+# Filter for: status=pending AND blockedBy is empty
+# These are ready to dispatch immediately
+```
+
+If no tasks exist yet, create them from the plan (see `/htmlgraph:plan`).
 
 ---
 
-## Step 2: Set Up Worktrees (if not done)
+## Step 2: Dispatch All Unblocked Tasks
 
-```bash
-# Set up a worktree for each task
-uv run htmlgraph worktree setup
+Spawn ALL ready tasks in a single message. Each gets an isolated worktree:
 
-# Pre-warm each worktree (faster agent startup)
-for worktree in $(git worktree list --porcelain | grep "worktree" | awk '{print $2}'); do
-    (cd "$worktree" && uv sync) &
-done
-wait
+```
+# In a SINGLE message, dispatch all N unblocked tasks:
 
-# Verify
-git worktree list
+Agent(
+    description="feat-001: Add check command",
+    subagent_type="htmlgraph:sonnet-coder",
+    isolation="worktree",
+    prompt="[full task spec — see template below]"
+)
+
+Agent(
+    description="feat-002: Add budget command",
+    subagent_type="htmlgraph:sonnet-coder",
+    isolation="worktree",
+    prompt="[full task spec]"
+)
+
+# ... repeat for ALL unblocked tasks
 ```
 
----
-
-## Step 3: Execute Each Wave
-
-For each wave, spawn all tasks simultaneously in a single message:
-
-```python
-# Wave N execution pattern
-wave = plan.waves[N]
-print(f"Executing Wave {N}: {len(wave.tasks)} tasks in parallel")
-
-for task in wave.tasks:
-    Task(
-        description=task.title,
-        prompt=generate_task_prompt(task, plan),
-        subagent_type=f"htmlgraph:{task.agent_type}-coder",
-        isolation="worktree"  # Each agent works in isolated branch
-    )
-
-# All tasks in this wave run in parallel - wait for all to complete
+Mark each task as in_progress:
+```
+TaskUpdate(taskId="1", status="in_progress")
+TaskUpdate(taskId="2", status="in_progress")
 ```
 
 ### Task Prompt Template
 
-Each agent receives a fully specified prompt:
+Each agent receives a self-contained prompt:
 
 ```
-## Task: {task.id}
-**Title:** {task.title}
-**Priority:** {task.priority}
-**Agent type:** {task.agent_type}
+## Task: {task.subject}
+**Feature:** {metadata.feature_id}
 
-## Specification
+## Goal
 {task.description}
 
 ## Files to Create/Edit
-{task.files}
+{metadata.files}
 
-## Do NOT Touch (other agents own these)
-{files_owned_by_other_wave_tasks}
+## Shared Registration Files
+These files are edited by multiple parallel agents. Add your changes —
+the orchestrator will resolve merge conflicts after all agents complete:
+- {list of shared files like main.go}
 
-## Acceptance Criteria
-{task.acceptance_criteria}
+## Do NOT Touch
+{files owned by other concurrent tasks — for awareness only}
 
-## Quality Requirements
-Before marking complete, ALL must pass:
-- uv run ruff check --fix && uv run ruff format
-- uv run mypy src/
-- uv run pytest (relevant tests only: pytest {task.test_paths})
+## Quality Gate (MANDATORY before commit)
+Go:     cd packages/go && go build ./... && go vet ./... && go test ./...
+Python: uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
 
-## HtmlGraph Tracking
-```python
-from htmlgraph import SDK
-sdk = SDK(agent='htmlgraph:{task.agent_type}-coder')
-feature = sdk.features.get('{task.id}')
-feature.set_status('in-progress').save()
-# ... do work ...
-feature.set_status('done').save()
-```
+## Commit
+git add {specific files}
+git commit -m "feat({scope}): {description} ({feature_id})"
 
-## Commit Your Work
-After all checks pass:
-git add {task.files}
-git commit -m "feat({task.id}): {task.title}"
-
-Report back: summary of changes made, files modified, tests added.
+Report: files changed, lines added, tests passing.
 ```
 
 ---
 
-## Step 4: Quality Gates After Each Wave
+## Step 3: Merge Completed Branches
 
-After all tasks in a wave complete, run gates on main before merging:
-
-```bash
-# Merge completed tasks to main
-for task in wave.completed_tasks:
-    git checkout main
-    git merge --no-ff feature/{task.id} -m "Merge: {task.title}"
-
-# Run quality gates on merged result
-uv run ruff check --fix
-uv run ruff format
-uv run mypy src/
-uv run pytest
-
-# Only proceed to next wave if all gates pass
-```
-
-If quality gates fail:
-1. Identify which merged task introduced the failure
-2. Fix in a follow-up commit on main (or revert and fix in the task's branch)
-3. Re-run gates before proceeding
-
----
-
-## Step 5: Merge Strategy
+After all dispatched agents complete, merge their branches to main:
 
 ```bash
-# Merge each completed task branch to main
 git checkout main
 
-# Use --no-ff to preserve branch history
-git merge --no-ff feature/<task-id> -m "feat: merge <task-title>"
+# Merge each completed branch
+git merge --no-ff worktree-agent-XXXX -m "feat: merge {task title} ({feature_id})"
 
-# Push after each wave completes
-git push origin main
+# If merge conflict (expected for shared files like main.go):
+# 1. Read the conflicted file
+# 2. Resolve by including ALL additions (they're independent registrations)
+# 3. git add + git commit
 ```
 
-### Conflict Resolution
+### Conflict Resolution Strategy
 
-If merge produces a conflict:
-1. Identify which tasks touched the same file (this was a missed conflict)
-2. For the conflicting file, manually resolve or assign one task as the canonical version
-3. Record in plan as a lesson for future conflict detection
+**Shared registration files** (main.go, hooks.json, etc.):
+- Conflicts are additive — each agent added a line. Include all lines.
+- Resolve by keeping all additions in a logical order.
+
+**Unexpected conflicts** (agents touched same logic):
+- Investigate which agent's change is correct
+- May indicate a missed dependency — add `addBlockedBy` for future runs
 
 ---
 
-## Step 6: Proceed to Next Wave
+## Step 4: Quality Gates After Merge
 
-Only start the next wave after:
-- All current wave tasks report complete
-- All branches merged to main
-- Quality gates pass on main
+Run full quality gates on the merged result:
 
-```python
-# Update plan progress
-for task in wave.tasks:
-    if task.status == "complete":
-        feature = sdk.features.get(task.id)
-        feature.set_status("done").save()
+```bash
+# Go
+cd packages/go && go build ./... && go vet ./... && go test ./...
 
-# Check if next wave is unblocked
-next_wave = plan.get_next_wave()
-if next_wave and next_wave.is_ready():
-    print(f"Wave {next_wave.number} is ready - proceeding...")
-    # Execute next wave (repeat Step 3)
+# Python (if applicable)
+uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
+```
+
+If gates fail:
+1. Identify which merge introduced the failure (bisect if needed)
+2. Fix directly on main (small fix) or revert and re-dispatch (large fix)
+3. Gates must pass before dispatching blocked tasks
+
+---
+
+## Step 5: Mark Complete and Check for Newly Unblocked
+
+```
+# Mark merged tasks as completed
+TaskUpdate(taskId="1", status="completed")
+TaskUpdate(taskId="2", status="completed")
+# ... for each merged task
+
+# Query again — completing tasks may have unblocked new ones
+TaskList()
+# Filter: status=pending AND blockedBy is empty
+# If any found → go to Step 2 (dispatch next round)
+# If none → DONE
+```
+
+---
+
+## Step 6: Clean Up
+
+After all tasks complete:
+
+```bash
+# Remove worktrees
+git worktree list
+git worktree remove .claude/worktrees/agent-XXXX --force
+# ... for each worktree
+
+# Remove branches
+git branch -D worktree-agent-XXXX
+# ... for each branch
+
+# Final quality gate
+cd packages/go && go build ./... && go vet ./... && go test ./...
+```
+
+Or use `/htmlgraph:cleanup` for automated cleanup.
+
+---
+
+## Dispatch Loop Pseudocode
+
+```
+while True:
+    ready = [t for t in TaskList() if t.status == "pending" and not t.blockedBy]
+    if not ready:
+        break  # All tasks done or blocked on failed tasks
+
+    # Dispatch all ready tasks in ONE message
+    for task in ready:
+        TaskUpdate(taskId=task.id, status="in_progress")
+        Agent(
+            description=task.subject,
+            subagent_type=task.metadata.agent,
+            isolation="worktree",
+            prompt=build_prompt(task)
+        )
+
+    # Wait for all agents to complete (foreground)
+
+    # Merge all completed branches
+    for task in ready:
+        merge(task.branch)
+        resolve_conflicts_if_any()
+
+    # Quality gates
+    run_quality_gates()  # MUST pass before next dispatch
+
+    # Mark complete
+    for task in ready:
+        TaskUpdate(taskId=task.id, status="completed")
 ```
 
 ---
 
 ## Error Handling
 
-### Blocked Task (dependency not met)
+### Agent Fails (tests not passing)
 ```
-If task reports: "Cannot start - {dependency} not complete"
-→ Check if dependency task actually finished
-→ If dependency failed, fix it first
-→ If dependency succeeded but status not updated, update manually
-```
-
-### Test Failures
-```
-If task reports: "Tests failing: {test_names}"
-→ Do NOT merge to main
-→ Assign as follow-up fix task
-→ Mark original task as "needs-fix"
-→ Continue other tasks in wave that don't depend on failing task
+Do NOT merge to main.
+Create follow-up task: TaskCreate(subject="Fix: {original task}", ...)
+Continue merging other successful agents.
+Mark original as completed (the fix task handles the remainder).
 ```
 
-### Merge Conflicts
+### Merge Conflict in Non-Registration File
 ```
-If merge fails with conflicts:
-→ Resolve conflicts on a resolution branch
-→ Run quality gates on resolution branch
-→ Merge resolution branch to main
-→ Update conflict detection rules for future plans
+Investigate: was this a missed dependency?
+If yes: add addBlockedBy for the conflicting task, re-dispatch
+If no: resolve manually, document for future conflict detection
+```
+
+### Quality Gate Fails After Merge
+```
+git log --oneline -N  # Find which merge broke it
+git revert <breaking-merge>  # Revert the offending merge
+Re-dispatch that task with a fix note in the prompt
+```
+
+### All Remaining Tasks Are Blocked
+```
+Some dependency failed or was never completed.
+TaskList() — find tasks with non-empty blockedBy
+TaskGet(id) — check what they're waiting for
+Either: fix the blocker, or remove the dependency if it's no longer needed
 ```
 
 ---
 
 ## Monitoring During Execution
 
-While agents are running, you can check status:
-
 ```bash
-# See active worktrees
+# Active worktrees
 git worktree list
 
-# Check which branches have recent commits
-git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short) %(committerdate:relative)'
-```
+# Recent commits across all branches
+git for-each-ref --sort=-committerdate refs/heads/ \
+  --format='%(refname:short) %(committerdate:relative) %(subject)' | head -20
 
-Or use `/htmlgraph:parallel-status` for a complete view.
-
----
-
-## Integration with HtmlGraph
-
-```python
-from htmlgraph import SDK
-sdk = SDK(agent="claude-code")
-
-# Track execution
-spike = sdk.spikes.create("Execution: Wave 1")
-spike.set_findings(f"""
-Wave 1 status:
-- task-001: DONE (3 files, 2 tests)
-- task-002: DONE (1 file, 5 tests)
-- task-003: IN PROGRESS
-
-Quality gates: PASSING
-Proceeding to Wave 2.
-""").save()
+# Task status
+TaskList()  # Shows status + blockedBy for each task
 ```
 
 ---
 
 ## Related Skills
 
-- **[/htmlgraph:plan](/htmlgraph:plan)** - Create the plan before executing
+- **[/htmlgraph:plan](/htmlgraph:plan)** - Create the dependency graph before executing
 - **[/htmlgraph:parallel-status](/htmlgraph:parallel-status)** - Monitor progress
 - **[/htmlgraph:cleanup](/htmlgraph:cleanup)** - Clean up after completion
-- **[/code-quality](/code-quality)** - Quality gate details
