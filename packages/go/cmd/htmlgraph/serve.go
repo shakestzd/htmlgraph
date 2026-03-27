@@ -50,6 +50,7 @@ func runServer(port int) error {
 	mux.Handle("/api/features", corsMiddleware(featuresHandler(database, htmlgraphDir)))
 	mux.Handle("/api/stats", corsMiddleware(statsHandler(database, htmlgraphDir)))
 	mux.Handle("/api/initial-stats", corsMiddleware(initialStatsHandler(database)))
+	mux.Handle("/api/timeline", corsMiddleware(timelineHandler(database)))
 
 	// Serve dashboard from Go plugin directory (primary) or project root (fallback).
 	// Also serve static assets (components.js, CSS) from the Go plugin.
