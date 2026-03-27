@@ -14,7 +14,7 @@ import (
 )
 
 func yoloCmd() *cobra.Command {
-	var dev, initMode, continueMode bool
+	var dev, initMode, continueMode, noWorktree bool
 	var permMode, trackID, featureID string
 
 	cmd := &cobra.Command{
@@ -35,13 +35,13 @@ Without either flag, launches in planning mode to help you create one first.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
 			case dev:
-				return launchYoloDev(trackID, featureID, args)
+				return launchYoloDev(trackID, featureID, noWorktree, args)
 			case initMode:
 				return launchYoloInit(trackID, featureID, args)
 			case continueMode:
 				return launchYoloContinue(args)
 			default:
-				return launchYoloDefault(permMode, trackID, featureID, args)
+				return launchYoloDefault(permMode, trackID, featureID, noWorktree, args)
 			}
 		},
 	}
@@ -49,6 +49,7 @@ Without either flag, launches in planning mode to help you create one first.`,
 	cmd.Flags().BoolVar(&dev, "dev", false, "Load plugin from local source (development mode)")
 	cmd.Flags().BoolVar(&initMode, "init", false, "Initialize .htmlgraph/ then launch in YOLO mode")
 	cmd.Flags().BoolVar(&continueMode, "continue", false, "Resume last YOLO session")
+	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation (run in project root)")
 	cmd.Flags().StringVar(&permMode, "permission-mode", "bypassPermissions",
 		"Permission mode (bypassPermissions, acceptEdits)")
 	cmd.Flags().StringVar(&trackID, "track", "", "Track ID to work on (e.g., trk-3719d8f3)")
@@ -96,6 +97,39 @@ func validateWorkItem(trackID, featureID, projectRoot string) (id, kind string, 
 	}
 }
 
+// createFeatureWorktree creates a git worktree at .claude/worktrees/<featureID> on branch
+// yolo-<featureID>. If the worktree path already exists it is reused. Returns the worktree
+// path and a cleanup function that removes the worktree on error.
+func createFeatureWorktree(featureID, projectRoot string) (string, func(), error) {
+	worktreePath := filepath.Join(projectRoot, ".claude", "worktrees", featureID)
+	branchName := "yolo-" + featureID
+	noop := func() {}
+
+	// If path already exists, reuse it — the worktree was created in a prior run.
+	if _, err := os.Stat(worktreePath); err == nil {
+		fmt.Printf("  Worktree: %s (reusing existing)\n", worktreePath)
+		return worktreePath, noop, nil
+	}
+
+	// Ensure the parent directory exists.
+	if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {
+		return "", noop, fmt.Errorf("could not create worktrees directory: %w", err)
+	}
+
+	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", worktreePath, "-b", branchName)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", noop, fmt.Errorf("git worktree add failed: %w\n%s", err, out)
+	}
+
+	fmt.Printf("  Worktree: %s (branch: %s)\n", worktreePath, branchName)
+
+	cleanup := func() {
+		removeCmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", worktreePath)
+		removeCmd.Run() //nolint:errcheck
+	}
+	return worktreePath, cleanup, nil
+}
+
 // buildWorkItemPromptPrefix returns the work item header to prepend to the yolo prompt.
 func buildWorkItemPromptPrefix(id, kind string) string {
 	return strings.Join([]string{
@@ -138,7 +172,7 @@ func launchYoloPlanningMode(pluginDir, projectRoot string, extraArgs []string) e
 	})
 }
 
-func launchYoloDefault(permMode, trackID, featureID string, extraArgs []string) error {
+func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, extraArgs []string) error {
 	pluginDir := resolvePluginDir()
 	projectRoot := ""
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
@@ -154,6 +188,17 @@ func launchYoloDefault(permMode, trackID, featureID string, extraArgs []string) 
 	id, kind, err := validateWorkItem(trackID, featureID, projectRoot)
 	if err != nil {
 		return err
+	}
+
+	// Create a worktree for feature isolation (skip for tracks and --no-worktree).
+	workDir := projectRoot
+	if featureID != "" && !noWorktree && projectRoot != "" {
+		worktreePath, cleanup, wtErr := createFeatureWorktree(featureID, projectRoot)
+		if wtErr != nil {
+			return wtErr
+		}
+		_ = cleanup // only used on error; worktree persists for the session
+		workDir = worktreePath
 	}
 
 	sessionName := yoloSessionName()
@@ -183,11 +228,11 @@ func launchYoloDefault(permMode, trackID, featureID string, extraArgs []string) 
 		PermissionMode:   permMode,
 		Name:             sessionName,
 		ExtraArgs:        extraArgs,
-		ProjectRoot:      projectRoot,
+		ProjectRoot:      workDir,
 	})
 }
 
-func launchYoloDev(trackID, featureID string, extraArgs []string) error {
+func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []string) error {
 	pluginDir := resolvePluginDir()
 	if pluginDir == "" {
 		return fmt.Errorf("could not find plugin directory. The binary may not be installed at the expected location (packages/go-plugin/hooks/bin/htmlgraph)")
@@ -215,6 +260,17 @@ func launchYoloDev(trackID, featureID string, extraArgs []string) error {
 	id, kind, err := validateWorkItem(trackID, featureID, projectRoot)
 	if err != nil {
 		return err
+	}
+
+	// Create a worktree for feature isolation (skip for tracks and --no-worktree).
+	workDir := projectRoot
+	if featureID != "" && !noWorktree && projectRoot != "" {
+		worktreePath, cleanup, wtErr := createFeatureWorktree(featureID, projectRoot)
+		if wtErr != nil {
+			return wtErr
+		}
+		_ = cleanup // only used on error; worktree persists for the session
+		workDir = worktreePath
 	}
 
 	fmt.Println("Disabling marketplace htmlgraph plugin...")
@@ -259,7 +315,7 @@ func launchYoloDev(trackID, featureID string, extraArgs []string) error {
 		PermissionMode:   "bypassPermissions",
 		Name:             sessionName,
 		ExtraArgs:        extraArgs,
-		ProjectRoot:      projectRoot,
+		ProjectRoot:      workDir,
 	})
 	restoreFn()
 	return launchErr
@@ -271,7 +327,7 @@ func launchYoloInit(trackID, featureID string, extraArgs []string) error {
 		return fmt.Errorf("init failed: %w", err)
 	}
 	fmt.Println()
-	return launchYoloDefault("bypassPermissions", trackID, featureID, extraArgs)
+	return launchYoloDefault("bypassPermissions", trackID, featureID, false, extraArgs)
 }
 
 func launchYoloContinue(extraArgs []string) error {
