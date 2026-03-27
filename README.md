@@ -41,47 +41,28 @@ This bootstraps:
 - `.htmlgraph/index.sqlite` analytics cache (rebuildable; gitignored via `.gitignore`)
 - versioned hook scripts under `.htmlgraph/hooks/` (installed into `.git/hooks/` with `--install-hooks`)
 
-### Python (SDK - Recommended)
+### CLI Workflow
 
-```python
-from htmlgraph import SDK
+```bash
+# Create and track features
+htmlgraph feature create "User Authentication"
+# Returns: feat-abc12345
 
-# Initialize (auto-discovers .htmlgraph directory)
-sdk = SDK(agent="claude")
+# Start working on it
+htmlgraph feature start feat-abc12345
 
-# Create and configure a feature with fluent API
-feature = sdk.features.create("User Authentication") \
-    .set_priority("high") \
-    .set_description("Implement OAuth 2.0 login") \
-    .add_steps([
-        "Create login endpoint",
-        "Add JWT middleware",
-        "Write integration tests"
-    ]) \
-    .save()
+# Query features by status
+htmlgraph find features --status todo
+htmlgraph find features --status in-progress
 
-print(f"Created: {feature.id}")
+# Complete feature
+htmlgraph feature complete feat-abc12345
 
-# Work on features
-with sdk.features.edit(feature.id) as f:
-    f.status = "in-progress"
-    f.agent_assigned = "claude"
-    f.steps[0].completed = True
+# Create a track
+htmlgraph track new "Q1 Security Initiative"
 
-# Query features
-high_priority_todos = sdk.features.where(status="todo", priority="high")
-for feat in high_priority_todos:
-    print(f"- {feat.id}: {feat.title}")
-
-# Create and configure a track with TrackBuilder
-track = sdk.tracks.builder() \
-    .title("Q1 Security Initiative") \
-    .priority("high") \
-    .add_feature("feature-001") \
-    .add_feature("feature-002") \
-    .create()
-
-print(f"Created track: {track.id}")
+# Get project snapshot
+htmlgraph snapshot --summary
 ```
 
 ### HTML File Format
@@ -135,7 +116,7 @@ HtmlGraph nodes are standard HTML files:
 - **Phoenix LiveView dashboard** - real-time activity feed and agent activity monitoring (optional, requires Elixir/Erlang)
 - **Multi-AI agent support** - Claude, Gemini, Codex, Copilot coordination out of the box
 - **Event-driven hook system** - Claude Code hooks record all tool calls and session events
-- **SDK for programmatic access** - features, bugs, spikes, tracks with fluent API
+- **CLI for programmatic access** - features, bugs, spikes, tracks via Go binary
 - **Version control friendly** - git diff works perfectly on all artifacts
 - **Graph algorithms** - BFS, shortest path, cycle detection, topological sort
 - **Agent Handoff** - Context-preserving task transfers between agents
@@ -221,11 +202,9 @@ uv sync
 uv run htmlgraph init --install-hooks
 uv run htmlgraph serve  # View dashboard
 
-# Use SDK for development
-uv run python
->>> from htmlgraph import SDK
->>> sdk = SDK(agent="your-name")
->>> sdk.features.where(status="todo")
+# Use CLI for development
+uv run htmlgraph feature list
+uv run htmlgraph find features --status todo
 ```
 
 ## License
@@ -244,7 +223,7 @@ For Claude Code users and teams using HtmlGraph for AI agent coordination:
 ## Links
 
 - [GitHub](https://github.com/shakestzd/htmlgraph)
-- [API Reference](docs/API_REFERENCE.md) - Complete SDK API documentation
-- [Documentation](docs/) - SDK guide, workflows, development principles
+- [CLI Reference](docs/API_REFERENCE.md) - Complete CLI documentation
+- [Documentation](docs/) - CLI guide, workflows, development principles
 - [Examples](examples/) - Real-world usage examples
 - [PyPI](https://pypi.org/project/htmlgraph/)

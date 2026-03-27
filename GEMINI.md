@@ -4,17 +4,17 @@
 
 ---
 
-## 📚 REQUIRED READING - DO THIS FIRST
+## REQUIRED READING - DO THIS FIRST
 
 **→ READ [AGENTS.md](./AGENTS.md) BEFORE USING HTMLGRAPH**
 
 The AGENTS.md file contains ALL core documentation:
-- ✅ **Python SDK Quick Start** - REQUIRED installation and usage
+- ✅ **CLI Quick Start** - REQUIRED commands and usage
 - ✅ **Deployment Instructions** - How to use `deploy-all.sh`
-- ✅ **API & CLI Alternatives** - When SDK isn't available
+- ✅ **REST API** - When CLI isn't available
 - ✅ **Best Practices** - MUST-FOLLOW patterns for AI agents
 - ✅ **Complete Workflow Examples** - Copy these patterns
-- ✅ **API Reference** - Full method documentation
+- ✅ **CLI Reference** - Full command documentation
 
 **DO NOT proceed without reading AGENTS.md first.**
 
@@ -22,7 +22,7 @@ The AGENTS.md file contains ALL core documentation:
 
 ## Gemini-Specific REQUIREMENTS
 
-### ABSOLUTE RULE: Use SDK, Never Direct File Edits
+### ABSOLUTE RULE: Use CLI, Never Direct File Edits
 
 **CRITICAL: NEVER use file operations on `.htmlgraph/` HTML files.**
 
@@ -33,30 +33,17 @@ Write('/path/to/.htmlgraph/features/feature-123.html', ...)
 Edit('/path/to/.htmlgraph/sessions/session-456.html', ...)
 ```
 
-✅ **REQUIRED - Use SDK:**
-```python
-from htmlgraph import SDK
-
-# ALWAYS initialize with agent="gemini"
-sdk = SDK(agent="gemini")
-
+✅ **REQUIRED - Use CLI:**
+```bash
 # Get project summary (DO THIS at session start)
-print(sdk.summary(max_items=10))
+htmlgraph snapshot --summary
 
-# Create features (USE builder pattern)
-feature = sdk.features.create("Implement Search") \
-    .set_priority("high") \
-    .add_steps([
-        "Design search UI",
-        "Add search endpoint",
-        "Implement indexing"
-    ]) \
-    .save()
+# Create a feature
+htmlgraph feature create "Implement Search"
+# Returns: feat-abc12345
 
-# Update features (USE context manager for auto-save)
-with sdk.features.edit(feature.id) as f:
-    f.status = "in-progress"
-    f.agent_assigned = "gemini"
+# Start working on it
+htmlgraph feature start feat-abc12345
 ```
 
 ### Gemini Extension Integration
@@ -101,13 +88,13 @@ All HtmlGraph commands are available in Gemini through the extension:
 
 | Feature | Gemini | Claude Code |
 |---------|--------|-------------|
-| SDK Access | ✅ Full | ✅ Full |
+| CLI Access | ✅ Full | ✅ Full |
 | Slash Commands | ✅ Via Extension | ✅ Via Plugin |
 | Dashboard | ✅ Browser | ✅ Browser |
-| CLI Integration | ✅ Same | ✅ Same |
+| REST API | ✅ Same | ✅ Same |
 
 **Both platforms use the same:**
-- Python SDK (`htmlgraph` package)
+- Go CLI binary (`htmlgraph`)
 - REST API (port 8080)
 - CLI commands (`uvx htmlgraph`)
 - HTML file format
@@ -116,36 +103,25 @@ All HtmlGraph commands are available in Gemini through the extension:
 
 ## Integration Pattern
 
-```python
+```bash
 # Gemini Code Assist workflow
-def gemini_workflow():
-    """Example workflow for Gemini agents."""
-    from htmlgraph import SDK
 
-    # 1. Initialize with Gemini identifier
-    sdk = SDK(agent="gemini")
+# 1. Get oriented
+htmlgraph snapshot --summary
 
-    # 2. Get recommendations
-    recs = sdk.recommend_next_work(agent_count=1)
-    if recs:
-        print(f"Recommended: {recs[0]['title']}")
+# 2. Get recommendations
+htmlgraph analytics recommend
 
-    # 3. Get next task
-    task = sdk.next_task(priority="high", auto_claim=True)
+# 3. Find next high-priority task
+htmlgraph find features --status todo
 
-    if task:
-        print(f"Working on: {task.title}")
+# 4. Start working on it
+htmlgraph feature start feat-abc12345
 
-        # 4. Complete work
-        with sdk.features.edit(task.id) as f:
-            for i, step in enumerate(f.steps):
-                if not step.completed:
-                    # Do the work...
-                    step.completed = True
-                    step.agent = "gemini"
-                    break
+# 5. (Do the actual implementation work...)
 
-        print("Step completed!")
+# 6. Complete the feature
+htmlgraph feature complete feat-abc12345
 ```
 
 ---
@@ -168,13 +144,15 @@ uv run python ../common/generators/generate_commands.py
 # Reload extension
 ```
 
-### SDK Import Errors
+### CLI Not Found
 
 Ensure htmlgraph is installed:
 ```bash
 uv pip install htmlgraph
 # or
 pip install htmlgraph
+# Verify
+htmlgraph version
 ```
 
 ---

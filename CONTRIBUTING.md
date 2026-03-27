@@ -195,24 +195,23 @@ uv run ptw tests/
 ### Writing Tests
 
 Place tests in `tests/` directory:
-- `tests/test_sdk.py` - SDK tests
-- `tests/test_models.py` - Model tests
 - `tests/test_cli.py` - CLI tests
+- `tests/test_models.py` - Model tests
+- `tests/test_api.py` - REST API tests
 
 Use pytest fixtures and parametrize:
 
 ```python
 import pytest
-from htmlgraph import SDK
+import subprocess
 
-@pytest.fixture
-def sdk():
-    return SDK(agent="test")
-
-def test_feature_creation(sdk):
-    feature = sdk.features.create("Test Feature")
-    assert feature.title == "Test Feature"
-    assert feature.status == "todo"
+def test_feature_creation(tmp_path):
+    result = subprocess.run(
+        ["htmlgraph", "feature", "create", "Test Feature"],
+        capture_output=True, text=True, cwd=tmp_path
+    )
+    assert result.returncode == 0
+    assert "feat-" in result.stdout
 ```
 
 ## Common Tasks

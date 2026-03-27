@@ -2,11 +2,11 @@
 
 **CRITICAL: AI agents must NEVER edit `.htmlgraph/` HTML files directly.**
 
-Use the Python SDK, API, or CLI instead. This ensures all HTML is validated through Pydantic + justhtml.
+Use the CLI or REST API instead. This ensures all HTML is validated through the Go binary.
 
 ---
 
-## 🔄 NOTE: Dogfooding in Action
+## NOTE: Dogfooding in Action
 
 **IF YOU'RE WORKING ON THE HTMLGRAPH PROJECT ITSELF:**
 
@@ -23,46 +23,30 @@ This project uses HtmlGraph to track its own development. The `.htmlgraph/` dire
 **IF YOU'RE USING HTMLGRAPH IN YOUR OWN PROJECT:**
 
 Ignore the HtmlGraph-specific features in `.htmlgraph/`. Focus on:
-- ✅ SDK patterns shown below
+- ✅ CLI patterns shown below
 - ✅ Workflow examples (they work for ANY project)
 - ✅ Best practices (universal)
 
 ---
 
-## Quick Start (Python SDK)
+## Quick Start (CLI)
 
-```python
-from htmlgraph import SDK
-
-# Initialize (auto-discovers .htmlgraph directory)
-sdk = SDK(agent="claude")
+```bash
+# Initialize project
+htmlgraph init --install-hooks
 
 # Get project status
-print(sdk.summary(max_items=10))
+htmlgraph snapshot --summary
 
 # Create a feature
-feature = sdk.features.create("User Authentication") \
-    .set_priority("high") \
-    .set_description("Implement OAuth 2.0 login") \
-    .add_steps([
-        "Create login endpoint",
-        "Add JWT middleware",
-        "Write integration tests"
-    ]) \
-    .save()
+htmlgraph feature create "User Authentication"
+# Returns: feat-abc12345
 
-print(f"Created: {feature.id}")
+# Start working on it
+htmlgraph feature start feat-abc12345
 
-# Work on it
-with sdk.features.edit(feature.id) as f:
-    f.status = "in-progress"
-    f.agent_assigned = "claude"
-    f.steps[0].completed = True
-
-# Query features
-high_priority_todos = sdk.features.where(status="todo", priority="high")
-for feat in high_priority_todos:
-    print(f"- {feat.id}: {feat.title}")
+# List high-priority todo features
+htmlgraph find features --status todo --priority high
 ```
 
 ### Delegating Complex Work with Task()
@@ -75,10 +59,6 @@ For complex tasks that require multiple operations, delegate to subagents to pre
 **Example: Delegating test execution**
 
 ```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="orchestrator")
-
 # Delegate test runs to parallel subagents
 Task(subagent_type="general-purpose",
      prompt="Run unit tests in tests/unit/ and report failures")
@@ -91,16 +71,13 @@ Task(subagent_type="general-purpose",
 
 **Parent-Child Session Tracking**
 
-HtmlGraph automatically links parent and child sessions:
-```python
-# After delegation completes, view results
-session = sdk.sessions.get(session_id)
-print(f"Child sessions: {session.child_session_ids}")
-# → Results from parallel subagents
+HtmlGraph automatically links parent and child sessions. View session history:
+```bash
+# List sessions
+htmlgraph session list
 
-# Find all work related to a feature
-sessions = sdk.get_feature_sessions("feature-001")
-# → Includes both orchestrator and delegated subagent sessions
+# Find sessions linked to a feature
+htmlgraph session list  # filter by feature context
 ```
 
 → [Complete delegation guide](docs/guide/delegation.md) - Best practices, patterns, cost optimization
@@ -121,28 +98,24 @@ with open(".htmlgraph/features/feature-123.html", "w") as f:
 Edit("/path/to/.htmlgraph/features/feature-123.html", ...)
 ```
 
-✅ **REQUIRED - Use SDK/CLI:**
-```python
-# SDK (recommended)
-with sdk.features.edit("feature-123") as f:
-    f.status = "done"
+✅ **REQUIRED - Use CLI:**
+```bash
+# Complete a feature
+htmlgraph feature complete feature-123
 
-# CLI
-uvx htmlgraph feature complete feature-123
+# Start a feature
+htmlgraph feature start feature-123
 ```
 
-**Feature CRUD is SDK-first.** The REST API is observability/sync-oriented — feature CRUD via HTTP is not currently implemented.
-
 **Why this matters:**
-- Direct edits bypass Pydantic validation
-- Bypass justhtml HTML generation
+- Direct edits bypass HTML validation
 - Break SQLite index sync
 - Can corrupt graph structure
 - Skip event logging
 
 ---
 
-## Python SDK (Recommended)
+## CLI Reference
 
 ### Installation
 
@@ -152,218 +125,67 @@ pip install htmlgraph
 uv pip install htmlgraph
 ```
 
-### Initialization
-
-```python
-from htmlgraph import SDK
-
-# Auto-discover .htmlgraph directory
-sdk = SDK(agent="claude")
-
-# Or specify path
-sdk = SDK(directory="/path/to/.htmlgraph", agent="claude")
-```
-
 ### Get Oriented
 
-```python
-# Project summary
-summary = sdk.summary(max_items=10)
-print(summary)
+```bash
+# Project snapshot
+htmlgraph snapshot --summary
 
-# My workload
-workload = sdk.my_work()
-print(f"In progress: {workload['in_progress']}")
-print(f"Completed: {workload['completed']}")
+# My in-progress work
+htmlgraph find features --status in-progress
 ```
 
-### SDK Method Discovery (Runtime Introspection)
-
-AI agents can't memorize all available methods. Use Python's introspection to explore the SDK at runtime:
-
-```python
-from htmlgraph import SDK
-import inspect
-
-sdk = SDK(agent="claude")
-
-# 1. Discover available collections
-collections = [attr for attr in dir(sdk) if not attr.startswith('_')]
-print(f"Collections: {collections}")
-# → ['bugs', 'chores', 'dep_analytics', 'epics', 'features', 'phases', 'spikes', 'tracks']
-
-# 2. List methods on a collection
-methods = [m for m in dir(sdk.features) if not m.startswith('_') and callable(getattr(sdk.features, m))]
-print(f"Feature methods: {methods}")
-# → ['all', 'assign', 'batch_delete', 'batch_update', 'claim', 'create', 'delete',
-#    'edit', 'get', 'mark_done', 'release', 'update', 'where']
-
-# 3. Get method signature
-sig = inspect.signature(sdk.features.create)
-print(f"create signature: {sig}")
-# → (title: str, **kwargs) -> FeatureBuilder
-
-# 4. Get method docstring
-print(sdk.features.delete.__doc__)
-# → Delete a node.
-#   Args: node_id (str) - Node ID to delete
-#   Returns: bool - True if deleted, False if not found
-
-# 5. Explore a collection class
-from htmlgraph.collections import BaseCollection
-available_methods = [m for m in dir(BaseCollection) if not m.startswith('_')]
-print(f"BaseCollection methods: {available_methods}")
-```
-
-**Common SDK Operations:**
-
-```python
-# Collection CRUD operations (all collections support these)
-sdk.features.get(id)           # Get by ID
-sdk.features.all()              # Get all
-sdk.features.where(**filters)   # Query with filters
-sdk.features.create(title)      # Create new (returns builder)
-sdk.features.edit(id)           # Edit (context manager, auto-saves)
-sdk.features.update(node)       # Update (manual)
-sdk.features.delete(id)         # Delete by ID
-
-# Batch operations
-sdk.features.batch_update(ids, updates)  # Update multiple
-sdk.features.batch_delete(ids)           # Delete multiple
-sdk.features.mark_done(ids)              # Mark multiple as done
-sdk.features.assign(ids, agent)          # Assign multiple to agent
-
-# Agent workflow
-sdk.features.claim(id, agent)    # Claim for agent
-sdk.features.release(id)         # Release claim
-```
-
-**All collections have the same interface:**
-- `sdk.features` - Features with builder support
-- `sdk.bugs` - Bug reports
-- `sdk.chores` - Maintenance tasks
-- `sdk.spikes` - Investigation spikes
-- `sdk.epics` - Large bodies of work
-- `sdk.phases` - Project phases
-
-```python
-# Same methods work across all collections
-sdk.bugs.delete("bug-001")
-sdk.chores.mark_done(["chore-1", "chore-2"])
-sdk.spikes.where(status="in-progress")
-sdk.epics.assign(["epic-1"], agent="claude")
-```
-
-**CLI Help as Reference:**
+### Feature Commands
 
 ```bash
-# See all feature commands
-uvx htmlgraph feature --help
-# Shows: create, start, complete, delete, claim, release, list, etc.
+# Create
+htmlgraph feature create "Title"         # Returns feat-<id>
 
-# Most CLI commands have SDK equivalents:
-# CLI: uvx htmlgraph feature delete feat-001
-# SDK: sdk.features.delete("feat-001")
+# Read
+htmlgraph feature show feat-abc12345     # Show feature details
+htmlgraph feature list                   # List all features
+
+# Update state
+htmlgraph feature start feat-abc12345    # Mark in-progress
+htmlgraph feature complete feat-abc12345 # Mark done
+
+# Query
+htmlgraph find features --status todo
+htmlgraph find features --status in-progress
 ```
 
-### Create Features
+### Bug Commands
 
-```python
-# Fluent builder pattern
-feature = sdk.features.create("Implement Dark Mode") \
-    .set_priority("high") \
-    .set_description("Add dark theme toggle to settings") \
-    .add_steps([
-        "Design color palette",
-        "Create CSS variables",
-        "Implement toggle component",
-        "Add persistence (localStorage)",
-        "Test across pages"
-    ]) \
-    .set_track("ui-improvements") \
-    .save()
-
-print(f"Created: {feature.id}")
+```bash
+htmlgraph bug create "Bug title"
+htmlgraph bug list
 ```
 
-### Work on Features
+### Spike Commands
 
-```python
-# Context manager auto-saves on exit
-with sdk.features.edit("feature-001") as f:
-    f.status = "in-progress"
-    f.agent_assigned = "claude"
-    f.steps[0].completed = True
-    f.steps[0].agent = "claude"
-
-# Check if all steps done
-with sdk.features.edit("feature-001") as f:
-    all_done = all(s.completed for s in f.steps)
-    if all_done:
-        f.status = "done"
+```bash
+htmlgraph spike create "Investigation title"
+htmlgraph spike list
 ```
 
-### Query Features
+### Track Commands
 
-```python
-# Declarative filtering
-high_priority = sdk.features.where(status="todo", priority="high")
-my_work = sdk.features.where(assigned_to="claude", status="in-progress")
-track_features = sdk.features.where(track="auth-track")
-
-# Get all
-all_features = sdk.features.all()
-
-# Get by ID
-feature = sdk.features.get("feature-001")
+```bash
+htmlgraph track new "Track title"
+htmlgraph track list
 ```
 
-### Batch Operations
+### Analytics
 
-```python
-# Mark multiple as done
-count = sdk.features.mark_done([
-    "feature-001",
-    "feature-002",
-    "feature-003"
-])
-print(f"Marked {count} features as done")
-
-# Assign multiple to agent
-count = sdk.features.assign(
-    ["feature-004", "feature-005"],
-    agent="claude"
-)
-print(f"Assigned {count} features to claude")
+```bash
+htmlgraph analytics recommend      # Recommended next work
+htmlgraph analytics bottlenecks    # Find blockers
 ```
 
-### Get Next Task
+### Version
 
-```python
-# Automatically find and claim next task
-task = sdk.next_task(priority="high", auto_claim=True)
-
-if task:
-    print(f"Working on: {task.id} - {task.title}")
-
-    # Work on it
-    with sdk.features.edit(task.id) as f:
-        for i, step in enumerate(f.steps):
-            if not step.completed:
-                # Do the work...
-                step.completed = True
-                step.agent = "claude"
-                print(f"✓ Completed: {step.description}")
-                break
-else:
-    print("No high-priority tasks available")
-```
-
-### Reload Data
-
-```python
-# Refresh from disk if files changed externally
-sdk.reload()
+```bash
+htmlgraph version
 ```
 
 ---
@@ -456,12 +278,12 @@ uvx htmlgraph serve
 
 ---
 
-## Decision Matrix: SDK vs API vs CLI
+## Decision Matrix: CLI vs API
 
 | Use Case | Recommended Interface |
 |----------|----------------------|
-| AI agent writing code | **SDK** (most ergonomic) |
-| Scripting/automation | SDK or CLI |
+| AI agent work tracking | **CLI** (stateless, fast) |
+| Scripting/automation | CLI |
 | Manual testing | CLI or Dashboard |
 | External integration | REST API |
 | Debugging | CLI + Dashboard |
@@ -470,19 +292,16 @@ uvx htmlgraph serve
 
 ## Best Practices for AI Agents
 
-### 1. Always Use SDK in Python Code
+### 1. Always Use CLI for Work Tracking
 
-```python
-# ✅ GOOD
-from htmlgraph import SDK
-sdk = SDK(agent="claude")
-feature = sdk.features.create("Title").save()
+```bash
+# ✅ GOOD - Use CLI commands
+htmlgraph feature create "Title"
+# Returns feat-abc12345
+htmlgraph feature start feat-abc12345
 
-# ❌ BAD - Don't use low-level API directly
-from htmlgraph import HtmlGraph, Node
-graph = HtmlGraph(".htmlgraph/features")
-node = Node(id="...", title="...")
-graph.add(node)
+# ❌ BAD - Don't edit .htmlgraph/ files directly
+# Edit("/path/to/.htmlgraph/features/feat-abc.html", ...)
 ```
 
 ---
@@ -532,130 +351,54 @@ packages/claude-plugin/agents/test-runner.md
 
 ---
 
-### 2. Use Context Managers (Auto-Save)
+### 2. Check Status Before Working
 
-```python
-# ✅ GOOD - Auto-saves on exit
-with sdk.features.edit("feature-001") as f:
-    f.status = "done"
-
-# ❌ BAD - Easy to forget to save
-feature = sdk.features.get("feature-001")
-feature.status = "done"
-# Forgot to call sdk._graph.update(feature)!
-```
-
-### 3. Use Declarative Queries
-
-```python
-# ✅ GOOD
-todos = sdk.features.where(status="todo", priority="high")
-
-# ❌ BAD - Manual filtering
-todos = [
-    f for f in sdk.features.all()
-    if f.status == "todo" and f.priority == "high"
-]
-```
-
-### 4. Use Batch Operations
-
-```python
-# ✅ GOOD - Single operation
-sdk.features.mark_done(["feat-001", "feat-002", "feat-003"])
-
-# ❌ BAD - Multiple operations
-for id in ["feat-001", "feat-002", "feat-003"]:
-    with sdk.features.edit(id) as f:
-        f.status = "done"
-```
-
-### 5. Check Status Before Working
-
-```python
+```bash
 # Get orientation
-print(sdk.summary())
+htmlgraph snapshot --summary
 
-# Check your workload
-workload = sdk.my_work()
-if workload['in_progress'] > 5:
-    print("Already at capacity!")
+# Check in-progress work
+htmlgraph find features --status in-progress
 ```
 
-### 6. Document Decisions
+### 3. Use CLI for Queries
 
-```python
-# If significant architectural decision
-# Document in feature content
-with sdk.features.edit("feature-001") as f:
-    f.content += """
-    <h3>Decision: Use JWT instead of sessions</h3>
-    <p>Rationale: Stateless, easier to scale horizontally</p>
-    """
+```bash
+# ✅ GOOD
+htmlgraph find features --status todo
+htmlgraph find features --status in-progress
+```
+
+### 4. Complete Features Properly
+
+```bash
+# ✅ GOOD - Use CLI to close out work
+htmlgraph feature complete feat-001
+htmlgraph feature complete feat-002
+htmlgraph feature complete feat-003
 ```
 
 ---
 
 ## Complete Workflow Example
 
-```python
-from htmlgraph import SDK
+```bash
+# 1. Get oriented
+htmlgraph snapshot --summary
 
-def ai_agent_workflow():
-    """Realistic AI agent workflow."""
+# 2. Check in-progress work
+htmlgraph find features --status in-progress
 
-    # 1. Initialize
-    sdk = SDK(agent="claude")
+# 3. Get recommended next work
+htmlgraph analytics recommend
 
-    # 2. Get oriented
-    print("=== Project Summary ===")
-    print(sdk.summary(max_items=10))
+# 4. Start working on a feature
+htmlgraph feature start feat-abc12345
 
-    # 3. Check workload
-    workload = sdk.my_work()
-    print(f"\nMy Workload:")
-    print(f"  In progress: {workload['in_progress']}")
-    print(f"  Completed: {workload['completed']}")
+# 5. (Do the actual implementation work...)
 
-    if workload['in_progress'] > 5:
-        print("\n⚠️  Already at capacity!")
-        return
-
-    # 4. Get next task
-    task = sdk.next_task(priority="high", auto_claim=True)
-
-    if not task:
-        print("\n✅ No high-priority tasks available")
-        return
-
-    print(f"\n=== Working on: {task.title} ===")
-
-    # 5. Work on task
-    with sdk.features.edit(task.id) as feature:
-        print(f"\nSteps:")
-        for i, step in enumerate(feature.steps):
-            if step.completed:
-                print(f"  ✅ {step.description}")
-            else:
-                print(f"  ⏳ {step.description}")
-
-                # Do the work here...
-                # (implementation details)
-
-                # Mark step complete
-                step.completed = True
-                step.agent = "claude"
-                print(f"  ✓ Completed: {step.description}")
-                break
-
-        # Check if all done
-        all_done = all(s.completed for s in feature.steps)
-        if all_done:
-            feature.status = "done"
-            print(f"\n✅ Feature complete: {feature.id}")
-
-if __name__ == "__main__":
-    ai_agent_workflow()
+# 6. Complete the feature
+htmlgraph feature complete feat-abc12345
 ```
 
 ---
@@ -707,11 +450,11 @@ Orchestrator Mode uses HtmlGraph's **PreToolUse hook** to intercept tool calls b
 
 #### ✅ Always Allowed (No restrictions)
 
-- **SDK Operations** - `sdk.features.create()`, `sdk.features.edit()`, etc.
+- **CLI Operations** - `htmlgraph feature start`, `htmlgraph spike create`, etc.
 - **Task Tool** - Delegation to subagents
 - **TodoWrite** - Task list management
 - **Read** - Reading files (≤5 per session)
-- **Strategic Analysis** - `dep_analytics`, `recommend_next_work()`
+- **Strategic Analysis** - `htmlgraph analytics recommend`, `htmlgraph analytics bottlenecks`
 
 #### ⚠️ Warned (Allowed with guidance)
 
@@ -797,7 +540,7 @@ Orchestrator mode is configured via `.htmlgraph/orchestrator.json`:
     "max_glob_calls": 5
   },
   "allowed_tools": [
-    "SDK",
+    "CLI",
     "Task",
     "TodoWrite"
   ]
@@ -995,73 +738,72 @@ def cmd_serve(args):
 
 ---
 
-## API Reference
+## CLI Reference
 
-### SDK Class
+### Feature Commands
 
-```python
-class SDK:
-    def __init__(
-        self,
-        directory: Path | str | None = None,  # Auto-discovered if None
-        agent: str | None = None
-    )
-
-    def reload(self) -> None
-    def summary(self, max_items: int = 10) -> str
-    def my_work(self) -> dict[str, Any]
-    def next_task(
-        self,
-        priority: str | None = None,
-        auto_claim: bool = True
-    ) -> Node | None
-
-    # Collections
-    features: FeatureCollection
+```bash
+htmlgraph feature create "Title"          # Create feature, prints ID
+htmlgraph feature show <id>               # Show feature details
+htmlgraph feature list                    # List all features
+htmlgraph feature start <id>              # Mark in-progress
+htmlgraph feature complete <id>           # Mark done
+htmlgraph find features --status <status> # Query by status
+htmlgraph find features --status <status> --priority <priority>
 ```
 
-### FeatureCollection
+### Bug Commands
 
-```python
-class FeatureCollection:
-    def create(self, title: str, **kwargs) -> FeatureBuilder
-    def get(self, feature_id: str) -> Node | None
-    def edit(self, feature_id: str) -> ContextManager[Node]
-    def where(
-        self,
-        status: str | None = None,
-        priority: str | None = None,
-        track: str | None = None,
-        assigned_to: str | None = None
-    ) -> list[Node]
-    def all(self) -> list[Node]
-    def mark_done(self, feature_ids: list[str]) -> int
-    def assign(self, feature_ids: list[str], agent: str) -> int
+```bash
+htmlgraph bug create "Title"   # Create bug, prints ID
+htmlgraph bug list             # List all bugs
+htmlgraph bug show <id>        # Show bug details
 ```
 
-### FeatureBuilder
+### Spike Commands
 
-```python
-class FeatureBuilder:
-    def set_priority(self, priority: Literal["low", "medium", "high", "critical"]) -> FeatureBuilder
-    def set_status(self, status: str) -> FeatureBuilder
-    def add_step(self, description: str) -> FeatureBuilder
-    def add_steps(self, descriptions: list[str]) -> FeatureBuilder
-    def set_track(self, track_id: str) -> FeatureBuilder
-    def set_description(self, description: str) -> FeatureBuilder
-    def blocks(self, feature_id: str) -> FeatureBuilder
-    def blocked_by(self, feature_id: str) -> FeatureBuilder
-    def save(self) -> Node
+```bash
+htmlgraph spike create "Title"  # Create spike, prints ID
+htmlgraph spike list            # List all spikes
+```
+
+### Track Commands
+
+```bash
+htmlgraph track new "Title"     # Create track
+htmlgraph track list            # List all tracks
+```
+
+### Session Commands
+
+```bash
+htmlgraph session list          # List sessions
+htmlgraph session start         # Start a session
+```
+
+### Analytics Commands
+
+```bash
+htmlgraph analytics recommend    # Recommended next work
+htmlgraph analytics bottlenecks  # Find blockers
+```
+
+### Snapshot Commands
+
+```bash
+htmlgraph snapshot               # Full snapshot
+htmlgraph snapshot --summary     # Summary view
 ```
 
 ---
 
 ## Examples
 
-See `examples/sdk_demo.py` for complete demonstration:
+See `examples/` directory for complete demonstrations. Run the CLI to explore:
 
 ```bash
-uv run python examples/sdk_demo.py
+htmlgraph --help
+htmlgraph feature --help
 ```
 
 ---
@@ -1070,65 +812,18 @@ uv run python examples/sdk_demo.py
 
 Handoff enables smooth context transfer between agents when a task requires different expertise.
 
-### Marking a Task for Handoff
-
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Complete work and hand off
-with sdk.features.edit("feature-001") as feature:
-    feature.steps[0].completed = True
-
-# Trigger handoff with context
-manager = sdk._session_manager
-manager.create_handoff(
-    feature_id="feature-001",
-    reason="blocked_on_testing",
-    notes="Implementation complete. Needs comprehensive test coverage.",
-    agent="claude"
-)
-
-# Feature now shows handoff context for next agent
-feature = sdk.features.get("feature-001")
-print(feature.previous_agent)  # "claude"
-print(feature.handoff_reason)  # "blocked_on_testing"
-print(feature.handoff_notes)   # Full context
-```
-
-### Receiving a Handoff
-
-When claiming a handoff task, the previous agent's context is available:
-
-```python
-sdk = SDK(agent="bob")
-
-# Get handoff task
-feature = sdk.features.get("feature-001")
-
-# View handoff context
-context = feature.to_context()
-# Output:
-# # feature-001: Implement API
-# Status: in-progress | Priority: high
-# ⚠️  Handoff from: claude
-# Reason: blocked_on_testing
-# Notes: Implementation complete. Needs comprehensive test coverage.
-# Progress: 1/3 steps
-
-# Mark as received and continue
-with sdk.features.edit("feature-001") as f:
-    f.agent_assigned = "bob"
-    f.steps[1].completed = True
-```
-
 ### Handoff Best Practices
 
-1. **Provide context**: Always include `notes` with relevant decisions/blockers
-2. **Mark progress**: Complete steps before handoff so next agent knows what's done
-3. **Set clear reason**: Use structured reasons: `blocked_on_*`, `needs_*`, `ready_for_*`
-4. **Preserve history**: Handoff chain shows full development history
+1. **Provide context**: Create a spike documenting what's done and what's next
+2. **Mark progress**: Use `htmlgraph feature start` / `htmlgraph feature complete` to keep status current
+3. **Document blockers**: `htmlgraph spike create "Handoff notes: <reason>"` to capture context
+4. **Leave breadcrumbs**: Record your approach so the next agent can continue
+
+```bash
+# Before handing off
+htmlgraph spike create "Handoff: feature-001 blocked on testing — implementation complete, needs test coverage"
+htmlgraph feature show feature-001  # Verify status is accurate
+```
 
 ---
 
@@ -1136,95 +831,18 @@ with sdk.features.edit("feature-001") as f:
 
 Capability-based routing automatically assigns tasks to agents with matching skills.
 
-### Register Agent Capabilities
+Use the analytics CLI to find recommended next work and understand workload:
 
-```python
-from htmlgraph.routing import AgentCapabilityRegistry
+```bash
+# Find recommended next work
+htmlgraph analytics recommend
 
-registry = AgentCapabilityRegistry()
+# Find bottlenecks and blockers
+htmlgraph analytics bottlenecks
 
-# Register agents with their capabilities
-registry.register_agent("alice", ["python", "backend", "databases"])
-registry.register_agent("bob", ["python", "frontend", "ui"])
-registry.register_agent("charlie", ["testing", "quality-assurance"])
+# Check in-progress work (workload view)
+htmlgraph find features --status in-progress
 ```
-
-### Define Task Requirements
-
-```python
-from htmlgraph.models import Node
-
-task = Node(
-    id="api-task",
-    title="Build User API",
-    required_capabilities=["python", "backend", "databases"]
-)
-```
-
-### Route Task to Best Agent
-
-```python
-from htmlgraph.routing import CapabilityMatcher
-
-# Find best agent for task
-agents = registry.get_all_agents()
-best_agent = CapabilityMatcher.find_best_agent(agents, task)
-
-print(f"Best agent: {best_agent.agent_id}")  # "alice"
-print(f"Match score: {best_agent.capabilities}")
-```
-
-### Routing with Workload Balancing
-
-```python
-# Set current workload
-registry.set_wip("alice", 4)  # Alice has 4 tasks in progress
-registry.set_wip("bob", 1)    # Bob has 1 task
-
-# Routing considers workload (alice is busier)
-best_agent = CapabilityMatcher.find_best_agent(agents, task)
-# Might choose bob if bob has matching skills (workload penalty applied)
-```
-
-### Multi-Agent Workflow
-
-```python
-from htmlgraph import SDK
-from htmlgraph.routing import AgentCapabilityRegistry, route_task_to_agent
-
-sdk = SDK(agent="coordinator")
-registry = AgentCapabilityRegistry()
-
-# Register team
-registry.register_agent("architect", ["architecture", "design"])
-registry.register_agent("backend", ["python", "backend"])
-registry.register_agent("qa", ["testing", "quality"])
-
-# Get tasks needing assignment
-tasks = sdk.features.where(status="todo")
-
-# Route each task
-for task in tasks:
-    best_agent, score = route_task_to_agent(task, registry)
-    if best_agent:
-        # Assign to best agent
-        print(f"Assigning {task.id} to {best_agent.agent_id} (score: {score})")
-```
-
-### Capability Scoring Algorithm
-
-Scoring is 0-based (higher = better fit):
-
-- **Exact match**: +100 per matching capability
-- **No match**: -50 per missing capability
-- **Extra capabilities**: +10 per bonus capability
-- **Workload penalty**: -5 per task in progress
-- **At capacity**: -100 (hard penalty for full WIP)
-
-Example:
-- Task needs: `["python", "testing"]`
-- Agent has: `["python", "testing", "documentation"]`
-- Score: (2 × 100) + (1 × 10) = 210 (excellent match)
 
 ---
 
@@ -1338,40 +956,28 @@ Compatible with [claude-code-transcripts](https://github.com/simonw/claude-code-
 
 ## Troubleshooting
 
-### SDK not finding .htmlgraph directory
+### CLI not finding .htmlgraph directory
 
-```python
-# Specify path explicitly
-sdk = SDK(directory="/path/to/project/.htmlgraph", agent="claude")
+Run from the project root directory, or initialize first:
+
+```bash
+htmlgraph init --install-hooks
 ```
 
 ### Feature not found
 
-```python
-# Reload from disk
-sdk.reload()
-feature = sdk.features.get("feature-001")
-```
+List all features to verify the ID:
 
-### Changes not persisting
-
-```python
-# Make sure you're using context manager
-with sdk.features.edit("feature-001") as f:
-    f.status = "done"  # Auto-saves on exit
-
-# Or manually save
-feature = sdk.features.get("feature-001")
-feature.status = "done"
-sdk._graph.update(feature)  # Manual save
+```bash
+htmlgraph feature list
+htmlgraph feature show <id>
 ```
 
 ---
 
 ## Documentation
 
-- **API Reference**: [docs/API_REFERENCE.md](docs/API_REFERENCE.md) - Complete SDK API reference with all methods, parameters, and examples
-- **SDK Guide**: `docs/SDK_FOR_AI_AGENTS.md`
+- **CLI Reference**: Run `htmlgraph --help` or `htmlgraph <command> --help` for all options
 - **Quickstart**: `docs/quickstart.md`
 - **Dashboard**: Run `uvx htmlgraph serve` and open http://localhost:8080
 
@@ -1465,7 +1071,7 @@ claude plugin update htmlgraph
 open https://pypi.org/project/htmlgraph/
 
 # Verify local install
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+htmlgraph version
 
 # Test Claude plugin
 claude plugin list | grep htmlgraph
@@ -1736,43 +1342,22 @@ Related: feature-session-002
 "
 ```
 
-### Feature File Patterns
-
-Add file patterns to features for automatic commit attribution:
-
-```python
-feature = sdk.features.create("User Authentication") \
-    .set_file_patterns([
-        "src/auth/**/*.py",
-        "tests/auth/**/*.py"
-    ]) \
-    .save()
-
-# Now commits touching these files auto-attribute to this feature
-```
-
 ### Cross-Agent Collaboration
 
 **Example: Work starts in Claude, continues in Codex**:
 
-```python
+```bash
 # Day 1 (Claude)
-session_s1 = sdk.sessions.start(agent="claude")
+htmlgraph feature start feature-auth-001
 # ... work ...
 git commit -m "feat: start auth (feature-auth-001)"  # → abc123
-sdk.sessions.end(session_s1.id)
 
 # Day 2 (Codex - different agent!)
-session_s2 = sdk.sessions.start(
-    agent="codex",
-    continued_from=session_s1.id  # Optional but helpful
-)
-# ... work ...
+# ... continue work ...
 git commit -m "feat: continue auth (feature-auth-001)"  # → def456
 
-# Query for full history (works across agents)
-sessions = sdk.get_feature_sessions("feature-auth-001")
-# → [Session(agent="claude"), Session(agent="codex")]
+# Query for full session history
+htmlgraph session list
 ```
 
 ### Event Types
@@ -1842,30 +1427,15 @@ sessions = sdk.get_feature_sessions("feature-auth-001")
 
 HtmlGraph can reconstruct session continuity using multiple signals:
 
-**1. Explicit continuation**:
-```python
-session = sdk.sessions.start(continued_from="session-s1")
+**1. Session listing**:
+```bash
+htmlgraph session list
 ```
 
-**2. Commit graph analysis**:
-```python
-# Find sessions between two commits
-sessions = sdk.find_sessions_between("abc123", "def456")
-```
-
-**3. Feature-based linking**:
-```python
-# All sessions that worked on a feature
-sessions = sdk.get_feature_sessions("feature-auth-001")
-```
-
-**4. Time-based proximity**:
-```python
-# Sessions within time window
-sessions = sdk.find_proximate_sessions(
-    datetime.now(),
-    window_minutes=60
-)
+**2. Feature-based linking**:
+```bash
+# View sessions and filter by feature context
+htmlgraph session list
 ```
 
 ### Documentation
@@ -1878,10 +1448,7 @@ For complete details, see:
 
 ## Related Files
 
-- `src/python/htmlgraph/sdk.py` - SDK implementation
-- `src/python/htmlgraph/graph.py` - Low-level graph operations
-- `src/python/htmlgraph/agents.py` - Agent interface (wrapped by SDK)
-- `src/python/htmlgraph/git_events.py` - Git event logging
-- `src/python/htmlgraph/event_log.py` - Event log storage
-- `examples/sdk_demo.py` - Complete examples
+- `packages/go/htmlgraph/` - Go CLI binary source
+- `src/python/htmlgraph/` - Python package source
+- `examples/` - Complete examples
 - `scripts/deploy-all.sh` - Deployment automation script
