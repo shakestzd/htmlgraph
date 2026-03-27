@@ -23,8 +23,19 @@ type LaunchOpts struct {
 	Resume bool
 	// SystemPromptDir is the directory from which to load system-prompt.md.
 	SystemPromptDir string
+	// SystemPromptFile, if set, reads this file and appends it as system prompt.
+	// Takes precedence over SystemPromptDir.
+	SystemPromptFile string
+	// PermissionMode, if set, passes --permission-mode to claude (e.g. "bypassPermissions").
+	PermissionMode string
+	// Name, if set, passes --name to claude for session naming.
+	Name string
 	// ExtraArgs are forwarded to the claude process.
 	ExtraArgs []string
+	// ProjectRoot is the absolute path to the project root (directory containing .htmlgraph/).
+	// When set, Claude Code is started with this as the working directory, and path-sensitive
+	// helpers (writeLaunchMarker, stubProjectHooks) anchor their paths here instead of CWD.
+	ProjectRoot string
 }
 
 func claudeCmd() *cobra.Command {
@@ -49,6 +60,7 @@ func claudeCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&dev, "dev", false, "Launch with local Go plugin for development")
 	cmd.Flags().BoolVar(&init_, "init", false, "Launch with marketplace plugin installation")
 	cmd.Flags().BoolVar(&continue_, "continue", false, "Resume last session with marketplace plugin")
+	cmd.AddCommand(yoloCmd())
 	return cmd
 }
 
@@ -56,16 +68,22 @@ func launchClaudeDev(extraArgs []string) error {
 	// resolvePluginDir is defined in serve.go; returns "" on failure.
 	pluginDir := resolvePluginDir()
 	if pluginDir == "" {
-		return fmt.Errorf("could not resolve Go plugin directory\nAre you running from the project root?")
+		return fmt.Errorf("could not find plugin directory. The binary may not be installed at the expected location (packages/go-plugin/hooks/bin/htmlgraph)")
 	}
 	// Verify expected plugin structure.
 	if _, err := os.Stat(filepath.Join(pluginDir, ".claude-plugin", "plugin.json")); os.IsNotExist(err) {
-		return fmt.Errorf("plugin.json not found at %s\nAre you running from the project root?",
+		return fmt.Errorf("plugin.json not found at %s. The binary may not be installed at the expected location (packages/go-plugin/hooks/bin/htmlgraph)",
 			filepath.Join(pluginDir, ".claude-plugin", "plugin.json"))
 	}
 	if _, err := os.Stat(filepath.Join(pluginDir, "hooks", "bin", "htmlgraph")); os.IsNotExist(err) {
 		return fmt.Errorf("Go hooks binary not found at %s\nBuild with: packages/go-plugin/build.sh",
 			filepath.Join(pluginDir, "hooks", "bin", "htmlgraph"))
+	}
+
+	// Resolve project root so paths are anchored correctly regardless of CWD.
+	projectRoot := ""
+	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
+		projectRoot = filepath.Dir(htmlgraphDir)
 	}
 
 	// Disable marketplace plugin to prevent duplicate hooks.
@@ -74,7 +92,7 @@ func launchClaudeDev(extraArgs []string) error {
 		exec.Command("claude", "plugin", "disable", scope).Run() //nolint:errcheck
 	}
 
-	restoreFn := stubProjectHooks()
+	restoreFn := stubProjectHooks(projectRoot)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -92,6 +110,7 @@ func launchClaudeDev(extraArgs []string) error {
 		PluginDir:       pluginDir,
 		SystemPromptDir: pluginDir,
 		ExtraArgs:       extraArgs,
+		ProjectRoot:     projectRoot,
 	})
 	restoreFn()
 	return launchErr
@@ -99,6 +118,10 @@ func launchClaudeDev(extraArgs []string) error {
 
 func launchClaudeInit(extraArgs []string) error {
 	pluginDir := resolvePluginDir()
+	projectRoot := ""
+	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
+		projectRoot = filepath.Dir(htmlgraphDir)
+	}
 	fmt.Println("Installing/updating marketplace htmlgraph plugin...")
 	if out, err := exec.Command("claude", "plugin", "install", "htmlgraph@htmlgraph").CombinedOutput(); err != nil {
 		// May already be installed — try update instead.
@@ -111,11 +134,16 @@ func launchClaudeInit(extraArgs []string) error {
 		Mode:            "init",
 		SystemPromptDir: pluginDir,
 		ExtraArgs:       extraArgs,
+		ProjectRoot:     projectRoot,
 	})
 }
 
 func launchClaudeContinue(extraArgs []string) error {
 	pluginDir := resolvePluginDir()
+	projectRoot := ""
+	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
+		projectRoot = filepath.Dir(htmlgraphDir)
+	}
 	fmt.Println("Installing/updating marketplace htmlgraph plugin...")
 	if out, err := exec.Command("claude", "plugin", "install", "htmlgraph@htmlgraph").CombinedOutput(); err != nil {
 		if out2, err2 := exec.Command("claude", "plugin", "update", "htmlgraph").CombinedOutput(); err2 != nil {
@@ -128,24 +156,38 @@ func launchClaudeContinue(extraArgs []string) error {
 		Resume:          true,
 		SystemPromptDir: pluginDir,
 		ExtraArgs:       extraArgs,
+		ProjectRoot:     projectRoot,
 	})
 }
 
 func launchClaudeDefault(extraArgs []string) error {
 	pluginDir := resolvePluginDir()
+	projectRoot := ""
+	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
+		projectRoot = filepath.Dir(htmlgraphDir)
+	}
 	fmt.Println("Launching Claude Code (default mode)...")
 	return launchClaude(LaunchOpts{
 		Mode:            "default",
 		SystemPromptDir: pluginDir,
 		ExtraArgs:       extraArgs,
+		ProjectRoot:     projectRoot,
 	})
 }
 
 // launchClaude is the shared launcher used by all modes.
 func launchClaude(opts LaunchOpts) error {
-	writeLaunchMarker(opts.Mode)
+	writeLaunchMarker(opts.Mode, opts.ProjectRoot)
 
-	systemPrompt := loadSystemPrompt(opts.SystemPromptDir)
+	// SystemPromptFile takes precedence over SystemPromptDir.
+	var systemPrompt string
+	if opts.SystemPromptFile != "" {
+		if data, err := os.ReadFile(opts.SystemPromptFile); err == nil {
+			systemPrompt = string(data)
+		}
+	} else {
+		systemPrompt = loadSystemPrompt(opts.SystemPromptDir)
+	}
 
 	var claudeArgs []string
 	if opts.Resume {
@@ -153,6 +195,12 @@ func launchClaude(opts LaunchOpts) error {
 	}
 	if opts.PluginDir != "" {
 		claudeArgs = append(claudeArgs, "--plugin-dir", opts.PluginDir)
+	}
+	if opts.PermissionMode != "" {
+		claudeArgs = append(claudeArgs, "--permission-mode", opts.PermissionMode)
+	}
+	if opts.Name != "" {
+		claudeArgs = append(claudeArgs, "--name", opts.Name)
 	}
 	if systemPrompt != "" {
 		claudeArgs = append(claudeArgs, "--append-system-prompt", systemPrompt)
@@ -169,6 +217,12 @@ func launchClaude(opts LaunchOpts) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
+	// Set working directory to project root so Claude starts in the right place,
+	// even if this command is run from a subdirectory like packages/go.
+	if opts.ProjectRoot != "" {
+		c.Dir = opts.ProjectRoot
+	}
+
 	if err := c.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exitErr.ExitCode())
@@ -180,10 +234,15 @@ func launchClaude(opts LaunchOpts) error {
 
 // stubProjectHooks replaces .claude/hooks/hooks.json with an empty stub
 // to prevent Python hooks from firing alongside Go hooks.
+// projectRoot, if non-empty, anchors the paths; otherwise CWD is used.
 // Returns a restore function that must be called on exit.
-func stubProjectHooks() func() {
+func stubProjectHooks(projectRoot string) func() {
 	projectHooks := ".claude/hooks/hooks.json"
 	backupPath := ".claude/hooks/hooks.json.go-backup"
+	if projectRoot != "" {
+		projectHooks = filepath.Join(projectRoot, ".claude/hooks/hooks.json")
+		backupPath = filepath.Join(projectRoot, ".claude/hooks/hooks.json.go-backup")
+	}
 
 	original, err := os.ReadFile(projectHooks)
 	if err != nil {
@@ -221,7 +280,12 @@ func loadSystemPrompt(pluginDir string) string {
 }
 
 // writeLaunchMarker writes .htmlgraph/.launch-mode for hooks to detect the launch mode.
-func writeLaunchMarker(mode string) {
+// projectRoot must be non-empty; if it is empty the write is skipped to avoid
+// polluting whatever directory the user happens to be in.
+func writeLaunchMarker(mode, projectRoot string) {
+	if projectRoot == "" {
+		return // No project root — skip rather than polluting CWD
+	}
 	marker := map[string]any{
 		"mode":      mode,
 		"pid":       os.Getpid(),
@@ -231,6 +295,7 @@ func writeLaunchMarker(mode string) {
 	if err != nil {
 		return
 	}
-	os.MkdirAll(".htmlgraph", 0755)              //nolint:errcheck
-	os.WriteFile(".htmlgraph/.launch-mode", data, 0644) //nolint:errcheck
+	dir := filepath.Join(projectRoot, ".htmlgraph")
+	os.MkdirAll(dir, 0755)                                       //nolint:errcheck
+	os.WriteFile(filepath.Join(dir, ".launch-mode"), data, 0644) //nolint:errcheck
 }
