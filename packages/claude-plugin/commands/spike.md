@@ -36,29 +36,18 @@ Spike with background context
 
 ## Instructions for Claude
 
-This command uses the SDK's `start_planning_spike()` method.
+This command uses the CLI's `spike create` command.
 
 ### Implementation:
 
-```python
-from htmlgraph import SDK
+**DO THIS:**
 
-sdk = SDK(agent="claude")
+1. **Create the spike using CLI:**
+   ```bash
+   htmlgraph spike create "title"
+   ```
 
-# Parse arguments
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-spike = sdk.start_planning_spike(
-    title=args.title,
-    context=args.context or "",
-    timebox_hours=args.timebox
-)
-
-print(format_spike_output(spike))
-```
-```
+2. **Present the output** using the template below.
 
 ### Output Format:
 

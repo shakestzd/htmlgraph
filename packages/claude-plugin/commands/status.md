@@ -25,32 +25,21 @@ Show project progress and current feature
 
 ## Instructions for Claude
 
-This command uses the SDK's `get_status()` method.
+This command uses the CLI's `status` and `find` commands.
 
 ### Implementation:
 
-```python
-from htmlgraph import SDK
+**DO THIS:**
 
-sdk = SDK(agent="claude")
-
-# Parse arguments
-**DO THIS (OPTIMIZED - 1 SDK CALL INSTEAD OF 3 CLI CALLS):**
-
-1. **Get comprehensive status (single SDK call):**
-   ```python
-   status = sdk.get_status()
-   active = sdk.features.where(status="in-progress")
+1. **Get comprehensive status:**
+   ```bash
+   htmlgraph status
+   htmlgraph find features --status in-progress
    ```
 
-   **Context usage: <5% (compared to 25% with 3 CLI calls)**
-
-2. **Extract key metrics:**
-   - Total features: status['total_nodes']
-   - Completed: status['done_count']
-   - In progress: status['in_progress_count']
-   - Completion percentage: (done_count / total_nodes * 100)
-   - Active features with details from 'active' list
+2. **Extract key metrics** from CLI output:
+   - Total features, completed count, in-progress count
+   - Active features with titles and progress
 
 3. **Present a summary** using the output template below
 
@@ -59,7 +48,6 @@ sdk = SDK(agent="claude")
    - If active features exist → Show their progress
    - If features done → Acknowledge progress
    - Suggest `/htmlgraph:plan` for new work
-```
 
 ### Output Format:
 

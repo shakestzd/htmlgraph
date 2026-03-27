@@ -58,240 +58,50 @@ Create track directly without spike (use for simple, well-defined work)
 
 ## Instructions for Claude
 
-This command uses the SDK's `smart_plan()` method which:
-1. Analyzes current project state (bottlenecks, risks, parallel capacity)
-2. Provides strategic context from analytics
-3. Creates a planning spike (default) or track directly
+### Implementation:
 
 **⚠️ CRITICAL: Check for Research Before Planning**
 
 Before creating the plan, check if research was completed:
 1. Check if `/htmlgraph:research` was used previously in the conversation
 2. If complex feature WITHOUT research → Warn and suggest research first
-3. If research completed → Pass research_completed=True and findings
 
-### Implementation:
+**DO THIS:**
 
-```python
-from htmlgraph import SDK
+1. **Check if research was done** for complex features (auth, security, real-time, OAuth)
+   - If not → warn: "RECOMMENDED: Run /htmlgraph:research first"
+   - Still proceed, but flag the warning
 
-sdk = SDK(agent="claude")
+2. **Get project context:**
+   ```bash
+   htmlgraph analytics bottlenecks
+   htmlgraph analytics recommend
+   ```
 
-# STEP 1: Check if research was completed
-# Look for research findings in conversation context
-research_completed = False
-research_findings = None
+3. **Create a planning spike:**
+   ```bash
+   htmlgraph spike create "Plan: <description>"
+   ```
+   Or create a track directly for well-defined work:
+   ```bash
+   htmlgraph track new "<title>"
+   ```
 
-# If you previously ran /htmlgraph:research, extract findings
-if has_previous_research():
-    research_completed = True
-    research_findings = {
-        "topic": "<topic from research>",
-        "sources_count": <number of sources>,
-        "recommended_library": "<library name if specified>",
-        "key_insights": ["<insight 1>", "<insight 2>", ...]
-    }
-
-# STEP 2: Validate complex features have research
-is_complex = any([
-    "auth" in args.description.lower(),
-    "security" in args.description.lower(),
-    "real-time" in args.description.lower(),
-    "websocket" in args.description.lower(),
-    "oauth" in args.description.lower(),
-])
-
-if is_complex and not research_completed:
-    print("⚠️  Warning: Complex feature detected without research.")
-    print("RECOMMENDED: Run /htmlgraph:research first to gather best practices.")
-    print(f"Example: /htmlgraph:research \"{args.description}\"")
-    print()
-    # Still proceed, but flag the warning
-
-# STEP 3: Create plan with research context
-result = sdk.smart_plan(
-    description=args.description,
-    create_spike=args.spike,  # Default: True
-    timebox_hours=args.timebox,  # Default: 4.0
-    research_completed=research_completed,
-    research_findings=research_findings
-)
-
-# STEP 4: Display result with warnings if any
-print(format_output(result))
-
-if "warnings" in result:
-    for warning in result["warnings"]:
-        print(f"\n{warning}")
-```
-
-### SDK API Reference
-
-**smart_plan() signature:**
-```python
-sdk.smart_plan(
-    description: str,        # What you want to plan
-    create_spike: bool = True,   # Create spike for research
-    timebox_hours: float = 4.0,  # Time limit for spike
-    research_completed: bool = False,  # Whether research was done
-    research_findings: dict[str, Any] | None = None  # Research results
-) -> dict[str, Any]
-```
-
-**Returns:**
-```python
-{
-    "type": "spike" | "track",
-    "spike_id": "spike-abc123",  # If spike created
-    "title": "Plan: User authentication system",
-    "status": "todo",
-    "research_informed": True,  # Whether research was provided
-    "project_context": {
-        "bottlenecks_count": 3,
-        "high_risk_count": 5,
-        "parallel_capacity": 4,
-        "description": "User authentication system"
-    },
-    "next_steps": [...],
-    "warnings": [...]  # Present if issues detected (e.g., no research)
-}
-```
+4. **Display result** using the output template below
 
 ### Creating Tracks Directly (Advanced)
 
-If the spike reveals a well-defined plan, create a track with TrackBuilder:
+If the spike reveals a well-defined plan, create a track:
 
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Create track with spec and plan in one call
-track = sdk.tracks.builder() \
-    .title("User Authentication System") \
-    .description("OAuth 2.0 authentication with JWT tokens") \
-    .priority("high") \
-    .with_spec(
-        overview="Secure user authentication supporting multiple OAuth providers",
-        context="Users need secure login without managing passwords",
-        requirements=[
-            ("Support Google and GitHub OAuth", "must-have"),
-            ("JWT-based session management", "must-have"),
-            ("Refresh token rotation", "should-have"),
-            ("Remember me functionality", "nice-to-have")
-        ],
-        acceptance_criteria=[
-            ("User can log in with Google", "test_google_login()"),
-            ("User can log in with GitHub", "test_github_login()"),
-            ("JWT tokens expire after 1 hour", "test_token_expiry()"),
-            ("Refresh tokens rotate on use", "test_token_rotation()")
-        ]
-    ) \
-    .with_plan_phases([
-        ("Phase 1: OAuth Setup", [
-            "Configure OAuth providers (2h)",
-            "Create callback endpoints (2h)",
-            "Add environment variables (0.5h)"
-        ]),
-        ("Phase 2: JWT Implementation", [
-            "Implement token signing (2h)",
-            "Add refresh token logic (1.5h)",
-            "Create token middleware (1h)"
-        ]),
-        ("Phase 3: Testing", [
-            "Write integration tests (3h)",
-            "Add E2E tests (2h)",
-            "Security audit (1h)"
-        ])
-    ]) \
-    .create()
-
-print(f"Created track: {track.id}")
+```bash
+htmlgraph track new "User Authentication System"
 ```
 
-### TrackBuilder API
-
-**Core Methods:**
-```python
-builder = sdk.tracks.builder()
-
-# Basic metadata
-builder.title(str)           # Track title (required)
-builder.description(str)     # Track description
-builder.priority(str)        # low|medium|high|critical
-
-# Add specification
-builder.with_spec(
-    overview: str,                    # High-level summary
-    context: str,                     # Background and current state
-    requirements: list,               # [(desc, priority)] or [desc]
-    acceptance_criteria: list         # [desc] or [(desc, test_case)]
-)
-
-# Add implementation plan
-builder.with_plan_phases([
-    (phase_name, [task_descriptions])  # Tasks can include "(2h)" for estimates
-])
-
-# File format (default: consolidated single file)
-builder.consolidated()      # Single index.html (default)
-builder.separate_files()    # Legacy 3-file format
-
-# Execute
-builder.create()  # Returns Track object
-```
-
-### Schema Reference
-
-**Track Model:**
-```python
-class Track(BaseModel):
-    id: str                # Generated track ID (trk-xxxxxxxx)
-    title: str             # Track title
-    description: str       # Track description
-    status: str            # planned|active|completed|abandoned
-    priority: str          # low|medium|high|critical
-    has_spec: bool         # Whether spec is included
-    has_plan: bool         # Whether plan is included
-    created: datetime
-    updated: datetime
-```
-
-**Spec Model:**
-```python
-class Spec(BaseModel):
-    id: str                        # Spec ID
-    title: str                     # Spec title
-    track_id: str                  # Parent track ID
-    status: str                    # draft|review|approved|outdated
-    overview: str                  # High-level summary
-    context: str                   # Why we're building this
-    requirements: list[Requirement]
-    acceptance_criteria: list[AcceptanceCriterion]
-```
-
-**Plan Model:**
-```python
-class Plan(BaseModel):
-    id: str                # Plan ID
-    title: str             # Plan title
-    track_id: str          # Parent track ID
-    status: str            # draft|active|completed
-    phases: list[Phase]    # Implementation phases
-```
-
-**Phase & Task:**
-```python
-class Phase(BaseModel):
-    id: str                    # Phase ID (phase-1, phase-2, etc.)
-    name: str                  # Phase name
-    tasks: list[Task]          # Tasks in this phase
-
-class Task(BaseModel):
-    id: str                    # Task ID (task-1-1, task-1-2, etc.)
-    description: str           # Task description
-    completed: bool            # Whether completed
-    estimate_hours: float      # Time estimate (optional)
+Then create features within the track:
+```bash
+htmlgraph feature create "Phase 1: OAuth Setup"
+htmlgraph feature create "Phase 2: JWT Implementation"
+htmlgraph feature create "Phase 3: Testing"
 ```
 
 ### Workflow Guidance
@@ -324,27 +134,22 @@ When working in a planning spike, you should:
 - Avoid reading entire codebases - use targeted searches
 
 **Example spike workflow:**
-```python
+```bash
 # 1. Get spike context
-spike = sdk.spikes.get(spike_id)
+htmlgraph spike show <spike-id>
 
 # 2. Research focused questions
 # Instead of: Read entire auth module
 # Do: Search for specific patterns
 grep "oauth" --type py  # Find OAuth usage
 
-# 3. Document findings
-with sdk.spikes.edit(spike_id) as s:
-    s.notes += "\nFound: Google OAuth already configured"
-    s.add_finding("JWT library", "Uses PyJWT 2.8.0")
+# 3. View and update spike findings via CLI
+htmlgraph spike show <spike-id>
 
 # 4. Create track from findings
-track = sdk.create_track_from_spike(
-    spike_id=spike_id,
-    title="User Authentication",
-    requirements=[...],  # From spike findings
-    phases=[...]         # From spike plan
-)
+htmlgraph track new "User Authentication"
+htmlgraph feature create "Phase 1: OAuth Setup"
+htmlgraph feature create "Phase 2: JWT Implementation"
 ```
 
 ### Output Format:

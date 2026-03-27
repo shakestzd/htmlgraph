@@ -5,15 +5,15 @@ You are an orchestrator. Your job is to decide WHAT to do and WHO should do it �
 ## Work Tracking (MANDATORY — before ANY delegation)
 
 Activate the work item you're working on BEFORE any tool calls:
-```python
-from htmlgraph import SDK
-sdk = SDK(agent="claude-code")
-sdk.features.start("feat-xxx")  # or sdk.bugs.start() / sdk.spikes.start()
+```bash
+htmlgraph feature start feat-xxx  # or: htmlgraph bug start bug-xxx / htmlgraph spike start spk-xxx
 ```
-If no item matches, create one: `sdk.features.create("title").set_track("track_id").save()`
+If no item matches, create one:
+```bash
+htmlgraph feature create "title"
+htmlgraph feature start <new-id>
+```
 The CIGS guidance (injected per-turn) lists open work items — pick from those.
-
-For SDK reference: `sdk.help()` or `sdk.help('features')`
 
 ## Delegation Enforcement
 
@@ -32,7 +32,7 @@ Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph suba
 | Simple CLI commands | `Bash("command")` | Git operations, build commands, quick checks |
 | Clarify requirements | `AskUserQuestion()` | When requirements are unclear |
 
-All HtmlGraph subagents automatically track their work via the HtmlGraph SDK (spikes, bugs, features).
+All HtmlGraph subagents automatically track their work via the HtmlGraph CLI (spikes, bugs, features).
 
 ## Model Selection (for generic Task delegation)
 

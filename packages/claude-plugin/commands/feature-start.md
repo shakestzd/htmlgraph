@@ -31,59 +31,42 @@ List available features and prompt for selection
 
 ## Instructions for Claude
 
-This command uses the SDK's `features.where()` and `features.start()` methods.
+This command uses the CLI's `feature list` and `feature start` commands.
 
 ### Implementation:
 
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
 **DO THIS:**
 
 1. **Check if feature-id provided:**
    - If YES → Go to step 3
    - If NO → Go to step 2
 
-2. **List available features and prompt using SDK:**
-   ```python
-   todo_features = sdk.features.where(status="todo")
-   if not todo_features:
-       print("No features available to start. Create one with /htmlgraph:feature-add")
-       return
+2. **List available features and prompt:**
+   ```bash
+   htmlgraph find features --status todo
    ```
    - Show available features to the user
    - Ask the user which feature they want to start
    - Wait for user response
    - Use the selected feature-id for next step
 
-3. **Start the feature using SDK:**
-   ```python
-   feature = sdk.features.start(feature_id)
-   if not feature:
-       print(f"Error: Feature {feature_id} not found")
-       return
+3. **Start the feature using CLI:**
+   ```bash
+   htmlgraph feature start <feature-id>
    ```
 
-4. **Extract feature details:**
-   - Feature title: `feature.title`
-   - Feature ID: `feature.id`
-   - Status: `feature.status` (should be "in-progress")
-   - Description: `feature.description` (if exists)
-   - Implementation steps: `feature.metadata.get('steps', [])` (if any)
+4. **Get feature details:**
+   ```bash
+   htmlgraph feature show <feature-id>
+   ```
 
-5. **Show step breakdown if available:**
-   - If feature has steps, show progress: "Step X/Y complete"
-   - Display remaining steps clearly
+5. **Show step breakdown if available** from feature details.
 
 6. **Present the feature context** using the output template below
 
 7. **Confirm readiness:**
    - Show the feature details clearly
    - Ask what the user would like to work on first
-```
 
 ### Output Format:
 

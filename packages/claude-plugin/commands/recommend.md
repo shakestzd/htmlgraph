@@ -35,69 +35,23 @@ Recommendations only, skip bottleneck analysis
 
 ## Instructions for Claude
 
-This command uses the SDK's `recommend_next_work()` method.
+This command uses the CLI's analytics commands.
 
 ### Implementation:
 
-```python
-from htmlgraph import SDK
+**DO THIS:**
 
-sdk = SDK(agent="claude")
+1. **Get recommendations:**
+   ```bash
+   htmlgraph analytics recommend
+   ```
 
-# Parse arguments
-```python
-from htmlgraph import SDK
+2. **Optionally check bottlenecks:**
+   ```bash
+   htmlgraph analytics bottlenecks
+   ```
 
-sdk = SDK(agent="claude")
-
-# Get recommendations
-recs = sdk.recommend_next_work(agent_count=count)
-
-# Optionally check bottlenecks
-bottlenecks = []
-if check_bottlenecks:
-    bottlenecks = sdk.find_bottlenecks(top_n=3)
-
-# Present bottlenecks first if any
-if bottlenecks:
-    print(f"## ⚠️  Bottlenecks Detected")
-    for bn in bottlenecks:
-        print(f"\n### {bn['title']} ({bn['id']})")
-        print(f"**Impact:** {bn['impact_score']:.2f}")
-        print(f"**Blocks:** {len(bn.get('blocks', []))} items")
-
-print(f"\n## Top {count} Recommendations")
-
-for i, rec in enumerate(recs[:count], 1):
-    print(f"\n### {i}. {rec['title']} ({rec['id']})")
-    print(f"**Score:** {rec['score']:.2f}")
-
-    # Show reasoning
-    if rec.get('reasons'):
-        print(f"\n**Why recommended:**")
-        for reason in rec['reasons']:
-            print(f"- {reason}")
-
-    # Show what this unlocks
-    if rec.get('unlocks'):
-        print(f"\n**Unlocks:** {len(rec['unlocks'])} dependent items")
-        for dep in rec['unlocks'][:3]:
-            print(f"  - {dep['title']}")
-        if len(rec['unlocks']) > 3:
-            print(f"  ... and {len(rec['unlocks']) - 3} more")
-
-    # Show complexity
-    if rec.get('complexity'):
-        print(f"**Complexity:** {rec['complexity']}")
-
-    # Show suggested approach
-    if rec.get('suggested_approach'):
-        print(f"**Approach:** {rec['suggested_approach']}")
-
-print(f"\n---")
-print(f"💡 Use `/htmlgraph:plan [id]` to start planning any of these items.")
-```
-```
+3. **Present results** using the output template below.
 
 ### Output Format:
 

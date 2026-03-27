@@ -25,51 +25,24 @@ Gracefully end the current session and show work summary
 
 ## Instructions for Claude
 
-This command uses the SDK's `end_session()` method.
-
 ### Implementation:
 
-```python
-import os
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
 **DO THIS:**
 
-1. **Get current session ID:**
-   ```python
-   # First try environment variable (Claude Code provides this)
-   session_id = os.getenv("CLAUDE_SESSION_ID")
-
-   # Fallback to SDK query if not available
-   if not session_id:
-       active_sessions = sdk.sessions.where(status="active")
-       if not active_sessions:
-           print("Error: No active session to end")
-           return
-       session_id = active_sessions[0].id
+1. **Get current session:**
+   ```bash
+   htmlgraph session list
    ```
 
 2. **Get current work item for handoff:**
-   ```python
-   active_work = sdk.get_active_work_item()
-   handoff_notes = None
-
-   if active_work:
-       # Prepare handoff notes with current work context
-       handoff_notes = f"Working on: {active_work.get('title', 'Unknown')}"
-       if active_work.get('description'):
-           handoff_notes += f"\n\nContext: {active_work['description']}"
+   ```bash
+   htmlgraph status
    ```
+   Note the active feature title and description for handoff notes.
 
-3. **End the session using SDK:**
-   ```python
-   session = sdk.end_session(
-       session_id=session_id,
-       handoff_notes=handoff_notes
-   )
+3. **End the session:**
+   ```bash
+   htmlgraph session end
    ```
 
 4. **Extract session details:**

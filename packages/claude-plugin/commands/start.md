@@ -23,17 +23,9 @@ Begin a new development session and choose what to work on
 
 ## Instructions for Claude
 
-This command uses the SDK's `get_session_start_info()` method.
-
 ### Implementation:
 
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
-**DO THIS (OPTIMIZED - 2 CALLS INSTEAD OF 6+):**
+**DO THIS:**
 
 **DELEGATION**: For complex project reviews or analysis of large backlogs, delegate to `Task(subagent_type="htmlgraph:researcher")`.
 

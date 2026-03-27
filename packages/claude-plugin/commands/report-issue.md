@@ -23,7 +23,7 @@ When the user invokes this command:
 
 1. If no title provided, ask the user to describe the issue they're experiencing
 2. Gather context automatically:
-   - HtmlGraph version: `uv run python -c "import htmlgraph; print(htmlgraph.__version__)"`
+   - HtmlGraph version: `htmlgraph version`
    - Python version: `python3 --version`
    - OS: `uname -s -r`
    - Claude Code version: check `claude --version` if available
