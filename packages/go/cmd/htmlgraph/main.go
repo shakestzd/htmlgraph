@@ -13,6 +13,9 @@ import (
 // version is set at build time via ldflags.
 var version = "dev"
 
+// projectDirFlag holds the value of the --project-dir persistent flag.
+var projectDirFlag string
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:           "htmlgraph",
@@ -21,6 +24,14 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+
+	// --project-dir overrides all other project-root detection strategies.
+	rootCmd.PersistentFlags().StringVar(
+		&projectDirFlag,
+		"project-dir",
+		"",
+		"explicit project root containing .htmlgraph/ (overrides CLAUDE_PROJECT_DIR and CWD walk-up)",
+	)
 
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(statusCmd())
@@ -59,8 +70,34 @@ func versionCmd() *cobra.Command {
 	}
 }
 
-// findHtmlgraphDir walks up from cwd looking for a .htmlgraph directory.
+// findHtmlgraphDir locates the .htmlgraph directory using the following
+// priority order:
+//
+//  1. --project-dir flag (explicit override, highest priority)
+//  2. CLAUDE_PROJECT_DIR env var (set by session-start hook; fixes plugin-dir CWD issue)
+//  3. Walk up from os.Getwd() (original behaviour, lowest priority)
 func findHtmlgraphDir() (string, error) {
+	// 1. Explicit --project-dir flag takes top priority.
+	if projectDirFlag != "" {
+		candidate := filepath.Join(projectDirFlag, ".htmlgraph")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate, nil
+		}
+		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found", projectDirFlag)
+	}
+
+	// 2. CLAUDE_PROJECT_DIR env var (set by session-start hook for downstream
+	//    invocations; also allows users/CI to override CWD without a flag).
+	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
+		candidate := filepath.Join(d, ".htmlgraph")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate, nil
+		}
+		// Env var was set but points somewhere without .htmlgraph — fall through
+		// to CWD walk-up rather than hard-failing, preserving usability.
+	}
+
+	// 3. Walk up from the process working directory.
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("get working directory: %w", err)
