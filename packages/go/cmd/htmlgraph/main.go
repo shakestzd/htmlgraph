@@ -60,6 +60,7 @@ func main() {
 	rootCmd.AddCommand(specCmd())
 	rootCmd.AddCommand(reviewCmd())
 	rootCmd.AddCommand(complianceCmd())
+	rootCmd.AddCommand(tddCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
