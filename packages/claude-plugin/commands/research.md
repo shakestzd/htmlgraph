@@ -79,13 +79,10 @@ This command implements the mandatory research phase from PARALLEL_WORKFLOW.md. 
 4. **Document research:**
 
    If spike provided:
-   ```python
-   from htmlgraph import SDK
-   sdk = SDK(agent="claude")
-
-   with sdk.spikes.edit(spike_id) as spike:
-       spike.add_finding("Research Topic", structured_findings)
-       spike.complete_step(0)  # Mark research step done
+   ```bash
+   # Show spike to get current content
+   htmlgraph spike show <spike-id>
+   # Then append findings via the spike notes section
    ```
 
    Otherwise, present findings in structured format

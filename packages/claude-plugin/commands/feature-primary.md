@@ -26,34 +26,23 @@ Set feature-001 as the primary feature for activity attribution
 
 ## Instructions for Claude
 
-This command uses the SDK's `features.set_primary()` method.
-
 ### Implementation:
 
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
 **DO THIS:**
 
-1. **Set feature as primary using SDK:**
-   ```python
-   feature = sdk.features.set_primary(feature_id)
-   if not feature:
-       print(f"Error: Feature {feature_id} not found")
-       return
+1. **Start the feature to set it as active (primary):**
+   ```bash
+   htmlgraph feature start <feature-id>
    ```
 
-2. **Extract feature details:**
-   - Feature ID: `feature.id`
-   - Feature title: `feature.title`
-   - Status: `feature.status`
+2. **Get feature details:**
+   ```bash
+   htmlgraph feature show <feature-id>
+   ```
 
-3. **Get other active features:**
-   ```python
-   other_active = [f for f in sdk.features.where(status="in-progress") if f.id != feature_id]
+3. **List other active features:**
+   ```bash
+   htmlgraph find features --status in-progress
    ```
 
 4. **Present a summary** using the output template below with:
@@ -63,9 +52,7 @@ sdk = SDK(agent="claude")
 
 5. **Inform the user:**
    - All new activity will be attributed to this feature by default
-   - The feature's patterns can override this for matching activity
    - Other features remain in progress and can be worked on
-```
 
 ### Output Format:
 

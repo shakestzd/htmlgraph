@@ -30,73 +30,24 @@ Run the delegation diagnostic and present a structured report.
 
 ### Implementation
 
-```python
-from htmlgraph import SDK
-from pathlib import Path
-import sqlite3
+**DO THIS:**
 
-sdk = SDK(agent="claude")
+1. **Get current session ID:**
+   ```bash
+   htmlgraph session list
+   ```
 
-# 1. Get orchestrator state
-from htmlgraph.orchestrator_mode import OrchestratorModeManager
-manager = OrchestratorModeManager(Path(".htmlgraph"))
-mode = manager.load()
-orch_status = manager.status()
+2. **Query events directly via SQLite** to analyze delegation patterns:
+   ```bash
+   htmlgraph status
+   ```
 
-# 2. Query current session events
-conn = sqlite3.connect(".htmlgraph/htmlgraph.db")
+3. **Compute delegation score** by reviewing:
+   - Tool calls to `Task` or `Agent` → delegations
+   - Direct `Edit` or `Write` calls → direct implementation
+   - Direct `git commit/push` Bash calls → git writes that should use copilot
 
-row = conn.execute(
-    "SELECT session_id FROM agent_events ORDER BY timestamp DESC LIMIT 1"
-).fetchone()
-session_id = row[0] if row else None
-
-direct_ops, git_writes, delegations, direct_impl = [], [], [], []
-
-if session_id:
-    direct_ops = conn.execute("""
-        SELECT event_id, tool_name, input_summary, timestamp
-        FROM agent_events
-        WHERE session_id = ? AND tool_name = 'Bash'
-          AND input_summary NOT LIKE '%ruff%'
-          AND input_summary NOT LIKE '%pytest%'
-          AND input_summary NOT LIKE '%mypy%'
-          AND input_summary NOT LIKE '%git status%'
-          AND input_summary NOT LIKE '%git log%'
-          AND input_summary NOT LIKE '%git diff%'
-          AND input_summary NOT LIKE '%git show%'
-          AND input_summary NOT LIKE '%ls %'
-        ORDER BY timestamp
-    """, (session_id,)).fetchall()
-
-    git_writes = [
-        op for op in direct_ops
-        if any(kw in (op[2] or '') for kw in [
-            'git commit', 'git push', 'git tag', 'git merge',
-            'git rebase', 'git reset', 'git branch -d'
-        ])
-    ]
-
-    delegations = conn.execute("""
-        SELECT event_id, tool_name, input_summary, timestamp
-        FROM agent_events
-        WHERE session_id = ? AND tool_name IN ('Task', 'Agent')
-        ORDER BY timestamp
-    """, (session_id,)).fetchall()
-
-    direct_impl = conn.execute("""
-        SELECT event_id, tool_name, input_summary, timestamp
-        FROM agent_events
-        WHERE session_id = ? AND tool_name IN ('Edit', 'Write')
-        ORDER BY timestamp
-    """, (session_id,)).fetchall()
-
-conn.close()
-
-# 3. Compute delegation score
-impl_total = len(delegations) + len(direct_impl) + len(git_writes)
-score = int(len(delegations) / impl_total * 100) if impl_total > 0 else 100
-```
+4. **Score = delegations / (delegations + direct_impl + git_writes) * 100**
 
 ### Output Format
 

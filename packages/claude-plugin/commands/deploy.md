@@ -35,62 +35,15 @@ Deploy major release (breaking changes)
 
 ## Instructions for Claude
 
-This command uses the SDK's `None()` method.
-
-### Implementation:
-
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
 **CRITICAL: This command deploys to production PyPI.**
 
 **PRE-DEPLOYMENT CHECKLIST:**
 
 1. ✅ **Verify version consistency:**
-   ```python
-   def check_version_consistency() -> tuple[bool, dict[str, str]]:
-       """Verify all version files match."""
-       import re
-       from pathlib import Path
-
-       files_to_check = {
-           "pyproject.toml": r'version\s*=\s*"([^"]+)"',
-           "src/python/htmlgraph/__init__.py": r'__version__\s*=\s*"([^"]+)"',
-           "packages/claude-plugin/.claude-plugin/plugin.json": r'"version":\s*"([^"]+)"',
-           "packages/gemini-extension/gemini-extension.json": r'"version":\s*"([^"]+)"',
-       }
-
-       versions = {}
-       for file_path, pattern in files_to_check.items():
-           full_path = Path(file_path)
-           if full_path.exists():
-               content = full_path.read_text()
-               match = re.search(pattern, content)
-               if match:
-                   versions[file_path] = match.group(1)
-
-       unique_versions = set(versions.values())
-       consistent = len(unique_versions) == 1
-
-       return consistent, versions
-
-   # Check versions before deployment
-   consistent, versions = check_version_consistency()
-
-   if not consistent:
-       print("⚠️  VERSION MISMATCH DETECTED")
-       print("\nVersion files:")
-       for file_path, version in versions.items():
-           print(f"- {file_path}: {version}")
-       print("\nRun: `./scripts/verify-versions.sh` to fix")
-       return False
-
-   print(f"✅ All version files consistent: {list(versions.values())[0]}")
-   print("Proceeding with deployment...")
+   ```bash
+   ./scripts/verify-versions.sh
    ```
+   If versions are inconsistent, fix them before deploying.
 
 2. ✅ **Verify tests pass:**
    ```bash
@@ -135,7 +88,7 @@ sdk = SDK(agent="claude")
    curl -s https://pypi.org/pypi/htmlgraph/json | python -c "import sys, json; print(json.load(sys.stdin)['info']['version'])"
 
    # Check local install
-   uv run python -c 'import htmlgraph; print(htmlgraph.__version__)'
+   htmlgraph version
    ```
 
 5. **Report completion:**
@@ -171,4 +124,4 @@ sdk = SDK(agent="claude")
 
 **Verify:**
 - PyPI: https://pypi.org/project/htmlgraph/{version}/
-- Local: `uv run python -c 'import htmlgraph; print(htmlgraph.__version__)'`
+- Local: `htmlgraph version`

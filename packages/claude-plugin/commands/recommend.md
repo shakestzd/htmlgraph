@@ -35,27 +35,21 @@ Recommendations only, skip bottleneck analysis
 
 ## Instructions for Claude
 
-This command uses the Go binary to retrieve work recommendations and bottleneck analysis.
+This command uses the CLI's analytics commands.
 
 ### Implementation:
 
-1. Run `packages/go-plugin/hooks/bin/htmlgraph analytics recommend` to get recommended work items
-2. If `--check-bottlenecks` is true (default), also run `packages/go-plugin/hooks/bin/htmlgraph analytics bottlenecks`
-3. Parse the CLI output (table format) and present it nicely in markdown
-4. Include the command output as-is, formatting it for readability
+1. **Get recommendations:**
+   ```bash
+   htmlgraph analytics recommend
+   ```
 
-### Sample CLI Commands:
+2. **Optionally check bottlenecks:**
+   ```bash
+   htmlgraph analytics bottlenecks
+   ```
 
-```bash
-# Get recommendations (shows top N items with scores)
-packages/go-plugin/hooks/bin/htmlgraph analytics recommend
-
-# Get bottlenecks (shows blocking items with impact scores)
-packages/go-plugin/hooks/bin/htmlgraph analytics bottlenecks
-
-# Optional: Get work summary
-packages/go-plugin/hooks/bin/htmlgraph analytics summary
-```
+3. **Present results** using the output template below.
 
 ### Output Format:
 

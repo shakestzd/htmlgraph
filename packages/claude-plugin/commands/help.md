@@ -23,16 +23,8 @@ Show all available commands and their descriptions
 
 ## Instructions for Claude
 
-This command uses the SDK's `None()` method.
-
 ### Implementation:
 
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
 **DO THIS:**
 
 1. **Retrieve help text:**

@@ -31,36 +31,26 @@ Prompt the user for a feature title
 
 ## Instructions for Claude
 
-This command uses the SDK's `features.create()` method.
+This command uses the CLI's `feature create` command.
 
 ### Implementation:
 
-```python
-from htmlgraph import SDK
-
-sdk = SDK(agent="claude")
-
-# Parse arguments
 **DO THIS:**
 
 1. **Check if title is provided:**
    - If title argument provided → proceed to step 2
    - If no title → ask the user: "What feature would you like to add?"
 
-2. **Create the feature using SDK:**
-   ```python
-   feature = sdk.features.create(title).save()
+2. **Create the feature using CLI:**
+   ```bash
+   htmlgraph feature create "title"
    ```
 
-3. **Present confirmation** using the output template below with:
-   - feature_id: `feature.id`
-   - title: `feature.title`
-   - status: `feature.status` (should be "todo")
+3. **Present confirmation** using the output template below with the feature ID and title shown in the CLI output.
 
 4. **Suggest next steps:**
    - Show command to start working: `/htmlgraph:feature-start {feature_id}`
    - Optionally suggest `/htmlgraph:plan` to plan the feature
-```
 
 ### Output Format:
 
