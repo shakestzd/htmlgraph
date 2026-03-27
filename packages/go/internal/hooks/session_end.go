@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/shakestzd/htmlgraph/internal/db"
 )
 
 // SessionEnd handles the SessionEnd Claude Code hook event.
@@ -26,6 +28,9 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 		now, endCommit, sessionID,
 	)
 	_ = err // Non-fatal
+
+	// Mark lineage trace complete so tree queries show accurate status.
+	_ = db.CompleteLineageTrace(database, sessionID)
 
 	return &HookResult{Continue: true}, nil
 }

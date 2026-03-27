@@ -51,6 +51,12 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 
 	_ = upsertSession(database, s) // Non-fatal: never block Claude
 
+	// Build lineage trace for subagent sessions so delegation chains are queryable.
+	if s.IsSubagent && s.ParentSessionID != "" {
+		buildLineageTrace(database, s.ParentSessionID, sessionID, agentName(), GetActiveFeatureID(database, sessionID))
+	}
+
+
 	return &HookResult{
 		Continue: true,
 		AdditionalContext: fmt.Sprintf(
@@ -157,6 +163,56 @@ func UpdateActiveFeature(database *sql.DB, sessionID, featureID string) error {
 		nullableStr(featureID), time.Now().UTC().Format(time.RFC3339), sessionID,
 	)
 	return err
+}
+
+// buildLineageTrace records the full delegation path for a subagent session.
+// It looks up the parent's lineage to inherit root/path, inserting the parent
+// as the root trace if it has no existing trace yet.
+func buildLineageTrace(database *sql.DB, parentSessionID, sessionID, myAgent, featureID string) {
+	parent, _ := db.GetLineageBySession(database, parentSessionID)
+
+	var rootSessionID string
+	var depth int
+	var path []string
+
+	if parent != nil {
+		rootSessionID = parent.RootSessionID
+		depth = parent.Depth + 1
+		path = make([]string, len(parent.Path)+1)
+		copy(path, parent.Path)
+		path[len(parent.Path)] = myAgent
+	} else {
+		// No parent trace: treat parent as root and seed its entry.
+		rootSessionID = parentSessionID
+		depth = 1
+		parentAgent := "claude-code"
+		path = []string{parentAgent, myAgent}
+		rootTrace := &models.LineageTrace{
+			TraceID:       parentSessionID,
+			RootSessionID: parentSessionID,
+			SessionID:     parentSessionID,
+			AgentName:     parentAgent,
+			Depth:         0,
+			Path:          []string{parentAgent},
+			FeatureID:     featureID,
+			StartedAt:     time.Now().UTC(),
+			Status:        "active",
+		}
+		_ = db.InsertLineageTrace(database, rootTrace)
+	}
+
+	trace := &models.LineageTrace{
+		TraceID:       sessionID,
+		RootSessionID: rootSessionID,
+		SessionID:     sessionID,
+		AgentName:     myAgent,
+		Depth:         depth,
+		Path:          path,
+		FeatureID:     featureID,
+		StartedAt:     time.Now().UTC(),
+		Status:        "active",
+	}
+	_ = db.InsertLineageTrace(database, trace)
 }
 
 // ensure db package is referenced (used via db.nullStr in other files).
