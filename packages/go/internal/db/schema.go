@@ -200,7 +200,18 @@ func CreateAllTables(db *sql.DB) error {
 			metadata JSON
 		)`,
 
-		// 7. agent_presence
+		// 7. git_commits
+		`CREATE TABLE IF NOT EXISTS git_commits (
+			commit_hash TEXT NOT NULL,
+			session_id TEXT NOT NULL,
+			feature_id TEXT,
+			tool_event_id TEXT,
+			message TEXT,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (commit_hash, session_id)
+		)`,
+
+		// 8. agent_presence
 		`CREATE TABLE IF NOT EXISTS agent_presence (
 			agent_id TEXT PRIMARY KEY,
 			status TEXT NOT NULL DEFAULT 'offline' CHECK(
@@ -266,6 +277,8 @@ func CreateAllIndexes(db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_edges_from ON graph_edges(from_node_id)",
 		"CREATE INDEX IF NOT EXISTS idx_edges_to ON graph_edges(to_node_id)",
 		"CREATE INDEX IF NOT EXISTS idx_edges_type ON graph_edges(relationship_type)",
+		// git_commits
+		"CREATE INDEX IF NOT EXISTS idx_git_commits_feature ON git_commits(feature_id)",
 		// agent_presence
 		"CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status, last_activity DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_agent_presence_feature ON agent_presence(current_feature_id, last_activity DESC)",

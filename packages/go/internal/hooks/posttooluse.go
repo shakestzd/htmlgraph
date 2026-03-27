@@ -4,9 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
 // PostToolUse handles the PostToolUse Claude Code hook event.
@@ -53,6 +56,23 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		recordOrchestratorToolUse(database, ctx.SessionID, event.ToolName, success)
 	}
 
+	// Capture git commits and link to the active work item.
+	if event.ToolName == "Bash" {
+		if cmd := extractBashCommand(event.ToolInput); looksLikeGitCommit(cmd) {
+			if hash, msg := parseGitCommitOutput(summarizeToolOutput(event.ToolResult)); hash != "" {
+				commit := &models.GitCommit{
+					CommitHash:  hash,
+					SessionID:   ctx.SessionID,
+					FeatureID:   ctx.FeatureID,
+					ToolEventID: eventID,
+					Message:     msg,
+					Timestamp:   time.Now().UTC(),
+				}
+				_ = db.InsertGitCommit(database, commit)
+			}
+		}
+	}
+
 	result := &HookResult{Continue: true}
 
 	// Quality gate: warn when Write/Edit/MultiEdit produces an oversized file.
@@ -66,6 +86,51 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	return result, nil
+}
+
+// gitCommitOutputRe matches the commit line from git commit output, e.g.:
+// "[main abc1234] commit message here"
+var gitCommitOutputRe = regexp.MustCompile(`\[[\w/\-]+\s+([0-9a-f]{7,40})\]\s+(.*)`)
+
+// looksLikeGitCommit returns true when the bash command appears to be a git commit.
+func looksLikeGitCommit(cmd string) bool {
+	return strings.Contains(cmd, "git commit") || strings.Contains(cmd, "git-commit")
+}
+
+// parseGitCommitOutput extracts the commit hash and message from git's stdout.
+// Returns ("", "") when the output does not match the expected format.
+func parseGitCommitOutput(output string) (hash, message string) {
+	for _, line := range strings.Split(output, "\n") {
+		if m := gitCommitOutputRe.FindStringSubmatch(strings.TrimSpace(line)); len(m) == 3 {
+			return m[1], strings.TrimSpace(m[2])
+		}
+	}
+	return "", ""
+}
+
+// extractBashCommand extracts the "command" field from a Bash tool_input map.
+func extractBashCommand(input map[string]any) string {
+	if input == nil {
+		return ""
+	}
+	if v, ok := input["command"].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// summarizeToolOutput extracts the full output string from a tool result for
+// commit parsing (we need more than the 200-char summariseOutput truncation).
+func summarizeToolOutput(result map[string]any) string {
+	if result == nil {
+		return ""
+	}
+	for _, key := range []string{"output", "content", "result"} {
+		if v, ok := result[key].(string); ok {
+			return v
+		}
+	}
+	return ""
 }
 
 // recordOrchestratorToolUse emits a structured log line to stderr when the
