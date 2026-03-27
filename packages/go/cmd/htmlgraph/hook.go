@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 
 	"github.com/spf13/cobra"
 	"github.com/shakestzd/htmlgraph/internal/db"
@@ -25,217 +25,99 @@ Usage in hooks.json:
   etc.`,
 	}
 
+	// Shared fallback results used across commands.
+	continueResult := &hooks.HookResult{Continue: true}
+	allowResult := &hooks.HookResult{Decision: "allow"}
+	emptyResult := &hooks.HookResult{}
+
 	cmd.AddCommand(
-		hookSessionStartCmd(),
-		hookSessionEndCmd(),
-		hookSessionResumeCmd(),
-		hookUserPromptCmd(),
-		hookPreToolUseCmd(),
-		hookPostToolUseCmd(),
-		hookSubagentStartCmd(),
-		hookSubagentStopCmd(),
-		hookTrackEventCmd(),
+		// Session lifecycle — need projectDir passed to the handler.
+		hookSubcmdWithProject("session-start", "Handle SessionStart event", emptyResult,
+			func(event *hooks.CloudEvent, database *sql.DB, projectDir string) (*hooks.HookResult, error) {
+				hooks.ApplyTraceparent()
+				return hooks.SessionStart(event, database, projectDir)
+			}),
+		hookSubcmdWithProject("session-end", "Handle SessionEnd event", continueResult, hooks.SessionEnd),
+		hookSubcmdWithProject("session-resume", "Handle SessionResume event", continueResult, hooks.SessionResume),
+
+		// Standard two-arg handlers (event + db only).
+		hookSubcmd("user-prompt", "Handle UserPromptSubmit event", emptyResult, hooks.UserPrompt),
+		hookSubcmd("pretooluse", "Handle PreToolUse event", allowResult, hooks.PreToolUse),
+		hookSubcmd("posttooluse", "Handle PostToolUse event", continueResult, hooks.PostToolUse),
+		hookSubcmd("subagent-start", "Handle SubagentStart event", continueResult, hooks.SubagentStart),
+		hookSubcmd("subagent-stop", "Handle SubagentStop event", continueResult, hooks.SubagentStop),
+		hookSubcmd("stop", "Handle Stop event", continueResult, hooks.Stop),
+		hookSubcmd("posttooluse-failure", "Handle PostToolUseFailure event", continueResult, hooks.PostToolUseFailure),
+		hookSubcmd("pre-compact", "Handle PreCompact event", continueResult, hooks.PreCompact),
+		hookSubcmd("teammate-idle", "Handle TeammateIdle event", continueResult, hooks.TeammateIdle),
+		hookSubcmd("task-completed", "Handle TaskCompleted event", continueResult, hooks.TaskCompleted),
+		hookSubcmd("instructions-loaded", "Handle InstructionsLoaded event", continueResult, hooks.InstructionsLoaded),
+		hookSubcmd("permission-request", "Handle PermissionRequest event", continueResult, hooks.PermissionRequest),
+
+		// track-event accepts an optional tool-name argument.
+		hookTrackEventCmd(continueResult),
 	)
 	return cmd
 }
 
-// openDB resolves the project directory and opens the HtmlGraph SQLite database.
-func openHookDB(event *hooks.CloudEvent) (*db_handle, error) {
-	projectDir := hooks.ResolveProjectDir(event.CWD)
-	if !hooks.IsHtmlGraphProject(projectDir) {
-		return nil, nil // Not an HtmlGraph project — skip silently.
-	}
-	database, err := db.Open(hooks.DBPath(projectDir))
-	if err != nil {
-		return nil, fmt.Errorf("open db: %w", err)
-	}
-	return &db_handle{db: database, projectDir: projectDir}, nil
-}
-
-// db_handle bundles the open database with its project directory.
-type db_handle struct {
-	db         interface{ Close() error }
-	projectDir string
-}
-
-func hookSessionStartCmd() *cobra.Command {
+// hookSubcmd creates a hook subcommand that resolves the project dir and opens
+// the DB before calling handler. fallback is returned when the project is not
+// an HtmlGraph project or when the DB cannot be opened.
+func hookSubcmd(
+	use, short string,
+	fallback *hooks.HookResult,
+	handler func(*hooks.CloudEvent, *sql.DB) (*hooks.HookResult, error),
+) *cobra.Command {
 	return &cobra.Command{
-		Use:   "session-start",
-		Short: "Handle SessionStart event",
+		Use:   use,
+		Short: short,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
 				projectDir := hooks.ResolveProjectDir(event.CWD)
 				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{}, nil
+					return fallback, nil
 				}
 				database, err := db.Open(hooks.DBPath(projectDir))
 				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{}, nil
+					return fallback, nil
 				}
 				defer database.Close()
-				hooks.ApplyTraceparent()
-				return hooks.SessionStart(event, database, projectDir)
+				return handler(event, database)
 			})
 		},
 	}
 }
 
-func hookSessionEndCmd() *cobra.Command {
+// hookSubcmdWithProject is like hookSubcmd but also passes projectDir to the
+// handler (needed by session-start, session-end, session-resume).
+func hookSubcmdWithProject(
+	use, short string,
+	fallback *hooks.HookResult,
+	handler func(*hooks.CloudEvent, *sql.DB, string) (*hooks.HookResult, error),
+) *cobra.Command {
 	return &cobra.Command{
-		Use:   "session-end",
-		Short: "Handle SessionEnd event",
+		Use:   use,
+		Short: short,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
 				projectDir := hooks.ResolveProjectDir(event.CWD)
 				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Continue: true}, nil
+					return fallback, nil
 				}
 				database, err := db.Open(hooks.DBPath(projectDir))
 				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Continue: true}, nil
+					return fallback, nil
 				}
 				defer database.Close()
-				return hooks.SessionEnd(event, database, projectDir)
+				return handler(event, database, projectDir)
 			})
 		},
 	}
 }
 
-func hookSessionResumeCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "session-resume",
-		Short: "Handle SessionResume event",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
-				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				database, err := db.Open(hooks.DBPath(projectDir))
-				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				defer database.Close()
-				return hooks.SessionResume(event, database, projectDir)
-			})
-		},
-	}
-}
-
-func hookUserPromptCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "user-prompt",
-		Short: "Handle UserPromptSubmit event",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
-				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{}, nil
-				}
-				database, err := db.Open(hooks.DBPath(projectDir))
-				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{}, nil
-				}
-				defer database.Close()
-				return hooks.UserPrompt(event, database)
-			})
-		},
-	}
-}
-
-func hookPreToolUseCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "pretooluse",
-		Short: "Handle PreToolUse event",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
-				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Decision: "allow"}, nil
-				}
-				database, err := db.Open(hooks.DBPath(projectDir))
-				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Decision: "allow"}, nil
-				}
-				defer database.Close()
-				return hooks.PreToolUse(event, database)
-			})
-		},
-	}
-}
-
-func hookPostToolUseCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "posttooluse",
-		Short: "Handle PostToolUse event",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
-				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				database, err := db.Open(hooks.DBPath(projectDir))
-				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				defer database.Close()
-				return hooks.PostToolUse(event, database)
-			})
-		},
-	}
-}
-
-func hookSubagentStartCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "subagent-start",
-		Short: "Handle SubagentStart event",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
-				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				database, err := db.Open(hooks.DBPath(projectDir))
-				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				defer database.Close()
-				return hooks.SubagentStart(event, database)
-			})
-		},
-	}
-}
-
-func hookSubagentStopCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "subagent-stop",
-		Short: "Handle SubagentStop event",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
-				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				database, err := db.Open(hooks.DBPath(projectDir))
-				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Continue: true}, nil
-				}
-				defer database.Close()
-				return hooks.SubagentStop(event, database)
-			})
-		},
-	}
-}
-
-func hookTrackEventCmd() *cobra.Command {
+// hookTrackEventCmd returns the track-event subcommand, which accepts an
+// optional tool-name CLI argument.
+func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 	return &cobra.Command{
 		Use:   "track-event [tool-name]",
 		Short: "Record a generic hook event",
@@ -248,12 +130,11 @@ func hookTrackEventCmd() *cobra.Command {
 			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
 				projectDir := hooks.ResolveProjectDir(event.CWD)
 				if !hooks.IsHtmlGraphProject(projectDir) {
-					return &hooks.HookResult{Continue: true}, nil
+					return fallback, nil
 				}
 				database, err := db.Open(hooks.DBPath(projectDir))
 				if err != nil {
-					_ = err // Non-fatal: never show hook errors to user
-					return &hooks.HookResult{Continue: true}, nil
+					return fallback, nil
 				}
 				defer database.Close()
 				return hooks.TrackEvent(toolName, event, database)

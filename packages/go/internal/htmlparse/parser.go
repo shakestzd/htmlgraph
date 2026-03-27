@@ -71,6 +71,7 @@ func parseDocument(doc *goquery.Document) (*models.Node, error) {
 	node.FromFeatureID = attrOr(article, "data-from-feature-id", "")
 	node.ToFeatureID = attrOr(article, "data-to-feature-id", "")
 	node.ModelName = attrOr(article, "data-model-name", "")
+	node.ClaimedAt = attrOr(article, "data-claimed-at", "")
 	node.ClaimedBySession = attrOr(article, "data-claimed-by-session", "")
 
 	if v := attrOr(article, "data-auto-generated", ""); strings.EqualFold(v, "true") {

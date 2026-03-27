@@ -84,7 +84,14 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	// Export event ID so posttooluse can link the result.
 	os.Setenv("HTMLGRAPH_CURRENT_EVENT_ID", ev.EventID)
 
-	return &HookResult{Decision: "allow"}, nil
+	result := &HookResult{Decision: "allow"}
+
+	// Orchestrator-only checks: attribution warning + delegation reminder.
+	if !isSubagent {
+		result.AdditionalContext = buildOrchestratorContext(event.ToolName, featureID)
+	}
+
+	return result, nil
 }
 
 // isHtmlGraphWrite returns true for file-write tools targeting .htmlgraph/.

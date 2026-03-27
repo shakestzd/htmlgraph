@@ -1,0 +1,29 @@
+name: Release Go Binary
+
+on:
+  push:
+    tags:
+      - 'go/v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/go/go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+          workdir: packages/go
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

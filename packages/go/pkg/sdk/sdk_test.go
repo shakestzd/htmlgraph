@@ -472,6 +472,606 @@ func TestNewSDKRequiresProjectDir(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Claim / Release / AtomicClaim / Unclaim
+// ---------------------------------------------------------------------------
+
+func TestClaimReleaseCycle(t *testing.T) {
+	s := newTestSDK(t)
+	feat, err := s.Features.Create("Claim Test")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// Claim
+	if err := s.Features.Claim(feat.ID, "sess-001"); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+
+	got, err := s.Features.Get(feat.ID)
+	if err != nil {
+		t.Fatalf("Get after claim: %v", err)
+	}
+	assertEqual(t, "AgentAssigned", got.AgentAssigned, "test-agent")
+	assertEqual(t, "ClaimedBySession", got.ClaimedBySession, "sess-001")
+	if got.ClaimedAt == "" {
+		t.Error("ClaimedAt should be set after Claim")
+	}
+
+	// Release
+	if err := s.Features.Release(feat.ID); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+
+	got, err = s.Features.Get(feat.ID)
+	if err != nil {
+		t.Fatalf("Get after release: %v", err)
+	}
+	assertEqual(t, "AgentAssigned after release", got.AgentAssigned, "")
+	assertEqual(t, "ClaimedBySession after release", got.ClaimedBySession, "")
+	assertEqual(t, "ClaimedAt after release", got.ClaimedAt, "")
+}
+
+func TestAtomicClaimSuccess(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Atomic Claim Test")
+
+	// First claim should succeed
+	if err := s.Features.AtomicClaim(feat.ID, "sess-001"); err != nil {
+		t.Fatalf("AtomicClaim: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	assertEqual(t, "AgentAssigned", got.AgentAssigned, "test-agent")
+	assertEqual(t, "ClaimedBySession", got.ClaimedBySession, "sess-001")
+}
+
+func TestAtomicClaimSameAgentSameSession(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Atomic Reclaim Test")
+
+	// Claim once
+	_ = s.Features.AtomicClaim(feat.ID, "sess-001")
+
+	// Same agent, same session should succeed (idempotent)
+	if err := s.Features.AtomicClaim(feat.ID, "sess-001"); err != nil {
+		t.Fatalf("AtomicClaim same agent/session should succeed: %v", err)
+	}
+}
+
+func TestAtomicClaimDifferentSessionFails(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Atomic Conflict Test")
+
+	// Claim with session-001
+	_ = s.Features.AtomicClaim(feat.ID, "sess-001")
+
+	// Different session should fail
+	err := s.Features.AtomicClaim(feat.ID, "sess-002")
+	if err == nil {
+		t.Error("expected error when claiming with different session")
+	}
+	if !strings.Contains(err.Error(), "already claimed") {
+		t.Errorf("error should mention 'already claimed': %v", err)
+	}
+}
+
+func TestAtomicClaimDifferentAgentFails(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Agent Conflict Test")
+
+	// Claim with test-agent
+	_ = s.Features.Claim(feat.ID, "sess-001")
+
+	// Create second SDK with different agent, same project dir
+	s2, err := sdk.New(s.ProjectDir, "other-agent")
+	if err != nil {
+		t.Fatalf("sdk.New for other-agent: %v", err)
+	}
+	defer s2.Close()
+
+	// Different agent should fail
+	err = s2.Features.AtomicClaim(feat.ID, "sess-002")
+	if err == nil {
+		t.Error("expected error when claiming with different agent")
+	}
+	if !strings.Contains(err.Error(), "already claimed") {
+		t.Errorf("error should mention 'already claimed': %v", err)
+	}
+}
+
+func TestUnclaim(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Unclaim Test")
+
+	// Claim then unclaim
+	_ = s.Features.Claim(feat.ID, "sess-001")
+
+	if err := s.Features.Unclaim(feat.ID); err != nil {
+		t.Fatalf("Unclaim: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	// Unclaim preserves AgentAssigned but clears claim metadata
+	assertEqual(t, "AgentAssigned preserved", got.AgentAssigned, "test-agent")
+	assertEqual(t, "ClaimedBySession cleared", got.ClaimedBySession, "")
+	assertEqual(t, "ClaimedAt cleared", got.ClaimedAt, "")
+}
+
+func TestClaimNonexistentFails(t *testing.T) {
+	s := newTestSDK(t)
+
+	if err := s.Features.Claim("feat-nonexistent", "sess-001"); err == nil {
+		t.Error("expected error claiming nonexistent feature")
+	}
+}
+
+func TestClaimOnBugs(t *testing.T) {
+	s := newTestSDK(t)
+	bug, _ := s.Bugs.Create("Bug Claim Test")
+
+	if err := s.Bugs.Claim(bug.ID, "sess-001"); err != nil {
+		t.Fatalf("Claim bug: %v", err)
+	}
+
+	got, _ := s.Bugs.Get(bug.ID)
+	assertEqual(t, "Bug AgentAssigned", got.AgentAssigned, "test-agent")
+	assertEqual(t, "Bug ClaimedBySession", got.ClaimedBySession, "sess-001")
+}
+
+func TestClaimOnSpikes(t *testing.T) {
+	s := newTestSDK(t)
+	spike, _ := s.Spikes.Create("Spike Claim Test")
+
+	if err := s.Spikes.Claim(spike.ID, "sess-001"); err != nil {
+		t.Fatalf("Claim spike: %v", err)
+	}
+
+	got, _ := s.Spikes.Get(spike.ID)
+	assertEqual(t, "Spike AgentAssigned", got.AgentAssigned, "test-agent")
+}
+
+// ---------------------------------------------------------------------------
+// GetActiveWorkItem
+// ---------------------------------------------------------------------------
+
+func TestGetActiveWorkItemNoActive(t *testing.T) {
+	s := newTestSDK(t)
+
+	// Create items but leave them in todo status
+	_, _ = s.Features.Create("Todo Feature")
+	_, _ = s.Bugs.Create("Todo Bug")
+
+	item, err := s.GetActiveWorkItem()
+	if err != nil {
+		t.Fatalf("GetActiveWorkItem: %v", err)
+	}
+	if item != nil {
+		t.Errorf("expected nil, got %+v", item)
+	}
+}
+
+func TestGetActiveWorkItemOneActive(t *testing.T) {
+	s := newTestSDK(t)
+
+	feat, _ := s.Features.Create("Active Feature")
+	_, _ = s.Features.Start(feat.ID)
+
+	item, err := s.GetActiveWorkItem()
+	if err != nil {
+		t.Fatalf("GetActiveWorkItem: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected active work item, got nil")
+	}
+	assertEqual(t, "WorkItem.ID", item.ID, feat.ID)
+	assertEqual(t, "WorkItem.Type", item.Type, "feature")
+	assertEqual(t, "WorkItem.Title", item.Title, "Active Feature")
+	assertEqual(t, "WorkItem.Status", item.Status, "in-progress")
+}
+
+func TestGetActiveWorkItemPrefersFeatures(t *testing.T) {
+	s := newTestSDK(t)
+
+	// Start a feature and a bug
+	feat, _ := s.Features.Create("Active Feature")
+	bug, _ := s.Bugs.Create("Active Bug")
+	_, _ = s.Features.Start(feat.ID)
+	_, _ = s.Bugs.Start(bug.ID)
+
+	// Features are scanned first, so the feature should be returned
+	item, err := s.GetActiveWorkItem()
+	if err != nil {
+		t.Fatalf("GetActiveWorkItem: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected active work item, got nil")
+	}
+	assertEqual(t, "WorkItem.Type", item.Type, "feature")
+}
+
+func TestGetActiveWorkItemFindsBug(t *testing.T) {
+	s := newTestSDK(t)
+
+	// Only a bug is active
+	bug, _ := s.Bugs.Create("Active Bug")
+	_, _ = s.Bugs.Start(bug.ID)
+
+	item, err := s.GetActiveWorkItem()
+	if err != nil {
+		t.Fatalf("GetActiveWorkItem: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected active work item, got nil")
+	}
+	assertEqual(t, "WorkItem.Type", item.Type, "bug")
+	assertEqual(t, "WorkItem.ID", item.ID, bug.ID)
+}
+
+func TestGetActiveWorkItemFindsSpike(t *testing.T) {
+	s := newTestSDK(t)
+
+	// Only a spike is active
+	spike, _ := s.Spikes.Create("Active Spike")
+	_, _ = s.Spikes.Start(spike.ID)
+
+	item, err := s.GetActiveWorkItem()
+	if err != nil {
+		t.Fatalf("GetActiveWorkItem: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected active work item, got nil")
+	}
+	assertEqual(t, "WorkItem.Type", item.Type, "spike")
+	assertEqual(t, "WorkItem.ID", item.ID, spike.ID)
+}
+
+func TestGetActiveWorkItemEmptyProject(t *testing.T) {
+	s := newTestSDK(t)
+
+	item, err := s.GetActiveWorkItem()
+	if err != nil {
+		t.Fatalf("GetActiveWorkItem: %v", err)
+	}
+	if item != nil {
+		t.Errorf("expected nil for empty project, got %+v", item)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EditBuilder
+// ---------------------------------------------------------------------------
+
+func TestEditSetStatus(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Edit Status Test")
+
+	err := s.Features.Edit(feat.ID).
+		SetStatus("in-progress").
+		Save()
+	if err != nil {
+		t.Fatalf("Edit.SetStatus.Save: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	assertEqual(t, "Status", string(got.Status), "in-progress")
+}
+
+func TestEditSetDescription(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Edit Desc Test")
+
+	// Content must be in an element (e.g. <p>) to survive HTML round-trip,
+	// because the parser reads child elements, not raw text nodes.
+	err := s.Features.Edit(feat.ID).
+		SetDescription("<p>New description body</p>").
+		Save()
+	if err != nil {
+		t.Fatalf("Edit.SetDescription.Save: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	if !strings.Contains(got.Content, "New description body") {
+		t.Errorf("Content: got %q", got.Content)
+	}
+}
+
+func TestEditSetFindings(t *testing.T) {
+	s := newTestSDK(t)
+	spike, _ := s.Spikes.Create("Edit Findings Test")
+
+	err := s.Spikes.Edit(spike.ID).
+		SetFindings("Investigation complete: use Redis").
+		Save()
+	if err != nil {
+		t.Fatalf("Edit.SetFindings.Save: %v", err)
+	}
+
+	got, _ := s.Spikes.Get(spike.ID)
+	if !strings.Contains(got.Content, "Investigation complete: use Redis") {
+		t.Errorf("Content: got %q", got.Content)
+	}
+}
+
+func TestEditAddNote(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Edit Note Test",
+		sdk.FeatWithContent("<p>Original content</p>"),
+	)
+
+	err := s.Features.Edit(feat.ID).
+		AddNote("First note").
+		AddNote("Second note").
+		Save()
+	if err != nil {
+		t.Fatalf("Edit.AddNote.Save: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	if !strings.Contains(got.Content, "First note") {
+		t.Errorf("Content missing first note: %q", got.Content)
+	}
+	if !strings.Contains(got.Content, "Second note") {
+		t.Errorf("Content missing second note: %q", got.Content)
+	}
+	if !strings.Contains(got.Content, "Original content") {
+		t.Errorf("Content missing original: %q", got.Content)
+	}
+}
+
+func TestEditChainMultipleFields(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Multi Edit Test")
+
+	err := s.Features.Edit(feat.ID).
+		SetStatus("in-progress").
+		SetPriority("critical").
+		SetAgent("new-agent").
+		SetTrack("trk-new").
+		AddNote("Started work").
+		Save()
+	if err != nil {
+		t.Fatalf("Edit chain Save: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	assertEqual(t, "Status", string(got.Status), "in-progress")
+	assertEqual(t, "Priority", string(got.Priority), "critical")
+	assertEqual(t, "AgentAssigned", got.AgentAssigned, "new-agent")
+	assertEqual(t, "TrackID", got.TrackID, "trk-new")
+	if !strings.Contains(got.Content, "Started work") {
+		t.Errorf("Content missing note: %q", got.Content)
+	}
+}
+
+func TestEditNonexistentNode(t *testing.T) {
+	s := newTestSDK(t)
+
+	err := s.Features.Edit("feat-nonexistent").
+		SetStatus("done").
+		Save()
+	if err == nil {
+		t.Error("expected error editing nonexistent node")
+	}
+}
+
+func TestEditDeferredError(t *testing.T) {
+	s := newTestSDK(t)
+
+	// All chained methods should be no-ops when initial load fails
+	err := s.Features.Edit("feat-nonexistent").
+		SetStatus("done").
+		SetPriority("high").
+		AddNote("note").
+		SetDescription("desc").
+		SetFindings("findings").
+		SetAgent("agent").
+		SetTrack("trk-x").
+		Save()
+	if err == nil {
+		t.Error("expected error from deferred load failure")
+	}
+}
+
+func TestEditOnBug(t *testing.T) {
+	s := newTestSDK(t)
+	bug, _ := s.Bugs.Create("Bug Edit Test")
+
+	err := s.Bugs.Edit(bug.ID).
+		SetStatus("in-progress").
+		AddNote("Investigating").
+		Save()
+	if err != nil {
+		t.Fatalf("Edit bug: %v", err)
+	}
+
+	got, _ := s.Bugs.Get(bug.ID)
+	assertEqual(t, "Bug status", string(got.Status), "in-progress")
+	if !strings.Contains(got.Content, "Investigating") {
+		t.Errorf("Bug content: %q", got.Content)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// AddNote (standalone Collection method)
+// ---------------------------------------------------------------------------
+
+func TestAddNote(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Note Test",
+		sdk.FeatWithContent("<p>Initial</p>"),
+	)
+
+	if err := s.Features.AddNote(feat.ID, "First observation"); err != nil {
+		t.Fatalf("AddNote: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	if !strings.Contains(got.Content, "First observation") {
+		t.Errorf("Content missing note: %q", got.Content)
+	}
+	if !strings.Contains(got.Content, "Initial") {
+		t.Errorf("Content lost original: %q", got.Content)
+	}
+	// Note should include agent name
+	if !strings.Contains(got.Content, "test-agent") {
+		t.Errorf("Note missing agent: %q", got.Content)
+	}
+}
+
+func TestAddNoteAppendsMultiple(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Multi Note Test")
+
+	_ = s.Features.AddNote(feat.ID, "Note one")
+	_ = s.Features.AddNote(feat.ID, "Note two")
+	_ = s.Features.AddNote(feat.ID, "Note three")
+
+	got, _ := s.Features.Get(feat.ID)
+	if !strings.Contains(got.Content, "Note one") {
+		t.Errorf("Missing note one: %q", got.Content)
+	}
+	if !strings.Contains(got.Content, "Note two") {
+		t.Errorf("Missing note two: %q", got.Content)
+	}
+	if !strings.Contains(got.Content, "Note three") {
+		t.Errorf("Missing note three: %q", got.Content)
+	}
+}
+
+func TestAddNoteNonexistent(t *testing.T) {
+	s := newTestSDK(t)
+	err := s.Features.AddNote("feat-nonexistent", "note")
+	if err == nil {
+		t.Error("expected error for nonexistent feature")
+	}
+}
+
+func TestAddNoteOnBug(t *testing.T) {
+	s := newTestSDK(t)
+	bug, _ := s.Bugs.Create("Bug Note Test")
+
+	if err := s.Bugs.AddNote(bug.ID, "Bug observation"); err != nil {
+		t.Fatalf("AddNote bug: %v", err)
+	}
+
+	got, _ := s.Bugs.Get(bug.ID)
+	if !strings.Contains(got.Content, "Bug observation") {
+		t.Errorf("Bug content: %q", got.Content)
+	}
+}
+
+func TestAddNoteOnSpike(t *testing.T) {
+	s := newTestSDK(t)
+	spike, _ := s.Spikes.Create("Spike Note Test")
+
+	if err := s.Spikes.AddNote(spike.ID, "Spike finding"); err != nil {
+		t.Fatalf("AddNote spike: %v", err)
+	}
+
+	got, _ := s.Spikes.Get(spike.ID)
+	if !strings.Contains(got.Content, "Spike finding") {
+		t.Errorf("Spike content: %q", got.Content)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SetFindings (standalone Collection method)
+// ---------------------------------------------------------------------------
+
+func TestSetFindingsReplacesContent(t *testing.T) {
+	s := newTestSDK(t)
+	spike, _ := s.Spikes.Create("Findings Test",
+		sdk.SpikeWithFindings("Old findings"),
+	)
+
+	if _, err := s.Spikes.SetFindings(spike.ID, "New findings replace old"); err != nil {
+		t.Fatalf("SetFindings: %v", err)
+	}
+
+	got, _ := s.Spikes.Get(spike.ID)
+	if !strings.Contains(got.Content, "New findings replace old") {
+		t.Errorf("Content missing new findings: %q", got.Content)
+	}
+	// Old findings should be gone (replaced, not appended)
+	if strings.Contains(got.Content, "Old findings") {
+		t.Errorf("Content still has old findings: %q", got.Content)
+	}
+}
+
+func TestSetFindingsOnFeature(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Feature Findings Test")
+
+	if err := s.Features.SetFindings(feat.ID, "Feature analysis complete"); err != nil {
+		t.Fatalf("SetFindings: %v", err)
+	}
+
+	got, _ := s.Features.Get(feat.ID)
+	if !strings.Contains(got.Content, "Feature analysis complete") {
+		t.Errorf("Content: %q", got.Content)
+	}
+}
+
+func TestSetFindingsNonexistent(t *testing.T) {
+	s := newTestSDK(t)
+	_, err := s.Spikes.SetFindings("spk-nonexistent", "findings")
+	if err == nil {
+		t.Error("expected error for nonexistent spike")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Claim round-trip with HTML parsing
+// ---------------------------------------------------------------------------
+
+func TestClaimRoundTrip(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Claim RT Test")
+
+	_ = s.Features.Claim(feat.ID, "sess-rt-001")
+
+	// Parse the HTML file directly
+	path := filepath.Join(s.FeaturesDir(), feat.ID+".html")
+	parsed, err := htmlparse.ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+
+	assertEqual(t, "parsed.AgentAssigned", parsed.AgentAssigned, "test-agent")
+	assertEqual(t, "parsed.ClaimedBySession", parsed.ClaimedBySession, "sess-rt-001")
+	if parsed.ClaimedAt == "" {
+		t.Error("parsed.ClaimedAt should be set")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Edit round-trip with HTML parsing
+// ---------------------------------------------------------------------------
+
+func TestEditRoundTrip(t *testing.T) {
+	s := newTestSDK(t)
+	feat, _ := s.Features.Create("Edit RT Test")
+
+	_ = s.Features.Edit(feat.ID).
+		SetStatus("in-progress").
+		SetPriority("high").
+		AddNote("Implementation started").
+		Save()
+
+	path := filepath.Join(s.FeaturesDir(), feat.ID+".html")
+	parsed, err := htmlparse.ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+
+	assertEqual(t, "parsed.Status", string(parsed.Status), "in-progress")
+	assertEqual(t, "parsed.Priority", string(parsed.Priority), "high")
+	if !strings.Contains(parsed.Content, "Implementation started") {
+		t.Errorf("parsed.Content missing note: %q", parsed.Content)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 

@@ -31,6 +31,8 @@ func main() {
 	rootCmd.AddCommand(snapshotCmd())
 	rootCmd.AddCommand(hookCmd())
 	rootCmd.AddCommand(claudeCmd())
+	rootCmd.AddCommand(initCmd())
+	rootCmd.AddCommand(trackCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

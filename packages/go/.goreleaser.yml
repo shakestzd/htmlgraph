@@ -1,0 +1,41 @@
+project_name: htmlgraph-hooks
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: htmlgraph-hooks
+    main: ./cmd/htmlgraph
+    binary: htmlgraph-hooks
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: htmlgraph-hooks
+    builds:
+      - htmlgraph-hooks
+    name_template: "htmlgraph-hooks_{{.Version}}_{{.Os}}_{{.Arch}}"
+    format: tar.gz
+
+checksum:
+  name_template: "htmlgraph-hooks_{{.Version}}_checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: shakestzd
+    name: htmlgraph
+  name_template: "Go v{{.Version}}"
+  tag_name: "go/v{{.Version}}"
+
+snapshot:
+  version_template: "{{incpatch .Version}}-next"

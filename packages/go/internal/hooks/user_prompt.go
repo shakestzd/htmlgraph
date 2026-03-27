@@ -12,7 +12,8 @@ import (
 )
 
 // UserPrompt handles the UserPromptSubmit Claude Code hook event.
-// It inserts a UserQuery agent_event and returns CIGS attribution guidance.
+// It inserts a UserQuery agent_event, classifies the prompt intent,
+// and returns combined CIGS attribution + classification guidance.
 func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	sessionID := EnvSessionID(event.SessionID)
 	if sessionID == "" || event.Prompt == "" {
@@ -59,7 +60,17 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	// Update session last_user_query fields.
 	updateLastQuery(database, sessionID, event.Prompt)
 
-	guidance := buildAttributionGuidance(database, sessionID, featureID)
+	// Classify the prompt intent for CIGS guidance.
+	intent := ClassifyPrompt(event.Prompt)
+
+	// Look up active work item type for intent-specific directives.
+	activeWorkType := getActiveWorkItemType(database, featureID)
+
+	// Build attribution block (open work items listing).
+	attributionBlock := buildAttributionGuidance(database, sessionID, featureID)
+
+	// Combine classification guidance with attribution.
+	guidance := GenerateGuidance(intent, featureID, activeWorkType, attributionBlock)
 
 	result := &HookResult{}
 	if guidance != "" {
@@ -143,6 +154,19 @@ func listOpenWorkItems(database *sql.DB) []workItemRow {
 		}
 	}
 	return items
+}
+
+// getActiveWorkItemType returns the type ("feature", "bug", "spike") of the
+// active work item, or "" if no active item or lookup fails.
+func getActiveWorkItemType(database *sql.DB, featureID string) string {
+	if featureID == "" {
+		return ""
+	}
+	var itemType sql.NullString
+	_ = database.QueryRow(
+		`SELECT type FROM features WHERE id = ?`, featureID,
+	).Scan(&itemType)
+	return itemType.String
 }
 
 func activeFeatureOrNone(id string) string {

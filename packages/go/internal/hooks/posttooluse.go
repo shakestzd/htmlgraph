@@ -2,6 +2,8 @@ package hooks
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 	"time"
 )
 
@@ -45,7 +47,44 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		status, outputSummary, now, eventID,
 	)
 
-	return &HookResult{Continue: true}, nil
+	// Record orchestrator direct-tool usage for analytics.
+	// Subagents are excluded — only direct orchestrator use is interesting here.
+	isSubagent := event.AgentID != "" && event.AgentID != "claude-code"
+	if !isSubagent {
+		recordOrchestratorToolUse(database, sessionID, event.ToolName, success)
+	}
+
+	result := &HookResult{Continue: true}
+
+	// Quality gate: warn when Write/Edit/MultiEdit produces an oversized file.
+	switch event.ToolName {
+	case "Write", "Edit", "MultiEdit":
+		if filePath := extractFilePath(event.ToolInput); filePath != "" {
+			if warnings := CheckFileQuality(filePath); warnings != "" {
+				result.AdditionalContext = warnings
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// recordOrchestratorToolUse emits a structured log line to stderr when the
+// orchestrator uses a delegatable tool directly. This is picked up by
+// Claude Code's hook debug output and serves as lightweight analytics
+// without requiring a dedicated DB table.
+func recordOrchestratorToolUse(_ *sql.DB, sessionID, toolName string, success bool) {
+	if _, ok := delegateToolAgents[toolName]; !ok {
+		return // only track tools that should be delegated
+	}
+	status := "completed"
+	if !success {
+		status = "failed"
+	}
+	fmt.Fprintf(os.Stderr,
+		"[htmlgraph] orchestrator_direct_tool session=%s tool=%s status=%s ts=%s\n",
+		sessionID, toolName, status, time.Now().UTC().Format(time.RFC3339),
+	)
 }
 
 // isSuccess returns false when the tool result contains an explicit error flag.
@@ -74,6 +113,3 @@ func summariseOutput(result map[string]any) string {
 	}
 	return ""
 }
-
-// ensure sql is referenced (used indirectly via nullable helpers).
-var _ *sql.DB
