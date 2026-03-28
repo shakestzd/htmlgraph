@@ -61,14 +61,60 @@ See `.claude/rules/deployment.md` for full deployment workflow and options.
 
 | Task | Command |
 |------|---------|
-| View work | `uv run htmlgraph snapshot --summary` |
-| Run tests | `uv run pytest` |
-| Lint | `uv run ruff check --fix` |
-| Type check | `uv run mypy src/` |
+| View work | `htmlgraph snapshot --summary` |
+| Run tests | `(cd packages/go && go test ./...)` |
+| **Build binary** | **`htmlgraph build`** |
 | Deploy | `./scripts/deploy-all.sh VERSION --no-confirm` |
-| Serve dashboard | `uv run htmlgraph serve` |
-| Status | `uv run htmlgraph status` |
-| Install hooks | `git config core.hooksPath .githooks` |
+| Serve dashboard | `htmlgraph serve` |
+| Status | `htmlgraph status` |
+| YOLO session | `htmlgraph yolo --feature <id>` |
+
+---
+
+## Building the Go Binary
+
+**CRITICAL: Always use `htmlgraph build`, never `go build` directly.**
+
+```bash
+# Correct — builds to the PATH-linked location
+htmlgraph build
+
+# Also correct — calls the same build script
+packages/go-plugin/build.sh
+```
+
+**NEVER do this:**
+```bash
+# WRONG — builds to packages/go/htmlgraph, NOT on your PATH
+(cd packages/go && go build -o htmlgraph ./cmd/htmlgraph/)
+```
+
+### Why This Matters
+
+The binary on your PATH is a symlink chain:
+```
+.venv/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph
+```
+
+`htmlgraph build` outputs to `packages/go-plugin/hooks/bin/htmlgraph` — the symlink target. Running `go build` directly puts the binary in `packages/go/htmlgraph` which is NOT on your PATH. You'll keep running the stale binary.
+
+### How Plugin Users Get the Binary
+
+Plugin users install via `claude plugin install htmlgraph`. The plugin ships with a **bootstrap script** at `hooks/bin/htmlgraph` that:
+
+1. On first run, detects OS/architecture (darwin/linux, amd64/arm64)
+2. Downloads the correct pre-built binary from GitHub Releases
+3. Caches it at `~/.claude/plugins/data/htmlgraph/htmlgraph-bin`
+4. `exec`s into the real binary, passing stdin (CloudEvent JSON) through
+5. On subsequent runs, checks cached version against `plugin.json` version — only re-downloads on version mismatch
+
+The bootstrap is a POSIX shell script (~170 lines) that requires only `curl`/`tar`. It never blocks Claude Code — on any error it outputs `{}` and exits 0.
+
+**Binary locations:**
+```
+Developer:  .venv/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph (built locally)
+Plugin user: hooks/bin/htmlgraph (bootstrap script) → ~/.claude/plugins/data/htmlgraph/htmlgraph-bin (downloaded)
+```
 
 ---
 
