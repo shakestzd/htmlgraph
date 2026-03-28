@@ -2,7 +2,6 @@ package db
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,15 +13,15 @@ func InsertEvent(db *sql.DB, e *models.AgentEvent) error {
 	_, err := db.Exec(`
 		INSERT INTO agent_events (
 			event_id, agent_id, event_type, timestamp, tool_name,
-			input_summary, output_summary, session_id, feature_id,
+			input_summary, tool_input, output_summary, session_id, feature_id,
 			parent_agent_id, parent_event_id, subagent_type,
 			cost_tokens, execution_duration_seconds, status,
 			model, claude_task_id, source, step_id,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?)`,
+		) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?)`,
 		e.EventID, e.AgentID, string(e.EventType),
 		e.Timestamp.UTC().Format(time.RFC3339), nullStr(e.ToolName),
-		nullStr(e.InputSummary), nullStr(e.OutputSummary),
+		nullStr(e.InputSummary), nullStr(e.ToolInput), nullStr(e.OutputSummary),
 		e.SessionID, nullStr(e.FeatureID),
 		nullStr(e.ParentAgentID), nullStr(e.ParentEventID),
 		nullStr(e.SubagentType),
@@ -42,7 +41,7 @@ func InsertEvent(db *sql.DB, e *models.AgentEvent) error {
 func GetEvent(db *sql.DB, eventID string) (*models.AgentEvent, error) {
 	row := db.QueryRow(`
 		SELECT event_id, agent_id, event_type, timestamp, tool_name,
-			input_summary, output_summary, session_id, feature_id,
+			input_summary, tool_input, output_summary, session_id, feature_id,
 			parent_agent_id, parent_event_id, subagent_type,
 			cost_tokens, execution_duration_seconds, status,
 			model, source, step_id, created_at, updated_at
@@ -50,14 +49,14 @@ func GetEvent(db *sql.DB, eventID string) (*models.AgentEvent, error) {
 
 	e := &models.AgentEvent{}
 	var (
-		tsStr, createdStr, updatedStr                       string
-		toolName, inSum, outSum, featID                     sql.NullString
+		tsStr, createdStr, updatedStr                        string
+		toolName, inSum, toolInput, outSum, featID           sql.NullString
 		parentAgent, parentEvt, subType, model, src, stepID sql.NullString
 	)
 
 	err := row.Scan(
 		&e.EventID, &e.AgentID, &e.EventType, &tsStr, &toolName,
-		&inSum, &outSum, &e.SessionID, &featID,
+		&inSum, &toolInput, &outSum, &e.SessionID, &featID,
 		&parentAgent, &parentEvt, &subType,
 		&e.CostTokens, &e.ExecDuration, &e.Status,
 		&model, &src, &stepID, &createdStr, &updatedStr,
@@ -71,6 +70,7 @@ func GetEvent(db *sql.DB, eventID string) (*models.AgentEvent, error) {
 	e.UpdatedAt, _ = time.Parse(time.RFC3339, updatedStr)
 	e.ToolName = toolName.String
 	e.InputSummary = inSum.String
+	e.ToolInput = toolInput.String
 	e.OutputSummary = outSum.String
 	e.FeatureID = featID.String
 	e.ParentAgentID = parentAgent.String
@@ -161,140 +161,6 @@ func ListEventsBySessionAsc(db *sql.DB, sessionID string, limit int) ([]models.A
 	return events, rows.Err()
 }
 
-// InsertLineageTrace inserts a new lineage trace row.
-func InsertLineageTrace(db *sql.DB, trace *models.LineageTrace) error {
-	pathJSON, err := json.Marshal(trace.Path)
-	if err != nil {
-		return fmt.Errorf("marshal lineage path: %w", err)
-	}
-	_, err = db.Exec(`
-		INSERT INTO agent_lineage_trace
-			(trace_id, root_session_id, session_id, agent_name, depth, path,
-			 feature_id, started_at, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		trace.TraceID, trace.RootSessionID, nullStr(trace.SessionID),
-		nullStr(trace.AgentName), trace.Depth, string(pathJSON),
-		nullStr(trace.FeatureID),
-		trace.StartedAt.UTC().Format(time.RFC3339),
-		trace.Status,
-	)
-	if err != nil {
-		return fmt.Errorf("insert lineage trace %s: %w", trace.TraceID, err)
-	}
-	return nil
-}
-
-// GetLineageByRoot returns all lineage traces rooted at a given session,
-// ordered by depth ascending.
-func GetLineageByRoot(db *sql.DB, rootSessionID string) ([]models.LineageTrace, error) {
-	rows, err := db.Query(`
-		SELECT trace_id, root_session_id, session_id, agent_name, depth, path,
-		       feature_id, started_at, completed_at, status
-		FROM agent_lineage_trace
-		WHERE root_session_id = ?
-		ORDER BY depth ASC`, rootSessionID)
-	if err != nil {
-		return nil, fmt.Errorf("get lineage by root %s: %w", rootSessionID, err)
-	}
-	defer rows.Close()
-	return scanLineageRows(rows)
-}
-
-// GetLineageBySession returns the lineage trace for a specific session, if any.
-func GetLineageBySession(db *sql.DB, sessionID string) (*models.LineageTrace, error) {
-	row := db.QueryRow(`
-		SELECT trace_id, root_session_id, session_id, agent_name, depth, path,
-		       feature_id, started_at, completed_at, status
-		FROM agent_lineage_trace
-		WHERE session_id = ?
-		LIMIT 1`, sessionID)
-	traces, err := scanLineageRows(singleRowToRows(row))
-	if err != nil {
-		return nil, fmt.Errorf("get lineage by session %s: %w", sessionID, err)
-	}
-	if len(traces) == 0 {
-		return nil, nil
-	}
-	return &traces[0], nil
-}
-
-// CompleteLineageTrace marks a session's lineage trace as completed.
-func CompleteLineageTrace(db *sql.DB, sessionID string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := db.Exec(`
-		UPDATE agent_lineage_trace
-		SET status = 'completed', completed_at = ?
-		WHERE session_id = ?`,
-		now, sessionID,
-	)
-	return err
-}
-
-// scanLineageRows scans a set of lineage rows into a slice of LineageTrace.
-func scanLineageRows(rows lineageScanner) ([]models.LineageTrace, error) {
-	var traces []models.LineageTrace
-	for rows.Next() {
-		var t models.LineageTrace
-		var sessionID, agentName, featureID, completedAt sql.NullString
-		var startedStr, pathJSON string
-
-		if err := rows.Scan(
-			&t.TraceID, &t.RootSessionID, &sessionID, &agentName,
-			&t.Depth, &pathJSON, &featureID, &startedStr, &completedAt, &t.Status,
-		); err != nil {
-			return nil, err
-		}
-		t.SessionID = sessionID.String
-		t.AgentName = agentName.String
-		t.FeatureID = featureID.String
-		t.StartedAt, _ = time.Parse(time.RFC3339, startedStr)
-		if completedAt.Valid && completedAt.String != "" {
-			ts, _ := time.Parse(time.RFC3339, completedAt.String)
-			t.CompletedAt = &ts
-		}
-		_ = json.Unmarshal([]byte(pathJSON), &t.Path)
-		traces = append(traces, t)
-	}
-	return traces, rows.Err()
-}
-
-// lineageScanner abstracts *sql.Rows so scanLineageRows works for both
-// multi-row queries and the single-row wrapper.
-type lineageScanner interface {
-	Next() bool
-	Scan(dest ...any) error
-	Err() error
-}
-
-// singleRowResult wraps *sql.Row into the lineageScanner interface.
-type singleRowResult struct {
-	row     *sql.Row
-	scanned bool
-	err     error
-}
-
-func singleRowToRows(row *sql.Row) lineageScanner {
-	return &singleRowResult{row: row}
-}
-
-func (s *singleRowResult) Next() bool {
-	if s.scanned {
-		return false
-	}
-	return true
-}
-
-func (s *singleRowResult) Scan(dest ...any) error {
-	s.scanned = true
-	s.err = s.row.Scan(dest...)
-	if s.err == sql.ErrNoRows {
-		s.err = nil
-	}
-	return s.err
-}
-
-func (s *singleRowResult) Err() error { return s.err }
-
 // MostRecentSession returns the session_id of the latest session (any status),
 // or ("", nil) if the table is empty.
 func MostRecentSession(db *sql.DB) (string, error) {
@@ -311,25 +177,21 @@ func MostRecentSession(db *sql.DB) (string, error) {
 	return id, nil
 }
 
-// ---------------------------------------------------------------------------
-// Consolidated query helpers — replace inline SQL scattered across hooks.
-// ---------------------------------------------------------------------------
-
 // UpsertEvent performs an INSERT OR REPLACE for idempotent event writes.
 // This is useful when a hook may fire multiple times for the same logical event.
 func UpsertEvent(db *sql.DB, e *models.AgentEvent) error {
 	_, err := db.Exec(`
 		INSERT OR REPLACE INTO agent_events (
 			event_id, agent_id, event_type, timestamp, tool_name,
-			input_summary, output_summary, session_id, feature_id,
+			input_summary, tool_input, output_summary, session_id, feature_id,
 			parent_agent_id, parent_event_id, subagent_type,
 			cost_tokens, execution_duration_seconds, status,
 			model, claude_task_id, source, step_id,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?)`,
+		) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?)`,
 		e.EventID, e.AgentID, string(e.EventType),
 		e.Timestamp.UTC().Format(time.RFC3339), nullStr(e.ToolName),
-		nullStr(e.InputSummary), nullStr(e.OutputSummary),
+		nullStr(e.InputSummary), nullStr(e.ToolInput), nullStr(e.OutputSummary),
 		e.SessionID, nullStr(e.FeatureID),
 		nullStr(e.ParentAgentID), nullStr(e.ParentEventID),
 		nullStr(e.SubagentType),
@@ -346,8 +208,7 @@ func UpsertEvent(db *sql.DB, e *models.AgentEvent) error {
 }
 
 // UpdateEventFields performs a partial UPDATE on an event, setting status,
-// output_summary, and updated_at. Any field left empty is still written
-// (callers should pass the desired value or "" to clear).
+// output_summary, and updated_at.
 func UpdateEventFields(db *sql.DB, eventID, status, outputSummary string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := db.Exec(`
@@ -370,9 +231,8 @@ func UpdateEventStatus(db *sql.DB, eventID, status string) error {
 	return err
 }
 
-// FindStartedEvent returns the event_id of the most recent event in the session
-// that matches the given tool_name and has status='started'.
-// Returns ("", sql.ErrNoRows) when no match is found.
+// FindStartedEvent returns the event_id of the most recent started event
+// matching tool_name in the session. Returns ("", sql.ErrNoRows) when not found.
 func FindStartedEvent(db *sql.DB, sessionID, toolName string) (string, error) {
 	var eventID string
 	err := db.QueryRow(`
@@ -384,11 +244,8 @@ func FindStartedEvent(db *sql.DB, sessionID, toolName string) (string, error) {
 	return eventID, err
 }
 
-// FindStartedEventByAgent returns the event_id of the most recent event in the
-// session that matches the given tool_name and agent_id with status='started'.
-// Used by PostToolUse for subagent events to avoid completing the wrong event
-// when multiple agents are running the same tool concurrently.
-// Returns ("", sql.ErrNoRows) when no match is found.
+// FindStartedEventByAgent returns the event_id of the most recent started event
+// matching tool_name and agent_id. Returns ("", sql.ErrNoRows) when not found.
 func FindStartedEventByAgent(db *sql.DB, sessionID, toolName, agentID string) (string, error) {
 	var eventID string
 	err := db.QueryRow(`
@@ -400,9 +257,8 @@ func FindStartedEventByAgent(db *sql.DB, sessionID, toolName, agentID string) (s
 	return eventID, err
 }
 
-// FindStartedDelegation returns the event_id of the most recent task_delegation
-// (or delegation) event with status='started' in the given session.
-// Returns ("", sql.ErrNoRows) when no match is found.
+// FindStartedDelegation returns the event_id of the most recent started
+// task_delegation in the session. Returns ("", sql.ErrNoRows) when not found.
 func FindStartedDelegation(db *sql.DB, sessionID string) (string, error) {
 	var eventID string
 	err := db.QueryRow(`
@@ -416,10 +272,8 @@ func FindStartedDelegation(db *sql.DB, sessionID string) (string, error) {
 	return eventID, err
 }
 
-// FindDelegationByAgent returns the event_id of the most recent task_delegation
-// (or delegation) event whose agent_id matches, within the given session.
-// Matches any status. Used for parent resolution where the delegation may
-// already be completed. Returns ("", sql.ErrNoRows) when no match is found.
+// FindDelegationByAgent returns the most recent delegation event for the agent
+// (any status). Returns ("", sql.ErrNoRows) when not found.
 func FindDelegationByAgent(db *sql.DB, sessionID, agentID string) (string, error) {
 	var eventID string
 	err := db.QueryRow(`
@@ -433,10 +287,8 @@ func FindDelegationByAgent(db *sql.DB, sessionID, agentID string) (string, error
 	return eventID, err
 }
 
-// FindStartedDelegationByAgent returns the event_id of the most recent
-// task_delegation (or delegation) with status='started' whose agent_id matches.
-// Used by SubagentStop to complete only the still-running delegation.
-// Returns ("", sql.ErrNoRows) when no match is found.
+// FindStartedDelegationByAgent returns the most recent started delegation for
+// the agent. Returns ("", sql.ErrNoRows) when not found.
 func FindStartedDelegationByAgent(db *sql.DB, sessionID, agentID string) (string, error) {
 	var eventID string
 	err := db.QueryRow(`
@@ -451,9 +303,8 @@ func FindStartedDelegationByAgent(db *sql.DB, sessionID, agentID string) (string
 	return eventID, err
 }
 
-// LatestEventByTool returns the event_id of the most recent event for the
-// given session and tool_name (e.g. "UserQuery"), regardless of status.
-// Returns ("", sql.ErrNoRows) when no match is found.
+// LatestEventByTool returns the event_id of the most recent event for the given
+// session and tool_name, regardless of status. Returns ("", sql.ErrNoRows) when not found.
 func LatestEventByTool(db *sql.DB, sessionID, toolName string) (string, error) {
 	var eventID string
 	err := db.QueryRow(`
@@ -465,59 +316,8 @@ func LatestEventByTool(db *sql.DB, sessionID, toolName string) (string, error) {
 	return eventID, err
 }
 
-// InsertGitCommit records a git commit linked to a session and optional feature.
-func InsertGitCommit(database *sql.DB, commit *models.GitCommit) error {
-	_, err := database.Exec(`
-		INSERT OR IGNORE INTO git_commits (
-			commit_hash, session_id, feature_id, tool_event_id, message, timestamp
-		) VALUES (?, ?, ?, ?, ?, ?)`,
-		commit.CommitHash,
-		commit.SessionID,
-		nullStr(commit.FeatureID),
-		nullStr(commit.ToolEventID),
-		nullStr(commit.Message),
-		commit.Timestamp.UTC().Format(time.RFC3339),
-	)
-	if err != nil {
-		return fmt.Errorf("insert git commit %s: %w", commit.CommitHash, err)
-	}
-	return nil
-}
-
-// GetCommitsByFeature returns all git commits linked to a feature, ordered by timestamp DESC.
-func GetCommitsByFeature(database *sql.DB, featureID string) ([]models.GitCommit, error) {
-	rows, err := database.Query(`
-		SELECT commit_hash, session_id, feature_id, tool_event_id, message, timestamp
-		FROM git_commits
-		WHERE feature_id = ?
-		ORDER BY timestamp DESC`, featureID)
-	if err != nil {
-		return nil, fmt.Errorf("get commits for feature %s: %w", featureID, err)
-	}
-	defer rows.Close()
-
-	var commits []models.GitCommit
-	for rows.Next() {
-		var c models.GitCommit
-		var tsStr string
-		var featID, toolEventID, message sql.NullString
-		if err := rows.Scan(
-			&c.CommitHash, &c.SessionID, &featID, &toolEventID, &message, &tsStr,
-		); err != nil {
-			return nil, err
-		}
-		c.Timestamp, _ = time.Parse(time.RFC3339, tsStr)
-		c.FeatureID = featID.String
-		c.ToolEventID = toolEventID.String
-		c.Message = message.String
-		commits = append(commits, c)
-	}
-	return commits, rows.Err()
-}
-
-// CountRecentDuplicates returns the number of events in the session that match
-// the given tool_name and input_summary within the last windowSeconds.
-// Used for dedup checks (e.g. UserQuery within 5 seconds).
+// CountRecentDuplicates returns the count of events matching tool_name and
+// input_summary within the last windowSeconds. Used for dedup checks.
 func CountRecentDuplicates(db *sql.DB, sessionID, toolName, inputSummary string, windowSeconds int) (int, error) {
 	var count int
 	err := db.QueryRow(
