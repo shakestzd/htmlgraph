@@ -170,6 +170,7 @@ class HgEventTree extends HTMLElement {
       + ' data-event-id="' + esc(evt.event_id) + '"'
       + (evt.session_id ? ' data-session="' + esc(evt.session_id) + '"' : '')
       + ' data-tool-use-id="' + esc(evt.tool_use_id || '') + '"'
+      + ' data-tool-name="' + esc(evt.tool_name || '') + '"'
       + ' data-timestamp="' + esc(evt.timestamp || '') + '"'
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(0,0,0,' + bgAlpha + ')">'
       + expandIcon
@@ -205,8 +206,11 @@ document.addEventListener('click', function(e) {
   var row = e.target.closest('.clickable-row[data-session]');
   if (row) {
     var sid = row.dataset.session;
-    var toolUseId = row.dataset.toolUseId || '';
-    var timestamp = row.dataset.timestamp || '';
+    var scrollHint = {
+      toolUseId: row.dataset.toolUseId || '',
+      toolName: row.dataset.toolName || '',
+      timestamp: row.dataset.timestamp || ''
+    };
     currentView = 'sessions';
     document.querySelectorAll('.nav-btn').forEach(function(b) {
       b.classList.toggle('active', b.dataset.view === 'sessions');
@@ -214,7 +218,7 @@ document.addEventListener('click', function(e) {
     document.querySelectorAll('.view').forEach(function(v) {
       v.classList.toggle('active', v.id === 'v-sessions');
     });
-    openTranscript(sid, toolUseId, timestamp);
+    openTranscript(sid, scrollHint);
     return;
   }
 });

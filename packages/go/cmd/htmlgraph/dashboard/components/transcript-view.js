@@ -1,6 +1,7 @@
 /* ── Transcript detail view ─────────────────────────────────── */
 
-function openTranscript(sessionId, scrollToToolUseId, scrollToTimestamp) {
+// scrollHint: { toolUseId, toolName, timestamp } or undefined
+function openTranscript(sessionId, scrollHint) {
   document.getElementById('sessions-list-view').style.display = 'none';
   var detail = document.getElementById('transcript-detail');
   detail.className = 'transcript-detail active';
@@ -12,7 +13,7 @@ function openTranscript(sessionId, scrollToToolUseId, scrollToTimestamp) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     })
-    .then(function(data) { renderTranscript(data, scrollToToolUseId, scrollToTimestamp); })
+    .then(function(data) { renderTranscript(data, scrollHint); })
     .catch(function(err) {
       document.getElementById('transcript-messages').textContent = 'Failed to load transcript: ' + err.message;
     });
@@ -25,9 +26,9 @@ function closeTranscript() {
 
 document.getElementById('transcript-back').addEventListener('click', closeTranscript);
 
-function renderTranscript(data, scrollToToolUseId, scrollToTimestamp) {
+function renderTranscript(data, scrollHint) {
   renderTranscriptStats(data);
-  renderTranscriptMessages(data.messages || [], scrollToToolUseId, scrollToTimestamp);
+  renderTranscriptMessages(data.messages || [], scrollHint);
 }
 
 function renderTranscriptStats(data) {
@@ -84,7 +85,7 @@ function renderTranscriptStats(data) {
   container.appendChild(frag);
 }
 
-function renderTranscriptMessages(messages, scrollToToolUseId, scrollToTimestamp) {
+function renderTranscriptMessages(messages, scrollHint) {
   var container = document.getElementById('transcript-messages');
   container.textContent = '';
 
@@ -93,9 +94,10 @@ function renderTranscriptMessages(messages, scrollToToolUseId, scrollToTimestamp
     return;
   }
 
+  var hint = scrollHint || {};
   var scrollTarget = null;
-  var closestTimeDiff = Infinity;
-  var targetTs = scrollToTimestamp ? new Date(scrollToTimestamp).getTime() : 0;
+  var bestScore = -1;
+  var targetTs = hint.timestamp ? new Date(hint.timestamp).getTime() : 0;
   var frag = document.createDocumentFragment();
   messages.forEach(function(m) {
     var bubble = document.createElement('div');
@@ -164,9 +166,10 @@ function renderTranscriptMessages(messages, scrollToToolUseId, scrollToTimestamp
         name.textContent = tc.tool_name;
         chip.appendChild(name);
 
-        // Track scroll target
-        if (scrollToToolUseId && tc.tool_use_id === scrollToToolUseId) {
+        // Exact tool_use_id match — highest priority
+        if (hint.toolUseId && tc.tool_use_id === hint.toolUseId) {
           scrollTarget = bubble;
+          bestScore = 1000;
         }
 
         if (tc.category && tc.category !== tc.tool_name) {
@@ -202,12 +205,30 @@ function renderTranscriptMessages(messages, scrollToToolUseId, scrollToTimestamp
       bubble.appendChild(toolsDiv);
     }
 
-    // Timestamp fallback: find closest message when no tool_use_id match
-    if (!scrollTarget && targetTs && m.timestamp) {
+    // Scored fallback matching when no exact tool_use_id hit
+    if (bestScore < 1000 && targetTs && m.timestamp) {
       var msgTs = new Date(m.timestamp).getTime();
-      var diff = Math.abs(msgTs - targetTs);
-      if (diff < closestTimeDiff) {
-        closestTimeDiff = diff;
+      var timeDiff = Math.abs(msgTs - targetTs);
+      // Score: tool_name match + time proximity (closer = higher)
+      var score = 0;
+      if (timeDiff < 30000) { // within 30 seconds
+        score = 100 - (timeDiff / 300); // 0-100 based on proximity
+        // Bonus for matching tool_name in this message's tool_calls
+        if (hint.toolName && m.tool_calls) {
+          for (var i = 0; i < m.tool_calls.length; i++) {
+            if (m.tool_calls[i].tool_name === hint.toolName) {
+              score += 200; // strong signal
+              break;
+            }
+          }
+        }
+        // Bonus for user messages matching UserQuery events
+        if (!hint.toolName && m.role === 'user') {
+          score += 50;
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
         scrollTarget = bubble;
       }
     }
@@ -220,12 +241,8 @@ function renderTranscriptMessages(messages, scrollToToolUseId, scrollToTimestamp
   if (scrollTarget) {
     setTimeout(function() {
       scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      scrollTarget.style.outline = '2px solid var(--accent)';
-      scrollTarget.style.outlineOffset = '2px';
-      setTimeout(function() {
-        scrollTarget.style.outline = '';
-        scrollTarget.style.outlineOffset = '';
-      }, 3000);
-    }, 100);
+      scrollTarget.classList.add('msg-highlight');
+      setTimeout(function() { scrollTarget.classList.remove('msg-highlight'); }, 4000);
+    }, 150);
   }
 }
