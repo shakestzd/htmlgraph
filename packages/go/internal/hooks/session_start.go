@@ -107,6 +107,7 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		ParentSessionID: os.Getenv("HTMLGRAPH_PARENT_SESSION"),
 		ParentEventID:   os.Getenv("HTMLGRAPH_PARENT_EVENT"),
 		GitRemoteURL:    paths.GetGitRemoteURL(projectDir),
+		ProjectDir:      projectDir,
 	}
 
 	if err := upsertSession(database, s); err != nil {
@@ -128,8 +129,8 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 		INSERT OR IGNORE INTO sessions
 			(session_id, agent_assigned, parent_session_id, parent_event_id,
 			 created_at, status, start_commit, is_subagent, model, active_feature_id,
-			 git_remote_url)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			 git_remote_url, project_dir)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.SessionID,
 		s.AgentAssigned,
 		nullableStr(s.ParentSessionID),
@@ -141,6 +142,7 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 		nullableStr(s.Model),
 		nullableStr(s.ActiveFeatureID),
 		nullableStr(s.GitRemoteURL),
+		nullableStr(s.ProjectDir),
 	)
 	return err
 }
