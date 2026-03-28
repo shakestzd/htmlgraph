@@ -61,3 +61,19 @@ func ResolveViaGitCommonDir(dir string) string {
 	}
 	return ""
 }
+
+// GetGitRemoteURL returns the remote origin URL for the given directory by
+// running `git -C <dir> remote get-url origin`.  It returns an empty string
+// on any error (not a git repo, no origin remote, git not installed, etc.).
+// If dir is empty, the function returns "" immediately.
+func GetGitRemoteURL(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	cmd := exec.Command("git", "-C", dir, "remote", "get-url", "origin")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
