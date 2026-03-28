@@ -40,6 +40,8 @@ release:
 
 git:
   tag_sort: -version:refname
+monorepo:
+  tag_prefix: go/
 
 snapshot:
   name_template: "{{incpatch .Version}}-next"
