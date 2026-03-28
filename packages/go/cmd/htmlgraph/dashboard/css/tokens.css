@@ -1,0 +1,47 @@
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+  --bg-primary: #151518;
+  --bg-secondary: #1C1C20;
+  --bg-tertiary: #252528;
+  --bg-hover: #2A2A2F;
+  --text-primary: #E0DED8;
+  --text-secondary: #A0A0A0;
+  --text-muted: #707070;
+  --border: #333338;
+  --border-strong: #606068;
+  --accent: #CDFF00;
+  --accent-dim: rgba(205, 255, 0, 0.15);
+  --accent-text: #0A0A0A;
+  --status-todo: #707070;
+  --status-ip: #3b82f6;
+  --status-done: #22c55e;
+  --status-blocked: #ef4444;
+  --priority-low: #707070;
+  --priority-medium: #A0A0A0;
+  --priority-high: #f59e0b;
+  --priority-critical: #ef4444;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+/* ── Reset & base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+body {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; font-family: inherit; font-size: inherit; }
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }

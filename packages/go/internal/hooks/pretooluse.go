@@ -59,6 +59,7 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		ParentEventID: parentEventID,
 		SubagentType:  agentType,
 		Status:        "started",
+		StepID:        event.ToolUseID,
 		Source:        "hook",
 		CreatedAt:     time.Now().UTC(),
 		UpdatedAt:     time.Now().UTC(),

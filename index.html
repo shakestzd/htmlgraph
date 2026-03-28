@@ -277,6 +277,11 @@ button { cursor: pointer; font-family: inherit; font-size: inherit; }
   margin-bottom: 8px;
 }
 .card-id { font-size: 11px; color: var(--accent); font-weight: 600; }
+.card-meta {
+  font-size: 10px; color: var(--text-muted);
+  margin-bottom: 6px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
 .card-row {
   display: flex;
   justify-content: space-between;
@@ -491,6 +496,113 @@ button { cursor: pointer; font-family: inherit; font-size: inherit; }
   color: var(--text-muted);
   font-size: 12px;
 }
+
+/* ── Transcript detail view ───────────────────────────────── */
+.transcript-detail { display: none; }
+.transcript-detail.active { display: block; }
+
+.transcript-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.transcript-back:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.transcript-stats {
+  display: flex;
+  gap: 20px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.transcript-stat { display: flex; flex-direction: column; gap: 2px; }
+.transcript-stat .label {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.transcript-stat .value { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+
+.transcript-messages { display: flex; flex-direction: column; gap: 6px; }
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 92%;
+  word-break: break-word;
+}
+.msg-user {
+  border-left: 3px solid #58a6ff;
+  background: rgba(88,166,255,0.06);
+}
+.msg-assistant {
+  border-left: 3px solid var(--accent);
+  background: rgba(205,255,0,0.04);
+}
+.msg-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px; font-size: 10px; color: var(--text-muted);
+}
+.msg-role { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.msg-role-user { color: #58a6ff; }
+.msg-role-assistant { color: var(--accent); }
+
+.model-badge {
+  padding: 1px 6px; border-radius: 9999px;
+  background: var(--bg-tertiary); font-size: 10px; color: var(--text-muted);
+}
+.token-info { font-size: 10px; color: var(--text-muted); }
+
+.msg-content { white-space: pre-wrap; color: var(--text-secondary); }
+
+.msg-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+
+.tool-call-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: var(--radius-sm);
+  font-size: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-tertiary);
+  color: var(--text-secondary); transition: background 0.15s;
+}
+.tool-call-chip:hover { background: var(--bg-hover); }
+.tool-call-chip .tool-name { font-weight: 600; }
+.tool-call-chip .tool-cat { color: var(--text-muted); }
+
+.tool-input-preview {
+  display: none; margin-top: 6px; padding: 8px;
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 11px;
+  color: var(--text-muted); white-space: pre-wrap;
+  word-break: break-all; max-height: 200px; overflow-y: auto;
+}
+.tool-input-preview.open { display: block; }
+
+.card-title {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  flex: 1;
+  min-width: 0;
+}
+
+.card.clickable { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.card.clickable:hover { border-color: var(--accent); background: var(--bg-hover); }
 </style>
 </head>
 <body>
@@ -550,10 +662,20 @@ button { cursor: pointer; font-family: inherit; font-size: inherit; }
 
     <!-- Sessions -->
     <section class="view" id="v-sessions">
-      <div class="view-title">Sessions <span class="count" id="sessions-count">0</span></div>
-      <div class="card-grid" id="sessions-grid"></div>
-      <div class="empty" id="sessions-empty" style="display:none">
-        <div>No sessions recorded.</div>
+      <div id="sessions-list-view">
+        <div class="view-title">Sessions <span class="count" id="sessions-count">0</span></div>
+        <div class="card-grid" id="sessions-grid"></div>
+        <div class="empty" id="sessions-empty" style="display:none">
+          <div>No sessions recorded.</div>
+        </div>
+      </div>
+      <div class="transcript-detail" id="transcript-detail">
+        <button class="transcript-back" id="transcript-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to Sessions
+        </button>
+        <div id="transcript-stats"></div>
+        <div class="transcript-messages" id="transcript-messages"></div>
       </div>
     </section>
 
@@ -687,6 +809,55 @@ function truncId(id) {
   if (!id) return '--';
   if (id.length <= 16) return id;
   return id.slice(0, 8) + '..' + id.slice(-6);
+}
+
+function cleanSessionTitle(text) {
+  if (!text) return '';
+  // Extract command name from <command-message>X</command-message>
+  var cmdMatch = text.match(/<command-message>([^<]+)<\/command-message>/);
+  if (cmdMatch) {
+    var cmd = cmdMatch[1];
+    // Map known commands to friendly names
+    var cmdNames = {
+      'htmlgraph:execute': 'Parallel Execution',
+      'htmlgraph:recommend': 'Work Recommendations',
+      'htmlgraph:plan': 'Planning Session',
+      'htmlgraph:status': 'Status Check',
+      'htmlgraph:diagnose': 'Diagnostics',
+      'htmlgraph:cleanup': 'Cleanup',
+      'htmlgraph:git-commit': 'Git Commit'
+    };
+    return cmdNames[cmd] || '/' + cmd;
+  }
+  // Strip markdown headers (## Title)
+  text = text.replace(/^#{1,4}\s+/, '');
+  // Strip XML/HTML tags
+  text = text.replace(/<[^>]+>/g, '').trim();
+  // Strip image references [Image #N]
+  text = text.replace(/\[Image #\d+\]/g, '').trim();
+  return text;
+}
+
+function sessionDisplayTitle(s) {
+  // Prefer AI-generated title from DB
+  if (s.title) return s.title;
+  // Fall back to cleaned first message
+  if (s.first_message) {
+    var title = cleanSessionTitle(s.first_message);
+    if (title.length > 60) title = title.substring(0, 57) + '...';
+    return title;
+  }
+  // Last resort: date/time label
+  return sessionTimeLabel(s);
+}
+
+function sessionTimeLabel(s) {
+  if (!s.created_at) return 'Untitled Session';
+  try {
+    var d = new Date(s.created_at);
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+      + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch(e) { return 'Untitled Session'; }
 }
 
 function agentClass(agentId) {
@@ -1025,23 +1196,33 @@ function renderSessions() {
   var frag = document.createDocumentFragment();
   sessions.forEach(function(s) {
     var card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card clickable';
+    card.dataset.sessionId = s.session_id;
+    card.addEventListener('click', function() { openTranscript(s.session_id); });
 
+    // Title row: meaningful name + status badge
     var head = document.createElement('div');
     head.className = 'card-head';
-    var idSpan = document.createElement('span');
-    idSpan.className = 'card-id';
-    idSpan.textContent = truncId(s.session_id);
-    head.appendChild(idSpan);
+    var titleSpan = document.createElement('span');
+    titleSpan.className = 'card-title';
+    titleSpan.textContent = sessionDisplayTitle(s);
+    titleSpan.title = s.first_message || s.session_id;
+    head.appendChild(titleSpan);
     head.appendChild(createStatusBadge(s.status));
     card.appendChild(head);
 
+    // Muted meta line: ID | model | date
+    var metaRow = document.createElement('div');
+    metaRow.className = 'card-meta';
+    var parts = [truncId(s.session_id)];
+    if (s.model) parts.push(s.model);
+    parts.push(relTime(s.created_at));
+    metaRow.textContent = parts.join(' · ');
+    card.appendChild(metaRow);
+
     var rows = [
-      ['Agent', s.agent || '--'],
-      ['Model', s.model || '--'],
-      ['Started', relTime(s.created_at)],
-      ['Events', String(s.total_events || 0)],
-      ['Feature', s.feature_id || '--']
+      ['Messages', s.message_count ? String(s.message_count) : '--'],
+      ['Events', String(s.total_events || 0)]
     ];
     rows.forEach(function(pair) {
       var row = document.createElement('div');
@@ -1252,6 +1433,216 @@ function renderHoursChart() {
   });
   var entries = keys.map(function(k) { return [k, buckets[k]]; });
   renderBarChart('chart-hours', entries);
+}
+
+// ── Transcript detail ─────────────────────────────────────────
+
+function openTranscript(sessionId) {
+  document.getElementById('sessions-list-view').style.display = 'none';
+  var detail = document.getElementById('transcript-detail');
+  detail.className = 'transcript-detail active';
+  document.getElementById('transcript-messages').textContent = 'Loading...';
+  document.getElementById('transcript-stats').textContent = '';
+
+  fetch('/api/transcript?session=' + encodeURIComponent(sessionId) + '&limit=500')
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) { renderTranscript(data); })
+    .catch(function(err) {
+      document.getElementById('transcript-messages').textContent = 'Failed to load transcript: ' + err.message;
+    });
+}
+
+function closeTranscript() {
+  document.getElementById('transcript-detail').className = 'transcript-detail';
+  document.getElementById('sessions-list-view').style.display = '';
+}
+
+document.getElementById('transcript-back').addEventListener('click', closeTranscript);
+
+function renderTranscript(data) {
+  renderTranscriptStats(data);
+  renderTranscriptMessages(data.messages || []);
+}
+
+function renderTranscriptStats(data) {
+  var container = document.getElementById('transcript-stats');
+  container.textContent = '';
+  container.className = 'transcript-stats';
+
+  var msgs = data.messages || [];
+  var totalInput = 0, totalOutput = 0, totalCache = 0;
+  var model = '';
+  msgs.forEach(function(m) {
+    totalInput += m.input_tokens || 0;
+    totalOutput += m.output_tokens || 0;
+    totalCache += m.cache_read_tokens || 0;
+    if (m.model && !model) model = m.model;
+  });
+
+  var firstTs = msgs.length > 0 ? msgs[0].timestamp : '';
+  var lastTs = msgs.length > 0 ? msgs[msgs.length - 1].timestamp : '';
+  var duration = '';
+  if (firstTs && lastTs) {
+    var diffMs = new Date(lastTs).getTime() - new Date(firstTs).getTime();
+    if (diffMs > 0) {
+      var mins = Math.floor(diffMs / 60000);
+      var secs = Math.floor((diffMs % 60000) / 1000);
+      duration = mins > 0 ? mins + 'm ' + secs + 's' : secs + 's';
+    }
+  }
+
+  var items = [
+    ['Session', truncId(data.session_id)],
+    ['Messages', String(data.message_count || 0)],
+    ['Tool Calls', String(data.tool_count || 0)],
+    ['Model', model || '--'],
+    ['Duration', duration || '--'],
+    ['Tokens', fmtTokens(totalInput) + ' in / ' + fmtTokens(totalOutput) + ' out'],
+    ['Cache Read', fmtTokens(totalCache)]
+  ];
+
+  var frag = document.createDocumentFragment();
+  items.forEach(function(pair) {
+    var stat = document.createElement('div');
+    stat.className = 'transcript-stat';
+    var lbl = document.createElement('span');
+    lbl.className = 'label';
+    lbl.textContent = pair[0];
+    var val = document.createElement('span');
+    val.className = 'value';
+    val.textContent = pair[1];
+    stat.appendChild(lbl);
+    stat.appendChild(val);
+    frag.appendChild(stat);
+  });
+  container.appendChild(frag);
+}
+
+function fmtTokens(n) {
+  if (!n || n === 0) return '0';
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+function renderTranscriptMessages(messages) {
+  var container = document.getElementById('transcript-messages');
+  container.textContent = '';
+
+  if (messages.length === 0) {
+    container.textContent = 'No messages in this session.';
+    return;
+  }
+
+  var frag = document.createDocumentFragment();
+  messages.forEach(function(m) {
+    var bubble = document.createElement('div');
+    bubble.className = 'msg-bubble ' + (m.role === 'user' ? 'msg-user' : 'msg-assistant');
+
+    // Meta row: role + model + tokens + timestamp
+    var meta = document.createElement('div');
+    meta.className = 'msg-meta';
+
+    var role = document.createElement('span');
+    role.className = 'msg-role ' + (m.role === 'user' ? 'msg-role-user' : 'msg-role-assistant');
+    role.textContent = m.role;
+    meta.appendChild(role);
+
+    if (m.model) {
+      var modelBdg = document.createElement('span');
+      modelBdg.className = 'model-badge';
+      modelBdg.textContent = m.model;
+      meta.appendChild(modelBdg);
+    }
+
+    if (m.input_tokens || m.output_tokens) {
+      var tokInfo = document.createElement('span');
+      tokInfo.className = 'token-info';
+      var parts = [];
+      if (m.input_tokens) parts.push(fmtTokens(m.input_tokens) + ' in');
+      if (m.output_tokens) parts.push(fmtTokens(m.output_tokens) + ' out');
+      if (m.cache_read_tokens) parts.push(fmtTokens(m.cache_read_tokens) + ' cache');
+      tokInfo.textContent = parts.join(' / ');
+      meta.appendChild(tokInfo);
+    }
+
+    if (m.timestamp) {
+      var ts = document.createElement('span');
+      ts.className = 'token-info';
+      ts.textContent = fmtTime(m.timestamp);
+      meta.appendChild(ts);
+    }
+
+    bubble.appendChild(meta);
+
+    // Content
+    if (m.content) {
+      var content = document.createElement('div');
+      content.className = 'msg-content';
+      var text = m.content;
+      if (text.length > 2000) text = text.substring(0, 2000) + '\n... (truncated)';
+      content.textContent = text;
+      bubble.appendChild(content);
+    }
+
+    // Tool calls
+    if (m.tool_calls && m.tool_calls.length > 0) {
+      var toolsDiv = document.createElement('div');
+      toolsDiv.className = 'msg-tools';
+
+      m.tool_calls.forEach(function(tc) {
+        var chipWrapper = document.createElement('div');
+        chipWrapper.style.display = 'inline-flex';
+        chipWrapper.style.flexDirection = 'column';
+
+        var chip = document.createElement('span');
+        chip.className = 'tool-call-chip';
+
+        var name = document.createElement('span');
+        name.className = 'tool-name';
+        name.textContent = tc.tool_name;
+        chip.appendChild(name);
+
+        if (tc.category && tc.category !== tc.tool_name) {
+          var cat = document.createElement('span');
+          cat.className = 'tool-cat';
+          cat.textContent = tc.category;
+          chip.appendChild(cat);
+        }
+
+        // Click to toggle input preview
+        var preview = document.createElement('div');
+        preview.className = 'tool-input-preview';
+        if (tc.input_json) {
+          try {
+            var parsed = JSON.parse(tc.input_json);
+            preview.textContent = JSON.stringify(parsed, null, 2);
+          } catch(e) {
+            preview.textContent = tc.input_json;
+          }
+        } else {
+          preview.textContent = '(no input)';
+        }
+
+        chip.addEventListener('click', function(e) {
+          e.stopPropagation();
+          preview.classList.toggle('open');
+        });
+
+        chipWrapper.appendChild(chip);
+        chipWrapper.appendChild(preview);
+        toolsDiv.appendChild(chipWrapper);
+      });
+
+      bubble.appendChild(toolsDiv);
+    }
+
+    frag.appendChild(bubble);
+  });
+  container.appendChild(frag);
 }
 
 // ── Init ──────────────────────────────────────────────────────

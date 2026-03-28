@@ -26,7 +26,7 @@ const eventColumns = `event_id, agent_id, event_type, timestamp, tool_name,
 	COALESCE(input_summary, ''), COALESCE(output_summary, ''),
 	session_id, COALESCE(feature_id, ''), status,
 	COALESCE(parent_event_id, ''), COALESCE(subagent_type, ''),
-	COALESCE(model, '')`
+	COALESCE(model, ''), COALESCE(step_id, '')`
 
 // treeHandler returns hierarchical event data grouped by UserQuery turns.
 // GET /api/events/tree?limit=50
@@ -175,12 +175,12 @@ func fetchSubagentOrphans(
 func scanEvent(rows *sql.Rows) map[string]any {
 	var eventID, agentID, eventType, ts, toolName string
 	var inputSum, outputSum, sessionID, featureID, status string
-	var parentEvtID, subagentType, model string
+	var parentEvtID, subagentType, model, stepID string
 
 	if err := rows.Scan(
 		&eventID, &agentID, &eventType, &ts, &toolName,
 		&inputSum, &outputSum, &sessionID, &featureID, &status,
-		&parentEvtID, &subagentType, &model,
+		&parentEvtID, &subagentType, &model, &stepID,
 	); err != nil {
 		return nil
 	}
@@ -198,6 +198,7 @@ func scanEvent(rows *sql.Rows) map[string]any {
 		"status":          status,
 		"parent_event_id": parentEvtID,
 		"subagent_type":   subagentType,
+		"tool_use_id":     stepID,
 		"model":           model,
 	}
 }

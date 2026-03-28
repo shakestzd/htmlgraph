@@ -37,6 +37,9 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("creating indexes: %w", err)
 	}
 
+	// Idempotent migrations for columns added after initial schema.
+	db.Exec(`ALTER TABLE sessions ADD COLUMN title TEXT`)
+
 	return db, nil
 }
 

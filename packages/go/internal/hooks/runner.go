@@ -27,6 +27,7 @@ type CloudEvent struct {
 	// PreToolUse / PostToolUse
 	ToolName  string         `json:"tool_name"`
 	ToolInput map[string]any `json:"tool_input"`
+	ToolUseID string         `json:"tool_use_id"`
 
 	// PostToolUse result
 	ToolResult map[string]any `json:"tool_result"`

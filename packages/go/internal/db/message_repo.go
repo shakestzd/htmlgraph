@@ -58,7 +58,7 @@ func ListMessages(db *sql.DB, sessionID string, limit int) ([]models.Message, er
 		       COALESCE(stop_reason, ''), COALESCE(uuid, ''), COALESCE(parent_uuid, '')
 		FROM messages
 		WHERE session_id = ?
-		ORDER BY ordinal
+		ORDER BY ordinal DESC
 		LIMIT ?`, sessionID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list messages for %s: %w", sessionID, err)

@@ -107,11 +107,21 @@ func recentEventsHandler(database *sql.DB) http.HandlerFunc {
 func sessionsHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.Query(`
-			SELECT session_id, agent_assigned, status, created_at,
-			       COALESCE(completed_at, ''), total_events,
-			       COALESCE(active_feature_id, ''), COALESCE(model, '')
-			FROM sessions
-			ORDER BY created_at DESC
+			SELECT s.session_id, s.agent_assigned, s.status, s.created_at,
+			       COALESCE(s.completed_at, ''), s.total_events,
+			       COALESCE(s.active_feature_id, ''), COALESCE(s.model, ''),
+			       COALESCE(s.title, '') AS title,
+			       COALESCE((SELECT SUBSTR(m.content, 1, 120)
+			                 FROM messages m
+			                 WHERE m.session_id = s.session_id AND m.role = 'user'
+			                 ORDER BY m.ordinal LIMIT 1), '') AS first_msg,
+			       COALESCE((SELECT COUNT(*) FROM messages m2
+			                 WHERE m2.session_id = s.session_id), 0) AS msg_count
+			FROM sessions s
+			WHERE s.total_events > 0
+			   OR EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
+			   OR s.status = 'active'
+			ORDER BY s.created_at DESC
 			LIMIT 20`)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -123,20 +133,24 @@ func sessionsHandler(database *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var sid, agent, status, created, completed string
 			var totalEvents int
-			var featureID, model string
+			var featureID, model, title, firstMsg string
+			var msgCount int
 			if err := rows.Scan(&sid, &agent, &status, &created, &completed,
-				&totalEvents, &featureID, &model); err != nil {
+				&totalEvents, &featureID, &model, &title, &firstMsg, &msgCount); err != nil {
 				continue
 			}
 			sessions = append(sessions, map[string]any{
-				"session_id":   sid,
-				"agent":        agent,
-				"status":       status,
-				"created_at":   created,
-				"completed_at": completed,
-				"total_events": totalEvents,
-				"feature_id":   featureID,
-				"model":        model,
+				"session_id":    sid,
+				"agent":         agent,
+				"status":        status,
+				"created_at":    created,
+				"completed_at":  completed,
+				"total_events":  totalEvents,
+				"feature_id":    featureID,
+				"model":         model,
+				"title":         title,
+				"first_message": firstMsg,
+				"message_count": msgCount,
 			})
 		}
 
