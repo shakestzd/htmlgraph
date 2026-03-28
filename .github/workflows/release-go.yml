@@ -3,7 +3,7 @@ name: Release Go Binary
 on:
   push:
     tags:
-      - 'go/v*'
+      - 'v*'
 
 jobs:
   release:
