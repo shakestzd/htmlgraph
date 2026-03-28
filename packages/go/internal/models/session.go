@@ -44,6 +44,7 @@ type Session struct {
 	PredictedCost          float64  `json:"predicted_cost"`
 	Model                  string   `json:"model,omitempty"`
 	ActiveFeatureID        string   `json:"active_feature_id,omitempty"`
+	GitRemoteURL           string   `json:"git_remote_url,omitempty"`
 }
 
 // ActivityEntry is a lightweight view used in dashboard activity feeds.

@@ -12,18 +12,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
 // activeSessionData is the JSON structure written to .htmlgraph/.active-session
 // as a fallback propagation mechanism when CLAUDE_ENV_FILE is unset (worktree
 // subagents). All fields mirror what writeEnvVars() exports via CLAUDE_ENV_FILE.
 type activeSessionData struct {
-	SessionID    string `json:"session_id"`
-	ParentSession string `json:"parent_session,omitempty"`
-	ParentAgent  string `json:"parent_agent,omitempty"`
-	NestingDepth int    `json:"nesting_depth"`
-	ProjectDir   string `json:"project_dir,omitempty"`
-	Timestamp    float64 `json:"timestamp"`
+	SessionID     string  `json:"session_id"`
+	ParentSession string  `json:"parent_session,omitempty"`
+	ParentAgent   string  `json:"parent_agent,omitempty"`
+	NestingDepth  int     `json:"nesting_depth"`
+	ProjectDir    string  `json:"project_dir,omitempty"`
+	GitRemoteURL  string  `json:"git_remote_url,omitempty"`
+	Timestamp     float64 `json:"timestamp"`
 }
 
 // writeActiveSession writes session context to .htmlgraph/.active-session so
@@ -38,6 +40,7 @@ func writeActiveSession(sessionID, projectDir string) {
 		ParentAgent:  "claude-code",
 		NestingDepth: 0,
 		ProjectDir:   projectDir,
+		GitRemoteURL: paths.GetGitRemoteURL(projectDir),
 		Timestamp:    float64(time.Now().UnixNano()) / 1e9,
 	}
 	b, err := json.Marshal(data)
@@ -103,6 +106,7 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		Model:           os.Getenv("CLAUDE_MODEL"),
 		ParentSessionID: os.Getenv("HTMLGRAPH_PARENT_SESSION"),
 		ParentEventID:   os.Getenv("HTMLGRAPH_PARENT_EVENT"),
+		GitRemoteURL:    paths.GetGitRemoteURL(projectDir),
 	}
 
 	if err := upsertSession(database, s); err != nil {
@@ -123,8 +127,9 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 	_, err := database.Exec(`
 		INSERT OR IGNORE INTO sessions
 			(session_id, agent_assigned, parent_session_id, parent_event_id,
-			 created_at, status, start_commit, is_subagent, model, active_feature_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			 created_at, status, start_commit, is_subagent, model, active_feature_id,
+			 git_remote_url)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.SessionID,
 		s.AgentAssigned,
 		nullableStr(s.ParentSessionID),
@@ -135,6 +140,7 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 		s.IsSubagent,
 		nullableStr(s.Model),
 		nullableStr(s.ActiveFeatureID),
+		nullableStr(s.GitRemoteURL),
 	)
 	return err
 }

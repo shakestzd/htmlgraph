@@ -13,12 +13,13 @@ func InsertSession(db *sql.DB, s *models.Session) error {
 	_, err := db.Exec(`
 		INSERT INTO sessions (session_id, agent_assigned, parent_session_id,
 			parent_event_id, created_at, status, start_commit,
-			is_subagent, model, active_feature_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			is_subagent, model, active_feature_id, git_remote_url)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.SessionID, s.AgentAssigned, nullStr(s.ParentSessionID),
 		nullStr(s.ParentEventID), s.CreatedAt.UTC().Format(time.RFC3339),
 		s.Status, nullStr(s.StartCommit),
 		s.IsSubagent, nullStr(s.Model), nullStr(s.ActiveFeatureID),
+		nullStr(s.GitRemoteURL),
 	)
 	if err != nil {
 		return fmt.Errorf("insert session %s: %w", s.SessionID, err)
