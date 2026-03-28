@@ -61,6 +61,73 @@ func ListFeaturesByFile(db *sql.DB, filePath string) ([]models.FeatureFile, erro
 	return scanFeatureFiles(rows)
 }
 
+// RelatedFeature summarises another feature that shares files with a given one.
+type RelatedFeature struct {
+	FeatureID   string   `json:"feature_id"`
+	Title       string   `json:"title"`
+	SharedCount int      `json:"shared_count"`
+	SharedFiles []string `json:"shared_files"`
+}
+
+// FindRelatedFeatures returns features that share at least one file with
+// featureID, ordered by shared file count descending.
+func FindRelatedFeatures(db *sql.DB, featureID string) ([]RelatedFeature, error) {
+	// Step 1: find related feature IDs and their shared counts.
+	rows, err := db.Query(`
+		SELECT ff2.feature_id, COUNT(DISTINCT ff2.file_path) AS shared_count
+		FROM feature_files ff1
+		JOIN feature_files ff2 ON ff1.file_path = ff2.file_path
+		WHERE ff1.feature_id = ? AND ff2.feature_id != ?
+		GROUP BY ff2.feature_id
+		ORDER BY shared_count DESC`, featureID, featureID)
+	if err != nil {
+		return nil, fmt.Errorf("find related features for %s: %w", featureID, err)
+	}
+	defer rows.Close()
+
+	var related []RelatedFeature
+	for rows.Next() {
+		var r RelatedFeature
+		if err := rows.Scan(&r.FeatureID, &r.SharedCount); err != nil {
+			continue
+		}
+		related = append(related, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Step 2: populate shared file paths and title for each related feature.
+	for i := range related {
+		rid := related[i].FeatureID
+
+		// Shared file paths.
+		fileRows, ferr := db.Query(`
+			SELECT ff2.file_path
+			FROM feature_files ff1
+			JOIN feature_files ff2 ON ff1.file_path = ff2.file_path
+			WHERE ff1.feature_id = ? AND ff2.feature_id = ?
+			GROUP BY ff2.file_path
+			ORDER BY ff2.file_path`, featureID, rid)
+		if ferr == nil {
+			for fileRows.Next() {
+				var fp string
+				if fileRows.Scan(&fp) == nil {
+					related[i].SharedFiles = append(related[i].SharedFiles, fp)
+				}
+			}
+			fileRows.Close()
+		}
+
+		// Title from the features table (empty when not yet indexed).
+		var title string
+		_ = db.QueryRow(`SELECT COALESCE(title, '') FROM features WHERE id = ?`, rid).Scan(&title)
+		related[i].Title = title
+	}
+
+	return related, nil
+}
+
 // scanFeatureFiles reads rows into a slice of FeatureFile.
 func scanFeatureFiles(rows *sql.Rows) ([]models.FeatureFile, error) {
 	var out []models.FeatureFile

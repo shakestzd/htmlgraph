@@ -38,7 +38,7 @@ func main() {
 	rootCmd.AddCommand(statusCmd())
 	rootCmd.AddCommand(statuslineCmd())
 	rootCmd.AddCommand(serveCmd())
-	rootCmd.AddCommand(workitemCmd("feature", "features"))
+	rootCmd.AddCommand(featureCmdWithExtras())
 	rootCmd.AddCommand(workitemCmd("spike", "spikes"))
 	rootCmd.AddCommand(workitemCmd("bug", "bugs"))
 	rootCmd.AddCommand(snapshotCmd())

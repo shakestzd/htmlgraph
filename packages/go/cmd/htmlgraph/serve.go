@@ -58,6 +58,7 @@ func runServer(port int) error {
 	mux.Handle("/api/timeline", corsMiddleware(timelineHandler(database)))
 	mux.Handle("/api/transcript", corsMiddleware(transcriptHandler(database)))
 	mux.Handle("/api/sessions/", corsMiddleware(sessionIngestHandler(database)))
+	mux.Handle("/api/features/related", corsMiddleware(relatedFeaturesHandler(database)))
 
 	// .htmlgraph/ files accessible under /htmlgraph/
 	mux.Handle("/htmlgraph/", corsMiddleware(
