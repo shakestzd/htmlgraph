@@ -149,12 +149,13 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 	event, err := hooks.ReadInput()
 	if err != nil {
-		return hooks.WriteResult(&hooks.HookResult{})
+		// Always return a valid decision so Claude Code doesn't show "hook error"
+		return hooks.Allow()
 	}
 
 	result, err := handler(event)
 	if err != nil || result == nil {
-		return hooks.WriteResult(&hooks.HookResult{})
+		return hooks.Allow()
 	}
 	return hooks.WriteResult(result)
 }
