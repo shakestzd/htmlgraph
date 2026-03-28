@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Debugger: YOLO enforcement gap analysis. Root cause: yolo-prompt.md is advisory text injected into system prompt — zero hooks enforce any of the 9 workflow steps. The PreToolUse hook (orchestrator.go) only warns when no work item is active (advisory, not blocking). The quality gate only checks file size after Write/Edit (PostToolUse, advisory). The budget command exists as CLI but is never called from any hook path. The .git/hooks/pre-commit enforces go build/vet/test but has no YOLO-mode awareness, no budget check, and no test-first check. git config core.hooksPath points to .git/hooks (default), NOT .githooks — so the newer pre-commit-systematic-check.sh in .githooks/ is DEAD CODE. The launch marker (.htmlgraph/.launch-mode) is written at session start but never read by any hook handler, so hooks cannot distinguish YOLO vs normal mode. Fix strategy: (1) Make PreToolUse read .launch-mode and apply stricter guards in YOLO mode, (2) Add a pre-commit hook that calls htmlgraph budget --strict and blocks commits when hard limit exceeded, (3) Add a Bash-command guard that detects git commit without a preceding test run and blocks it in YOLO mode, (4) Fix core.hooksPath to point to .githooks/ not .git/hooks, (5) Document that yolo-prompt.md is guidance only — enforcement requires the above infrastructure.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-28356bd1"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T05:22:36.793342"
+             data-updated="2026-03-28T21:25:39.610013" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Debugger: YOLO enforcement gap analysis. Root cause: yolo-prompt.md is advisory text injected into system prompt — zero hooks enforce any of the 9 workflow steps. The PreToolUse hook (orchestrator.go) only warns when no work item is active (advisory, not blocking). The quality gate only checks file size after Write/Edit (PostToolUse, advisory). The budget command exists as CLI but is never called from any hook path. The .git/hooks/pre-commit enforces go build/vet/test but has no YOLO-mode awareness, no budget check, and no test-first check. git config core.hooksPath points to .git/hooks (default), NOT .githooks — so the newer pre-commit-systematic-check.sh in .githooks/ is DEAD CODE. The launch marker (.htmlgraph/.launch-mode) is written at session start but never read by any hook handler, so hooks cannot distinguish YOLO vs normal mode. Fix strategy: (1) Make PreToolUse read .launch-mode and apply stricter guards in YOLO mode, (2) Add a pre-commit hook that calls htmlgraph budget --strict and blocks commits when hard limit exceeded, (3) Add a Bash-command guard that detects git commit without a preceding test run and blocks it in YOLO mode, (4) Fix core.hooksPath to point to .githooks/ not .git/hooks, (5) Document that yolo-prompt.md is guidance only — enforcement requires the above infrastructure.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>
