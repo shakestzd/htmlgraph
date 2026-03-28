@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Debug investigation: PreToolUse hook errors. Root cause: posttooluse.go recordOrchestratorToolUse() writes to stderr via fmt.Fprintf(os.Stderr,...). Claude Code shows &#39;hook error&#39; in UI for any hook with non-empty stderr, even with exit code 0. Fix: remove stderr write or move analytics to DB-only approach.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-59db6cba"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T15:41:24.535659"
+             data-updated="2026-03-28T20:53:47.1983" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Debug investigation: PreToolUse hook errors. Root cause: posttooluse.go recordOrchestratorToolUse() writes to stderr via fmt.Fprintf(os.Stderr,...). Claude Code shows &#39;hook error&#39; in UI for any hook with non-empty stderr, even with exit code 0. Fix: remove stderr write or move analytics to DB-only approach.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

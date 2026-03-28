@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Implemented on-demand session ingestion API (feat-c6e4a380). Files changed: packages/go/cmd/htmlgraph/api_ingest.go (new), packages/go/cmd/htmlgraph/serve.go (route registration &#43; CORS POST), packages/go/cmd/htmlgraph/dashboard/components/transcript-view.js (call ingest before transcript fetch). Approach: new file api_ingest.go adds POST /api/sessions/{id}/ingest handler that reuses existing ingest machinery (ensureSession, storeParseResult, ingest.DiscoverSessions, ingest.ParseFile). Idempotent: skips re-ingest when transcript_synced &gt;= file mtime. Returns {session_id, status, messages, tool_calls}. Dashboard fires-and-forgets the POST then fetches transcript.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-16323443"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T18:01:12.160865"
+             data-updated="2026-03-28T20:53:47.064179" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Implemented on-demand session ingestion API (feat-c6e4a380). Files changed: packages/go/cmd/htmlgraph/api_ingest.go (new), packages/go/cmd/htmlgraph/serve.go (route registration &#43; CORS POST), packages/go/cmd/htmlgraph/dashboard/components/transcript-view.js (call ingest before transcript fetch). Approach: new file api_ingest.go adds POST /api/sessions/{id}/ingest handler that reuses existing ingest machinery (ensureSession, storeParseResult, ingest.DiscoverSessions, ingest.ParseFile). Idempotent: skips re-ingest when transcript_synced &gt;= file mtime. Returns {session_id, status, messages, tool_calls}. Dashboard fires-and-forgets the POST then fetches transcript.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Implemented .active-session fallback for CLAUDE_ENV_FILE unset in worktree subagents (bug-c45eef1a). Files changed: packages/go/internal/hooks/session_start.go (added activeSessionData struct, writeActiveSession/readActiveSession helpers; updated writeEnvVars to write .active-session fallback; simplified isSubagent), packages/go/internal/hooks/runner.go (updated EnvSessionID to read .active-session as 2nd fallback), packages/go/internal/hooks/attribution.go (cleaned up writeSubagentEnvVars to log and return cleanly when CLAUDE_ENV_FILE unset). Approach: when CLAUDE_ENV_FILE is unset, session_start writes session ID to .htmlgraph/.active-session as JSON. EnvSessionID reads it back in a 3-step chain: env var -&gt; .active-session file -&gt; CloudEvent session_id. The traceparent queue already handles parent linkage for worktree subagents.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-764996f0"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T18:39:39.391228"
+             data-updated="2026-03-28T20:53:46.997181" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Implemented .active-session fallback for CLAUDE_ENV_FILE unset in worktree subagents (bug-c45eef1a). Files changed: packages/go/internal/hooks/session_start.go (added activeSessionData struct, writeActiveSession/readActiveSession helpers; updated writeEnvVars to write .active-session fallback; simplified isSubagent), packages/go/internal/hooks/runner.go (updated EnvSessionID to read .active-session as 2nd fallback), packages/go/internal/hooks/attribution.go (cleaned up writeSubagentEnvVars to log and return cleanly when CLAUDE_ENV_FILE unset). Approach: when CLAUDE_ENV_FILE is unset, session_start writes session ID to .htmlgraph/.active-session as JSON. EnvSessionID reads it back in a 3-step chain: env var -&gt; .active-session file -&gt; CloudEvent session_id. The traceparent queue already handles parent linkage for worktree subagents.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

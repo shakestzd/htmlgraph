@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Implemented git worktree .htmlgraph path resolution fix (bug-c45eef1a). Created packages/go/internal/paths/resolve.go with ResolveViaGitCommonDir() helper that shells out to &#39;git rev-parse --git-common-dir&#39; to detect linked worktrees and return the main repo root. Integrated into hooks/runner.go ResolveProjectDir() (step 2, after CLAUDE_PROJECT_DIR) and cmd/htmlgraph/main.go findHtmlgraphDir() (step 3, after CLAUDE_PROJECT_DIR). Returns empty string for non-git dirs, git not installed, or main worktree (.git literal), falling through to existing walk-up logic. All 8 test packages pass.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-25312b19"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T16:06:22.634579"
+             data-updated="2026-03-28T20:53:47.153738" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Implemented git worktree .htmlgraph path resolution fix (bug-c45eef1a). Created packages/go/internal/paths/resolve.go with ResolveViaGitCommonDir() helper that shells out to &#39;git rev-parse --git-common-dir&#39; to detect linked worktrees and return the main repo root. Integrated into hooks/runner.go ResolveProjectDir() (step 2, after CLAUDE_PROJECT_DIR) and cmd/htmlgraph/main.go findHtmlgraphDir() (step 3, after CLAUDE_PROJECT_DIR). Returns empty string for non-git dirs, git not installed, or main worktree (.git literal), falling through to existing walk-up logic. All 8 test packages pass.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Fixed YOLO worktree guard checking main repo branch instead of target file&#39;s worktree branch. Root cause: pretooluse.go L54 called currentBranchIn(event.CWD) which always returns main repo branch. Fix: added branchForFilePath(filePath, cwdBranch) helper that uses git -C filepath.Dir(filePath) to get the branch of the worktree owning the target file. Falls back to CWD branch when filePath is empty. Files changed: packages/go/internal/hooks/yolo_guard.go (added branchForFilePath helper), packages/go/internal/hooks/pretooluse.go (use branchForFilePath instead of currentBranchIn(event.CWD)), packages/go/internal/hooks/yolo_guard_test.go (added TestBranchForFilePath with real git worktree fixture).</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-6fcf700f"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T18:37:44.543924"
+             data-updated="2026-03-28T20:53:47.019477" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Fixed YOLO worktree guard checking main repo branch instead of target file&#39;s worktree branch. Root cause: pretooluse.go L54 called currentBranchIn(event.CWD) which always returns main repo branch. Fix: added branchForFilePath(filePath, cwdBranch) helper that uses git -C filepath.Dir(filePath) to get the branch of the worktree owning the target file. Falls back to CWD branch when filePath is empty. Files changed: packages/go/internal/hooks/yolo_guard.go (added branchForFilePath helper), packages/go/internal/hooks/pretooluse.go (use branchForFilePath instead of currentBranchIn(event.CWD)), packages/go/internal/hooks/yolo_guard_test.go (added TestBranchForFilePath with real git worktree fixture).</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

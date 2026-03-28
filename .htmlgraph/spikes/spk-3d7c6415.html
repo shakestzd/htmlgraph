@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Implemented dual-write for AddEdge/RemoveEdge to graph_edges SQLite table. Files created: internal/db/edge_repo.go (InsertEdge/DeleteEdge), internal/db/edge_repo_test.go (5 tests). Files modified: internal/workitem/collection.go (dual-write &#43; inferNodeType helper), cmd/htmlgraph/workitem.go (UpdateActiveFeature call on feature start to fix YOLO guard), internal/hooks/yolo_guard_test.go (updated test for pre-existing 4-arg signature). Approach: INSERT OR REPLACE for idempotency; errors non-fatal; inferNodeType derives type from ID prefix.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-3d7c6415"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T18:54:36.365471"
+             data-updated="2026-03-28T20:53:46.974902" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Implemented dual-write for AddEdge/RemoveEdge to graph_edges SQLite table. Files created: internal/db/edge_repo.go (InsertEdge/DeleteEdge), internal/db/edge_repo_test.go (5 tests). Files modified: internal/workitem/collection.go (dual-write &#43; inferNodeType helper), cmd/htmlgraph/workitem.go (UpdateActiveFeature call on feature start to fix YOLO guard), internal/hooks/yolo_guard_test.go (updated test for pre-existing 4-arg signature). Approach: INSERT OR REPLACE for idempotency; errors non-fatal; inferNodeType derives type from ID prefix.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

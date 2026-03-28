@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Investigated bug-c45eef1a (CLAUDE_ENV_FILE diagnostic logging). Both writeEnvVars() in session_start.go and writeSubagentEnvVars() in attribution.go already have the requested stderr logging. Files: packages/go/internal/hooks/session_start.go (lines 93-101), packages/go/internal/hooks/attribution.go (lines 102-111). Approach: Verified stderr is safe — hook runner in hook.go only reads stdin/writes stdout for JSON; stderr flows directly to terminal and does not cause hook errors per Claude Code design.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-12e71854"
+             data-type="spike"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-28T16:33:05.452707"
+             data-updated="2026-03-28T20:53:47.131706" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Investigated bug-c45eef1a (CLAUDE_ENV_FILE diagnostic logging). Both writeEnvVars() in session_start.go and writeSubagentEnvVars() in attribution.go already have the requested stderr logging. Files: packages/go/internal/hooks/session_start.go (lines 93-101), packages/go/internal/hooks/attribution.go (lines 102-111). Approach: Verified stderr is safe — hook runner in hook.go only reads stdin/writes stdout for JSON; stderr flows directly to terminal and does not cause hook errors per Claude Code design.</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>
