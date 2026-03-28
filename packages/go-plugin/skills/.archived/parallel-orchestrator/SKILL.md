@@ -13,7 +13,7 @@ description: ARCHIVED — Use orchestrator-directives-skill instead. Orchestrate
 ## Core Principle: 6-Phase Parallel Workflow
 
 ```
-1. ANALYZE   → htmlgraph analytics recommend + htmlgraph find features --status todo
+1. ANALYZE   → htmlgraph analytics summary + htmlgraph find features --status todo
 2. PREPARE   → Cache shared context, isolate tasks
 3. DISPATCH  → Spawn agents in ONE message (parallel)
 4. MONITOR   → Track health metrics per agent
@@ -27,9 +27,9 @@ description: ARCHIVED — Use orchestrator-directives-skill instead. Orchestrate
 
 ```bash
 # Check what can be parallelized
-htmlgraph analytics recommend
+htmlgraph analytics summary
 htmlgraph find features --status todo
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 ```
 
 ### Decision Criteria
@@ -118,7 +118,7 @@ htmlgraph feature complete <feat-id>
 ### "Not enough independent tasks"
 ```bash
 # Check what's available
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 htmlgraph find features --status todo
 ```
 

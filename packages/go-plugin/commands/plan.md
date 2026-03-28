@@ -80,8 +80,8 @@ Example: /htmlgraph:research "{description}"
 **STEP 2: Get project context**
 
 ```bash
-htmlgraph analytics bottlenecks
-htmlgraph analytics recommend
+htmlgraph analytics summary
+htmlgraph analytics summary
 ```
 
 **STEP 3: Create spike or track**

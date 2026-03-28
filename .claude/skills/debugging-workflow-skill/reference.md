@@ -196,10 +196,10 @@ uv run pytest -x                # Stop on first failure
 uv run pytest --pdb             # Drop into debugger on failure
 
 # HtmlGraph debugging
-uv run htmlgraph orchestrator status  # Check orchestrator state
-uv run htmlgraph status              # List active features
-uv run htmlgraph feature show <id>   # Feature details
-uv run htmlgraph session list --active  # Active sessions
+htmlgraph orchestrator status  # Check orchestrator state
+htmlgraph status              # List active features
+htmlgraph feature show <id>   # Feature details
+htmlgraph session list  # Active sessions
 ```
 
 **Example Delegation:**
@@ -348,34 +348,34 @@ claude plugin update htmlgraph
 
 ```bash
 # Check orchestrator status
-uv run htmlgraph orchestrator status
+htmlgraph orchestrator status
 # Shows: mode (strict/permissive), active features
 
 # List all features
-uv run htmlgraph status
+htmlgraph status
 # Shows: features, status, priority
 
 # View specific feature
-uv run htmlgraph feature show <id>
+htmlgraph feature show <id>
 # Shows: full feature details, edges, steps
 
 # List active sessions
-uv run htmlgraph session list --active
+htmlgraph session list
 # Shows: current sessions with activity
 
 # View session details
-uv run htmlgraph session show <session-id>
+htmlgraph session show <session-id>
 # Shows: session events, timeline
 
 # Sync documentation
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 # Shows: which docs are out of sync
 
 # Analytics
-uv run htmlgraph analytics recommend-next
+htmlgraph analytics summary
 # Shows: recommended work based on analytics
 
-uv run htmlgraph analytics find-bottlenecks
+htmlgraph analytics summary
 # Shows: blocking features
 ```
 
@@ -492,7 +492,7 @@ def fix_attempt_2():
 ### Orchestrator Status
 
 ```bash
-uv run htmlgraph orchestrator status
+htmlgraph orchestrator status
 ```
 
 **Shows:**
@@ -510,16 +510,16 @@ uv run htmlgraph orchestrator status
 
 ```bash
 # List all features
-uv run htmlgraph status
+htmlgraph status
 
 # Show specific feature
-uv run htmlgraph feature show feat-abc123
+htmlgraph feature show feat-abc123
 
 # List by status
-uv run htmlgraph feature list --status in-progress
+htmlgraph feature list --status in-progress
 
 # List by priority
-uv run htmlgraph feature list --priority high
+htmlgraph feature list --priority high
 ```
 
 **Shows:**
@@ -532,16 +532,16 @@ uv run htmlgraph feature list --priority high
 
 ```bash
 # List all sessions
-uv run htmlgraph session list
+htmlgraph session list
 
 # Show active sessions only
-uv run htmlgraph session list --active
+htmlgraph session list
 
 # Show specific session
-uv run htmlgraph session show sess-abc123
+htmlgraph session show sess-abc123
 
 # Session timeline
-uv run htmlgraph session timeline sess-abc123
+htmlgraph session timeline sess-abc123
 ```
 
 **Shows:**
@@ -554,13 +554,13 @@ uv run htmlgraph session timeline sess-abc123
 
 ```bash
 # Recommend next work
-uv run htmlgraph analytics recommend-next
+htmlgraph analytics summary
 
 # Find bottlenecks
-uv run htmlgraph analytics find-bottlenecks
+htmlgraph analytics summary
 
 # Show dependency graph
-uv run htmlgraph analytics dependency-graph
+htmlgraph analytics dependency-graph
 ```
 
 **Shows:**

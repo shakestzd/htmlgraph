@@ -74,8 +74,8 @@ Before creating the plan, check if research was completed:
 
 2. **Get project context:**
    ```bash
-   htmlgraph analytics bottlenecks
-   htmlgraph analytics recommend
+   htmlgraph analytics summary
+   htmlgraph analytics summary
    ```
 
 3. **Create a planning spike:**

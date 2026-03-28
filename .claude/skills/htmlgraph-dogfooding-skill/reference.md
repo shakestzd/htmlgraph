@@ -226,7 +226,7 @@ def sync_memory_files(source: Path, targets: list[Path]):
         print(f"Synced {source} → {target}")
 ```
 
-**Package as:** `htmlgraph sync-docs` generalized to any file patterns
+**Package as:** `# sync-docs not yet in Go CLI` generalized to any file patterns
 
 ### 3. Project Initialization Pattern
 

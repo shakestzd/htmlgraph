@@ -12,14 +12,14 @@ Use this skill for documentation synchronization and memory file management.
 
 ```bash
 # Check if files are synchronized
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 # Synchronize all files (default)
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # Generate platform-specific file
-uv run htmlgraph sync-docs --generate gemini
-uv run htmlgraph sync-docs --generate claude
+# sync-docs not yet in Go CLI
+# sync-docs not yet in Go CLI
 ```
 
 ### Memory File Hierarchy
@@ -92,10 +92,10 @@ Quick example:
 vim AGENTS.md
 
 # 2. Sync to platform files
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # 3. Verify sync
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 # 4. Commit
 git add AGENTS.md CLAUDE.md GEMINI.md
@@ -119,7 +119,7 @@ git commit -m "docs: add Claude orchestrator patterns"
 
 ```bash
 # Check if files are in sync
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 # Output examples:
 # ✅ All files synchronized
@@ -130,10 +130,10 @@ uv run htmlgraph sync-docs --check
 
 ```bash
 # Generate Gemini-specific file from AGENTS.md
-uv run htmlgraph sync-docs --generate gemini
+# sync-docs not yet in Go CLI
 
 # Generate Claude-specific file from AGENTS.md
-uv run htmlgraph sync-docs --generate claude
+# sync-docs not yet in Go CLI
 ```
 
 ### File Structure
@@ -155,8 +155,8 @@ htmlgraph/
 **Pre-commit Check:**
 ```bash
 # Add to pre-commit hook
-uv run htmlgraph sync-docs --check || {
-    echo "⚠️  Documentation out of sync. Run: uv run htmlgraph sync-docs"
+# sync-docs not yet in Go CLI || {
+    echo "⚠️  Documentation out of sync. Run: # sync-docs not yet in Go CLI"
     exit 1
 }
 ```
@@ -165,10 +165,10 @@ uv run htmlgraph sync-docs --check || {
 ```bash
 # In deploy-all.sh
 echo "Checking documentation sync..."
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 if [ $? -ne 0 ]; then
     echo "Auto-syncing documentation..."
-    uv run htmlgraph sync-docs
+    # sync-docs not yet in Go CLI
 fi
 ```
 
@@ -223,7 +223,7 @@ sdk.spikes.get('spk-12345').add_finding('Discovered issue').save()
 EOF
 
 # 2. Sync
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # 3. Verify CLAUDE.md and GEMINI.md reference it
 grep -A 2 "SDK Usage" CLAUDE.md GEMINI.md
@@ -249,7 +249,7 @@ vim AGENTS.md
 # Update example
 
 # 2. Sync to propagate
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # 3. All platform files now have updated example
 ```

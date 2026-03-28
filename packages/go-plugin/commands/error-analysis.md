@@ -219,7 +219,7 @@ This command follows the research-first debugging methodology from `.claude/rule
 Use these commands to begin:
 ```bash
 # View spike in dashboard
-uv run htmlgraph serve
+htmlgraph serve
 # Open: http://localhost:8080
 
 # Research if needed (unfamiliar error)

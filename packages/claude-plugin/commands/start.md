@@ -31,8 +31,8 @@ Begin a new development session and choose what to work on
 
 1. **Get comprehensive session start info:**
    ```bash
-   uv run htmlgraph snapshot --summary  # Quick visual overview (colors preserved)
-   uv run htmlgraph session start-info  # Detailed analytics
+   htmlgraph snapshot --summary  # Quick visual overview (colors preserved)
+   htmlgraph status  # Detailed analytics
    ```
 
    This replaces 6+ separate calls:

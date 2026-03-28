@@ -36,10 +36,10 @@ HtmlGraph provides analytics that consider:
 
 ```bash
 # 1. What should I work on? (recommendations)
-htmlgraph analytics recommend
+htmlgraph analytics summary
 
 # 2. What's blocking progress?
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 
 # 3. Project snapshot (status + WIP)
 htmlgraph snapshot --summary
@@ -52,12 +52,12 @@ htmlgraph find features --status in-progress
 
 ## CLI Reference
 
-### `htmlgraph analytics bottlenecks`
+### `htmlgraph analytics summary`
 
 Find tasks that block the most downstream work.
 
 ```bash
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 ```
 
 **Use when:**
@@ -67,12 +67,12 @@ htmlgraph analytics bottlenecks
 
 ---
 
-### `htmlgraph analytics recommend`
+### `htmlgraph analytics summary`
 
 Get scored recommendations considering all factors.
 
 ```bash
-htmlgraph analytics recommend
+htmlgraph analytics summary
 ```
 
 **Scoring factors:**
@@ -125,7 +125,7 @@ htmlgraph snapshot --summary
 # Get project status overview
 htmlgraph status
 htmlgraph snapshot --summary
-htmlgraph analytics recommend
+htmlgraph analytics summary
 ```
 
 ---
@@ -134,7 +134,7 @@ htmlgraph analytics recommend
 
 ```bash
 # Find what's causing the block
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 htmlgraph find features --status blocked
 ```
 
@@ -144,7 +144,7 @@ htmlgraph find features --status blocked
 
 ```bash
 # Check what's ready (no dependencies)
-htmlgraph analytics recommend
+htmlgraph analytics summary
 htmlgraph find features --status todo
 ```
 
@@ -167,8 +167,8 @@ Use CLI analytics to inform planning decisions:
 
 ```bash
 # Get full picture before planning
-htmlgraph analytics recommend
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
+htmlgraph analytics summary
 htmlgraph snapshot --summary
 
 # Then create a spike to document the plan
@@ -200,10 +200,10 @@ htmlgraph spike create "Plan: Real-time collaboration — [analysis findings]"
 
 ```bash
 # What's blocking us?
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 
 # What should I do?
-htmlgraph analytics recommend
+htmlgraph analytics summary
 
 # Project snapshot
 htmlgraph snapshot --summary

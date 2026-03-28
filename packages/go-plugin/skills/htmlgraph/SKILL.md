@@ -257,7 +257,7 @@ When coordinating multiple agents with Task tool, follow this structured workflo
 **Quick Start - Parallel Execution:**
 ```bash
 # Check what's ready (no dependencies = safe to parallelize)
-htmlgraph analytics recommend
+htmlgraph analytics summary
 htmlgraph find features --status todo
 ```
 
@@ -316,8 +316,8 @@ htmlgraph feature show <id>
 
 # Analytics
 htmlgraph snapshot --summary
-htmlgraph analytics recommend
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
+htmlgraph analytics summary
 ```
 
 **Why SDK is best:**
@@ -477,7 +477,7 @@ Validation **DENIES** code changes (Write/Edit/Delete) when ALL of these are tru
 ```
 PreToolUse Validation: Cannot proceed without active work item
 - Reason: Multi-file changes (5 files) without tracked work item
-- Action: Create a feature first with uv run htmlgraph feature create
+- Action: Create a feature first with htmlgraph feature create
 ```
 
 **Resolution:** Create a feature using the feature decision framework, then try again.
@@ -573,7 +573,7 @@ User request or idea
 3. ✅ You explore and read code (no restrictions)
 4. ✅ You ask user what to work on
 5. ✅ User says: "Implement user authentication"
-6. ✅ You create feature: `uv run htmlgraph feature create "User Authentication"`
+6. ✅ You create feature: `htmlgraph feature create "User Authentication"`
 7. ✅ Feature becomes primary (replaces auto-spike attribution)
 8. ✅ You can now code freely
 
@@ -588,7 +588,7 @@ User request or idea
 **WITHOUT feature:**
 ```bash
 # Try to edit 5 files without creating a feature
-uv run htmlgraph something that touches 5 files
+htmlgraph something that touches 5 files
 
 # Validation DENIES:
 # ❌ PreToolUse Validation: Cannot proceed without active work item
@@ -599,7 +599,7 @@ uv run htmlgraph something that touches 5 files
 **WITH feature:**
 ```bash
 # Create the feature first
-uv run htmlgraph feature create "User Authentication"
+htmlgraph feature create "User Authentication"
 # → feat-abc123 created and marked in-progress
 
 # Now implement - all 5 files allowed
@@ -655,7 +655,7 @@ htmlgraph feature list
 htmlgraph feature start <feature-id>
 
 # Set Primary Feature (when multiple are active)
-htmlgraph feature primary <feature-id>
+htmlgraph feature start <feature-id>
 
 # Complete a Feature
 htmlgraph feature complete <feature-id>
@@ -673,8 +673,8 @@ htmlgraph feature show <id>
 
 # Analytics
 htmlgraph snapshot --summary
-htmlgraph analytics recommend
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
+htmlgraph analytics summary
 ```
 
 ---
@@ -687,7 +687,7 @@ htmlgraph analytics bottlenecks
 
 ```bash
 # Get smart recommendations on what to work on
-htmlgraph analytics recommend
+htmlgraph analytics summary
 ```
 
 ### Available Strategic Planning Features
@@ -697,7 +697,7 @@ htmlgraph analytics recommend
 Identify tasks blocking the most downstream work:
 
 ```bash
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 ```
 
 #### 2. Get Parallel Work
@@ -713,7 +713,7 @@ htmlgraph find features --status todo
 Get smart recommendations considering priority, dependencies, and impact:
 
 ```bash
-htmlgraph analytics recommend
+htmlgraph analytics summary
 ```
 
 #### 4. Assess Risks ⚠️
@@ -731,8 +731,8 @@ This provides a project health overview including blocked tasks and dependency i
 See what work is available and what's blocking progress:
 
 ```bash
-htmlgraph analytics bottlenecks
-htmlgraph analytics recommend
+htmlgraph analytics summary
+htmlgraph analytics summary
 ```
 
 ### Recommended Decision Flow
@@ -741,10 +741,10 @@ At the start of each work session:
 
 ```bash
 # 1. Check for bottlenecks
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
 
 # 2. Get recommendations
-htmlgraph analytics recommend
+htmlgraph analytics summary
 
 # 3. Check parallel opportunities
 htmlgraph find features --status todo
@@ -755,8 +755,8 @@ htmlgraph snapshot --summary
 
 ### When to Use Each Command
 
-- **`htmlgraph analytics bottlenecks`**: At session start, during sprint planning
-- **`htmlgraph analytics recommend`**: When deciding what task to pick up
+- **`htmlgraph analytics summary`**: At session start, during sprint planning
+- **`htmlgraph analytics summary`**: When deciding what task to pick up
 - **`htmlgraph find features --status todo`**: When coordinating multiple agents
 - **`htmlgraph snapshot --summary`**: During project health checks, before milestones
 
@@ -793,7 +793,7 @@ Dispatch all independent tasks in a single message for true parallelism:
 
 ```python
 # 1. ANALYZE - Check what's available
-# Run: htmlgraph analytics recommend
+# Run: htmlgraph analytics summary
 # Run: htmlgraph find features --status todo
 
 # 2. DISPATCH - Spawn all agents in ONE message (parallel)
@@ -1115,7 +1115,7 @@ See `docs/WORKFLOW.md` for the complete decision framework with detailed criteri
 ### Session Start (DO THESE FIRST)
 1. ✅ Activate this skill (done automatically)
 2. ✅ **AUTO-SPIKE CREATED:** Validation hook automatically creates an auto-spike for session exploration (see "Auto-Spike Integration" section)
-3. ✅ **RUN:** `uv run htmlgraph session start-info` - Get comprehensive session context (optimized, 1 call)
+3. ✅ **RUN:** `htmlgraph status` - Get comprehensive session context (optimized, 1 call)
    - Replaces: status + feature list + session list + git log + analytics
    - Reduces context usage from 30% to <5%
 4. ✅ Review active features and decide if you need to create a new one
@@ -1183,7 +1183,7 @@ When you see a drift warning like:
 
 Consider:
 1. **Is this expected?** Sometimes work naturally spans multiple features
-2. **Should you switch features?** Use `uv run htmlgraph feature primary <id>` to change attribution
+2. **Should you switch features?** Use `htmlgraph feature start <id>` to change attribution
 3. **Is the feature scope wrong?** The feature's file patterns or keywords may need updating
 
 ## Session Continuity
@@ -1225,14 +1225,14 @@ Bash(command="npm install")
 ### Decision Documentation
 When making architectural decisions:
 
-1. Track with `uv run htmlgraph track "Decision" "Chose X over Y because Z"`
+1. Track with `htmlgraph track "Decision" "Chose X over Y because Z"`
 2. Or note in the feature's HTML file under activity log
 
 ## Dashboard Access
 
 View progress visually:
 ```bash
-uv run htmlgraph serve
+htmlgraph serve
 # Open http://localhost:8080
 ```
 

@@ -55,7 +55,7 @@ Complete the current active feature
 
 5. **Recommend next steps:**
    ```bash
-   htmlgraph analytics recommend
+   htmlgraph analytics summary
    ```
    - If pending features exist → Suggest starting the next feature
    - If all features done → Congratulate on completion
@@ -73,7 +73,7 @@ Complete the current active feature
 {progress from `htmlgraph status` output}
 
 ### What's Next?
-{top recommendation from `htmlgraph analytics recommend`}
+{top recommendation from `htmlgraph analytics summary`}
 
 **DELEGATION**: Delegate implementation based on complexity:
 - Simple fixes (1-2 files) → `Task(subagent_type="htmlgraph:haiku-coder")`

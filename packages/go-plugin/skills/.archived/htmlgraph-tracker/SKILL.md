@@ -17,7 +17,7 @@ description: ARCHIVED — Use htmlgraph skill instead. HtmlGraph workflow combin
 ```bash
 # Session start
 htmlgraph status
-htmlgraph analytics recommend
+htmlgraph analytics summary
 
 # Create and track work
 htmlgraph feature create "Title"
@@ -58,8 +58,8 @@ htmlgraph track new "Title"
 ## Analytics
 
 ```bash
-htmlgraph analytics recommend
-htmlgraph analytics bottlenecks
+htmlgraph analytics summary
+htmlgraph analytics summary
 htmlgraph snapshot --summary
 htmlgraph find features --status todo
 ```

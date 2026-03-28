@@ -32,8 +32,8 @@ Begin a new development session and choose what to work on
 1. **Get comprehensive session start info:**
    ```bash
    htmlgraph snapshot --summary
-   htmlgraph analytics recommend
-   htmlgraph analytics bottlenecks
+   htmlgraph analytics summary
+   htmlgraph analytics summary
    ```
 
 2. **Parse the output** to extract:

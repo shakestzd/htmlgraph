@@ -41,12 +41,12 @@ This command uses the CLI's analytics commands.
 
 1. **Get recommendations:**
    ```bash
-   htmlgraph analytics recommend
+   htmlgraph analytics summary
    ```
 
 2. **Optionally check bottlenecks:**
    ```bash
-   htmlgraph analytics bottlenecks
+   htmlgraph analytics summary
    ```
 
 3. **Present results** using the output template below.

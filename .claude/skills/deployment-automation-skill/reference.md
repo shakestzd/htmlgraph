@@ -317,7 +317,7 @@ git diff --quiet index.html && echo "In sync" || echo "Out of sync"
 
 ## Memory File Synchronization
 
-**CRITICAL: Use `uv run htmlgraph sync-docs` to maintain documentation consistency.**
+**CRITICAL: Use `# sync-docs not yet in Go CLI` to maintain documentation consistency.**
 
 HtmlGraph uses a centralized documentation pattern:
 - **AGENTS.md** - Single source of truth (SDK, API, CLI, workflows)
@@ -328,14 +328,14 @@ HtmlGraph uses a centralized documentation pattern:
 
 ```bash
 # Check if files are synchronized
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 # Generate platform-specific file
-uv run htmlgraph sync-docs --generate gemini
-uv run htmlgraph sync-docs --generate claude
+# sync-docs not yet in Go CLI
+# sync-docs not yet in Go CLI
 
 # Synchronize all files (default)
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 ```
 
 ### Why This Matters
@@ -377,8 +377,8 @@ uv pip install dist/htmlgraph-0.3.0-py3-none-any.whl --force-reinstall
 python -c "import htmlgraph; print(htmlgraph.__version__)"
 
 # Test CLI
-uv run htmlgraph --help
-uv run htmlgraph status
+htmlgraph --help
+htmlgraph status
 ```
 
 ### Documentation-Only Updates
@@ -395,7 +395,7 @@ uv run htmlgraph status
 ./scripts/deploy-all.sh 0.3.0 --skip-pypi
 
 # Test locally installed package
-uv run htmlgraph status
+htmlgraph status
 python -c "import htmlgraph; print(htmlgraph.__version__)"
 ```
 

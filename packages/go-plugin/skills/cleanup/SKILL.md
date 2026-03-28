@@ -15,13 +15,13 @@ Use this skill after parallel execution completes to clean up worktrees and bran
 
 ```bash
 # Remove all merged worktrees
-uv run htmlgraph worktree cleanup
+git worktree prune
 
 # Force remove all worktrees (including unmerged)
-uv run htmlgraph worktree cleanup --force
+git worktree prune
 
 # Remove specific task worktree
-uv run htmlgraph worktree cleanup --task task-001
+git worktree remove <path>
 ```
 
 ---
@@ -32,21 +32,21 @@ uv run htmlgraph worktree cleanup --task task-001
 
 ```bash
 # See what's still active
-uv run htmlgraph worktree status
+git worktree list
 ```
 
 ### Step 2: Merge Any Remaining Work
 
 ```bash
 # Merge completed tasks first
-uv run htmlgraph worktree merge <task-id>
+git merge <branch> --no-edit
 ```
 
 ### Step 3: Run Cleanup
 
 ```bash
 # Safe cleanup - only removes merged branches
-uv run htmlgraph worktree cleanup
+git worktree prune
 
 # Or use the shell script directly
 ./scripts/worktree-cleanup.sh

@@ -132,7 +132,7 @@ Find all roborev bugs:
 
 ```bash
 # Via HtmlGraph CLI
-uv run htmlgraph status --filter "title:roborev"
+htmlgraph status --filter "title:roborev"
 
 # Via SQL
 sqlite3 .htmlgraph/htmlgraph.db "

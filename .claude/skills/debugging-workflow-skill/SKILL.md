@@ -79,10 +79,10 @@ claude --debug <command>        # Verbose output
 claude --verbose               # Detailed logging
 
 # HtmlGraph debugging
-uv run htmlgraph orchestrator status
-uv run htmlgraph status
-uv run htmlgraph feature show <id>
-uv run htmlgraph session list --active
+htmlgraph orchestrator status
+htmlgraph status
+htmlgraph feature show <id>
+htmlgraph session list
 ```
 
 ## Quality Gates
@@ -196,7 +196,7 @@ spike = sdk.spikes.create('Investigation: Duplicate hooks error') \
 
 ### Quick diagnosis
 ```bash
-uv run htmlgraph wip   # Shows all active items with ages
+htmlgraph wip   # Shows all active items with ages
 ```
 
 Or via SDK:

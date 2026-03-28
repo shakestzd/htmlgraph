@@ -39,8 +39,8 @@ This command uses the Go binary to retrieve work recommendations and bottleneck 
 
 ### Implementation:
 
-1. Run `packages/go-plugin/hooks/bin/htmlgraph analytics recommend` to get recommended work items
-2. If `--check-bottlenecks` is true (default), also run `packages/go-plugin/hooks/bin/htmlgraph analytics bottlenecks`
+1. Run `packages/go-plugin/hooks/bin/htmlgraph analytics summary` to get recommended work items
+2. If `--check-bottlenecks` is true (default), also run `packages/go-plugin/hooks/bin/htmlgraph analytics summary`
 3. Parse the CLI output (table format) and present it nicely in markdown
 4. Include the command output as-is, formatting it for readability
 
@@ -48,10 +48,10 @@ This command uses the Go binary to retrieve work recommendations and bottleneck 
 
 ```bash
 # Get recommendations (shows top N items with scores)
-packages/go-plugin/hooks/bin/htmlgraph analytics recommend
+packages/go-plugin/hooks/bin/htmlgraph analytics summary
 
 # Get bottlenecks (shows blocking items with impact scores)
-packages/go-plugin/hooks/bin/htmlgraph analytics bottlenecks
+packages/go-plugin/hooks/bin/htmlgraph analytics summary
 
 # Optional: Get work summary
 packages/go-plugin/hooks/bin/htmlgraph analytics summary

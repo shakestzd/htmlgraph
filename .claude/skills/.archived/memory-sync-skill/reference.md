@@ -127,7 +127,7 @@ For more: deployment, CLI, best practices → see AGENTS.md
 
 ## Command Reference
 
-### `htmlgraph sync-docs`
+### `# sync-docs not yet in Go CLI`
 
 Main command for documentation synchronization.
 
@@ -135,17 +135,17 @@ Main command for documentation synchronization.
 
 ```bash
 # Check synchronization status
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 # Synchronize all files (default)
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # Generate specific platform file
-uv run htmlgraph sync-docs --generate gemini
-uv run htmlgraph sync-docs --generate claude
+# sync-docs not yet in Go CLI
+# sync-docs not yet in Go CLI
 
 # Verbose output
-uv run htmlgraph sync-docs --verbose
+# sync-docs not yet in Go CLI --verbose
 ```
 
 #### Options
@@ -169,7 +169,7 @@ uv run htmlgraph sync-docs --verbose
 
 **Check before commit:**
 ```bash
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 if [ $? -eq 0 ]; then
     echo "✅ Documentation synchronized"
     git commit -m "docs: update SDK examples"
@@ -185,9 +185,9 @@ fi
 # .git/hooks/pre-commit
 
 echo "Checking documentation sync..."
-uv run htmlgraph sync-docs --check || {
+# sync-docs not yet in Go CLI || {
     echo "Auto-syncing documentation..."
-    uv run htmlgraph sync-docs
+    # sync-docs not yet in Go CLI
     git add AGENTS.md CLAUDE.md GEMINI.md
 }
 ```
@@ -195,7 +195,7 @@ uv run htmlgraph sync-docs --check || {
 **Generate platform file:**
 ```bash
 # Regenerate GEMINI.md from AGENTS.md
-uv run htmlgraph sync-docs --generate gemini
+# sync-docs not yet in Go CLI
 
 # Review changes
 git diff GEMINI.md
@@ -403,10 +403,10 @@ vim AGENTS.md
 # Update multiple features in one call...
 
 # 2. Sync to platform files
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # 3. Verify synchronization
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 # 4. Commit
 git add AGENTS.md CLAUDE.md GEMINI.md
@@ -444,7 +444,7 @@ vim AGENTS.md
 # Fix example code
 
 # 2. Sync propagates to all platform files
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # 3. All files now reference updated example
 git diff CLAUDE.md GEMINI.md  # No changes (they reference AGENTS.md)
@@ -463,12 +463,12 @@ git commit -m "docs: fix SDK initialization example"
 #!/bin/bash
 
 echo "Checking documentation sync..."
-uv run htmlgraph sync-docs --check
+# sync-docs not yet in Go CLI
 
 if [ $? -ne 0 ]; then
     echo ""
     echo "⚠️  Documentation out of sync!"
-    echo "Run: uv run htmlgraph sync-docs"
+    echo "Run: # sync-docs not yet in Go CLI"
     echo ""
     exit 1
 fi
@@ -481,9 +481,9 @@ fi
 ```bash
 # In deploy-all.sh
 step "Verify Documentation Sync" || {
-    uv run htmlgraph sync-docs --check || {
+    # sync-docs not yet in Go CLI || {
         echo "Documentation out of sync. Auto-syncing..."
-        uv run htmlgraph sync-docs
+        # sync-docs not yet in Go CLI
         git add AGENTS.md CLAUDE.md GEMINI.md
         git commit -m "chore: sync documentation"
     }
@@ -498,7 +498,7 @@ step "Verify Documentation Sync" || {
 
 **Symptom:**
 ```bash
-$ uv run htmlgraph sync-docs --check
+$ # sync-docs not yet in Go CLI
 ⚠️  CLAUDE.md out of sync with AGENTS.md
 ```
 
@@ -507,7 +507,7 @@ $ uv run htmlgraph sync-docs --check
 **Fix:**
 ```bash
 # Auto-fix with sync
-uv run htmlgraph sync-docs
+# sync-docs not yet in Go CLI
 
 # Or manually replace with reference:
 vim CLAUDE.md
@@ -551,7 +551,7 @@ vim CLAUDE.md
 
 **Symptom:**
 ```bash
-$ uv run htmlgraph sync-docs
+$ # sync-docs not yet in Go CLI
 Error: Command 'sync-docs' not found
 ```
 
@@ -563,7 +563,7 @@ Error: Command 'sync-docs' not found
 uv pip install --upgrade htmlgraph
 
 # Verify version
-uv run htmlgraph --version
+htmlgraph --version
 ```
 
 ---
@@ -601,8 +601,8 @@ sync.run()
 
 ```bash
 # Future feature
-uv run htmlgraph sync-docs --section "SDK Usage"
-uv run htmlgraph sync-docs --section "CLI Commands"
+# sync-docs not yet in Go CLI --section "SDK Usage"
+# sync-docs not yet in Go CLI --section "CLI Commands"
 ```
 
 ### Dry-Run Mode
@@ -611,7 +611,7 @@ uv run htmlgraph sync-docs --section "CLI Commands"
 
 ```bash
 # Future feature
-uv run htmlgraph sync-docs --dry-run
+# sync-docs not yet in Go CLI --dry-run
 
 # Output:
 # Would update CLAUDE.md:

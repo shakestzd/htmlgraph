@@ -119,7 +119,7 @@ GROUP BY priority;
 ### Find High Priority RoboRev Issues
 
 ```bash
-uv run htmlgraph status --filter "title:roborev priority:high"
+htmlgraph status --filter "title:roborev priority:high"
 ```
 
 ## Environment Setup

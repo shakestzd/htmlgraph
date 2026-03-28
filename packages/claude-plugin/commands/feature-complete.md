@@ -77,7 +77,7 @@ This command uses the CLI's `feature complete` command.
 
 Get recommendations for next work:
 ```bash
-htmlgraph analytics recommend
+htmlgraph analytics summary
 ```
 
 If no pending work, plan new features with `/htmlgraph:plan`.

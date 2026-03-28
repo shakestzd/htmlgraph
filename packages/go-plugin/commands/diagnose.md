@@ -36,8 +36,8 @@ htmlgraph status
 htmlgraph session list --limit 1
 
 # 2. Query current session events (delegation audit)
-htmlgraph analytics bottlenecks
-htmlgraph analytics recommend
+htmlgraph analytics summary
+htmlgraph analytics summary
 ```
 
 Parse the output to identify:

@@ -135,7 +135,7 @@ Present the report in this format:
 
 ### Recommendations
 1. [Based on gaps found, give specific actionable recommendations]
-2. Enable strict mode: `uv run htmlgraph orchestrator enable --level strict`
+2. Enable strict mode: `htmlgraph orchestrator`
 3. Use /htmlgraph:copilot skill for git ops
 4. Delegate Edit/Write to coder agents via Task()
 ```
