@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/pkg/sdk"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -81,40 +81,40 @@ func runFind(collection string, opts findOpts) error {
 		return err
 	}
 
-	s, err := sdk.New(dir, "claude-code")
+	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
 	// Build query.
-	var q *sdk.Query
+	var q *workitem.Query
 	if collection == "all" {
-		q = s.FindAll()
+		q = p.FindAll()
 	} else {
-		q = s.Find(collection)
+		q = p.Find(collection)
 	}
 
 	// Apply filters.
 	if opts.status != "" {
-		q = q.Where(sdk.StatusIs(opts.status))
+		q = q.Where(workitem.StatusIs(opts.status))
 	}
 	if opts.priority != "" {
-		q = q.Where(sdk.PriorityIs(opts.priority))
+		q = q.Where(workitem.PriorityIs(opts.priority))
 	}
 	if opts.title != "" {
-		q = q.Where(sdk.TitleContains(opts.title))
+		q = q.Where(workitem.TitleContains(opts.title))
 	}
 	if opts.trackID != "" {
-		q = q.Where(sdk.TrackIs(opts.trackID))
+		q = q.Where(workitem.TrackIs(opts.trackID))
 	}
 	if opts.agent != "" {
-		q = q.Where(sdk.AgentIs(opts.agent))
+		q = q.Where(workitem.AgentIs(opts.agent))
 	}
 
 	// Apply ordering.
 	if opts.orderBy != "" {
-		q = q.OrderBy(opts.orderBy, sdk.Asc)
+		q = q.OrderBy(opts.orderBy, workitem.Asc)
 	}
 
 	// Apply limit.

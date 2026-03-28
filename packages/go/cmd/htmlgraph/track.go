@@ -11,7 +11,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/pkg/sdk"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -52,20 +52,20 @@ func runTrackNew(title, priority, description string) error {
 		return err
 	}
 
-	s, err := sdk.New(dir, "cli")
+	p, err := workitem.Open(dir, "cli")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
-	opts := []sdk.TrackOption{
-		sdk.TrackWithPriority(priority),
+	opts := []workitem.TrackOption{
+		workitem.TrackWithPriority(priority),
 	}
 	if description != "" {
-		opts = append(opts, sdk.TrackWithContent(description))
+		opts = append(opts, workitem.TrackWithContent(description))
 	}
 
-	node, err := s.Tracks.Create(title, opts...)
+	node, err := p.Tracks.Create(title, opts...)
 	if err != nil {
 		return fmt.Errorf("create track: %w", err)
 	}

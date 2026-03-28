@@ -8,7 +8,7 @@ import (
 
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/pkg/sdk"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -100,18 +100,18 @@ func runSpikeCreate(title, trackID, priority string) error {
 	if err != nil {
 		return err
 	}
-	s, err := sdk.New(dir, "claude-code")
+	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
-	opts := []sdk.SpikeOption{sdk.SpikeWithPriority(priority)}
+	opts := []workitem.SpikeOption{workitem.SpikeWithPriority(priority)}
 	if trackID != "" {
-		opts = append(opts, sdk.SpikeWithTrack(trackID))
+		opts = append(opts, workitem.SpikeWithTrack(trackID))
 	}
 
-	node, err := s.Spikes.Create(title, opts...)
+	node, err := p.Spikes.Create(title, opts...)
 	if err != nil {
 		return fmt.Errorf("create spike: %w", err)
 	}

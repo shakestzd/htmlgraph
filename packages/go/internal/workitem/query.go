@@ -1,4 +1,4 @@
-package sdk
+package workitem
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ const (
 // Query is a chainable query builder for HtmlGraph nodes.
 // Build a query with Find/FindAll, add Where/OrderBy/Limit, then Execute.
 type Query struct {
-	sdk        *SDK
+	project    *Project
 	collection string // empty means all collections
 	predicates []Predicate
 	orderField string
@@ -32,17 +32,17 @@ type Query struct {
 }
 
 // Find begins a query scoped to a single collection (e.g. "features", "bugs").
-func (s *SDK) Find(collection string) *Query {
+func (p *Project) Find(collection string) *Query {
 	return &Query{
-		sdk:        s,
+		project:    p,
 		collection: collection,
 	}
 }
 
 // FindAll begins a query that spans all collections.
-func (s *SDK) FindAll() *Query {
+func (p *Project) FindAll() *Query {
 	return &Query{
-		sdk: s,
+		project: p,
 	}
 }
 
@@ -110,11 +110,10 @@ func (q *Query) Count() (int, error) {
 // loadNodes loads raw nodes from the appropriate collection(s).
 func (q *Query) loadNodes() ([]*models.Node, error) {
 	if q.collection == "" {
-		return graph.LoadAll(q.sdk.ProjectDir)
+		return graph.LoadAll(q.project.ProjectDir)
 	}
 
-	// Map collection name to directory.
-	dir := q.sdk.collectionDir(q.collection)
+	dir := q.project.collectionDir(q.collection)
 	if dir == "" {
 		return nil, fmt.Errorf("unknown collection %q", q.collection)
 	}
@@ -163,7 +162,6 @@ func (q *Query) applySort(nodes []*models.Node) {
 }
 
 // compareNodes compares two nodes by the configured sort field.
-// Returns negative if a < b, positive if a > b, zero if equal.
 func (q *Query) compareNodes(a, b *models.Node) int {
 	switch strings.ToLower(q.orderField) {
 	case "created", "created_at":
@@ -187,16 +185,16 @@ func (q *Query) compareNodes(a, b *models.Node) int {
 }
 
 // collectionDir maps a collection name to its directory path.
-func (s *SDK) collectionDir(name string) string {
+func (p *Project) collectionDir(name string) string {
 	switch name {
 	case "features":
-		return s.FeaturesDir()
+		return p.FeaturesDir()
 	case "bugs":
-		return s.BugsDir()
+		return p.BugsDir()
 	case "spikes":
-		return s.SpikesDir()
+		return p.SpikesDir()
 	case "tracks":
-		return s.TracksDir()
+		return p.TracksDir()
 	default:
 		return ""
 	}

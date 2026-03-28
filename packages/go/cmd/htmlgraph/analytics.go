@@ -8,7 +8,6 @@ import (
 
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/pkg/sdk"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +18,6 @@ func analyticsCmd() *cobra.Command {
 	}
 	cmd.AddCommand(analyticsSummaryCmd())
 	cmd.AddCommand(analyticsVelocityCmd())
-	cmd.AddCommand(analyticsRecommendCmd())
-	cmd.AddCommand(analyticsBottlenecksCmd())
 	return cmd
 }
 
@@ -183,134 +180,5 @@ func progressBar(count, maxWidth int) string {
 		bar[i] = '█'
 	}
 	return string(bar)
-}
-
-// analyticsRecommendCmd suggests the next items to work on.
-func analyticsRecommendCmd() *cobra.Command {
-	var count int
-	cmd := &cobra.Command{
-		Use:   "recommend",
-		Short: "Suggest next work items ordered by track and item priority",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runAnalyticsRecommend(count)
-		},
-	}
-	cmd.Flags().IntVar(&count, "count", 5, "number of recommendations to show")
-	return cmd
-}
-
-func runAnalyticsRecommend(count int) error {
-	dir, err := findHtmlgraphDir()
-	if err != nil {
-		return err
-	}
-
-	s, err := sdk.New(dir, "cli")
-	if err != nil {
-		return fmt.Errorf("init sdk: %w", err)
-	}
-	defer s.Close()
-
-	recs, err := s.RecommendNextWork()
-	if err != nil {
-		return fmt.Errorf("recommend next work: %w", err)
-	}
-
-	if count > 0 && len(recs) > count {
-		recs = recs[:count]
-	}
-
-	fmt.Printf("Recommended next work  (%s)\n\n", dir)
-
-	if len(recs) == 0 {
-		fmt.Println("No todo items found.")
-		return nil
-	}
-
-	fmt.Printf("%-20s  %-8s  %-20s  %-30s  %s\n", "ID", "PRIORITY", "TRACK", "TITLE", "REASON")
-	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────")
-
-	for _, r := range recs {
-		trackID := r.TrackID
-		if trackID == "" {
-			trackID = "—"
-		}
-		title := r.Title
-		if len(title) > 30 {
-			title = title[:27] + "..."
-		}
-		fmt.Printf("%-20s  %-8s  %-20s  %-30s  %s\n",
-			r.ItemID, r.Priority, trackID, title, r.Reason)
-	}
-	return nil
-}
-
-// analyticsBottlenecksCmd finds stale items and overloaded tracks.
-func analyticsBottlenecksCmd() *cobra.Command {
-	var top int
-	cmd := &cobra.Command{
-		Use:   "bottlenecks",
-		Short: "Find stale in-progress items and overloaded tracks",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runAnalyticsBottlenecks(top)
-		},
-	}
-	cmd.Flags().IntVar(&top, "top", 5, "maximum number of bottlenecks to show")
-	return cmd
-}
-
-func runAnalyticsBottlenecks(top int) error {
-	dir, err := findHtmlgraphDir()
-	if err != nil {
-		return err
-	}
-
-	s, err := sdk.New(dir, "cli")
-	if err != nil {
-		return fmt.Errorf("init sdk: %w", err)
-	}
-	defer s.Close()
-
-	bns, err := s.FindBottlenecks()
-	if err != nil {
-		return fmt.Errorf("find bottlenecks: %w", err)
-	}
-
-	if top > 0 && len(bns) > top {
-		bns = bns[:top]
-	}
-
-	fmt.Printf("Bottlenecks  (%s)\n\n", dir)
-
-	if len(bns) == 0 {
-		fmt.Println("No bottlenecks detected.")
-		return nil
-	}
-
-	fmt.Printf("%-20s  %-8s  %-10s  %s\n", "ID", "TYPE", "DURATION", "REASON")
-	fmt.Println("────────────────────────────────────────────────────────────────")
-
-	for _, b := range bns {
-		dur := "—"
-		if b.Duration > 0 {
-			dur = formatDuration(b.Duration)
-		}
-		fmt.Printf("%-20s  %-8s  %-10s  %s\n", b.ItemID, b.Type, dur, b.Reason)
-	}
-	return nil
-}
-
-// formatDuration formats a duration as "Xh" or "Xd Yh".
-func formatDuration(d time.Duration) string {
-	hours := int(d.Hours())
-	if hours < 24 {
-		return fmt.Sprintf("%dh", hours)
-	}
-	days := hours / 24
-	rem := hours % 24
-	if rem == 0 {
-		return fmt.Sprintf("%dd", days)
-	}
-	return fmt.Sprintf("%dd %dh", days, rem)
 }
 

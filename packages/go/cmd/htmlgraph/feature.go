@@ -10,7 +10,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/pkg/sdk"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -147,13 +147,13 @@ func runFeatureStart(id string) error {
 	if err != nil {
 		return err
 	}
-	s, err := sdk.New(dir, "claude-code")
+	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
-	node, err := s.Features.Start(id)
+	node, err := p.Features.Start(id)
 	if err != nil {
 		return fmt.Errorf("start feature: %w", err)
 	}
@@ -178,13 +178,13 @@ func runFeatureComplete(id string) error {
 	if err != nil {
 		return err
 	}
-	s, err := sdk.New(dir, "claude-code")
+	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
-	node, err := s.Features.Complete(id)
+	node, err := p.Features.Complete(id)
 	if err != nil {
 		return fmt.Errorf("complete feature: %w", err)
 	}
@@ -214,18 +214,18 @@ func runFeatureCreate(title, trackID, priority string) error {
 	if err != nil {
 		return err
 	}
-	s, err := sdk.New(dir, "claude-code")
+	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
-	opts := []sdk.FeatureOption{sdk.FeatWithPriority(priority)}
+	opts := []workitem.FeatureOption{workitem.FeatWithPriority(priority)}
 	if trackID != "" {
-		opts = append(opts, sdk.FeatWithTrack(trackID))
+		opts = append(opts, workitem.FeatWithTrack(trackID))
 	}
 
-	node, err := s.Features.Create(title, opts...)
+	node, err := p.Features.Create(title, opts...)
 	if err != nil {
 		return fmt.Errorf("create feature: %w", err)
 	}

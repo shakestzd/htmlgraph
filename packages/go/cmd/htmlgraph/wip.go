@@ -10,7 +10,7 @@ import (
 
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/pkg/sdk"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -102,14 +102,14 @@ func runWipReset(force bool) error {
 		return nil
 	}
 
-	s, err := sdk.New(dir, "claude-code")
+	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
-		return fmt.Errorf("open SDK: %w", err)
+		return fmt.Errorf("open project: %w", err)
 	}
-	defer s.Close()
+	defer p.Close()
 
 	for _, n := range items {
-		if err := resetNodeToTodo(s, n); err != nil {
+		if err := resetNodeToTodo(p, n); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: reset %s: %v\n", n.ID, err)
 			continue
 		}
@@ -120,24 +120,24 @@ func runWipReset(force bool) error {
 }
 
 // resetNodeToTodo writes the node back with status=todo and cleared agent.
-func resetNodeToTodo(s *sdk.SDK, n *models.Node) error {
+func resetNodeToTodo(p *workitem.Project, n *models.Node) error {
 	n.Status = models.StatusTodo
 	n.AgentAssigned = ""
 	n.UpdatedAt = time.Now().UTC()
-	dir := collectionDir(s, n.Type)
-	_, err := sdk.WriteNodeHTML(dir, n)
+	dir := collectionDir(p, n.Type)
+	_, err := workitem.WriteNodeHTML(dir, n)
 	return err
 }
 
 // collectionDir maps a node type to its collection directory.
-func collectionDir(s *sdk.SDK, nodeType string) string {
+func collectionDir(p *workitem.Project, nodeType string) string {
 	switch nodeType {
 	case "bug":
-		return s.BugsDir()
+		return p.BugsDir()
 	case "spike":
-		return s.SpikesDir()
+		return p.SpikesDir()
 	default: // "feature" and anything else
-		return s.FeaturesDir()
+		return p.FeaturesDir()
 	}
 }
 
