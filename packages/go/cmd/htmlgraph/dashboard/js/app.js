@@ -95,7 +95,9 @@ function renderSessions() {
     titleSpan.title = s.first_message || s.session_id;
     head.appendChild(titleSpan);
     head.appendChild(createStatusBadge(s.status));
-    if (stats.launch_mode === 'yolo' && s.status === 'active') {
+    var isYoloSession = (s.title && /yolo/i.test(s.title))
+      || (s.first_message && /yolo/i.test(s.first_message));
+    if (isYoloSession) {
       var yoloBadge = document.createElement('span');
       yoloBadge.className = 'badge-yolo';
       yoloBadge.textContent = 'YOLO';

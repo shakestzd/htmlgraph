@@ -276,11 +276,20 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 		database.QueryRow(`SELECT COUNT(*) FROM sessions WHERE status='active'`).Scan(&activeSessions)
 		database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents)
 
-		// Read launch mode
+		// Read launch mode and timestamp
 		launchMode := ""
+		launchTimestamp := ""
 		if data, err := os.ReadFile(filepath.Join(projectDir, ".launch-mode")); err == nil {
-			if strings.Contains(string(data), `"yolo`) {
+			content := string(data)
+			if strings.Contains(content, `"yolo`) {
 				launchMode = "yolo"
+			}
+			// Extract timestamp: {"mode":"yolo-dev","pid":123,"timestamp":"2026-..."}
+			if idx := strings.Index(content, `"timestamp":"`); idx >= 0 {
+				rest := content[idx+13:]
+				if end := strings.Index(rest, `"`); end >= 0 {
+					launchTimestamp = rest[:end]
+				}
 			}
 		}
 
@@ -292,6 +301,7 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 			"active_sessions":      activeSessions,
 			"total_events":         totalEvents,
 			"launch_mode":          launchMode,
+			"launch_timestamp":     launchTimestamp,
 		})
 	}
 }
