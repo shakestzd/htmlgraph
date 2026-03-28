@@ -243,15 +243,17 @@ func runWiSetStatus(typeName, id, status string) error {
 		return fmt.Errorf("set %s %s: %w", typeName, status, err)
 	}
 
-	// When starting a work item, update active_feature_id on the DB session row
-	// so the YOLO guard can see the active work item without reading HTML files.
-	if status == "in-progress" && p.DB != nil {
-		projectDir := strings.TrimSuffix(dir, "/.htmlgraph")
+	// When starting a work item, update active_feature_id and create
+	// an implemented_in edge linking the work item to this session.
+	if status == "in-progress" {
 		sessionID := hooks.EnvSessionID("")
 		if sessionID != "" {
-			_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
+			if p.DB != nil {
+				_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
+			}
+			// Auto-create implemented_in edge (idempotent — skip if exists).
+			autoImplementedInEdge(col, id, sessionID)
 		}
-		_ = projectDir // used implicitly via EnvSessionID resolution
 	}
 
 	verb := "Started"
@@ -396,6 +398,28 @@ func printNodeDetail(n *models.Node) {
 			fmt.Printf("  %s\n", line)
 		}
 	}
+}
+
+// autoImplementedInEdge creates an implemented_in edge from a work item to
+// a session. Idempotent: skips if edge already exists. Non-fatal on error.
+func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string) {
+	node, err := col.Get(itemID)
+	if err != nil {
+		return
+	}
+	// Check for existing implemented_in edge to this session.
+	for _, e := range node.Edges[string(models.RelImplementedIn)] {
+		if e.TargetID == sessionID {
+			return // already linked
+		}
+	}
+	edge := models.Edge{
+		TargetID:     sessionID,
+		Relationship: models.RelImplementedIn,
+		Title:        "session " + sessionID,
+		Since:        time.Now().UTC(),
+	}
+	_, _ = col.AddEdge(itemID, edge)
 }
 
 // autoTrackEdges creates bidirectional part_of/contains edges between a work
