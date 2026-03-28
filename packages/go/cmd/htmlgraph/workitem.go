@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/hooks"
@@ -96,6 +97,14 @@ func runWiCreate(typeName, title, trackID, priority string, start bool) error {
 	if err != nil {
 		return fmt.Errorf("create %s: %w", typeName, err)
 	}
+
+	// Auto-create bidirectional part_of/contains edges when --track is used.
+	if trackID != "" && typeName != "track" {
+		if linkErr := autoTrackEdges(p, node.ID, typeName, trackID, node.Title); linkErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: auto-link to track failed: %v\n", linkErr)
+		}
+	}
+
 	if start {
 		if _, startErr := collectionFor(p, typeName).Start(node.ID); startErr != nil {
 			return fmt.Errorf("start %s: %w", typeName, startErr)
@@ -387,4 +396,35 @@ func printNodeDetail(n *models.Node) {
 			fmt.Printf("  %s\n", line)
 		}
 	}
+}
+
+// autoTrackEdges creates bidirectional part_of/contains edges between a work
+// item and its track. Errors are non-fatal (warn-not-block).
+func autoTrackEdges(p *workitem.Project, itemID, typeName, trackID, itemTitle string) error {
+	now := time.Now().UTC()
+
+	// item → track (part_of)
+	col := collectionFor(p, typeName)
+	partOf := models.Edge{
+		TargetID:     trackID,
+		Relationship: models.RelPartOf,
+		Title:        trackID,
+		Since:        now,
+	}
+	if _, err := col.AddEdge(itemID, partOf); err != nil {
+		return fmt.Errorf("part_of: %w", err)
+	}
+
+	// track → item (contains)
+	contains := models.Edge{
+		TargetID:     itemID,
+		Relationship: models.RelContains,
+		Title:        itemTitle,
+		Since:        now,
+	}
+	if _, err := p.Tracks.AddEdge(trackID, contains); err != nil {
+		return fmt.Errorf("contains: %w", err)
+	}
+
+	return nil
 }
