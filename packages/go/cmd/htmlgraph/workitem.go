@@ -99,6 +99,11 @@ func runWiCreate(typeName, title, trackID, priority string, start, noLink bool) 
 		return fmt.Errorf("create %s: %w", typeName, err)
 	}
 
+	// Warn about missing track (spikes and tracks are exempt).
+	if trackID == "" && typeName != "track" && typeName != "spike" {
+		fmt.Fprintf(os.Stderr, "Warning: no track specified. Use --track to link this %s to an initiative.\n", typeName)
+	}
+
 	// Auto-create caused_by edge: bug → active feature (when available).
 	if typeName == "bug" && !noLink {
 		if featID := detectActiveFeature(p, dir); featID != "" {
