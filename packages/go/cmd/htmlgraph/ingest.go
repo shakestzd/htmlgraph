@@ -175,10 +175,20 @@ func storeParseResult(database *sql.DB, sessionID string, result *ingest.ParseRe
 		msgCount++
 	}
 
+	// Fetch the session's active_feature_id to tag each tool call.
+	var activeFeatureID string
+	database.QueryRow(
+		`SELECT COALESCE(active_feature_id, '') FROM sessions WHERE session_id = ?`,
+		sessionID,
+	).Scan(&activeFeatureID)
+
 	for _, tc := range result.ToolCalls {
 		tc.SessionID = sessionID
 		if mid, ok := msgIDs[tc.MessageOrdinal]; ok {
 			tc.MessageID = int(mid)
+		}
+		if activeFeatureID != "" {
+			tc.FeatureID = activeFeatureID
 		}
 		if err := dbpkg.InsertToolCall(database, &tc); err != nil {
 			fmt.Fprintf(os.Stderr, "    warn: tool %s: %v\n", tc.ToolName, err)
