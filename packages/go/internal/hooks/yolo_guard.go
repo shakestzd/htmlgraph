@@ -207,8 +207,8 @@ func hasRecentDiffReview(database *sql.DB, sessionID string) bool {
 }
 
 // currentBranch returns the current git branch name.
-func currentBranch() string {
-	out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+func currentBranchIn(dir string) string {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
 	if err != nil {
 		return ""
 	}
