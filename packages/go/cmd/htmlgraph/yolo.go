@@ -223,7 +223,7 @@ func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, ext
 
 	return launchClaude(LaunchOpts{
 		Mode:             "yolo",
-		SystemPromptDir:  pluginDir,
+		PluginDir:        pluginDir,
 		SystemPromptFile: tmpFile.Name(),
 		PermissionMode:   permMode,
 		Name:             sessionName,
