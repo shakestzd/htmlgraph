@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -173,6 +174,12 @@ func summariseInput(toolName string, input map[string]any) string {
 	if input == nil {
 		return toolName
 	}
+
+	// Read tool: include offset/limit as line range suffix.
+	if toolName == "Read" {
+		return summariseReadInput(input)
+	}
+
 	// For file tools, use the path.
 	for _, key := range []string{"path", "file_path", "command", "query", "prompt"} {
 		if v, ok := input[key].(string); ok && v != "" {
@@ -189,6 +196,53 @@ func summariseInput(toolName string, input map[string]any) string {
 		s = s[:200] + "…"
 	}
 	return s
+}
+
+// summariseReadInput builds a summary for the Read tool that includes the file
+// path and optional line range from offset/limit parameters.
+// Examples:
+//
+//	"/path/to/file.go"              — no offset/limit
+//	"/path/to/file.go [100:150]"    — offset=100, limit=50
+//	"/path/to/file.go [100:]"       — offset=100, no limit
+//	"/path/to/file.go [:50]"        — no offset, limit=50
+func summariseReadInput(input map[string]any) string {
+	filePath := extractFilePath(input)
+	if filePath == "" {
+		return "Read"
+	}
+
+	offset := toInt(input["offset"])
+	limit := toInt(input["limit"])
+
+	if offset > 0 || limit > 0 {
+		switch {
+		case offset > 0 && limit > 0:
+			filePath += fmt.Sprintf(" [%d:%d]", offset, offset+limit)
+		case offset > 0:
+			filePath += fmt.Sprintf(" [%d:]", offset)
+		default:
+			filePath += fmt.Sprintf(" [:%d]", limit)
+		}
+	}
+
+	if len(filePath) > 120 {
+		filePath = filePath[:120] + "…"
+	}
+	return filePath
+}
+
+// toInt converts a JSON number (float64) to int, returning 0 for non-numeric values.
+func toInt(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case int64:
+		return int(n)
+	}
+	return 0
 }
 
 // agentIDFromEnv returns the current agent ID.

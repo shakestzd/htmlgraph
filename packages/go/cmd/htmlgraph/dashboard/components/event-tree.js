@@ -176,7 +176,7 @@ class HgEventTree extends HTMLElement {
       + expandIcon
       + '<span class="event-time">' + formatTime(evt.timestamp) + '</span>'
       + agentBadge
-      + '<span class="tool-chip tool-' + esc(evt.tool_name) + '">' + esc(evt.tool_name) + '</span>'
+      + '<span class="tool-chip tool-' + esc(evt.tool_name) + '">' + esc(evt.tool_name) + toolChipRange(evt) + '</span>'
       + subagentBadge
       + '<span class="event-summary">' + esc(evt.input_summary || evt.output_summary || '') + '</span>'
       + this.featureBadge(evt.feature_id)

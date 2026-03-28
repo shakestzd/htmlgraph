@@ -36,6 +36,9 @@ type CloudEvent struct {
 	AgentID   string `json:"agent_id"`
 	AgentType string `json:"agent_type"`
 
+	// WorktreeCreate / WorktreeRemove
+	WorktreePath string `json:"worktree_path"`
+
 	// Stop / SubagentStop
 	StopReason           string `json:"stop_reason"`
 	LastAssistantMessage string `json:"last_assistant_message"`

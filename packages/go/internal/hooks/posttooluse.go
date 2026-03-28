@@ -27,7 +27,7 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		status = "failed"
 	}
 
-	outputSummary := summariseOutput(event.ToolResult)
+	outputSummary := summariseToolOutput(event.ToolName, event.ToolInput, event.ToolResult, success)
 
 	// For subagent events, scope the lookup to this specific agent to avoid
 	// completing events belonging to a different concurrent agent.
@@ -176,4 +176,114 @@ func summariseOutput(result map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// summariseToolOutput builds a tool-specific structured output summary that
+// captures key metadata (file path, success, content length) rather than raw
+// output text. Falls back to summariseOutput for unrecognised tools.
+func summariseToolOutput(toolName string, input map[string]any, result map[string]any, success bool) string {
+	switch toolName {
+	case "Read":
+		return summariseReadOutput(input, result, success)
+	case "Write":
+		return summariseWriteOutput(input, success)
+	case "Edit", "MultiEdit":
+		return summariseEditOutput(input, success)
+	case "Glob":
+		return summariseGlobOutput(result, success)
+	case "Grep":
+		return summariseGrepOutput(result, success)
+	default:
+		return summariseOutput(result)
+	}
+}
+
+func summariseReadOutput(input, result map[string]any, success bool) string {
+	filePath := extractFilePath(input)
+	if filePath == "" {
+		filePath = "unknown"
+	}
+	if !success {
+		return fmt.Sprintf("%s (error)", filePath)
+	}
+	// Count lines in content to report size.
+	content := ""
+	for _, key := range []string{"output", "content", "result"} {
+		if v, ok := result[key].(string); ok {
+			content = v
+			break
+		}
+	}
+	lines := countLines(content)
+	return fmt.Sprintf("%s (ok, %d lines)", filePath, lines)
+}
+
+func summariseWriteOutput(input map[string]any, success bool) string {
+	filePath := extractFilePath(input)
+	if filePath == "" {
+		filePath = "unknown"
+	}
+	if !success {
+		return fmt.Sprintf("%s (error)", filePath)
+	}
+	return fmt.Sprintf("%s (written)", filePath)
+}
+
+func summariseEditOutput(input map[string]any, success bool) string {
+	filePath := extractFilePath(input)
+	if filePath == "" {
+		filePath = "unknown"
+	}
+	if !success {
+		return fmt.Sprintf("%s (error)", filePath)
+	}
+	return fmt.Sprintf("%s (edited)", filePath)
+}
+
+func summariseGlobOutput(result map[string]any, success bool) string {
+	if !success {
+		return "glob (error)"
+	}
+	content := ""
+	for _, key := range []string{"output", "content", "result"} {
+		if v, ok := result[key].(string); ok {
+			content = v
+			break
+		}
+	}
+	n := countLines(content)
+	return fmt.Sprintf("%d files matched", n)
+}
+
+func summariseGrepOutput(result map[string]any, success bool) string {
+	if !success {
+		return "grep (error)"
+	}
+	content := ""
+	for _, key := range []string{"output", "content", "result"} {
+		if v, ok := result[key].(string); ok {
+			content = v
+			break
+		}
+	}
+	n := countLines(content)
+	return fmt.Sprintf("%d matches", n)
+}
+
+// countLines returns the number of non-empty lines in s.
+func countLines(s string) int {
+	if s == "" {
+		return 0
+	}
+	n := 1
+	for i := range s {
+		if s[i] == '\n' {
+			n++
+		}
+	}
+	// Don't count trailing newline as an extra line.
+	if len(s) > 0 && s[len(s)-1] == '\n' {
+		n--
+	}
+	return n
 }

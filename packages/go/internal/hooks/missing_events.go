@@ -68,6 +68,13 @@ func PreCompact(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	return recordSimpleEvent(models.EventCheckPoint, "PreCompact", "Conversation compaction triggered", "recorded", event, database)
 }
 
+// PostCompact handles the PostCompact Claude Code hook event.
+// Records a checkpoint after conversation context compaction completes, so
+// subsequent re-reads of already-seen files are explainable in the timeline.
+func PostCompact(event *CloudEvent, database *sql.DB) (*HookResult, error) {
+	return recordSimpleEvent(models.EventCheckPoint, "PostCompact", "Conversation compaction completed", "recorded", event, database)
+}
+
 // TeammateIdle handles the TeammateIdle Claude Code hook event.
 // Records a teammate_idle event when a teammate agent goes idle.
 func TeammateIdle(event *CloudEvent, database *sql.DB) (*HookResult, error) {
@@ -94,6 +101,26 @@ func PermissionRequest(event *CloudEvent, database *sql.DB) (*HookResult, error)
 		summary = fmt.Sprintf("Permission requested for tool: %s", event.ToolName)
 	}
 	return recordSimpleEvent(models.EventCheckPoint, "PermissionRequest", summary, "recorded", event, database)
+}
+
+// WorktreeCreate handles the WorktreeCreate Claude Code hook event.
+// Records when a git worktree is created for isolated work.
+func WorktreeCreate(event *CloudEvent, database *sql.DB) (*HookResult, error) {
+	summary := "Worktree created"
+	if event.WorktreePath != "" {
+		summary = fmt.Sprintf("Worktree created: %s", event.WorktreePath)
+	}
+	return recordSimpleEvent(models.EventCheckPoint, "WorktreeCreate", summary, "recorded", event, database)
+}
+
+// WorktreeRemove handles the WorktreeRemove Claude Code hook event.
+// Records when a git worktree is removed after work is complete.
+func WorktreeRemove(event *CloudEvent, database *sql.DB) (*HookResult, error) {
+	summary := "Worktree removed"
+	if event.WorktreePath != "" {
+		summary = fmt.Sprintf("Worktree removed: %s", event.WorktreePath)
+	}
+	return recordSimpleEvent(models.EventCheckPoint, "WorktreeRemove", summary, "recorded", event, database)
 }
 
 // PostToolUseFailure handles the PostToolUseFailure Claude Code hook event.

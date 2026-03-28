@@ -39,6 +39,7 @@ func Open(dbPath string) (*sql.DB, error) {
 
 	// Idempotent migrations for columns added after initial schema.
 	db.Exec(`ALTER TABLE sessions ADD COLUMN title TEXT`)
+	db.Exec(`ALTER TABLE sessions ADD COLUMN active_feature_id TEXT`)
 
 	return db, nil
 }

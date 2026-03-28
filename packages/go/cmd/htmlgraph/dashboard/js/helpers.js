@@ -50,6 +50,14 @@ function summaryText(evt) {
   return evt.input_summary || evt.output_summary || evt.summary || '';
 }
 
+// Extract line range from Read input_summary for display in tool chip.
+// Returns e.g. " [100:150]" or "" if no range present.
+function toolChipRange(evt) {
+  if (evt.tool_name !== 'Read' || !evt.input_summary) return '';
+  var m = evt.input_summary.match(/\s(\[\d*:\d*\])$/);
+  return m ? ' ' + m[1] : '';
+}
+
 function truncId(id) {
   if (!id) return '--';
   if (id.length <= 16) return id;
