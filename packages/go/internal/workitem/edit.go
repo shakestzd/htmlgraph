@@ -100,6 +100,19 @@ func (e *EditBuilder) SetTrack(trackID string) *EditBuilder {
 	return e
 }
 
+// AddStep appends an implementation step to the node.
+func (e *EditBuilder) AddStep(description string) *EditBuilder {
+	if e.err != nil {
+		return e
+	}
+	stepID := fmt.Sprintf("step-%s-%d", e.node.ID, len(e.node.Steps))
+	e.node.Steps = append(e.node.Steps, models.Step{
+		StepID:      stepID,
+		Description: description,
+	})
+	return e
+}
+
 // Save applies all buffered changes and writes the node to disk.
 // Returns an error if the initial load or the write fails.
 func (e *EditBuilder) Save() error {

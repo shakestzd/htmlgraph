@@ -27,6 +27,7 @@ func workitemCmd(typeName, dirName string) *cobra.Command {
 	cmd.AddCommand(wiStartCmd(typeName))
 	cmd.AddCommand(wiCompleteCmd(typeName))
 	cmd.AddCommand(wiDeleteCmd(typeName))
+	cmd.AddCommand(wiAddStepCmd(typeName))
 	return cmd
 }
 
@@ -272,5 +273,35 @@ func runWiDelete(id string) error {
 		return fmt.Errorf("delete %s: %w", id, err)
 	}
 	fmt.Printf("Deleted: %s\n", id)
+	return nil
+}
+
+func wiAddStepCmd(typeName string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "add-step <id> <description>",
+		Short: "Add an implementation step to a " + typeName,
+		Args:  cobra.ExactArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runWiAddStep(typeName, args[0], args[1])
+		},
+	}
+}
+
+func runWiAddStep(typeName, id, description string) error {
+	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	p, err := workitem.Open(dir, "claude-code")
+	if err != nil {
+		return fmt.Errorf("open project: %w", err)
+	}
+	defer p.Close()
+
+	col := collectionFor(p, typeName)
+	if err := col.Edit(id).AddStep(description).Save(); err != nil {
+		return fmt.Errorf("add step: %w", err)
+	}
+	fmt.Printf("Added step to %s: %s\n", id, description)
 	return nil
 }
