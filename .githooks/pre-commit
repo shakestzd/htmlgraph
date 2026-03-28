@@ -36,4 +36,16 @@ if git diff --cached --name-only | grep -q '\.go$' || [ -d "$GO_PKG" ]; then
     fi
 fi
 
+# YOLO mode budget check: enforce file/line limits
+if [ -f "$REPO_ROOT/.htmlgraph/.launch-mode" ] && grep -q '"yolo' "$REPO_ROOT/.htmlgraph/.launch-mode"; then
+    HTMLGRAPH_BIN="$GO_PKG/htmlgraph"
+    if [ -x "$HTMLGRAPH_BIN" ]; then
+        echo "  -> YOLO budget check..."
+        if ! "$HTMLGRAPH_BIN" budget --strict 2>/dev/null; then
+            echo "FAIL: YOLO budget exceeded. Split into sub-features."
+            exit 1
+        fi
+    fi
+fi
+
 echo "All pre-commit checks passed!"

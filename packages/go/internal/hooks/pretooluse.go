@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -30,12 +31,32 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	// Guard: block bare `cd` in Bash commands that pollute the working directory.
-	// Subshells `(cd dir && cmd)` are fine — only bare `cd` drifts CWD permanently.
 	if warn := checkBashCwdGuard(event); warn != "" {
 		return &HookResult{
 			Decision: "block",
 			Reason:   warn,
 		}, nil
+	}
+
+	// YOLO mode enforcement: check launch mode and apply guards.
+	projectDir := ResolveProjectDir(event.CWD)
+	yolo := isYoloMode(filepath.Join(projectDir, ".htmlgraph"))
+
+	if warn := checkYoloWorkItemGuard(event.ToolName, ctx.FeatureID, yolo); warn != "" {
+		return &HookResult{
+			Decision: "block",
+			Reason:   warn,
+		}, nil
+	}
+
+	if yolo {
+		testRan := hasRecentTestRun(database, ctx.SessionID)
+		if warn := checkYoloCommitGuard(event, yolo, testRan); warn != "" {
+			return &HookResult{
+				Decision: "block",
+				Reason:   warn,
+			}, nil
+		}
 	}
 
 	parentEventID := resolveParentEventID(database, ctx.SessionID, event.AgentID, ctx.IsSubagent)
