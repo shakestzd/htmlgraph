@@ -44,6 +44,7 @@ func Open(dbPath string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE agent_events ADD COLUMN subagent_type TEXT`)
 	db.Exec(`ALTER TABLE sessions ADD COLUMN git_remote_url TEXT`)
 	db.Exec(`ALTER TABLE sessions ADD COLUMN project_dir TEXT`)
+	db.Exec(`ALTER TABLE tool_calls ADD COLUMN feature_id TEXT`)
 
 	return db, nil
 }
@@ -277,7 +278,8 @@ func CreateAllTables(db *sql.DB) error {
 			tool_use_id TEXT,
 			input_json TEXT,
 			result_content_length INTEGER DEFAULT 0,
-			subagent_session_id TEXT
+			subagent_session_id TEXT,
+			feature_id TEXT
 		)`,
 
 		// 12. agent_presence
@@ -363,6 +365,7 @@ func CreateAllIndexes(db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_tool_calls_message ON tool_calls(message_id)",
 		"CREATE INDEX IF NOT EXISTS idx_tool_calls_name ON tool_calls(tool_name)",
 		"CREATE INDEX IF NOT EXISTS idx_tool_calls_category ON tool_calls(category)",
+		"CREATE INDEX IF NOT EXISTS idx_tool_calls_feature ON tool_calls(feature_id)",
 		// agent_presence
 		"CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status, last_activity DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_agent_presence_feature ON agent_presence(current_feature_id, last_activity DESC)",

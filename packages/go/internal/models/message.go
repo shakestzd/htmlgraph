@@ -34,6 +34,7 @@ type ToolCall struct {
 	InputJSON           string `json:"input_json,omitempty"`
 	ResultContentLength int    `json:"result_content_length,omitempty"`
 	SubagentSessionID   string `json:"subagent_session_id,omitempty"`
+	FeatureID           string `json:"feature_id,omitempty"`
 }
 
 // ToolCategory normalises a tool name to a canonical category.
