@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
+
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 )
 
 // FilterFunc is a predicate applied to nodes during queries.
@@ -185,6 +188,8 @@ func (c *Collection) Complete(id string) (*models.Node, error) {
 // --- Edge operations ---------------------------------------------------------
 
 // AddEdge reads a node, appends an edge, and writes it back to disk.
+// It also dual-writes to graph_edges in SQLite when a DB connection is available.
+// HTML is canonical; SQLite errors are non-fatal.
 func (c *Collection) AddEdge(id string, e models.Edge) (*models.Node, error) {
 	node, err := c.Get(id)
 	if err != nil {
@@ -194,11 +199,25 @@ func (c *Collection) AddEdge(id string, e models.Edge) (*models.Node, error) {
 	if _, err := c.writeNode(node); err != nil {
 		return nil, fmt.Errorf("add edge %s: %w", id, err)
 	}
+
+	// Dual-write to SQLite read index.
+	if c.base.DB != nil {
+		edgeID := fmt.Sprintf("%s-%s-%s", id, string(e.Relationship), e.TargetID)
+		_ = dbpkg.InsertEdge(
+			c.base.DB,
+			edgeID, id, c.nodeType,
+			e.TargetID, inferNodeType(e.TargetID),
+			string(e.Relationship),
+			e.Properties,
+		)
+	}
+
 	return node, nil
 }
 
 // RemoveEdge reads a node, removes the matching edge, and writes it back.
 // Returns the updated node and whether an edge was actually removed.
+// It also removes the corresponding row from graph_edges in SQLite.
 func (c *Collection) RemoveEdge(id, targetID string, relType models.RelationshipType) (*models.Node, bool, error) {
 	node, err := c.Get(id)
 	if err != nil {
@@ -211,7 +230,36 @@ func (c *Collection) RemoveEdge(id, targetID string, relType models.Relationship
 	if _, err := c.writeNode(node); err != nil {
 		return nil, false, fmt.Errorf("remove edge %s: %w", id, err)
 	}
+
+	// Dual-write: remove from SQLite read index.
+	if c.base.DB != nil {
+		_ = dbpkg.DeleteEdge(c.base.DB, id, targetID, string(relType))
+	}
+
 	return node, true, nil
+}
+
+// inferNodeType derives the node type string from an ID prefix.
+// feat-* → "feature", bug-* → "bug", spk-* → "spike",
+// trk-* → "track", plan-* → "plan", spec-* → "spec".
+// Falls back to "unknown" for unrecognised prefixes.
+func inferNodeType(id string) string {
+	switch {
+	case strings.HasPrefix(id, "feat-"):
+		return "feature"
+	case strings.HasPrefix(id, "bug-"):
+		return "bug"
+	case strings.HasPrefix(id, "spk-"):
+		return "spike"
+	case strings.HasPrefix(id, "trk-"):
+		return "track"
+	case strings.HasPrefix(id, "plan-"):
+		return "plan"
+	case strings.HasPrefix(id, "spec-"):
+		return "spec"
+	default:
+		return "unknown"
+	}
 }
 
 // --- Claim / release operations ----------------------------------------------
