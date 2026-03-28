@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
 // CloudEvent is the JSON payload Claude Code sends to every hook via stdin.
@@ -75,9 +77,13 @@ func WriteResult(result *HookResult) error {
 	return json.NewEncoder(os.Stdout).Encode(result)
 }
 
-// Allow writes a simple allow decision and returns.
+// Allow writes an empty JSON object to allow the tool to proceed.
+// NOTE: We intentionally return {} instead of {"decision":"allow"} because
+// Claude Code v2.1.x displays a spurious "hook error" label in the TUI
+// when a PreToolUse hook returns {"decision":"allow"}. An empty object
+// is treated as "no opinion" which defaults to allow without the error label.
 func Allow() error {
-	return WriteResult(&HookResult{Decision: "allow"})
+	return Empty()
 }
 
 // Continue writes a continue:true response (used by non-blocking hooks).
@@ -98,19 +104,26 @@ func ResolveProjectDir(cwd string) string {
 	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
 		return d
 	}
-	// 2. CWD from the CloudEvent
+	// 2. Git worktree detection — when running inside a linked worktree,
+	//    git rev-parse --git-common-dir points back to the main repo's .git.
+	//    This ensures work items land in the main repo's .htmlgraph/ rather
+	//    than a worktree-local copy that would be invisible from main.
+	if dir := paths.ResolveViaGitCommonDir(cwd); dir != "" {
+		return dir
+	}
+	// 3. CWD from the CloudEvent
 	if cwd != "" {
 		if _, err := os.Stat(filepath.Join(cwd, ".htmlgraph")); err == nil {
 			return cwd
 		}
 	}
-	// 3. Process working directory
+	// 4. Process working directory
 	if wd, err := os.Getwd(); err == nil {
 		if _, err := os.Stat(filepath.Join(wd, ".htmlgraph")); err == nil {
 			return wd
 		}
 	}
-	// 4. Walk up from cwd
+	// 5. Walk up from cwd
 	if cwd != "" {
 		dir := cwd
 		for i := 0; i < 10; i++ {

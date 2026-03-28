@@ -17,6 +17,12 @@ var delegateToolAgents = map[string]string{
 //   - a tool is used directly that should be delegated (delegation reminder).
 //
 // Both checks are advisory only — they never block execution.
+//
+// NOTE: This function is currently NOT called from PreToolUse because setting
+// additionalContext in a PreToolUse hook triggers a known Claude Code bug that
+// displays a false "hook error" label in the TUI on every tool use. Preserved
+// here for future use if the upstream bug is resolved or a different injection
+// point is identified.
 func buildOrchestratorContext(toolName, featureID string) string {
 	var ctx string
 

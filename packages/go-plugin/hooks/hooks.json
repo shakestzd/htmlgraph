@@ -6,7 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "comment": "Go binary: create session in SQLite",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook session-start"
           }
         ]
@@ -29,7 +28,6 @@
         "hooks": [
           {
             "type": "command",
-            "comment": "Go binary: record UserQuery + CIGS attribution guidance",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook user-prompt"
           }
         ]
@@ -41,7 +39,6 @@
         "hooks": [
           {
             "type": "command",
-            "comment": "Go binary: record tool_call event",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook pretooluse"
           }
         ]

@@ -19,7 +19,7 @@ import (
 func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	ctx := resolveToolUseContext(event, database)
 	if ctx == nil {
-		return &HookResult{Decision: "allow"}, nil
+		return &HookResult{}, nil
 	}
 
 	// Guard: never intercept writes to .htmlgraph/ — mirror of
@@ -105,14 +105,10 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	// Export event ID so posttooluse can link the result.
 	os.Setenv("HTMLGRAPH_CURRENT_EVENT_ID", ev.EventID)
 
-	result := &HookResult{Decision: "allow"}
-
-	// Orchestrator-only checks: attribution warning + delegation reminder.
-	if !ctx.IsSubagent {
-		result.AdditionalContext = buildOrchestratorContext(event.ToolName, ctx.FeatureID)
-	}
-
-	return result, nil
+	// Return empty object to allow. We use {} instead of {"decision":"allow"}
+	// because Claude Code v2.1.x shows a spurious "hook error" label for
+	// PreToolUse hooks that return {"decision":"allow"}.
+	return &HookResult{}, nil
 }
 
 // checkBashCwdGuard detects Bash commands that would permanently change the

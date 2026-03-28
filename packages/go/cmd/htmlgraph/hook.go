@@ -27,7 +27,7 @@ Usage in hooks.json:
 
 	// Shared fallback results used across commands.
 	continueResult := &hooks.HookResult{Continue: true}
-	allowResult := &hooks.HookResult{Decision: "allow"}
+	allowResult := &hooks.HookResult{} // Empty object = allow (avoids Claude Code "hook error" label)
 	emptyResult := &hooks.HookResult{}
 
 	cmd.AddCommand(

@@ -366,8 +366,9 @@ func CreateAllIndexes(db *sql.DB) error {
 
 	for _, idx := range indexes {
 		if _, err := db.Exec(idx); err != nil {
-			// Non-fatal: log and continue (matches Python behaviour).
-			fmt.Fprintf(os.Stderr, "warning: index creation: %v\n", err)
+			// Non-fatal: silently continue (matches Python behaviour).
+			// Do NOT log to stderr — Claude Code treats any hook stderr as an error.
+			_ = err
 		}
 	}
 	return nil
