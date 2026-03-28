@@ -138,26 +138,3 @@ func (fc *FeatureCollection) Create(title string, opts ...FeatureOption) (*model
 	return node, nil
 }
 
-// Start marks a feature as in-progress and updates SQLite.
-func (fc *FeatureCollection) Start(id string) (*models.Node, error) {
-	node, err := fc.Collection.Start(id)
-	if err != nil {
-		return nil, err
-	}
-	if fc.base.DB != nil {
-		_ = dbpkg.UpdateFeatureStatus(fc.base.DB, id, "in-progress")
-	}
-	return node, nil
-}
-
-// Complete marks a feature as done and updates SQLite.
-func (fc *FeatureCollection) Complete(id string) (*models.Node, error) {
-	node, err := fc.Collection.Complete(id)
-	if err != nil {
-		return nil, err
-	}
-	if fc.base.DB != nil {
-		_ = dbpkg.UpdateFeatureStatus(fc.base.DB, id, "done")
-	}
-	return node, nil
-}

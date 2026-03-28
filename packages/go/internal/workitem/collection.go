@@ -149,7 +149,7 @@ func (c *Collection) writeNode(node *models.Node) (string, error) {
 	return WriteNodeHTML(c.Dir(), node)
 }
 
-// Start marks a node as in-progress.
+// Start marks a node as in-progress and dual-writes status to SQLite.
 func (c *Collection) Start(id string) (*models.Node, error) {
 	node, err := c.Get(id)
 	if err != nil {
@@ -160,6 +160,9 @@ func (c *Collection) Start(id string) (*models.Node, error) {
 	node.UpdatedAt = time.Now().UTC()
 	if _, err := c.writeNode(node); err != nil {
 		return nil, err
+	}
+	if c.base.DB != nil {
+		_ = dbpkg.UpdateFeatureStatus(c.base.DB, id, "in-progress")
 	}
 	return node, nil
 }
@@ -181,6 +184,9 @@ func (c *Collection) Complete(id string) (*models.Node, error) {
 	node.UpdatedAt = time.Now().UTC()
 	if _, err := c.writeNode(node); err != nil {
 		return nil, err
+	}
+	if c.base.DB != nil {
+		_ = dbpkg.UpdateFeatureStatus(c.base.DB, id, "done")
 	}
 	return node, nil
 }
