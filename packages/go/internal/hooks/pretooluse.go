@@ -93,6 +93,14 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	parentEventID := resolveParentEventID(database, ctx.SessionID, event.AgentID, ctx.IsSubagent)
 	inputSummary := summariseInput(event.ToolName, event.ToolInput)
 
+	// Serialize the full tool_input map to JSON for storage.
+	var toolInputStr string
+	if event.ToolInput != nil {
+		if b, err := json.Marshal(event.ToolInput); err == nil {
+			toolInputStr = string(b)
+		}
+	}
+
 	// Resolve agent_type from CloudEvent, then env var.
 	agentType := event.AgentType
 	if agentType == "" {
@@ -106,6 +114,7 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		Timestamp:     time.Now().UTC(),
 		ToolName:      event.ToolName,
 		InputSummary:  inputSummary,
+		ToolInput:     toolInputStr,
 		SessionID:     ctx.SessionID,
 		FeatureID:     ctx.FeatureID,
 		ParentEventID: parentEventID,
