@@ -25,7 +25,7 @@ func recordSimpleEvent(
 		return &HookResult{Continue: true}, nil
 	}
 
-	featureID := GetActiveFeatureID(database, sessionID)
+	featureID := cachedGetActiveFeatureID(database, sessionID)
 	now := time.Now().UTC()
 
 	ev := &models.AgentEvent{
@@ -153,7 +153,7 @@ func PostToolUseFailure(event *CloudEvent, database *sql.DB) (*HookResult, error
 		return &HookResult{Continue: true}, nil
 	}
 
-	featureID := GetActiveFeatureID(database, sessionID)
+	featureID := cachedGetActiveFeatureID(database, sessionID)
 	errorSummary := summariseOutput(event.ToolResult)
 	if errorSummary == "" {
 		errorSummary = fmt.Sprintf("tool %q crashed or threw exception", event.ToolName)

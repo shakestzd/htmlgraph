@@ -20,7 +20,7 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	projectDir := ResolveProjectDir(event.CWD)
-	featureID := GetActiveFeatureID(database, sessionID)
+	featureID := cachedGetActiveFeatureID(database, sessionID)
 	eventID := uuid.New().String()
 	agentType := event.AgentType
 	if agentType == "" {
