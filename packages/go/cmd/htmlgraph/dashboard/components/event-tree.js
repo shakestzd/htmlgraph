@@ -246,10 +246,9 @@ class HgEventTree extends HTMLElement {
     var featureBdg = this.featureBadge(uq.feature_id);
 
     var html = '<div class="turn-group">'
-      + '<div class="event-row depth-0 user-query-row clickable-row"'
+      + '<div class="event-row depth-0 user-query-row"'
       + ' data-event-id="' + esc(uq.event_id) + '"'
-      + (uq.session_id ? ' data-session="' + esc(uq.session_id) + '"' : '')
-      + ' data-tool-use-id="" data-timestamp="' + esc(uq.timestamp || '') + '">'
+      + ' data-timestamp="' + esc(uq.timestamp || '') + '">'
       + expandIcon
       + '<span class="event-time">' + formatTime(uq.timestamp) + '</span>'
       + '<span class="event-summary">' + esc(uq.input_summary || '') + '</span>'
