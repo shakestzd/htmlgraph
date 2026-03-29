@@ -315,6 +315,38 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 		database.QueryRow(`SELECT COUNT(*) FROM sessions WHERE status='active'`).Scan(&activeSessions)
 		database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents)
 
+		// Live sessions: active with event in last 5 minutes
+		var liveSessions int
+		database.QueryRow(`
+			SELECT COUNT(DISTINCT s.session_id) FROM sessions s
+			WHERE s.status = 'active' AND s.is_subagent = FALSE
+			  AND EXISTS (SELECT 1 FROM agent_events ae
+			    WHERE ae.session_id = s.session_id
+			      AND ae.timestamp > datetime('now', '-5 minutes'))`).Scan(&liveSessions)
+
+		// Done today
+		var doneToday int
+		database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'
+			AND updated_at > datetime('now', '-24 hours')`).Scan(&doneToday)
+
+		// Errors today
+		var errorsToday int
+		database.QueryRow(`SELECT COUNT(*) FROM agent_events
+			WHERE event_type = 'error'
+			AND timestamp > datetime('now', '-24 hours')`).Scan(&errorsToday)
+
+		// Cost estimate today (input_tokens * rate + cache * rate + output * rate per model)
+		var costToday float64
+		database.QueryRow(`
+			SELECT COALESCE(SUM(
+				CASE
+					WHEN model LIKE '%opus%' THEN (input_tokens * 15.0 + cache_read_tokens * 1.50 + output_tokens * 75.0) / 1000000.0
+					WHEN model LIKE '%sonnet%' THEN (input_tokens * 3.0 + cache_read_tokens * 0.30 + output_tokens * 15.0) / 1000000.0
+					WHEN model LIKE '%haiku%' THEN (input_tokens * 0.80 + cache_read_tokens * 0.08 + output_tokens * 4.0) / 1000000.0
+					ELSE (input_tokens * 3.0 + cache_read_tokens * 0.30 + output_tokens * 15.0) / 1000000.0
+				END
+			), 0) FROM messages WHERE timestamp > datetime('now', '-24 hours')`).Scan(&costToday)
+
 		launchMode := ""
 		launchTimestamp := ""
 		if data, err := os.ReadFile(filepath.Join(projectDir, ".launch-mode")); err == nil {
@@ -336,6 +368,10 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 			"features_done":        done,
 			"features_todo":        todo,
 			"active_sessions":      activeSessions,
+			"live_sessions":        liveSessions,
+			"done_today":           doneToday,
+			"errors_today":         errorsToday,
+			"cost_today":           costToday,
 			"total_events":         totalEvents,
 			"launch_mode":          launchMode,
 			"launch_timestamp":     launchTimestamp,

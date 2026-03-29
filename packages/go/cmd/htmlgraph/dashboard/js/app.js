@@ -32,79 +32,26 @@ function fetchStats() {
   }).catch(function() {});
 }
 
+function formatCost(val) {
+  if (val >= 1000) return '$' + (val / 1000).toFixed(1) + 'k';
+  if (val >= 1) return '$' + val.toFixed(0);
+  return '$' + val.toFixed(2);
+}
+
 function updateStatsBar() {
-  var todayCount = 0;
-  var now = Date.now();
-  events.forEach(function(e) {
-    if (!e.timestamp) return;
-    var ts = e.timestamp.indexOf('T') >= 0 ? e.timestamp : e.timestamp.replace(' ', 'T') + 'Z';
-    if (now - new Date(ts).getTime() < 86400000) todayCount++;
-  });
-  setVal('sv-today', todayCount || stats.total_events);
-  setVal('sv-sessions', stats.active_sessions);
+  setVal('sv-live', stats.live_sessions);
   setVal('sv-feat-ip', stats.features_in_progress);
-  setVal('sv-feat-done', stats.features_done);
-}
-
-function renderTopTools() {
-  var container = document.getElementById('sp-top-tools');
-  container.textContent = '';
-  if (events.length === 0) return;
-  var toolMap = {};
-  events.forEach(function(e) {
-    var t = e.tool_name || e.event_type || 'other';
-    toolMap[t] = (toolMap[t] || 0) + 1;
-  });
-  var sorted = Object.keys(toolMap).map(function(k) { return [k, toolMap[k]]; })
-    .sort(function(a, b) { return b[1] - a[1]; }).slice(0, 3);
-  var maxVal = sorted.length > 0 ? sorted[0][1] : 1;
-  var frag = document.createDocumentFragment();
-  sorted.forEach(function(pair) {
-    var label = pair[0];
-    var count = pair[1];
-    var pct = Math.round((count / maxVal) * 100);
-    var wrap = document.createElement('div');
-    wrap.className = 'stat-mini-bar';
-    wrap.title = label + ': ' + count;
-    var track = document.createElement('div');
-    track.className = 'stat-mini-bar-track';
-    var fill = document.createElement('div');
-    fill.className = 'stat-mini-bar-fill';
-    fill.style.width = pct + '%';
-    track.appendChild(fill);
-    wrap.appendChild(track);
-    var lbl = document.createElement('span');
-    lbl.className = 'stat-mini-bar-label';
-    lbl.textContent = label.length > 6 ? label.slice(0, 6) : label;
-    wrap.appendChild(lbl);
-    frag.appendChild(wrap);
-  });
-  container.appendChild(frag);
-}
-
-function renderAgentTooltip() {
-  var tooltip = document.getElementById('agents-tooltip');
-  tooltip.textContent = '';
-  var agentMap = {};
-  events.forEach(function(e) {
-    var aid = e.agent_id || 'unknown';
-    agentMap[aid] = (agentMap[aid] || 0) + 1;
-  });
-  var sorted = Object.keys(agentMap).map(function(k) { return [k, agentMap[k]]; })
-    .sort(function(a, b) { return b[1] - a[1]; });
-  var frag = document.createDocumentFragment();
-  sorted.forEach(function(pair) {
-    var item = document.createElement('div');
-    item.className = 'stat-tooltip-item';
-    var nameSpan = document.createElement('span');
-    nameSpan.textContent = pair[0];
-    var countSpan = document.createElement('span');
-    countSpan.textContent = pair[1];
-    item.appendChild(nameSpan);
-    item.appendChild(countSpan);
-    frag.appendChild(item);
-  });
-  tooltip.appendChild(frag);
+  setVal('sv-done-today', '+' + (stats.done_today || 0));
+  setVal('sv-cost', formatCost(stats.cost_today || 0));
+  var errPill = document.getElementById('sp-errors');
+  if (errPill) {
+    if (stats.errors_today > 0) {
+      errPill.style.display = '';
+      setVal('sv-errors', stats.errors_today);
+    } else {
+      errPill.style.display = 'none';
+    }
+  }
 }
 
 function fetchEvents() {
@@ -113,10 +60,6 @@ function fetchEvents() {
     return r.json().then(function(data) {
       events = data;
       events.forEach(function(e) { seenEventIds.add(e.event_id); });
-      renderAgentCount();
-      renderTopTools();
-      renderAgentTooltip();
-      updateStatsBar();
     });
   }).catch(function() {});
 }
@@ -467,12 +410,6 @@ function renderAgents() {
   body.appendChild(frag);
 }
 
-function renderAgentCount() {
-  var agents = new Set();
-  events.forEach(function(e) { if (e.agent_id) agents.add(e.agent_id); });
-  setVal('sv-agents', agents.size);
-}
-
 /* ── Rendering: Metrics ────────────────────────────────────── */
 function renderMetrics() {
   var emptyEl = document.getElementById('metrics-empty');
@@ -562,23 +499,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  var agentsPill = document.getElementById('sp-agents');
-  var agentsTooltip = document.getElementById('agents-tooltip');
-  if (agentsPill && agentsTooltip) {
-    agentsPill.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var open = agentsTooltip.classList.toggle('open');
-      if (open) {
-        var rect = agentsPill.getBoundingClientRect();
-        agentsTooltip.style.top = (rect.bottom + 4) + 'px';
-        agentsTooltip.style.right = (window.innerWidth - rect.right) + 'px';
-        agentsTooltip.style.left = 'auto';
-      }
-    });
-    document.addEventListener('click', function() {
-      agentsTooltip.classList.remove('open');
-    });
-  }
 });
 
 Promise.all([fetchStats(), fetchEvents()]);
