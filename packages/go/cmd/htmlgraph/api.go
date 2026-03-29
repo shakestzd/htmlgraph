@@ -119,9 +119,12 @@ func sessionsHandler(database *sql.DB) http.HandlerFunc {
 			                 WHERE m2.session_id = s.session_id), 0) AS msg_count,
 			       COALESCE(json_extract(s.metadata, '$.launch_mode'), '') AS launch_mode
 			FROM sessions s
-			WHERE s.total_events > 0
+			WHERE (s.total_events > 0
 			   OR EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
-			   OR s.status = 'active'
+			   OR s.status = 'active')
+			  AND s.is_subagent = FALSE
+			  AND (SELECT COUNT(*) FROM messages m3
+			       WHERE m3.session_id = s.session_id) >= 5
 			ORDER BY s.created_at DESC
 			LIMIT 20`)
 		if err != nil {
