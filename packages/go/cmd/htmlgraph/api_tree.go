@@ -95,7 +95,6 @@ func fetchChildren(database *sql.DB, parentID, sessionID string, depth int) []ma
 		SELECT `+eventColumns+`
 		FROM agent_events
 		WHERE parent_event_id = ?
-		  AND NOT (tool_name = 'Agent' AND event_type != 'task_delegation')
 		ORDER BY timestamp DESC`, parentID)
 	if err != nil {
 		return nil
