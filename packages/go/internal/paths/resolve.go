@@ -3,11 +3,125 @@
 package paths
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// ProjectDirOptions configures the unified project-directory resolver.
+// Zero value is safe: all optional fields default to "not set".
+type ProjectDirOptions struct {
+	// ExplicitDir is the value of the --project-dir CLI flag.
+	// When non-empty it is checked first and an error is returned if it
+	// does not contain a .htmlgraph directory.
+	ExplicitDir string
+
+	// EventCWD is the "cwd" field extracted from a CloudEvent payload.
+	// Checked after CLAUDE_PROJECT_DIR and git-common-dir resolution.
+	EventCWD string
+
+	// WalkLevels is the maximum number of parent directories to traverse
+	// during the CWD walk-up phase.  0 means "no limit" (walk to root).
+	WalkLevels int
+}
+
+// ResolveProjectDir locates the project root (the directory that contains
+// .htmlgraph/) using the following priority order:
+//
+//  1. opts.ExplicitDir (--project-dir flag) — hard error if set but invalid
+//  2. CLAUDE_PROJECT_DIR env var — fall through on miss (not an error)
+//  3. ResolveViaGitCommonDir() — worktree → main repo root
+//  4. opts.EventCWD — direct .htmlgraph check
+//  5. os.Getwd() — direct .htmlgraph check
+//  6. Walk-up from opts.EventCWD (limited by WalkLevels when > 0)
+//  7. Walk-up from os.Getwd() (unlimited)
+//
+// Returns the project root directory (not the .htmlgraph subdirectory).
+// The only hard-error case is when ExplicitDir is set but no .htmlgraph
+// can be found there.  All other failures fall back gracefully.
+func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
+	// 1. Explicit flag — highest priority, hard-fail on miss.
+	if opts.ExplicitDir != "" {
+		if _, err := os.Stat(filepath.Join(opts.ExplicitDir, ".htmlgraph")); err == nil {
+			return opts.ExplicitDir, nil
+		}
+		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found", opts.ExplicitDir)
+	}
+
+	// 2. CLAUDE_PROJECT_DIR env var — fall through on miss.
+	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
+		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
+			return d, nil
+		}
+	}
+
+	// 3. Git worktree detection — resolve linked worktrees to main repo root.
+	startDir := opts.EventCWD
+	if startDir == "" {
+		startDir, _ = os.Getwd()
+	}
+	if dir := ResolveViaGitCommonDir(startDir); dir != "" {
+		return dir, nil
+	}
+
+	// 4. EventCWD direct check.
+	if opts.EventCWD != "" {
+		if _, err := os.Stat(filepath.Join(opts.EventCWD, ".htmlgraph")); err == nil {
+			return opts.EventCWD, nil
+		}
+	}
+
+	// 5. Process CWD direct check.
+	if wd, err := os.Getwd(); err == nil {
+		if _, err := os.Stat(filepath.Join(wd, ".htmlgraph")); err == nil {
+			return wd, nil
+		}
+	}
+
+	// 6. Walk-up from EventCWD (limited when WalkLevels > 0).
+	if opts.EventCWD != "" {
+		if found := walkUpForHtmlgraph(opts.EventCWD, opts.WalkLevels); found != "" {
+			return found, nil
+		}
+	}
+
+	// 7. Walk-up from process CWD (unlimited).
+	if wd, err := os.Getwd(); err == nil {
+		if found := walkUpForHtmlgraph(wd, 0); found != "" {
+			return found, nil
+		}
+	}
+
+	// Fallback: return best-effort directory without error (mirrors prior hook
+	// behaviour where ResolveProjectDir never returned an empty string).
+	if opts.EventCWD != "" {
+		return opts.EventCWD, nil
+	}
+	if wd, err := os.Getwd(); err == nil {
+		return wd, nil
+	}
+	return "", errors.New("no .htmlgraph directory found (run from within an htmlgraph project)")
+}
+
+// walkUpForHtmlgraph traverses parent directories looking for .htmlgraph/.
+// maxLevels == 0 means walk all the way to the filesystem root.
+func walkUpForHtmlgraph(start string, maxLevels int) string {
+	dir := start
+	for i := 0; maxLevels == 0 || i < maxLevels; i++ {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+		if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err == nil {
+			return dir
+		}
+	}
+	return ""
+}
 
 // ResolveViaGitCommonDir detects when dir is inside a git linked worktree and
 // returns the main repository root (i.e. the parent of the shared .git dir).

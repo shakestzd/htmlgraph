@@ -98,50 +98,14 @@ func Empty() error {
 }
 
 // ResolveProjectDir finds the project directory containing .htmlgraph/.
-// Mirrors Python bootstrap.resolve_project_dir().
+// Delegates to paths.ResolveProjectDir with the CloudEvent CWD and a
+// walk-up limit of 10 levels (matching the previous hook behaviour).
 func ResolveProjectDir(cwd string) string {
-	// 1. Explicit env var (set by session-start for downstream hooks)
-	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
-		return d
-	}
-	// 2. Git worktree detection — when running inside a linked worktree,
-	//    git rev-parse --git-common-dir points back to the main repo's .git.
-	//    This ensures work items land in the main repo's .htmlgraph/ rather
-	//    than a worktree-local copy that would be invisible from main.
-	if dir := paths.ResolveViaGitCommonDir(cwd); dir != "" {
-		return dir
-	}
-	// 3. CWD from the CloudEvent
-	if cwd != "" {
-		if _, err := os.Stat(filepath.Join(cwd, ".htmlgraph")); err == nil {
-			return cwd
-		}
-	}
-	// 4. Process working directory
-	if wd, err := os.Getwd(); err == nil {
-		if _, err := os.Stat(filepath.Join(wd, ".htmlgraph")); err == nil {
-			return wd
-		}
-	}
-	// 5. Walk up from cwd
-	if cwd != "" {
-		dir := cwd
-		for i := 0; i < 10; i++ {
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-			if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err == nil {
-				return dir
-			}
-		}
-	}
-	if cwd != "" {
-		return cwd
-	}
-	wd, _ := os.Getwd()
-	return wd
+	dir, _ := paths.ResolveProjectDir(paths.ProjectDirOptions{
+		EventCWD:   cwd,
+		WalkLevels: 10,
+	})
+	return dir
 }
 
 // IsHtmlGraphProject returns true when the project directory has a .htmlgraph/ dir.

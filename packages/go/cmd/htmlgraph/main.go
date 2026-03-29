@@ -2,7 +2,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -88,60 +87,17 @@ func versionCmd() *cobra.Command {
 	}
 }
 
-// findHtmlgraphDir locates the .htmlgraph directory using the following
-// priority order:
-//
-//  1. --project-dir flag (explicit override, highest priority)
-//  2. CLAUDE_PROJECT_DIR env var (set by session-start hook; fixes plugin-dir CWD issue)
-//  3. Walk up from os.Getwd() (original behaviour, lowest priority)
+// findHtmlgraphDir locates the .htmlgraph directory by delegating to the
+// shared paths.ResolveProjectDir resolver (--project-dir flag → CLAUDE_PROJECT_DIR
+// env → git worktree detection → CWD walk-up) and appending ".htmlgraph".
 func findHtmlgraphDir() (string, error) {
-	// 1. Explicit --project-dir flag takes top priority.
-	if projectDirFlag != "" {
-		candidate := filepath.Join(projectDirFlag, ".htmlgraph")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate, nil
-		}
-		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found", projectDirFlag)
-	}
-
-	// 2. CLAUDE_PROJECT_DIR env var (set by session-start hook for downstream
-	//    invocations; also allows users/CI to override CWD without a flag).
-	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
-		candidate := filepath.Join(d, ".htmlgraph")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate, nil
-		}
-		// Env var was set but points somewhere without .htmlgraph — fall through
-		// to CWD walk-up rather than hard-failing, preserving usability.
-	}
-
-	// 3. Git worktree detection — resolve linked worktrees to main repo root.
-	//    When running inside a git worktree (e.g. .claude/worktrees/feat-xxx/),
-	//    git rev-parse --git-common-dir returns the main .git directory, whose
-	//    parent is the main repo root. This ensures CLI commands find the main
-	//    repo's .htmlgraph/ rather than a worktree-local copy.
-	if dir := paths.ResolveViaGitCommonDir(""); dir != "" {
-		return filepath.Join(dir, ".htmlgraph"), nil
-	}
-
-	// 4. Walk up from the process working directory.
-	dir, err := os.Getwd()
+	root, err := paths.ResolveProjectDir(paths.ProjectDirOptions{
+		ExplicitDir: projectDirFlag,
+	})
 	if err != nil {
-		return "", fmt.Errorf("get working directory: %w", err)
+		return "", err
 	}
-
-	for {
-		candidate := filepath.Join(dir, ".htmlgraph")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	return "", errors.New("no .htmlgraph directory found (run from within an htmlgraph project)")
+	return filepath.Join(root, ".htmlgraph"), nil
 }
 
 // truncate shortens s to maxLen characters, appending "…" if cut.
