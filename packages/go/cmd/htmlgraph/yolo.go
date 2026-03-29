@@ -331,23 +331,18 @@ func launchYoloInit(trackID, featureID string, extraArgs []string) error {
 }
 
 func launchYoloContinue(extraArgs []string) error {
-	pluginDir := resolvePluginDir()
 	projectRoot := ""
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
 		projectRoot = filepath.Dir(htmlgraphDir)
 	}
 
-	yoloPrompt := resolveYoloPromptFile(pluginDir)
-
 	fmt.Println("Resuming last YOLO session...")
 
 	return launchClaude(LaunchOpts{
-		Mode:             "yolo-continue",
-		Resume:           true,
-		SystemPromptDir:  pluginDir,
-		SystemPromptFile: yoloPrompt,
-		PermissionMode:   "bypassPermissions",
-		ExtraArgs:        extraArgs,
-		ProjectRoot:      projectRoot,
+		Mode:           "yolo-continue",
+		Resume:         true,
+		PermissionMode: "bypassPermissions",
+		ExtraArgs:      extraArgs,
+		ProjectRoot:    projectRoot,
 	})
 }
