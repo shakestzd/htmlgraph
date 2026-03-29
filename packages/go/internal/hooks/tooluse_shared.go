@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
 )
@@ -36,15 +37,21 @@ func cachedGetActiveFeatureID(database *sql.DB, sessionID string) string {
 
 // toolUseContext holds resolved identifiers shared by PreToolUse and PostToolUse.
 type toolUseContext struct {
-	SessionID  string
-	FeatureID  string
-	AgentID    string
-	IsSubagent bool
+	SessionID     string
+	FeatureID     string
+	AgentID       string
+	AgentType     string
+	IsSubagent    bool
+	ProjectDir    string
+	HgDir         string
+	IsYoloMode    bool
+	ParentEventID string
 }
 
-// resolveToolUseContext resolves session, feature, and agent identifiers from
-// a CloudEvent and database. Returns nil when no active session is found,
-// indicating the caller should skip all DB operations.
+// resolveToolUseContext resolves session, feature, agent identifiers, project
+// directory, YOLO mode, and parent event ID from a CloudEvent and database.
+// Returns nil when no active session is found, indicating the caller should
+// skip all DB operations.
 func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext {
 	sessionID := EnvSessionID(event.SessionID)
 	if sessionID == "" {
@@ -53,12 +60,28 @@ func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext 
 
 	featureID := cachedGetActiveFeatureID(database, sessionID)
 	agentID := resolveAgentID(event)
+	isSubagent := isSubagentEvent(event)
+
+	agentType := event.AgentType
+	if agentType == "" {
+		agentType = os.Getenv("HTMLGRAPH_AGENT_TYPE")
+	}
+
+	projectDir := ResolveProjectDir(event.CWD)
+	hgDir := filepath.Join(projectDir, ".htmlgraph")
+	yolo := isYoloMode(hgDir)
+	parentEventID := resolveParentEventID(database, sessionID, agentID, isSubagent)
 
 	return &toolUseContext{
-		SessionID:  sessionID,
-		FeatureID:  featureID,
-		AgentID:    agentID,
-		IsSubagent: isSubagentEvent(event),
+		SessionID:     sessionID,
+		FeatureID:     featureID,
+		AgentID:       agentID,
+		AgentType:     agentType,
+		IsSubagent:    isSubagent,
+		ProjectDir:    projectDir,
+		HgDir:         hgDir,
+		IsYoloMode:    yolo,
+		ParentEventID: parentEventID,
 	}
 }
 

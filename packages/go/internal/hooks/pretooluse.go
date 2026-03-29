@@ -46,54 +46,48 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	// YOLO mode enforcement: check launch mode and apply guards.
-	projectDir := ResolveProjectDir(event.CWD)
-	yolo := isYoloMode(filepath.Join(projectDir, ".htmlgraph"))
-
 	hasWorkItem := ctx.FeatureID != "" || hasAnyInProgressWorkItem(database)
-	if warn := checkYoloWorkItemGuard(event.ToolName, ctx.FeatureID, yolo, hasWorkItem); warn != "" {
+	if warn := checkYoloWorkItemGuard(event.ToolName, ctx.FeatureID, ctx.IsYoloMode, hasWorkItem); warn != "" {
 		return &HookResult{
 			Decision: "block",
 			Reason:   warn,
 		}, nil
 	}
 
-	if yolo {
-		hgDir := filepath.Join(projectDir, ".htmlgraph")
-
+	if ctx.IsYoloMode {
 		// Warn (not block) when starting a work item without steps.
-		if warn := checkYoloStepsGuard(event, yolo, hgDir); warn != "" {
-			debugLog(projectDir, "[htmlgraph] YOLO steps warning: %s", warn)
+		if warn := checkYoloStepsGuard(event, ctx.IsYoloMode, ctx.HgDir); warn != "" {
+			debugLog(ctx.ProjectDir, "[htmlgraph] YOLO steps warning: %s", warn)
 		}
 
 		// Resolve branch from the target file's worktree, not the session CWD.
 		targetFile := extractFilePath(event.ToolInput)
 		cwdBranch := currentBranchIn(event.CWD)
 		branch := branchForFilePath(targetFile, cwdBranch)
-		if warn := checkYoloWorktreeGuard(event.ToolName, branch, yolo); warn != "" {
+		if warn := checkYoloWorktreeGuard(event.ToolName, branch, ctx.IsYoloMode); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
-		if warn := checkYoloResearchGuard(event.ToolName, yolo, hasRecentResearch(database, ctx.SessionID)); warn != "" {
+		if warn := checkYoloResearchGuard(event.ToolName, ctx.IsYoloMode, hasRecentResearch(database, ctx.SessionID)); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
-		if warn := checkYoloCodeHealthGuard(event, yolo); warn != "" {
+		if warn := checkYoloCodeHealthGuard(event, ctx.IsYoloMode); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
 		testRan := hasRecentTestRun(database, ctx.SessionID)
-		if warn := checkYoloCommitGuard(event, yolo, testRan); warn != "" {
+		if warn := checkYoloCommitGuard(event, ctx.IsYoloMode, testRan); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
-		if warn := checkYoloDiffReviewGuard(event, yolo, hasRecentDiffReview(database, ctx.SessionID)); warn != "" {
+		if warn := checkYoloDiffReviewGuard(event, ctx.IsYoloMode, hasRecentDiffReview(database, ctx.SessionID)); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
-		if warn := checkYoloUIValidationGuard(event, yolo, database, ctx.SessionID); warn != "" {
+		if warn := checkYoloUIValidationGuard(event, ctx.IsYoloMode, database, ctx.SessionID); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
-		if warn := checkYoloBudgetGuard(event, yolo); warn != "" {
+		if warn := checkYoloBudgetGuard(event, ctx.IsYoloMode); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
 	}
 
-	parentEventID := resolveParentEventID(database, ctx.SessionID, event.AgentID, ctx.IsSubagent)
 	inputSummary := summariseInput(event.ToolName, event.ToolInput)
 
 	// Serialize the full tool_input map to JSON for storage.
@@ -102,12 +96,6 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		if b, err := json.Marshal(event.ToolInput); err == nil {
 			toolInputStr = string(b)
 		}
-	}
-
-	// Resolve agent_type from CloudEvent, then env var.
-	agentType := event.AgentType
-	if agentType == "" {
-		agentType = os.Getenv("HTMLGRAPH_AGENT_TYPE")
 	}
 
 	ev := &models.AgentEvent{
@@ -120,8 +108,8 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		ToolInput:     toolInputStr,
 		SessionID:     ctx.SessionID,
 		FeatureID:     ctx.FeatureID,
-		ParentEventID: parentEventID,
-		SubagentType:  agentType,
+		ParentEventID: ctx.ParentEventID,
+		SubagentType:  ctx.AgentType,
 		Status:        "started",
 		StepID:        event.ToolUseID,
 		Source:        "hook",

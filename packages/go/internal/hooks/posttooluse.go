@@ -3,7 +3,6 @@ package hooks
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -108,8 +107,7 @@ func checkYoloFeatureCompleteAdvisory(event *CloudEvent, ctx *toolUseContext, da
 	if cmd := extractBashCommand(event.ToolInput); !looksLikeGitCommit(cmd) {
 		return ""
 	}
-	projectDir := ResolveProjectDir(event.CWD)
-	if !isYoloMode(filepath.Join(projectDir, ".htmlgraph")) {
+	if !ctx.IsYoloMode {
 		return ""
 	}
 	featureID := ctx.FeatureID
