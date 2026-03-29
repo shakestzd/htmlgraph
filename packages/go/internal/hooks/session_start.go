@@ -147,16 +147,17 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 	return err
 }
 
-// writeEnvVars appends session context exports to CLAUDE_ENV_FILE.
-// When CLAUDE_ENV_FILE is unset (e.g. worktree subagents), falls back to
-// writing .htmlgraph/.active-session so downstream hooks can still resolve
-// the session ID via readActiveSession().
+// writeEnvVars appends session context exports to CLAUDE_ENV_FILE and always
+// writes .htmlgraph/.active-session as a backup. The .active-session file
+// ensures downstream hooks can resolve the session ID even when CLAUDE_ENV_FILE
+// is unavailable (YOLO mode, worktree subagents, plugin-dir launches).
 func writeEnvVars(sessionID, projectDir string) {
+	// Always write .active-session as backup — prevents stale session IDs.
+	writeActiveSession(sessionID, projectDir)
+
 	envFile := os.Getenv("CLAUDE_ENV_FILE")
 	if envFile == "" {
-		// Fallback: write session context to project-scoped .active-session file.
-		writeActiveSession(sessionID, projectDir)
-		debugLog(projectDir, "[htmlgraph] CLAUDE_ENV_FILE unset — wrote session to .active-session (session_id=%s)", sessionID)
+		debugLog(projectDir, "[htmlgraph] CLAUDE_ENV_FILE unset — using .active-session only (session_id=%s)", sessionID)
 		return
 	}
 	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_WRONLY, 0o644)
