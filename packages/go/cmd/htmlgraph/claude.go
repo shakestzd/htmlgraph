@@ -122,13 +122,7 @@ func launchClaudeInit(extraArgs []string) error {
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
 		projectRoot = filepath.Dir(htmlgraphDir)
 	}
-	fmt.Println("Installing/updating marketplace htmlgraph plugin...")
-	if out, err := exec.Command("claude", "plugin", "install", "htmlgraph@htmlgraph").CombinedOutput(); err != nil {
-		// May already be installed — try update instead.
-		if out2, err2 := exec.Command("claude", "plugin", "update", "htmlgraph").CombinedOutput(); err2 != nil {
-			fmt.Fprintf(os.Stderr, "warning: plugin install: %s\nwarning: plugin update: %s\n", out, out2)
-		}
-	}
+	ensureHtmlgraphPlugin()
 	fmt.Println("Launching Claude Code with marketplace plugin (init mode)...")
 	return launchClaude(LaunchOpts{
 		Mode:            "init",
@@ -142,12 +136,6 @@ func launchClaudeContinue(extraArgs []string) error {
 	projectRoot := ""
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
 		projectRoot = filepath.Dir(htmlgraphDir)
-	}
-	fmt.Println("Installing/updating marketplace htmlgraph plugin...")
-	if out, err := exec.Command("claude", "plugin", "install", "htmlgraph@htmlgraph").CombinedOutput(); err != nil {
-		if out2, err2 := exec.Command("claude", "plugin", "update", "htmlgraph").CombinedOutput(); err2 != nil {
-			fmt.Fprintf(os.Stderr, "warning: plugin install: %s\nwarning: plugin update: %s\n", out, out2)
-		}
 	}
 	fmt.Println("Resuming last Claude Code session (continue mode)...")
 	return launchClaude(LaunchOpts{
@@ -171,6 +159,25 @@ func launchClaudeDefault(extraArgs []string) error {
 		ExtraArgs:       extraArgs,
 		ProjectRoot:     projectRoot,
 	})
+}
+
+const htmlgraphMarketplaceRepo = "shakestzd/htmlgraph"
+
+// ensureHtmlgraphPlugin registers the htmlgraph marketplace (if needed) and
+// installs or updates the plugin.
+func ensureHtmlgraphPlugin() {
+	// Step 1: Register marketplace if not already known.
+	fmt.Println("Registering htmlgraph marketplace...")
+	exec.Command("claude", "plugin", "marketplace", "add", "htmlgraph",
+		"--github", htmlgraphMarketplaceRepo).Run() //nolint:errcheck
+
+	// Step 2: Try install, fall back to update.
+	fmt.Println("Installing/updating htmlgraph plugin...")
+	if out, err := exec.Command("claude", "plugin", "install", "htmlgraph@htmlgraph").CombinedOutput(); err != nil {
+		if out2, err2 := exec.Command("claude", "plugin", "update", "htmlgraph").CombinedOutput(); err2 != nil {
+			fmt.Fprintf(os.Stderr, "warning: plugin install: %s\nwarning: plugin update: %s\n", out, out2)
+		}
+	}
 }
 
 // launchClaude is the shared launcher used by all modes.
