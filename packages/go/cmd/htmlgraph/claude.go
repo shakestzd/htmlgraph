@@ -139,7 +139,6 @@ func launchClaudeInit(extraArgs []string) error {
 }
 
 func launchClaudeContinue(extraArgs []string) error {
-	pluginDir := resolvePluginDir()
 	projectRoot := ""
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
 		projectRoot = filepath.Dir(htmlgraphDir)
@@ -152,11 +151,10 @@ func launchClaudeContinue(extraArgs []string) error {
 	}
 	fmt.Println("Resuming last Claude Code session (continue mode)...")
 	return launchClaude(LaunchOpts{
-		Mode:            "continue",
-		Resume:          true,
-		SystemPromptDir: pluginDir,
-		ExtraArgs:       extraArgs,
-		ProjectRoot:     projectRoot,
+		Mode:        "continue",
+		Resume:      true,
+		ExtraArgs:   extraArgs,
+		ProjectRoot: projectRoot,
 	})
 }
 
