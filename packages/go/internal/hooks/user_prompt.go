@@ -51,7 +51,9 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		UpdatedAt:    time.Now().UTC(),
 	}
 
-	_ = db.InsertEvent(database, ev) // Non-fatal
+	if err := db.InsertEvent(database, ev); err != nil {
+		debugLog(ResolveProjectDir(event.CWD), "[error] handler=user-prompt session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
+	}
 
 	// Update session last_user_query fields.
 	updateLastQuery(database, sessionID, event.Prompt)

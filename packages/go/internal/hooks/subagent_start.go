@@ -47,7 +47,9 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		UpdatedAt:     time.Now().UTC(),
 	}
 
-	_ = db.InsertEvent(database, ev) // Non-fatal
+	if err := db.InsertEvent(database, ev); err != nil {
+		debugLog(projectDir, "[error] handler=subagent-start session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
+	}
 
 	// Write traceparent so the subagent's session-start can claim it.
 	writeTraceparent(sessionID, eventID)
@@ -88,7 +90,10 @@ func SubagentStop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		}
 	}
 
-	_ = db.UpdateEventFields(database, eventID, "completed", outputSummary)
+	if err := db.UpdateEventFields(database, eventID, "completed", outputSummary); err != nil {
+		projectDir := ResolveProjectDir(event.CWD)
+		debugLog(projectDir, "[error] handler=subagent-stop session=%s: update event fields: %v", sessionID[:minSessionLen(sessionID)], err)
+	}
 
 	return &HookResult{Continue: true}, nil
 }

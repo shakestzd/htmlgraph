@@ -27,10 +27,14 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 		WHERE session_id = ?`,
 		now, endCommit, sessionID,
 	)
-	_ = err // Non-fatal
+	if err != nil {
+		debugLog(projectDir, "[error] handler=session-end session=%s: update sessions: %v", sessionID[:minLen(sessionID, 8)], err)
+	}
 
 	// Mark lineage trace complete so tree queries show accurate status.
-	_ = db.CompleteLineageTrace(database, sessionID)
+	if err := db.CompleteLineageTrace(database, sessionID); err != nil {
+		debugLog(projectDir, "[error] handler=session-end session=%s: complete lineage trace: %v", sessionID[:minLen(sessionID, 8)], err)
+	}
 
 	return &HookResult{Continue: true}, nil
 }
@@ -43,12 +47,14 @@ func SessionResume(event *CloudEvent, database *sql.DB, projectDir string) (*Hoo
 		return &HookResult{Continue: true}, nil
 	}
 
-	_, _ = database.Exec(`
+	if _, err := database.Exec(`
 		UPDATE sessions
 		SET status = 'active', completed_at = NULL
 		WHERE session_id = ? AND status = 'completed'`,
 		sessionID,
-	)
+	); err != nil {
+		debugLog(projectDir, "[error] handler=session-resume session=%s: update sessions: %v", sessionID[:minLen(sessionID, 8)], err)
+	}
 
 	// Re-export env vars so downstream hooks have the session ID.
 	writeEnvVars(sessionID, projectDir)
