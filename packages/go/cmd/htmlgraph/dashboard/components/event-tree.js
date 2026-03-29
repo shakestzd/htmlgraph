@@ -271,7 +271,7 @@ class HgEventTree extends HTMLElement {
       ? '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(evt.event_id) + '">\u25B6</span>'
       : '<span class="expand-icon-spacer"></span>';
 
-    var isTask = evt.tool_name === 'Task' || evt.tool_name === 'Agent';
+    var isTask = evt.tool_name === 'Task' || evt.tool_name === 'Agent' || evt.event_type === 'task_delegation';
     var isError = evt.event_type === 'error' || evt.status === 'failed';
     var borderClass = isTask ? 'border-task' : isError ? 'border-error' : '';
 
