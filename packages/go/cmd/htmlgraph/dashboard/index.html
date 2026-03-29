@@ -51,6 +51,12 @@
 
     <section class="view active" id="v-activity">
       <div class="view-title">Activity Feed <span class="count" id="activity-count">0</span></div>
+      <div class="filter-bar" id="activity-filters">
+        <input type="text" class="filter-input" id="filter-text" placeholder="Search events...">
+        <select class="filter-select" id="filter-tool"><option value="">All Tools</option></select>
+        <select class="filter-select" id="filter-agent"><option value="">All Agents</option></select>
+        <span class="filter-count" id="filter-count"></span>
+      </div>
       <hg-event-tree data-limit="50"></hg-event-tree>
     </section>
 
