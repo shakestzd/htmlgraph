@@ -83,7 +83,7 @@
 /* ── Session list table ─────────────────────────────────────── */
 .session-row { cursor: pointer; }
 .session-row:hover td { background: var(--bg-hover); }
-.session-row.live td { border-left: 3px solid var(--status-done); }
+.session-row.live td:first-child { border-left: 3px solid var(--status-done); }
 .session-title {
   font-weight: 500;
   color: var(--text-primary);
