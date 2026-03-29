@@ -187,14 +187,13 @@ func featuresFromDB(database *sql.DB) []map[string]any {
 		LEFT JOIN features t ON t.id = f.track_id
 		ORDER BY
 		    CASE f.status WHEN 'in-progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END,
-		    f.created_at DESC
-		LIMIT 50`)
+		    f.created_at DESC`)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 
-	features := make([]map[string]any, 0, 50)
+	features := make([]map[string]any, 0, 200)
 	for rows.Next() {
 		var id, ftype, title, status, priority, trackID, created, trackTitle string
 		var stepsTotal, stepsCompleted int
