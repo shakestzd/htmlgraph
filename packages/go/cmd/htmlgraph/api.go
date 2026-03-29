@@ -122,7 +122,7 @@ func sessionsHandler(database *sql.DB) http.HandlerFunc {
 			WHERE s.total_events > 0
 			   OR EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
 			   OR s.status = 'active'
-			ORDER BY COALESCE(s.transcript_synced, s.created_at) DESC
+			ORDER BY s.created_at DESC
 			LIMIT 20`)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
