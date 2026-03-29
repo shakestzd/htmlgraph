@@ -57,7 +57,19 @@
     <section class="view" id="v-sessions">
       <div id="sessions-list-view">
         <div class="view-title">Sessions <span class="count" id="sessions-count">0</span></div>
-        <div class="card-grid" id="sessions-grid"></div>
+        <div style="overflow-x:auto">
+          <table class="tbl" id="sessions-table">
+            <thead><tr>
+              <th>Title</th>
+              <th style="width:100px">Model</th>
+              <th style="width:70px">Msgs</th>
+              <th style="width:60px">Activity</th>
+              <th style="width:70px">Status</th>
+              <th style="width:90px">Time</th>
+            </tr></thead>
+            <tbody id="sessions-body"></tbody>
+          </table>
+        </div>
         <div class="empty" id="sessions-empty" style="display:none">
           <div>No sessions recorded.</div>
         </div>
