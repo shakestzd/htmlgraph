@@ -6,6 +6,7 @@ var features = [];
 var stats = {};
 var currentView = 'activity';
 var seenEventIds = new Set();
+var groupByTrack = localStorage.getItem('htmlgraph-kanban-group-by-track') === 'true';
 
 /* ── Navigation ────────────────────────────────────────────── */
 document.querySelector('.nav').addEventListener('click', function(e) {
@@ -301,17 +302,9 @@ function buildKanbanCard(f) {
   return card;
 }
 
-function renderKanban() {
-  var board = document.getElementById('kanban-board');
-  var empty = document.getElementById('work-empty');
-  document.getElementById('work-count').textContent = features.length;
-  board.textContent = '';
-
-  if (features.length === 0) { empty.style.display = ''; return; }
-  empty.style.display = 'none';
-
+function buildKanbanColumns(items) {
   var buckets = { 'todo': [], 'in-progress': [], 'done': [] };
-  features.forEach(function(f) {
+  items.forEach(function(f) {
     var s = f.status || 'todo';
     if (!buckets[s]) s = 'todo';
     buckets[s].push(f);
@@ -319,8 +312,7 @@ function renderKanban() {
 
   var frag = document.createDocumentFragment();
   COL_DEFS.forEach(function(col) {
-    var items = sortItems(buckets[col.status] || []);
-
+    var sorted = sortItems(buckets[col.status] || []);
     var colEl = document.createElement('div');
     colEl.className = 'kanban-col';
     colEl.dataset.status = col.status;
@@ -332,18 +324,101 @@ function renderKanban() {
     header.appendChild(labelSpan);
     var countBadge = document.createElement('span');
     countBadge.className = 'col-count';
-    countBadge.textContent = items.length;
+    countBadge.textContent = sorted.length;
     header.appendChild(countBadge);
     colEl.appendChild(header);
 
     var cardsEl = document.createElement('div');
     cardsEl.className = 'kanban-cards';
-    items.forEach(function(f) {
-      cardsEl.appendChild(buildKanbanCard(f));
-    });
+    sorted.forEach(function(f) { cardsEl.appendChild(buildKanbanCard(f)); });
     colEl.appendChild(cardsEl);
     frag.appendChild(colEl);
   });
+  return frag;
+}
+
+function buildTrackSection(trackId, trackTitle, items) {
+  var doneCount = items.filter(function(f) { return f.status === 'done'; }).length;
+  var collapseKey = 'htmlgraph-track-collapsed-' + trackId;
+  var isCollapsed = localStorage.getItem(collapseKey) === 'true';
+
+  var section = document.createElement('div');
+  section.className = 'track-section';
+
+  var sectionHeader = document.createElement('div');
+  sectionHeader.className = 'track-section-header';
+
+  var titleSpan = document.createElement('span');
+  titleSpan.className = 'track-section-title';
+  titleSpan.textContent = trackTitle || trackId;
+  sectionHeader.appendChild(titleSpan);
+
+  var progressSpan = document.createElement('span');
+  progressSpan.className = 'track-section-progress';
+  progressSpan.textContent = doneCount + '/' + items.length + ' done';
+  sectionHeader.appendChild(progressSpan);
+
+  var chevron = document.createElement('span');
+  chevron.className = 'track-section-toggle' + (isCollapsed ? ' collapsed' : '');
+  chevron.textContent = '\u25BE';
+  sectionHeader.appendChild(chevron);
+
+  var body = document.createElement('div');
+  body.className = 'track-section-body kanban-board' + (isCollapsed ? ' collapsed' : '');
+  body.appendChild(buildKanbanColumns(items));
+
+  sectionHeader.addEventListener('click', function() {
+    isCollapsed = !isCollapsed;
+    chevron.classList.toggle('collapsed', isCollapsed);
+    body.classList.toggle('collapsed', isCollapsed);
+    localStorage.setItem(collapseKey, isCollapsed ? 'true' : 'false');
+  });
+
+  section.appendChild(sectionHeader);
+  section.appendChild(body);
+  return section;
+}
+
+function renderKanban() {
+  var board = document.getElementById('kanban-board');
+  var empty = document.getElementById('work-empty');
+  document.getElementById('work-count').textContent = features.length;
+  board.textContent = '';
+
+  var toggleBtn = document.getElementById('track-group-toggle');
+  if (toggleBtn) toggleBtn.classList.toggle('active', groupByTrack);
+
+  if (features.length === 0) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  var frag = document.createDocumentFragment();
+
+  if (!groupByTrack) {
+    frag.appendChild(buildKanbanColumns(features));
+  } else {
+    var trackMap = {};
+    var trackOrder = [];
+    var untracked = [];
+
+    features.forEach(function(f) {
+      if (!f.track_id) { untracked.push(f); return; }
+      if (!trackMap[f.track_id]) {
+        trackMap[f.track_id] = { title: f.track_title || f.track_id, items: [] };
+        trackOrder.push(f.track_id);
+      }
+      trackMap[f.track_id].items.push(f);
+    });
+
+    trackOrder.forEach(function(tid) {
+      var t = trackMap[tid];
+      frag.appendChild(buildTrackSection(tid, t.title, t.items));
+    });
+
+    if (untracked.length > 0) {
+      frag.appendChild(buildTrackSection('untracked', 'Untracked', untracked));
+    }
+  }
+
   board.appendChild(frag);
 }
 
@@ -476,5 +551,17 @@ function renderHoursChart() {
 }
 
 /* ── Init ──────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  var toggleBtn = document.getElementById('track-group-toggle');
+  if (toggleBtn) {
+    toggleBtn.classList.toggle('active', groupByTrack);
+    toggleBtn.addEventListener('click', function() {
+      groupByTrack = !groupByTrack;
+      localStorage.setItem('htmlgraph-kanban-group-by-track', groupByTrack ? 'true' : 'false');
+      renderKanban();
+    });
+  }
+});
+
 Promise.all([fetchStats(), fetchEvents()]);
 setInterval(fetchStats, 30000);
