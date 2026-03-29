@@ -109,65 +109,35 @@ func fetchChildren(database *sql.DB, parentID, sessionID string, depth int) []ma
 		}
 
 		eventID, _ := evt["event_id"].(string)
-		evtType, _ := evt["event_type"].(string)
-		subagentType, _ := evt["subagent_type"].(string)
 
 		// Recurse for direct children.
 		evt["children"] = fetchChildren(database, eventID, sessionID, depth+1)
 
-		// For task delegations, also fetch cross-session subagent events.
-		if evtType == "task_delegation" && subagentType != "" {
-			crossSession := fetchSubagentOrphans(
-				database, sessionID, subagentType, depth+1,
-			)
-			if existing, ok := evt["children"].([]map[string]any); ok {
-				evt["children"] = append(existing, crossSession...)
-			} else {
-				evt["children"] = crossSession
-			}
-		}
-
 		children = append(children, evt)
 	}
-	return children
-}
 
-// fetchSubagentOrphans finds events in child sessions that have no
-// parent_event_id (orphans created by subagent processes).
-func fetchSubagentOrphans(
-	database *sql.DB, parentSessionID, subagentType string, depth int,
-) []map[string]any {
-	if depth > 3 {
-		return nil
-	}
-
-	// Child sessions are named: parentSessionID-subagentType or similar.
-	pattern := parentSessionID + "-" + subagentType + "%"
-
-	rows, err := database.Query(`
-		SELECT `+eventColumns+`
-		FROM agent_events
-		WHERE session_id LIKE ?
-		  AND (parent_event_id IS NULL OR parent_event_id = '')
-		  AND tool_name != 'UserQuery'
-		ORDER BY timestamp DESC`, pattern)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-
-	var orphans []map[string]any
-	for rows.Next() {
-		evt := scanEvent(rows)
-		if evt == nil {
-			continue
+	// Suppress duplicate tool_call/Agent rows when a sibling task_delegation exists.
+	hasDelegation := false
+	for _, c := range children {
+		if et, _ := c["event_type"].(string); et == "task_delegation" {
+			hasDelegation = true
+			break
 		}
-		eventID, _ := evt["event_id"].(string)
-		evtSessionID, _ := evt["session_id"].(string)
-		evt["children"] = fetchChildren(database, eventID, evtSessionID, depth+1)
-		orphans = append(orphans, evt)
 	}
-	return orphans
+	if hasDelegation {
+		filtered := children[:0]
+		for _, c := range children {
+			et, _ := c["event_type"].(string)
+			tn, _ := c["tool_name"].(string)
+			if et == "tool_call" && tn == "Agent" {
+				continue // suppress — task_delegation is the canonical row
+			}
+			filtered = append(filtered, c)
+		}
+		children = filtered
+	}
+
+	return children
 }
 
 // scanEvent reads one row from the standard eventColumns projection.
