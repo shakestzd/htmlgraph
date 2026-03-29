@@ -9,16 +9,34 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-// isYoloMode checks if the current session is in YOLO mode by reading
-// the .htmlgraph/.launch-mode file.
+// yoloModeCache stores per-directory launch-mode results for the lifetime of
+// the process. Each hook invocation is a separate process, so this is
+// effectively "read once per invocation" with no staleness risk in production.
+var yoloModeCache sync.Map // map[string]bool
+
+// resetYoloModeCache clears the per-process cache. Only used in tests that
+// mutate the .launch-mode file between isYoloMode calls.
+func resetYoloModeCache() {
+	yoloModeCache.Range(func(k, _ any) bool {
+		yoloModeCache.Delete(k)
+		return true
+	})
+}
+
+// isYoloMode checks if the current session is in YOLO mode by reading the
+// .htmlgraph/.launch-mode file. The result is cached per htmlgraphDir for the
+// lifetime of the process (each hook invocation is a new process).
 func isYoloMode(htmlgraphDir string) bool {
-	data, err := os.ReadFile(filepath.Join(htmlgraphDir, ".launch-mode"))
-	if err != nil {
-		return false
+	if v, ok := yoloModeCache.Load(htmlgraphDir); ok {
+		return v.(bool)
 	}
-	return strings.Contains(string(data), `"yolo`)
+	data, err := os.ReadFile(filepath.Join(htmlgraphDir, ".launch-mode"))
+	result := err == nil && strings.Contains(string(data), `"yolo`)
+	yoloModeCache.Store(htmlgraphDir, result)
+	return result
 }
 
 // checkYoloWorkItemGuard blocks Write/Edit tools when no active work item
