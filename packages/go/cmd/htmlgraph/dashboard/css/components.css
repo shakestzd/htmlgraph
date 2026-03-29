@@ -247,12 +247,12 @@
 .stat-pill-clickable { cursor: pointer; position: relative; }
 .stat-pill-clickable:hover { background: var(--bg-hover); border-radius: var(--radius-sm); }
 .stat-tooltip {
-  display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+  display: none; position: fixed; z-index: 100;
   background: var(--bg-secondary); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 8px 12px; z-index: 10;
+  border-radius: var(--radius); padding: 8px 12px;
   min-width: 160px; font-size: 11px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
-.stat-pill-clickable:hover .stat-tooltip { display: block; }
+.stat-tooltip.open { display: block; }
 .stat-tooltip-item { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; color: var(--text-secondary); }
 
 /* Status badges (tree view) */

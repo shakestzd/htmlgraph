@@ -561,6 +561,24 @@ document.addEventListener('DOMContentLoaded', function() {
       renderKanban();
     });
   }
+
+  var agentsPill = document.getElementById('sp-agents');
+  var agentsTooltip = document.getElementById('agents-tooltip');
+  if (agentsPill && agentsTooltip) {
+    agentsPill.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var open = agentsTooltip.classList.toggle('open');
+      if (open) {
+        var rect = agentsPill.getBoundingClientRect();
+        agentsTooltip.style.top = (rect.bottom + 4) + 'px';
+        agentsTooltip.style.right = (window.innerWidth - rect.right) + 'px';
+        agentsTooltip.style.left = 'auto';
+      }
+    });
+    document.addEventListener('click', function() {
+      agentsTooltip.classList.remove('open');
+    });
+  }
 });
 
 Promise.all([fetchStats(), fetchEvents()]);
