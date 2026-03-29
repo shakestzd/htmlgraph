@@ -17,7 +17,7 @@ Local-first observability and coordination platform for AI-assisted development.
 - SQLite = operational read index for queries, dashboard, analytics
 - Phoenix LiveView = live observability dashboard with real-time event feed (optional, requires Elixir/Erlang runtime)
 - No external infrastructure required (no Postgres, no Redis, no cloud)
-- 10 Python runtime dependencies (justhtml, pydantic, rich, jinja2, networkx, etc.)
+- Single Go binary — zero runtime dependencies
 
 > **Historical note:** The original tagline "HTML is All You Need" reflects the project's design influence -- HTML as a human-readable, git-diffable, browser-viewable storage format. It is not a literal architecture claim.
 
@@ -38,7 +38,7 @@ All delegated work must follow: DRY, SRP, KISS, YAGNI. Research existing librari
 ## Code Quality
 
 ```bash
-uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
+(cd packages/go && go build ./... && go vet ./... && go test ./...)
 # Commit only when ALL pass
 ```
 
@@ -49,7 +49,7 @@ uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pyte
 ## Deployment
 
 ```bash
-uv run pytest                                   # Run tests
+(cd packages/go && go test ./...)                # Run tests
 ./scripts/deploy-all.sh X.Y.Z --no-confirm      # Deploy
 ```
 
@@ -120,14 +120,7 @@ Plugin user: hooks/bin/htmlgraph (bootstrap script) → ~/.claude/plugins/data/h
 
 ## Development Mode
 
-**CRITICAL: Hooks load htmlgraph from PyPI, not local source, even in dev mode.**
-
-### What Dev Mode Does
-
-Dev mode enables local plugin development by loading the plugin directly from the source directory instead of from the Claude Code marketplace. This allows you to:
-- Test changes to commands, agents, skills, and hooks immediately
-- Work with the latest code without deploying to PyPI
-- Debug plugin functionality in a live Claude Code session
+Dev mode enables local plugin development by loading the plugin directly from the source directory instead of from the Claude Code marketplace.
 
 ### Starting Dev Mode
 
@@ -136,125 +129,39 @@ htmlgraph claude --dev
 ```
 
 This launches Claude Code with:
-- Plugin loaded from local source: `packages/claude-plugin/`
+- Plugin loaded from local source: `packages/go-plugin/`
 - Orchestrator system prompt injected
 - Multi-AI delegation rules enabled
 - All slash commands available with the plugin namespace prefix
 
 ### Plugin Directory Structure
 
-When dev mode runs, it needs to find all plugin components. The structure must be:
-
 ```
-packages/claude-plugin/              <- PLUGIN ROOT (passed to --plugin-dir)
+packages/go-plugin/                  <- PLUGIN ROOT (passed to --plugin-dir)
 ├── .claude-plugin/
 │   └── plugin.json                  <- Plugin manifest
 ├── commands/                        <- At plugin root (NOT in .claude-plugin)
-│   ├── deploy.md
-│   ├── init.md
-│   ├── plan.md
-│   └── ...
 ├── agents/                          <- At plugin root
-│   ├── researcher.md
-│   ├── sonnet-coder.md
-│   ├── haiku-coder.md
-│   └── ...
-├── skills/                          <- At plugin root
-│   ├── gemini/
-│   │   └── SKILL.md                 <- Must be uppercase SKILL.md
-│   ├── codex/
-│   │   └── SKILL.md
-│   └── copilot/
-│       └── SKILL.md
-├── hooks/                           <- At plugin root
-│   ├── hooks.json
-│   └── scripts/
-│       ├── session-start.py
-│       └── ...
+├── skills/                          <- At plugin root (SKILL.md files)
+├── hooks/
+│   ├── hooks.json                   <- Hook event routing
+│   └── bin/htmlgraph                <- Go binary hook handler
 └── config/
 ```
 
-**CRITICAL MISTAKE TO AVOID:** Don't put `commands/`, `agents/`, `skills/`, or `hooks/` inside `.claude-plugin/`. According to Claude Code documentation, only `plugin.json` belongs in `.claude-plugin/`. All other directories must be at the plugin root level.
+**CRITICAL MISTAKE TO AVOID:** Don't put `commands/`, `agents/`, `skills/`, or `hooks/` inside `.claude-plugin/`. Only `plugin.json` belongs in `.claude-plugin/`.
 
-### How Dev Mode Plugin Loading Works
+### How Hooks Work
 
-1. **`get_plugin_dir()` returns the plugin root:** `packages/claude-plugin/`
-2. **This directory is passed to Claude Code:** `claude --plugin-dir ./packages/claude-plugin`
-3. **Claude Code scans the root directory for:**
-   - `.claude-plugin/plugin.json` - Plugin metadata
-   - `commands/` - Slash commands (discovered automatically)
-   - `agents/` - Agent definitions (discovered automatically)
-   - `skills/` - Agent skills with `SKILL.md` files (discovered automatically)
-   - `hooks/` - Hook definitions in `hooks.json` (loaded automatically)
-4. **Commands appear namespaced:** `/htmlgraph:deploy`, `/htmlgraph:init`, etc.
-
-### Verifying Dev Mode Components
-
-After running `htmlgraph claude --dev`, you should see:
-
-- **Slash commands** visible in `/help`:
-  `/htmlgraph:deploy`, `/htmlgraph:init`, `/htmlgraph:plan`, `/htmlgraph:research`, `/htmlgraph:status`, etc.
-
-- **Agent skills** available to Claude when working on relevant tasks (automatic based on context)
-
-- **Hooks** executing based on Claude Code events (PreToolUse, PostToolUse, etc.)
-
-If commands don't appear, verify:
-1. `get_plugin_dir()` returns the correct path (root, not `.claude-plugin`)
-2. Command files exist in `packages/claude-plugin/commands/`
-3. Skill files are named `SKILL.md` (uppercase), not `skill.md`
-4. No files are in `.claude-plugin/` except `plugin.json`
-
-### How Hooks Load HtmlGraph
-
-**Hook scripts use PEP 723 inline metadata:**
-```python
-#!/usr/bin/env -S uv run
-# /// script
-# requires-python = ">=3.10"
-# dependencies = [
-#   "htmlgraph>=0.34.15",
-# ]
-# ///
-```
-
-**Key behavior:**
-- `uv run` reads the inline `dependencies` block and installs from PyPI
-- Even when running from project root, hooks use PyPI package
-- Hooks pin a minimum version (e.g., `>=0.34.15`)
-- Version pins are updated during deployment via `deploy-all.sh`
-
-### Why PyPI in Dev Mode?
-
-**Testing in production-like environment:**
-- Ensures changes work the same way for users
-- Catches integration issues before distribution
-- No surprises when hooks run in production
-- Single source of truth (PyPI package)
+Hooks are handled by the Go binary at `hooks/bin/htmlgraph`. The binary receives CloudEvent JSON on stdin and processes events (session start/end, tool use tracking, attribution checks, etc.).
 
 ### Development Workflow
 
-1. **Make changes** to `src/python/htmlgraph/`
-2. **Run tests** locally: `uv run pytest`
-3. **Deploy to PyPI**: `./scripts/deploy-all.sh X.Y.Z --no-confirm`
-4. **Restart Claude**: Hooks automatically load new version from PyPI
-5. **Verify**: Check that changes work correctly
-
-### Troubleshooting Dev Mode
-
-**Hooks not executing?**
-- Check PyPI package is latest: `pip show htmlgraph`
-- Verify hooks are executable: `ls -la packages/claude-plugin/hooks/scripts/`
-- Check hook shebangs: `head -5 packages/claude-plugin/hooks/scripts/*.py`
-
-**Stale hook cache?**
-- Clear uv cache: `uv cache clean htmlgraph`
-- Hooks may be using a cached older version of the package
-
-**Local changes not reflected?**
-- Hooks load from PyPI, not local source
-- Must deploy to PyPI for hooks to see changes
-- Use incremental versions when deploying
+1. **Make changes** to `packages/go/`
+2. **Run tests**: `(cd packages/go && go test ./...)`
+3. **Build binary**: `htmlgraph build`
+4. **Test in dev mode**: `htmlgraph claude --dev`
+5. **Deploy**: `./scripts/deploy-all.sh X.Y.Z --no-confirm`
 
 ---
 
@@ -265,7 +172,6 @@ If commands don't appear, verify:
 Your project's critical guidance (model selection, delegation patterns, quality gates) persists via `.claude/system-prompt.md` and auto-injects at session start, surviving compact/resume cycles.
 
 **Quick Setup**: Create `.claude/system-prompt.md` with project guidance
-**Verification**: Run `uv run pytest tests/hooks/test_system_prompt_persistence.py`
 
 ### Documentation Guides
 
@@ -316,36 +222,21 @@ This project uses HtmlGraph to develop HtmlGraph. The `.htmlgraph/` directory co
 
 **CRITICAL: ALL Claude Code integrations (hooks, agents, skills) must be built in the PLUGIN SOURCE.**
 
-**Plugin Source:** `packages/claude-plugin/`
+**Plugin Source:** `packages/go-plugin/`
 **Do NOT edit:** `.claude/` directory (auto-synced from plugin)
 
 ### Plugin Components - What Belongs in the Plugin
 
-Everything that extends Claude Code functionality should be in `packages/claude-plugin/`:
+Everything that extends Claude Code functionality should be in `packages/go-plugin/`:
 
 #### 1. **Hooks** (All CloudEvent handlers)
-   - **Location:** `packages/claude-plugin/hooks/`
-   - **What:** Python scripts that respond to Claude Code events
-   - **Scripts:**
-     - `session-start.py` - Database session creation
-     - `session-resume.py` - Session resumption handling
-     - `session-end.py` - Session cleanup
-     - `user-prompt-submit.py` - UserQuery event creation
-     - `pretooluse-integrator.py` - Track tool use and link to parent activities
-     - `posttooluse-integrator.py` - Activity linking
-     - `pretooluse-attribution-check.py` - Verify work item attribution
-     - `pretooluse-htmlgraph-guard.py` - Guard against .htmlgraph/ edits
-     - `posttooluse-failure.py` - Handle tool failures
-     - `subagent-start.py` - Subagent launch tracking
-     - `subagent-stop.py` - Subagent completion handling
-     - `track-event.py` - All event tracking
-     - `pre-compact.py` - Pre-compaction handling
-     - `instructions-loaded.py` - Instructions load event
-     - `permission-request.py` - Permission request handling
+   - **Location:** `packages/go-plugin/hooks/`
+   - **What:** Go binary that processes CloudEvent JSON on stdin
+   - **Events handled:** session start/resume/end, tool use tracking, attribution checks, subagent tracking, compaction, permission requests
    - **Why plugin:** Hooks are Claude Code infrastructure -- must be packaged for distribution
 
 #### 2. **Agents** (Specialized AI agents)
-   - **Location:** `packages/claude-plugin/agents/`
+   - **Location:** `packages/go-plugin/agents/`
    - **What:** Markdown agent definitions with system prompts
    - **Current agents:**
      - `researcher.md` - Research-first documentation investigation
@@ -359,18 +250,18 @@ Everything that extends Claude Code functionality should be in `packages/claude-
    - **Why plugin:** Agents are Claude Code infrastructure -- must be packaged for distribution
 
 #### 3. **Skills** (User-invocable commands)
-   - **Location:** `packages/claude-plugin/skills/`
-   - **What:** Markdown skill definitions + embedded Python for orchestration
+   - **Location:** `packages/go-plugin/skills/`
+   - **What:** Markdown skill definitions for orchestration
    - **15 skills** including: orchestrator-directives-skill, code-quality-skill, strategic-planning, plan, execute, parallel-status, cleanup, multi-ai-orchestration-skill, gemini, codex, copilot, htmlgraph, htmlgraph-coder, htmlgraph-explorer, roborev
    - **Why plugin:** Skills are Claude Code UI components -- must be packaged for distribution
 
 #### 4. **Plugin Configuration**
-   - **Location:** `packages/claude-plugin/.claude-plugin/plugin.json`
+   - **Location:** `packages/go-plugin/.claude-plugin/plugin.json`
    - **What:** Plugin metadata (name, version, description)
    - **Why plugin:** Defines how Claude Code loads and runs the plugin
 
 #### 5. **Configuration & Prompts**
-   - **Location:** `packages/claude-plugin/config/`
+   - **Location:** `packages/go-plugin/config/`
    - **What:** System prompts, classification rules, drift thresholds
    - **Files:**
      - `classification-prompt.md` - Prompt for work type classification
@@ -381,58 +272,21 @@ Everything that extends Claude Code functionality should be in `packages/claude-
 ### Directory Structure
 
 ```
-packages/claude-plugin/                  <-- SOURCE (make changes here)
+packages/go-plugin/                      <-- PLUGIN SOURCE (make changes here)
 ├── .claude-plugin/
 │   └── plugin.json                      <- Plugin manifest
 ├── hooks/
 │   ├── hooks.json                       <- Hook event routing
-│   └── scripts/
-│       ├── session-start.py             <- Database session creation
-│       ├── session-resume.py            <- Session resumption
-│       ├── session-end.py               <- Session cleanup
-│       ├── user-prompt-submit.py        <- UserQuery event creation
-│       ├── pretooluse-integrator.py     <- Tool use tracking
-│       ├── posttooluse-integrator.py    <- Activity linking
-│       ├── pretooluse-attribution-check.py <- Attribution verification
-│       ├── pretooluse-htmlgraph-guard.py   <- .htmlgraph/ edit guard
-│       ├── posttooluse-failure.py       <- Tool failure handling
-│       ├── subagent-start.py            <- Subagent launch tracking
-│       ├── subagent-stop.py             <- Subagent completion
-│       ├── track-event.py               <- All event tracking
-│       ├── pre-compact.py               <- Pre-compaction handling
-│       ├── instructions-loaded.py       <- Instructions load event
-│       └── permission-request.py        <- Permission request handling
-├── agents/
-│   ├── researcher.md
-│   ├── debugger.md
-│   ├── haiku-coder.md
-│   ├── sonnet-coder.md
-│   ├── opus-coder.md
-│   ├── test-runner.md
-│   ├── task-executor.md
-│   └── roborev.md
-├── skills/                              <- 15 skill directories
-│   ├── orchestrator-directives-skill/
-│   ├── code-quality-skill/
-│   ├── strategic-planning/
-│   ├── plan/
-│   ├── execute/
-│   ├── parallel-status/
-│   ├── cleanup/
-│   ├── multi-ai-orchestration-skill/
-│   ├── gemini/
-│   ├── codex/
-│   ├── copilot/
-│   ├── htmlgraph/
-│   ├── htmlgraph-coder/
-│   ├── htmlgraph-explorer/
-│   └── roborev/
-├── commands/                            <- 19 slash commands
-├── config/
-│   ├── classification-prompt.md
-│   ├── drift-config.json
-│   └── validation-config.json
+│   └── bin/htmlgraph                    <- Go binary hook handler
+├── agents/                              <- Markdown agent definitions
+├── skills/                              <- Skill directories with SKILL.md
+├── commands/                            <- Slash commands
+├── config/                              <- Classification, drift, validation
 └── README.md
+
+packages/go/                             <-- GO SOURCE (core logic)
+├── cmd/htmlgraph/                       <- CLI entry point
+└── internal/                            <- Business logic packages
 
 .claude/  <-- AUTO-SYNCED (do not edit)
 ├── hooks/ (synced from plugin)
@@ -445,29 +299,28 @@ packages/claude-plugin/                  <-- SOURCE (make changes here)
 **NEVER edit `.claude/` expecting changes to persist.**
 
 - Do NOT edit `.claude/hooks/hooks.json` -- changes lost on plugin update
-- Do NOT edit `.claude/hooks/scripts/*.py` -- changes lost on plugin update
 - Do NOT edit `.claude/agents/` -- changes lost on plugin update
 - Do NOT add hooks to `.claude/` -- not published, not shareable
 
 **ALWAYS edit in plugin source:**
 
-- Edit `packages/claude-plugin/hooks/hooks.json`
-- Edit `packages/claude-plugin/hooks/scripts/*.py`
-- Add agents to `packages/claude-plugin/agents/`
-- Add skills to `packages/claude-plugin/skills/`
+- Edit `packages/go-plugin/hooks/hooks.json`
+- Edit Go source in `packages/go/` for hook logic
+- Add agents to `packages/go-plugin/agents/`
+- Add skills to `packages/go-plugin/skills/`
 
 ### Workflow: Making Changes to Plugin
 
 1. **Make changes in plugin source:**
    ```bash
-   # Edit files in packages/claude-plugin/
-   vim packages/claude-plugin/hooks/scripts/user-prompt-submit.py
-   vim packages/claude-plugin/.claude-plugin/plugin.json
+   # Edit files in packages/go-plugin/ or packages/go/
+   vim packages/go-plugin/.claude-plugin/plugin.json
+   vim packages/go/cmd/htmlgraph/reindex.go
    ```
 
 2. **Run quality checks:**
    ```bash
-   uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
+   (cd packages/go && go build ./... && go vet ./... && go test ./...)
    ```
 
 3. **Verify plugin is synced (in dev mode, hooks run from plugin source):**
@@ -478,7 +331,7 @@ packages/claude-plugin/                  <-- SOURCE (make changes here)
 
 4. **Commit changes:**
    ```bash
-   git add packages/claude-plugin/
+   git add packages/go-plugin/
    git commit -m "fix: update hook X with Y changes"
    ```
 
@@ -491,17 +344,16 @@ packages/claude-plugin/                  <-- SOURCE (make changes here)
 ### Never Do This
 
 - Edit `.claude/hooks/hooks.json` directly
-- Edit `.claude/hooks/scripts/*.py` directly
 - Edit `.claude/agents/` directly
 - Add new hooks to `.claude/` expecting them to run
 - Make changes to `.claude/` expecting them to persist
 
 ### Always Do This
 
-- Edit `packages/claude-plugin/hooks/hooks.json`
-- Edit `packages/claude-plugin/hooks/scripts/*.py`
-- Add agents to `packages/claude-plugin/agents/`
-- Add skills to `packages/claude-plugin/skills/`
+- Edit `packages/go-plugin/hooks/hooks.json`
+- Edit Go source in `packages/go/` for hook/CLI logic
+- Add agents to `packages/go-plugin/agents/`
+- Add skills to `packages/go-plugin/skills/`
 - Commit plugin source files
 - Test in dev mode (hooks run from plugin automatically)
 

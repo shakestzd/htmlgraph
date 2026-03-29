@@ -9,9 +9,9 @@ Maintaining clean, error-free code is non-negotiable. Every commit should reduce
 ## Rules
 
 1. **Fix All Errors Before Committing**
-   - Run all linters (ruff, mypy) before every commit
+   - Run `go build`, `go vet`, and `go test` before every commit
    - Fix ALL errors, even pre-existing ones from previous sessions
-   - Never commit with unresolved type errors, lint warnings, or test failures
+   - Never commit with unresolved build errors, vet warnings, or test failures
 
 2. **No "I'll Fix It Later" Mentality**
    - Errors compound over time
@@ -20,8 +20,8 @@ Maintaining clean, error-free code is non-negotiable. Every commit should reduce
 
 3. **Deployment Blockers**
    - The `deploy-all.sh` script blocks on:
-     - Mypy type errors
-     - Ruff lint errors
+     - Go build errors
+     - Go vet warnings
      - Test failures
    - This is intentional - maintain quality gates
 
@@ -35,10 +35,7 @@ Maintaining clean, error-free code is non-negotiable. Every commit should reduce
 
 ```bash
 # Before every commit:
-1. uv run ruff check --fix
-2. uv run ruff format
-3. uv run mypy src/
-4. uv run pytest
+(cd packages/go && go build ./... && go vet ./... && go test ./...)
 
 # Only commit when ALL checks pass
 git commit -m "..."
@@ -52,40 +49,13 @@ git commit -m "..."
 
 | Metric | Target | Warning | Fail (new code) |
 |--------|--------|---------|------------------|
-| Module | 200-500 lines | >300 lines | >500 lines |
+| File | 200-500 lines | >300 lines | >500 lines |
 | Function | 10-20 lines | >30 lines | >50 lines |
-| Class | 100-200 lines | >200 lines | >300 lines |
+| Struct | 100-200 lines | >200 lines | >300 lines |
 
 ### Principles
 
-1. **Single Responsibility**: Each module should have one clear purpose describable in one sentence
-2. **No Duplication**: Check `src/python/htmlgraph/utils/` for shared utilities before writing new ones
-3. **Prefer Existing Dependencies**: Check `pyproject.toml` and stdlib before custom implementations
-4. **Import Direction**: Dependencies flow one way (services -> models, never models -> services)
-
-### Enforcement
-
-- **Script**: `python scripts/check-module-size.py` checks all modules against limits
-- **Pre-commit**: Runs automatically on changed files
-- **Grandfathered modules**: 15 existing modules >1000 lines are tracked but not blocking (see `scripts/check-module-size.py` for list)
-- **Ratchet rule**: Any modification to a grandfathered module must not increase its line count
-- **Refactoring track**: See `docs/tracks/MODULE_REFACTORING_TRACK.md` for planned splits
-
-### Quick Commands
-
-```bash
-# Check all modules
-python scripts/check-module-size.py
-
-# Check only changed files
-python scripts/check-module-size.py --changed-only
-
-# Summary table of oversized modules
-python scripts/check-module-size.py --summary
-
-# JSON output for CI
-python scripts/check-module-size.py --json
-
-# Strict mode (warnings = failures)
-python scripts/check-module-size.py --fail-on-warning
-```
+1. **Single Responsibility**: Each package should have one clear purpose describable in one sentence
+2. **No Duplication**: Check `packages/go/internal/` for shared utilities before writing new ones
+3. **Prefer Existing Dependencies**: Check `go.mod` and stdlib before custom implementations
+4. **Import Direction**: Dependencies flow one way (cmd -> internal, never internal -> cmd)

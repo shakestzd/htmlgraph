@@ -17,39 +17,22 @@ When you see workflows in this project:
 - ✅ They're **actual tracking** of HtmlGraph development
 - ✅ Learn from them for YOUR projects
 
-```python
+```bash
 # This IS real - we use this to track HtmlGraph development
-sdk = SDK(agent="claude")
-feature = sdk.features.create("Add deployment automation")  # Real feature!
+htmlgraph feature create "Add deployment automation"  # Real feature!
 ```
 
 ### 2. General vs Project-Specific
 
 **GENERAL WORKFLOWS** (package these for all users):
-- ✅ Feature creation and tracking → SDK already provides this
-- ✅ Track planning with TrackBuilder → SDK provides this
-- ✅ Strategic analytics (recommend_next_work, find_bottlenecks) → SDK provides this
-- ✅ Session management → Hooks provide this
-- ⚠️ **Deployment automation** → Should package `deploy-all.sh` pattern
-- ⚠️ **Memory file sync** → Should package `sync_memory_files.py` pattern
+- Feature creation and tracking → CLI provides this
+- Track planning → CLI provides this
+- Strategic analytics (recommend, bottlenecks) → CLI provides this
+- Session management → Hooks provide this
 
 **PROJECT-SPECIFIC** (only for HtmlGraph development):
-- ❌ Publishing to PyPI (specific to HtmlGraph package)
-- ❌ The specific features in `.htmlgraph/features/` (our roadmap)
-- ❌ Phase 1-6 implementation plan (our project structure)
-
-### 3. Workflows to Package for Users
-
-**TODO - Extract these into the package:**
-1. **Deployment Script Pattern** - Generalize `deploy-all.sh` for any Python package
-2. **Memory File Sync** - Include `sync_memory_files.py` in the package
-3. **Project Initialization** - `htmlgraph init` should set up `.htmlgraph/`
-4. **Pre-commit Hooks** - Package the git hooks for automatic tracking
-
-**Current Status:**
-- ✅ SDK provides feature/track/analytics workflows
-- ⚠️ Deployment scripts are project-specific (need to generalize)
-- ⚠️ Memory sync is project-specific (need to package)
+- The specific features in `.htmlgraph/features/` (our roadmap)
+- Phase 1-6 implementation plan (our project structure)
 
 ### 4. How to Read This Codebase
 
