@@ -379,6 +379,54 @@
 }
 .tool-input-preview.open { display: block; }
 
+/* ── Subagent inline block (transcript view) ──────────────── */
+.subagent-block {
+  width: 100%;
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.subagent-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  font-size: 11px;
+  user-select: none;
+}
+.subagent-block-header:hover { background: var(--bg-hover); }
+.subagent-desc {
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subagent-block-body {
+  padding: 2px 0;
+  background: var(--bg-primary);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.subagent-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+}
+.subagent-event-row:last-child { border-bottom: none; }
+.subagent-empty {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* ── Kanban board ─────────────────────────────────────────── */
 .kanban-board {
   display: flex;

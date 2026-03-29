@@ -159,52 +159,17 @@ function renderTranscriptMessages(messages, scrollHint) {
       toolsDiv.className = 'msg-tools';
 
       m.tool_calls.forEach(function(tc) {
-        var chipWrapper = document.createElement('div');
-        chipWrapper.style.display = 'inline-flex';
-        chipWrapper.style.flexDirection = 'column';
-
-        var chip = document.createElement('span');
-        chip.className = 'tool-call-chip';
-        if (tc.tool_use_id) chip.dataset.toolUseId = tc.tool_use_id;
-        var name = document.createElement('span');
-        name.className = 'tool-name';
-        name.textContent = tc.tool_name;
-        chip.appendChild(name);
-
-        // Exact tool_use_id match — highest priority
+        // Exact tool_use_id match — highest priority scroll target
         if (hint.toolUseId && tc.tool_use_id === hint.toolUseId) {
           scrollTarget = bubble;
           bestScore = 1000;
         }
 
-        if (tc.category && tc.category !== tc.tool_name) {
-          var cat = document.createElement('span');
-          cat.className = 'tool-cat';
-          cat.textContent = tc.category;
-          chip.appendChild(cat);
-        }
-
-        var preview = document.createElement('div');
-        preview.className = 'tool-input-preview';
-        if (tc.input_json) {
-          try {
-            var parsed = JSON.parse(tc.input_json);
-            preview.textContent = JSON.stringify(parsed, null, 2);
-          } catch(e) {
-            preview.textContent = tc.input_json;
-          }
+        if (tc.tool_name === 'Agent') {
+          toolsDiv.appendChild(renderAgentBlock(tc));
         } else {
-          preview.textContent = '(no input)';
+          toolsDiv.appendChild(renderToolChip(tc));
         }
-
-        chip.addEventListener('click', function(e) {
-          e.stopPropagation();
-          preview.classList.toggle('open');
-        });
-
-        chipWrapper.appendChild(chip);
-        chipWrapper.appendChild(preview);
-        toolsDiv.appendChild(chipWrapper);
       });
 
       bubble.appendChild(toolsDiv);
@@ -250,4 +215,154 @@ function renderTranscriptMessages(messages, scrollHint) {
       setTimeout(function() { scrollTarget.classList.remove('msg-highlight'); }, 4000);
     }, 150);
   }
+}
+
+// renderToolChip renders a plain tool call as a clickable chip with input preview.
+function renderToolChip(tc) {
+  var wrapper = document.createElement('div');
+  wrapper.style.display = 'inline-flex';
+  wrapper.style.flexDirection = 'column';
+
+  var chip = document.createElement('span');
+  chip.className = 'tool-call-chip';
+  if (tc.tool_use_id) chip.dataset.toolUseId = tc.tool_use_id;
+
+  var name = document.createElement('span');
+  name.className = 'tool-name';
+  name.textContent = tc.tool_name;
+  chip.appendChild(name);
+
+  if (tc.category && tc.category !== tc.tool_name) {
+    var cat = document.createElement('span');
+    cat.className = 'tool-cat';
+    cat.textContent = tc.category;
+    chip.appendChild(cat);
+  }
+
+  var preview = document.createElement('div');
+  preview.className = 'tool-input-preview';
+  if (tc.input_json) {
+    try {
+      preview.textContent = JSON.stringify(JSON.parse(tc.input_json), null, 2);
+    } catch(e) {
+      preview.textContent = tc.input_json;
+    }
+  } else {
+    preview.textContent = '(no input)';
+  }
+
+  chip.addEventListener('click', function(e) {
+    e.stopPropagation();
+    preview.classList.toggle('open');
+  });
+
+  wrapper.appendChild(chip);
+  wrapper.appendChild(preview);
+  return wrapper;
+}
+
+// renderAgentBlock renders an Agent tool call as an expandable subagent block
+// that lazily fetches and shows the subagent's events from /api/events/subagent.
+function renderAgentBlock(tc) {
+  var info = {};
+  try { info = JSON.parse(tc.input_json || '{}'); } catch(e) {}
+
+  var subType = info.subagent_type || 'Agent';
+  var desc = info.description || info.prompt || '';
+
+  var block = document.createElement('div');
+  block.className = 'subagent-block';
+
+  var header = document.createElement('div');
+  header.className = 'subagent-block-header';
+
+  var icon = document.createElement('span');
+  icon.className = 'expand-icon';
+  icon.textContent = '\u25B6';
+
+  var badge = document.createElement('span');
+  badge.className = 'badge badge-subagent';
+  badge.textContent = subType;
+
+  var descSpan = document.createElement('span');
+  descSpan.className = 'subagent-desc';
+  descSpan.textContent = desc ? (desc.length > 80 ? desc.slice(0, 77) + '...' : desc) : 'Subagent';
+
+  header.appendChild(icon);
+  header.appendChild(badge);
+  header.appendChild(descSpan);
+  block.appendChild(header);
+
+  var body = document.createElement('div');
+  body.className = 'subagent-block-body';
+  body.style.display = 'none';
+  block.appendChild(body);
+
+  var loaded = false;
+  header.addEventListener('click', function() {
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      icon.classList.add('expanded');
+      if (!loaded) {
+        loaded = true;
+        body.textContent = 'Loading...';
+        fetchSubagentEvents(tc.tool_use_id, body);
+      }
+    } else {
+      body.style.display = 'none';
+      icon.classList.remove('expanded');
+    }
+  });
+
+  return block;
+}
+
+// fetchSubagentEvents loads events for a given parent_event_id and renders them.
+function fetchSubagentEvents(parentEventId, container) {
+  fetch('/api/events/subagent?parent_event_id=' + encodeURIComponent(parentEventId))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(events) {
+      container.textContent = '';
+      if (!events || events.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'subagent-empty';
+        empty.textContent = 'No subagent events recorded.';
+        container.appendChild(empty);
+        return;
+      }
+      var frag = document.createDocumentFragment();
+      events.forEach(function(evt) {
+        var row = document.createElement('div');
+        row.className = 'subagent-event-row';
+
+        var timeEl = document.createElement('span');
+        timeEl.className = 'event-time';
+        timeEl.textContent = formatTime(evt.timestamp);
+
+        var chip = document.createElement('span');
+        chip.className = 'tool-chip tool-' + (evt.tool_name || 'unknown');
+        chip.textContent = evt.tool_name || evt.event_type || '';
+
+        var summary = document.createElement('span');
+        summary.className = 'event-summary';
+        summary.textContent = evt.input_summary || evt.output_summary || '';
+
+        var statusEl = document.createElement('span');
+        statusEl.className = 'badge badge-status-' + (evt.status || 'unknown');
+        statusEl.textContent = evt.status || '';
+
+        row.appendChild(timeEl);
+        row.appendChild(chip);
+        row.appendChild(summary);
+        if (evt.status) row.appendChild(statusEl);
+        frag.appendChild(row);
+      });
+      container.appendChild(frag);
+    })
+    .catch(function(err) {
+      container.textContent = 'Failed to load subagent events: ' + err.message;
+    });
 }

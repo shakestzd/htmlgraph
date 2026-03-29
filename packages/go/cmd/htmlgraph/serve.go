@@ -51,6 +51,7 @@ func runServer(port int) error {
 	mux.Handle("/api/events/recent", corsMiddleware(recentEventsHandler(database)))
 	mux.Handle("/api/events/tree", corsMiddleware(treeHandler(database)))
 	mux.Handle("/api/events/stream", corsMiddleware(sseHandler(database)))
+	mux.Handle("/api/events/subagent", corsMiddleware(subagentEventsHandler(database)))
 	mux.Handle("/api/sessions", corsMiddleware(sessionsHandler(database)))
 	mux.Handle("/api/features", corsMiddleware(featuresHandler(database, htmlgraphDir)))
 	mux.Handle("/api/stats", corsMiddleware(statsHandler(database, htmlgraphDir)))
