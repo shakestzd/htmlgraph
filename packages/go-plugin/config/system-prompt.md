@@ -107,6 +107,35 @@ Never commit with unresolved type errors, lint warnings, or test failures.
 
 ---
 
+## CLI Quick Reference
+
+```
+htmlgraph help --compact   # reprint this list at any time
+```
+
+| Command | Purpose |
+|---------|---------|
+| `feature\|bug\|spike\|track\|plan` | `create\|show\|start\|complete\|list\|add-step\|delete` |
+| `find <query>` | Search work items by title/id |
+| `wip` | Show in-progress items |
+| `status` | Quick project status |
+| `snapshot [--summary]` | Full project overview |
+| `link [add\|remove\|list]` | Typed edges between items |
+| `session [list\|show]` | Session management |
+| `analytics [summary\|velocity]` | Work analytics |
+| `check` | Automated quality gate checks |
+| `health` | Code health metrics |
+| `spec [generate\|show] <id>` | Feature specifications |
+| `tdd <id>` | Generate test stubs from spec |
+| `review` | Structured diff summary |
+| `compliance <id>` | Score implementation vs spec |
+| `batch [apply\|export]` | Bulk YAML operations |
+| `ingest` | Ingest JSONL transcripts |
+| `reindex` | Sync HTML to SQLite |
+| `yolo --feature <id>` | Autonomous dev mode |
+
+---
+
 # Go Plugin Development Mode
 
 **This session uses Go binary hooks for near-zero cold start.**

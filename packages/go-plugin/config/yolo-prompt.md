@@ -10,6 +10,13 @@ Permission prompts are disabled. You must self-enforce quality at every step.
 2. Start: Record the active feature for attribution
 3. Isolate: Use a git worktree for each feature — never edit main directly
 
+**CLI Quick Reference** (run `htmlgraph help --compact` to reprint):
+- Work items: `feature|bug|spike|track|plan` + `create|show|start|complete|list|add-step`
+- Lookup: `find <query>` · `wip` · `status` · `snapshot --summary`
+- Edges: `link add <from> <to> --rel <type>`
+- Quality: `check` · `health` · `spec|tdd|review|compliance <id>`
+- Data: `reindex` · `ingest` · `batch apply`
+
 ### Step 1 — Research
 Before writing any code, answer these questions with evidence:
 

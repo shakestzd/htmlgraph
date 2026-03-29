@@ -93,8 +93,12 @@ func updateLastQuery(database *sql.DB, sessionID, prompt string) {
 	)
 }
 
+// compactCLIRef is a per-turn CLI quick-reference injected into CIGS guidance.
+// Keep in sync with the constant in help.go.
+const compactCLIRef = `**htmlgraph CLI** — feature|bug|spike|track|plan [create|show|start|complete|list|add-step|delete] · find <q> · wip · status · snapshot · link [add|remove|list] · session [list|show] · analytics [summary|velocity] · check · health · spec|tdd|review|compliance <id> · batch [apply|export] · ingest · reindex · yolo --feature <id>`
+
 // buildAttributionGuidance returns a compact CIGS attribution block listing
-// open work items so Claude can call sdk.features.start() for the right item.
+// open work items so Claude can call htmlgraph feature start for the right item.
 func buildAttributionGuidance(database *sql.DB, sessionID, activeFeatureID string) string {
 	open := listOpenWorkItems(database)
 	if len(open) == 0 {
@@ -106,7 +110,7 @@ func buildAttributionGuidance(database *sql.DB, sessionID, activeFeatureID strin
 		"",
 		"**ACTIVE**: " + activeFeatureOrNone(activeFeatureID),
 		"",
-		"**Open work items** — call `sdk.features.start(\"id\")` for the item matching this task:",
+		"**Open work items** — run `htmlgraph feature start <id>` for the item matching this task:",
 	}
 	for _, item := range open {
 		marker := "  "
@@ -115,6 +119,7 @@ func buildAttributionGuidance(database *sql.DB, sessionID, activeFeatureID strin
 		}
 		lines = append(lines, fmt.Sprintf("%s`%s` — %s [%s]", marker, item.id, item.title, item.status))
 	}
+	lines = append(lines, "", compactCLIRef)
 	return joinLines(lines)
 }
 

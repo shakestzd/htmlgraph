@@ -69,6 +69,7 @@ func main() {
 	rootCmd.AddCommand(workitemCmd("plan", "plans"))
 	rootCmd.AddCommand(backfillCmd())
 	rootCmd.AddCommand(reindexCmd())
+	rootCmd.AddCommand(helpCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
