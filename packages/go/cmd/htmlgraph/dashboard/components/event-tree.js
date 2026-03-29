@@ -6,6 +6,7 @@ class HgEventTree extends HTMLElement {
     this.turns = [];
     this.featureTitles = {};
     this.expanded = new Set(JSON.parse(localStorage.getItem('hg-expanded') || '[]'));
+    this._filterDebounce = null;
   }
 
   connectedCallback() {
@@ -30,10 +31,25 @@ class HgEventTree extends HTMLElement {
         }
       }, 2000);
     };
+    this._bindFilterListeners();
   }
 
   disconnectedCallback() {
     if (this.evtSource) this.evtSource.close();
+  }
+
+  _bindFilterListeners() {
+    var textEl = document.getElementById('filter-text');
+    var toolEl = document.getElementById('filter-tool');
+    var agentEl = document.getElementById('filter-agent');
+    if (textEl) {
+      textEl.addEventListener('input', () => {
+        clearTimeout(this._filterDebounce);
+        this._filterDebounce = setTimeout(() => this.render(), 200);
+      });
+    }
+    if (toolEl) toolEl.addEventListener('change', () => this.render());
+    if (agentEl) agentEl.addEventListener('change', () => this.render());
   }
 
   async load() {
@@ -47,6 +63,7 @@ class HgEventTree extends HTMLElement {
     }
     await this.loadFeatureTitles();
     this.updateCount();
+    this._populateDropdowns();
     this.render();
   }
 
@@ -67,6 +84,99 @@ class HgEventTree extends HTMLElement {
       var self = this;
       features.forEach(function(f) { if (ids.has(f.id)) self.featureTitles[f.id] = f.title; });
     } catch(e) { /* non-fatal */ }
+  }
+
+  _collectFromChildren(children, tools, agents) {
+    (children || []).forEach((c) => {
+      if (c.tool_name) tools.add(c.tool_name);
+      if (c.agent_id && c.agent_id !== 'claude-code') agents.add(c.agent_id);
+      this._collectFromChildren(c.children, tools, agents);
+    });
+  }
+
+  _populateDropdowns() {
+    var tools = new Set();
+    var agents = new Set();
+    this.turns.forEach((t) => {
+      this._collectFromChildren(t.children, tools, agents);
+    });
+
+    var toolEl = document.getElementById('filter-tool');
+    var agentEl = document.getElementById('filter-agent');
+    if (toolEl) {
+      var prevTool = toolEl.value;
+      toolEl.innerHTML = '<option value="">All Tools</option>';
+      Array.from(tools).sort().forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === prevTool) opt.selected = true;
+        toolEl.appendChild(opt);
+      });
+    }
+    if (agentEl) {
+      var prevAgent = agentEl.value;
+      agentEl.innerHTML = '<option value="">All Agents</option>';
+      Array.from(agents).sort().forEach(function(a) {
+        var opt = document.createElement('option');
+        opt.value = a;
+        opt.textContent = a;
+        if (a === prevAgent) opt.selected = true;
+        agentEl.appendChild(opt);
+      });
+    }
+  }
+
+  getFilterValues() {
+    var textEl = document.getElementById('filter-text');
+    var toolEl = document.getElementById('filter-tool');
+    var agentEl = document.getElementById('filter-agent');
+    return {
+      text: textEl ? textEl.value.trim().toLowerCase() : '',
+      tool: toolEl ? toolEl.value : '',
+      agent: agentEl ? agentEl.value : ''
+    };
+  }
+
+  _turnMatchesFilters(turn, filters) {
+    if (!filters.text && !filters.tool && !filters.agent) return true;
+
+    var uq = turn.user_query || {};
+    if (filters.text) {
+      var summary = (uq.input_summary || '').toLowerCase();
+      if (!this._childrenContainText(turn.children, filters.text) && !summary.includes(filters.text)) {
+        return false;
+      }
+    }
+    if (filters.tool && !this._childrenContainTool(turn.children, filters.tool)) {
+      return false;
+    }
+    if (filters.agent && !this._childrenContainAgent(turn.children, filters.agent)) {
+      return false;
+    }
+    return true;
+  }
+
+  _childrenContainText(children, text) {
+    return (children || []).some((c) => {
+      var s = ((c.input_summary || '') + ' ' + (c.output_summary || '') + ' ' + (c.tool_name || '')).toLowerCase();
+      if (s.includes(text)) return true;
+      return this._childrenContainText(c.children, text);
+    });
+  }
+
+  _childrenContainTool(children, tool) {
+    return (children || []).some((c) => {
+      if (c.tool_name === tool) return true;
+      return this._childrenContainTool(c.children, tool);
+    });
+  }
+
+  _childrenContainAgent(children, agent) {
+    return (children || []).some((c) => {
+      if (c.agent_id === agent) return true;
+      return this._childrenContainAgent(c.children, agent);
+    });
   }
 
   featureBadge(featureId) {
@@ -107,9 +217,20 @@ class HgEventTree extends HTMLElement {
   render() {
     if (!this.turns || this.turns.length === 0) {
       this.innerHTML = '<div class="empty-state">No activity yet. Start a Claude Code session to see activity.</div>';
+      this._updateFilterCount(0, 0);
       return;
     }
-    this.innerHTML = this.turns.map(t => this.renderTurn(t)).join('');
+
+    var filters = this.getFilterValues();
+    var filtered = this.turns.filter((t) => this._turnMatchesFilters(t, filters));
+    this._updateFilterCount(filtered.length, this.turns.length);
+    this.innerHTML = filtered.map(t => this.renderTurn(t)).join('');
+  }
+
+  _updateFilterCount(shown, total) {
+    var countEl = document.getElementById('filter-count');
+    if (!countEl) return;
+    countEl.textContent = (shown < total) ? shown + ' of ' + total : '';
   }
 
   renderTurn(turn) {

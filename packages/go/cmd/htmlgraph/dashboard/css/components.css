@@ -411,3 +411,46 @@
   100% { outline: 2px solid transparent; outline-offset: 2px; box-shadow: none; }
 }
 .msg-highlight { animation: msgHighlight 4s ease-out; }
+
+/* ── Activity filter bar ──────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+.filter-input {
+  flex: 1;
+  max-width: 300px;
+  padding: 5px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+}
+.filter-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+.filter-select {
+  padding: 5px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+}
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.filter-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
