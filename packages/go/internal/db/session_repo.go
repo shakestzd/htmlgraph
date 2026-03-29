@@ -141,6 +141,17 @@ func MostRecentActiveSession(db *sql.DB) (string, error) {
 	return id, nil
 }
 
+// GetSessionProjectDir returns the project_dir for a session, or empty string
+// if the session does not exist or has no project_dir set.
+func GetSessionProjectDir(database *sql.DB, sessionID string) string {
+	var projectDir sql.NullString
+	row := database.QueryRow(
+		`SELECT project_dir FROM sessions WHERE session_id = ?`, sessionID,
+	)
+	_ = row.Scan(&projectDir)
+	return projectDir.String
+}
+
 // nullStr converts an empty string to sql.NullString.
 func nullStr(s string) sql.NullString {
 	if s == "" {
