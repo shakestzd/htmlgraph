@@ -12,6 +12,7 @@ import (
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
 // respondJSON encodes v as JSON and writes it with status 200.
@@ -178,13 +179,15 @@ func featuresHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 
 func featuresFromDB(database *sql.DB) []map[string]any {
 	rows, err := database.Query(`
-		SELECT id, type, title, status, priority,
-		       COALESCE(track_id, ''), created_at,
-		       steps_total, steps_completed
-		FROM features
+		SELECT f.id, f.type, f.title, f.status, f.priority,
+		       COALESCE(f.track_id, ''), f.created_at,
+		       f.steps_total, f.steps_completed,
+		       COALESCE(t.title, '') AS track_title
+		FROM features f
+		LEFT JOIN features t ON t.id = f.track_id
 		ORDER BY
-		    CASE status WHEN 'in-progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END,
-		    created_at DESC
+		    CASE f.status WHEN 'in-progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END,
+		    f.created_at DESC
 		LIMIT 50`)
 	if err != nil {
 		return nil
@@ -193,10 +196,10 @@ func featuresFromDB(database *sql.DB) []map[string]any {
 
 	features := make([]map[string]any, 0, 50)
 	for rows.Next() {
-		var id, ftype, title, status, priority, trackID, created string
+		var id, ftype, title, status, priority, trackID, created, trackTitle string
 		var stepsTotal, stepsCompleted int
 		if err := rows.Scan(&id, &ftype, &title, &status, &priority, &trackID,
-			&created, &stepsTotal, &stepsCompleted); err != nil {
+			&created, &stepsTotal, &stepsCompleted, &trackTitle); err != nil {
 			continue
 		}
 		features = append(features, map[string]any{
@@ -206,9 +209,11 @@ func featuresFromDB(database *sql.DB) []map[string]any {
 			"status":          status,
 			"priority":        priority,
 			"track_id":        trackID,
+			"track_title":     trackTitle,
 			"created_at":      created,
 			"steps_total":     stepsTotal,
 			"steps_completed": stepsCompleted,
+			"edges":           map[string]any{},
 		})
 	}
 	return features
@@ -217,6 +222,9 @@ func featuresFromDB(database *sql.DB) []map[string]any {
 // featuresFromHTML scans .htmlgraph/features/*.html, .htmlgraph/bugs/*.html,
 // .htmlgraph/spikes/*.html, .htmlgraph/tracks/*.html and parses each file.
 func featuresFromHTML(projectDir string) []map[string]any {
+	// Build track title lookup from tracks/*.html first.
+	trackTitles := buildTrackTitles(projectDir)
+
 	features := make([]map[string]any, 0, 100)
 	for _, subdir := range []string{"features", "bugs", "spikes", "tracks"} {
 		pattern := filepath.Join(projectDir, subdir, "*.html")
@@ -232,6 +240,11 @@ func featuresFromHTML(projectDir string) []map[string]any {
 					completed++
 				}
 			}
+			edges := node.Edges
+			if edges == nil {
+				edges = map[string][]models.Edge{}
+			}
+			trackTitle := trackTitles[node.TrackID]
 			features = append(features, map[string]any{
 				"id":              node.ID,
 				"type":            node.Type,
@@ -239,13 +252,32 @@ func featuresFromHTML(projectDir string) []map[string]any {
 				"status":          string(node.Status),
 				"priority":        string(node.Priority),
 				"track_id":        node.TrackID,
+				"track_title":     trackTitle,
 				"created_at":      node.CreatedAt.Format(time.RFC3339),
 				"steps_total":     len(node.Steps),
 				"steps_completed": completed,
+				"edges":           edges,
 			})
 		}
 	}
 	return features
+}
+
+// buildTrackTitles parses tracks/*.html and returns a map of track ID -> title.
+func buildTrackTitles(projectDir string) map[string]string {
+	titles := make(map[string]string)
+	pattern := filepath.Join(projectDir, "tracks", "*.html")
+	files, _ := filepath.Glob(pattern)
+	for _, f := range files {
+		node, err := htmlparse.ParseFile(f)
+		if err != nil || node == nil {
+			continue
+		}
+		if node.ID != "" {
+			titles[node.ID] = node.Title
+		}
+	}
+	return titles
 }
 
 // statsHandler returns a summary of counts from the database.
