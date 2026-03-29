@@ -275,10 +275,7 @@ class HgEventTree extends HTMLElement {
     var isError = evt.event_type === 'error' || evt.status === 'failed';
     var borderClass = isTask ? 'border-task' : isError ? 'border-error' : '';
 
-    var agentBadge = (evt.agent_id && evt.agent_id !== 'claude-code')
-      ? '<span class="agent-badge agent-' + agentClass(evt.agent_id) + '">' + esc(evt.agent_id) + '</span>'
-      : '';
-    var subagentBadge = evt.subagent_type
+    var subagentBadge = (isTask && evt.subagent_type)
       ? '<span class="badge badge-subagent">' + esc(evt.subagent_type) + '</span>'
       : '';
     var statusBdg = '<span class="badge badge-status-' + (evt.status || 'unknown') + '">' + esc(evt.status || 'unknown') + '</span>';
@@ -291,11 +288,11 @@ class HgEventTree extends HTMLElement {
       + (evt.session_id ? ' data-session="' + esc(evt.session_id) + '"' : '')
       + ' data-tool-use-id="' + esc(evt.tool_use_id || '') + '"'
       + ' data-tool-name="' + esc(evt.tool_name || '') + '"'
+      + (evt.agent_id ? ' data-agent="' + esc(evt.agent_id) + '"' : '')
       + ' data-timestamp="' + esc(evt.timestamp || '') + '"'
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(0,0,0,' + bgAlpha + ')">'
       + expandIcon
       + '<span class="event-time">' + formatTime(evt.timestamp) + '</span>'
-      + agentBadge
       + '<span class="tool-chip tool-' + esc(evt.tool_name) + '">' + esc(evt.tool_name) + toolChipRange(evt) + '</span>'
       + subagentBadge
       + '<span class="event-summary">' + esc(evt.input_summary || evt.output_summary || '') + '</span>'
