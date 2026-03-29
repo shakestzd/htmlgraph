@@ -95,7 +95,6 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 	// Wait for git result — upsertSession needs the commit hash.
 	startCommit := <-commitCh
 
-	// Upsert: insert or ignore on conflict (session may already exist on resume).
 	s := &models.Session{
 		SessionID:       sessionID,
 		AgentAssigned:   agentName(),
@@ -110,22 +109,88 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		ProjectDir:      projectDir,
 	}
 
-	if err := upsertSession(database, s); err != nil {
-		debugLog(projectDir, "[session-start] upsertSession failed (session=%s): %v", sessionID[:8], err)
-	}
-
-	// Build lineage trace for subagent sessions so delegation chains are queryable.
+	// Resolve lineage inputs before opening the transaction (read-only queries).
+	var inp *lineageInputs
 	if s.IsSubagent && s.ParentSessionID != "" {
-		buildLineageTrace(database, s.ParentSessionID, sessionID, agentName(), GetActiveFeatureID(database, sessionID))
+		featureID := GetActiveFeatureID(database, s.SessionID)
+		inp = resolveParentLineage(database, s.ParentSessionID, featureID)
 	}
 
+	// Batch all writes into a single transaction: session upsert + lineage inserts.
+	if err := runSessionTransaction(database, s, inp); err != nil {
+		debugLog(projectDir, "[session-start] transaction failed (session=%s): %v", sessionID[:8], err)
+	}
 
 	return &HookResult{}, nil
 }
 
-// upsertSession inserts the session row, ignoring duplicate-key conflicts.
-func upsertSession(database *sql.DB, s *models.Session) error {
-	_, err := database.Exec(`
+// lineageInputs holds pre-resolved data needed to insert lineage traces inside
+// the transaction. All fields are computed from read-only DB queries before
+// the transaction begins.
+type lineageInputs struct {
+	featureID     string
+	rootSessionID string
+	parentSessionID string
+	depth         int
+	path          []string
+	parentAgent   string
+	myAgent       string
+	needsRootSeed bool
+}
+
+// resolveParentLineage reads the parent's lineage record and builds the inputs
+// for the child trace. Pure reads — must be called before the transaction.
+func resolveParentLineage(database *sql.DB, parentSessionID, featureID string) *lineageInputs {
+	parent, _ := db.GetLineageBySession(database, parentSessionID)
+	inp := &lineageInputs{
+		myAgent:         agentName(),
+		featureID:       featureID,
+		parentSessionID: parentSessionID,
+	}
+
+	if parent != nil {
+		inp.rootSessionID = parent.RootSessionID
+		inp.depth = parent.Depth + 1
+		inp.path = make([]string, len(parent.Path)+1)
+		copy(inp.path, parent.Path)
+		inp.path[len(parent.Path)] = inp.myAgent
+	} else {
+		// No parent trace: treat parent as root and seed its entry.
+		inp.rootSessionID = parentSessionID
+		inp.depth = 1
+		inp.parentAgent = "claude-code"
+		inp.path = []string{inp.parentAgent, inp.myAgent}
+		inp.needsRootSeed = true
+	}
+	return inp
+}
+
+// runSessionTransaction batches the session upsert and optional lineage inserts
+// into a single SQLite transaction, reducing per-operation journal sync overhead.
+func runSessionTransaction(database *sql.DB, s *models.Session, inp *lineageInputs) error {
+	tx, err := database.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := upsertSessionTx(tx, s); err != nil {
+		return err
+	}
+
+	if inp != nil {
+		if err := insertLineageTracesTx(tx, inp, s.SessionID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// upsertSessionTx inserts the session row within a transaction,
+// ignoring duplicate-key conflicts (session may already exist on resume).
+func upsertSessionTx(tx *sql.Tx, s *models.Session) error {
+	_, err := tx.Exec(`
 		INSERT OR IGNORE INTO sessions
 			(session_id, agent_assigned, parent_session_id, parent_event_id,
 			 created_at, status, start_commit, is_subagent, model, active_feature_id,
@@ -145,6 +210,55 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 		nullableStr(s.ProjectDir),
 	)
 	return err
+}
+
+// insertLineageTracesTx inserts lineage trace rows within an existing transaction.
+func insertLineageTracesTx(tx *sql.Tx, inp *lineageInputs, sessionID string) error {
+	now := time.Now().UTC()
+
+	if inp.needsRootSeed {
+		rootTrace := &models.LineageTrace{
+			TraceID:       inp.parentSessionID,
+			RootSessionID: inp.parentSessionID,
+			SessionID:     inp.parentSessionID,
+			AgentName:     inp.parentAgent,
+			Depth:         0,
+			Path:          []string{inp.parentAgent},
+			FeatureID:     inp.featureID,
+			StartedAt:     now,
+			Status:        "active",
+		}
+		if err := db.InsertLineageTraceExecer(tx, rootTrace); err != nil {
+			return err
+		}
+	}
+
+	trace := &models.LineageTrace{
+		TraceID:       sessionID,
+		RootSessionID: inp.rootSessionID,
+		SessionID:     sessionID,
+		AgentName:     inp.myAgent,
+		Depth:         inp.depth,
+		Path:          inp.path,
+		FeatureID:     inp.featureID,
+		StartedAt:     now,
+		Status:        "active",
+	}
+	return db.InsertLineageTraceExecer(tx, trace)
+}
+
+// upsertSession inserts the session row, ignoring duplicate-key conflicts.
+// Kept for test compatibility (session_start_test.go calls it directly).
+func upsertSession(database *sql.DB, s *models.Session) error {
+	tx, err := database.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	if err := upsertSessionTx(tx, s); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // writeEnvVars appends session context exports to CLAUDE_ENV_FILE and always
@@ -237,56 +351,6 @@ func UpdateActiveFeature(database *sql.DB, sessionID, featureID string) error {
 		nullableStr(featureID), time.Now().UTC().Format(time.RFC3339), sessionID,
 	)
 	return err
-}
-
-// buildLineageTrace records the full delegation path for a subagent session.
-// It looks up the parent's lineage to inherit root/path, inserting the parent
-// as the root trace if it has no existing trace yet.
-func buildLineageTrace(database *sql.DB, parentSessionID, sessionID, myAgent, featureID string) {
-	parent, _ := db.GetLineageBySession(database, parentSessionID)
-
-	var rootSessionID string
-	var depth int
-	var path []string
-
-	if parent != nil {
-		rootSessionID = parent.RootSessionID
-		depth = parent.Depth + 1
-		path = make([]string, len(parent.Path)+1)
-		copy(path, parent.Path)
-		path[len(parent.Path)] = myAgent
-	} else {
-		// No parent trace: treat parent as root and seed its entry.
-		rootSessionID = parentSessionID
-		depth = 1
-		parentAgent := "claude-code"
-		path = []string{parentAgent, myAgent}
-		rootTrace := &models.LineageTrace{
-			TraceID:       parentSessionID,
-			RootSessionID: parentSessionID,
-			SessionID:     parentSessionID,
-			AgentName:     parentAgent,
-			Depth:         0,
-			Path:          []string{parentAgent},
-			FeatureID:     featureID,
-			StartedAt:     time.Now().UTC(),
-			Status:        "active",
-		}
-		_ = db.InsertLineageTrace(database, rootTrace)
-	}
-
-	trace := &models.LineageTrace{
-		TraceID:       sessionID,
-		RootSessionID: rootSessionID,
-		SessionID:     sessionID,
-		AgentName:     myAgent,
-		Depth:         depth,
-		Path:          path,
-		FeatureID:     featureID,
-		StartedAt:     time.Now().UTC(),
-		Status:        "active",
-	}
-	_ = db.InsertLineageTrace(database, trace)
 }
 
 // ensure db package is referenced (used via db.nullStr in other files).
