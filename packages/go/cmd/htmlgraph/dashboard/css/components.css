@@ -524,3 +524,65 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+/* ── Track grouping toggle & sections ─────────────────────── */
+.track-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  color: var(--text-muted);
+  margin-left: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.track-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.track-toggle.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.track-section {
+  margin-bottom: 16px;
+}
+.track-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.track-section-header:hover {
+  background: var(--bg-hover);
+}
+.track-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+.track-section-progress {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.track-section-toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.track-section-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+.track-section-body {
+  display: flex;
+}
+.track-section-body.collapsed {
+  display: none;
+}
