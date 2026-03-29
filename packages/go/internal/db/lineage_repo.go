@@ -9,13 +9,27 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
+// Execer is satisfied by both *sql.DB and *sql.Tx, enabling transaction-aware helpers.
+type Execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
 // InsertLineageTrace inserts a new lineage trace row.
 func InsertLineageTrace(db *sql.DB, trace *models.LineageTrace) error {
+	return insertLineageTrace(db, trace)
+}
+
+// InsertLineageTraceExecer inserts a lineage trace row using an Execer (e.g. *sql.Tx).
+func InsertLineageTraceExecer(ex Execer, trace *models.LineageTrace) error {
+	return insertLineageTrace(ex, trace)
+}
+
+func insertLineageTrace(ex Execer, trace *models.LineageTrace) error {
 	pathJSON, err := json.Marshal(trace.Path)
 	if err != nil {
 		return fmt.Errorf("marshal lineage path: %w", err)
 	}
-	_, err = db.Exec(`
+	_, err = ex.Exec(`
 		INSERT INTO agent_lineage_trace
 			(trace_id, root_session_id, session_id, agent_name, depth, path,
 			 feature_id, started_at, status)
