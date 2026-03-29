@@ -175,11 +175,15 @@ func normalizeTimes(createdAt, updatedAt time.Time) (time.Time, time.Time) {
 	return createdAt, updatedAt
 }
 
-// purgeStaleEntries removes features and graph_edges whose IDs are no longer
-// backed by an HTML file. Returns counts of purged features and edges.
+// purgeStaleEntries removes features, tracks, and graph_edges whose IDs are no
+// longer backed by an HTML file. Returns counts of purged features+tracks and edges.
 func purgeStaleEntries(database *sql.DB, validIDs map[string]bool) (int, int) {
 	staleFeatureIDs := collectStaleIDs(database, "SELECT id FROM features", validIDs)
 	purged := deleteByIDs(database, "DELETE FROM features WHERE id = ?", staleFeatureIDs)
+
+	// Purge stale tracks (HTML files deleted from .htmlgraph/tracks/).
+	staleTrackIDs := collectStaleIDs(database, "SELECT id FROM tracks", validIDs)
+	purged += deleteByIDs(database, "DELETE FROM tracks WHERE id = ?", staleTrackIDs)
 
 	// Purge edges that reference deleted node IDs (either endpoint).
 	staleEdgeIDs := collectStaleEdgeIDs(database, validIDs)
