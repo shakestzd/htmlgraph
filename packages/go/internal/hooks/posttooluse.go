@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -83,7 +84,44 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		}
 	}
 
+	// YOLO advisory: after a successful git commit, remind agent to mark feature done.
+	if advisory := checkYoloFeatureCompleteAdvisory(event, ctx, database); advisory != "" {
+		if result.AdditionalContext != "" {
+			result.AdditionalContext += "\n" + advisory
+		} else {
+			result.AdditionalContext = advisory
+		}
+	}
+
 	return result, nil
+}
+
+// checkYoloFeatureCompleteAdvisory returns an advisory string when a successful
+// git commit is made in YOLO mode and the active feature is still in-progress.
+func checkYoloFeatureCompleteAdvisory(event *CloudEvent, ctx *toolUseContext, database *sql.DB) string {
+	if event.ToolName != "Bash" {
+		return ""
+	}
+	if !isSuccess(event.ToolResult) {
+		return ""
+	}
+	if cmd := extractBashCommand(event.ToolInput); !looksLikeGitCommit(cmd) {
+		return ""
+	}
+	projectDir := ResolveProjectDir(event.CWD)
+	if !isYoloMode(filepath.Join(projectDir, ".htmlgraph")) {
+		return ""
+	}
+	featureID := ctx.FeatureID
+	if featureID == "" {
+		return ""
+	}
+	var status string
+	_ = database.QueryRow(`SELECT status FROM features WHERE id = ?`, featureID).Scan(&status)
+	if status != "in-progress" {
+		return ""
+	}
+	return fmt.Sprintf("Mark the feature complete: htmlgraph feature complete %s", featureID)
 }
 
 // gitCommitOutputRe matches the commit line from git commit output, e.g.:

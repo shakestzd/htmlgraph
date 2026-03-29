@@ -85,6 +85,9 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		if warn := checkYoloDiffReviewGuard(event, yolo, hasRecentDiffReview(database, ctx.SessionID)); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
+		if warn := checkYoloUIValidationGuard(event, yolo, database, ctx.SessionID); warn != "" {
+			return &HookResult{Decision: "block", Reason: warn}, nil
+		}
 		if warn := checkYoloBudgetGuard(event, yolo); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}

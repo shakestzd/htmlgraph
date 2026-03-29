@@ -249,11 +249,10 @@ func hasRecentResearch(database *sql.DB, sessionID string) bool {
 	return count > 0
 }
 
-// hasRecentDiffReview checks if git diff was run in this session or its
-// parent session. Worktree subagents inherit diff reviews from the outer
-// orchestrator session that spawned them.
-func hasRecentDiffReview(database *sql.DB, sessionID string) bool {
-	// Build list of session IDs to check: current + parent (if any).
+// getSessionAndParent returns the current session ID plus its parent session
+// ID (if any). Worktree subagents inherit context from the outer orchestrator
+// session that spawned them.
+func getSessionAndParent(database *sql.DB, sessionID string) []string {
 	sessionIDs := []string{sessionID}
 	var parentID string
 	database.QueryRow(
@@ -263,8 +262,14 @@ func hasRecentDiffReview(database *sql.DB, sessionID string) bool {
 	if parentID != "" {
 		sessionIDs = append(sessionIDs, parentID)
 	}
+	return sessionIDs
+}
 
-	for _, sid := range sessionIDs {
+// hasRecentDiffReview checks if git diff was run in this session or its
+// parent session. Worktree subagents inherit diff reviews from the outer
+// orchestrator session that spawned them.
+func hasRecentDiffReview(database *sql.DB, sessionID string) bool {
+	for _, sid := range getSessionAndParent(database, sessionID) {
 		var count int
 		database.QueryRow(`
 			SELECT COUNT(*) FROM agent_events
@@ -313,18 +318,7 @@ var testPattern = regexp.MustCompile(`\bgo test\b|\bpytest\b|\buv run pytest\b|\
 // matching test patterns. Worktree subagents inherit test runs from the
 // outer orchestrator session that spawned them.
 func hasRecentTestRun(database *sql.DB, sessionID string) bool {
-	// Build list of session IDs to check: current + parent (if any).
-	sessionIDs := []string{sessionID}
-	var parentID string
-	database.QueryRow(
-		`SELECT COALESCE(parent_session_id, '') FROM sessions WHERE session_id = ?`,
-		sessionID,
-	).Scan(&parentID)
-	if parentID != "" {
-		sessionIDs = append(sessionIDs, parentID)
-	}
-
-	for _, sid := range sessionIDs {
+	for _, sid := range getSessionAndParent(database, sessionID) {
 		var count int
 		database.QueryRow(`
 			SELECT COUNT(*) FROM agent_events
@@ -340,4 +334,54 @@ func hasRecentTestRun(database *sql.DB, sessionID string) bool {
 		}
 	}
 	return false
+}
+
+// checkYoloUIValidationGuard blocks git commit when UI files were modified in
+// the session but no screenshot or visual validation was performed.
+// Returns a non-empty reason to block, or "" to allow.
+func checkYoloUIValidationGuard(event *CloudEvent, yolo bool, database *sql.DB, sessionID string) string {
+	if !yolo || event.ToolName != "Bash" {
+		return ""
+	}
+	cmd, _ := event.ToolInput["command"].(string)
+	if !gitCommitPattern.MatchString(cmd) {
+		return ""
+	}
+
+	// Check if any UI files were modified in this session.
+	var uiFileCount int
+	database.QueryRow(`
+		SELECT COUNT(*) FROM agent_events
+		WHERE session_id = ? AND tool_name IN ('Write', 'Edit', 'MultiEdit')
+		  AND (input_summary LIKE '%.html%' OR input_summary LIKE '%.css%'
+		    OR input_summary LIKE '%.js%'  OR input_summary LIKE '%.ts%'
+		    OR input_summary LIKE '%.tsx%' OR input_summary LIKE '%.vue%'
+		    OR input_summary LIKE '%.svelte%')
+		  AND status = 'completed'`,
+		sessionID,
+	).Scan(&uiFileCount)
+
+	if uiFileCount == 0 {
+		return "" // no UI files touched
+	}
+
+	// Check for screenshot / UI validation in session (+ parent).
+	for _, sid := range getSessionAndParent(database, sessionID) {
+		var validationCount int
+		database.QueryRow(`
+			SELECT COUNT(*) FROM agent_events
+			WHERE session_id = ?
+			  AND (tool_name LIKE '%screenshot%'
+			    OR tool_name LIKE '%take_screenshot%'
+			    OR input_summary LIKE '%ui-review%'
+			    OR input_summary LIKE '%htmlgraph:ui-review%')`,
+			sid,
+		).Scan(&validationCount)
+		if validationCount > 0 {
+			return ""
+		}
+	}
+
+	return "UI files were modified but no visual validation was performed. " +
+		"Take a screenshot or run /htmlgraph:ui-review before committing."
 }
