@@ -306,7 +306,12 @@ function renderAgentBlock(tc) {
       if (!loaded) {
         loaded = true;
         body.textContent = 'Loading...';
-        fetchSubagentEvents(tc.tool_use_id, body);
+        // Prefer agent_id lookup (reliable); fall back to tool_use_id (legacy).
+        if (tc.subagent_agent_id) {
+          fetchSubagentEventsByAgentID(tc.subagent_agent_id, body);
+        } else {
+          fetchSubagentEvents(tc.tool_use_id, body);
+        }
       }
     } else {
       body.style.display = 'none';
@@ -317,51 +322,69 @@ function renderAgentBlock(tc) {
   return block;
 }
 
+// fetchSubagentEventsByAgentID loads events for a subagent using its agent_id.
+// This is the preferred path — agent_id is a stable identifier for the subagent.
+function fetchSubagentEventsByAgentID(agentID, container) {
+  fetch('/api/events/subagent?agent_id=' + encodeURIComponent(agentID))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(events) { renderSubagentEvents(events, container); })
+    .catch(function(err) {
+      container.textContent = 'Failed to load subagent events: ' + err.message;
+    });
+}
+
+// renderSubagentEvents populates a container DOM element with subagent event rows.
+function renderSubagentEvents(events, container) {
+  container.textContent = '';
+  if (!events || events.length === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'subagent-empty';
+    empty.textContent = 'No subagent events recorded.';
+    container.appendChild(empty);
+    return;
+  }
+  var frag = document.createDocumentFragment();
+  events.forEach(function(evt) {
+    var row = document.createElement('div');
+    row.className = 'subagent-event-row';
+
+    var timeEl = document.createElement('span');
+    timeEl.className = 'event-time';
+    timeEl.textContent = formatTime(evt.timestamp);
+
+    var chip = document.createElement('span');
+    chip.className = 'tool-chip tool-' + (evt.tool_name || 'unknown');
+    chip.textContent = evt.tool_name || evt.event_type || '';
+
+    var summary = document.createElement('span');
+    summary.className = 'event-summary';
+    summary.textContent = evt.input_summary || evt.output_summary || '';
+
+    var statusEl = document.createElement('span');
+    statusEl.className = 'badge badge-status-' + (evt.status || 'unknown');
+    statusEl.textContent = evt.status || '';
+
+    row.appendChild(timeEl);
+    row.appendChild(chip);
+    row.appendChild(summary);
+    if (evt.status) row.appendChild(statusEl);
+    frag.appendChild(row);
+  });
+  container.appendChild(frag);
+}
+
 // fetchSubagentEvents loads events for a given parent_event_id and renders them.
+// Kept as legacy fallback when subagent_agent_id is not available.
 function fetchSubagentEvents(parentEventId, container) {
   fetch('/api/events/subagent?parent_event_id=' + encodeURIComponent(parentEventId))
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     })
-    .then(function(events) {
-      container.textContent = '';
-      if (!events || events.length === 0) {
-        var empty = document.createElement('div');
-        empty.className = 'subagent-empty';
-        empty.textContent = 'No subagent events recorded.';
-        container.appendChild(empty);
-        return;
-      }
-      var frag = document.createDocumentFragment();
-      events.forEach(function(evt) {
-        var row = document.createElement('div');
-        row.className = 'subagent-event-row';
-
-        var timeEl = document.createElement('span');
-        timeEl.className = 'event-time';
-        timeEl.textContent = formatTime(evt.timestamp);
-
-        var chip = document.createElement('span');
-        chip.className = 'tool-chip tool-' + (evt.tool_name || 'unknown');
-        chip.textContent = evt.tool_name || evt.event_type || '';
-
-        var summary = document.createElement('span');
-        summary.className = 'event-summary';
-        summary.textContent = evt.input_summary || evt.output_summary || '';
-
-        var statusEl = document.createElement('span');
-        statusEl.className = 'badge badge-status-' + (evt.status || 'unknown');
-        statusEl.textContent = evt.status || '';
-
-        row.appendChild(timeEl);
-        row.appendChild(chip);
-        row.appendChild(summary);
-        if (evt.status) row.appendChild(statusEl);
-        frag.appendChild(row);
-      });
-      container.appendChild(frag);
-    })
+    .then(function(events) { renderSubagentEvents(events, container); })
     .catch(function(err) {
       container.textContent = 'Failed to load subagent events: ' + err.message;
     });
