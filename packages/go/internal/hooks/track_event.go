@@ -18,7 +18,7 @@ func TrackEvent(toolName string, event *CloudEvent, database *sql.DB) (*HookResu
 		return &HookResult{Continue: true}, nil
 	}
 
-	featureID := GetActiveFeatureID(database, sessionID)
+	featureID := cachedGetActiveFeatureID(database, sessionID)
 
 	ev := &models.AgentEvent{
 		EventID:      uuid.New().String(),

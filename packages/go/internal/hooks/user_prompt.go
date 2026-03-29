@@ -20,7 +20,7 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		return &HookResult{Continue: true}, nil
 	}
 
-	featureID := GetActiveFeatureID(database, sessionID)
+	featureID := cachedGetActiveFeatureID(database, sessionID)
 
 	promptSummary := sanitizePrompt(event.Prompt)
 	if promptSummary == "" {
