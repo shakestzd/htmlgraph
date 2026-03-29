@@ -155,6 +155,10 @@ func DBPath(projectDir string) string {
 	return filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db")
 }
 
+// uuidPattern matches RFC 4122 UUID format (8-4-4-4-12).
+// Pre-compiled at module load to avoid repeated compilation on every hook invocation.
+var uuidPattern = regexp.MustCompile(`([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`)
+
 // NormaliseSessionID extracts a UUID from a path-style session_id that Claude
 // Code sometimes provides for subagent sessions, e.g.:
 //
@@ -165,10 +169,7 @@ func NormaliseSessionID(raw string) string {
 	if raw == "" || !containsSlash(raw) {
 		return raw
 	}
-	re := regexp.MustCompile(
-		`([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`,
-	)
-	if m := re.FindString(raw); m != "" {
+	if m := uuidPattern.FindString(raw); m != "" {
 		return m
 	}
 	return raw
