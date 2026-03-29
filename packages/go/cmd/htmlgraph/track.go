@@ -67,9 +67,14 @@ func runTrackShow(id string, deep bool) error {
 		return err
 	}
 
+	// Try flat format first: tracks/id.html
 	path := filepath.Join(dir, "tracks", id+".html")
 	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("track %q not found", id)
+		// Try subdirectory format: tracks/id/index.html
+		path = filepath.Join(dir, "tracks", id, "index.html")
+		if _, err := os.Stat(path); err != nil {
+			return fmt.Errorf("track %q not found", id)
+		}
 	}
 
 	node, err := htmlparse.ParseFile(path)
@@ -252,4 +257,3 @@ func printTrackDeep(n *models.Node, htmlgraphDir string) {
 	printDeepGroup("Bugs", bugs)
 	printDeepGroup("Spikes", spikes)
 }
-

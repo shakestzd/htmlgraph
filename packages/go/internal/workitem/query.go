@@ -410,7 +410,8 @@ func GetActiveWorkItem(projectDir string) (*WorkItem, error) {
 }
 
 // findActiveInDir scans a directory for the first in-progress node
-// of the given type.
+// of the given type. Supports both flat format (id.html) and subdirectory
+// format (id/index.html).
 func findActiveInDir(dir, nodeType string) (*WorkItem, error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, nil
@@ -422,10 +423,21 @@ func findActiveInDir(dir, nodeType string) (*WorkItem, error) {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".html") {
+		var path string
+		if entry.IsDir() {
+			// Try subdirectory format: id/index.html
+			path = filepath.Join(dir, entry.Name(), "index.html")
+			if _, err := os.Stat(path); err != nil {
+				continue
+			}
+		} else if !strings.HasSuffix(entry.Name(), ".html") {
+			// Skip non-HTML files
 			continue
+		} else {
+			// Flat format: id.html
+			path = filepath.Join(dir, entry.Name())
 		}
-		path := filepath.Join(dir, entry.Name())
+
 		node, err := htmlparse.ParseFile(path)
 		if err != nil {
 			continue // skip unparseable files
