@@ -64,7 +64,7 @@ function fetchFeatures() {
     if (!r.ok) return;
     return r.json().then(function(data) {
       features = data;
-      renderFeatures();
+      renderKanban();
     });
   }).catch(function() {});
 }
@@ -136,49 +136,116 @@ function renderSessions() {
   grid.appendChild(frag);
 }
 
-/* ── Rendering: Work ───────────────────────────────────────── */
-function renderFeatures() {
-  var body = document.getElementById('work-body');
+/* ── Rendering: Work (Kanban) ──────────────────────────────── */
+var PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+
+var TYPE_ICONS = {
+  feat:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  bug:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  spk:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  track: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>'
+};
+
+var COL_DEFS = [
+  { status: 'todo',        label: 'Todo' },
+  { status: 'in-progress', label: 'In Progress' },
+  { status: 'done',        label: 'Done' }
+];
+
+function itemTypeKey(id) {
+  if (!id) return 'feat';
+  if (id.startsWith('bug')) return 'bug';
+  if (id.startsWith('spk')) return 'spk';
+  if (id.startsWith('trk')) return 'track';
+  return 'feat';
+}
+
+function sortItems(items) {
+  return items.slice().sort(function(a, b) {
+    var pa = PRIORITY_ORDER[a.priority] != null ? PRIORITY_ORDER[a.priority] : 2;
+    var pb = PRIORITY_ORDER[b.priority] != null ? PRIORITY_ORDER[b.priority] : 2;
+    if (pa !== pb) return pa - pb;
+    return (b.created_at || '') > (a.created_at || '') ? 1 : -1;
+  });
+}
+
+function buildKanbanCard(f) {
+  var card = document.createElement('div');
+  card.className = 'kanban-card';
+
+  var titleEl = document.createElement('div');
+  titleEl.className = 'kanban-card-title';
+  titleEl.textContent = f.title || f.id;
+  titleEl.title = f.title || f.id;
+  card.appendChild(titleEl);
+
+  var meta = document.createElement('div');
+  meta.className = 'kanban-card-meta';
+
+  var typeKey = itemTypeKey(f.id);
+  var iconHtml = TYPE_ICONS[typeKey] || TYPE_ICONS.feat;
+  var iconWrap = document.createElement('span');
+  iconWrap.className = 'type-icon';
+  iconWrap.innerHTML = iconHtml;
+  meta.appendChild(iconWrap);
+
+  var idSpan = document.createElement('span');
+  idSpan.textContent = f.id ? f.id.slice(0, 12) : '--';
+  meta.appendChild(idSpan);
+
+  if (f.priority) {
+    var priBadge = createPriorityBadge(f.priority);
+    meta.appendChild(priBadge);
+  }
+
+  card.appendChild(meta);
+  return card;
+}
+
+function renderKanban() {
+  var board = document.getElementById('kanban-board');
   var empty = document.getElementById('work-empty');
   document.getElementById('work-count').textContent = features.length;
-  body.textContent = '';
+  board.textContent = '';
+
   if (features.length === 0) { empty.style.display = ''; return; }
   empty.style.display = 'none';
 
-  var frag = document.createDocumentFragment();
+  var buckets = { 'todo': [], 'in-progress': [], 'done': [] };
   features.forEach(function(f) {
-    var tr = document.createElement('tr');
-    tr.appendChild(td(f.id, { className: 'mono', style: 'color:var(--accent)' }));
-    tr.appendChild(tdWithChild(createStatusBadge(f.status)));
-    tr.appendChild(tdWithChild(createPriorityBadge(f.priority)));
-    tr.appendChild(td(f.title || f.id, { className: 'ellipsis', title: true }));
-
-    var progCell = document.createElement('td');
-    if (f.steps_total > 0) {
-      var pct = Math.round((f.steps_completed / f.steps_total) * 100);
-      var wrapper = document.createElement('div');
-      wrapper.setAttribute('style', 'display:flex;align-items:center;gap:6px');
-      var track = document.createElement('div');
-      track.className = 'bar-track';
-      track.setAttribute('style', 'width:60px;height:10px');
-      var fill = document.createElement('div');
-      fill.className = 'bar-fill';
-      fill.style.width = pct + '%';
-      track.appendChild(fill);
-      wrapper.appendChild(track);
-      var pctLabel = document.createElement('span');
-      pctLabel.className = 'mono';
-      pctLabel.textContent = pct + '%';
-      wrapper.appendChild(pctLabel);
-      progCell.appendChild(wrapper);
-    } else {
-      progCell.className = 'mono';
-      progCell.textContent = '--';
-    }
-    tr.appendChild(progCell);
-    frag.appendChild(tr);
+    var s = f.status || 'todo';
+    if (!buckets[s]) s = 'todo';
+    buckets[s].push(f);
   });
-  body.appendChild(frag);
+
+  var frag = document.createDocumentFragment();
+  COL_DEFS.forEach(function(col) {
+    var items = sortItems(buckets[col.status] || []);
+
+    var colEl = document.createElement('div');
+    colEl.className = 'kanban-col';
+    colEl.dataset.status = col.status;
+
+    var header = document.createElement('div');
+    header.className = 'kanban-col-header';
+    var labelSpan = document.createElement('span');
+    labelSpan.textContent = col.label;
+    header.appendChild(labelSpan);
+    var countBadge = document.createElement('span');
+    countBadge.className = 'col-count';
+    countBadge.textContent = items.length;
+    header.appendChild(countBadge);
+    colEl.appendChild(header);
+
+    var cardsEl = document.createElement('div');
+    cardsEl.className = 'kanban-cards';
+    items.forEach(function(f) {
+      cardsEl.appendChild(buildKanbanCard(f));
+    });
+    colEl.appendChild(cardsEl);
+    frag.appendChild(colEl);
+  });
+  board.appendChild(frag);
 }
 
 /* ── Rendering: Agents ─────────────────────────────────────── */

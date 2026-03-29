@@ -404,6 +404,91 @@
 }
 .tool-input-preview.open { display: block; }
 
+/* ── Kanban board ─────────────────────────────────────────── */
+.kanban-board {
+  display: flex;
+  gap: 12px;
+  min-height: calc(100vh - 120px);
+  align-items: flex-start;
+}
+.kanban-col {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+}
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-top: 3px solid;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.kanban-col-header .col-count {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  min-width: 20px;
+  text-align: center;
+}
+.kanban-col[data-status="todo"] .kanban-col-header        { border-color: var(--status-todo); }
+.kanban-col[data-status="in-progress"] .kanban-col-header { border-color: var(--status-ip); }
+.kanban-col[data-status="done"] .kanban-col-header        { border-color: var(--status-done); }
+.kanban-cards {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+.kanban-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  cursor: default;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kanban-card:hover { border-color: var(--border-strong); background: var(--bg-hover); }
+.kanban-card-title {
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 6px;
+}
+.kanban-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.kanban-card-meta .type-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+.kanban-card-meta .type-icon svg { display: block; }
+
 /* Scroll-to highlight animation */
 @keyframes msgHighlight {
   0% { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 12px rgba(205,255,0,0.3); }
