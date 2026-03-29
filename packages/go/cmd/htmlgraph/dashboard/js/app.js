@@ -70,70 +70,98 @@ function fetchFeatures() {
 }
 
 /* ── Rendering: Sessions ───────────────────────────────────── */
+function sessionSparkline(msgCount) {
+  var maxMsgs = 100;
+  var w = Math.min(50, Math.max(4, (msgCount / maxMsgs) * 50));
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '50');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('viewBox', '0 0 50 16');
+  var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', '0');
+  rect.setAttribute('y', '4');
+  rect.setAttribute('width', String(w));
+  rect.setAttribute('height', '8');
+  rect.setAttribute('rx', '2');
+  rect.setAttribute('fill', 'var(--accent)');
+  rect.setAttribute('opacity', '0.5');
+  svg.appendChild(rect);
+  return svg;
+}
+
 function renderSessions() {
-  var grid = document.getElementById('sessions-grid');
+  var body = document.getElementById('sessions-body');
   var empty = document.getElementById('sessions-empty');
   document.getElementById('sessions-count').textContent = sessions.length;
-  grid.textContent = '';
+  body.textContent = '';
   if (sessions.length === 0) { empty.style.display = ''; return; }
   empty.style.display = 'none';
 
-  var frag = document.createDocumentFragment();
-  sessions.forEach(function(s) {
-    var card = document.createElement('div');
-    card.className = 'card clickable';
-    card.dataset.sessionId = s.session_id;
-    card.addEventListener('click', function() { openTranscript(s.session_id); });
+  // Pin live sessions to top, then sort by created_at DESC
+  var sorted = sessions.slice().sort(function(a, b) {
+    var aLive = a.status === 'active' ? 1 : 0;
+    var bLive = b.status === 'active' ? 1 : 0;
+    if (bLive !== aLive) return bLive - aLive;
+    return (b.created_at || '') > (a.created_at || '') ? 1 : -1;
+  });
 
-    var head = document.createElement('div');
-    head.className = 'card-head';
+  var frag = document.createDocumentFragment();
+  sorted.forEach(function(s) {
+    var tr = document.createElement('tr');
+    tr.className = 'session-row' + (s.status === 'active' ? ' live' : '');
+    tr.addEventListener('click', function() { openTranscript(s.session_id); });
+
+    // Title cell
+    var titleTd = document.createElement('td');
     var titleSpan = document.createElement('span');
-    titleSpan.className = 'card-title';
+    titleSpan.className = 'session-title';
     titleSpan.textContent = sessionDisplayTitle(s);
     titleSpan.title = s.first_message || s.session_id;
-    head.appendChild(titleSpan);
-    // Only show badge for live sessions or YOLO sessions
-    if (s.status === 'active') {
-      var liveBadge = document.createElement('span');
-      liveBadge.className = 'badge-live';
-      liveBadge.textContent = 'LIVE';
-      head.appendChild(liveBadge);
-    }
+    titleTd.appendChild(titleSpan);
     if (s.launch_mode === 'yolo') {
       var yoloBadge = document.createElement('span');
       yoloBadge.className = 'badge-yolo';
       yoloBadge.textContent = 'YOLO';
-      head.appendChild(yoloBadge);
+      yoloBadge.style.marginLeft = '6px';
+      titleTd.appendChild(yoloBadge);
     }
-    card.appendChild(head);
+    tr.appendChild(titleTd);
 
-    var metaRow = document.createElement('div');
-    metaRow.className = 'card-meta';
-    var parts = [truncId(s.session_id)];
-    if (s.model) parts.push(s.model);
-    parts.push(relTime(s.created_at));
-    metaRow.textContent = parts.join(' \u00b7 ');
-    card.appendChild(metaRow);
+    // Model cell
+    var modelTd = document.createElement('td');
+    modelTd.className = 'mono';
+    modelTd.textContent = s.model || '--';
+    tr.appendChild(modelTd);
 
-    var rows = [
-      ['Messages', s.message_count ? String(s.message_count) : '--']
-    ];
-    rows.forEach(function(pair) {
-      var row = document.createElement('div');
-      row.className = 'card-row';
-      var lbl = document.createElement('span');
-      lbl.className = 'label';
-      lbl.textContent = pair[0];
-      var val = document.createElement('span');
-      val.textContent = pair[1];
-      row.appendChild(lbl);
-      row.appendChild(val);
-      card.appendChild(row);
-    });
+    // Msgs cell
+    tr.appendChild(td(s.message_count ? String(s.message_count) : '--', { className: 'mono' }));
 
-    frag.appendChild(card);
+    // Activity sparkline cell
+    var sparkTd = document.createElement('td');
+    sparkTd.appendChild(sessionSparkline(s.message_count || 0));
+    tr.appendChild(sparkTd);
+
+    // Status cell
+    var statusTd = document.createElement('td');
+    if (s.status === 'active') {
+      var liveBadge = document.createElement('span');
+      liveBadge.className = 'badge-live';
+      liveBadge.textContent = 'LIVE';
+      statusTd.appendChild(liveBadge);
+    } else {
+      var endedBadge = document.createElement('span');
+      endedBadge.className = 'badge badge-ended';
+      endedBadge.textContent = s.status || 'ended';
+      statusTd.appendChild(endedBadge);
+    }
+    tr.appendChild(statusTd);
+
+    // Time cell
+    tr.appendChild(td(relTime(s.created_at), { className: 'mono' }));
+
+    frag.appendChild(tr);
   });
-  grid.appendChild(frag);
+  body.appendChild(frag);
 }
 
 /* ── Rendering: Work (Kanban) ──────────────────────────────── */
