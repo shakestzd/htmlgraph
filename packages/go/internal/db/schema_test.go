@@ -197,3 +197,34 @@ func TestIntegrityCheck(t *testing.T) {
 		t.Error("integrity check failed on fresh database")
 	}
 }
+
+func TestGetSessionProjectDir(t *testing.T) {
+	database, err := db.Open("file::memory:?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer database.Close()
+
+	now := time.Now().UTC()
+	sess := &models.Session{
+		SessionID:     "sess-proj-dir-getter-001",
+		AgentAssigned: "claude-code",
+		CreatedAt:     now,
+		Status:        "active",
+		ProjectDir:    "/home/user/myproject",
+	}
+	if err := db.InsertSession(database, sess); err != nil {
+		t.Fatalf("InsertSession: %v", err)
+	}
+
+	got := db.GetSessionProjectDir(database, sess.SessionID)
+	if got != sess.ProjectDir {
+		t.Errorf("GetSessionProjectDir: got %q, want %q", got, sess.ProjectDir)
+	}
+
+	// Non-existent session returns empty string.
+	empty := db.GetSessionProjectDir(database, "does-not-exist")
+	if empty != "" {
+		t.Errorf("GetSessionProjectDir non-existent: got %q, want empty", empty)
+	}
+}
