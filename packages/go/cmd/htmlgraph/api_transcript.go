@@ -84,9 +84,11 @@ func transcriptHandler(database *sql.DB) http.HandlerFunc {
 	}
 }
 
-// subagentEventsHandler returns agent_events whose parent_event_id matches
-// the given tool_use_id. Used by the transcript view to show subagent activity
-// inline. GET /api/events/subagent?parent_event_id=XXX
+// subagentEventsHandler returns agent_events for the subagent launched by the
+// given tool_use_id. The event chain is: Agent event → Task event → subagent
+// tool events. We do a two-step lookup: try direct children first; if empty,
+// find the Task intermediary and return ITS children instead.
+// GET /api/events/subagent?parent_event_id=XXX
 func subagentEventsHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		parentID := r.URL.Query().Get("parent_event_id")
@@ -95,46 +97,65 @@ func subagentEventsHandler(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := database.Query(`
-			SELECT event_id, agent_id, event_type, timestamp, COALESCE(tool_name, ''),
-			       COALESCE(input_summary, ''), COALESCE(output_summary, ''),
-			       session_id, COALESCE(status, ''), COALESCE(subagent_type, '')
-			FROM agent_events
-			WHERE parent_event_id = ?
-			ORDER BY timestamp ASC`, parentID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		events := make([]map[string]any, 0)
-		for rows.Next() {
-			var eid, aid, etype, ts, tool, inputSum, outputSum, sid, status, subType string
-			if err := rows.Scan(&eid, &aid, &etype, &ts, &tool,
-				&inputSum, &outputSum, &sid, &status, &subType); err != nil {
-				continue
+		// Try direct children first (handles cases where parent_event_id is the
+		// Task event's event_id directly).
+		events := querySubagentEvents(database, parentID)
+		if len(events) == 0 {
+			// The caller passed an Agent event ID. Find the Task child, then
+			// return its children (the actual subagent tool events).
+			var taskEventID string
+			database.QueryRow(`
+				SELECT event_id FROM agent_events
+				WHERE parent_event_id = ? AND tool_name = 'Task'
+				LIMIT 1`, parentID).Scan(&taskEventID) //nolint:errcheck
+			if taskEventID != "" {
+				events = querySubagentEvents(database, taskEventID)
 			}
-			events = append(events, map[string]any{
-				"event_id":       eid,
-				"agent_id":       aid,
-				"event_type":     etype,
-				"timestamp":      ts,
-				"tool_name":      tool,
-				"input_summary":  inputSum,
-				"output_summary": outputSum,
-				"session_id":     sid,
-				"status":         status,
-				"subagent_type":  subType,
-			})
-		}
-		if err := rows.Err(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
 
+		if events == nil {
+			events = []map[string]any{}
+		}
 		respondJSON(w, events)
 	}
+}
+
+// querySubagentEvents returns all agent_events that are direct children of
+// parentID, ordered by timestamp ascending.
+func querySubagentEvents(database *sql.DB, parentID string) []map[string]any {
+	rows, err := database.Query(`
+		SELECT event_id, agent_id, event_type, timestamp, COALESCE(tool_name, ''),
+		       COALESCE(input_summary, ''), COALESCE(output_summary, ''),
+		       session_id, COALESCE(status, ''), COALESCE(subagent_type, '')
+		FROM agent_events
+		WHERE parent_event_id = ?
+		ORDER BY timestamp ASC`, parentID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var events []map[string]any
+	for rows.Next() {
+		var eid, aid, etype, ts, tool, inputSum, outputSum, sid, status, subType string
+		if err := rows.Scan(&eid, &aid, &etype, &ts, &tool,
+			&inputSum, &outputSum, &sid, &status, &subType); err != nil {
+			continue
+		}
+		events = append(events, map[string]any{
+			"event_id":       eid,
+			"agent_id":       aid,
+			"event_type":     etype,
+			"timestamp":      ts,
+			"tool_name":      tool,
+			"input_summary":  inputSum,
+			"output_summary": outputSum,
+			"session_id":     sid,
+			"status":         status,
+			"subagent_type":  subType,
+		})
+	}
+	return events
 }
 
 // sseHandler streams new agent_events rows as Server-Sent Events.
