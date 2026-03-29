@@ -18,11 +18,15 @@
       HtmlGraph
     </div>
     <div class="stats-bar" id="stats-bar">
-      <div class="stat-pill" id="sp-events"><span class="label">Events</span> <span class="val" id="sv-events">--</span></div>
+      <div class="stat-pill" id="sp-today"><span class="label">Today</span> <span class="val" id="sv-today">--</span></div>
       <div class="stat-pill" id="sp-sessions"><span class="label">Sessions</span> <span class="val" id="sv-sessions">--</span></div>
       <div class="stat-pill" id="sp-feat-ip"><span class="label">In-Progress</span> <span class="val" id="sv-feat-ip">--</span></div>
       <div class="stat-pill" id="sp-feat-done"><span class="label">Done</span> <span class="val" id="sv-feat-done">--</span></div>
-      <div class="stat-pill" id="sp-agents"><span class="label">Agents</span> <span class="val" id="sv-agents">--</span></div>
+      <div class="stat-pill stat-pill-tools" id="sp-top-tools"></div>
+      <div class="stat-pill stat-pill-clickable" id="sp-agents">
+        <span class="label">Agents</span> <span class="val" id="sv-agents">--</span>
+        <div class="stat-tooltip" id="agents-tooltip"></div>
+      </div>
       <div class="stat-pill" style="gap:4px">
         <span class="conn-dot live" id="conn-dot"></span>
         <span class="conn-label" id="conn-label">Live</span>

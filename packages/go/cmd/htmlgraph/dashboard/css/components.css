@@ -270,6 +270,23 @@
   white-space: nowrap;
 }
 
+/* ── Header stats bar enhancements ──────────────────────────── */
+.stat-pill-tools { gap: 4px; }
+.stat-mini-bar { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--text-muted); }
+.stat-mini-bar-track { width: 40px; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+.stat-mini-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.stat-mini-bar-label { white-space: nowrap; }
+.stat-pill-clickable { cursor: pointer; position: relative; }
+.stat-pill-clickable:hover { background: var(--bg-hover); border-radius: var(--radius-sm); }
+.stat-tooltip {
+  display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 12px; z-index: 10;
+  min-width: 160px; font-size: 11px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.stat-pill-clickable:hover .stat-tooltip { display: block; }
+.stat-tooltip-item { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; color: var(--text-secondary); }
+
 /* Status badges (tree view) */
 .badge-status-completed { background: rgba(63,185,80,0.2); color: #3fb950; }
 .badge-status-started   { background: rgba(210,153,34,0.2); color: #d29922; }

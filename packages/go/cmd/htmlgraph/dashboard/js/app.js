@@ -32,10 +32,78 @@ function fetchStats() {
 }
 
 function updateStatsBar() {
-  setVal('sv-events', stats.total_events);
+  var todayCount = 0;
+  var now = Date.now();
+  events.forEach(function(e) {
+    if (!e.timestamp) return;
+    var ts = e.timestamp.indexOf('T') >= 0 ? e.timestamp : e.timestamp.replace(' ', 'T') + 'Z';
+    if (now - new Date(ts).getTime() < 86400000) todayCount++;
+  });
+  setVal('sv-today', todayCount || stats.total_events);
   setVal('sv-sessions', stats.active_sessions);
   setVal('sv-feat-ip', stats.features_in_progress);
   setVal('sv-feat-done', stats.features_done);
+}
+
+function renderTopTools() {
+  var container = document.getElementById('sp-top-tools');
+  container.textContent = '';
+  if (events.length === 0) return;
+  var toolMap = {};
+  events.forEach(function(e) {
+    var t = e.tool_name || e.event_type || 'other';
+    toolMap[t] = (toolMap[t] || 0) + 1;
+  });
+  var sorted = Object.keys(toolMap).map(function(k) { return [k, toolMap[k]]; })
+    .sort(function(a, b) { return b[1] - a[1]; }).slice(0, 3);
+  var maxVal = sorted.length > 0 ? sorted[0][1] : 1;
+  var frag = document.createDocumentFragment();
+  sorted.forEach(function(pair) {
+    var label = pair[0];
+    var count = pair[1];
+    var pct = Math.round((count / maxVal) * 100);
+    var wrap = document.createElement('div');
+    wrap.className = 'stat-mini-bar';
+    wrap.title = label + ': ' + count;
+    var track = document.createElement('div');
+    track.className = 'stat-mini-bar-track';
+    var fill = document.createElement('div');
+    fill.className = 'stat-mini-bar-fill';
+    fill.style.width = pct + '%';
+    track.appendChild(fill);
+    wrap.appendChild(track);
+    var lbl = document.createElement('span');
+    lbl.className = 'stat-mini-bar-label';
+    lbl.textContent = label.length > 6 ? label.slice(0, 6) : label;
+    wrap.appendChild(lbl);
+    frag.appendChild(wrap);
+  });
+  container.appendChild(frag);
+}
+
+function renderAgentTooltip() {
+  var tooltip = document.getElementById('agents-tooltip');
+  tooltip.textContent = '';
+  var agentMap = {};
+  events.forEach(function(e) {
+    var aid = e.agent_id || 'unknown';
+    agentMap[aid] = (agentMap[aid] || 0) + 1;
+  });
+  var sorted = Object.keys(agentMap).map(function(k) { return [k, agentMap[k]]; })
+    .sort(function(a, b) { return b[1] - a[1]; });
+  var frag = document.createDocumentFragment();
+  sorted.forEach(function(pair) {
+    var item = document.createElement('div');
+    item.className = 'stat-tooltip-item';
+    var nameSpan = document.createElement('span');
+    nameSpan.textContent = pair[0];
+    var countSpan = document.createElement('span');
+    countSpan.textContent = pair[1];
+    item.appendChild(nameSpan);
+    item.appendChild(countSpan);
+    frag.appendChild(item);
+  });
+  tooltip.appendChild(frag);
 }
 
 function fetchEvents() {
@@ -45,6 +113,9 @@ function fetchEvents() {
       events = data;
       events.forEach(function(e) { seenEventIds.add(e.event_id); });
       renderAgentCount();
+      renderTopTools();
+      renderAgentTooltip();
+      updateStatsBar();
     });
   }).catch(function() {});
 }
