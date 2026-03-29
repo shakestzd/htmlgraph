@@ -43,7 +43,10 @@ func recordSimpleEvent(
 		UpdatedAt:    now,
 	}
 
-	_ = db.InsertEvent(database, ev) // Non-fatal
+	if err := db.InsertEvent(database, ev); err != nil {
+		projectDir := ResolveProjectDir(event.CWD)
+		debugLog(projectDir, "[error] handler=%s session=%s: insert event: %v", toolName, sessionID[:minSessionLen(sessionID)], err)
+	}
 
 	return &HookResult{Continue: true}, nil
 }
@@ -175,7 +178,10 @@ func PostToolUseFailure(event *CloudEvent, database *sql.DB) (*HookResult, error
 		UpdatedAt:    now,
 	}
 
-	_ = db.InsertEvent(database, ev) // Non-fatal
+	if err := db.InsertEvent(database, ev); err != nil {
+		projectDir := ResolveProjectDir(event.CWD)
+		debugLog(projectDir, "[error] handler=posttooluse-failure session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
+	}
 
 	return &HookResult{Continue: true}, nil
 }

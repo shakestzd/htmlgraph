@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/shakestzd/htmlgraph/internal/db"
@@ -147,17 +148,23 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 }
 
 // runHook is the common wrapper: read stdin, call the handler, write stdout.
-// On any error it falls back to writing an empty JSON object so Claude is
-// never blocked by a hook failure.
+// On any error it logs to debug.log and falls back to writing an empty JSON
+// object so Claude is never blocked by a hook failure.
 func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 	event, err := hooks.ReadInput()
 	if err != nil {
+		hooks.LogError("runHook", "", fmt.Sprintf("read input: %v", err))
 		// Always return a valid decision so Claude Code doesn't show "hook error"
 		return hooks.Allow()
 	}
 
 	result, err := handler(event)
-	if err != nil || result == nil {
+	if err != nil {
+		hooks.LogError("runHook", event.SessionID, fmt.Sprintf("handler error: %v", err))
+		return hooks.Allow()
+	}
+	if result == nil {
+		hooks.LogError("runHook", event.SessionID, "handler returned nil result")
 		return hooks.Allow()
 	}
 	return hooks.WriteResult(result)
