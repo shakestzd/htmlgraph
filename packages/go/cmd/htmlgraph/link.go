@@ -53,6 +53,15 @@ func runLinkAdd(fromID, toID, rel string) error {
 		return err
 	}
 
+	fromID, err = resolveID(dir, fromID)
+	if err != nil {
+		return err
+	}
+	toID, err = resolveID(dir, toID)
+	if err != nil {
+		return err
+	}
+
 	// Resolve the target node to get its title for the edge label.
 	targetPath := resolveNodePath(dir, toID)
 	var title string
@@ -120,6 +129,15 @@ func runLinkRemove(fromID, toID, rel string) error {
 		return err
 	}
 
+	fromID, err = resolveID(dir, fromID)
+	if err != nil {
+		return err
+	}
+	toID, err = resolveID(dir, toID)
+	if err != nil {
+		return err
+	}
+
 	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
 		return fmt.Errorf("open project: %w", err)
@@ -156,6 +174,11 @@ func linkListCmd() *cobra.Command {
 
 func runLinkList(id string) error {
 	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	id, err = resolveID(dir, id)
 	if err != nil {
 		return err
 	}

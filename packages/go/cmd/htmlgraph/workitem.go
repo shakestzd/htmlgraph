@@ -231,9 +231,13 @@ func runWiShow(id string) error {
 	if err != nil {
 		return err
 	}
-	path := resolveNodePath(dir, id)
+	resolved, err := resolveID(dir, id)
+	if err != nil {
+		return err
+	}
+	path := resolveNodePath(dir, resolved)
 	if path == "" {
-		return fmt.Errorf("work item %q not found", id)
+		return fmt.Errorf("work item %q not found", resolved)
 	}
 	node, err := htmlparse.ParseFile(path)
 	if err != nil {
@@ -267,6 +271,10 @@ func wiCompleteCmd(typeName string) *cobra.Command {
 
 func runWiSetStatus(typeName, id, status string) error {
 	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	id, err = resolveID(dir, id)
 	if err != nil {
 		return err
 	}
@@ -341,14 +349,18 @@ func runWiDelete(id string) error {
 	if err != nil {
 		return err
 	}
-	path := resolveNodePath(dir, id)
+	resolved, err := resolveID(dir, id)
+	if err != nil {
+		return err
+	}
+	path := resolveNodePath(dir, resolved)
 	if path == "" {
-		return fmt.Errorf("work item %q not found", id)
+		return fmt.Errorf("work item %q not found", resolved)
 	}
 	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("delete %s: %w", id, err)
+		return fmt.Errorf("delete %s: %w", resolved, err)
 	}
-	fmt.Printf("Deleted: %s\n", id)
+	fmt.Printf("Deleted: %s\n", resolved)
 	return nil
 }
 
@@ -368,6 +380,10 @@ func runWiAddStep(typeName, id, description string) error {
 	if err != nil {
 		return err
 	}
+	id, err = resolveID(dir, id)
+	if err != nil {
+		return err
+	}
 	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
 		return fmt.Errorf("open project: %w", err)
@@ -382,10 +398,16 @@ func runWiAddStep(typeName, id, description string) error {
 	return nil
 }
 
-// resolveNodePath searches all subdirectories for a file matching id.
+// resolveID resolves a partial or full work item ID to its canonical form.
+// It delegates to workitem.ResolvePartialID which handles exact and prefix matches.
+func resolveID(htmlgraphDir, id string) (string, error) {
+	return workitem.ResolvePartialID(htmlgraphDir, id)
+}
+
+// resolveNodePath searches all subdirectories for a file matching id (exact match).
 func resolveNodePath(htmlgraphDir, id string) string {
-	subdirs := []string{"features", "bugs", "spikes", "tracks", "plans", "specs"}
-	for _, sub := range subdirs {
+	dirs := []string{"features", "bugs", "spikes", "tracks", "plans", "specs"}
+	for _, sub := range dirs {
 		p := filepath.Join(htmlgraphDir, sub, id+".html")
 		if _, err := os.Stat(p); err == nil {
 			return p
