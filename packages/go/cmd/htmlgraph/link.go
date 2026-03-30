@@ -35,10 +35,16 @@ func linkAddCmd() *cobra.Command {
 	var rel string
 
 	cmd := &cobra.Command{
-		Use:   "add <from-id> <to-id>",
+		Use:   "add <from-id> <to-id> [rel-type]",
 		Short: "Add an edge between two work items",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.RangeArgs(2, 3),
 		RunE: func(_ *cobra.Command, args []string) error {
+			// Accept relationship type as optional 3rd positional arg
+			// (e.g. `link add trk-xxx feat-yyy child`) in addition to --rel.
+			// "child" is a common alias for "contains".
+			if len(args) == 3 {
+				rel = args[2]
+			}
 			return runLinkAdd(args[0], args[1], rel)
 		},
 	}

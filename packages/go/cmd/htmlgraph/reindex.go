@@ -51,6 +51,14 @@ func runReindex(_ *cobra.Command, _ []string) error {
 		errCount += e
 	}
 
+	// Pass 3: mark all known session IDs as valid so edges pointing to
+	// sessions (e.g. implemented_in) are not purged as stale.
+	collectSessionIDs(database, validIDs)
+
+	// Pass 4: re-populate graph_edges from HTML so edges written by
+	// `link add` survive repeated reindex runs.
+	reindexEdges(database, htmlgraphDir, validIDs)
+
 	purged, edgesPurged := purgeStaleEntries(database, validIDs)
 
 	fmt.Printf("Reindexed: %d upserted, %d errors (of %d HTML files)\n",
@@ -281,5 +289,87 @@ func mapNodeType(nodeType string) string {
 		return "task"
 	default:
 		return "feature"
+	}
+}
+
+// collectSessionIDs adds all session IDs from the sessions table to validIDs.
+// Sessions are not backed by HTML files; without this, edges pointing to sessions
+// (e.g. implemented_in) would be incorrectly purged as stale by purgeStaleEntries.
+func collectSessionIDs(database *sql.DB, validIDs map[string]bool) {
+	rows, err := database.Query("SELECT session_id FROM sessions")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && id != "" {
+			validIDs[id] = true
+		}
+	}
+}
+
+// reindexEdges re-populates graph_edges from all HTML files whose edges are
+// already in validIDs. This ensures that edges written by `link add` survive
+// repeated reindex runs even when the SQLite graph_edges row was missing.
+// Only edges whose both endpoints are in validIDs are upserted (stale edges
+// are left to purgeStaleEntries).
+func reindexEdges(database *sql.DB, htmlgraphDir string, validIDs map[string]bool) {
+	dirs := []struct {
+		subdir   string
+		nodeType string
+	}{
+		{"tracks", "track"},
+		{"features", "feature"},
+		{"bugs", "bug"},
+		{"spikes", "spike"},
+	}
+	for _, d := range dirs {
+		pattern := filepath.Join(htmlgraphDir, d.subdir, "*.html")
+		files, _ := filepath.Glob(pattern)
+		for _, f := range files {
+			node, err := htmlparse.ParseFile(f)
+			if err != nil || !validIDs[node.ID] {
+				continue
+			}
+			for _, edges := range node.Edges {
+				for _, e := range edges {
+					if !validIDs[e.TargetID] {
+						continue
+					}
+					edgeID := fmt.Sprintf("%s-%s-%s", node.ID, string(e.Relationship), e.TargetID)
+					_ = dbpkg.InsertEdge(
+						database,
+						edgeID, node.ID, d.nodeType,
+						e.TargetID, inferNodeTypeFromID(e.TargetID),
+						string(e.Relationship),
+						e.Properties,
+					)
+				}
+			}
+		}
+	}
+}
+
+// inferNodeTypeFromID derives a node type string from an ID prefix.
+// Mirrors workitem.inferNodeType without the workitem package import.
+func inferNodeTypeFromID(id string) string {
+	switch {
+	case len(id) > 5 && id[:5] == "feat-":
+		return "feature"
+	case len(id) > 4 && id[:4] == "bug-":
+		return "bug"
+	case len(id) > 4 && id[:4] == "spk-":
+		return "spike"
+	case len(id) > 4 && id[:4] == "trk-":
+		return "track"
+	case len(id) > 5 && id[:5] == "plan-":
+		return "plan"
+	case len(id) > 5 && id[:5] == "spec-":
+		return "spec"
+	case len(id) > 5 && id[:5] == "sess-":
+		return "session"
+	default:
+		return "unknown"
 	}
 }
