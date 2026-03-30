@@ -168,8 +168,8 @@ const htmlgraphMarketplaceRepo = "shakestzd/htmlgraph"
 func ensureHtmlgraphPlugin() {
 	// Step 1: Register marketplace if not already known.
 	fmt.Println("Registering htmlgraph marketplace...")
-	exec.Command("claude", "plugin", "marketplace", "add", "htmlgraph",
-		"--github", htmlgraphMarketplaceRepo).Run() //nolint:errcheck
+	exec.Command("claude", "plugin", "marketplace", "add",
+		htmlgraphMarketplaceRepo).Run() //nolint:errcheck
 
 	// Step 2: Try install, fall back to update.
 	fmt.Println("Installing/updating htmlgraph plugin...")
