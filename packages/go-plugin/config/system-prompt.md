@@ -138,13 +138,13 @@ htmlgraph help --compact   # reprint this list at any time
 
 **This session uses Go binary hooks for near-zero cold start.**
 
-Hooks binary: `packages/go-plugin/hooks/bin/htmlgraph`
+Hooks binary: `htmlgraph` (available on PATH)
 Plugin dir: `packages/go-plugin/`
 
 ## Development Workflow
 1. Make changes to Go code in `packages/go/`
 2. Rebuild: `packages/go-plugin/build.sh`
-3. Restart Claude Code: `packages/go-plugin/hooks/bin/htmlgraph claude --dev`
+3. Restart Claude Code: `htmlgraph claude --dev`
 4. Changes take effect immediately (no re-release needed)
 
 ## Go Quality Gates
