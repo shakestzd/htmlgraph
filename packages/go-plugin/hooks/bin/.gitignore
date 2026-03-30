@@ -1,3 +1,6 @@
-# Locally-compiled binary produced by build.sh (not distributed via git)
-htmlgraph
+# Locally-compiled binaries (not distributed via git).
+# NOTE: "htmlgraph" is NOT ignored — the bootstrap shell script is tracked
+# under that name so marketplace users get it. Dev builds write to
+# htmlgraph-dev; build.sh installs to ~/.local/bin for PATH access.
+htmlgraph-dev
 htmlgraph-bin
