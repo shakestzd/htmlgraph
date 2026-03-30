@@ -47,6 +47,10 @@ func Open(dbPath string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE tool_calls ADD COLUMN feature_id TEXT`)
 	db.Exec(`ALTER TABLE messages ADD COLUMN agent_id TEXT`)
 
+	// Drop deprecated tables replaced by claims system.
+	db.Exec(`DROP TABLE IF EXISTS agent_collaboration`)
+	db.Exec(`DROP TABLE IF EXISTS agent_presence`)
+
 	return db, nil
 }
 
@@ -61,7 +65,9 @@ func CreateAllTables(db *sql.DB) error {
 			event_type TEXT NOT NULL CHECK(
 				event_type IN ('tool_call','tool_result','error','delegation',
 				               'completion','start','end','check_point','task_delegation',
-				               'teammate_idle','task_completed')
+				               'teammate_idle','task_completed',
+				               'claim.proposed','claim.claimed','claim.heartbeat','claim.blocked',
+				               'claim.completed','claim.abandoned','claim.expired','claim.handoff')
 			),
 			timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			tool_name TEXT,
@@ -177,25 +183,29 @@ func CreateAllTables(db *sql.DB) error {
 			metadata JSON
 		)`,
 
-		// 5. agent_collaboration
-		`CREATE TABLE IF NOT EXISTS agent_collaboration (
-			handoff_id TEXT PRIMARY KEY,
-			from_agent TEXT NOT NULL,
-			to_agent TEXT NOT NULL,
-			timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			feature_id TEXT,
-			session_id TEXT,
-			handoff_type TEXT CHECK(
-				handoff_type IN ('delegation','parallel','sequential','fallback')
+		// 5. claims
+		`CREATE TABLE IF NOT EXISTS claims (
+			claim_id TEXT PRIMARY KEY,
+			work_item_id TEXT NOT NULL,
+			track_id TEXT,
+			owner_session_id TEXT NOT NULL,
+			owner_agent TEXT NOT NULL DEFAULT 'claude-code',
+			status TEXT NOT NULL DEFAULT 'proposed' CHECK(
+				status IN ('proposed','claimed','in_progress','blocked',
+				           'handoff_pending','completed','abandoned','expired','rejected')
 			),
-			status TEXT DEFAULT 'pending' CHECK(
-				status IN ('pending','accepted','rejected','completed','failed')
-			),
-			reason TEXT,
-			context JSON,
-			result JSON,
-			FOREIGN KEY (feature_id) REFERENCES features(id),
-			FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+			intended_output TEXT,
+			write_scope JSON,
+			leased_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			lease_expires_at DATETIME NOT NULL,
+			last_heartbeat_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			dependencies JSON,
+			progress_notes TEXT,
+			blocker_reason TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (work_item_id) REFERENCES features(id) ON DELETE CASCADE,
+			FOREIGN KEY (owner_session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 		)`,
 
 		// 6. graph_edges
@@ -296,22 +306,6 @@ func CreateAllTables(db *sql.DB) error {
 			UNIQUE(feature_id, file_path)
 		)`,
 
-		// 13. agent_presence
-		`CREATE TABLE IF NOT EXISTS agent_presence (
-			agent_id TEXT PRIMARY KEY,
-			status TEXT NOT NULL DEFAULT 'offline' CHECK(
-				status IN ('active','idle','offline')
-			),
-			current_feature_id TEXT,
-			last_tool_name TEXT,
-			last_activity DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			total_tools_executed INTEGER DEFAULT 0,
-			total_cost_tokens INTEGER DEFAULT 0,
-			session_id TEXT,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (current_feature_id) REFERENCES features(id) ON DELETE SET NULL,
-			FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE SET NULL
-		)`,
 	}
 
 	for _, stmt := range stmts {
@@ -351,13 +345,11 @@ func CreateAllIndexes(db *sql.DB) error {
 		// tracks
 		"CREATE INDEX IF NOT EXISTS idx_tracks_status_created ON tracks(status, created_at DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_tracks_priority ON tracks(priority DESC)",
-		// collaboration
-		"CREATE INDEX IF NOT EXISTS idx_collaboration_session ON agent_collaboration(session_id, timestamp DESC)",
-		"CREATE INDEX IF NOT EXISTS idx_collaboration_from_agent ON agent_collaboration(from_agent)",
-		"CREATE INDEX IF NOT EXISTS idx_collaboration_to_agent ON agent_collaboration(to_agent)",
-		"CREATE INDEX IF NOT EXISTS idx_collaboration_agents ON agent_collaboration(from_agent, to_agent)",
-		"CREATE INDEX IF NOT EXISTS idx_collaboration_feature ON agent_collaboration(feature_id)",
-		"CREATE INDEX IF NOT EXISTS idx_collaboration_handoff_type ON agent_collaboration(handoff_type, timestamp DESC)",
+		// claims
+		"CREATE INDEX IF NOT EXISTS idx_claims_work_item ON claims(work_item_id)",
+		"CREATE INDEX IF NOT EXISTS idx_claims_session ON claims(owner_session_id)",
+		"CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status)",
+		"CREATE INDEX IF NOT EXISTS idx_claims_lease_expiry ON claims(lease_expires_at)",
 		// graph_edges
 		"CREATE INDEX IF NOT EXISTS idx_edges_from ON graph_edges(from_node_id)",
 		"CREATE INDEX IF NOT EXISTS idx_edges_to ON graph_edges(to_node_id)",
@@ -383,10 +375,6 @@ func CreateAllIndexes(db *sql.DB) error {
 		// feature_files
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_feature ON feature_files(feature_id)",
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_path ON feature_files(file_path)",
-		// agent_presence
-		"CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status, last_activity DESC)",
-		"CREATE INDEX IF NOT EXISTS idx_agent_presence_feature ON agent_presence(current_feature_id, last_activity DESC)",
-		"CREATE INDEX IF NOT EXISTS idx_agent_presence_activity ON agent_presence(last_activity DESC)",
 	}
 
 	for _, idx := range indexes {

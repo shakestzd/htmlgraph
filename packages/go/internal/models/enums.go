@@ -139,3 +139,15 @@ const (
 	EventTeammateIdle   EventType = "teammate_idle"
 	EventTaskCompleted  EventType = "task_completed"
 )
+
+// Claim lifecycle event types.
+const (
+	EventClaimProposed  EventType = "claim.proposed"
+	EventClaimClaimed   EventType = "claim.claimed"
+	EventClaimHeartbeat EventType = "claim.heartbeat"
+	EventClaimBlocked   EventType = "claim.blocked"
+	EventClaimCompleted EventType = "claim.completed"
+	EventClaimAbandoned EventType = "claim.abandoned"
+	EventClaimExpired   EventType = "claim.expired"
+	EventClaimHandoff   EventType = "claim.handoff"
+)
