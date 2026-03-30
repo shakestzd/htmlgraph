@@ -141,34 +141,45 @@ func printTrackDetail(n *models.Node, htmlgraphDir string) {
 	}
 }
 
-// loadLinkedFeatures returns features whose TrackID matches trackID.
+// loadLinkedFeatures returns features linked to trackID either via the
+// TrackID metadata field or via a "contains" edge on the track node.
 func loadLinkedFeatures(htmlgraphDir, trackID string) []*models.Node {
-	nodes, err := graph.LoadDir(filepath.Join(htmlgraphDir, "features"))
+	return loadLinkedByType(htmlgraphDir, "features", trackID)
+}
+
+// containsEdgeIDs returns the set of target IDs referenced by a track's
+// "contains" edges, so loadLinkedByType can include edge-linked children that
+// do not carry the data-track-id attribute.
+func containsEdgeIDs(htmlgraphDir, trackID string) map[string]bool {
+	path := filepath.Join(htmlgraphDir, "tracks", trackID+".html")
+	node, err := htmlparse.ParseFile(path)
 	if err != nil {
 		return nil
 	}
-	var linked []*models.Node
-	for _, n := range nodes {
-		if n.TrackID == trackID {
-			linked = append(linked, n)
-		}
+	ids := make(map[string]bool)
+	for _, e := range node.Edges[string(models.RelContains)] {
+		ids[e.TargetID] = true
 	}
-	sort.Slice(linked, func(i, j int) bool {
-		return linked[i].ID < linked[j].ID
-	})
-	return linked
+	return ids
 }
 
-// loadLinkedByType returns nodes of a given subdir whose TrackID matches trackID.
+// loadLinkedByType returns nodes of a given subdir linked to trackID either
+// via the TrackID metadata field or via a "contains" edge on the track.
 func loadLinkedByType(htmlgraphDir, subdir, trackID string) []*models.Node {
 	nodes, err := graph.LoadDir(filepath.Join(htmlgraphDir, subdir))
 	if err != nil {
 		return nil
 	}
+	edgeIDs := containsEdgeIDs(htmlgraphDir, trackID)
+	seen := make(map[string]bool)
 	var linked []*models.Node
 	for _, n := range nodes {
-		if n.TrackID == trackID {
+		if seen[n.ID] {
+			continue
+		}
+		if n.TrackID == trackID || edgeIDs[n.ID] {
 			linked = append(linked, n)
+			seen[n.ID] = true
 		}
 	}
 	sort.Slice(linked, func(i, j int) bool {
