@@ -15,7 +15,7 @@ import (
 
 // trackCmdWithExtras builds the standard workitem commands for tracks,
 // then replaces the generic show with a track-specific one that lists
-// linked features.
+// all linked children (features, bugs, and spikes).
 func trackCmdWithExtras() *cobra.Command {
 	cmd := workitemCmd("track", "tracks")
 	// Replace generic show with track-specific show (shows linked features)
@@ -103,18 +103,9 @@ func printTrackDetail(n *models.Node, htmlgraphDir string) {
 		fmt.Printf("  Created   %s\n", n.CreatedAt.Format("2006-01-02"))
 	}
 
-	features := loadLinkedFeatures(htmlgraphDir, n.ID)
-	if len(features) > 0 {
-		fmt.Printf("\nLinked features (%d):\n", len(features))
-		for _, f := range features {
-			marker := "  "
-			if f.Status == models.StatusInProgress {
-				marker = "* "
-			}
-			fmt.Printf("  %s%-20s  %-11s  %s\n",
-				marker, f.ID, f.Status, truncate(f.Title, 38))
-		}
-	}
+	printLinkedSection(htmlgraphDir, "features", "Linked features", n.ID)
+	printLinkedSection(htmlgraphDir, "bugs", "Linked bugs", n.ID)
+	printLinkedSection(htmlgraphDir, "spikes", "Linked spikes", n.ID)
 
 	if n.Content != "" {
 		fmt.Println("\nDescription:")
@@ -141,10 +132,22 @@ func printTrackDetail(n *models.Node, htmlgraphDir string) {
 	}
 }
 
-// loadLinkedFeatures returns features linked to trackID either via the
-// TrackID metadata field or via a "contains" edge on the track node.
-func loadLinkedFeatures(htmlgraphDir, trackID string) []*models.Node {
-	return loadLinkedByType(htmlgraphDir, "features", trackID)
+// printLinkedSection prints a labelled section of items linked to a track,
+// covering a single work item subdir (features, bugs, or spikes).
+func printLinkedSection(htmlgraphDir, subdir, label, trackID string) {
+	items := loadLinkedByType(htmlgraphDir, subdir, trackID)
+	if len(items) == 0 {
+		return
+	}
+	fmt.Printf("\n%s (%d):\n", label, len(items))
+	for _, item := range items {
+		marker := "  "
+		if item.Status == models.StatusInProgress {
+			marker = "* "
+		}
+		fmt.Printf("  %s%-20s  %-11s  %s\n",
+			marker, item.ID, item.Status, truncate(item.Title, 38))
+	}
 }
 
 // containsEdgeIDs returns the set of target IDs referenced by a track's

@@ -314,7 +314,7 @@ func runBatchExport(trackID string) error {
 	}
 
 	// Load linked features
-	features := loadLinkedFeatures(dir, trackID)
+	features := loadLinkedByType(dir, "features", trackID)
 	idToTitle := make(map[string]string)
 	for _, f := range features {
 		idToTitle[f.ID] = f.Title

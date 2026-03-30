@@ -35,10 +35,25 @@ var ValidRelationshipTypes = []RelationshipType{
 	RelContains,
 }
 
+// relationshipAliases maps convenience short-forms to canonical relationship types.
+// This allows users to type e.g. "child" instead of "contains" in CLI commands.
+var relationshipAliases = map[string]RelationshipType{
+	"child":   RelContains,
+	"parent":  RelPartOf,
+	"dep":     RelBlockedBy,
+	"depends": RelBlockedBy,
+}
+
 // NormalizeRelationship converts a raw relationship string to its canonical
 // underscore form, replacing hyphens with underscores and lowercasing.
+// It also resolves convenience aliases (e.g. "child" → "contains",
+// "parent" → "part_of").
 func NormalizeRelationship(s string) RelationshipType {
-	return RelationshipType(strings.ToLower(strings.ReplaceAll(s, "-", "_")))
+	normalized := RelationshipType(strings.ToLower(strings.ReplaceAll(s, "-", "_")))
+	if alias, ok := relationshipAliases[string(normalized)]; ok {
+		return alias
+	}
+	return normalized
 }
 
 // IsValidRelationship reports whether r is a known RelationshipType.

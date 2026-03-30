@@ -25,6 +25,12 @@ func TestNormalizeRelationship(t *testing.T) {
 		{"part-of", models.RelPartOf},
 		{"part_of", models.RelPartOf},
 		{"contains", models.RelContains},
+		// Convenience aliases
+		{"child", models.RelContains},
+		{"CHILD", models.RelContains},
+		{"parent", models.RelPartOf},
+		{"dep", models.RelBlockedBy},
+		{"depends", models.RelBlockedBy},
 	}
 
 	for _, tt := range tests {
@@ -74,6 +80,16 @@ func TestAllConstantsUseUnderscores(t *testing.T) {
 		s := string(r)
 		if strings.Contains(s, "-") {
 			t.Errorf("RelationshipType constant %q contains a hyphen; use underscores", s)
+		}
+	}
+}
+
+func TestAliasesProduceValidRelationships(t *testing.T) {
+	aliases := []string{"child", "parent", "dep", "depends"}
+	for _, a := range aliases {
+		normalized := models.NormalizeRelationship(a)
+		if !models.IsValidRelationship(normalized) {
+			t.Errorf("alias %q normalizes to %q which is not a valid relationship", a, normalized)
 		}
 	}
 }
