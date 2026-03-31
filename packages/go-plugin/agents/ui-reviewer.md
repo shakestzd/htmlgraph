@@ -10,11 +10,11 @@ tools: mcp__plugin_htmlgraph_chrome-devtools__navigate_page, mcp__plugin_htmlgra
 
 Visual QA for any web application using browser automation.
 
-## Work Attribution (MANDATORY — do this FIRST)
+## Initialization (MANDATORY — run this FIRST)
 
-Before ANY tool calls, identify and activate the work item:
+Before ANY other work, run this command and follow ALL instructions in its output:
 ```bash
-htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
+htmlgraph agent-init
 ```
 
 ## Purpose

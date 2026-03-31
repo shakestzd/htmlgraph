@@ -8,11 +8,11 @@ tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 
 # Researcher Agent
 
-## Work Attribution (MANDATORY — do this FIRST)
+## Initialization (MANDATORY — run this FIRST)
 
-Before ANY tool calls, identify and activate the work item:
+Before ANY other work, run this command and follow ALL instructions in its output:
 ```bash
-htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
+htmlgraph agent-init
 ```
 
 Research documentation and resources BEFORE implementing solutions.

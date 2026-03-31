@@ -29,11 +29,11 @@ when_not_to_use: |
 
 # Haiku Coder Agent
 
-## Work Attribution (MANDATORY — do this FIRST)
+## Initialization (MANDATORY — run this FIRST)
 
-Before ANY tool calls, identify and activate the work item:
+Before ANY other work, run this command and follow ALL instructions in its output:
 ```bash
-htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
+htmlgraph agent-init
 ```
 
 **Fast and efficient for simple, well-defined tasks.**

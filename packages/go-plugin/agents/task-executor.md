@@ -6,11 +6,11 @@ model: haiku
 
 # Task Executor Agent
 
-## Work Attribution (MANDATORY — do this FIRST)
+## Initialization (MANDATORY — run this FIRST)
 
-Before ANY tool calls, identify and activate the work item:
+Before ANY other work, run this command and follow ALL instructions in its output:
 ```bash
-htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
+htmlgraph agent-init
 ```
 
 You are a focused task executor. You receive a single, well-defined task and execute it autonomously in an isolated git worktree.

@@ -8,11 +8,11 @@ color: yellow
 
 # Gemini Operator Agent
 
-## Work Attribution (MANDATORY — do this FIRST)
+## Initialization (MANDATORY — run this FIRST)
 
-Before ANY tool calls, identify and activate the work item:
+Before ANY other work, run this command and follow ALL instructions in its output:
 ```bash
-htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
+htmlgraph agent-init
 ```
 
 **Execute research, analysis, and large-context tasks by delegating to Google Gemini CLI first, falling back to direct execution only if Gemini is unavailable.**
