@@ -1,5 +1,5 @@
 ---
-name: htmlgraph:task-executor
+name: task-executor
 description: Autonomous agent for executing a single task in an isolated git worktree. Spawned by the orchestrator during parallel execution.
 model: haiku
 ---
