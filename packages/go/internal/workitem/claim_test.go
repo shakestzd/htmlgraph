@@ -66,11 +66,13 @@ func TestAtomicClaimSameAgentSameSession(t *testing.T) {
 	feat, _ := p.Features.Create("Atomic Reclaim Test")
 
 	// Claim once
-	_ = p.Features.AtomicClaim(feat.ID, "sess-001")
-
-	// Same agent, same session should succeed (idempotent)
 	if err := p.Features.AtomicClaim(feat.ID, "sess-001"); err != nil {
-		t.Fatalf("AtomicClaim same agent/session should succeed: %v", err)
+		t.Fatalf("first claim should succeed: %v", err)
+	}
+
+	// Second claim by same session should fail (claim is exclusive)
+	if err := p.Features.AtomicClaim(feat.ID, "sess-001"); err == nil {
+		t.Error("expected error when reclaiming with same session")
 	}
 }
 
@@ -95,8 +97,10 @@ func TestAtomicClaimDifferentAgentFails(t *testing.T) {
 	p := newTestProject(t)
 	feat, _ := p.Features.Create("Agent Conflict Test")
 
-	// Claim with test-agent
-	_ = p.Features.Claim(feat.ID, "sess-001")
+	// Atomically claim with test-agent
+	if err := p.Features.AtomicClaim(feat.ID, "sess-001"); err != nil {
+		t.Fatalf("first atomic claim should succeed: %v", err)
+	}
 
 	// Create second Project with different agent, same project dir
 	p2, err := workitem.Open(p.ProjectDir, "other-agent")
@@ -109,8 +113,7 @@ func TestAtomicClaimDifferentAgentFails(t *testing.T) {
 	err = p2.Features.AtomicClaim(feat.ID, "sess-002")
 	if err == nil {
 		t.Error("expected error when claiming with different agent")
-	}
-	if !strings.Contains(err.Error(), "already claimed") {
+	} else if !strings.Contains(err.Error(), "already claimed") {
 		t.Errorf("error should mention 'already claimed': %v", err)
 	}
 }

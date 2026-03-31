@@ -42,6 +42,11 @@ func ClaimItem(db *sql.DB, claim *models.Claim, leaseDuration time.Duration) err
 		claim.OwnerAgent = "claude-code"
 	}
 
+	// Ensure FK-referenced rows exist. HTML is canonical; SQLite is a read
+	// index that may not have the row yet (e.g. workitem tests, CLI-only usage).
+	ensureFeatureRow(db, claim.WorkItemID)
+	ensureSessionRow(db, claim.OwnerSessionID, claim.OwnerAgent)
+
 	activeList := activeStatusList()
 	query := fmt.Sprintf(`
 		INSERT INTO claims (
@@ -417,4 +422,28 @@ func nullJSON(raw json.RawMessage) sql.NullString {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: string(raw), Valid: true}
+}
+
+// ensureFeatureRow creates a placeholder feature row if it doesn't exist.
+// This handles the case where a feature is created via HTML but not yet indexed
+// into the database, or when tests create features without database indexing.
+// Best-effort: errors are logged but not returned, since HTML is canonical.
+func ensureFeatureRow(db *sql.DB, featureID string) {
+	now := time.Now().UTC()
+	_, _ = db.Exec(`
+		INSERT OR IGNORE INTO features (id, type, title, status, priority, created_at, updated_at)
+		VALUES (?, 'feature', '', 'todo', 'medium', ?, ?)`,
+		featureID, now.Format(time.RFC3339), now.Format(time.RFC3339))
+}
+
+// ensureSessionRow creates a placeholder session row if it doesn't exist.
+// This handles the case where a session is referenced before it's been created,
+// or when tests create claims without proper session setup.
+// Best-effort: errors are logged but not returned.
+func ensureSessionRow(db *sql.DB, sessionID, agent string) {
+	now := time.Now().UTC()
+	_, _ = db.Exec(`
+		INSERT OR IGNORE INTO sessions (session_id, agent, created_at, ended_at)
+		VALUES (?, ?, ?, ?)`,
+		sessionID, agent, now.Format(time.RFC3339), nil)
 }

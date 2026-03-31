@@ -71,6 +71,7 @@ func main() {
 	rootCmd.AddCommand(reindexCmd())
 	rootCmd.AddCommand(recommendCmd())
 	rootCmd.AddCommand(helpCmd())
+	rootCmd.AddCommand(claimCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
