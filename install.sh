@@ -43,6 +43,36 @@ die() {
 }
 
 # ---------------------------------------------------------------------------
+# Help message
+# ---------------------------------------------------------------------------
+show_help() {
+    cat <<EOF
+htmlgraph installer — Download and install the htmlgraph binary.
+
+Usage:
+  install.sh [OPTIONS]
+
+  curl -fsSL https://raw.githubusercontent.com/shakestzd/htmlgraph/main/install.sh | sh
+
+Options:
+  --version <ver>      Install a specific version (e.g. 0.38.0)
+  --install-dir <dir>  Install to a custom directory (default: ~/.local/bin)
+  --help               Show this help message
+
+Examples:
+  # Install latest version
+  sh install.sh
+
+  # Install specific version
+  sh install.sh --version 0.38.0
+
+  # Custom install directory
+  sh install.sh --install-dir /usr/local/bin
+
+EOF
+}
+
+# ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
 VERSION=""
@@ -50,6 +80,10 @@ INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        --help)
+            show_help
+            exit 0
+            ;;
         --version)
             [ $# -ge 2 ] || die "--version requires an argument"
             VERSION="$2"
@@ -123,7 +157,7 @@ detect_platform() {
 }
 
 # ---------------------------------------------------------------------------
-# Resolve latest go/v* release version from GitHub API
+# Resolve latest v* release version from GitHub API
 # ---------------------------------------------------------------------------
 resolve_latest_version() {
     log_info "Fetching latest release version..."
@@ -131,15 +165,16 @@ resolve_latest_version() {
     _api_url="https://api.github.com/repos/${REPO}/releases"
     _response="$(http_get_stdout "${_api_url}" 2>/dev/null)" || die "Failed to fetch releases from GitHub API."
 
-    # Extract the first tag_name that starts with go/v
-    _tag="$(printf '%s' "${_response}" | grep -o '"tag_name": "go/v[^"]*"' | head -1 | grep -o 'go/v[^"]*')"
+    # Extract the first tag_name that starts with v (semantic versioning)
+    # Skip pre-releases and drafts by looking at the first non-prerelease tag
+    _tag="$(printf '%s' "${_response}" | grep -o '"tag_name": "v[0-9][^"]*"' | head -1 | grep -o 'v[0-9][^"]*')"
 
     if [ -z "${_tag}" ]; then
-        die "Could not determine latest version. No go/v* release found."
+        die "Could not determine latest version. No v* release found."
     fi
 
-    # Strip "go/v" prefix to get bare semver (e.g. 0.35.0)
-    VERSION="${_tag#go/v}"
+    # Strip "v" prefix to get bare semver (e.g. 0.35.0)
+    VERSION="${_tag#v}"
     log_info "Latest version: ${VERSION}"
 }
 
@@ -149,7 +184,7 @@ resolve_latest_version() {
 verify_checksum() {
     _tarball="$1"
     _version="$2"
-    _checksums_url="https://github.com/${REPO}/releases/download/go/v${_version}/htmlgraph_${_version}_checksums.txt"
+    _checksums_url="https://github.com/${REPO}/releases/download/v${_version}/htmlgraph_${_version}_checksums.txt"
     _tmpfile="${_tarball}.checksums.txt"
 
     if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
@@ -203,7 +238,7 @@ is_already_installed() {
 # ---------------------------------------------------------------------------
 download_and_install() {
     _archive="htmlgraph_${VERSION}_${PLATFORM_OS}_${PLATFORM_ARCH}.tar.gz"
-    _url="https://github.com/${REPO}/releases/download/go/v${VERSION}/${_archive}"
+    _url="https://github.com/${REPO}/releases/download/v${VERSION}/${_archive}"
 
     log_info "Downloading ${_archive}..."
 
