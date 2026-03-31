@@ -22,24 +22,41 @@ Modern AI agent systems are drowning in complexity:
 
 ## Installation
 
-```bash
-pip install htmlgraph
-```
-
-## Quick Start
-
-### CLI (recommended for new projects)
+### Homebrew (macOS/Linux)
 
 ```bash
-htmlgraph init --install-hooks
-htmlgraph serve
+brew install shakestzd/tap/htmlgraph
 ```
 
-This bootstraps:
-- `index.html` dashboard at the project root
-- `.htmlgraph/events/` append-only JSONL event stream (Git-friendly)
-- `.htmlgraph/index.sqlite` analytics cache (rebuildable; gitignored via `.gitignore`)
-- versioned hook scripts under `.htmlgraph/hooks/` (installed into `.git/hooks/` with `--install-hooks`)
+### Shell Script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shakestzd/htmlgraph/main/install.sh | sh
+```
+
+### Go Install
+
+```bash
+go install github.com/shakestzd/htmlgraph/packages/go/cmd/htmlgraph@latest
+```
+
+### Verify
+
+```bash
+htmlgraph version
+```
+
+## Getting Started
+
+1. **Install the CLI** — pick any method above
+2. **Initialize your project**: `htmlgraph init`
+3. **Optionally install the Claude Code plugin**: `htmlgraph plugin install`
+4. **Start tracking**: `htmlgraph yolo --feature <id>`
+
+### CLI vs Plugin
+
+- **CLI (`htmlgraph` binary)** — Core tool. Work items, tracking, analytics. Works standalone without Claude Code.
+- **Plugin (Claude Code integration)** — Optional add-on. Adds hooks for automatic session tracking, delegation enforcement, and AI agent coordination. Install with `htmlgraph plugin install`.
 
 ### CLI Workflow
 
