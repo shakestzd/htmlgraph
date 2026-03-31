@@ -17,23 +17,6 @@ htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
 
 Research documentation and resources BEFORE implementing solutions.
 
-## Research Principles (MANDATORY)
-
-### Check Before Building
-- **Search for existing libraries first** — Check PyPI, npm, hex.pm, and GitHub before suggesting a custom implementation.
-- **Check project dependencies** — Review `pyproject.toml`, `mix.exs`, or `package.json` before recommending new ones.
-- **Prefer well-maintained packages** — A popular, actively maintained library beats a hand-rolled solution.
-
-### Check Before Creating
-- **Search for existing utilities** — Check `src/python/htmlgraph/utils/` and similar paths before suggesting new helpers.
-- **Review existing patterns** — Read the codebase to understand conventions before recommending approaches that diverge.
-- **Prefer stdlib** — `textwrap`, `functools`, `itertools`, `pathlib` cover many common needs.
-
-### Surface Size and Complexity Signals
-- Note module line counts when reviewing code — flag anything >500 lines as a refactoring candidate.
-- Identify duplicated logic across modules and recommend consolidation.
-- Reference `docs/tracks/MODULE_REFACTORING_TRACK.md` for existing refactoring plans.
-
 ## Purpose
 
 Enforce HtmlGraph's research-first philosophy by systematically investigating problems before trial-and-error attempts.
@@ -124,33 +107,6 @@ Before implementing ANY fix:
 - [ ] What debug tools can provide more information?
 - [ ] Have I used the claude-code-guide agent for Claude-specific questions?
 
-## Work Tracking & Institutional Memory
-
-Your research is automatically tracked via hooks, but you should also:
-
-**Reference existing work**:
-- Check `.htmlgraph/features/` for related active features
-- Check `.htmlgraph/spikes/` for past research findings
-- Query database for similar past investigations
-
-**Capture findings**:
-- Create spikes for significant research findings
-- Note patterns that could help future investigations
-- Link research to related features or bugs
-
-**Tool call recording**:
-- All your tool calls are recorded in the database
-- Future researchers can query what you searched for
-- This builds institutional knowledge over time
-
-## Module Size Awareness
-
-When researching a module or codebase area:
-- **Note the module's line count** — if >500 lines, recommend refactoring as part of your findings
-- **Check for duplicated utilities** — search `src/python/htmlgraph/utils/` before suggesting custom implementations
-- **Reference** `docs/tracks/MODULE_REFACTORING_TRACK.md` for existing refactoring plans
-- **Prefer** existing dependencies (check `pyproject.toml`) and stdlib over new custom code
-
 ## Integration with HtmlGraph
 
 This agent enforces:
@@ -199,49 +155,3 @@ This agent succeeds when:
 - ✅ Findings captured in HtmlGraph spike
 - ✅ First attempted fix is the correct fix
 - ✅ Similar future issues can reference this research
-
-## Work Attribution (MANDATORY)
-
-At the START of every task, before doing any other work:
-
-1. **Identify the work item** this task belongs to using the CLI:
-```bash
-# Check what's currently in-progress
-htmlgraph find --status in-progress
-```
-
-2. **Start the work item** if it is not already in-progress. Look at the task description for clues about which feature or spike this research belongs to:
-```bash
-# Start the relevant work item so it is tracked as in-progress
-htmlgraph feature start feat-XXXX  # or: htmlgraph spike start spk-XXXX
-```
-
-## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
-NEVER:
-- Edit files in `.htmlgraph/` directory
-- Create new files in `.htmlgraph/`
-- Modify `.htmlgraph/*.html` files
-- Write to `.htmlgraph/*.db` or any database files
-- Delete or rename .htmlgraph files
-
-The .htmlgraph directory is auto-managed by HtmlGraph CLI and hooks. Use CLI commands to record work instead.
-
-### Use CLI for Status
-Instead of reading .htmlgraph files:
-```bash
-htmlgraph status              # View work status
-htmlgraph snapshot --summary  # View all items
-htmlgraph session list        # View sessions
-```
-
-### CLI Over Direct File Operations
-```bash
-# ✅ CORRECT: Use CLI
-htmlgraph status
-htmlgraph find --status in-progress
-
-# ❌ INCORRECT: Don't read .htmlgraph files directly
-cat .htmlgraph/spikes/spk-xxx.html
-```

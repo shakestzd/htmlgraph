@@ -35,32 +35,6 @@ htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
 
 **Balanced performance for moderate complexity implementation work.**
 
-## Core Development Principles (MANDATORY)
-
-### Research First
-- **ALWAYS search for existing libraries** before implementing from scratch. Check PyPI, npm, hex.pm for packages that solve the problem.
-- Check project dependencies (`pyproject.toml`, `mix.exs`, `package.json`) before adding new ones.
-- Prefer well-maintained, widely-used libraries over custom implementations.
-
-### Code Quality
-- **DRY** — Extract shared logic into utilities. Check `packages/go/internal/` before writing new helpers.
-- **Single Responsibility** — Each module, class, and function should have one clear purpose.
-- **KISS** — Choose the simplest solution that works. Don't over-engineer.
-- **YAGNI** — Only implement what's needed now. No speculative features.
-- **Composition over inheritance** — Favor composable pieces over deep class hierarchies.
-
-### Module Size Limits
-- Functions: <50 lines (warning at 30)
-- Classes: <300 lines (warning at 200)
-- Modules: <500 lines (warning at 300)
-- If a file exceeds limits, refactor before adding more code.
-
-### Before Committing
-- Run `uv run ruff check --fix && uv run ruff format`
-- Run `uv run mypy src/` for type checking
-- Run relevant tests
-- Never commit with unresolved lint or type errors
-
 ## Capabilities
 
 - ✅ Multi-file feature implementations
@@ -115,66 +89,9 @@ Task(
 - "Optimize database schema for scale"
 ```
 
-## Module Size Standards
-
-When implementing features:
-- **Target**: 200-500 lines per module, 10-20 lines per function, 100-200 lines per class
-- **Hard limits**: 500 lines/module (new), 50 lines/function, 300 lines/class
-- **Before adding code** to a module >400 lines, evaluate if it should be split first
-- If your changes would push a module >500 lines, split it as part of your work
-- **Run** `go build ./... && go vet ./... && go test ./...` before committing
-- **Check** `packages/go/internal/` for existing shared utilities before creating new ones
-- **Prefer** stdlib (`fmt`, `sync`, `sort`) over custom implementations
-
 ## Cost
 
 **$3 per million input tokens**
 - Default choice for most implementation work
 - Good balance of capability and cost
 - Suitable for 70% of coding tasks
-
-## Work Attribution (MANDATORY)
-
-At the START of every task, before doing any other work:
-
-1. **Identify the work item** this task belongs to using the CLI:
-```bash
-# Check what's currently in-progress
-htmlgraph find --status in-progress
-```
-
-2. **Start the work item** if it is not already in-progress. Look at the task description for clues about which feature or bug this work belongs to:
-```bash
-# Start the relevant work item so it is tracked as in-progress
-htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
-```
-
-## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
-NEVER:
-- Edit files in `.htmlgraph/` directory
-- Create new files in `.htmlgraph/`
-- Modify `.htmlgraph/*.html` files
-- Write to `.htmlgraph/*.db` or any database files
-- Delete or rename .htmlgraph files
-
-The .htmlgraph directory is auto-managed by HtmlGraph CLI and hooks. Use CLI commands to record work instead.
-
-### Use CLI for Status
-Instead of reading .htmlgraph files:
-```bash
-htmlgraph status              # View work status
-htmlgraph snapshot --summary  # View all items
-htmlgraph session list        # View sessions
-```
-
-### CLI Over Direct File Operations
-```bash
-# ✅ CORRECT: Use CLI
-htmlgraph status
-htmlgraph find --status in-progress
-
-# ❌ INCORRECT: Don't read .htmlgraph files directly
-cat .htmlgraph/spikes/spk-xxx.html
-```

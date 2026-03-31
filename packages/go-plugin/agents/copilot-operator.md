@@ -44,36 +44,9 @@ Report:
 - The command output
 - Any errors encountered
 
-## Work Attribution (MANDATORY)
-
-At the START of every task, before doing any other work:
-
-1. **Identify the work item** this task belongs to using the CLI:
-```bash
-# Check what's currently in-progress
-htmlgraph find --status in-progress
-```
-
-2. **Start the work item** if it is not already in-progress:
-```bash
-htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
-```
-
 ## Safety Rules
 
 - NEVER use `git push --force` directly — use copilot with `--deny-tool "shell(git push --force)"`
 - NEVER commit sensitive files (.env, credentials)
 - NEVER skip pre-commit hooks (--no-verify) unless explicitly requested
 - Prefer `gh pr create` over direct git operations for pull requests
-
-## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
-NEVER:
-- Edit files in `.htmlgraph/` directory
-- Create new files in `.htmlgraph/`
-- Modify `.htmlgraph/*.html` files
-- Write to `.htmlgraph/*.db` or any database files
-- Delete or rename .htmlgraph files
-
-The .htmlgraph directory is auto-managed by HtmlGraph CLI and hooks. Use CLI commands to record work instead.

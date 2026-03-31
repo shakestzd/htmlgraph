@@ -8,6 +8,13 @@ tools: Bash, Read, Write, Grep
 
 # RoboRev Agent
 
+## Work Attribution (MANDATORY — do this FIRST)
+
+Before ANY tool calls, identify and activate the work item:
+```bash
+htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
+```
+
 Run automated code reviews and track findings as HtmlGraph bugs.
 
 ## Review Criteria: Core Development Principles
@@ -16,7 +23,7 @@ When evaluating findings, flag violations of these principles as medium or high 
 
 ### Research & Reuse
 - **NIH (Not Invented Here)** — Custom implementations where a well-maintained library exists. Flag as medium.
-- **Duplicate utilities** — Logic that already exists in `src/python/htmlgraph/utils/` or stdlib. Flag as medium.
+- **Duplicate utilities** — Logic that already exists in `packages/go/internal/` or stdlib. Flag as medium.
 - **Unnecessary dependencies** — New packages added when existing deps or stdlib would suffice. Flag as low.
 
 ### Code Quality
@@ -27,12 +34,12 @@ When evaluating findings, flag violations of these principles as medium or high 
 
 ### Module Size
 - **Functions >50 lines** — Flag as medium (warning threshold: 30 lines).
-- **Classes >300 lines** — Flag as medium (warning threshold: 200 lines).
+- **Structs >300 lines** — Flag as medium (warning threshold: 200 lines).
 - **Modules >500 lines** — Flag as high for new code; medium for grandfathered modules that grew (warning threshold: 300 lines).
 
 ### Commit Hygiene
-- **Unresolved lint errors** — Any ruff warnings in committed code. Flag as high.
-- **Type errors** — mypy violations in committed code. Flag as high.
+- **Build failures** — `go build` errors in committed code. Flag as critical.
+- **Vet errors** — `go vet` warnings in committed code. Flag as high.
 - **Failing tests committed** — Flag as critical.
 
 ## Purpose
@@ -165,50 +172,4 @@ done
 ```bash
 # Verify CLI is available
 htmlgraph version
-```
-
-## Work Attribution (MANDATORY)
-
-At the START of every task, before doing any other work:
-
-1. **Identify the work item** this task belongs to using the CLI:
-```bash
-# Check what's currently in-progress
-htmlgraph find --status in-progress
-```
-
-2. **Start the work item** if it is not already in-progress. If the review targets a specific feature's commits, start that feature:
-```bash
-# Start the relevant work item so it is tracked as in-progress
-htmlgraph feature start feat-XXXX
-```
-
-## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
-NEVER:
-- Edit files in `.htmlgraph/` directory
-- Create new files in `.htmlgraph/`
-- Modify `.htmlgraph/*.html` files
-- Write to `.htmlgraph/*.db` or any database files
-- Delete or rename .htmlgraph files
-
-The .htmlgraph directory is auto-managed by HtmlGraph CLI and hooks. Use CLI commands to record work instead.
-
-### Use CLI for Status
-Instead of reading .htmlgraph files:
-```bash
-htmlgraph status              # View work status
-htmlgraph snapshot --summary  # View all items
-htmlgraph session list        # View sessions
-```
-
-### CLI Over Direct File Operations
-```bash
-# ✅ CORRECT: Use CLI
-htmlgraph status
-htmlgraph find --status in-progress
-
-# ❌ INCORRECT: Don't read .htmlgraph files directly
-cat .htmlgraph/spikes/spk-xxx.html
 ```
