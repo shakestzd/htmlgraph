@@ -44,6 +44,19 @@ type CloudEvent struct {
 	// Stop / SubagentStop
 	StopReason           string `json:"stop_reason"`
 	LastAssistantMessage string `json:"last_assistant_message"`
+
+	// SessionStart / SessionEnd / Stop — common session fields
+	TranscriptPath string `json:"transcript_path"`
+	Source         string `json:"source"`   // startup, resume, clear, compact
+	Model          string `json:"model"`
+
+	// SessionEnd
+	Reason   string `json:"reason"`    // prompt_input_exit, interrupt, etc.
+	ExitCode int    `json:"exit_code"`
+
+	// TaskCreated / TaskCompleted
+	TaskID   string         `json:"task_id"`
+	TaskData map[string]any `json:"task"`
 }
 
 // HookResult is the JSON written to stdout to control Claude Code behaviour.

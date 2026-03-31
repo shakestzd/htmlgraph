@@ -176,6 +176,28 @@
         ]
       }
     ],
+    "SessionResume": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook session-resume"
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook task-created"
+          }
+        ]
+      }
+    ],
     "PermissionRequest": [
       {
         "matcher": "",

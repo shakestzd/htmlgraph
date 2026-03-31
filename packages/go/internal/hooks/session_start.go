@@ -112,6 +112,11 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		ProjectDir:      projectDir,
 	}
 
+	// Prefer model from CloudEvent over env var (more reliable).
+	if event.Model != "" {
+		s.Model = event.Model
+	}
+
 	// Resolve lineage inputs before opening the transaction (read-only queries).
 	var inp *lineageInputs
 	if s.IsSubagent && s.ParentSessionID != "" {
@@ -132,6 +137,12 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 	LogTimed(projectDir, "session-start", map[string]string{
 		"session": shortID,
 	}, handlerStart, "handler complete")
+
+	// Store transcript path if provided by CloudEvent.
+	if event.TranscriptPath != "" {
+		_, _ = database.Exec(`UPDATE sessions SET transcript_path = ? WHERE session_id = ?`,
+			event.TranscriptPath, sessionID)
+	}
 
 	return &HookResult{}, nil
 }

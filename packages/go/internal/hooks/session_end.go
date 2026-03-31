@@ -31,9 +31,27 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 		debugLog(projectDir, "[error] handler=session-end session=%s: update sessions: %v", sessionID[:minLen(sessionID, 8)], err)
 	}
 
+	// Store transcript_path and termination reason if provided.
+	if event.TranscriptPath != "" || event.Reason != "" {
+		_, _ = database.Exec(`
+			UPDATE sessions
+			SET transcript_path = COALESCE(NULLIF(?, ''), transcript_path),
+			    metadata = json_set(COALESCE(metadata, '{}'), '$.end_reason', ?)
+			WHERE session_id = ?`,
+			event.TranscriptPath, event.Reason, sessionID,
+		)
+	}
+
 	// Mark lineage trace complete so tree queries show accurate status.
 	if err := db.CompleteLineageTrace(database, sessionID); err != nil {
 		debugLog(projectDir, "[error] handler=session-end session=%s: complete lineage trace: %v", sessionID[:minLen(sessionID, 8)], err)
+	}
+
+	// Release all active claims held by this session.
+	if released, err := db.ReleaseAllClaimsForSession(database, sessionID); err != nil {
+		debugLog(projectDir, "[error] handler=session-end session=%s: release claims: %v", sessionID[:minLen(sessionID, 8)], err)
+	} else if released > 0 {
+		debugLog(projectDir, "[htmlgraph] session-end: released %d claims for session %s", released, sessionID[:minLen(sessionID, 8)])
 	}
 
 	return &HookResult{Continue: true}, nil

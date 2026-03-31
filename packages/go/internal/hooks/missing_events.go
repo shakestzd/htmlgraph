@@ -90,6 +90,22 @@ func TaskCompleted(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	return recordSimpleEvent(models.EventTaskCompleted, "TaskCompleted", "Delegated task completed", "completed", event, database)
 }
 
+// TaskCreated handles the TaskCreated Claude Code hook event.
+// Records when a new task is created via TaskCreate, capturing the task
+// subject and ID for HtmlGraph task tracking.
+func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
+	summary := "Task created"
+	if event.TaskID != "" {
+		subject, _ := event.TaskData["subject"].(string)
+		if subject != "" {
+			summary = fmt.Sprintf("Task created: %s (task_id=%s)", subject, event.TaskID)
+		} else {
+			summary = fmt.Sprintf("Task created: task_id=%s", event.TaskID)
+		}
+	}
+	return recordSimpleEvent(models.EventCheckPoint, "TaskCreated", summary, "recorded", event, database)
+}
+
 // InstructionsLoaded handles the InstructionsLoaded Claude Code hook event.
 // Records a checkpoint when CLAUDE.md or other instruction files are loaded.
 func InstructionsLoaded(event *CloudEvent, database *sql.DB) (*HookResult, error) {
