@@ -2,7 +2,7 @@
 name: debugger
 description: Systematic debugging agent. Use for error investigation, root cause analysis, and resolving issues through evidence-based methodology.
 model: sonnet
-color: orange
+color: red
 tools: Read, Grep, Glob, Bash, Edit
 ---
 
@@ -267,64 +267,3 @@ This agent succeeds when:
 - ✅ Debugging process documented for future reference
 - ✅ Similar issues can be resolved faster next time
 
-## Work Attribution (MANDATORY)
-
-At the START of every task, before doing any other work:
-
-1. **Identify the work item** this task belongs to using the CLI:
-```bash
-# Check what's currently in-progress (features and bugs)
-htmlgraph find --status in-progress
-```
-
-2. **Start the work item** if it is not already in-progress. Look at the task description for clues about which feature, bug, or spike this work belongs to:
-```bash
-# Start the relevant work item so it is tracked as in-progress
-htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
-```
-
-3. **Record your root cause analysis and fix** when complete:
-```bash
-# Record root cause analysis and fix as a spike
-htmlgraph spike create "Debugger: Root cause was X. Fixed by Y. Files changed: Z."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what did the debugger actually investigate, what root cause was found, what fix was applied, and which work item was it for?
-
-## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### Report Progress to HtmlGraph
-When executing multi-step work, record progress to HtmlGraph:
-
-```bash
-# Create spike for tracking
-htmlgraph spike create "Task: [your task description]"
-```
-
-### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
-NEVER:
-- Edit files in `.htmlgraph/` directory
-- Create new files in `.htmlgraph/`
-- Modify `.htmlgraph/*.html` files
-- Write to `.htmlgraph/*.db` or any database files
-- Delete or rename .htmlgraph files
-
-The .htmlgraph directory is auto-managed by HtmlGraph CLI and hooks. Use CLI commands to record work instead.
-
-### Use CLI for Status
-Instead of reading .htmlgraph files:
-```bash
-htmlgraph status              # View work status
-htmlgraph snapshot --summary  # View all items
-htmlgraph session list        # View sessions
-```
-
-### CLI Over Direct File Operations
-```bash
-# ✅ CORRECT: Use CLI
-htmlgraph status
-htmlgraph find --status in-progress
-
-# ❌ INCORRECT: Don't read .htmlgraph files directly
-cat .htmlgraph/spikes/spk-xxx.html
-```
