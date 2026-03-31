@@ -149,23 +149,7 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record what you implemented and why** when complete:
-```bash
-# Record implementation notes as a spike linked to the work item
-htmlgraph spike create "Sonnet-coder: Implemented [what]. Files changed: [list]. Approach: [rationale]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what was implemented, what files changed, what approach was taken, and which work item drove the work?
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### Report Progress to HtmlGraph
-When executing multi-step work, record progress to HtmlGraph:
-
-```bash
-# Create spike for tracking
-htmlgraph spike create "Task: [your task description]"
-```
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
 NEVER:

@@ -70,11 +70,6 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record what you implemented and why** when complete:
-```bash
-htmlgraph spike create "Gemini-operator: Researched [what]. Used gemini: [yes/no]. Session: [id]. Findings: [summary]."
-```
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory

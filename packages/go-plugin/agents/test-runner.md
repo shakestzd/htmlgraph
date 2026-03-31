@@ -256,15 +256,6 @@ Your testing work is automatically tracked via hooks, but you should also:
 - Test results can be queried by future agents
 - Builds institutional knowledge about test reliability
 
-## Output Format
-
-Document test results in HtmlGraph:
-
-```bash
-# Create a spike to record test results
-htmlgraph spike create "Test Results: [Feature Name] — Unit tests: X/Y passing. Integration tests: X/Y passing. Type checks: pass/fail. Lint: pass/fail. Coverage gaps: [areas]. Recommendations: [suggestions]."
-```
-
 ## Integration with Other Agents
 
 Testing fits into the workflow:
@@ -333,23 +324,7 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record your test results** when complete:
-```bash
-# Record test results as a spike
-htmlgraph spike create "Test-runner: Ran [N] tests. Pass: [X], Fail: [Y]. Quality gates: ruff [pass/fail], mypy [pass/fail], pytest [pass/fail]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what tests were run, what passed or failed, which quality gates were checked, and which work item was validated?
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### Report Progress to HtmlGraph
-When executing multi-step work, record progress to HtmlGraph:
-
-```bash
-# Create spike for tracking
-htmlgraph spike create "Task: [your task description]"
-```
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
 NEVER:

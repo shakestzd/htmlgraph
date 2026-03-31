@@ -169,23 +169,7 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record your architectural decisions and changes** when complete:
-```bash
-# Record architectural notes as a spike linked to the work item
-htmlgraph spike create "Opus-coder: Designed [architecture]. Changed [files]. Key decisions: [rationale]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what architectural decisions were made, what files changed, what tradeoffs were considered, and which work item drove the work?
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### Report Progress to HtmlGraph
-When executing multi-step work, record progress to HtmlGraph:
-
-```bash
-# Create spike for tracking
-htmlgraph spike create "Task: [your task description]"
-```
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
 NEVER:

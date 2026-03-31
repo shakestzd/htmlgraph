@@ -183,14 +183,6 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX
 ```
 
-3. **Record your review results** when complete:
-```bash
-# Record review results as a spike
-htmlgraph spike create "Roborev: Reviewed [N] commits. Findings: [X] critical, [Y] high, [Z] medium. Bugs created: [list]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what was reviewed, what findings emerged, which bugs were created, and which feature triggered the review?
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory

@@ -59,11 +59,6 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record what you implemented and why** when complete:
-```bash
-htmlgraph spike create "Copilot-operator: Executed [what]. Used copilot: [yes/no]. Files changed: [list]."
-```
-
 ## Safety Rules
 
 - NEVER use `git push --force` directly — use copilot with `--deny-tool "shell(git push --force)"`

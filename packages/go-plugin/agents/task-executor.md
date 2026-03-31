@@ -80,14 +80,6 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX
 ```
 
-3. **Record what you executed and the outcome** when complete:
-```bash
-# Record execution outcome as a spike
-htmlgraph spike create "Task-executor: Executed [task]. Files changed: [list]. Quality gates: [pass/fail]. Outcome: [success/blocked]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what task was executed, what changed, whether quality gates passed, and which work item it belonged to.
-
 ## Rules
 
 - Do NOT touch files outside your task spec

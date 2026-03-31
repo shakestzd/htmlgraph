@@ -140,23 +140,7 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record what you changed** when complete:
-```bash
-# Record implementation notes as a spike linked to the work item
-htmlgraph spike create "Haiku-coder: Changed [files]. Reason: [why]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what did each agent actually change, in which files, and for which work item?
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### Report Progress to HtmlGraph
-When executing multi-step work, record progress to HtmlGraph:
-
-```bash
-# Create spike for tracking
-htmlgraph spike create "Task: [your task description]"
-```
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
 NEVER:

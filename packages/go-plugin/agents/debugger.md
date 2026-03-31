@@ -212,14 +212,11 @@ When debugging issues in large modules:
 
 ## Output Format
 
-Document debugging process in HtmlGraph bug or spike:
+Document debugging process in HtmlGraph:
 
 ```bash
 # Create a bug to track the issue
 htmlgraph bug create "[Error Description]"
-
-# Create a spike to document the investigation
-htmlgraph spike create "Debug investigation: [Error Description] — Symptoms: [what's happening]. Root cause: [confirmed issue]. Fix: [solution applied]."
 ```
 
 ## Work Tracking & Institutional Memory

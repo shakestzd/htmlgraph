@@ -62,11 +62,6 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ```
 
-3. **Record what you implemented and why** when complete:
-```bash
-htmlgraph spike create "Codex-operator: Implemented [what]. Used codex: [yes/no]. Model: [model]. Files changed: [list]."
-```
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory

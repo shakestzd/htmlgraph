@@ -151,15 +151,6 @@ When researching a module or codebase area:
 - **Reference** `docs/tracks/MODULE_REFACTORING_TRACK.md` for existing refactoring plans
 - **Prefer** existing dependencies (check `pyproject.toml`) and stdlib over new custom code
 
-## Output Format
-
-Document findings in HtmlGraph spike:
-
-```bash
-# Create a spike to document research findings
-htmlgraph spike create "Research: [Problem Description] — Sources: [list]. Root cause: [what docs revealed]. Recommended approach: [based on research]."
-```
-
 ## Integration with HtmlGraph
 
 This agent enforces:
@@ -225,23 +216,7 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph spike start spk-XXXX
 ```
 
-3. **Record your research findings** when complete:
-```bash
-# Record research findings as a spike
-htmlgraph spike create "Researcher: Investigated [topic]. Key findings: [summary]. Sources: [urls/docs]. Recommended approach: [conclusion]."
-```
-
-**Why this matters:** Work attribution creates an audit trail -- what was researched, what sources were consulted, what conclusions were drawn, and which work item was it for?
-
 ## 🔴 CRITICAL: HtmlGraph Tracking & Safety Rules
-
-### Report Progress to HtmlGraph
-When executing multi-step work, record progress to HtmlGraph:
-
-```bash
-# Create spike for tracking
-htmlgraph spike create "Task: [your task description]"
-```
 
 ### 🚫 FORBIDDEN: Do NOT Edit .htmlgraph Directory
 NEVER:
