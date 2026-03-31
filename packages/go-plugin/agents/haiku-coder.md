@@ -46,7 +46,7 @@ htmlgraph feature start feat-xxx  # Check CIGS guidance for the active item
 - Prefer well-maintained, widely-used libraries over custom implementations.
 
 ### Code Quality
-- **DRY** — Extract shared logic into utilities. Check `src/python/htmlgraph/utils/` before writing new helpers.
+- **DRY** — Extract shared logic into utilities. Check `packages/go/internal/` before writing new helpers.
 - **Single Responsibility** — Each module, class, and function should have one clear purpose.
 - **KISS** — Choose the simplest solution that works. Don't over-engineer.
 - **YAGNI** — Only implement what's needed now. No speculative features.
@@ -114,7 +114,7 @@ Task(
 
 - **Hard limits**: 500 lines/module (new), 50 lines/function, 300 lines/class
 - If your changes would push a module >500 lines, **decline the task** and escalate to Sonnet or Opus for a split-first approach
-- **Check** `src/python/htmlgraph/utils/` for existing shared utilities before writing new helpers
+- **Check** `packages/go/internal/` for existing shared utilities before writing new helpers
 - **Never** duplicate formatting, truncation, or caching utilities — they exist in shared modules
 
 ## Cost
