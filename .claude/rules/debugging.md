@@ -82,7 +82,7 @@ claude --verbose               # More detailed logging
 **Test commands**:
 ```bash
 # Full quality gate (pre-commit)
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 ```
 
 ## Debugging Workflow Pattern
@@ -139,7 +139,7 @@ This encourages delegation to specialized agents (researcher, debugger, test-run
 
 ## Documentation References
 
-**For debugging agents**: See `packages/go-plugin/agents/`
+**For debugging agents**: See `plugin/agents/`
 - `researcher.md` - Research-first methodology
 - `debugger.md` - Systematic error analysis
 - `test-runner.md` - Quality gates and testing

@@ -1448,7 +1448,7 @@ For complete details, see:
 
 ## Related Files
 
-- `packages/go/htmlgraph/` - Go CLI binary source
-- `src/python/htmlgraph/` - Python package source
+- `cmd/` - Go CLI binary source
+- `internal/` - Go business logic packages
 - `examples/` - Complete examples
 - `scripts/deploy-all.sh` - Deployment automation script

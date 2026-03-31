@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh - Build the htmlgraph Go binary for the go-plugin.
+# build.sh - Build the htmlgraph Go binary for the plugin.
 #
 # Usage:
 #   ./build.sh          # Dev mode: binary at hooks/bin/htmlgraph
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-GO_DIR="${SCRIPT_DIR}/../go"
+GO_DIR="${SCRIPT_DIR}/.."
 BIN_DIR="${SCRIPT_DIR}/hooks/bin"
 DIST_MODE=false
 

@@ -9,15 +9,15 @@ The Go binary is distributed via GitHub Releases. The plugin bootstrap script do
 ## Version Files (Must All Match)
 
 ```
-packages/go-plugin/.claude-plugin/plugin.json:    "version": "X.Y.Z"
-packages/gemini-extension/gemini-extension.json:   "version": "X.Y.Z"
+plugin/.claude-plugin/plugin.json:                "version": "X.Y.Z"
+packages/gemini-extension/gemini-extension.json:  "version": "X.Y.Z"
 ```
 
 ## For Claude: Always Check Version
 
 ```bash
 # Check local plugin version
-grep '"version"' packages/go-plugin/.claude-plugin/plugin.json
+grep '"version"' plugin/.claude-plugin/plugin.json
 
 # Check latest GitHub Release
 gh release view --json tagName -q .tagName 2>/dev/null || echo "No releases"

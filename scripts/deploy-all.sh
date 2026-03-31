@@ -19,7 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_JSON="$PROJECT_ROOT/plugin/.claude-plugin/plugin.json"
-GO_DIR="$PROJECT_ROOT/packages/go"
+GO_DIR="$PROJECT_ROOT"
 
 # Colors
 RED='\033[0;31m'
@@ -116,9 +116,9 @@ if [[ "$BRANCH" != "main" ]]; then
     if ! confirm "Continue anyway?"; then exit 1; fi
 fi
 
-if [[ -n "$(git status --porcelain -- packages/go plugin/hooks plugin/.claude-plugin)" ]]; then
+if [[ -n "$(git status --porcelain -- cmd/ internal/ go.mod plugin/hooks plugin/.claude-plugin)" ]]; then
     warn "Uncommitted changes in source files"
-    git status --short -- packages/go plugin/hooks plugin/.claude-plugin
+    git status --short -- cmd/ internal/ go.mod plugin/hooks plugin/.claude-plugin
     if ! confirm "Continue anyway?"; then exit 1; fi
 fi
 

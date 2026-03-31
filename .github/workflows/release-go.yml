@@ -17,13 +17,12 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: packages/go/go.mod
+          go-version-file: go.mod
 
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: '~> v2'
           args: release --clean
-          workdir: packages/go
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
