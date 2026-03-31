@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 	"github.com/spf13/cobra"
 )
 

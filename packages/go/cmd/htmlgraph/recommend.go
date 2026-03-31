@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/graph"
-	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/graph"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/workitem"
 	"github.com/spf13/cobra"
 )
 

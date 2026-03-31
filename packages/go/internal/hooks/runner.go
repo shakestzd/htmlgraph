@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/paths"
 )
 
 // CloudEvent is the JSON payload Claude Code sends to every hook via stdin.

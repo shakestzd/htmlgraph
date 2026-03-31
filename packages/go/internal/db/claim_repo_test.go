@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // setupClaimDB returns an in-memory database with a test session and feature.

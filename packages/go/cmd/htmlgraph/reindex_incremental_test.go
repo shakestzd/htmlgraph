@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
 )
 
 // --- metadata helper tests ---

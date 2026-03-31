@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 const sampleHTML = `<!DOCTYPE html>

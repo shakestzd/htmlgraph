@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
 )
 
 // testCreate is a test helper that wraps runWiCreate with the opts struct.

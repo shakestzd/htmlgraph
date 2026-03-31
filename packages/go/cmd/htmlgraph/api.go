@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // respondJSON encodes v as JSON and writes it with status 200.

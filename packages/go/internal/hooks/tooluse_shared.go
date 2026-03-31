@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/db"
 )
 
 // featureIDCacheEntry holds the single cached result of GetActiveFeatureID for

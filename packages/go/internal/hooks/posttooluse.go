@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // PostToolUse handles the PostToolUse Claude Code hook event.

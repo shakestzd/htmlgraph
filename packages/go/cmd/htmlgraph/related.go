@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/workitem"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/workitem"
 	"github.com/spf13/cobra"
 )
 

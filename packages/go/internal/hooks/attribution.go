@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/paths"
 )
 
 // agentTraceFormatVersion is the pinned Agent Trace RFC version.

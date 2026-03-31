@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
-	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/workitem"
 )
 
 // ---------------------------------------------------------------------------

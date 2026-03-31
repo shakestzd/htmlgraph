@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/paths"
 	"github.com/spf13/cobra"
 )
 
@@ -74,6 +74,7 @@ func main() {
 	rootCmd.AddCommand(helpCmd())
 	rootCmd.AddCommand(claimCmd())
 	rootCmd.AddCommand(agentInitCmd())
+	rootCmd.AddCommand(pluginCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

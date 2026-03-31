@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/paths"
 )
 
 // activeSessionData is the JSON structure written to .htmlgraph/.active-session

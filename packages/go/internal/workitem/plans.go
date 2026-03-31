@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // PlanOption configures a new plan during creation.

@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/ingest"
-	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/internal/paths"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/ingest"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/paths"
 	"github.com/spf13/cobra"
 )
 

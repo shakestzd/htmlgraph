@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/hooks"
-	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/hooks"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/workitem"
 )
 
 // detectActiveFeature returns the active feature ID from the session DB, or "".

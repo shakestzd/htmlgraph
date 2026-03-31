@@ -161,6 +161,25 @@ if [ -z "${EXPECTED_VERSION}" ]; then
     bail
 fi
 
+# ---------------------------------------------------------------------------
+# Prefer PATH-installed binary if version matches (Homebrew, go install, curl)
+# ---------------------------------------------------------------------------
+PATH_BINARY="$(command -v htmlgraph 2>/dev/null || true)"
+if [ -n "${PATH_BINARY}" ]; then
+    # Guard: don't exec ourselves (bootstrap is also named "htmlgraph")
+    # Resolve real path of found binary
+    _real_path="$(cd "$(dirname "${PATH_BINARY}")" && pwd)/$(basename "${PATH_BINARY}")"
+    _self_path="${SCRIPT_DIR}/$(basename "$0")"
+
+    if [ "${_real_path}" != "${_self_path}" ]; then
+        # Check version matches expected
+        _path_ver="$("${PATH_BINARY}" version 2>/dev/null | grep -o '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*' | head -1 || true)"
+        if [ "${_path_ver}" = "${EXPECTED_VERSION}" ]; then
+            exec "${PATH_BINARY}" "$@"
+        fi
+    fi
+fi
+
 # Fast path: binary exists and version matches.
 if [ -x "${BINARY}" ] && [ -f "${VERSION_FILE}" ]; then
     CACHED_VERSION="$(cat "${VERSION_FILE}" 2>/dev/null || echo "")"

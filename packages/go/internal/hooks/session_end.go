@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/db"
 )
 
 // SessionEnd handles the SessionEnd Claude Code hook event.

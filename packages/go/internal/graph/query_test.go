@@ -3,7 +3,7 @@ package graph
 import (
 	"testing"
 
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // makeNode is a test helper that creates a Node with the given ID.

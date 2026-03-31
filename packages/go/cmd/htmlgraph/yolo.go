@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
 )
 
 func yoloCmd() *cobra.Command {

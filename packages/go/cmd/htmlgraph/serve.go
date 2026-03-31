@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/ingest"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/ingest"
 	"github.com/spf13/cobra"
 )
 
@@ -80,8 +80,33 @@ func runServer(port int) error {
 	return http.ListenAndServe(addr, mux)
 }
 
-// resolvePluginDir finds the go-plugin directory relative to the binary.
+// resolvePluginDir finds the go-plugin directory using a priority-ordered
+// search strategy. This decouples plugin discovery from the binary's
+// filesystem location, supporting Homebrew, go install, curl install, and
+// dev-mode symlink workflows.
+//
+// Search order:
+//  1. HTMLGRAPH_PLUGIN_DIR env var (explicit override)
+//  2. ~/.claude/plugins/htmlgraph/ (Claude Code marketplace install)
+//  3. Symlink walk-up from binary (dev mode fallback)
 func resolvePluginDir() string {
+	// 1. Explicit env var override.
+	if dir := os.Getenv("HTMLGRAPH_PLUGIN_DIR"); dir != "" {
+		if _, err := os.Stat(filepath.Join(dir, ".claude-plugin", "plugin.json")); err == nil {
+			return dir
+		}
+	}
+
+	// 2. Well-known Claude Code plugin location.
+	if home, err := os.UserHomeDir(); err == nil {
+		wellKnown := filepath.Join(home, ".claude", "plugins", "htmlgraph")
+		if _, err := os.Stat(filepath.Join(wellKnown, ".claude-plugin", "plugin.json")); err == nil {
+			return wellKnown
+		}
+	}
+
+	// 3. Symlink walk-up from binary (existing behavior -- works for dev mode
+	//    where binary is symlinked from packages/go-plugin/hooks/bin/).
 	binPath, err := os.Executable()
 	if err != nil {
 		return ""
@@ -94,6 +119,7 @@ func resolvePluginDir() string {
 	if _, err := os.Stat(filepath.Join(pluginDir, ".claude-plugin", "plugin.json")); err == nil {
 		return pluginDir
 	}
+
 	return ""
 }
 

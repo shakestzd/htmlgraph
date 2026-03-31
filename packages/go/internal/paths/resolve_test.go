@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/paths"
 )
 
 // TestResolveViaGitCommonDir_NonGitDir verifies that a plain (non-git)

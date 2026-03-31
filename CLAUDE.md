@@ -100,20 +100,32 @@ The binary on your PATH is set up via a symlink:
 
 ### How Plugin Users Get the Binary
 
-Plugin users install via `claude plugin install htmlgraph`. The plugin ships with a **bootstrap script** at `hooks/bin/htmlgraph` that:
+**Recommended install path (CLI-first):** Install the CLI binary first via Homebrew, shell script, or `go install`, then run `htmlgraph plugin install` to add the Claude Code plugin. The bootstrap script detects a PATH-installed binary and uses it directly, skipping the download.
 
-1. On first run, detects OS/architecture (darwin/linux, amd64/arm64)
-2. Downloads the correct pre-built binary from GitHub Releases
-3. Caches it at `~/.claude/plugins/data/htmlgraph/htmlgraph-bin`
-4. `exec`s into the real binary, passing stdin (CloudEvent JSON) through
-5. On subsequent runs, checks cached version against `plugin.json` version — only re-downloads on version mismatch
+```bash
+# 1. Install CLI
+brew install shakestzd/tap/htmlgraph   # or curl install script or go install
+
+# 2. Install plugin (optional — adds Claude Code hooks and agents)
+htmlgraph plugin install
+```
+
+Plugin-only users (no CLI pre-installed) install via `claude plugin install htmlgraph`. The plugin ships with a **bootstrap script** at `hooks/bin/htmlgraph` that:
+
+1. On first run, checks whether `htmlgraph` is already on PATH — uses it if so
+2. Otherwise detects OS/architecture (darwin/linux, amd64/arm64)
+3. Downloads the correct pre-built binary from GitHub Releases
+4. Caches it at `~/.claude/plugins/data/htmlgraph/htmlgraph-bin`
+5. `exec`s into the real binary, passing stdin (CloudEvent JSON) through
+6. On subsequent runs, checks cached version against `plugin.json` version — only re-downloads on version mismatch
 
 The bootstrap is a POSIX shell script (~170 lines) that requires only `curl`/`tar`. It never blocks Claude Code — on any error it outputs `{}` and exits 0.
 
 **Binary locations:**
 ```
-Developer:  ~/.local/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph (built locally via setup-cli)
-Plugin user: hooks/bin/htmlgraph (bootstrap script) → ~/.claude/plugins/data/htmlgraph/htmlgraph-bin (downloaded)
+CLI install:  /usr/local/bin/htmlgraph (brew) or ~/.local/bin/htmlgraph (go install / shell script)
+Developer:    ~/.local/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph (built locally via setup-cli)
+Plugin-only:  hooks/bin/htmlgraph (bootstrap script) → ~/.claude/plugins/data/htmlgraph/htmlgraph-bin (downloaded)
 ```
 
 ---
