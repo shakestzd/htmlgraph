@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"path/filepath"
 
@@ -60,6 +61,9 @@ func statuslineFromSession(dir, sessionID string) error {
 	}
 	defer p.Close()
 
+	// Find the feature node.
+	var featureType string
+	var featureTitle string
 	for _, typeName := range []string{"bug", "feature", "spike"} {
 		col := collectionFor(p, typeName)
 		node, err := col.Get(featureID)
@@ -67,12 +71,76 @@ func statuslineFromSession(dir, sessionID string) error {
 			if node.Status == "done" || node.Status == "completed" {
 				return nil // Feature was completed — don't show it
 			}
-			fmt.Printf("%s %s\n", iconFor(typeName), truncate(node.Title, 30))
-			return nil
+			featureType = typeName
+			featureTitle = node.Title
+			break
 		}
 	}
+	if featureTitle == "" {
+		return nil
+	}
 
+	// Check if feature belongs to a track.
+	trackLine := resolveTrackContext(database, featureID)
+
+	if trackLine != "" {
+		fmt.Printf("%s → %s %s\n", trackLine, iconFor(featureType), truncate(featureTitle, 25))
+	} else {
+		fmt.Printf("%s %s\n", iconFor(featureType), truncate(featureTitle, 30))
+	}
 	return nil
+}
+
+// resolveTrackContext returns a formatted track summary if the feature belongs to a track.
+// Format: "track_icon Track Title [done/total]"
+// Returns empty string if no track.
+func resolveTrackContext(database *sql.DB, featureID string) string {
+	// Check track_id in SQLite first (fast path).
+	var trackID sql.NullString
+	database.QueryRow("SELECT track_id FROM features WHERE id = ?", featureID).Scan(&trackID) //nolint:errcheck
+
+	if !trackID.Valid || trackID.String == "" {
+		// Check graph_edges for part_of relationship.
+		database.QueryRow(`
+			SELECT to_node_id FROM graph_edges
+			WHERE from_node_id = ? AND relationship_type = 'part_of'
+			AND to_node_id LIKE 'trk-%'
+			LIMIT 1`, featureID).Scan(&trackID) //nolint:errcheck
+	}
+
+	if !trackID.Valid || trackID.String == "" {
+		return ""
+	}
+
+	// Get track title.
+	var trackTitle sql.NullString
+	database.QueryRow("SELECT title FROM tracks WHERE id = ?", trackID.String).Scan(&trackTitle) //nolint:errcheck
+
+	// Count done/total features via track_id column.
+	var total, done int
+	database.QueryRow(`
+		SELECT COUNT(*), COALESCE(SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END), 0)
+		FROM features WHERE track_id = ?`, trackID.String).Scan(&total, &done) //nolint:errcheck
+
+	// Also count features linked only via contains edges (not in track_id column).
+	var edgeTotal, edgeDone int
+	database.QueryRow(`
+		SELECT COUNT(*), COALESCE(SUM(CASE WHEN f.status = 'done' THEN 1 ELSE 0 END), 0)
+		FROM graph_edges ge
+		JOIN features f ON ge.to_node_id = f.id
+		WHERE ge.from_node_id = ? AND ge.relationship_type = 'contains'
+		AND (f.track_id IS NULL OR f.track_id != ?)`,
+		trackID.String, trackID.String).Scan(&edgeTotal, &edgeDone) //nolint:errcheck
+
+	total += edgeTotal
+	done += edgeDone
+
+	title := trackID.String
+	if trackTitle.Valid && trackTitle.String != "" {
+		title = truncate(trackTitle.String, 25)
+	}
+
+	return fmt.Sprintf("%s %s [%d/%d]", iconFor("track"), title, done, total)
 }
 
 func statuslineFromHTML(dir string) error {
