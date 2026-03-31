@@ -72,6 +72,7 @@ func main() {
 	rootCmd.AddCommand(recommendCmd())
 	rootCmd.AddCommand(helpCmd())
 	rootCmd.AddCommand(claimCmd())
+	rootCmd.AddCommand(agentInitCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

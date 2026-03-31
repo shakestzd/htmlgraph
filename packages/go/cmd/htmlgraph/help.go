@@ -34,7 +34,8 @@ const compactCLIRef = `htmlgraph CLI commands:
   reindex — Sync HTML work items to SQLite index
   yolo --feature <id> [--track <id>] — Autonomous dev mode
   build — Build Go binary (dev workflow)
-  serve — Start local dashboard server`
+  serve — Start local dashboard server
+  agent-init — Output shared agent context (safety, attribution, quality gates)`
 
 // helpCmd returns the "htmlgraph help" command with --compact flag support.
 func helpCmd() *cobra.Command {
