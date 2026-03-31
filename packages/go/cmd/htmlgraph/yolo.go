@@ -164,6 +164,79 @@ func createTrackWorktree(trackID, projectRoot string) (string, func(), error) {
 	return worktreePath, cleanup, nil
 }
 
+// createAgentWorktree creates a git worktree branching from the track branch
+// (not main). The branch is named agent-{trackID}-{taskName} (flat name due to Git's
+// ref hierarchy constraints) and the worktree is placed at .claude/worktrees/{trackID}/agent-{taskName}.
+//
+// The track branch must exist. If the worktree path already exists, it is reused.
+// Returns the worktree path and a cleanup function.
+func createAgentWorktree(trackID, taskName, projectRoot string) (string, func(), error) {
+	agentBranch := "agent-" + trackID + "-" + taskName
+	worktreePath := filepath.Join(projectRoot, ".claude", "worktrees", trackID, "agent-"+taskName)
+	noop := func() {}
+
+	// If path already exists, reuse.
+	if _, err := os.Stat(worktreePath); err == nil {
+		fmt.Printf("  Agent worktree: %s (reusing existing)\n", worktreePath)
+		return worktreePath, noop, nil
+	}
+
+	// Verify track branch exists.
+	if err := exec.Command("git", "-C", projectRoot, "rev-parse", "--verify", trackID).Run(); err != nil {
+		return "", noop, fmt.Errorf("track branch %s not found: create track worktree first with htmlgraph yolo --track %s", trackID, trackID)
+	}
+
+	// Ensure parent directory exists.
+	if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {
+		return "", noop, fmt.Errorf("could not create agent worktrees directory: %w", err)
+	}
+
+	// Create worktree branching from track branch.
+	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", worktreePath, "-b", agentBranch, trackID)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", noop, fmt.Errorf("git worktree add failed: %w\n%s", err, out)
+	}
+
+	fmt.Printf("  Agent worktree: %s (branch: %s, from: %s)\n", worktreePath, agentBranch, trackID)
+
+	cleanup := func() {
+		removeCmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", worktreePath)
+		removeCmd.Run() //nolint:errcheck
+	}
+	return worktreePath, cleanup, nil
+}
+
+// mergeAgentToTrack merges an agent branch back into its parent track branch
+// and removes the agent worktree. This is the cleanup step after agent completion.
+func mergeAgentToTrack(trackID, taskName, projectRoot string) error {
+	agentBranch := "agent-" + trackID + "-" + taskName
+	worktreePath := filepath.Join(projectRoot, ".claude", "worktrees", trackID, "agent-"+taskName)
+
+	// Checkout track branch first
+	checkoutCmd := exec.Command("git", "-C", projectRoot, "checkout", trackID)
+	if out, err := checkoutCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("checkout track branch failed: %w\n%s", err, out)
+	}
+
+	// Merge agent branch into track branch
+	mergeCmd := exec.Command("git", "-C", projectRoot, "merge", "--no-ff", agentBranch,
+		"-m", fmt.Sprintf("feat: merge agent-%s into %s", taskName, trackID))
+
+	if out, err := mergeCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("merge agent to track failed: %w\n%s", err, out)
+	}
+
+	// Remove the agent worktree
+	removeCmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", worktreePath)
+	removeCmd.Run() //nolint:errcheck
+
+	// Delete the agent branch
+	deleteCmd := exec.Command("git", "-C", projectRoot, "branch", "-d", agentBranch)
+	deleteCmd.Run() //nolint:errcheck
+
+	return nil
+}
+
 // resolveTrackForFeature reads a feature HTML file and returns its data-track-id attribute.
 // If the feature file doesn't exist or has no track ID, returns empty string.
 func resolveTrackForFeature(featureID, projectRoot string) string {
