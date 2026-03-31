@@ -78,15 +78,15 @@ func launchClaudeDev(extraArgs []string) error {
 	// resolvePluginDir is defined in serve.go; returns "" on failure.
 	pluginDir := resolvePluginDir()
 	if pluginDir == "" {
-		return fmt.Errorf("could not find plugin directory. The binary may not be installed at the expected location (packages/go-plugin/hooks/bin/htmlgraph)")
+		return fmt.Errorf("could not find plugin directory. The binary may not be installed at the expected location (plugin/hooks/bin/htmlgraph)")
 	}
 	// Verify expected plugin structure.
 	if _, err := os.Stat(filepath.Join(pluginDir, ".claude-plugin", "plugin.json")); os.IsNotExist(err) {
-		return fmt.Errorf("plugin.json not found at %s. The binary may not be installed at the expected location (packages/go-plugin/hooks/bin/htmlgraph)",
+		return fmt.Errorf("plugin.json not found at %s. The binary may not be installed at the expected location (plugin/hooks/bin/htmlgraph)",
 			filepath.Join(pluginDir, ".claude-plugin", "plugin.json"))
 	}
 	if _, err := os.Stat(filepath.Join(pluginDir, "hooks", "bin", "htmlgraph")); os.IsNotExist(err) {
-		return fmt.Errorf("Go hooks binary not found at %s\nBuild with: packages/go-plugin/build.sh",
+		return fmt.Errorf("Go hooks binary not found at %s\nBuild with: plugin/build.sh",
 			filepath.Join(pluginDir, "hooks", "bin", "htmlgraph"))
 	}
 

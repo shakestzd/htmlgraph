@@ -25,7 +25,7 @@ Run the full deployment pipeline for HtmlGraph.
 
 1. **Pre-flight** — Verify clean git state, correct branch, current version
 2. **Quality gates** — `go build ./...`, `go vet ./...`, `go test ./...`
-3. **Version bump** — Update `plugin/.claude-plugin/plugin.json`
+3. **Version bump** — Update `packages/go-plugin/.claude-plugin/plugin.json`
 4. **Commit + tag** — `release: vX.Y.Z` commit, `vX.Y.Z` git tag
 5. **Push** — Push commits and tags to origin/main
 6. **GitHub Release** — Triggered automatically by `release-go.yml` workflow on `v*` tag
@@ -35,7 +35,7 @@ Run the full deployment pipeline for HtmlGraph.
 When the user asks to deploy or release:
 
 1. **Check for a version argument.** If not provided, read the current version from
-   `plugin/.claude-plugin/plugin.json` and suggest the next patch/minor/major bump.
+   `packages/go-plugin/.claude-plugin/plugin.json` and suggest the next patch/minor/major bump.
 
 2. **Run the deploy script:**
    ```bash
@@ -51,7 +51,7 @@ When the user asks to deploy or release:
    # 2. Bump version in plugin.json
 
    # 3. Commit, tag, push
-   git add plugin/.claude-plugin/plugin.json
+   git add packages/go-plugin/.claude-plugin/plugin.json
    git commit -m "release: vVERSION"
    git tag vVERSION
    git push origin main --tags

@@ -193,9 +193,9 @@ func TestResolvePluginDir_SymlinkWalkUpFallback(t *testing.T) {
 }
 
 // TestResolvePluginDir_ProjectRootDetection tests that resolveProjectPluginDir
-// walks up from CWD to find .htmlgraph/ and packages/go-plugin/.
+// walks up from CWD to find .htmlgraph/ and plugin/.
 func TestResolvePluginDir_ProjectRootDetection(t *testing.T) {
-	// Create a fake project with .htmlgraph/ and packages/go-plugin/
+	// Create a fake project with .htmlgraph/ and plugin/
 	tmpDir := t.TempDir()
 
 	// Create .htmlgraph directory (marks project root)
@@ -204,7 +204,7 @@ func TestResolvePluginDir_ProjectRootDetection(t *testing.T) {
 	}
 
 	// Create plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "packages", "go-plugin")
+	pluginDir := filepath.Join(tmpDir, "plugin")
 	createFakePlugin(t, pluginDir)
 
 	// Clear env vars so earlier steps don't match
@@ -228,7 +228,7 @@ func TestResolvePluginDir_ProjectRootDetection(t *testing.T) {
 // TestResolvePluginDir_ProjectRootDetectionFromSubdirectory tests that
 // resolveProjectPluginDir can walk UP from a subdirectory to find the project root.
 func TestResolvePluginDir_ProjectRootDetectionFromSubdirectory(t *testing.T) {
-	// Create a fake project with .htmlgraph/ and packages/go-plugin/
+	// Create a fake project with .htmlgraph/ and plugin/
 	tmpDir := t.TempDir()
 
 	// Create .htmlgraph directory (marks project root)
@@ -237,7 +237,7 @@ func TestResolvePluginDir_ProjectRootDetectionFromSubdirectory(t *testing.T) {
 	}
 
 	// Create plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "packages", "go-plugin")
+	pluginDir := filepath.Join(tmpDir, "plugin")
 	createFakePlugin(t, pluginDir)
 
 	// Create a subdirectory that we'll work from

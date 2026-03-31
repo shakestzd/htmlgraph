@@ -20,7 +20,7 @@ func getBootstrapScriptPath(t *testing.T) string {
 	// Walk up from cmd/htmlgraph/bootstrap_test.go to repo root
 	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
 
-	scriptPath := filepath.Join(repoRoot, "packages", "go-plugin", "hooks", "bin", "bootstrap.sh")
+	scriptPath := filepath.Join(repoRoot, "plugin", "hooks", "bin", "bootstrap.sh")
 	return scriptPath
 }
 

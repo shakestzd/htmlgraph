@@ -39,10 +39,10 @@ func buildCmd() *cobra.Command {
 
 // resolveBuildScript finds build.sh using a priority-ordered strategy.
 //
-// The build script lives at packages/go-plugin/build.sh.  Its location
+// The build script lives at plugin/build.sh.  Its location
 // depends on which binary is running:
 //
-//   - Dev mode: binary at packages/go-plugin/hooks/bin/htmlgraph → two levels up
+//   - Dev mode: binary at plugin/hooks/bin/htmlgraph → two levels up
 //   - Standalone CLI: binary at ~/.local/bin/htmlgraph → walk-up fails;
 //     fall back to plugin dir from CLAUDE_PLUGIN_ROOT / HTMLGRAPH_PLUGIN_DIR /
 //     project-root detection
@@ -52,7 +52,7 @@ func buildCmd() *cobra.Command {
 // Search order:
 //  1. CLAUDE_PLUGIN_ROOT env var (always set in hook/plugin context)
 //  2. HTMLGRAPH_PLUGIN_DIR env var (explicit user override)
-//  3. project-root detection (find .htmlgraph/, look for packages/go-plugin/ next to it)
+//  3. project-root detection (find .htmlgraph/, look for plugin/ next to it)
 //  4. os.Executable() walk-up (dev mode: binary inside plugin tree)
 func resolveBuildScript() (string, error) {
 	// Helper: probe whether a plugin dir has build.sh.
@@ -78,14 +78,14 @@ func resolveBuildScript() (string, error) {
 	}
 
 	// 3. Project-root detection: find the .htmlgraph/ directory walking up from
-	//    CWD, then look for packages/go-plugin/ adjacent to .htmlgraph/.
+	//    CWD, then look for plugin/ adjacent to .htmlgraph/.
 	//    This works when the user runs `htmlgraph build` from anywhere inside
 	//    the project tree (standalone CLI case).
 	if cwd, err := os.Getwd(); err == nil {
 		dir := cwd
 		for {
 			if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err == nil {
-				candidate := filepath.Join(dir, "packages", "go-plugin", "build.sh")
+				candidate := filepath.Join(dir, "plugin", "build.sh")
 				if _, err := os.Stat(candidate); err == nil {
 					return candidate, nil
 				}
@@ -99,7 +99,7 @@ func resolveBuildScript() (string, error) {
 	}
 
 	// 4. os.Executable() walk-up — works for dev mode where the binary lives
-	//    at packages/go-plugin/hooks/bin/htmlgraph.
+	//    at plugin/hooks/bin/htmlgraph.
 	binPath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("finding executable path: %w", err)

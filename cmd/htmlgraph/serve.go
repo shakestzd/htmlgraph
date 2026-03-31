@@ -91,7 +91,7 @@ func runServer(port int) error {
 //  2. HTMLGRAPH_PLUGIN_DIR env var (explicit user override)
 //  3. installed_plugins.json installPath (marketplace: ~/.claude/plugins/cache/...)
 //  4. Symlink walk-up from binary (dev mode: binary lives inside plugin tree)
-//  5. Project-root detection (CWD walk-up: find .htmlgraph/ + packages/go-plugin/)
+//  5. Project-root detection (CWD walk-up: find .htmlgraph/ + plugin/)
 func resolvePluginDir() string {
 	// 1. CLAUDE_PLUGIN_ROOT — set by Claude Code whenever a hook runs.
 	//    This is the authoritative source in hook and plugin context, and
@@ -118,7 +118,7 @@ func resolvePluginDir() string {
 	}
 
 	// 4. Symlink walk-up from binary — works for dev mode where the binary
-	//    lives at packages/go-plugin/hooks/bin/htmlgraph (two levels up is
+	//    lives at plugin/hooks/bin/htmlgraph (two levels up is
 	//    the plugin root).  Fails gracefully when the binary is at
 	//    ~/.local/bin/htmlgraph (standalone) or inside the marketplace cache
 	//    (already handled above), because those paths have no plugin.json.
@@ -136,7 +136,7 @@ func resolvePluginDir() string {
 	}
 
 	// 5. Project-root detection — walk up from CWD to find .htmlgraph/,
-	//    then check for packages/go-plugin/ relative to the project root.
+	//    then check for plugin/ relative to the project root.
 	//    This makes dev mode work from a fresh clone or fork without
 	//    needing a marketplace install first.
 	if projectPlugin := resolveProjectPluginDir(); projectPlugin != "" {
@@ -147,7 +147,7 @@ func resolvePluginDir() string {
 }
 
 // resolveProjectPluginDir walks up from CWD looking for a directory containing
-// .htmlgraph/ and packages/go-plugin/.claude-plugin/plugin.json. Returns the
+// .htmlgraph/ and plugin/.claude-plugin/plugin.json. Returns the
 // plugin dir path or "" if not found.
 func resolveProjectPluginDir() string {
 	cwd, err := os.Getwd()
@@ -158,8 +158,8 @@ func resolveProjectPluginDir() string {
 	// Walk up at most 5 levels looking for the project root.
 	dir := cwd
 	for i := 0; i < 5; i++ {
-		// Check if this directory has both .htmlgraph/ and packages/go-plugin/
-		pluginDir := filepath.Join(dir, "packages", "go-plugin")
+		// Check if this directory has both .htmlgraph/ and plugin/
+		pluginDir := filepath.Join(dir, "plugin")
 		if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err == nil {
 			if _, err := os.Stat(filepath.Join(pluginDir, ".claude-plugin", "plugin.json")); err == nil {
 				return pluginDir
