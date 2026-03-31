@@ -38,7 +38,7 @@ All delegated work must follow: DRY, SRP, KISS, YAGNI. Research existing librari
 ## Code Quality
 
 ```bash
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 # Commit only when ALL pass
 ```
 
@@ -49,7 +49,7 @@ All delegated work must follow: DRY, SRP, KISS, YAGNI. Research existing librari
 ## Deployment
 
 ```bash
-(cd packages/go && go test ./...)                # Run tests
+go test ./...                                    # Run tests
 ./scripts/deploy-all.sh X.Y.Z --no-confirm      # Deploy
 ```
 
@@ -62,7 +62,7 @@ See `.claude/rules/deployment.md` for full deployment workflow and options.
 | Task | Command |
 |------|---------|
 | View work | `htmlgraph snapshot --summary` |
-| Run tests | `(cd packages/go && go test ./...)` |
+| Run tests | `go test ./...` |
 | **Build binary** | **`htmlgraph build`** |
 | Deploy | `./scripts/deploy-all.sh VERSION --no-confirm` |
 | Serve dashboard | `htmlgraph serve` |
@@ -80,23 +80,23 @@ See `.claude/rules/deployment.md` for full deployment workflow and options.
 htmlgraph build
 
 # Also correct — calls the same build script
-packages/go-plugin/build.sh
+plugin/build.sh
 ```
 
 **NEVER do this:**
 ```bash
-# WRONG — builds to packages/go/htmlgraph, NOT on your PATH
-(cd packages/go && go build -o htmlgraph ./cmd/htmlgraph/)
+# WRONG — builds to ./htmlgraph in the current directory, NOT on your PATH
+go build -o htmlgraph ./cmd/htmlgraph/
 ```
 
 ### Why This Matters
 
 The binary on your PATH is set up via a symlink:
 ```
-~/.local/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph
+~/.local/bin/htmlgraph → plugin/hooks/bin/htmlgraph
 ```
 
-`htmlgraph build` outputs to `packages/go-plugin/hooks/bin/htmlgraph` — the symlink target. Running `go build` directly puts the binary in `packages/go/htmlgraph` which is NOT on your PATH. You'll keep running the stale binary.
+`htmlgraph build` outputs to `plugin/hooks/bin/htmlgraph` — the symlink target. Running `go build` directly puts the binary in the current directory, which is NOT on your PATH. You'll keep running the stale binary.
 
 ### How Plugin Users Get the Binary
 
@@ -124,7 +124,7 @@ The bootstrap is a POSIX shell script (~170 lines) that requires only `curl`/`ta
 **Binary locations:**
 ```
 CLI install:  /usr/local/bin/htmlgraph (brew) or ~/.local/bin/htmlgraph (go install / shell script)
-Developer:    ~/.local/bin/htmlgraph → packages/go-plugin/hooks/bin/htmlgraph (built locally via setup-cli)
+Developer:    ~/.local/bin/htmlgraph → plugin/hooks/bin/htmlgraph (built locally via setup-cli)
 Plugin-only:  hooks/bin/htmlgraph (bootstrap script) → ~/.claude/plugins/data/htmlgraph/htmlgraph-bin (downloaded)
 ```
 
@@ -141,7 +141,7 @@ htmlgraph claude --dev
 ```
 
 This launches Claude Code with:
-- Plugin loaded from local source: `packages/go-plugin/`
+- Plugin loaded from local source: `plugin/`
 - Orchestrator system prompt injected
 - Multi-AI delegation rules enabled
 - All slash commands available with the plugin namespace prefix
@@ -149,7 +149,7 @@ This launches Claude Code with:
 ### Plugin Directory Structure
 
 ```
-packages/go-plugin/                  <- PLUGIN ROOT (passed to --plugin-dir)
+plugin/                              <- PLUGIN ROOT (passed to --plugin-dir)
 ├── .claude-plugin/
 │   └── plugin.json                  <- Plugin manifest
 ├── commands/                        <- At plugin root (NOT in .claude-plugin)
@@ -169,8 +169,8 @@ Hooks are handled by the Go binary at `hooks/bin/htmlgraph`. The binary receives
 
 ### Development Workflow
 
-1. **Make changes** to `packages/go/`
-2. **Run tests**: `(cd packages/go && go test ./...)`
+1. **Make changes** to `cmd/` or `internal/`
+2. **Run tests**: `go test ./...`
 3. **Build binary**: `htmlgraph build`
 4. **Test in dev mode**: `htmlgraph claude --dev`
 5. **Deploy**: `./scripts/deploy-all.sh X.Y.Z --no-confirm`
@@ -234,21 +234,21 @@ This project uses HtmlGraph to develop HtmlGraph. The `.htmlgraph/` directory co
 
 **CRITICAL: ALL Claude Code integrations (hooks, agents, skills) must be built in the PLUGIN SOURCE.**
 
-**Plugin Source:** `packages/go-plugin/`
+**Plugin Source:** `plugin/`
 **Do NOT edit:** `.claude/` directory (auto-synced from plugin)
 
 ### Plugin Components - What Belongs in the Plugin
 
-Everything that extends Claude Code functionality should be in `packages/go-plugin/`:
+Everything that extends Claude Code functionality should be in `plugin/`:
 
 #### 1. **Hooks** (All CloudEvent handlers)
-   - **Location:** `packages/go-plugin/hooks/`
+   - **Location:** `plugin/hooks/`
    - **What:** Go binary that processes CloudEvent JSON on stdin
    - **Events handled:** session start/resume/end, tool use tracking, attribution checks, subagent tracking, compaction, permission requests
    - **Why plugin:** Hooks are Claude Code infrastructure -- must be packaged for distribution
 
 #### 2. **Agents** (Specialized AI agents)
-   - **Location:** `packages/go-plugin/agents/`
+   - **Location:** `plugin/agents/`
    - **What:** Markdown agent definitions with system prompts
    - **Current agents:**
      - `researcher.md` - Research-first documentation investigation
@@ -262,18 +262,18 @@ Everything that extends Claude Code functionality should be in `packages/go-plug
    - **Why plugin:** Agents are Claude Code infrastructure -- must be packaged for distribution
 
 #### 3. **Skills** (User-invocable commands)
-   - **Location:** `packages/go-plugin/skills/`
+   - **Location:** `plugin/skills/`
    - **What:** Markdown skill definitions for orchestration
    - **15 skills** including: orchestrator-directives-skill, code-quality-skill, strategic-planning, plan, execute, parallel-status, cleanup, multi-ai-orchestration-skill, gemini, codex, copilot, htmlgraph, htmlgraph-coder, htmlgraph-explorer, roborev
    - **Why plugin:** Skills are Claude Code UI components -- must be packaged for distribution
 
 #### 4. **Plugin Configuration**
-   - **Location:** `packages/go-plugin/.claude-plugin/plugin.json`
+   - **Location:** `plugin/.claude-plugin/plugin.json`
    - **What:** Plugin metadata (name, version, description)
    - **Why plugin:** Defines how Claude Code loads and runs the plugin
 
 #### 5. **Configuration & Prompts**
-   - **Location:** `packages/go-plugin/config/`
+   - **Location:** `plugin/config/`
    - **What:** System prompts, classification rules, drift thresholds
    - **Files:**
      - `classification-prompt.md` - Prompt for work type classification
@@ -284,7 +284,7 @@ Everything that extends Claude Code functionality should be in `packages/go-plug
 ### Directory Structure
 
 ```
-packages/go-plugin/                      <-- PLUGIN SOURCE (make changes here)
+plugin/                                  <-- PLUGIN SOURCE (make changes here)
 ├── .claude-plugin/
 │   └── plugin.json                      <- Plugin manifest
 ├── hooks/
@@ -296,9 +296,9 @@ packages/go-plugin/                      <-- PLUGIN SOURCE (make changes here)
 ├── config/                              <- Classification, drift, validation
 └── README.md
 
-packages/go/                             <-- GO SOURCE (core logic)
-├── cmd/htmlgraph/                       <- CLI entry point
-└── internal/                            <- Business logic packages
+cmd/                                     <-- GO CLI ENTRY POINT
+internal/                                <-- GO BUSINESS LOGIC
+go.mod                                   <-- Go module (github.com/shakestzd/htmlgraph)
 
 .claude/  <-- AUTO-SYNCED (do not edit)
 ├── hooks/ (synced from plugin)
@@ -316,23 +316,23 @@ packages/go/                             <-- GO SOURCE (core logic)
 
 **ALWAYS edit in plugin source:**
 
-- Edit `packages/go-plugin/hooks/hooks.json`
-- Edit Go source in `packages/go/` for hook logic
-- Add agents to `packages/go-plugin/agents/`
-- Add skills to `packages/go-plugin/skills/`
+- Edit `plugin/hooks/hooks.json`
+- Edit Go source in `cmd/` or `internal/` for hook logic
+- Add agents to `plugin/agents/`
+- Add skills to `plugin/skills/`
 
 ### Workflow: Making Changes to Plugin
 
 1. **Make changes in plugin source:**
    ```bash
-   # Edit files in packages/go-plugin/ or packages/go/
-   vim packages/go-plugin/.claude-plugin/plugin.json
-   vim packages/go/cmd/htmlgraph/reindex.go
+   # Edit files in plugin/ or cmd/ / internal/
+   vim plugin/.claude-plugin/plugin.json
+   vim cmd/htmlgraph/reindex.go
    ```
 
 2. **Run quality checks:**
    ```bash
-   (cd packages/go && go build ./... && go vet ./... && go test ./...)
+   go build ./... && go vet ./... && go test ./...
    ```
 
 3. **Verify plugin is synced (in dev mode, hooks run from plugin source):**
@@ -343,7 +343,7 @@ packages/go/                             <-- GO SOURCE (core logic)
 
 4. **Commit changes:**
    ```bash
-   git add packages/go-plugin/
+   git add plugin/
    git commit -m "fix: update hook X with Y changes"
    ```
 
@@ -362,10 +362,10 @@ packages/go/                             <-- GO SOURCE (core logic)
 
 ### Always Do This
 
-- Edit `packages/go-plugin/hooks/hooks.json`
-- Edit Go source in `packages/go/` for hook/CLI logic
-- Add agents to `packages/go-plugin/agents/`
-- Add skills to `packages/go-plugin/skills/`
+- Edit `plugin/hooks/hooks.json`
+- Edit Go source in `cmd/` or `internal/` for hook/CLI logic
+- Add agents to `plugin/agents/`
+- Add skills to `plugin/skills/`
 - Commit plugin source files
 - Test in dev mode (hooks run from plugin automatically)
 

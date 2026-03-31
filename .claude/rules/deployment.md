@@ -8,12 +8,12 @@
 1. **MUST be in project root directory** - Script will fail if run from subdirectories
 2. ~~**Commit all changes first**~~ - **AUTOMATED!** Script auto-commits version changes in Step 0
 3. ~~**Verify version numbers**~~ - **AUTOMATED!** Script auto-updates all version numbers in Step 0
-4. **Run tests** - `(cd packages/go && go test ./...)` must pass before deployment
+4. **Run tests** - `go test ./...` must pass before deployment
 
 **Streamlined Workflow:**
 ```bash
 # 1. Run tests
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 
 # 2. Deploy (one command, fully automated!)
 ./scripts/deploy-all.sh 1.0.0 --no-confirm
@@ -58,7 +58,7 @@
 
 **What the Script Does:**
 - **Pre-flight: Code Quality** - Run `go build`, `go vet`, `go test`
-- **Pre-flight: Plugin Sync** - Verify packages/go-plugin and .claude are synced
+- **Pre-flight: Plugin Sync** - Verify plugin/ and .claude are synced
 0. **Update & Commit Versions** - Auto-update version numbers in all files and commit
 1. **Git Push** - Push commits and tags to origin/main
 2. **Build Binary** - Cross-compile Go binary for darwin/linux (amd64/arm64)
@@ -77,13 +77,13 @@ HtmlGraph follows [Semantic Versioning](https://semver.org/):
 - **PATCH**: Bug fixes (backward compatible)
 
 **Version Files to Update:**
-1. `packages/go-plugin/.claude-plugin/plugin.json` - Plugin version
+1. `plugin/.claude-plugin/plugin.json` - Plugin version
 2. `packages/gemini-extension/gemini-extension.json` - Gemini extension version
 
 ## Publishing Checklist
 
 **Pre-Release:**
-- [ ] All tests pass: `(cd packages/go && go test ./...)`
+- [ ] All tests pass: `go test ./...`
 - [ ] Documentation updated
 - [ ] Version bumped in all files
 - [ ] Changes committed to git
@@ -106,7 +106,7 @@ claude plugin install htmlgraph
 htmlgraph --version
 
 # Check plugin version
-grep '"version"' packages/go-plugin/.claude-plugin/plugin.json
+grep '"version"' plugin/.claude-plugin/plugin.json
 ```
 
 ## Rollback

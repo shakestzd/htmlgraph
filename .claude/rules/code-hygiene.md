@@ -35,7 +35,7 @@ Maintaining clean, error-free code is non-negotiable. Every commit should reduce
 
 ```bash
 # Before every commit:
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 
 # Only commit when ALL checks pass
 git commit -m "..."
@@ -56,6 +56,6 @@ git commit -m "..."
 ### Principles
 
 1. **Single Responsibility**: Each package should have one clear purpose describable in one sentence
-2. **No Duplication**: Check `packages/go/internal/` for shared utilities before writing new ones
+2. **No Duplication**: Check `internal/` for shared utilities before writing new ones
 3. **Prefer Existing Dependencies**: Check `go.mod` and stdlib before custom implementations
 4. **Import Direction**: Dependencies flow one way (cmd -> internal, never internal -> cmd)
