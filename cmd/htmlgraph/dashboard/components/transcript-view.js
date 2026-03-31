@@ -1,0 +1,391 @@
+/* ── Transcript detail view ─────────────────────────────────── */
+
+// scrollHint: { toolUseId, toolName, timestamp } or undefined
+function openTranscript(sessionId, scrollHint) {
+  document.getElementById('sessions-list-view').style.display = 'none';
+  var detail = document.getElementById('transcript-detail');
+  detail.className = 'transcript-detail active';
+  document.getElementById('transcript-messages').textContent = 'Loading...';
+  document.getElementById('transcript-stats').textContent = '';
+
+  // Trigger on-demand ingest so the transcript is up-to-date, then fetch.
+  fetch('/api/sessions/' + encodeURIComponent(sessionId) + '/ingest', { method: 'POST' })
+    .catch(function() {}) // fire-and-forget; failures are non-fatal
+    .then(function() {
+      return fetch('/api/transcript?session=' + encodeURIComponent(sessionId) + '&limit=500');
+    })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) { renderTranscript(data, scrollHint); })
+    .catch(function(err) {
+      document.getElementById('transcript-messages').textContent = 'Failed to load transcript: ' + err.message;
+    });
+}
+
+function closeTranscript() {
+  document.getElementById('transcript-detail').className = 'transcript-detail';
+  document.getElementById('sessions-list-view').style.display = '';
+}
+
+document.getElementById('transcript-back').addEventListener('click', closeTranscript);
+
+function renderTranscript(data, scrollHint) {
+  renderTranscriptStats(data);
+  renderTranscriptMessages(data.messages || [], scrollHint);
+}
+
+function renderTranscriptStats(data) {
+  var container = document.getElementById('transcript-stats');
+  container.textContent = '';
+  container.className = 'transcript-stats';
+
+  var msgs = data.messages || [];
+  var totalInput = 0, totalOutput = 0, totalCache = 0;
+  var model = '';
+  msgs.forEach(function(m) {
+    totalInput += m.input_tokens || 0;
+    totalOutput += m.output_tokens || 0;
+    totalCache += m.cache_read_tokens || 0;
+    if (m.model && !model) model = m.model;
+  });
+
+  var firstTs = msgs.length > 0 ? msgs[0].timestamp : '';
+  var lastTs = msgs.length > 0 ? msgs[msgs.length - 1].timestamp : '';
+  var duration = '';
+  if (firstTs && lastTs) {
+    var diffMs = Math.abs(new Date(lastTs).getTime() - new Date(firstTs).getTime());
+    if (diffMs > 0) {
+      var mins = Math.floor(diffMs / 60000);
+      var secs = Math.floor((diffMs % 60000) / 1000);
+      duration = mins > 0 ? mins + 'm ' + secs + 's' : secs + 's';
+    }
+  }
+
+  var items = [
+    ['Session', truncId(data.session_id)],
+    ['Messages', String(data.message_count || 0)],
+    ['Tool Calls', String(data.tool_count || 0)],
+    ['Model', model || '--'],
+    ['Duration', duration || '--'],
+    ['Tokens', fmtTokens(totalInput) + ' in / ' + fmtTokens(totalOutput) + ' out'],
+    ['Cache Read', fmtTokens(totalCache)]
+  ];
+
+  var frag = document.createDocumentFragment();
+  items.forEach(function(pair) {
+    var stat = document.createElement('div');
+    stat.className = 'transcript-stat';
+    var lbl = document.createElement('span');
+    lbl.className = 'label';
+    lbl.textContent = pair[0];
+    var val = document.createElement('span');
+    val.className = 'value';
+    val.textContent = pair[1];
+    stat.appendChild(lbl);
+    stat.appendChild(val);
+    frag.appendChild(stat);
+  });
+  container.appendChild(frag);
+}
+
+function renderTranscriptMessages(messages, scrollHint) {
+  var container = document.getElementById('transcript-messages');
+  container.textContent = '';
+
+  if (messages.length === 0) {
+    container.textContent = 'No messages in this session.';
+    return;
+  }
+
+  var hint = scrollHint || {};
+  var scrollTarget = null;
+  var bestScore = -1;
+  var targetTs = hint.timestamp ? new Date(hint.timestamp).getTime() : 0;
+  var frag = document.createDocumentFragment();
+  messages.forEach(function(m) {
+    var bubble = document.createElement('div');
+    bubble.className = 'msg-bubble ' + (m.role === 'user' ? 'msg-user' : 'msg-assistant');
+
+    // Meta row
+    var meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    var role = document.createElement('span');
+    role.className = 'msg-role ' + (m.role === 'user' ? 'msg-role-user' : 'msg-role-assistant');
+    role.textContent = m.role;
+    meta.appendChild(role);
+
+    if (m.model) {
+      var modelBdg = document.createElement('span');
+      modelBdg.className = 'model-badge';
+      modelBdg.textContent = m.model;
+      meta.appendChild(modelBdg);
+    }
+
+    if (m.input_tokens || m.output_tokens) {
+      var tokInfo = document.createElement('span');
+      tokInfo.className = 'token-info';
+      var parts = [];
+      if (m.input_tokens) parts.push(fmtTokens(m.input_tokens) + ' in');
+      if (m.output_tokens) parts.push(fmtTokens(m.output_tokens) + ' out');
+      if (m.cache_read_tokens) parts.push(fmtTokens(m.cache_read_tokens) + ' cache');
+      tokInfo.textContent = parts.join(' / ');
+      meta.appendChild(tokInfo);
+    }
+
+    if (m.timestamp) {
+      var ts = document.createElement('span');
+      ts.className = 'token-info';
+      ts.textContent = fmtTime(m.timestamp);
+      meta.appendChild(ts);
+    }
+
+    bubble.appendChild(meta);
+
+    // Content
+    if (m.content) {
+      var content = document.createElement('div');
+      content.className = 'msg-content';
+      var text = m.content;
+      if (text.length > 2000) text = text.substring(0, 2000) + '\n... (truncated)';
+      content.textContent = text;
+      bubble.appendChild(content);
+    }
+
+    // Tool calls
+    if (m.tool_calls && m.tool_calls.length > 0) {
+      var toolsDiv = document.createElement('div');
+      toolsDiv.className = 'msg-tools';
+
+      m.tool_calls.forEach(function(tc) {
+        // Exact tool_use_id match — highest priority scroll target
+        if (hint.toolUseId && tc.tool_use_id === hint.toolUseId) {
+          scrollTarget = bubble;
+          bestScore = 1000;
+        }
+
+        if (tc.tool_name === 'Agent') {
+          toolsDiv.appendChild(renderAgentBlock(tc));
+        } else {
+          toolsDiv.appendChild(renderToolChip(tc));
+        }
+      });
+
+      bubble.appendChild(toolsDiv);
+    }
+
+    // Scored fallback matching when no exact tool_use_id hit
+    if (bestScore < 1000 && targetTs && m.timestamp) {
+      var msgTs = new Date(m.timestamp).getTime();
+      var timeDiff = Math.abs(msgTs - targetTs);
+      // Score: tool_name match + time proximity (closer = higher)
+      var score = 0;
+      if (timeDiff < 30000) { // within 30 seconds
+        score = 100 - (timeDiff / 300); // 0-100 based on proximity
+        // Bonus for matching tool_name in this message's tool_calls
+        if (hint.toolName && m.tool_calls) {
+          for (var i = 0; i < m.tool_calls.length; i++) {
+            if (m.tool_calls[i].tool_name === hint.toolName) {
+              score += 200; // strong signal
+              break;
+            }
+          }
+        }
+        // Bonus for user messages matching UserQuery events
+        if (!hint.toolName && m.role === 'user') {
+          score += 50;
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        scrollTarget = bubble;
+      }
+    }
+
+    frag.appendChild(bubble);
+  });
+  container.appendChild(frag);
+
+  // Scroll to the targeted message and highlight it
+  if (scrollTarget) {
+    setTimeout(function() {
+      scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      scrollTarget.classList.add('msg-highlight');
+      setTimeout(function() { scrollTarget.classList.remove('msg-highlight'); }, 4000);
+    }, 150);
+  }
+}
+
+// renderToolChip renders a plain tool call as a clickable chip with input preview.
+function renderToolChip(tc) {
+  var wrapper = document.createElement('div');
+  wrapper.style.display = 'inline-flex';
+  wrapper.style.flexDirection = 'column';
+
+  var chip = document.createElement('span');
+  chip.className = 'tool-call-chip';
+  if (tc.tool_use_id) chip.dataset.toolUseId = tc.tool_use_id;
+
+  var name = document.createElement('span');
+  name.className = 'tool-name';
+  name.textContent = tc.tool_name;
+  chip.appendChild(name);
+
+  if (tc.category && tc.category !== tc.tool_name) {
+    var cat = document.createElement('span');
+    cat.className = 'tool-cat';
+    cat.textContent = tc.category;
+    chip.appendChild(cat);
+  }
+
+  var preview = document.createElement('div');
+  preview.className = 'tool-input-preview';
+  if (tc.input_json) {
+    try {
+      preview.textContent = JSON.stringify(JSON.parse(tc.input_json), null, 2);
+    } catch(e) {
+      preview.textContent = tc.input_json;
+    }
+  } else {
+    preview.textContent = '(no input)';
+  }
+
+  chip.addEventListener('click', function(e) {
+    e.stopPropagation();
+    preview.classList.toggle('open');
+  });
+
+  wrapper.appendChild(chip);
+  wrapper.appendChild(preview);
+  return wrapper;
+}
+
+// renderAgentBlock renders an Agent tool call as an expandable subagent block
+// that lazily fetches and shows the subagent's events from /api/events/subagent.
+function renderAgentBlock(tc) {
+  var info = {};
+  try { info = JSON.parse(tc.input_json || '{}'); } catch(e) {}
+
+  var subType = info.subagent_type || 'Agent';
+  var desc = info.description || info.prompt || '';
+
+  var block = document.createElement('div');
+  block.className = 'subagent-block';
+
+  var header = document.createElement('div');
+  header.className = 'subagent-block-header';
+
+  var icon = document.createElement('span');
+  icon.className = 'expand-icon';
+  icon.textContent = '\u25B6';
+
+  var badge = document.createElement('span');
+  badge.className = 'badge badge-subagent';
+  badge.textContent = subType;
+
+  var descSpan = document.createElement('span');
+  descSpan.className = 'subagent-desc';
+  descSpan.textContent = desc ? (desc.length > 80 ? desc.slice(0, 77) + '...' : desc) : 'Subagent';
+
+  header.appendChild(icon);
+  header.appendChild(badge);
+  header.appendChild(descSpan);
+  block.appendChild(header);
+
+  var body = document.createElement('div');
+  body.className = 'subagent-block-body';
+  body.style.display = 'none';
+  block.appendChild(body);
+
+  var loaded = false;
+  header.addEventListener('click', function() {
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      icon.classList.add('expanded');
+      if (!loaded) {
+        loaded = true;
+        body.textContent = 'Loading...';
+        // Prefer agent_id lookup (reliable); fall back to tool_use_id (legacy).
+        if (tc.subagent_agent_id) {
+          fetchSubagentEventsByAgentID(tc.subagent_agent_id, body);
+        } else {
+          fetchSubagentEvents(tc.tool_use_id, body);
+        }
+      }
+    } else {
+      body.style.display = 'none';
+      icon.classList.remove('expanded');
+    }
+  });
+
+  return block;
+}
+
+// fetchSubagentEventsByAgentID loads events for a subagent using its agent_id.
+// This is the preferred path — agent_id is a stable identifier for the subagent.
+function fetchSubagentEventsByAgentID(agentID, container) {
+  fetch('/api/events/subagent?agent_id=' + encodeURIComponent(agentID))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(events) { renderSubagentEvents(events, container); })
+    .catch(function(err) {
+      container.textContent = 'Failed to load subagent events: ' + err.message;
+    });
+}
+
+// renderSubagentEvents populates a container DOM element with subagent event rows.
+function renderSubagentEvents(events, container) {
+  container.textContent = '';
+  if (!events || events.length === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'subagent-empty';
+    empty.textContent = 'No subagent events recorded.';
+    container.appendChild(empty);
+    return;
+  }
+  var frag = document.createDocumentFragment();
+  events.forEach(function(evt) {
+    var row = document.createElement('div');
+    row.className = 'subagent-event-row';
+
+    var timeEl = document.createElement('span');
+    timeEl.className = 'event-time';
+    timeEl.textContent = formatTime(evt.timestamp);
+
+    var chip = document.createElement('span');
+    chip.className = 'tool-chip tool-' + (evt.tool_name || 'unknown');
+    chip.textContent = evt.tool_name || evt.event_type || '';
+
+    var summary = document.createElement('span');
+    summary.className = 'event-summary';
+    summary.textContent = evt.input_summary || evt.output_summary || '';
+
+    var statusEl = document.createElement('span');
+    statusEl.className = 'badge badge-status-' + (evt.status || 'unknown');
+    statusEl.textContent = evt.status || '';
+
+    row.appendChild(timeEl);
+    row.appendChild(chip);
+    row.appendChild(summary);
+    if (evt.status) row.appendChild(statusEl);
+    frag.appendChild(row);
+  });
+  container.appendChild(frag);
+}
+
+// fetchSubagentEvents loads events for a given parent_event_id and renders them.
+// Kept as legacy fallback when subagent_agent_id is not available.
+function fetchSubagentEvents(parentEventId, container) {
+  fetch('/api/events/subagent?parent_event_id=' + encodeURIComponent(parentEventId))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(events) { renderSubagentEvents(events, container); })
+    .catch(function(err) {
+      container.textContent = 'Failed to load subagent events: ' + err.message;
+    });
+}

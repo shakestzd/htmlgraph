@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HtmlGraph Dashboard</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="shell">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      HtmlGraph
+    </div>
+    <div class="stats-bar" id="stats-bar">
+      <div class="stat-pill" id="sp-live"><span class="label">Live</span> <span class="val" id="sv-live">--</span></div>
+      <div class="stat-pill" id="sp-feat-ip"><span class="label">In-Progress</span> <span class="val" id="sv-feat-ip">--</span></div>
+      <div class="stat-pill" id="sp-done-today"><span class="label">Done</span> <span class="val" id="sv-done-today">--</span></div>
+      <div class="stat-pill" id="sp-cost"><span class="label">Cost</span> <span class="val" id="sv-cost">--</span></div>
+      <div class="stat-pill stat-pill-warn" id="sp-errors" style="display:none"><span class="label">Errors</span> <span class="val" id="sv-errors">0</span></div>
+      <div class="stat-pill" style="gap:4px">
+        <span class="conn-dot live" id="conn-dot"></span>
+        <span class="conn-label" id="conn-label">Connected</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side nav -->
+  <nav class="nav">
+    <button class="nav-btn active" data-view="activity">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Activity
+    </button>
+    <button class="nav-btn" data-view="sessions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Sessions
+    </button>
+    <button class="nav-btn" data-view="work">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Work
+    </button>
+  </nav>
+
+  <!-- Content -->
+  <main class="content">
+
+    <section class="view active" id="v-activity">
+      <div class="view-title">Activity Feed <span class="count" id="activity-count">0</span></div>
+      <div class="filter-bar" id="activity-filters">
+        <input type="text" class="filter-input" id="filter-text" placeholder="Search events...">
+        <select class="filter-select" id="filter-tool"><option value="">All Tools</option></select>
+        <select class="filter-select" id="filter-agent"><option value="">All Agents</option></select>
+        <span class="filter-count" id="filter-count"></span>
+      </div>
+      <hg-event-tree data-limit="50"></hg-event-tree>
+    </section>
+
+    <section class="view" id="v-sessions">
+      <div id="sessions-list-view">
+        <div class="view-title">Sessions <span class="count" id="sessions-count">0</span></div>
+        <div style="overflow-x:auto">
+          <table class="tbl" id="sessions-table">
+            <thead><tr>
+              <th>Title</th>
+              <th style="width:100px">Model</th>
+              <th style="width:70px">Msgs</th>
+              <th style="width:60px">Activity</th>
+              <th style="width:70px">Status</th>
+              <th style="width:90px">Time</th>
+            </tr></thead>
+            <tbody id="sessions-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="sessions-empty" style="display:none">
+          <div>No sessions recorded.</div>
+        </div>
+      </div>
+      <div class="transcript-detail" id="transcript-detail">
+        <button class="transcript-back" id="transcript-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to Sessions
+        </button>
+        <div id="transcript-stats"></div>
+        <div class="transcript-messages" id="transcript-messages"></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-work">
+      <div class="view-title">
+        Work <span class="count" id="work-count">0</span>
+        <button class="track-toggle" id="track-group-toggle" title="Group by Track">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+          </svg>
+        </button>
+      </div>
+      <div class="kanban-board" id="kanban-board"></div>
+      <div class="empty" id="work-empty" style="display:none">
+        <div>No work items found.</div>
+      </div>
+      <div class="work-detail" id="work-detail">
+        <div class="work-detail-header">
+          <button class="transcript-back work-detail-back" id="work-detail-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to Board
+          </button>
+        </div>
+        <div id="work-detail-content"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="js/helpers.js"></script>
+<script src="components/event-tree.js"></script>
+<script src="components/transcript-view.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

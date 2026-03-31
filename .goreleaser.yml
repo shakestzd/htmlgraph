@@ -1,0 +1,41 @@
+version: 2
+
+project_name: htmlgraph
+
+builds:
+  - id: htmlgraph
+    main: ./cmd/htmlgraph
+    binary: htmlgraph
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: htmlgraph
+    builds:
+      - htmlgraph
+    name_template: "htmlgraph_{{.Version}}_{{.Os}}_{{.Arch}}"
+    format: tar.gz
+
+checksum:
+  name_template: "htmlgraph_{{.Version}}_checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: shakestzd
+    name: htmlgraph
+  name_template: "Go v{{.Version}}"
+
+git:
+  tag_sort: -version:refname
+
+snapshot:
+  name_template: "{{incpatch .Version}}-next"

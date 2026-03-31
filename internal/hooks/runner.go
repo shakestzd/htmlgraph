@@ -1,0 +1,188 @@
+// Package hooks implements Claude Code hook handlers for HtmlGraph.
+//
+// Each handler reads a CloudEvent JSON payload from stdin and writes a
+// HookResult JSON to stdout. The Go binary replaces the Python hook scripts,
+// eliminating the ~500ms uv cold-start per invocation.
+package hooks
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
+
+	"github.com/shakestzd/htmlgraph/internal/paths"
+)
+
+// CloudEvent is the JSON payload Claude Code sends to every hook via stdin.
+// Only the fields HtmlGraph actually uses are decoded; the rest are ignored.
+type CloudEvent struct {
+	// Top-level fields common to all hook types
+	SessionID      string `json:"session_id"`
+	CWD            string `json:"cwd"`
+	PermissionMode string `json:"permission_mode"` // "default", "plan", "auto", "bypassPermissions"
+
+	// UserPromptSubmit
+	Prompt string `json:"prompt"`
+
+	// PreToolUse / PostToolUse
+	ToolName  string         `json:"tool_name"`
+	ToolInput map[string]any `json:"tool_input"`
+	ToolUseID string         `json:"tool_use_id"`
+
+	// PostToolUse result
+	ToolResult map[string]any `json:"tool_result"`
+
+	// SubagentStart / SubagentStop
+	AgentID   string `json:"agent_id"`
+	AgentType string `json:"agent_type"`
+
+	// WorktreeCreate / WorktreeRemove
+	WorktreePath string `json:"worktree_path"`
+
+	// Stop / SubagentStop
+	StopReason           string `json:"stop_reason"`
+	LastAssistantMessage string `json:"last_assistant_message"`
+
+	// SessionStart / SessionEnd / Stop — common session fields
+	TranscriptPath string `json:"transcript_path"`
+	Source         string `json:"source"`   // startup, resume, clear, compact
+	Model          string `json:"model"`
+
+	// SessionEnd
+	Reason   string `json:"reason"`    // prompt_input_exit, interrupt, etc.
+	ExitCode int    `json:"exit_code"`
+
+	// TaskCreated / TaskCompleted
+	TaskID   string         `json:"task_id"`
+	TaskData map[string]any `json:"task"`
+}
+
+// HookResult is the JSON written to stdout to control Claude Code behaviour.
+// Fields are omitted when empty to keep the payload minimal.
+type HookResult struct {
+	Continue          bool   `json:"continue,omitempty"`
+	Decision          string `json:"decision,omitempty"`           // "allow" | "deny" | "block"
+	Reason            string `json:"reason,omitempty"`
+	Message           string `json:"message,omitempty"`            // shown on stderr
+	AdditionalContext string `json:"additionalContext,omitempty"`  // injected into conversation
+}
+
+// ReadInput reads and parses a CloudEvent from stdin.
+func ReadInput() (*CloudEvent, error) {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("reading stdin: %w", err)
+	}
+	if len(data) == 0 {
+		return &CloudEvent{}, nil
+	}
+	var ev CloudEvent
+	if err := json.Unmarshal(data, &ev); err != nil {
+		return nil, fmt.Errorf("parsing CloudEvent: %w", err)
+	}
+	return &ev, nil
+}
+
+// WriteResult encodes result as JSON to stdout.
+func WriteResult(result *HookResult) error {
+	return json.NewEncoder(os.Stdout).Encode(result)
+}
+
+// Allow writes an empty JSON object to allow the tool to proceed.
+// NOTE: We intentionally return {} instead of {"decision":"allow"} because
+// Claude Code v2.1.x displays a spurious "hook error" label in the TUI
+// when a PreToolUse hook returns {"decision":"allow"}. An empty object
+// is treated as "no opinion" which defaults to allow without the error label.
+func Allow() error {
+	return Empty()
+}
+
+// Continue writes a continue:true response (used by non-blocking hooks).
+func Continue() error {
+	return WriteResult(&HookResult{Continue: true})
+}
+
+// Empty writes an empty JSON object (hook has no opinion).
+func Empty() error {
+	_, err := fmt.Fprintln(os.Stdout, "{}")
+	return err
+}
+
+// ResolveProjectDir finds the project directory containing .htmlgraph/.
+// Delegates to paths.ResolveProjectDir with the CloudEvent CWD and a
+// walk-up limit of defaultProjectDirWalkLevels (matching the previous hook behaviour).
+func ResolveProjectDir(cwd string) string {
+	dir, _ := paths.ResolveProjectDir(paths.ProjectDirOptions{
+		EventCWD:   cwd,
+		WalkLevels: defaultProjectDirWalkLevels,
+	})
+	return dir
+}
+
+// IsHtmlGraphProject returns true when the project directory has a .htmlgraph/ dir.
+func IsHtmlGraphProject(projectDir string) bool {
+	_, err := os.Stat(filepath.Join(projectDir, ".htmlgraph"))
+	return err == nil
+}
+
+// DBPath returns the canonical SQLite path for the given project directory.
+func DBPath(projectDir string) string {
+	return filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db")
+}
+
+// uuidPattern matches RFC 4122 UUID format (8-4-4-4-12).
+// Pre-compiled at module load to avoid repeated compilation on every hook invocation.
+var uuidPattern = regexp.MustCompile(`([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`)
+
+// NormaliseSessionID extracts a UUID from a path-style session_id that Claude
+// Code sometimes provides for subagent sessions, e.g.:
+//
+//	/private/tmp/claude-501/-Users-shakes-.../550e8400-e29b-41d4-a716-446655440000
+//
+// If no UUID is found the original string is returned unchanged.
+func NormaliseSessionID(raw string) string {
+	if raw == "" || !containsSlash(raw) {
+		return raw
+	}
+	if m := uuidPattern.FindString(raw); m != "" {
+		return m
+	}
+	return raw
+}
+
+func containsSlash(s string) bool {
+	for _, c := range s {
+		if c == '/' {
+			return true
+		}
+	}
+	return false
+}
+
+// EnvSessionID returns the current session ID using a three-step fallback:
+//  1. HTMLGRAPH_SESSION_ID env var (set by writeEnvVars via CLAUDE_ENV_FILE)
+//  2. CloudEvent session_id (always present, always correct for this invocation)
+//  3. .htmlgraph/.active-session file (last resort for edge cases)
+func EnvSessionID(eventSessionID string) string {
+	if v := os.Getenv("HTMLGRAPH_SESSION_ID"); v != "" {
+		return v
+	}
+	// Prefer the CloudEvent session_id — it's always correct for this hook
+	// invocation. The .active-session file can become stale when
+	// CLAUDE_ENV_FILE is unavailable (e.g. YOLO mode, worktree subagents).
+	if sid := NormaliseSessionID(eventSessionID); sid != "" {
+		return sid
+	}
+	// Last resort: .active-session file.
+	cwd, _ := os.Getwd()
+	projectDir := ResolveProjectDir(cwd)
+	if projectDir != "" {
+		if as := readActiveSession(projectDir); as != nil && as.SessionID != "" {
+			return as.SessionID
+		}
+	}
+	return ""
+}
