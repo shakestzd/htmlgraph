@@ -7,23 +7,21 @@
 set -e
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-GO_PKG="$REPO_ROOT/packages/go"
-
 echo "Running pre-commit checks..."
 
-# Only run Go checks if Go files are staged or if the Go package exists
-if git diff --cached --name-only | grep -q '\.go$' || [ -d "$GO_PKG" ]; then
-    if [ ! -d "$GO_PKG" ]; then
-        echo "  Warning: no packages/go directory found, skipping Go checks."
+# Go source is at the repo root (go.mod, cmd/, internal/)
+if git diff --cached --name-only | grep -q '\.go$' || [ -f "$REPO_ROOT/go.mod" ]; then
+    if [ ! -f "$REPO_ROOT/go.mod" ]; then
+        echo "  Warning: no go.mod found at repo root, skipping Go checks."
     else
         echo "  -> go build..."
-        if ! (cd "$GO_PKG" && go build ./...) ; then
+        if ! (cd "$REPO_ROOT" && go build ./...) ; then
             echo "FAIL: go build failed. Fix compilation errors before committing."
             exit 1
         fi
 
         echo "  -> go vet..."
-        if ! (cd "$GO_PKG" && go vet ./...) ; then
+        if ! (cd "$REPO_ROOT" && go vet ./...) ; then
             echo "FAIL: go vet failed. Fix issues before committing."
             exit 1
         fi
@@ -31,7 +29,7 @@ if git diff --cached --name-only | grep -q '\.go$' || [ -d "$GO_PKG" ]; then
         echo "  -> go test..."
         # Unset GIT_DIR/GIT_INDEX_FILE so tests that create real git repos
         # (e.g. TestBranchForFilePath) are not polluted by the pre-commit env.
-        if ! (cd "$GO_PKG" && env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE go test ./...) ; then
+        if ! (cd "$REPO_ROOT" && env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE go test ./...) ; then
             echo "FAIL: go test failed. Fix failing tests before committing."
             exit 1
         fi
