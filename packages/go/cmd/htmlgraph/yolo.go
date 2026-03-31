@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 )
 
 func yoloCmd() *cobra.Command {
@@ -130,6 +131,51 @@ func createFeatureWorktree(featureID, projectRoot string) (string, func(), error
 	return worktreePath, cleanup, nil
 }
 
+// createTrackWorktree creates a git worktree at .claude/worktrees/<trackID> on branch
+// trk-<trackID>. If the worktree path already exists it is reused. Returns the worktree
+// path and a cleanup function that removes the worktree on error.
+func createTrackWorktree(trackID, projectRoot string) (string, func(), error) {
+	worktreePath := filepath.Join(projectRoot, ".claude", "worktrees", trackID)
+	branchName := trackID // Track worktrees use branch name trk-abc123, not yolo-trk-abc123
+	noop := func() {}
+
+	// If path already exists, reuse it — the worktree was created in a prior run.
+	if _, err := os.Stat(worktreePath); err == nil {
+		fmt.Printf("  Worktree: %s (reusing existing)\n", worktreePath)
+		return worktreePath, noop, nil
+	}
+
+	// Ensure the parent directory exists.
+	if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {
+		return "", noop, fmt.Errorf("could not create worktrees directory: %w", err)
+	}
+
+	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", worktreePath, "-b", branchName)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", noop, fmt.Errorf("git worktree add failed: %w\n%s", err, out)
+	}
+
+	fmt.Printf("  Worktree: %s (branch: %s)\n", worktreePath, branchName)
+
+	cleanup := func() {
+		removeCmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", worktreePath)
+		removeCmd.Run() //nolint:errcheck
+	}
+	return worktreePath, cleanup, nil
+}
+
+// resolveTrackForFeature reads a feature HTML file and returns its data-track-id attribute.
+// If the feature file doesn't exist or has no track ID, returns empty string.
+func resolveTrackForFeature(featureID, projectRoot string) string {
+	featureFile := filepath.Join(projectRoot, ".htmlgraph", "features", featureID+".html")
+	node, err := htmlparse.ParseFile(featureFile)
+	if err != nil {
+		// File not found or parse error — gracefully return empty
+		return ""
+	}
+	return node.TrackID
+}
+
 // buildWorkItemPromptPrefix returns the work item header to prepend to the yolo prompt.
 func buildWorkItemPromptPrefix(id, kind string) string {
 	return strings.Join([]string{
@@ -190,15 +236,38 @@ func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, ext
 		return err
 	}
 
-	// Create a worktree for feature isolation (skip for tracks and --no-worktree).
+	// Create a worktree for isolation (skip for --no-worktree).
 	workDir := projectRoot
-	if featureID != "" && !noWorktree && projectRoot != "" {
-		worktreePath, cleanup, wtErr := createFeatureWorktree(featureID, projectRoot)
-		if wtErr != nil {
-			return wtErr
+	if !noWorktree && projectRoot != "" {
+		// If --track is provided, create a track worktree
+		if trackID != "" {
+			worktreePath, cleanup, wtErr := createTrackWorktree(trackID, projectRoot)
+			if wtErr != nil {
+				return wtErr
+			}
+			_ = cleanup // only used on error; worktree persists for the session
+			workDir = worktreePath
+		} else if featureID != "" {
+			// If --feature is provided, check if it has a parent track
+			resolvedTrackID := resolveTrackForFeature(featureID, projectRoot)
+			if resolvedTrackID != "" {
+				// Feature has a parent track — use the track worktree
+				worktreePath, cleanup, wtErr := createTrackWorktree(resolvedTrackID, projectRoot)
+				if wtErr != nil {
+					return wtErr
+				}
+				_ = cleanup // only used on error; worktree persists for the session
+				workDir = worktreePath
+			} else {
+				// Feature has no parent track — use the feature worktree
+				worktreePath, cleanup, wtErr := createFeatureWorktree(featureID, projectRoot)
+				if wtErr != nil {
+					return wtErr
+				}
+				_ = cleanup // only used on error; worktree persists for the session
+				workDir = worktreePath
+			}
 		}
-		_ = cleanup // only used on error; worktree persists for the session
-		workDir = worktreePath
 	}
 
 	sessionName := yoloSessionName()
@@ -262,15 +331,38 @@ func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []strin
 		return err
 	}
 
-	// Create a worktree for feature isolation (skip for tracks and --no-worktree).
+	// Create a worktree for isolation (skip for --no-worktree).
 	workDir := projectRoot
-	if featureID != "" && !noWorktree && projectRoot != "" {
-		worktreePath, cleanup, wtErr := createFeatureWorktree(featureID, projectRoot)
-		if wtErr != nil {
-			return wtErr
+	if !noWorktree && projectRoot != "" {
+		// If --track is provided, create a track worktree
+		if trackID != "" {
+			worktreePath, cleanup, wtErr := createTrackWorktree(trackID, projectRoot)
+			if wtErr != nil {
+				return wtErr
+			}
+			_ = cleanup // only used on error; worktree persists for the session
+			workDir = worktreePath
+		} else if featureID != "" {
+			// If --feature is provided, check if it has a parent track
+			resolvedTrackID := resolveTrackForFeature(featureID, projectRoot)
+			if resolvedTrackID != "" {
+				// Feature has a parent track — use the track worktree
+				worktreePath, cleanup, wtErr := createTrackWorktree(resolvedTrackID, projectRoot)
+				if wtErr != nil {
+					return wtErr
+				}
+				_ = cleanup // only used on error; worktree persists for the session
+				workDir = worktreePath
+			} else {
+				// Feature has no parent track — use the feature worktree
+				worktreePath, cleanup, wtErr := createFeatureWorktree(featureID, projectRoot)
+				if wtErr != nil {
+					return wtErr
+				}
+				_ = cleanup // only used on error; worktree persists for the session
+				workDir = worktreePath
+			}
 		}
-		_ = cleanup // only used on error; worktree persists for the session
-		workDir = worktreePath
 	}
 
 	fmt.Println("Disabling marketplace htmlgraph plugin...")

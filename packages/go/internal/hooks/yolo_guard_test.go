@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -154,6 +155,9 @@ func TestCheckYoloWorktreeGuard(t *testing.T) {
 		{"write on feature branch allows", "Write", "feat-123", true, false},
 		{"write on main outside yolo allows", "Write", "main", false, false},
 		{"read on main in yolo allows", "Read", "main", true, false},
+		{"write on track branch allows", "Write", "trk-abc123", true, false},
+		{"write on track agent branch allows", "Write", "trk-abc123/agent-task1", true, false},
+		{"write on yolo-feat branch allows", "Write", "yolo-feat-123", true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,6 +169,16 @@ func TestCheckYoloWorktreeGuard(t *testing.T) {
 				t.Errorf("expected allow, got: %s", result)
 			}
 		})
+	}
+}
+
+func TestCheckYoloWorktreeGuard_ErrorMessage(t *testing.T) {
+	msg := checkYoloWorktreeGuard("Write", "main", true)
+	if msg == "" {
+		t.Fatal("expected block message")
+	}
+	if !strings.Contains(msg, "htmlgraph yolo") {
+		t.Errorf("error message should suggest htmlgraph yolo, got: %s", msg)
 	}
 }
 

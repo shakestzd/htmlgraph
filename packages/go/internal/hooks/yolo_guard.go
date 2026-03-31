@@ -230,8 +230,8 @@ func checkYoloWorktreeGuard(toolName, branch string, yolo bool) string {
 		if isMergeInProgress() {
 			return ""
 		}
-		return "YOLO mode requires a feature branch or worktree. " +
-			"Create one: git worktree add -b feat-xxx .claude/worktrees/xxx main"
+		return "YOLO mode requires a feature or track branch. " +
+			"Use: htmlgraph yolo --track <id> or htmlgraph yolo --feature <id>"
 	}
 	return ""
 }
