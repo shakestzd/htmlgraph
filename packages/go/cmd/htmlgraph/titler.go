@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
 )
 
 // generateTitle calls `claude -p --model haiku` once to produce a short title.

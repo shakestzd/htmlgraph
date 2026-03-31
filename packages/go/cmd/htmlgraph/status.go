@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/shakestzd/htmlgraph/internal/graph"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/graph"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 	"github.com/spf13/cobra"
 )
 

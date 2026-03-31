@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
 	"github.com/spf13/cobra"
 )
 

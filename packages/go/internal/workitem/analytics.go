@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/graph"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/graph"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // Bottleneck describes a stalled work item or overloaded track.

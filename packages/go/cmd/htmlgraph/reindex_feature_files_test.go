@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/models"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 )
 
 // initBareGitRepo creates a minimal git repo in dir with one commit touching files.

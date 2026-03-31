@@ -1,4 +1,4 @@
-module github.com/shakestzd/htmlgraph
+module github.com/shakestzd/htmlgraph/packages/go
 
 go 1.23.0
 

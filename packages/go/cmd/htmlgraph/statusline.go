@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/hooks"
-	"github.com/shakestzd/htmlgraph/internal/workitem"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/hooks"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/workitem"
 	"github.com/spf13/cobra"
 )
 

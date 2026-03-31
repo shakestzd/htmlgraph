@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/htmlparse"
-	"github.com/shakestzd/htmlgraph/internal/models"
-	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/workitem"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
 )
 
 // --- Base types --------------------------------------------------------------

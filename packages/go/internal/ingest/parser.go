@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/packages/go/internal/models"
 	"github.com/tidwall/gjson"
 )
 

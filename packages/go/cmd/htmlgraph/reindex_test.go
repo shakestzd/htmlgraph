@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
 )
 
 // openReindexTestDB creates an in-memory SQLite database with the full schema.

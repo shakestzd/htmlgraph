@@ -1,4 +1,4 @@
-MODULE := github.com/shakestzd/htmlgraph
+MODULE := github.com/shakestzd/htmlgraph/packages/go
 VERSION ?= dev
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 

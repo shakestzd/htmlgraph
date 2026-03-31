@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	dbpkg "github.com/shakestzd/htmlgraph/packages/go/internal/db"
 )
 
 // transcriptHandler returns messages and tool calls for a session.
