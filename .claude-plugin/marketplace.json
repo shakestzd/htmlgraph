@@ -11,7 +11,7 @@
     {
       "name": "htmlgraph",
       "version": "0.37.1",
-      "source": "./packages/go-plugin",
+      "source": "./plugin",
       "description": "Local-first observability with Go binary hooks \u2014 near-zero cold start, no Python runtime needed",
       "category": "Development Tools",
       "tags": [

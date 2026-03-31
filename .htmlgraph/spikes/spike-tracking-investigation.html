@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Tracking System Investigation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spike-tracking-investigation"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2025-12-16T00:00:00"
+             data-updated="2026-03-31T17:44:29.956899">
+
+        <header>
+            <h1>Tracking System Investigation</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="related">
+                <h3>Related:</h3>
+                <ul>
+                    <li><a href="feature-self-tracking.html" data-relationship="related">Feature: Self-Tracking</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            Investigation spike triggered by high-drift activity pattern detection. Multiple accesses to tracking feature and skill invocations suggest system exploration/validation needed.
+Observations:
+Repeated feature-self-tracking.html reads with 0.71 drift score
+                Multiple htmlgraph-tracker skill activations
+                Directory structure exploration in .htmlgraph/
+Questions to Answer:
+Is the tracking system working as designed?
+                Are drift scores calculated correctly?
+                Should these activities have been classified differently?
+        </section>
+    </article>
+</body>
+</html>

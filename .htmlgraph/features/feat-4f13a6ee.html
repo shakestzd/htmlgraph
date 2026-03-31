@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Ephemeral agent branches for parallel work</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-4f13a6ee"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-31T11:51:04.663559"
+             data-updated="2026-03-31T13:17:06.411099" data-agent-assigned="claude-code" data-track-id="trk-e7e7b4c2">
+
+        <header>
+            <h1>Ephemeral agent branches for parallel work</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-e7e7b4c2.html" data-relationship="part_of" data-since="2026-03-31T11:51:04.664828">trk-e7e7b4c2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b8c6e384-49e1-4696-b7f8-7f8fd434778e.html" data-relationship="implemented_in" data-since="2026-03-31T13:14:22.106253">session b8c6e384-49e1-4696-b7f8-7f8fd434778e</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-78081efd.html" data-relationship="blocked_by" data-since="2026-03-31T11:51:25.972585">Track worktree — createTrackWorktree replacing createFeatureWorktree</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-feat-4f13a6ee-0" data-agent="claude-code">✅ TDD: Write TestCreateAgentWorktree_BranchesFromTrack, TestCreateAgentWorktree_Cleanup_MergesToTrack</li>
+                <li data-completed="true" data-step-id="step-feat-4f13a6ee-1" data-agent="claude-code">✅ TDD: Write TestCreateAgentWorktree_NamingConvention (trk-{id}/agent-{task})</li>
+                <li data-completed="true" data-step-id="step-feat-4f13a6ee-2" data-agent="claude-code">✅ Implement createAgentWorktree in yolo.go (branches from track branch, not main)</li>
+                <li data-completed="true" data-step-id="step-feat-4f13a6ee-3" data-agent="claude-code">✅ Update execute skill dispatch to use ephemeral agent branches off track</li>
+                <li data-completed="true" data-step-id="step-feat-4f13a6ee-4" data-agent="claude-code">✅ Quality gate: go build &amp;&amp; go vet &amp;&amp; go test</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>
