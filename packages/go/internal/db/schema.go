@@ -309,6 +309,29 @@ func CreateAllTables(db *sql.DB) error {
 			UNIQUE(feature_id, file_path)
 		)`,
 
+		// 13. agent_presence
+		`CREATE TABLE IF NOT EXISTS agent_presence (
+			agent_id TEXT PRIMARY KEY,
+			status TEXT NOT NULL DEFAULT 'offline' CHECK(
+				status IN ('active','idle','offline')
+			),
+			current_feature_id TEXT,
+			last_tool_name TEXT,
+			last_activity DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			total_tools_executed INTEGER DEFAULT 0,
+			total_cost_tokens INTEGER DEFAULT 0,
+			session_id TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (current_feature_id) REFERENCES features(id) ON DELETE SET NULL,
+			FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE SET NULL
+		)`,
+
+		// 14. metadata — key-value store for operational state (e.g. last_indexed_commit)
+		`CREATE TABLE IF NOT EXISTS metadata (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL,
+			updated_at TEXT DEFAULT (datetime('now'))
+		)`,
 	}
 
 	for _, stmt := range stmts {

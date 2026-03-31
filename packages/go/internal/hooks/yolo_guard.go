@@ -26,9 +26,14 @@ func resetYoloModeCache() {
 	})
 }
 
-// isYoloMode checks if the current session is in YOLO mode by reading the
-// .htmlgraph/.launch-mode file. The result is cached per htmlgraphDir for the
-// lifetime of the process (each hook invocation is a new process).
+// isYoloMode determines if the current session is in YOLO mode.
+//
+// Primary source: the CloudEvent permission_mode field, which reflects
+// the live state from Claude Code (syncs with Shift+Tab toggles).
+// "bypassPermissions" = YOLO mode.
+//
+// Fallback: .htmlgraph/.launch-mode file, for backward compatibility with
+// sessions launched via `htmlgraph claude --yolo` before this change.
 func isYoloMode(htmlgraphDir string) bool {
 	if v, ok := yoloModeCache.Load(htmlgraphDir); ok {
 		return v.(bool)
@@ -39,15 +44,30 @@ func isYoloMode(htmlgraphDir string) bool {
 	return result
 }
 
+// isYoloFromEvent checks the CloudEvent permission_mode field first (live
+// state from Claude Code), falling back to the file-based check.
+func isYoloFromEvent(event *CloudEvent, htmlgraphDir string) bool {
+	if event.PermissionMode == "bypassPermissions" {
+		return true
+	}
+	// If Claude Code reports a non-bypass mode, trust it over the stale file.
+	if event.PermissionMode != "" {
+		return false
+	}
+	// Fallback: older Claude Code versions may not send permission_mode.
+	return isYoloMode(htmlgraphDir)
+}
+
 // checkYoloWorkItemGuard blocks Write/Edit tools when no active work item
 // exists in YOLO mode. Returns a non-empty reason to block, or "" to allow.
 //
-// featureID is the session's active_feature_id column (set at session-start).
-// hasInProgressItem is true when a feature or bug with status="in-progress"
-// exists in the DB — this covers items started mid-session via
-// `htmlgraph feature start` / `htmlgraph bug start` which update the features
-// table but do NOT update sessions.active_feature_id.
-func checkYoloWorkItemGuard(toolName, featureID string, yolo, hasInProgressItem bool) string {
+// featureID is the session's active_feature_id column (set at session-start
+// or inherited from a parent session via lineage).
+// sessionID is used for the fallback check: when featureID is empty, we check
+// whether a feature was started mid-session and linked to THIS session — not
+// whether any feature is globally in-progress (which causes false passes when
+// unrelated features exist).
+func checkYoloWorkItemGuard(toolName, featureID string, yolo bool, sessionID string, db *sql.DB) string {
 	if !yolo {
 		return ""
 	}
@@ -56,22 +76,30 @@ func checkYoloWorkItemGuard(toolName, featureID string, yolo, hasInProgressItem 
 	default:
 		return ""
 	}
-	if featureID != "" || hasInProgressItem {
+	if featureID != "" {
+		return ""
+	}
+	// Fallback: check if a feature was started mid-session and linked to this
+	// session via the sessions table or a recent feature start command.
+	if sessionID != "" && db != nil && sessionHasLinkedFeature(db, sessionID) {
 		return ""
 	}
 	return "YOLO mode requires an active work item before writing code. " +
-		"Create or start a feature first: htmlgraph feature create \"title\""
+		"Run: htmlgraph feature start <id>  or  htmlgraph feature create \"title\""
 }
 
-// hasAnyInProgressWorkItem returns true when any feature or bug with
-// status="in-progress" exists in the features table. Used as a fallback when
-// sessions.active_feature_id is empty (e.g. item started mid-session via CLI).
-func hasAnyInProgressWorkItem(database *sql.DB) bool {
-	var count int
-	database.QueryRow(
-		`SELECT COUNT(*) FROM features WHERE status = 'in-progress' LIMIT 1`,
-	).Scan(&count)
-	return count > 0
+// sessionHasLinkedFeature returns true when the given session has a feature
+// linked via sessions.active_feature_id OR when a recent feature-start command
+// updated the session's feature association. This replaces the old global
+// hasAnyInProgressWorkItem check which false-passed when unrelated features
+// were in-progress elsewhere in the project.
+func sessionHasLinkedFeature(db *sql.DB, sessionID string) bool {
+	var featureID sql.NullString
+	db.QueryRow(
+		`SELECT active_feature_id FROM sessions WHERE session_id = ? LIMIT 1`,
+		sessionID,
+	).Scan(&featureID)
+	return featureID.Valid && featureID.String != ""
 }
 
 // featureStartPattern matches htmlgraph feature/bug start commands.
@@ -137,13 +165,17 @@ func checkYoloCommitGuard(event *CloudEvent, yolo, testRan bool) string {
 }
 
 // checkYoloBudgetGuard blocks git commit when the staged diff exceeds
-// YOLO hard limits (20 files or 600 lines added).
+// YOLO hard limits (20 files or 600 lines added). Merge commits are
+// exempt — they combine already-reviewed sub-feature work.
 func checkYoloBudgetGuard(event *CloudEvent, yolo bool) string {
 	if !yolo || event.ToolName != "Bash" {
 		return ""
 	}
 	cmd, _ := event.ToolInput["command"].(string)
 	if !gitCommitPattern.MatchString(cmd) {
+		return ""
+	}
+	if isMergeInProgress() {
 		return ""
 	}
 	out, err := exec.Command("git", "diff", "--cached", "--numstat").Output()
@@ -171,7 +203,20 @@ func checkYoloBudgetGuard(event *CloudEvent, yolo bool) string {
 	return ""
 }
 
+// isMergeInProgress returns true when git is resolving a merge (MERGE_HEAD exists).
+func isMergeInProgress() bool {
+	out, err := exec.Command("git", "rev-parse", "--git-dir").Output()
+	if err != nil {
+		return false
+	}
+	gitDir := strings.TrimSpace(string(out))
+	_, err = os.Stat(filepath.Join(gitDir, "MERGE_HEAD"))
+	return err == nil
+}
+
 // checkYoloWorktreeGuard blocks Write/Edit on main/master branch in YOLO mode.
+// Merge conflict resolution is exempt — edits on main during an active merge
+// are integration work, not feature development.
 func checkYoloWorktreeGuard(toolName, branch string, yolo bool) string {
 	if !yolo {
 		return ""
@@ -182,6 +227,9 @@ func checkYoloWorktreeGuard(toolName, branch string, yolo bool) string {
 		return ""
 	}
 	if branch == "main" || branch == "master" {
+		if isMergeInProgress() {
+			return ""
+		}
 		return "YOLO mode requires a feature branch or worktree. " +
 			"Create one: git worktree add -b feat-xxx .claude/worktrees/xxx main"
 	}

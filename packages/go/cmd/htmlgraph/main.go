@@ -70,6 +70,7 @@ func main() {
 	rootCmd.AddCommand(backfillCmd())
 	rootCmd.AddCommand(reindexCmd())
 	rootCmd.AddCommand(recommendCmd())
+	rootCmd.AddCommand(ciCmd())
 	rootCmd.AddCommand(helpCmd())
 	rootCmd.AddCommand(claimCmd())
 	rootCmd.AddCommand(agentInitCmd())

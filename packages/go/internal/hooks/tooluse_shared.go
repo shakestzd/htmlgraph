@@ -72,7 +72,7 @@ func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext 
 
 	projectDir := ResolveProjectDir(event.CWD)
 	hgDir := filepath.Join(projectDir, ".htmlgraph")
-	yolo := isYoloMode(hgDir)
+	yolo := isYoloFromEvent(event, hgDir)
 	parentEventID := resolveParentEventID(database, sessionID, agentID, isSubagent)
 
 	LogTimed(projectDir, "pretooluse", map[string]string{

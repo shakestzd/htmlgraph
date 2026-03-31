@@ -20,8 +20,9 @@ import (
 // Only the fields HtmlGraph actually uses are decoded; the rest are ignored.
 type CloudEvent struct {
 	// Top-level fields common to all hook types
-	SessionID string `json:"session_id"`
-	CWD       string `json:"cwd"`
+	SessionID      string `json:"session_id"`
+	CWD            string `json:"cwd"`
+	PermissionMode string `json:"permission_mode"` // "default", "plan", "auto", "bypassPermissions"
 
 	// UserPromptSubmit
 	Prompt string `json:"prompt"`

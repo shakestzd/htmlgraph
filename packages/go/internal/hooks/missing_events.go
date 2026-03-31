@@ -134,10 +134,7 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		addTaskStep(database, sessionID, featureID, taskID, subject)
 	}
 
-	// If task metadata includes files, create a claim with write scope.
-	if featureID != "" && taskID != "" {
-		createTaskClaim(database, event, sessionID, featureID, taskID, subject)
-	}
+
 
 	return &HookResult{Continue: true}, nil
 }

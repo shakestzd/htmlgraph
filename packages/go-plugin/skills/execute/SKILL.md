@@ -11,6 +11,21 @@ Use this skill to execute development tasks in parallel using dependency-driven 
 
 ---
 
+## Work Item Attribution (MANDATORY)
+
+Before dispatching any agents, verify attribution is set:
+
+1. **Confirm active feature/track:** `htmlgraph status` — check "In progress" section
+2. **If no active feature:** `htmlgraph feature start <id>` before proceeding
+3. **Each agent prompt MUST include:**
+   - `htmlgraph feature start {feature_id}` as the FIRST command the agent runs
+   - `htmlgraph feature complete {feature_id}` after passing quality gates
+4. **Need help?** Run `htmlgraph help` for available commands
+
+Without attribution, work is invisible to the project graph.
+
+---
+
 ## Core Principle: Dependency-Driven Dispatch Loop
 
 Do NOT execute in manual waves. Instead, run a dispatch loop:
@@ -77,11 +92,15 @@ TaskUpdate(taskId="2", status="in_progress")
 
 ### Task Prompt Template
 
-Each agent receives a self-contained prompt:
+Each agent receives a self-contained prompt with TDD enforcement.
+**The agent MUST write failing tests before any implementation code.**
 
 ```
 ## Task: {task.subject}
 **Feature:** {metadata.feature_id}
+
+## Step 0: Attribution (FIRST — before any code)
+htmlgraph feature start {metadata.feature_id}
 
 ## Goal
 {task.description}
@@ -97,7 +116,20 @@ the orchestrator will resolve merge conflicts after all agents complete:
 ## Do NOT Touch
 {files owned by other concurrent tasks — for awareness only}
 
-## Quality Gate (MANDATORY before commit)
+## Step 1: Write Failing Tests FIRST (TDD — mandatory)
+Before writing ANY implementation code, create test file(s):
+{task.tests — from acceptance criteria in the plan}
+
+After writing tests, verify:
+- Tests COMPILE (no syntax errors)
+- Tests FAIL (implementation doesn't exist yet)
+Run: go test ./... — expect failures, not compilation errors.
+
+## Step 2: Implement Until Tests Pass
+Now write the minimum implementation to make all tests pass.
+Do not add code that isn't covered by a test.
+
+## Step 3: Quality Gate (MANDATORY before commit)
 Go:     (cd packages/go && go build ./... && go vet ./... && go test ./...)
 Python: uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
 
@@ -105,7 +137,10 @@ Python: uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv 
 git add {specific files}
 git commit -m "feat({scope}): {description} ({feature_id})"
 
-Report: files changed, lines added, tests passing.
+## Step 4: Complete Attribution
+htmlgraph feature complete {metadata.feature_id}
+
+Report: files changed, lines added, tests passing, test names.
 ```
 
 ---
@@ -174,25 +209,49 @@ TaskList()
 
 ---
 
-## Step 6: Clean Up
+## Step 6: Review, Merge, and Clean Up
 
-After all tasks complete:
+After all tasks complete, transition from autonomous development to reviewed integration.
+
+### 6a. Code Review (MANDATORY before merge)
+
+Run roborev on the feature branch:
+```bash
+# Review all branch commits
+/htmlgraph:roborev  # or: roborev review-branch
+
+# Address any medium+ severity findings before merging
+# Fix on the feature branch, or acknowledge with justification
+```
+
+### 6b. Merge to Main
+
+```bash
+# Switch to main
+git checkout main
+
+# Merge the feature branch (merge conflict resolution on main is allowed)
+git merge --no-ff <branch> -m "feat: merge <track> — <title>"
+
+# If merge conflicts: resolve them (edits on main during merge are permitted)
+# Then: git add <resolved files> && git commit
+
+# Final quality gate on merged result
+(cd packages/go && go build ./... && go vet ./... && go test ./...)
+```
+
+### 6c. Clean Up
 
 ```bash
 # Remove worktrees
 git worktree list
 git worktree remove .claude/worktrees/agent-XXXX --force
-# ... for each worktree
 
 # Remove branches
 git branch -D worktree-agent-XXXX
-# ... for each branch
 
-# Final quality gate
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+# Or use /htmlgraph:cleanup for automated cleanup
 ```
-
-Or use `/htmlgraph:cleanup` for automated cleanup.
 
 ---
 
