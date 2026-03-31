@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>feat-10991336: Fixed 3 env-leaking test failures. Root cause: HTMLGRAPH_PROJECT_DIR hint file (/var/folders/.../T/htmlgraph-project-dir.hint) contained real project path, causing ResolveProjectDir to return real htmlgraph project instead of test tmpDir. Fix: set t.Setenv(HTMLGRAPH_PROJECT_DIR, projectDir) and t.Setenv(CLAUDE_PROJECT_DIR, &#39;&#39;) in each test. Also cleared CLAUDE_SESSION_ID in TestNoImplementedInEdgeWithoutSession. Files changed: packages/go/cmd/htmlgraph/workitem_test.go, packages/go/internal/hooks/pretooluse_test.go, packages/go/internal/hooks/lifecycle_test.go.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-a8d4904d"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-31T11:41:30.908429"
+             data-updated="2026-03-31T11:41:30.912554" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>feat-10991336: Fixed 3 env-leaking test failures. Root cause: HTMLGRAPH_PROJECT_DIR hint file (/var/folders/.../T/htmlgraph-project-dir.hint) contained real project path, causing ResolveProjectDir to return real htmlgraph project instead of test tmpDir. Fix: set t.Setenv(HTMLGRAPH_PROJECT_DIR, projectDir) and t.Setenv(CLAUDE_PROJECT_DIR, &#39;&#39;) in each test. Also cleared CLAUDE_SESSION_ID in TestNoImplementedInEdgeWithoutSession. Files changed: packages/go/cmd/htmlgraph/workitem_test.go, packages/go/internal/hooks/pretooluse_test.go, packages/go/internal/hooks/lifecycle_test.go.</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>

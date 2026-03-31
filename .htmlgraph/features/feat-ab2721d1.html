@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Single PR per track workflow</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-ab2721d1"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-03-31T11:51:04.724203"
+             data-updated="2026-03-31T13:19:18.375821" data-agent-assigned="claude-code" data-track-id="trk-e7e7b4c2">
+
+        <header>
+            <h1>Single PR per track workflow</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b8c6e384-49e1-4696-b7f8-7f8fd434778e.html" data-relationship="implemented_in" data-since="2026-03-31T13:18:26.291115">session b8c6e384-49e1-4696-b7f8-7f8fd434778e</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-e7e7b4c2.html" data-relationship="part_of" data-since="2026-03-31T11:51:04.725296">trk-e7e7b4c2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-450a814b.html" data-relationship="blocked_by" data-since="2026-03-31T11:51:26.06181">Feature identity via commit prefixes and git tags</a></li>
+                    <li><a href="feat-0fb2ee87.html" data-relationship="blocked_by" data-since="2026-03-31T11:51:26.104348">Yolo guard updates for track branches</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-feat-ab2721d1-0" data-agent="claude-code">✅ TDD: Write TestTrackPRBody_IncludesAllFeatures, TestTrackPRBody_IncludesDiffStat</li>
+                <li data-completed="true" data-step-id="step-feat-ab2721d1-1" data-agent="claude-code">✅ Add htmlgraph track pr command — creates PR from trk-{id} to main with feature summary</li>
+                <li data-completed="true" data-step-id="step-feat-ab2721d1-2" data-agent="claude-code">✅ PR body auto-generates feature list from git log --grep, diff stat from git diff --stat</li>
+                <li data-completed="true" data-step-id="step-feat-ab2721d1-3" data-agent="claude-code">✅ Update execute skill Step 6: use track pr instead of manual gh pr create</li>
+                <li data-completed="true" data-step-id="step-feat-ab2721d1-4" data-agent="claude-code">✅ Quality gate: go build &amp;&amp; go vet &amp;&amp; go test</li>
+            </ol>
+        </section>
+    </article>
+</body>
+</html>

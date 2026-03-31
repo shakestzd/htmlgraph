@@ -1,0 +1,64 @@
+{
+  "name": "htmlgraph-dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.23"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "mounts": [
+    "source=htmlgraph-claude-home,target=/home/vscode/.claude,type=volume",
+    "source=htmlgraph-codex-home,target=/home/vscode/.codex,type=volume",
+    "source=htmlgraph-gemini-home,target=/home/vscode/.gemini,type=volume",
+    "source=htmlgraph-uv-cache,target=/home/vscode/.cache/uv,type=volume"
+  ],
+  "containerEnv": {
+    "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "UV_LINK_MODE": "copy",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}",
+    "GOOGLE_API_KEY": "${localEnv:GOOGLE_API_KEY}",
+    "GOOGLE_CLOUD_PROJECT": "${localEnv:GOOGLE_CLOUD_PROJECT}",
+    "GOOGLE_CLOUD_LOCATION": "${localEnv:GOOGLE_CLOUD_LOCATION}"
+  },
+  "forwardPorts": [
+    8080
+  ],
+  "portsAttributes": {
+    "8080": {
+      "label": "HtmlGraph dashboard",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "go.toolsManagement.autoUpdate": true,
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "golang.Go",
+        "ms-vscode.makefile-tools",
+        "ms-playwright.playwright",
+        "eamodio.gitlens"
+      ]
+    }
+  }
+}

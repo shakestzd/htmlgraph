@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Sonnet-coder: Implemented feat-17f5b68a — derive feature_files from git commits. Files changed: packages/go/cmd/htmlgraph/reindex.go, packages/go/cmd/htmlgraph/reindex_feature_files_test.go, packages/go/internal/hooks/pretooluse.go. Approach: Added reindexFeatureFiles() to reindex.go that queries git_commits for feature-linked commits, runs git diff-tree on each, and upserts into feature_files. Removed hot-path UpsertFeatureFile call &#43; fileToolOperation helper from pretooluse.go. Tests: 5 new tests (PopulatesFromCommit, OperationIsCommit, MissingCommitSkipped, EmptyTable, MultipleFeatures) &#43; TestSanitizePathID. All pass. Committed in 00ac314c alongside feat-3eaff20c timestamp work.</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-6c123656"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-03-31T12:21:35.789775"
+             data-updated="2026-03-31T12:21:35.791096" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Sonnet-coder: Implemented feat-17f5b68a — derive feature_files from git commits. Files changed: packages/go/cmd/htmlgraph/reindex.go, packages/go/cmd/htmlgraph/reindex_feature_files_test.go, packages/go/internal/hooks/pretooluse.go. Approach: Added reindexFeatureFiles() to reindex.go that queries git_commits for feature-linked commits, runs git diff-tree on each, and upserts into feature_files. Removed hot-path UpsertFeatureFile call &#43; fileToolOperation helper from pretooluse.go. Tests: 5 new tests (PopulatesFromCommit, OperationIsCommit, MissingCommitSkipped, EmptyTable, MultipleFeatures) &#43; TestSanitizePathID. All pass. Committed in 00ac314c alongside feat-3eaff20c timestamp work.</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+    </article>
+</body>
+</html>
