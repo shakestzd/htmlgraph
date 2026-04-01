@@ -1,6 +1,6 @@
 # /htmlgraph:deploy
 
-Deploy new version to PyPI using deploy-all.sh script
+Deploy a new HtmlGraph release. Handles quality gates, git push, GitHub Release, marketplace sync, plugin update, and CLI binary rebuild.
 
 ## Usage
 
@@ -10,122 +10,77 @@ Deploy new version to PyPI using deploy-all.sh script
 
 ## Parameters
 
-- `version` (required): Version number (e.g., 0.12.1, 0.13.0, 1.0.0)
-- `skip_confirm` (optional) (default: True): Skip confirmation prompts (recommended for AI agents)
-
+- `version` (required): Semantic version (e.g., 0.42.3, 0.43.0, 1.0.0)
 
 ## Examples
 
-```bash
-/htmlgraph:deploy 0.12.1
 ```
-Deploy patch release (bug fixes)
-
-```bash
-/htmlgraph:deploy 0.13.0
+/htmlgraph:deploy 0.42.3
 ```
-Deploy minor release (new features)
+Patch release (bug fixes)
 
-```bash
-/htmlgraph:deploy 1.0.0
 ```
-Deploy major release (breaking changes)
-
-
+/htmlgraph:deploy 0.43.0
+```
+Minor release (new features)
 
 ## Instructions for Claude
 
-**CRITICAL: This command deploys to production PyPI.**
+### Pre-deployment
 
-### Implementation:
-
-**PRE-DEPLOYMENT CHECKLIST:**
-
-1. ✅ **Verify version consistency:**
+1. Ensure all source changes are committed:
    ```bash
-   ./scripts/verify-versions.sh
+   git status --porcelain -- cmd/ internal/ go.mod plugin/
    ```
-   All version files must match before deployment.
+   If there are uncommitted changes, commit them first (ask the user for a commit message if unclear).
 
-2. ✅ **Verify tests pass:**
+2. Run quality gates:
    ```bash
-   uv run pytest
+   go build ./... && go vet ./... && go test ./...
    ```
-   ALL tests must pass before deployment.
+   ALL must pass. Fix any failures before proceeding.
 
-3. ✅ **Verify all work is committed:**
-   ```bash
-   git status
-   ```
-   Working directory should be clean.
+### Deployment
 
-4. ✅ **Choose correct version number:**
-   - Patch (X.Y.Z+1): Bug fixes only
-   - Minor (X.Y+1.0): New features (backward compatible)
-   - Major (X+1.0.0): Breaking changes
+Run the deploy script from the project root:
+```bash
+./scripts/deploy-all.sh {version} --no-confirm
+```
 
-**DEPLOYMENT STEPS:**
+The script handles everything:
+- Version bump in plugin.json
+- Git commit, tag, push
+- GitHub Actions triggers GoReleaser (cross-platform binaries)
+- Marketplace clone pull
+- `claude plugin update htmlgraph@htmlgraph`
+- CLI binary rebuild via `plugin/build.sh`
 
-1. **Execute the deployment script:**
-   ```bash
-   ./scripts/deploy-all.sh {version} --no-confirm
-   ```
+### Post-deployment verification
 
-2. **The script will:**
-   - Update version numbers in all files (Step 0)
-   - Commit version changes automatically
-   - Push to git (Step 1)
-   - Build package (Step 2)
-   - Publish to PyPI (Step 3)
-   - Install locally (Step 4)
-   - Update Claude plugin (Step 5)
-   - Update Gemini extension (Step 6)
-   - Update Codex skill if present (Step 7)
+```bash
+# Check CI pipelines
+gh run list --workflow=ci.yml --limit 1
+gh run list --workflow=release-go.yml --limit 1
 
-3. **Monitor output for errors:**
-   - Watch for "❌" or "⚠️" symbols
-   - Check PyPI publish succeeded
-   - Verify local install completed
+# Verify installed versions match
+grep '"version"' plugin/.claude-plugin/plugin.json
+cat ~/.local/share/htmlgraph/.binary-version
+```
 
-4. **Verify deployment:**
-   ```bash
-   # Check PyPI (may take 5-10 seconds for CDN)
-   curl -s https://pypi.org/pypi/htmlgraph/json | python3 -c "import sys, json; print(json.load(sys.stdin)['info']['version'])"
+### If deployment fails
 
-   # Check local install
-   htmlgraph version
-   ```
+- **Quality gate failure**: Fix the issue, re-run
+- **Git push failure**: Check branch is main, no upstream conflicts
+- **Plugin update failure**: Manually pull marketplace clone and retry:
+  ```bash
+  (cd ~/.claude/plugins/marketplaces/htmlgraph && git pull origin main)
+  claude plugin update htmlgraph@htmlgraph
+  ```
+- **Build failure**: Run `sh plugin/build.sh` directly
 
-5. **Report completion:**
-   Use the output template to summarize the deployment
+### Rules
 
-**IF DEPLOYMENT FAILS:**
-- Check error messages in script output
-- Verify PyPI credentials in .env file
-- Check network connectivity
-- Contact user if manual intervention needed
-
-**NEVER:**
-- ❌ Deploy without running tests
-- ❌ Deploy with uncommitted changes
-- ❌ Deploy without understanding the changes
-- ❌ Skip the --no-confirm flag (causes interactive prompts)
-
-**ALWAYS:**
-- ✅ Run full test suite first
-- ✅ Verify version number is correct
-- ✅ Check deployment succeeded before reporting
-- ✅ Include PyPI link in success message
-
-### Output Format:
-
-🚀 **Deployment Complete: v{version}**
-
-✅ Git: Pushed to origin/main
-✅ PyPI: https://pypi.org/project/htmlgraph/{version}/
-✅ Local: Installed version {version}
-✅ Plugins: Updated
-
-**Verify:**
-- PyPI: https://pypi.org/project/htmlgraph/{version}/
-- Local: `htmlgraph version`
+- NEVER deploy without passing quality gates
+- NEVER skip `--no-confirm` (causes interactive prompts that block automation)
+- ALWAYS verify post-deployment that CLI and plugin versions match
+- Patch (X.Y.Z+1) for bug fixes, Minor (X.Y+1.0) for features, Major (X+1.0.0) for breaking changes
