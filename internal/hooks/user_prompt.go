@@ -57,7 +57,7 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	if err := db.InsertEvent(database, ev); err != nil {
-		debugLog(ResolveProjectDir(event.CWD), "[error] handler=user-prompt session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
+		debugLog(ResolveProjectDir(event.CWD, event.SessionID), "[error] handler=user-prompt session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 
 	// Update session last_user_query fields.
@@ -100,7 +100,7 @@ func ensureSessionExists(database *sql.DB, sessionID string, event *CloudEvent) 
 	_, _ = database.Exec(`
 		INSERT OR IGNORE INTO sessions (session_id, agent_assigned, status, created_at, project_dir)
 		VALUES (?, 'claude-code', 'active', ?, ?)`,
-		sessionID, now, ResolveProjectDir(event.CWD))
+		sessionID, now, ResolveProjectDir(event.CWD, event.SessionID))
 }
 
 // updateLastQuery refreshes last_user_query_at and last_user_query on the session.

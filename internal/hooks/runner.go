@@ -114,10 +114,12 @@ func Empty() error {
 // ResolveProjectDir finds the project directory containing .htmlgraph/.
 // Delegates to paths.ResolveProjectDir with the CloudEvent CWD and a
 // walk-up limit of defaultProjectDirWalkLevels (matching the previous hook behaviour).
-func ResolveProjectDir(cwd string) string {
+// sessionID enables session-scoped hint lookup; pass "" when no event is available.
+func ResolveProjectDir(cwd, sessionID string) string {
 	dir, _ := paths.ResolveProjectDir(paths.ProjectDirOptions{
 		EventCWD:   cwd,
 		WalkLevels: defaultProjectDirWalkLevels,
+		SessionID:  sessionID,
 	})
 	return dir
 }
@@ -178,7 +180,7 @@ func EnvSessionID(eventSessionID string) string {
 	}
 	// Last resort: .active-session file.
 	cwd, _ := os.Getwd()
-	projectDir := ResolveProjectDir(cwd)
+	projectDir := ResolveProjectDir(cwd, "")
 	if projectDir != "" {
 		if as := readActiveSession(projectDir); as != nil && as.SessionID != "" {
 			return as.SessionID

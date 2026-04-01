@@ -63,6 +63,11 @@ func runServer(port int) error {
 	mux.Handle("/api/features/detail", corsMiddleware(featureDetailHandler(htmlgraphDir)))
 	mux.Handle("/api/features/related", corsMiddleware(relatedFeaturesHandler(database)))
 
+	// CRISPI plan routes — list route must precede the per-plan catch-all.
+	mux.Handle("/api/plans", corsMiddleware(plansListHandler(htmlgraphDir, database)))
+	mux.Handle("/plans/", corsMiddleware(planFileHandler(htmlgraphDir)))
+	mux.Handle("/api/plans/", corsMiddleware(planRouter(database, htmlgraphDir)))
+
 	// .htmlgraph/ files accessible under /htmlgraph/
 	mux.Handle("/htmlgraph/", corsMiddleware(
 		http.StripPrefix("/htmlgraph/", http.FileServer(http.Dir(htmlgraphDir))),
@@ -73,7 +78,6 @@ func runServer(port int) error {
 
 	addr := fmt.Sprintf("localhost:%d", port)
 	fmt.Printf("HtmlGraph Dashboard:  http://%s/\n", addr)
-	fmt.Printf("Graph Viewer:         http://%s/graph-viewer.html\n", addr)
 	fmt.Printf("API Stats:            http://%s/api/stats\n", addr)
 	fmt.Printf("SSE Stream:           http://%s/api/events/stream\n", addr)
 	fmt.Println("Press Ctrl+C to stop.")

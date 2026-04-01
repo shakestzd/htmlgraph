@@ -1,0 +1,262 @@
+package db_test
+
+import (
+	"database/sql"
+	"testing"
+
+	"github.com/shakestzd/htmlgraph/internal/db"
+)
+
+// setupPlanDB returns an in-memory database with a test plan feature row.
+func setupPlanDB(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+	database := setupTestDB(t)
+	planID := "plan-test-001"
+	_, err := database.Exec(
+		`INSERT INTO features (id, type, title, status) VALUES (?, 'plan', 'Test Plan', 'in-progress')`,
+		planID,
+	)
+	if err != nil {
+		t.Fatalf("insert test plan: %v", err)
+	}
+	return database, planID
+}
+
+func TestStorePlanFeedback(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	if err := db.StorePlanFeedback(database, planID, "design", "approve", "true", ""); err != nil {
+		t.Fatalf("StorePlanFeedback: %v", err)
+	}
+
+	entries, err := db.GetPlanFeedback(database, planID)
+	if err != nil {
+		t.Fatalf("GetPlanFeedback: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+
+	got := entries[0]
+	if got.PlanID != planID {
+		t.Errorf("PlanID: got %q, want %q", got.PlanID, planID)
+	}
+	if got.Section != "design" {
+		t.Errorf("Section: got %q, want %q", got.Section, "design")
+	}
+	if got.Action != "approve" {
+		t.Errorf("Action: got %q, want %q", got.Action, "approve")
+	}
+	if got.Value != "true" {
+		t.Errorf("Value: got %q, want %q", got.Value, "true")
+	}
+}
+
+func TestStorePlanFeedbackUpsert(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	// Store initial answer.
+	if err := db.StorePlanFeedback(database, planID, "design", "answer", "option-a", "delivery-mode"); err != nil {
+		t.Fatalf("first StorePlanFeedback: %v", err)
+	}
+
+	// Re-submit with a different value — should update, not duplicate.
+	if err := db.StorePlanFeedback(database, planID, "design", "answer", "option-b", "delivery-mode"); err != nil {
+		t.Fatalf("second StorePlanFeedback: %v", err)
+	}
+
+	entries, err := db.GetPlanFeedback(database, planID)
+	if err != nil {
+		t.Fatalf("GetPlanFeedback: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry after upsert, got %d", len(entries))
+	}
+	if entries[0].Value != "option-b" {
+		t.Errorf("upsert value: got %q, want %q", entries[0].Value, "option-b")
+	}
+}
+
+func TestStorePlanFeedbackComment(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	if err := db.StorePlanFeedback(database, planID, "outline", "comment", "please expand section 2", ""); err != nil {
+		t.Fatalf("StorePlanFeedback comment: %v", err)
+	}
+
+	entries, err := db.GetPlanFeedback(database, planID)
+	if err != nil {
+		t.Fatalf("GetPlanFeedback: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Action != "comment" {
+		t.Errorf("Action: got %q, want comment", entries[0].Action)
+	}
+}
+
+func TestGetPlanFeedbackBySection(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	if err := db.StorePlanFeedback(database, planID, "design", "approve", "true", ""); err != nil {
+		t.Fatalf("StorePlanFeedback design: %v", err)
+	}
+	if err := db.StorePlanFeedback(database, planID, "outline", "approve", "true", ""); err != nil {
+		t.Fatalf("StorePlanFeedback outline: %v", err)
+	}
+	if err := db.StorePlanFeedback(database, planID, "design", "comment", "looks good", ""); err != nil {
+		t.Fatalf("StorePlanFeedback design comment: %v", err)
+	}
+
+	designEntries, err := db.GetPlanFeedbackBySection(database, planID, "design")
+	if err != nil {
+		t.Fatalf("GetPlanFeedbackBySection: %v", err)
+	}
+	if len(designEntries) != 2 {
+		t.Errorf("design section: got %d entries, want 2", len(designEntries))
+	}
+	for _, e := range designEntries {
+		if e.Section != "design" {
+			t.Errorf("expected section 'design', got %q", e.Section)
+		}
+	}
+
+	outlineEntries, err := db.GetPlanFeedbackBySection(database, planID, "outline")
+	if err != nil {
+		t.Fatalf("GetPlanFeedbackBySection outline: %v", err)
+	}
+	if len(outlineEntries) != 1 {
+		t.Errorf("outline section: got %d entries, want 1", len(outlineEntries))
+	}
+}
+
+func TestIsPlanFullyApproved_NotYet(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	// No feedback at all — not approved.
+	approved, err := db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved (no feedback): %v", err)
+	}
+	if approved {
+		t.Error("expected false with no feedback")
+	}
+
+	// One section approved, another has a disapproval — not fully approved.
+	if err := db.StorePlanFeedback(database, planID, "design", "approve", "true", ""); err != nil {
+		t.Fatalf("StorePlanFeedback: %v", err)
+	}
+	if err := db.StorePlanFeedback(database, planID, "outline", "approve", "false", ""); err != nil {
+		t.Fatalf("StorePlanFeedback: %v", err)
+	}
+
+	approved, err = db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved (partial): %v", err)
+	}
+	if approved {
+		t.Error("expected false when one section is disapproved")
+	}
+}
+
+func TestIsPlanFullyApproved_True(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	sections := []string{"design", "outline", "slice-1", "slice-2"}
+	for _, s := range sections {
+		if err := db.StorePlanFeedback(database, planID, s, "approve", "true", ""); err != nil {
+			t.Fatalf("StorePlanFeedback %s: %v", s, err)
+		}
+	}
+
+	approved, err := db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved: %v", err)
+	}
+	if !approved {
+		t.Error("expected true when all sections approved")
+	}
+}
+
+func TestIsPlanFullyApproved_WithNonApproveActions(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	// Approve one section and add comments — comments should not block approval.
+	if err := db.StorePlanFeedback(database, planID, "design", "approve", "true", ""); err != nil {
+		t.Fatalf("StorePlanFeedback approve: %v", err)
+	}
+	if err := db.StorePlanFeedback(database, planID, "design", "comment", "minor note", ""); err != nil {
+		t.Fatalf("StorePlanFeedback comment: %v", err)
+	}
+
+	approved, err := db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved: %v", err)
+	}
+	if !approved {
+		t.Error("expected true: comments should not block approval")
+	}
+}
+
+func TestFinalizePlan(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	if err := db.FinalizePlan(database, planID); err != nil {
+		t.Fatalf("FinalizePlan: %v", err)
+	}
+
+	// Verify status updated in features table.
+	var status string
+	if err := database.QueryRow(`SELECT status FROM features WHERE id = ?`, planID).Scan(&status); err != nil {
+		t.Fatalf("query status: %v", err)
+	}
+	if status != "done" {
+		t.Errorf("status: got %q, want done", status)
+	}
+}
+
+func TestFinalizePlanNotFound(t *testing.T) {
+	database, _ := setupPlanDB(t)
+	defer database.Close()
+
+	// Finalizing a non-existent plan succeeds gracefully (best-effort).
+	// HTML is canonical — plans can exist as files without being indexed.
+	err := db.FinalizePlan(database, "plan-does-not-exist")
+	if err != nil {
+		t.Errorf("expected graceful success for non-existent plan, got: %v", err)
+	}
+}
+
+func TestFinalizePlanWrongType(t *testing.T) {
+	database, _ := setupPlanDB(t)
+	defer database.Close()
+
+	// Insert a feature (not a plan) and try to finalize it.
+	// Should succeed gracefully — the UPDATE won't match type='plan'.
+	_, err := database.Exec(
+		`INSERT INTO features (id, type, title, status) VALUES ('feat-not-plan', 'feature', 'Not a Plan', 'in-progress')`,
+	)
+	if err != nil {
+		t.Fatalf("insert feature: %v", err)
+	}
+
+	if err := db.FinalizePlan(database, "feat-not-plan"); err != nil {
+		t.Errorf("expected graceful success, got: %v", err)
+	}
+
+	// Verify the feature status was NOT changed (only type='plan' updates).
+	var status string
+	database.QueryRow(`SELECT status FROM features WHERE id = 'feat-not-plan'`).Scan(&status)
+	if status != "in-progress" {
+		t.Errorf("feature status changed unexpectedly: got %q, want in-progress", status)
+	}
+}

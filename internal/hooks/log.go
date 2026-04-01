@@ -96,7 +96,7 @@ func LogTimed(projectDir, handler string, fields map[string]string, start time.T
 // resolveLogDir finds the project directory for logging by checking env then CWD walk-up.
 func resolveLogDir() string {
 	cwd, _ := os.Getwd()
-	return ResolveProjectDir(cwd)
+	return ResolveProjectDir(cwd, "")
 }
 
 // MinSessionLen returns min(8, len(s)) for safe session ID truncation in log messages.

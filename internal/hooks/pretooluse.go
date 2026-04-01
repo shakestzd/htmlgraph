@@ -310,7 +310,7 @@ func checkProjectDivergence(event *CloudEvent, database *sql.DB, sessionID strin
 		return nil
 	}
 
-	eventProjectDir := ResolveProjectDir(event.CWD)
+	eventProjectDir := ResolveProjectDir(event.CWD, event.SessionID)
 	sessionProjectDir := sess.ProjectDir
 
 	if eventProjectDir == sessionProjectDir {

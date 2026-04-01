@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
 // SessionEnd handles the SessionEnd Claude Code hook event.
@@ -53,6 +54,9 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 	} else if released > 0 {
 		debugLog(projectDir, "[htmlgraph] session-end: released %d claims for session %s", released, sessionID[:minLen(sessionID, 8)])
 	}
+
+	// Clean up the session-scoped project dir hint file now that this session is ending.
+	paths.CleanupSessionHint(sessionID)
 
 	return &HookResult{Continue: true}, nil
 }

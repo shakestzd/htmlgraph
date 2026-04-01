@@ -332,6 +332,19 @@ func CreateAllTables(db *sql.DB) error {
 			value TEXT NOT NULL,
 			updated_at TEXT DEFAULT (datetime('now'))
 		)`,
+
+		// 15. plan_feedback — structured feedback from CRISPI plan review
+		`CREATE TABLE IF NOT EXISTS plan_feedback (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			plan_id TEXT NOT NULL,
+			section TEXT NOT NULL,
+			action TEXT NOT NULL,
+			value TEXT,
+			question_id TEXT NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(plan_id, section, action, question_id)
+		)`,
 	}
 
 	for _, stmt := range stmts {
@@ -401,6 +414,9 @@ func CreateAllIndexes(db *sql.DB) error {
 		// feature_files
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_feature ON feature_files(feature_id)",
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_path ON feature_files(file_path)",
+		// plan_feedback
+		"CREATE INDEX IF NOT EXISTS idx_plan_feedback_plan_id ON plan_feedback(plan_id)",
+		"CREATE INDEX IF NOT EXISTS idx_plan_feedback_section ON plan_feedback(plan_id, section)",
 	}
 
 	for _, idx := range indexes {

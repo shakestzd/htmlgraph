@@ -5,17 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="htmlgraph-version" content="1.0">
 <title>Plan: Webhook Support</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/go.min.js"></script>
 <style>
 :root {
   --bg:#151518; --bg-card:#1c1c20; --bg-input:#252528; --bg-hover:#2a2a2f;
   --text:#e0ded8; --text-dim:#a0a0a0; --text-muted:#707070; --border:#333338;
   --accent:#cdff00; --accent-dim:rgba(205,255,0,.15);
   --approved:#16a34a; --revision:#f59e0b; --discuss:#8b5cf6; --pending:#6b7280; --blocked:#dc2626;
-  --radius:6px; --mono:ui-monospace,'SF Mono','Cascadia Code',monospace; --sans:system-ui,-apple-system,sans-serif;
+  --radius:6px; --mono:'JetBrains Mono',ui-monospace,'SF Mono','Cascadia Code',monospace; --sans:'JetBrains Mono',system-ui,-apple-system,sans-serif;
 }
+[data-theme="light"] {
+  --bg: #F5F5F0;
+  --bg-card: #FFFFFF;
+  --bg-input: #EEEEE8;
+  --bg-hover: #E8E8E2;
+  --text: #1A1A1A;
+  --text-dim: #555555;
+  --text-muted: #888888;
+  --border: #D0D0C8;
+  --accent: #5A7A00;
+  --accent-dim: rgba(90, 122, 0, 0.12);
+}
+[data-theme="light"] .badge-approved { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); }
+[data-theme="light"] .badge-revision { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); }
+[data-theme="light"] .badge-discuss  { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.25); }
+[data-theme="light"] .badge-pending  { background: rgba(107,114,128,0.1); border-color: rgba(107,114,128,0.25); }
+[data-theme="light"] .badge-blocked  { background: rgba(220,38,38,0.1); border-color: rgba(220,38,38,0.25); }
+[data-theme="light"] .btn-finalize { background: #5A7A00; color: #FFFFFF; }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.55;max-width:960px;margin:0 auto;padding:24px 20px 64px}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.55;margin:0;padding:0;display:grid;grid-template-columns:180px 1fr;min-height:100vh}
+.plan-sidebar{background:var(--bg-card);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.plan-sidebar .brand{padding:12px 16px 16px;font-weight:700;font-size:1rem;color:var(--accent);text-decoration:none;display:block;border-bottom:1px solid var(--border);margin-bottom:4px}
+.plan-sidebar a.nav-link{display:flex;align-items:center;gap:8px;padding:8px 16px;color:var(--text-dim);text-decoration:none;font-size:0.85rem;border-radius:0}
+.plan-sidebar a.nav-link:hover{background:var(--bg-hover);color:var(--text)}
+.plan-sidebar a.nav-link.active{background:var(--accent-dim);color:var(--accent);font-weight:600}
+.plan-content{max-width:960px;padding:24px 20px 64px}
 h1{font-size:1.5rem;font-weight:700;color:var(--accent);margin-bottom:4px}
 h2{font-size:1.1rem;font-weight:600}
 h3{font-size:.85rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
@@ -93,6 +124,14 @@ textarea::placeholder{color:var(--text-muted)}
 </head>
 <body>
 
+<nav class="plan-sidebar">
+  <a href="/" class="brand">HtmlGraph</a>
+  <a href="/#activity" class="nav-link">Activity</a>
+  <a href="/#sessions" class="nav-link">Sessions</a>
+  <a href="/#work" class="nav-link">Work</a>
+  <a href="/#plans" class="nav-link active">Plans</a>
+</nav>
+<div class="plan-content">
 <article data-plan-id="plan-webhook-support" data-feature-id="feat-xxx" data-status="draft">
 
 <!-- Plan Header -->
@@ -104,6 +143,9 @@ textarea::placeholder{color:var(--text-muted)}
     <span style="font-size:.75rem;color:var(--text-muted)">4 slices &middot; 6 files &middot; Created 2026-04-01</span>
   </div>
 </header>
+<button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
+  &#9728; Light
+</button>
 
 <!-- ZONE 1: Dependency Graph -->
 <section class="dep-graph" data-zone="dependency-graph">
@@ -170,7 +212,7 @@ textarea::placeholder{color:var(--text-muted)}
   <summary><span>B. Structure Outline</span><span class="badge badge-pending" data-badge-for="outline">Pending</span></summary>
   <div class="section-body">
     <h4>Type Definitions &amp; Function Signatures</h4>
-    <pre><code>// internal/webhook/config.go
+    <pre><code class="language-go">// internal/webhook/config.go
 
 type WebhookConfig struct {
     URL     string   `json:"url"`
@@ -183,7 +225,7 @@ func Register(cfg WebhookConfig) error
 func Unregister(url string) error
 func LoadConfig(path string) ([]WebhookConfig, error)
 func SaveConfig(path string, cfgs []WebhookConfig) error</code></pre>
-    <pre><code>// internal/webhook/dispatch.go
+    <pre><code class="language-go">// internal/webhook/dispatch.go
 
 type DeliveryResult struct {
     URL        string
@@ -278,8 +320,50 @@ func Dispatch(ctx context.Context, event Event) []DeliveryResult</code></pre>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
 <script>
+// Theme toggle
+(function(){
+  var themeBtn = document.getElementById('themeToggle');
+  var html = document.documentElement;
+
+  // Check for saved preference or system preference
+  var saved = localStorage.getItem('crispi-theme');
+  function syncHljsTheme(theme) {
+    var dark = document.getElementById('hljs-dark');
+    var light = document.getElementById('hljs-light');
+    if (theme === 'light') {
+      dark.disabled = true; light.disabled = false;
+    } else {
+      dark.disabled = false; light.disabled = true;
+    }
+  }
+
+  if (saved) {
+    html.dataset.theme = saved;
+    themeBtn.textContent = saved === 'light' ? '\u263E Dark' : '\u2600 Light';
+    syncHljsTheme(saved);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    html.dataset.theme = 'light';
+    themeBtn.textContent = '\u263E Dark';
+    syncHljsTheme('light');
+  }
+
+  themeBtn.addEventListener('click', function() {
+    var current = html.dataset.theme || 'dark';
+    var next = current === 'dark' ? 'light' : 'dark';
+    html.dataset.theme = next;
+    localStorage.setItem('crispi-theme', next);
+    themeBtn.textContent = next === 'light' ? '\u263E Dark' : '\u2600 Light';
+    syncHljsTheme(next);
+  });
+
+  // Syntax highlighting
+  hljs.highlightAll();
+})();
+
 (function(){
   'use strict';
+  var article=document.querySelector('article[data-plan-id]');
+  var planId=article?article.dataset.planId:null;
   var SECTIONS=['design','outline','slice-1','slice-2','slice-3','slice-4'];
 
   function setBadge(el,ok){
@@ -311,6 +395,13 @@ func Dispatch(ctx context.Context, event Event) []DeliveryResult</code></pre>
         if(sd) sd.dataset.status=allOk?'approved':'pending';
       }
       updateProgress();
+      if(planId){
+        fetch('/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:sec,action:'approve',value:String(this.checked),question_id:''})
+        });
+      }
     });
   });
 
@@ -334,8 +425,34 @@ func Dispatch(ctx context.Context, event Event) []DeliveryResult</code></pre>
       if(headerBadge) setBadge(headerBadge,allAnswered);
       var details=document.querySelector('[data-phase="questions"]');
       if(details) details.dataset.status=allAnswered?'approved':'pending';
+      if(planId){
+        fetch('/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:'questions',action:'answer',value:this.value,question_id:this.dataset.question})
+        });
+      }
     });
   });
+
+  // Fire initial status for pre-selected radio defaults
+  document.querySelectorAll('input[type="radio"][data-question]:checked').forEach(function(r){
+    var row=document.querySelector('[data-recap-for="'+r.dataset.question+'"]');
+    if(row){
+      var badge=row.querySelector('.badge');
+      if(badge) setBadge(badge,true);
+    }
+  });
+  // Check if all questions start answered
+  var allRows=document.querySelectorAll('[data-recap-for]');
+  var allAnswered=Array.prototype.every.call(allRows,function(r){
+    var b=r.querySelector('.badge');
+    return b&&b.className.indexOf('badge-approved')>=0;
+  });
+  var qBadge=document.querySelector('[data-badge-for="questions"]');
+  if(qBadge) setBadge(qBadge,allAnswered);
+  var qDetails=document.querySelector('[data-phase="questions"]');
+  if(qDetails) qDetails.dataset.status=allAnswered?'approved':'pending';
 
   function updateProgress(){
     var approved=0;
@@ -362,13 +479,80 @@ func Dispatch(ctx context.Context, event Event) []DeliveryResult</code></pre>
   var timer;
   document.querySelectorAll('textarea[data-section]').forEach(function(ta){
     ta.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(updateComments,400)});
+    ta.addEventListener('blur',function(){
+      if(planId&&this.value.trim()){
+        fetch('/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:this.dataset.section,action:'comment',value:this.value.trim(),question_id:''})
+        });
+      }
+    });
   });
 
   document.getElementById('finalizeBtn').addEventListener('click',function(){
-    var a=document.querySelector('article[data-plan-id]');
-    if(a) a.dataset.status='finalized';
-    this.textContent='Plan Finalized';this.disabled=true;this.style.background='var(--approved)';
+    if(!planId){return;}
+    var btn=this;
+    btn.disabled=true;
+    btn.textContent='Finalizing...';
+    fetch('/api/plans/'+planId+'/finalize',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'}
+    })
+    .then(function(r){
+      if(r.ok){
+        article.dataset.status='finalized';
+        btn.textContent='Plan Finalized';
+        btn.style.background='var(--approved)';
+      } else {
+        return r.json().then(function(data){
+          btn.textContent='Finalize Plan';
+          btn.disabled=false;
+          alert('Cannot finalize: '+(data.error||'Not all sections approved'));
+        });
+      }
+    })
+    .catch(function(){
+      btn.textContent='Finalize Plan';
+      btn.disabled=false;
+      alert('Server not running. Start with: htmlgraph serve');
+    });
   });
+
+  function loadExistingFeedback(){
+    if(!planId){return;}
+    fetch('/api/plans/'+planId+'/feedback')
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(data){
+        if(!data){return;}
+        if(data.sections){
+          Object.keys(data.sections).forEach(function(sec){
+            var info=data.sections[sec];
+            if(info.approved){
+              var cb=document.querySelector('input[data-section="'+sec+'"][data-action="approve"]');
+              if(cb&&!cb.checked){cb.checked=true;cb.dispatchEvent(new Event('change'));}
+            }
+            if(info.comment){
+              var ta=document.querySelector('textarea[data-section="'+sec+'"]');
+              if(ta) ta.value=info.comment;
+            }
+          });
+        }
+        if(data.questions){
+          Object.keys(data.questions).forEach(function(qid){
+            var val=data.questions[qid];
+            var radio=document.querySelector('input[type="radio"][data-question="'+qid+'"][value="'+val+'"]');
+            if(radio&&!radio.checked){radio.checked=true;radio.dispatchEvent(new Event('change'));}
+          });
+        }
+        updateProgress();
+      })
+      .catch(function(){
+        // Server not running — work offline
+      });
+  }
+
+  loadExistingFeedback();
 
   // Approval checkbox: also re-style the dagre node border
   document.querySelectorAll('input[data-action="approve"]').forEach(function(cb){
@@ -408,7 +592,8 @@ func Dispatch(ctx context.Context, event Event) []DeliveryResult</code></pre>
         label: name+'\n'+files+' files',
         rx: 6,
         ry: 6,
-        padding: 12,
+        paddingX: 36,
+        paddingY: 16,
         status: status
       });
     });
@@ -463,5 +648,6 @@ func Dispatch(ctx context.Context, event Event) []DeliveryResult</code></pre>
   }
 })();
 </script>
+</div><!-- .plan-content -->
 </body>
 </html>

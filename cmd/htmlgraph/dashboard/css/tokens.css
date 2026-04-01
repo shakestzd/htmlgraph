@@ -24,7 +24,7 @@
   --warning: #f59e0b;
   --radius: 6px;
   --radius-sm: 4px;
-  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'JetBrains Mono', ui-monospace, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
 }
 

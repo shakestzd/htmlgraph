@@ -151,18 +151,18 @@ func claimTraceparent() *agentTraceRecord {
 // the subagent's hooks know their parent delegation, agent identity, and
 // Agent Trace contributor classification.
 // When CLAUDE_ENV_FILE is unset (worktree subagents), falls back to a
-// temp-file hint so the subagent's hook processes can still resolve the
-// project directory via paths.ReadProjectDirHint.
-func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir string) {
+// session-scoped temp-file hint so the subagent's hook processes can still
+// resolve the project directory via paths.ReadSessionHint.
+func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir, sessionID string) {
 	envFile := os.Getenv("CLAUDE_ENV_FILE")
 	if envFile == "" {
 		// CLAUDE_ENV_FILE is unset in worktree subagents. Parent linkage is
 		// handled by the traceparent queue (writeTraceparent is called by the
 		// SubagentStart handler before this function). Write the project dir
-		// to a well-known temp file so downstream hook processes can still
+		// to a session-scoped temp file so downstream hook processes can still
 		// resolve .htmlgraph/ when their EventCWD is a temp directory.
-		debugLog(projectDir, "[htmlgraph] CLAUDE_ENV_FILE unset — writing project dir hint to temp file (agent=%s)", agentType)
-		writeProjectDirHint(projectDir)
+		debugLog(projectDir, "[htmlgraph] CLAUDE_ENV_FILE unset — writing session-scoped project dir hint (agent=%s session=%s)", agentType, sessionID)
+		writeSessionProjectDirHint(sessionID, projectDir)
 		return
 	}
 	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -184,14 +184,11 @@ func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir string) 
 	f.WriteString(lines)
 }
 
-// writeProjectDirHint persists projectDir to the temp hint file so that
-// future hook processes (running in subagent temp dirs) can read it via
-// paths.ReadProjectDirHint when HTMLGRAPH_PROJECT_DIR is not in their env.
-func writeProjectDirHint(projectDir string) {
-	if projectDir == "" {
-		return
-	}
-	_ = os.WriteFile(paths.ProjectDirHintPath(), []byte(projectDir), 0o644)
+// writeSessionProjectDirHint persists projectDir to a session-scoped temp file
+// so that future hook processes (running in subagent temp dirs) can read it via
+// paths.ReadSessionHint when HTMLGRAPH_PROJECT_DIR is not in their env.
+func writeSessionProjectDirHint(sessionID, projectDir string) {
+	paths.WriteSessionHint(sessionID, projectDir)
 }
 
 // ApplyTraceparent reads a traceparent from the queue and exports env vars

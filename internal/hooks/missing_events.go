@@ -44,7 +44,7 @@ func recordSimpleEvent(
 	}
 
 	if err := db.InsertEvent(database, ev); err != nil {
-		projectDir := ResolveProjectDir(event.CWD)
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 		debugLog(projectDir, "[error] handler=%s session=%s: insert event: %v", toolName, sessionID[:minSessionLen(sessionID)], err)
 	}
 
@@ -125,7 +125,7 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	if err := db.InsertEvent(database, ev); err != nil {
-		projectDir := ResolveProjectDir(event.CWD)
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 		debugLog(projectDir, "[error] handler=TaskCreated session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 
@@ -177,7 +177,7 @@ func TaskCompleted(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	if err := db.InsertEvent(database, ev); err != nil {
-		projectDir := ResolveProjectDir(event.CWD)
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 		debugLog(projectDir, "[error] handler=TaskCompleted session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 
@@ -233,7 +233,7 @@ func WorktreeRemove(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	// Inject guidance so the agent can complete post-worktree steps.
 	// The worktree directory no longer exists — any Bash command using the
 	// old CWD will fail. Tell the agent to switch to the project root.
-	projectRoot := ResolveProjectDir(event.CWD)
+	projectRoot := ResolveProjectDir(event.CWD, event.SessionID)
 	if projectRoot != "" {
 		result.AdditionalContext = fmt.Sprintf(
 			"WORKTREE REMOVED: Your working directory (%s) no longer exists. "+
@@ -278,7 +278,7 @@ func PostToolUseFailure(event *CloudEvent, database *sql.DB) (*HookResult, error
 	}
 
 	if err := db.InsertEvent(database, ev); err != nil {
-		projectDir := ResolveProjectDir(event.CWD)
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 		debugLog(projectDir, "[error] handler=posttooluse-failure session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 

@@ -26,6 +26,10 @@ type ProjectDirOptions struct {
 	// WalkLevels is the maximum number of parent directories to traverse
 	// during the CWD walk-up phase.  0 means "no limit" (walk to root).
 	WalkLevels int
+
+	// SessionID enables session-scoped hint lookup when set (hook context).
+	// CLI callers leave this empty and skip the hint step entirely.
+	SessionID string
 }
 
 // ResolveProjectDir locates the project root (the directory that contains
@@ -35,8 +39,8 @@ type ProjectDirOptions struct {
 //  2. CLAUDE_PROJECT_DIR env var — fall through on miss (not an error)
 //  3. HTMLGRAPH_PROJECT_DIR env var — written by SubagentStart for subagents
 //     whose EventCWD is a temp dir (e.g. /private/tmp/claude-501/...)
-//  4. Project dir hint file — written by SubagentStart when CLAUDE_ENV_FILE
-//     is unset (worktree subagents); read via ReadProjectDirHint()
+//  4. Session-scoped hint file — written by SubagentStart for worktree
+//     subagents whose CLAUDE_ENV_FILE is unset; read via ReadSessionHint()
 //  5. ResolveViaGitCommonDir() — worktree → main repo root
 //  6. opts.EventCWD — direct .htmlgraph check
 //  7. os.Getwd() — direct .htmlgraph check
@@ -71,12 +75,14 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 		}
 	}
 
-	// 4. Project dir hint file — written by SubagentStart when CLAUDE_ENV_FILE
-	// is unset (worktree subagents). Falls through if the hint is stale or
-	// the directory no longer has a .htmlgraph/ dir.
-	if d := ReadProjectDirHint(); d != "" {
-		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
-			return d, nil
+	// 4. Session-scoped hint file — written by SubagentStart for worktree
+	// subagents whose CLAUDE_ENV_FILE is unset. Only consulted when SessionID
+	// is provided (hook context). CLI callers don't set SessionID and skip this.
+	if opts.SessionID != "" {
+		if d := ReadSessionHint(opts.SessionID); d != "" {
+			if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
+				return d, nil
+			}
 		}
 	}
 
@@ -214,23 +220,42 @@ func GetGitRemoteURL(dir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// ProjectDirHintPath returns the path to the temp file used as a fallback
-// for HTMLGRAPH_PROJECT_DIR when CLAUDE_ENV_FILE is unset (worktree subagents).
-// The file is written by SubagentStart via hooks.writeProjectDirHint and read
-// by ResolveProjectDir as step 4 in its resolution chain.
-func ProjectDirHintPath() string {
-	return filepath.Join(os.TempDir(), "htmlgraph-project-dir.hint")
+// SessionHintPath returns the path to the session-scoped project dir hint.
+func SessionHintPath(sessionID string) string {
+	return filepath.Join(os.TempDir(), "htmlgraph-session-"+sessionID+".projectdir")
 }
 
-// ReadProjectDirHint reads the project directory from the temp hint file.
+// ReadSessionHint reads the project directory from a session-scoped hint file.
 // Returns "" when the file does not exist or cannot be read.
-// The hint is written by SubagentStart when CLAUDE_ENV_FILE is unset so that
-// subagent hook processes can still locate .htmlgraph/ when their EventCWD
-// is a temp directory (e.g. /private/tmp/claude-501/...).
-func ReadProjectDirHint() string {
-	b, err := os.ReadFile(ProjectDirHintPath())
+func ReadSessionHint(sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
+	b, err := os.ReadFile(SessionHintPath(sessionID))
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(string(b))
+}
+
+// WriteSessionHint writes the project directory to a session-scoped hint file.
+func WriteSessionHint(sessionID, projectDir string) {
+	if sessionID == "" || projectDir == "" {
+		return
+	}
+	_ = os.WriteFile(SessionHintPath(sessionID), []byte(projectDir), 0o644)
+}
+
+// CleanupSessionHint removes the session-scoped hint file.
+func CleanupSessionHint(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	_ = os.Remove(SessionHintPath(sessionID))
+}
+
+// CleanupGlobalHint removes the legacy global hint file if it exists.
+// Called once at startup to clean up stale state from older versions.
+func CleanupGlobalHint() {
+	_ = os.Remove(filepath.Join(os.TempDir(), "htmlgraph-project-dir.hint"))
 }

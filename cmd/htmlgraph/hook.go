@@ -80,7 +80,7 @@ func hookSubcmd(
 		Short: short,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
+				projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 				if !hooks.IsHtmlGraphProject(projectDir) {
 					return fallback, nil
 				}
@@ -107,7 +107,7 @@ func hookSubcmdWithProject(
 		Short: short,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
+				projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 				if !hooks.IsHtmlGraphProject(projectDir) {
 					return fallback, nil
 				}
@@ -135,7 +135,7 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 				toolName = args[0]
 			}
 			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
-				projectDir := hooks.ResolveProjectDir(event.CWD)
+				projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 				if !hooks.IsHtmlGraphProject(projectDir) {
 					return fallback, nil
 				}
@@ -176,7 +176,7 @@ func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 
 	// Log timing for every hook invocation — helps identify slow handlers.
 	// Use the cobra subcommand name (os.Args[2]) as the event label when available.
-	projectDir := hooks.ResolveProjectDir(event.CWD)
+	projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 	hookName := ""
 	if len(os.Args) >= 3 {
 		hookName = os.Args[2]

@@ -19,7 +19,7 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		return &HookResult{Continue: true}, nil
 	}
 
-	projectDir := ResolveProjectDir(event.CWD)
+	projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 	featureID := cachedGetActiveFeatureID(database, sessionID)
 	eventID := uuid.New().String()
 	agentType := event.AgentType
@@ -55,7 +55,7 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	writeTraceparent(sessionID, eventID)
 
 	// Write env vars so subagent hooks know their parent and identity.
-	writeSubagentEnvVars(eventID, event.AgentID, agentType, projectDir)
+	writeSubagentEnvVars(eventID, event.AgentID, agentType, projectDir, sessionID)
 
 	return &HookResult{Continue: true}, nil
 }
@@ -91,7 +91,7 @@ func SubagentStop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	if err := db.UpdateEventFields(database, eventID, "completed", outputSummary); err != nil {
-		projectDir := ResolveProjectDir(event.CWD)
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 		debugLog(projectDir, "[error] handler=subagent-stop session=%s: update event fields: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 

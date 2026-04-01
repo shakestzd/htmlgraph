@@ -157,10 +157,11 @@ func TestResolveProjectDir_HtmlgraphProjectDirEnv_Invalid(t *testing.T) {
 	}
 }
 
-// TestResolveProjectDir_HintFile verifies that the temp hint file (step 4 in
-// the resolution chain) is used when HTMLGRAPH_PROJECT_DIR is not set.
-// This covers the worktree subagent case where CLAUDE_ENV_FILE is unset so
-// SubagentStart writes to the hint file instead of the env file.
+// TestResolveProjectDir_HintFile verifies that the session-scoped hint file
+// (step 4 in the resolution chain) is used when HTMLGRAPH_PROJECT_DIR is not
+// set and a SessionID is provided. This covers the worktree subagent case
+// where CLAUDE_ENV_FILE is unset so SubagentStart writes to the hint file
+// instead of the env file.
 func TestResolveProjectDir_HintFile(t *testing.T) {
 	// Set up a real project directory with .htmlgraph/.
 	projectDir := t.TempDir()
@@ -175,34 +176,27 @@ func TestResolveProjectDir_HintFile(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 
-	// Write the hint file (simulates writeProjectDirHint in SubagentStart).
-	hintPath := paths.ProjectDirHintPath()
-	origHint, readErr := os.ReadFile(hintPath)
-	if readErr == nil {
-		// Restore the original hint file after the test.
-		t.Cleanup(func() { _ = os.WriteFile(hintPath, origHint, 0o644) })
-	} else {
-		t.Cleanup(func() { _ = os.Remove(hintPath) })
-	}
-	if err := os.WriteFile(hintPath, []byte(projectDir), 0o644); err != nil {
-		t.Fatalf("write hint file: %v", err)
-	}
+	// Write the session-scoped hint file (simulates writeSessionProjectDirHint in SubagentStart).
+	const testSessionID = "test-session-hint-valid"
+	paths.WriteSessionHint(testSessionID, projectDir)
+	t.Cleanup(func() { paths.CleanupSessionHint(testSessionID) })
 
 	got, err := paths.ResolveProjectDir(paths.ProjectDirOptions{
 		EventCWD:   fakeTmpCWD,
 		WalkLevels: 10,
+		SessionID:  testSessionID,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got != projectDir {
-		t.Errorf("ResolveProjectDir = %q, want %q (hint file not used?)", got, projectDir)
+		t.Errorf("ResolveProjectDir = %q, want %q (session hint not used?)", got, projectDir)
 	}
 }
 
-// TestResolveProjectDir_HintFile_Invalid verifies that a stale/invalid hint
-// file (pointing to a dir with no .htmlgraph/) is skipped and the resolver
-// falls through to the next step.
+// TestResolveProjectDir_HintFile_Invalid verifies that a stale/invalid
+// session-scoped hint file (pointing to a dir with no .htmlgraph/) is skipped
+// and the resolver falls through to the next step.
 func TestResolveProjectDir_HintFile_Invalid(t *testing.T) {
 	// A project dir that DOES have .htmlgraph/ — used as EventCWD direct hit.
 	projectDir := t.TempDir()
@@ -216,28 +210,22 @@ func TestResolveProjectDir_HintFile_Invalid(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 
-	// Write a stale hint pointing at a dir without .htmlgraph/.
-	hintPath := paths.ProjectDirHintPath()
-	origHint, readErr := os.ReadFile(hintPath)
-	if readErr == nil {
-		t.Cleanup(func() { _ = os.WriteFile(hintPath, origHint, 0o644) })
-	} else {
-		t.Cleanup(func() { _ = os.Remove(hintPath) })
-	}
-	if err := os.WriteFile(hintPath, []byte(badDir), 0o644); err != nil {
-		t.Fatalf("write hint file: %v", err)
-	}
+	// Write a stale session-scoped hint pointing at a dir without .htmlgraph/.
+	const testSessionID = "test-session-hint-invalid"
+	paths.WriteSessionHint(testSessionID, badDir)
+	t.Cleanup(func() { paths.CleanupSessionHint(testSessionID) })
 
 	// EventCWD points directly at a valid project — step 6 should find it.
 	got, err := paths.ResolveProjectDir(paths.ProjectDirOptions{
 		EventCWD:   projectDir,
 		WalkLevels: 10,
+		SessionID:  testSessionID,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got != projectDir {
-		t.Errorf("ResolveProjectDir = %q, want %q (stale hint not skipped?)", got, projectDir)
+		t.Errorf("ResolveProjectDir = %q, want %q (stale session hint not skipped?)", got, projectDir)
 	}
 }
 

@@ -3,6 +3,7 @@
 var events = [];
 var sessions = [];
 var features = [];
+var plans = [];
 var stats = {};
 var currentView = 'activity';
 var seenEventIds = new Set();
@@ -19,6 +20,7 @@ document.querySelector('.nav').addEventListener('click', function(e) {
   document.querySelectorAll('.view').forEach(function(v) { v.classList.toggle('active', v.id === 'v-' + view); });
   if (view === 'sessions' && sessions.length === 0) fetchSessions();
   if (view === 'work' && features.length === 0) fetchFeatures();
+  if (view === 'plans' && plans.length === 0) fetchPlans();
 });
 
 /* ── Data fetching ─────────────────────────────────────────── */
@@ -82,6 +84,119 @@ function fetchFeatures() {
       renderKanban();
     });
   }).catch(function() {});
+}
+
+function fetchPlans() {
+  fetch('/api/plans')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      plans = data || [];
+      renderPlans();
+    })
+    .catch(function() {
+      plans = [];
+      renderPlans();
+    });
+}
+
+function renderPlans() {
+  var body = document.getElementById('plans-body');
+  var empty = document.getElementById('plans-empty');
+  document.getElementById('plans-count').textContent = plans.length;
+
+  if (plans.length === 0) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  body.innerHTML = '';
+  plans.forEach(function(p) {
+    var tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', function() {
+      window.open('/plans/' + p.id + '.html', '_blank');
+    });
+
+    // Title
+    tr.appendChild(td(p.title));
+
+    // Status badge
+    var statusClass = p.status === 'finalized' ? 'badge-done' :
+                      p.status === 'in-progress' ? 'badge-ip' : 'badge-todo';
+    var statusText = p.status === 'finalized' ? 'Finalized' :
+                     p.status === 'in-progress' ? 'In Progress' : 'Draft';
+    tr.appendChild(tdWithChild(createBadge(statusText, statusClass)));
+
+    // Progress bar
+    var pct = p.total > 0 ? Math.round(p.approved / p.total * 100) : 0;
+    var progTd = document.createElement('td');
+    var progWrap = document.createElement('div');
+    progWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    var progTrack = document.createElement('div');
+    progTrack.style.cssText = 'flex:1;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden;';
+    var progFill = document.createElement('div');
+    progFill.style.cssText = 'height:100%;border-radius:3px;background:' +
+      (pct === 100 ? 'var(--status-done)' : 'var(--accent)') + ';width:' + pct + '%;';
+    progTrack.appendChild(progFill);
+    progWrap.appendChild(progTrack);
+    var progLabel = document.createElement('span');
+    progLabel.style.cssText = 'font-size:0.75rem;color:var(--text-secondary);white-space:nowrap;';
+    progLabel.textContent = p.approved + '/' + p.total;
+    progWrap.appendChild(progLabel);
+    progTd.appendChild(progWrap);
+    tr.appendChild(progTd);
+
+    // Linked feature/track
+    tr.appendChild(td(p.feature_id || '\u2014'));
+
+    // Updated
+    tr.appendChild(td(relTime(p.updated_at)));
+
+    // Delete button (only for non-finalized plans)
+    var delTd = document.createElement('td');
+    delTd.style.cssText = 'white-space:nowrap;';
+    if (p.status !== 'finalized') {
+      (function(planId, planTitle, td) {
+        var btnStyle = 'background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:var(--font-sans,inherit);';
+        var delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.style.cssText = btnStyle;
+        delBtn.addEventListener('mouseenter', function() { this.style.borderColor='#dc2626'; this.style.color='#dc2626'; });
+        delBtn.addEventListener('mouseleave', function() { this.style.borderColor=''; this.style.color='var(--text-muted)'; });
+        delBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          td.innerHTML = '';
+          var cancelBtn = document.createElement('button');
+          cancelBtn.textContent = 'Cancel';
+          cancelBtn.style.cssText = btnStyle + 'margin-right:6px;';
+          cancelBtn.addEventListener('click', function(e2) {
+            e2.stopPropagation();
+            td.innerHTML = '';
+            td.appendChild(delBtn);
+          });
+          var confirmBtn = document.createElement('button');
+          confirmBtn.textContent = 'Confirm';
+          confirmBtn.style.cssText = 'background:#dc2626;border:1px solid #dc2626;color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:var(--font-sans,inherit);';
+          confirmBtn.addEventListener('click', function(e2) {
+            e2.stopPropagation();
+            confirmBtn.textContent = 'Deleting...';
+            confirmBtn.disabled = true;
+            fetch('/api/plans/' + planId + '/delete', { method: 'DELETE' })
+              .then(function(r) { return r.json(); })
+              .then(function() { plans = []; fetchPlans(); });
+          });
+          td.appendChild(cancelBtn);
+          td.appendChild(confirmBtn);
+        });
+        td.appendChild(delBtn);
+      })(p.id, p.title, delTd);
+    }
+    tr.appendChild(delTd);
+
+    body.appendChild(tr);
+  });
 }
 
 /* ── Rendering: Sessions ───────────────────────────────────── */

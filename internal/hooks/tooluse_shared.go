@@ -70,7 +70,7 @@ func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext 
 		agentType = os.Getenv("HTMLGRAPH_AGENT_TYPE")
 	}
 
-	projectDir := ResolveProjectDir(event.CWD)
+	projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 	hgDir := filepath.Join(projectDir, ".htmlgraph")
 	yolo := isYoloFromEvent(event, hgDir)
 	parentEventID := resolveParentEventID(database, sessionID, agentID, isSubagent)

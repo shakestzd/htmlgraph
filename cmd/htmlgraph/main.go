@@ -66,7 +66,7 @@ func main() {
 	rootCmd.AddCommand(ingestCmd())
 	rootCmd.AddCommand(linkCmd())
 	rootCmd.AddCommand(batchCmd())
-	rootCmd.AddCommand(workitemCmd("plan", "plans"))
+	rootCmd.AddCommand(planCmdWithExtras())
 	rootCmd.AddCommand(backfillCmd())
 	rootCmd.AddCommand(reindexCmd())
 	rootCmd.AddCommand(recommendCmd())
@@ -75,6 +75,7 @@ func main() {
 	rootCmd.AddCommand(claimCmd())
 	rootCmd.AddCommand(agentInitCmd())
 	rootCmd.AddCommand(pluginCmd())
+	rootCmd.AddCommand(purgeSpikesCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -96,6 +97,7 @@ func versionCmd() *cobra.Command {
 // shared paths.ResolveProjectDir resolver (--project-dir flag → CLAUDE_PROJECT_DIR
 // env → git worktree detection → CWD walk-up) and appending ".htmlgraph".
 func findHtmlgraphDir() (string, error) {
+	paths.CleanupGlobalHint() // Remove stale global hint from older versions
 	root, err := paths.ResolveProjectDir(paths.ProjectDirOptions{
 		ExplicitDir: projectDirFlag,
 	})

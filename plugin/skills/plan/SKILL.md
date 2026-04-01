@@ -1,277 +1,259 @@
 ---
 name: htmlgraph:plan
-description: Create a dependency-first parallel plan using native TaskCreate with addBlockedBy. Maximizes parallelism by dispatching ALL independent tasks simultaneously. Activate when asked to create a plan, parallelize work, or organize development tasks.
+description: Plan development work with interactive HTML review before any code is written. Generates a human-reviewable plan, waits for structured feedback, then hands off to execute. Use when asked to plan, create a development plan, parallelize work, or build a feature with design clarity first.
 ---
 
-# HtmlGraph Parallel Plan
+# HtmlGraph Plan
 
-Use this skill when asked to plan development work, create a parallel execution plan, or organize tasks for multi-agent execution.
+Use this skill when asked to plan development work, create a parallel execution plan, organize tasks for multi-agent execution, or build a feature with human review before implementation.
 
-**Trigger keywords:** create plan, development plan, parallel plan, plan tasks, parallelize work, organize work, task breakdown
-
----
-
-## Work Item Attribution (MANDATORY)
-
-Before creating any plan, ensure work items exist:
-
-1. **Verify or create a track:** `htmlgraph track create "Track Title"` for the body of work
-2. **Create features under the track:** `htmlgraph feature create "Feature Title" --track <track-id>`
-3. **Start the track:** `htmlgraph track start <track-id>`
-4. **Each task in the plan MUST reference a feature ID** in its metadata
-5. **Need help?** Run `htmlgraph help` for available commands
-
-Plans without attributed features produce untracked work.
+**Trigger keywords:** create plan, development plan, parallel plan, plan tasks, parallelize work, organize work, task breakdown, crispi, interactive plan, plan with review, design and build, plan this feature, review before building
 
 ---
 
-## Core Principle: Maximum Parallelism via Dependency Graph
+## What This Skill Does
 
-Do NOT manually assign tasks to waves. Instead:
+Generates an interactive HTML plan, opens it for human review, reads structured feedback, then hands off to `/htmlgraph:execute`.
 
-1. **Identify real dependencies** between tasks (Task B imports Task A's output)
-2. **Detect file conflicts** (two tasks editing the same file)
-3. **Create native tasks** with `TaskCreate` + `addBlockedBy` for real dependencies
-4. **Dispatch ALL unblocked tasks** in a single message — the dependency graph determines ordering, not manual wave assignment
+The human sees the plan, approves sections, answers open design questions, and clicks Finalize — before any code is written. Only finalized, approved slices are dispatched.
+
+---
+
+## Step 0: Work Item Attribution (MANDATORY)
+
+Before anything else:
+
+1. Check: `htmlgraph status` — is there an active feature/track for this work?
+2. If yes: `htmlgraph feature start <id>`
+3. If no: `htmlgraph feature create "<title>"` then `htmlgraph feature start <id>`
+
+Plans without attribution produce untracked work.
+
+---
+
+## Step 1: Research (Parallel Agents)
+
+Spawn research agents in a single message — do not proceed until both complete:
 
 ```
-Traditional (wrong):          Dependency-first (correct):
+Agent(description="Understand current codebase state", subagent_type="htmlgraph:researcher",
+      prompt="Investigate [area]. Answer: current state, key files, existing patterns, constraints.")
 
-Wave 1: [A] [B] [C]          All independent: [A] [B] [C] [D] [E] [F]
-Wave 2: [D] [E]              Blocked on A:    [G] (addBlockedBy: [A])
-Wave 3: [F]                  Blocked on G:    [H] (addBlockedBy: [G])
-
-Artificial sequencing         Only real dependencies block
+Agent(description="Check for prior work", subagent_type="Explore",
+      prompt="Search .htmlgraph/ for any features or spikes related to [area]. Report feature IDs and status.")
 ```
+
+Research must answer:
+- Current state of the codebase in this area
+- Desired end state (from the request)
+- Open design questions (choices that affect the architecture)
+- Candidate vertical slices (end-to-end, not horizontal layers)
+- Real dependencies between slices
 
 ---
 
-## Step 1: Gather All Tasks
+## Step 2: Generate the Interactive Plan HTML
 
-Extract every task from the conversation, track, or feature list. For each task, determine:
+Using research findings, generate the interactive plan file.
 
-| Field | How to Determine |
-|-------|-----------------|
-| **Files it creates/edits** | Analyze the spec — what new files, what existing files modified |
-| **Real dependencies** | Does this task need another task's OUTPUT? (import, schema, API) |
-| **File conflicts** | Does another task also edit the same file? (not a dependency — a merge concern) |
-| **Complexity** | haiku: single-file, clear spec. sonnet: multi-file, design needed. opus: architecture |
+### Slice Design Rules
+
+- Each slice is independently deployable (not "DB layer" or "API layer")
+- Each slice is vertical: CLI command + storage + tests — all in one slice
+- Each slice has a concrete test strategy (what tests prove it works)
+- Slices that depend on another slice say so explicitly
+- If a slice agent prompt would exceed 40 instructions, split the slice
 
 ### Dependency vs File Conflict
 
 **Dependency** (use `addBlockedBy`): Task B literally cannot be written until Task A exists.
 - Task B imports a module Task A creates
-- Task B tests an API Task A implements
-- Task B extends a schema Task A defines
+- Task B extends an interface Task A defines
 
 **File conflict** (handle at merge time, NOT with `addBlockedBy`): Both tasks edit the same file but don't depend on each other's logic.
-- Both tasks add a line to `main.go` registering their command
+- Both tasks add a registration line to `main.go`
 - Both tasks add an entry to a config file
-- Both tasks import from the same module
 
-File conflicts are resolved at merge time, not by serializing tasks.
+### Create Feature IDs for Each Slice
+
+```bash
+htmlgraph feature create "<slice-title>" --track <track-id>
+# Repeat for each slice. Note the returned feature IDs.
+```
+
+### Write the Plan File
+
+Output path: `.htmlgraph/plans/plan-<kebab-title>.html`
+
+Use the template from `internal/templates/plan-template.html`. Every interactive element needs `data-*` attributes so `htmlgraph plan read-feedback` can parse structured output.
+
+Key sections to include:
+- **Summary** — one paragraph describing what will be built and why
+- **Open Questions** — design decisions with pre-selected sensible defaults (human overrides only where they disagree)
+- **Slices** — one card per slice, with: title, feature ID, goal, files, test strategy, dependencies
+- **Finalize button** — triggers plan state transition to `finalized`
+
+Pre-selecting defaults is important: the human should only need to act where they have a strong opinion.
 
 ---
 
-## Step 2: Research (Parallel Agents)
+## Step 3: Open for Human Review (PAUSE HERE)
 
-Spawn research agents in a single message to gather evidence:
+Start the dashboard if not already running:
 
-```
-Agent(description="Find existing patterns", subagent_type="Explore", prompt="...")
-Agent(description="Check dependencies", subagent_type="Explore", prompt="...")
-Agent(description="Detect file conflicts", subagent_type="Explore", prompt="...")
+```bash
+htmlgraph serve &
 ```
 
-Research should answer:
-- What existing patterns should tasks follow?
-- Which files will each task touch? (for conflict detection)
-- Are there shared registration points? (e.g., `main.go`, `hooks.json`)
+Tell the human:
+
+```
+Plan ready for review: http://localhost:8080/plans/plan-<id>.html
+
+Please:
+1. Read the Summary — does it describe what you want built?
+2. Review the Open Questions — defaults are pre-selected, override where you disagree
+3. Check each Slice — approve or flag for revision
+4. Add comments on any section
+5. Click Finalize when ready
+
+I will wait until you finalize the plan before writing any code.
+```
+
+**STOP. Do not proceed until the human finalizes the plan.**
 
 ---
 
-## Step 3: Build the Dependency Graph
+## Step 4: Read Structured Feedback
 
-After research, classify every task pair:
+After the human finalizes:
 
-```
-For each pair (A, B):
-  if B needs A's output → B.addBlockedBy(A)
-  if both edit same file → note as FILE_CONFLICT (resolve at merge)
-  else → independent (both dispatch immediately)
+```bash
+htmlgraph plan read-feedback <plan-id>
 ```
 
-### Shared Registration Files
+This outputs JSON:
+```json
+{
+  "status": "finalized",
+  "section_approvals": { "summary": true, "questions": true },
+  "question_answers": { "q-delivery-model": "async", "q-storage-format": "sqlite" },
+  "slice_approvals": { "slice-1": true, "slice-2": false },
+  "comments": { "slice-2": "Needs rate limiting" }
+}
+```
 
-Many projects have "registration files" that multiple tasks edit (e.g., `main.go` adding commands, `hooks.json` adding handlers). These are NOT dependencies — they're predictable merge conflicts.
-
-**Strategy:** Identify shared registration files upfront. Tell each agent: "Add your registration to [file] — expect a merge conflict that the orchestrator will resolve."
+Parse it:
+- If any slice has `false`: summarize what needs revision. Ask the human — revise now, or proceed without it?
+- If revising: update the plan HTML, set status back to `draft`, loop to Step 3.
+- If proceeding: note which slices are excluded from execution.
 
 ---
 
-## Step 4: Create Native Tasks
+## Step 5: Announce Finalized Plan
 
-Use `TaskCreate` for each task. Use `TaskUpdate` with `addBlockedBy` for real dependencies only.
-
-```
-# Independent tasks — no blockers, dispatch immediately
-TaskCreate(subject="feat-001: Add check command", description="...",
-           metadata={"files": ["check.go", "main.go"], "agent": "sonnet-coder", "feature_id": "feat-41114e5d"})
-
-TaskCreate(subject="feat-002: Add budget command", description="...",
-           metadata={"files": ["budget.go", "main.go"], "agent": "sonnet-coder", "feature_id": "feat-9ef589b4"})
-
-TaskCreate(subject="feat-003: Add health command", description="...",
-           metadata={"files": ["health.go", "main.go"], "agent": "sonnet-coder", "feature_id": "feat-e745f68f"})
-
-# Dependent task — needs feat-001's quality gate infrastructure
-TaskCreate(subject="feat-004: Spec compliance scoring", description="...",
-           metadata={"files": ["compliance.go"], "agent": "sonnet-coder", "feature_id": "feat-abb438f5"})
-
-# Link the dependency
-TaskUpdate(taskId="4", addBlockedBy=["1"])  # feat-004 needs feat-001
-```
-
-### Task Description Template
-
-Each task description must be self-contained (agents have no shared context).
-**TDD is mandatory** — every task includes test specifications that the agent writes BEFORE implementation.
+Announce what was decided:
 
 ```
+Plan finalized. Here's what was approved:
+
+Slices (3 of 3 approved):
+  slice-1  feat-XXXX  CLI command skeleton       -> implement
+  slice-2  feat-XXXX  Storage layer              -> implement
+  slice-3  feat-XXXX  Integration tests          -> implement
+
+Design decisions made:
+  Delivery model: async (overridden from default "sync")
+  Storage format: sqlite (default accepted)
+
+These answers are wired into each slice's task description.
+```
+
+Reconcile question answers into slice specs. If the human chose "async delivery", the dispatch slice description must say "implement async delivery, not sync."
+
+---
+
+## Step 6: Create Tasks and Hand Off to Execute
+
+Create a `TaskCreate` for each approved slice. Descriptions must be self-contained — the executing agent has no other context. **TDD is mandatory** — every task includes test specifications written before implementation.
+
+```
+TaskCreate(
+  subject="{feature_id}: {slice_name}",
+  description="""
 ## Goal
-[One sentence: what this task produces]
+[One sentence from the plan, incorporating question answers]
 
 ## Files to Create/Edit
 - NEW: path/to/new_file.go
 - EDIT: path/to/existing_file.go (add registration line)
 
 ## Shared Files (expect merge conflict)
-- main.go: Add `rootCmd.AddCommand(yourCmd())` — orchestrator resolves conflicts
+- main.go: Add registration line — orchestrator resolves conflicts
 
-## Acceptance Criteria
-1. [Specific, measurable pass/fail condition]
-2. [Specific, measurable pass/fail condition]
+## Accepted Design Decisions
+[List any question answers that affect this slice]
 
-## Test Plan (TDD — mandatory)
-
-### Test Strategy
-[What kind of testing: "unit test the parser", "integration test the CLI command",
-"table-driven tests for edge cases". Match the strategy to the task's risk profile.]
-
-### Expected Behavior
-[Concrete input/output examples that tests must verify:]
-- Given [input/state], expect [output/behavior]
-- Given [edge case], expect [error/fallback]
-- Given [invalid input], expect [specific error message]
-
-### Tests to Write FIRST
-Write these tests BEFORE any implementation. They must compile and FAIL.
-- Test: [TestFunctionName] — verifies [acceptance criterion 1]
-- Test: [TestFunctionName] — verifies [acceptance criterion 2]
-- Test: [TestEdgeCase] — verifies [boundary/error condition]
+## Test Plan (TDD — write tests FIRST)
+[Concrete input/output examples; tests must compile and FAIL before implementation]
 
 ## Quality Gate
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 
-## Commit
-git commit -m "feat(scope): description (feat-XXXXXXXX)"
+## Attribution
+htmlgraph feature start {feature_id}
+htmlgraph feature complete {feature_id}
+""",
+  metadata={"feature_id": "feat-XXXX", "slice_num": 1, "plan_id": "<id>",
+            "agent_tier": "sonnet"}
+)
 ```
 
----
-
-## Step 5: Analyze Parallelism
-
-Before presenting, compute the parallelism profile:
+Wire real dependencies only:
 
 ```
-Total tasks:        N
-Independent:        X (dispatch immediately)
-Blocked:            Y (wait for dependencies)
-Max parallel:       X (first round)
-File conflicts:     Z (handled at merge)
-Merge rounds:       ceil(Y / batch_size) + 1
+TaskUpdate(taskId="2", addBlockedBy=["1"])  # only if slice-2 imports slice-1's output
 ```
 
-If most tasks are independent, nearly everything runs in the first dispatch. Only genuinely blocked tasks wait.
-
----
-
-## Step 6: Present the Plan
-
-Show the dependency graph, NOT waves:
+After all tasks are created, present the dispatch summary:
 
 ```
 Plan: [Name]
-Total tasks: 13 | Independent: 10 | Blocked: 3 | File conflicts: 5
+Total slices: N | Independent: X | Blocked: Y
 
-DISPATCH IMMEDIATELY (10 tasks, all parallel):
-  #1  feat-001 [sonnet] Add check command          files: check.go, main.go
-  #2  feat-002 [sonnet] Add budget command          files: budget.go, main.go
-  #3  feat-003 [sonnet] Add health command          files: health.go, main.go
-  #4  feat-004 [sonnet] Research gate               files: research.go, main.go
-  #5  feat-005 [sonnet] Feature spec generator      files: specgen.go, main.go
-  #6  feat-006 [sonnet] TDD test case generator     files: tdd.go, main.go
-  #7  feat-007 [sonnet] Worktree isolation          files: yolo.go
-  #8  feat-008 [sonnet] Commit attribution          files: hook.go, hooks.json
-  #9  feat-009 [sonnet] Diff review gate            files: review.go
-  #10 feat-010 [sonnet] Agent lineage tracking      files: lineage.go
+DISPATCH IMMEDIATELY (X slices, all parallel):
+  #1  feat-001 [sonnet] CLI command skeleton     files: cmd.go, main.go
+  #2  feat-002 [sonnet] Storage layer            files: store.go
 
-BLOCKED (3 tasks, dispatch after dependencies complete):
-  #11 feat-011 [sonnet] Spec compliance scoring     blocked-by: #5 (needs spec generator)
-  #12 feat-012 [sonnet] Session timeline dashboard  blocked-by: #8, #10 (needs tracking data)
-  #13 feat-013 [sonnet] UI validation               blocked-by: #12 (needs dashboard)
-
-FILE CONFLICTS (resolved at merge, not by serialization):
-  main.go:   tasks #1-#6 all add registrations — merge sequentially
-  hooks.json: task #8 — single owner, no conflict
-
-Merge strategy:
-  Round 1: Merge all 10 independent branches, resolve main.go conflicts
-  Round 2: Dispatch #11 after #5 merges. Dispatch #12 after #8+#10 merge.
-  Round 3: Dispatch #13 after #12 merges.
+BLOCKED (dispatch after dependencies complete):
+  #3  feat-003 [sonnet] Integration tests        blocked-by: #1, #2
 
 To execute: /htmlgraph:execute
 ```
 
----
+### Human Review Between Slices
 
-## Step 7: Agent Type Selection
-
-| Agent | When to Use | Cost |
-|-------|------------|------|
-| `htmlgraph:haiku-coder` | Single-file, clear spec, <50 lines, no design decisions | Lowest |
-| `htmlgraph:sonnet-coder` | Multi-file, needs codebase context, moderate complexity | Medium |
-| `htmlgraph:opus-coder` | Architecture decisions, complex algorithms, novel design | Highest |
-
-**Default to sonnet** unless the task is trivially simple (haiku) or requires deep reasoning (opus).
+After each slice completes, before dispatching the next:
+1. Show a diff summary: files changed, lines added, tests added
+2. Ask: "Slice N complete. Approve and continue, or review code first?"
+3. Wait for approval. Do not auto-dispatch the next slice.
 
 ---
 
-## Decision Rules
+## Agent Type Selection
 
-### When to add `addBlockedBy`
+| Agent | When to Use |
+|-------|------------|
+| `htmlgraph:haiku-coder` | Single-file, clear spec, <50 lines, no design decisions |
+| `htmlgraph:sonnet-coder` | Multi-file, needs codebase context, moderate complexity |
+| `htmlgraph:opus-coder` | Architecture decisions, complex algorithms, novel design |
 
-Add ONLY when:
-- Task B imports/uses a module that Task A creates from scratch
-- Task B extends an interface that Task A defines
-- Task B's test fixtures depend on Task A's schema
-
-Do NOT add when:
-- Both tasks edit the same file (file conflict, not dependency)
-- Tasks are in the same domain but logically independent
-- "It would be nice" to have A before B but B could technically be written first
-
-### When to split a task
-
-Split when:
-- Task touches >10 files (YOLO budget advisory)
-- Task has >300 new lines (YOLO budget advisory)
-- Task mixes unrelated concerns (e.g., CLI command + hook + dashboard)
+Default to sonnet unless the task is trivially simple (haiku) or requires deep reasoning (opus).
 
 ---
 
 ## Related Skills
 
-- **[/htmlgraph:execute](/htmlgraph:execute)** - Execute the plan with dependency-driven dispatch
-- **[/htmlgraph:parallel-status](/htmlgraph:parallel-status)** - Monitor execution progress
-- **[/htmlgraph:cleanup](/htmlgraph:cleanup)** - Clean up worktrees after completion
+- **[/htmlgraph:execute](/htmlgraph:execute)** — Execute the finalized task list with dependency-driven dispatch
+- **[/htmlgraph:parallel-status](/htmlgraph:parallel-status)** — Monitor slice execution progress
+- **[/htmlgraph:cleanup](/htmlgraph:cleanup)** — Clean up worktrees after completion
