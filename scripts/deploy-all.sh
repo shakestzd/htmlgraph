@@ -209,11 +209,48 @@ else
     ok "Tag v$VERSION pushed — release pipeline triggered"
 fi
 
+# ── Update local install ──────────────────────────────────────
+
+step "Update local install"
+
+if $DRY_RUN; then
+    ok "[dry-run] Would pull marketplace clone and run claude plugin update"
+    ok "[dry-run] Would rebuild CLI binary via plugin/build.sh"
+else
+    # 1. Pull the marketplace clone so `claude plugin update` sees the new version.
+    #    Claude Code's marketplace is a local git clone; without a pull the
+    #    update command compares against the stale checkout and reports "already
+    #    at latest."
+    MARKETPLACE_DIR="$HOME/.claude/plugins/marketplaces/htmlgraph"
+    if [[ -d "$MARKETPLACE_DIR/.git" ]]; then
+        (cd "$MARKETPLACE_DIR" && git pull origin main --quiet 2>/dev/null) \
+            && ok "Marketplace clone updated" \
+            || warn "Marketplace pull failed (non-fatal)"
+    else
+        warn "Marketplace clone not found at $MARKETPLACE_DIR — skipping pull"
+    fi
+
+    # 2. Update the installed plugin (agents, skills, hooks config, bootstrap).
+    if command -v claude >/dev/null 2>&1; then
+        claude plugin update htmlgraph@htmlgraph 2>&1 | tail -1
+        ok "Plugin updated"
+    else
+        warn "claude CLI not found — skipping plugin update"
+    fi
+
+    # 3. Rebuild CLI binary so ~/.local/bin/htmlgraph matches the release.
+    if [[ -f "$PROJECT_ROOT/plugin/build.sh" ]]; then
+        sh "$PROJECT_ROOT/plugin/build.sh" 2>&1 | tail -1
+        ok "CLI binary rebuilt"
+    else
+        warn "build.sh not found — skipping CLI rebuild"
+    fi
+fi
+
 # ── Post-release ───────────────────────────────────────────────
 
 step "Post-release"
 
-echo "  To update local plugin:  claude plugin update htmlgraph"
 echo "  To check CI status:      gh run list --workflow=release-go.yml --limit 3"
 echo "  To verify release:       gh release view v$VERSION"
 
