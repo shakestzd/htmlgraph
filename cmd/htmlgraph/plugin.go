@@ -28,14 +28,19 @@ func pluginInstallCmd() *cobra.Command {
 				return fmt.Errorf("'claude' not found on PATH: install Claude Code first (https://claude.ai/code)")
 			}
 
-			c := exec.Command(claudePath, "plugin", "install", "htmlgraph")
+			// Register the marketplace so Claude Code can find the plugin.
+			fmt.Fprintln(cmd.OutOrStdout(), "Registering htmlgraph marketplace...")
+			_ = exec.Command(claudePath, "plugin", "marketplace", "add", htmlgraphMarketplaceRepo).Run()
+
+			fmt.Fprintln(cmd.OutOrStdout(), "Installing plugin...")
+			c := exec.Command(claudePath, "plugin", "install", "htmlgraph@htmlgraph")
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			if err := c.Run(); err != nil {
-				return fmt.Errorf("claude plugin install htmlgraph: %w", err)
+				return fmt.Errorf("claude plugin install htmlgraph@htmlgraph: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), "Plugin installed. Run 'htmlgraph claude --dev' to test.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Plugin installed successfully.")
 			return nil
 		},
 	}
