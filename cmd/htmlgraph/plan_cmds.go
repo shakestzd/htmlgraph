@@ -31,6 +31,7 @@ func planCmdWithExtras() *cobra.Command {
 	cmd.AddCommand(planReadFeedbackCmd())
 	cmd.AddCommand(planAddQuestionCmd())
 	cmd.AddCommand(planSetSectionCmd())
+	cmd.AddCommand(planSetSliceCmd())
 	return cmd
 }
 
@@ -494,6 +495,127 @@ func runPlanSetSection(planID, placeholder, content string) error {
 	}
 
 	fmt.Printf("Set %s in %s\n", placeholder, planID)
+	return nil
+}
+
+// ---- plan set-slice ---------------------------------------------------------
+
+func planSetSliceCmd() *cobra.Command {
+	var tests, deps, files string
+	cmd := &cobra.Command{
+		Use:   "set-slice <plan-id> <slice-number>",
+		Short: "Update a slice's test strategy, dependencies, and files",
+		Long: `Update a vertical slice's metadata in a plan.
+
+Example:
+  htmlgraph plan set-slice plan-my-feature 1 \
+    --tests "Unit: ErrNotFound returns correct format. Integration: resolveID failure includes hint." \
+    --deps "none (foundation slice)" \
+    --files "internal/workitem/errors.go, internal/workitem/resolve.go"`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runPlanSetSlice(args[0], args[1], tests, deps, files)
+		},
+	}
+	cmd.Flags().StringVar(&tests, "tests", "", "test strategy (rendered as list items)")
+	cmd.Flags().StringVar(&deps, "deps", "", "dependency description")
+	cmd.Flags().StringVar(&files, "files", "", "affected files (comma-separated)")
+	return cmd
+}
+
+func runPlanSetSlice(planID, sliceNum, tests, deps, files string) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
+	data, err := os.ReadFile(planPath)
+	if err != nil {
+		return fmt.Errorf("plan %q not found: %w", planID, err)
+	}
+	content := string(data)
+
+	// Find the slice card by data-slice="N".
+	sliceMarker := fmt.Sprintf(`data-slice="%s"`, sliceNum)
+	if !strings.Contains(content, sliceMarker) {
+		return fmt.Errorf("slice %s not found in plan", sliceNum)
+	}
+
+	if tests != "" {
+		// Replace the placeholder test strategy list.
+		oldTests := fmt.Sprintf(`data-slice="%s"`, sliceNum)
+		// Find the <ul> after "Test Strategy" within this slice.
+		// Strategy: find the slice marker, then find the next <ul>...</ul> and replace.
+		sliceIdx := strings.Index(content, sliceMarker)
+		afterSlice := content[sliceIdx:]
+		testH4 := strings.Index(afterSlice, "<h4>Test Strategy</h4>")
+		if testH4 >= 0 {
+			afterH4 := afterSlice[testH4:]
+			ulStart := strings.Index(afterH4, "<ul>")
+			ulEnd := strings.Index(afterH4, "</ul>")
+			if ulStart >= 0 && ulEnd >= 0 {
+				// Build new test list.
+				var listItems strings.Builder
+				for _, t := range strings.Split(tests, ".") {
+					t = strings.TrimSpace(t)
+					if t != "" {
+						listItems.WriteString("<li>" + html.EscapeString(t) + "</li>")
+					}
+				}
+				absStart := sliceIdx + testH4 + ulStart
+				absEnd := sliceIdx + testH4 + ulEnd + len("</ul>")
+				content = content[:absStart] + "<ul>" + listItems.String() + "</ul>" + content[absEnd:]
+				_ = oldTests // suppress unused
+			}
+		}
+	}
+
+	if deps != "" {
+		// Replace "Dependencies: none" with actual text.
+		sliceIdx := strings.Index(content, sliceMarker)
+		afterSlice := content[sliceIdx:]
+		depIdx := strings.Index(afterSlice, "Dependencies: ")
+		if depIdx >= 0 {
+			// Find the end of the <p> tag.
+			pEnd := strings.Index(afterSlice[depIdx:], "</p>")
+			if pEnd >= 0 {
+				absStart := sliceIdx + depIdx + len("Dependencies: ")
+				absEnd := sliceIdx + depIdx + pEnd
+				content = content[:absStart] + html.EscapeString(deps) + content[absEnd:]
+			}
+		}
+	}
+
+	if files != "" {
+		// Replace the slice-meta span content.
+		sliceIdx := strings.Index(content, sliceMarker)
+		afterSlice := content[sliceIdx:]
+		metaIdx := strings.Index(afterSlice, `class="slice-meta"`)
+		if metaIdx >= 0 {
+			spanStart := strings.Index(afterSlice[metaIdx:], "<span>")
+			spanEnd := strings.Index(afterSlice[metaIdx:], "</span>")
+			if spanStart >= 0 && spanEnd >= 0 {
+				absStart := sliceIdx + metaIdx + spanStart + len("<span>")
+				absEnd := sliceIdx + metaIdx + spanEnd
+				fileHTML := "Files: "
+				for i, f := range strings.Split(files, ",") {
+					f = strings.TrimSpace(f)
+					if i > 0 {
+						fileHTML += ", "
+					}
+					fileHTML += "<code>" + html.EscapeString(f) + "</code>"
+				}
+				content = content[:absStart] + fileHTML + content[absEnd:]
+			}
+		}
+	}
+
+	if err := os.WriteFile(planPath, []byte(content), 0o644); err != nil {
+		return err
+	}
+
+	fmt.Printf("Updated slice %s in %s\n", sliceNum, planID)
 	return nil
 }
 
