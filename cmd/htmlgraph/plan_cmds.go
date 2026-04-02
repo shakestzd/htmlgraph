@@ -30,6 +30,7 @@ func planCmdWithExtras() *cobra.Command {
 	cmd.AddCommand(planWaitCmd())
 	cmd.AddCommand(planReadFeedbackCmd())
 	cmd.AddCommand(planAddQuestionCmd())
+	cmd.AddCommand(planSetSectionCmd())
 	return cmd
 }
 
@@ -444,6 +445,56 @@ func derivePlanID(title string) string {
 		result = strings.TrimRight(result[:40], "-")
 	}
 	return "plan-" + result
+}
+
+// ---- plan set-section -------------------------------------------------------
+
+func planSetSectionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-section <plan-id> <placeholder> <html-content>",
+		Short: "Set content for a plan section placeholder",
+		Long: `Inject HTML content into a named placeholder in the plan.
+
+Placeholders: PLAN_DESIGN_CONTENT, PLAN_OUTLINE_CONTENT, PLAN_QUESTIONS,
+PLAN_QUESTIONS_RECAP, PLAN_GRAPH_NODES, PLAN_SLICE_CARDS.
+
+The placeholder marker is replaced with the content. If the placeholder
+has already been replaced, the command has no effect (won't duplicate).
+
+Example:
+  htmlgraph plan set-section plan-my-feature PLAN_OUTLINE_CONTENT '<h4>Helpers</h4><pre><code>func ErrNotFound(kind, id string) error</code></pre>'`,
+		Args: cobra.ExactArgs(3),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runPlanSetSection(args[0], args[1], args[2])
+		},
+	}
+}
+
+func runPlanSetSection(planID, placeholder, content string) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
+	data, err := os.ReadFile(planPath)
+	if err != nil {
+		return fmt.Errorf("plan %q not found: %w", planID, err)
+	}
+
+	marker := "<!--" + strings.TrimSpace(placeholder) + "-->"
+	fileContent := string(data)
+	if !strings.Contains(fileContent, marker) {
+		return fmt.Errorf("placeholder %s not found in plan (already replaced or misspelled)", marker)
+	}
+
+	fileContent = strings.Replace(fileContent, marker, content+"\n    "+marker, 1)
+	if err := os.WriteFile(planPath, []byte(fileContent), 0o644); err != nil {
+		return err
+	}
+
+	fmt.Printf("Set %s in %s\n", placeholder, planID)
+	return nil
 }
 
 // ---- plan add-question ------------------------------------------------------
