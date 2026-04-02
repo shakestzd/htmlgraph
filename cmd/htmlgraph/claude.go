@@ -398,10 +398,7 @@ func cleanupStaleDev(projectRoot string) {
 
 func launchClaudeInit(extraArgs []string) error {
 	pluginDir := resolvePluginDir()
-	projectRoot := ""
-	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
-		projectRoot = filepath.Dir(htmlgraphDir)
-	}
+	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
 	fmt.Println("Launching Claude Code with marketplace plugin (init mode)...")
@@ -414,10 +411,7 @@ func launchClaudeInit(extraArgs []string) error {
 }
 
 func launchClaudeContinue(extraArgs []string) error {
-	projectRoot := ""
-	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
-		projectRoot = filepath.Dir(htmlgraphDir)
-	}
+	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
 	fmt.Println("Resuming last Claude Code session (continue mode)...")
@@ -431,10 +425,7 @@ func launchClaudeContinue(extraArgs []string) error {
 
 func launchClaudeDefault(extraArgs []string) error {
 	pluginDir := resolvePluginDir()
-	projectRoot := ""
-	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
-		projectRoot = filepath.Dir(htmlgraphDir)
-	}
+	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
 	fmt.Println("Launching Claude Code (default mode)...")
@@ -445,6 +436,7 @@ func launchClaudeDefault(extraArgs []string) error {
 		ProjectRoot:     projectRoot,
 	})
 }
+
 
 const htmlgraphMarketplaceRepo = "shakestzd/htmlgraph"
 
