@@ -39,6 +39,7 @@ if [ "${DIST_MODE}" = true ]; then
     INSTALL_DIR="${HOME}/.local/bin"
     META_DIR="${HOME}/.local/share/htmlgraph"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
+    rm -f "${INSTALL_DIR}/htmlgraph"  # Fresh inode avoids macOS signature cache
     cp "${BIN_DIR}/htmlgraph-bin" "${INSTALL_DIR}/htmlgraph"
     chmod +x "${INSTALL_DIR}/htmlgraph"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
@@ -61,6 +62,7 @@ else
     INSTALL_DIR="${HOME}/.local/bin"
     META_DIR="${HOME}/.local/share/htmlgraph"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
+    rm -f "${INSTALL_DIR}/htmlgraph"  # Fresh inode avoids macOS signature cache
     cp "${BIN_DIR}/htmlgraph" "${INSTALL_DIR}/htmlgraph"
     chmod +x "${INSTALL_DIR}/htmlgraph"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
