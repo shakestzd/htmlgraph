@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 )
 
 func yoloCmd() *cobra.Command {
@@ -84,13 +85,13 @@ func validateWorkItem(trackID, featureID, projectRoot string) (id, kind string, 
 	case trackID != "":
 		htmlFile := filepath.Join(htmlgraphDir, "tracks", trackID+".html")
 		if _, statErr := os.Stat(htmlFile); os.IsNotExist(statErr) {
-			return "", "", fmt.Errorf("track %s not found in .htmlgraph/", trackID)
+			return "", "", workitem.ErrNotFound("track", trackID)
 		}
 		return trackID, "track", nil
 	case featureID != "":
 		htmlFile := filepath.Join(htmlgraphDir, "features", featureID+".html")
 		if _, statErr := os.Stat(htmlFile); os.IsNotExist(statErr) {
-			return "", "", fmt.Errorf("feature %s not found in .htmlgraph/", featureID)
+			return "", "", workitem.ErrNotFound("feature", featureID)
 		}
 		return featureID, "feature", nil
 	default:

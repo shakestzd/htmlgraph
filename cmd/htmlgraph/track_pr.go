@@ -62,7 +62,7 @@ func runTrackPR(trackID, base string, dryRun bool) error {
 
 	// Check branch exists
 	if err := exec.Command("git", "rev-parse", "--verify", branchName).Run(); err != nil {
-		return fmt.Errorf("branch %s not found", branchName)
+		return fmt.Errorf("branch %s not found — track branches are created by YOLO mode\nRun 'htmlgraph yolo --track <id>' to create the worktree and branch.", branchName)
 	}
 
 	// Get commits on track branch not on base
