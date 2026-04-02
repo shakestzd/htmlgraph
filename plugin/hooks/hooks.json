@@ -176,17 +176,6 @@
         ]
       }
     ],
-    "SessionResume": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook session-resume"
-          }
-        ]
-      }
-    ],
     "TaskCreated": [
       {
         "matcher": "",
