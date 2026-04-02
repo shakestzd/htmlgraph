@@ -75,7 +75,7 @@ func projectRoot() (string, error) {
 func verifyHooksDir(dir string) error {
 	info, err := os.Stat(dir)
 	if err != nil {
-		return fmt.Errorf(".githooks directory not found at %s", dir)
+		return fmt.Errorf(".githooks directory not found at %s\nCreate it first: mkdir -p .githooks", dir)
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("%s exists but is not a directory", dir)

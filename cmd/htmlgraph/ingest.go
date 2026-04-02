@@ -148,7 +148,7 @@ func ingestBySessionID(database *sql.DB, sessionID string, force bool) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("session %s not found in ~/.claude/projects/", sessionID)
+	return fmt.Errorf("session %s not found in ~/.claude/projects/\nSession IDs are full UUIDs from Claude Code. Run 'htmlgraph ingest' without --session to discover available sessions.", sessionID)
 }
 
 func ingestFile(database *sql.DB, sf ingest.SessionFile, force bool) (int, int, error) {

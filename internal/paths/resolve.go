@@ -131,7 +131,7 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 	if wd, err := os.Getwd(); err == nil {
 		return wd, nil
 	}
-	return "", errors.New("no .htmlgraph directory found (run from within an htmlgraph project)")
+	return "", errors.New("no .htmlgraph directory found\nRun 'htmlgraph init' to initialize this directory, or cd into an existing htmlgraph project.")
 }
 
 // walkUpForHtmlgraph traverses parent directories looking for .htmlgraph/.

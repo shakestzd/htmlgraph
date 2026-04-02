@@ -193,7 +193,7 @@ func printComplianceText(r *complianceResult) error {
 	fmt.Println()
 
 	if r.HasFailure {
-		return fmt.Errorf("compliance check failed: %d criteria marked as failed", r.Failed)
+		return fmt.Errorf("compliance check failed: %d criteria marked as failed\nRun 'htmlgraph compliance show <feature-id>' to review individual criteria.", r.Failed)
 	}
 	return nil
 }

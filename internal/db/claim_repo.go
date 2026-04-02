@@ -95,7 +95,7 @@ func ClaimItem(db *sql.DB, claim *models.Claim, leaseDuration time.Duration) err
 		if qErr != nil {
 			return fmt.Errorf("work item %s already has an active claim (lookup failed: %w)", claim.WorkItemID, qErr)
 		}
-		return fmt.Errorf("work item %s already claimed by session %s (claim %s, status %s)",
+		return fmt.Errorf("work item %s already claimed by session %s (claim %s, status %s)\nClaims expire after 30 minutes. Run 'htmlgraph claim list' to check status.",
 			claim.WorkItemID, existing.OwnerSessionID, existing.ClaimID, existing.Status)
 	}
 	return nil

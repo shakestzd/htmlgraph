@@ -91,7 +91,7 @@ func autoTrackEdges(p *workitem.Project, itemID, typeName, trackID, itemTitle st
 func warnMissingFields(typeName string, o *wiCreateOpts) error {
 	// Track: warn about no --track (spikes and tracks exempt).
 	if o.trackID == "" && typeName != "track" && typeName != "spike" {
-		fmt.Fprintf(os.Stderr, "Warning: no track specified. Use --track to link this %s to an initiative.\n", typeName)
+		fmt.Fprintf(os.Stderr, "Warning: no track specified. Use --track <trk-id> to link this %s to an initiative.\nRun 'htmlgraph track list' to see existing tracks.\n", typeName)
 	}
 
 	switch typeName {

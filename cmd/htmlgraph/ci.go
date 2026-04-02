@@ -81,7 +81,7 @@ func detectGoDir(projectDir string) (string, error) {
 			return rel, nil
 		}
 	}
-	return "", fmt.Errorf("no go.mod found — only Go projects are supported currently")
+	return "", fmt.Errorf("no go.mod found in project root\nRun 'go mod init <module-name>' to create one, or check you're in the right directory.")
 }
 
 // generateGoWorkflow returns a GitHub Actions CI workflow YAML for a Go

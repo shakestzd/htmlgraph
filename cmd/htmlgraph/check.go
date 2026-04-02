@@ -147,5 +147,5 @@ func printResults(results []gateResult) error {
 		return nil
 	}
 	fmt.Println("\033[31mOne or more quality gates failed.\033[0m")
-	return fmt.Errorf("quality gates failed")
+	return fmt.Errorf("quality gates failed — see details above\nRun individual checks with 'htmlgraph check --go-only' to isolate failures.")
 }

@@ -28,7 +28,7 @@ func DiscoverSessions(projectFilter string) ([]SessionFile, error) {
 
 	projectsDir := filepath.Join(home, ".claude", "projects")
 	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("claude projects dir not found: %s", projectsDir)
+		return nil, fmt.Errorf("claude projects directory not found at %s\nClaude Code must be installed and have been run at least once. Install from https://claude.ai/code", projectsDir)
 	}
 
 	var files []SessionFile

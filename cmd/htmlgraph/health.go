@@ -76,7 +76,7 @@ func runHealth(path string, goOnly, pythonOnly, jsonOut, failOnWarn bool) error 
 	}
 	printHealthReport(*result)
 	if result.Failures > 0 {
-		return fmt.Errorf("health check failed: %d failure(s)", result.Failures)
+		return fmt.Errorf("health check failed: %d failure(s) — see violations above\nUse 'htmlgraph health --json' for machine-readable output.", result.Failures)
 	}
 	if failOnWarn && result.Warnings > 0 {
 		return fmt.Errorf("health check failed: %d warning(s)", result.Warnings)
