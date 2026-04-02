@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -84,7 +85,7 @@ func computeCompliance(featureID string) (*complianceResult, error) {
 
 	path := filepath.Join(dir, "features", featureID+".html")
 	if _, err := os.Stat(path); err != nil {
-		return nil, fmt.Errorf("feature %q not found", featureID)
+		return nil, workitem.ErrNotFound("feature", featureID)
 	}
 
 	content, err := os.ReadFile(path)

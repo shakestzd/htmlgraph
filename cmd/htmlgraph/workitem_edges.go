@@ -97,7 +97,7 @@ func warnMissingFields(typeName string, o *wiCreateOpts) error {
 	switch typeName {
 	case "bug", "feature":
 		if o.description == "" {
-			return fmt.Errorf("%s requires --description. Research context should be captured at creation time so future sessions don't need to re-research", typeName)
+			return fmt.Errorf("%s requires --description (captures context for future sessions)\nExample: htmlgraph %s create \"title\" --description \"root cause and context\"", typeName, typeName)
 		}
 	case "spec":
 		if o.description == "" {

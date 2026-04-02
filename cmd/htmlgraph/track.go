@@ -12,6 +12,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -77,7 +78,7 @@ func runTrackShow(id string, deep bool) error {
 		// Try subdirectory format: tracks/id/index.html
 		path = filepath.Join(dir, "tracks", id, "index.html")
 		if _, err := os.Stat(path); err != nil {
-			return fmt.Errorf("track %q not found", id)
+			return workitem.ErrNotFound("track", id)
 		}
 	}
 

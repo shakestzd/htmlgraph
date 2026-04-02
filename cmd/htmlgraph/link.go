@@ -88,7 +88,7 @@ func runLinkAdd(fromID, toID, rel string) error {
 
 	col := resolveCollection(p, fromID)
 	if col == nil {
-		return fmt.Errorf("cannot determine collection for %q", fromID)
+		return fmt.Errorf("cannot determine collection for %q\nID prefix must be feat-, bug-, spk-, trk-, plan-, or spec-. Partial hex IDs need the full prefix.", fromID)
 	}
 
 	normalizedRel := models.NormalizeRelationship(rel)
@@ -152,7 +152,7 @@ func runLinkRemove(fromID, toID, rel string) error {
 
 	col := resolveCollection(p, fromID)
 	if col == nil {
-		return fmt.Errorf("cannot determine collection for %q", fromID)
+		return fmt.Errorf("cannot determine collection for %q\nID prefix must be feat-, bug-, spk-, trk-, plan-, or spec-. Partial hex IDs need the full prefix.", fromID)
 	}
 
 	_, removed, err := col.RemoveEdge(fromID, toID, models.RelationshipType(rel))
@@ -160,7 +160,7 @@ func runLinkRemove(fromID, toID, rel string) error {
 		return fmt.Errorf("remove edge: %w", err)
 	}
 	if !removed {
-		return fmt.Errorf("no %s edge from %s to %s", rel, fromID, toID)
+		return fmt.Errorf("no %s edge from %s to %s\nRun 'htmlgraph link list %s' to see existing edges for this work item.", rel, fromID, toID, fromID)
 	}
 
 	fmt.Printf("Unlinked: %s -[%s]-> %s\n", fromID, rel, toID)

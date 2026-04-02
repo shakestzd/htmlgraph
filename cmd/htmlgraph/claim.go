@@ -124,7 +124,7 @@ func runClaimShow(claimID string) error {
 		return fmt.Errorf("get claim: %w", err)
 	}
 	if claim == nil {
-		return fmt.Errorf("claim %q not found", claimID)
+		return fmt.Errorf("claim %q not found — claims expire after 30 minutes of inactivity\nRun 'htmlgraph claim list' to see active claims.", claimID)
 	}
 
 	fmt.Printf("Claim:    %s\n", claim.ClaimID)
@@ -190,7 +190,7 @@ func runClaimRelease(claimID string) error {
 		return fmt.Errorf("get claim: %w", err)
 	}
 	if claim == nil {
-		return fmt.Errorf("claim %q not found", claimID)
+		return fmt.Errorf("claim %q not found — claims expire after 30 minutes of inactivity\nRun 'htmlgraph claim list' to see active claims.", claimID)
 	}
 
 	// Release the claim (moves to abandoned state)
@@ -249,7 +249,7 @@ func runHeartbeatOne(db *sql.DB, claimID string) error {
 		return fmt.Errorf("get claim: %w", err)
 	}
 	if claim == nil {
-		return fmt.Errorf("claim %q not found", claimID)
+		return fmt.Errorf("claim %q not found — claims expire after 30 minutes of inactivity\nRun 'htmlgraph claim list' to see active claims.", claimID)
 	}
 
 	// Default lease duration (30 minutes)
@@ -273,7 +273,7 @@ func runHeartbeatAllForSession(db *sql.DB) error {
 		var err error
 		sessionID, err = dbpkg.MostRecentActiveSession(db)
 		if err != nil || sessionID == "" {
-			return fmt.Errorf("no active session found; specify claim ID explicitly")
+			return fmt.Errorf("no active session found — cannot auto-detect claim\nSpecify the claim ID directly: 'htmlgraph claim heartbeat clm-xxxxxxxx'. Run 'htmlgraph claim list' to find it.")
 		}
 	}
 

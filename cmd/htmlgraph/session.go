@@ -178,7 +178,7 @@ func runSessionEnd(sessionID string) error {
 			return fmt.Errorf("find active session: %w", err)
 		}
 		if sessionID == "" {
-			return fmt.Errorf("no active sessions found")
+			return fmt.Errorf("no active sessions found\nRun 'htmlgraph session start' to begin tracking, or specify a session ID explicitly.")
 		}
 	}
 

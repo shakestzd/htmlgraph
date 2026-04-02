@@ -57,7 +57,7 @@ func runReport(sessionID string, summaryOnly bool) error {
 			return fmt.Errorf("find most recent session: %w", err)
 		}
 		if sessionID == "" {
-			return fmt.Errorf("no sessions found")
+			return fmt.Errorf("no sessions found in the database\nRun 'htmlgraph ingest' to import Claude Code session transcripts, or 'htmlgraph session start' to begin tracking.")
 		}
 	}
 

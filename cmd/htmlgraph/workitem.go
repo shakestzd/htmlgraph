@@ -185,7 +185,7 @@ func createNode(p *workitem.Project, typeName, title string, o *wiCreateOpts) (*
 		}
 		return p.Specs.Create(title, opts...)
 	default:
-		return nil, fmt.Errorf("unknown type: %s", typeName)
+		return nil, fmt.Errorf("unknown type %q\nValid types: feature, bug, spike, track, plan, spec", typeName)
 	}
 }
 
@@ -266,7 +266,8 @@ func runWiShow(id string) error {
 	}
 	path := resolveNodePath(dir, resolved)
 	if path == "" {
-		return fmt.Errorf("work item %q not found", resolved)
+		kind := kindFromPrefix(resolved)
+		return workitem.ErrNotFoundOnDisk(kind, resolved)
 	}
 	node, err := htmlparse.ParseFile(path)
 	if err != nil {
@@ -398,7 +399,8 @@ func runWiDelete(id string) error {
 	}
 	path := resolveNodePath(dir, resolved)
 	if path == "" {
-		return fmt.Errorf("work item %q not found", resolved)
+		kind := kindFromPrefix(resolved)
+		return workitem.ErrNotFoundOnDisk(kind, resolved)
 	}
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("delete %s: %w", resolved, err)
@@ -527,4 +529,28 @@ func printNodeDetail(n *models.Node) {
 			fmt.Printf("  %s\n", line)
 		}
 	}
+}
+
+// kindFromPrefix determines the work item kind from an ID prefix.
+// Examples: "feat-" -> "feature", "bug-" -> "bug", "trk-" -> "track", "spk-" -> "spike"
+func kindFromPrefix(id string) string {
+	if strings.HasPrefix(id, "feat-") {
+		return "feature"
+	}
+	if strings.HasPrefix(id, "bug-") {
+		return "bug"
+	}
+	if strings.HasPrefix(id, "spk-") {
+		return "spike"
+	}
+	if strings.HasPrefix(id, "trk-") {
+		return "track"
+	}
+	if strings.HasPrefix(id, "pln-") {
+		return "plan"
+	}
+	if strings.HasPrefix(id, "spc-") {
+		return "spec"
+	}
+	return "work item" // fallback
 }

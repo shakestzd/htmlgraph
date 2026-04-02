@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +59,7 @@ func runTDD(featureID string, python bool, output, pkg string) error {
 
 	path := filepath.Join(dir, "features", featureID+".html")
 	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("feature %q not found in %s/features/", featureID, dir)
+		return workitem.ErrNotFound("feature", featureID)
 	}
 
 	criteria, err := extractAcceptanceCriteria(path)

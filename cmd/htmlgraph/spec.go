@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -93,7 +94,7 @@ func runSpecShow(featureID, format, output string) error {
 
 	path := filepath.Join(dir, "features", featureID+".html")
 	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("feature %q not found", featureID)
+		return workitem.ErrNotFound("feature", featureID)
 	}
 
 	content, err := os.ReadFile(path)
@@ -122,7 +123,7 @@ func resolveFeatureTitle(featureID string) (string, error) {
 
 	path := filepath.Join(dir, "features", featureID+".html")
 	if _, err := os.Stat(path); err != nil {
-		return "", fmt.Errorf("feature %q not found in %s/features/", featureID, dir)
+		return "", workitem.ErrNotFound("feature", featureID)
 	}
 
 	node, err := htmlparse.ParseFile(path)

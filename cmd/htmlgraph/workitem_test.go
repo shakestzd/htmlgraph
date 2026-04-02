@@ -267,3 +267,112 @@ func TestBugCreateNoLinkSkipsCausedBy(t *testing.T) {
 		t.Errorf("--no-link should skip caused_by edge, got %v", bugNode.Edges)
 	}
 }
+
+func TestFeatureCreateRequiresDescription(t *testing.T) {
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	// Try to create a feature without --description
+	opts := &wiCreateOpts{
+		trackID:     "",
+		priority:    "high",
+		description: "", // no description
+		start:       false,
+		noLink:      false,
+	}
+	err := runWiCreate("feature", "Feature without description", opts)
+
+	if err == nil {
+		t.Fatal("expected error when creating feature without --description, got nil")
+	}
+
+	// Check error message contains example syntax
+	errMsg := err.Error()
+	if !stringContains(errMsg, "Example:") {
+		t.Errorf("error message should mention 'Example:' to show syntax: %q", errMsg)
+	}
+	if !stringContains(errMsg, "--description") {
+		t.Errorf("error message should mention --description: %q", errMsg)
+	}
+	if !stringContains(errMsg, "feature") {
+		t.Errorf("error message should mention 'feature' command: %q", errMsg)
+	}
+}
+
+func TestBugCreateRequiresDescription(t *testing.T) {
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	// Try to create a bug without --description
+	opts := &wiCreateOpts{
+		trackID:     "",
+		priority:    "high",
+		description: "", // no description
+		start:       false,
+		noLink:      false,
+	}
+	err := runWiCreate("bug", "Bug without description", opts)
+
+	if err == nil {
+		t.Fatal("expected error when creating bug without --description, got nil")
+	}
+
+	// Check error message contains example syntax
+	errMsg := err.Error()
+	if !stringContains(errMsg, "Example:") {
+		t.Errorf("error message should mention 'Example:' to show syntax: %q", errMsg)
+	}
+	if !stringContains(errMsg, "--description") {
+		t.Errorf("error message should mention --description: %q", errMsg)
+	}
+	if !stringContains(errMsg, "bug") {
+		t.Errorf("error message should mention 'bug' command: %q", errMsg)
+	}
+}
+
+func TestSpecCreateNoDescriptionWarning(t *testing.T) {
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	// Create a spec without --description (should warn, not error)
+	opts := &wiCreateOpts{
+		trackID:     "",
+		priority:    "medium",
+		description: "", // no description
+		start:       false,
+		noLink:      false,
+	}
+	err := runWiCreate("spec", "Spec without description", opts)
+
+	if err != nil {
+		t.Fatalf("spec should warn but not error, got: %v", err)
+	}
+}
+
+// stringContains is a helper to check if a string contains a substring
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

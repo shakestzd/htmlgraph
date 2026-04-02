@@ -83,10 +83,6 @@ func wipResetCmd() *cobra.Command {
 }
 
 func runWipReset(force bool) error {
-	if !force {
-		return fmt.Errorf("use --force to confirm resetting all in-progress items to todo")
-	}
-
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err
@@ -95,6 +91,11 @@ func runWipReset(force bool) error {
 	items, err := scanInProgress(dir)
 	if err != nil {
 		return err
+	}
+
+	if !force {
+		count := len(items)
+		return fmt.Errorf("%d items are in-progress. This will reset all to todo.\nRun 'htmlgraph wip reset --force' to confirm, or 'htmlgraph wip show' to review first.", count)
 	}
 
 	if len(items) == 0 {
