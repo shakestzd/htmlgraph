@@ -1,13 +1,13 @@
 ---
 name: htmlgraph:plan
-description: Plan development work with interactive HTML review before any code is written. Generates a human-reviewable plan, waits for structured feedback, then hands off to execute. Use when asked to plan, create a development plan, parallelize work, or build a feature with design clarity first.
+description: Plan development work with interactive HTML review before any code is written. Generates a human-reviewable HTML plan file via `htmlgraph plan generate`, waits for structured feedback, then hands off to execute. Use when asked to plan, create a development plan, generate a plan HTML file, parallelize work, or build a feature with design clarity first.
 ---
 
 # HtmlGraph Plan
 
 Use this skill when asked to plan development work, create a parallel execution plan, organize tasks for multi-agent execution, or build a feature with human review before implementation.
 
-**Trigger keywords:** create plan, development plan, parallel plan, plan tasks, parallelize work, organize work, task breakdown, crispi, interactive plan, plan with review, design and build, plan this feature, review before building
+**Trigger keywords:** create plan, development plan, parallel plan, plan tasks, parallelize work, organize work, task breakdown, crispi, interactive plan, plan with review, design and build, plan this feature, review before building, generate plan html, plan html file, planning htmlfile, generate the plan, scaffold plan
 
 ---
 
@@ -53,6 +53,13 @@ Research must answer:
 ---
 
 ## Step 2: Generate the Interactive Plan HTML
+
+**CRITICAL: Always use the CLI to generate plan HTML. Never write plan HTML manually or delegate HTML generation to a subagent.**
+
+```bash
+# This is the ONLY correct way to generate a plan HTML file:
+htmlgraph plan generate <track-id>
+```
 
 ### Slice Design Rules
 
