@@ -166,9 +166,15 @@ func runWiSetStatus(typeName, id, status string) error {
 
 	col := collectionFor(p, typeName)
 	var node *models.Node
-	if status == "in-progress" {
+	switch status {
+	case "in-progress":
 		node, err = col.Start(id)
-	} else {
+	case "blocked":
+		err = col.Edit(id).SetStatus("blocked").Save()
+		if err == nil {
+			node, err = col.Get(id)
+		}
+	default:
 		node, err = col.Complete(id)
 	}
 	if err != nil {
@@ -205,8 +211,11 @@ func runWiSetStatus(typeName, id, status string) error {
 	}
 
 	verb := "Started"
-	if status == "done" {
+	switch status {
+	case "done":
 		verb = "Completed"
+	case "blocked":
+		verb = "Blocked"
 	}
 	fmt.Printf("%s: %s  %s\n", verb, node.ID, node.Title)
 	return nil

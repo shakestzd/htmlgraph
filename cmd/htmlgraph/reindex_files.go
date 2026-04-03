@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"os/exec"
@@ -78,11 +79,14 @@ func reindexFeatureFiles(database *sql.DB, projectDir string) (int, error) {
 
 // sanitizePathID converts a file path to a short token safe for use in a
 // composite primary key (replaces separators and dots, truncates to 32 chars).
+// When truncation is required, an 8-char hex suffix derived from the original
+// path is appended to prevent collisions between paths with identical prefixes.
 func sanitizePathID(filePath string) string {
 	r := strings.NewReplacer("/", "-", ".", "-", " ", "-")
 	s := r.Replace(filePath)
 	if len(s) > 32 {
-		s = s[:32]
+		h := sha256.Sum256([]byte(filePath))
+		s = s[:24] + fmt.Sprintf("%x", h[:4]) // 24 chars + 8 hex = 32 total
 	}
 	return s
 }

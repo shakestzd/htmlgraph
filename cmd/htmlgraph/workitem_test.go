@@ -389,6 +389,61 @@ func TestSpecCreateNoDescriptionWarning(t *testing.T) {
 	}
 }
 
+func TestRunWiSetStatus_BlockedClearsCache(t *testing.T) {
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	// Set cache dir to temp so we don't pollute the real home dir.
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	// Create a feature linked to the track.
+	if err := testCreate("feature", "Test Blocked Feature", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 1 {
+		t.Fatalf("expected 1 feature file, got %d", len(featFiles))
+	}
+	featNode, err := htmlparse.ParseFile(featFiles[0])
+	if err != nil {
+		t.Fatalf("parse feature: %v", err)
+	}
+
+	// Start it — cache should be populated.
+	if err := runWiSetStatus("feature", featNode.ID, "in-progress"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	cache := ReadStatuslineCache()
+	if cache == "" {
+		t.Fatal("cache should be populated after start")
+	}
+
+	// Block it — cache should be cleared and status must become blocked.
+	if err := runWiSetStatus("feature", featNode.ID, "blocked"); err != nil {
+		t.Fatalf("blocked: %v", err)
+	}
+	cache = ReadStatuslineCache()
+	if cache != "" {
+		t.Errorf("cache should be empty after blocked, got %q", cache)
+	}
+
+	// Verify the status was actually set to blocked (not done).
+	updatedNode, err := htmlparse.ParseFile(featFiles[0])
+	if err != nil {
+		t.Fatalf("parse after blocked: %v", err)
+	}
+	if string(updatedNode.Status) != "blocked" {
+		t.Errorf("expected status %q, got %q", "blocked", updatedNode.Status)
+	}
+}
+
 // stringContains is a helper to check if a string contains a substring
 func stringContains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {

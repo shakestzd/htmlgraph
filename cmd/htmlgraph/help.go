@@ -35,7 +35,9 @@ const compactCLIRef = `htmlgraph CLI commands:
   yolo --feature <id> [--track <id>] — Autonomous dev mode
   build — Build Go binary (dev workflow)
   serve — Start local dashboard server
-  agent-init — Output shared agent context (safety, attribution, quality gates)`
+  agent-init — Output shared agent context (safety, attribution, quality gates)
+
+Required flags: feature/bug create require --track <id> --description "…"`
 
 // helpCmd returns the "htmlgraph help" command with --compact flag support.
 func helpCmd() *cobra.Command {

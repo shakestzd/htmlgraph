@@ -106,9 +106,20 @@ func parseBatchSpec(data []byte) (*batchSpec, error) {
 	return &spec, nil
 }
 
+func validateBatchSpec(spec *batchSpec) error {
+	if len(spec.Features) > 0 && spec.Track.Title == "" {
+		return fmt.Errorf("batch spec has %d feature(s) but no track — features require a parent track to avoid orphans", len(spec.Features))
+	}
+	return nil
+}
+
 func executeBatchApply(data []byte, dryRun bool) (*batchResult, error) {
 	spec, err := parseBatchSpec(data)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := validateBatchSpec(spec); err != nil {
 		return nil, err
 	}
 

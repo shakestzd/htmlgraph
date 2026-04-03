@@ -206,3 +206,49 @@ func TestParseBatchSpecInvalid(t *testing.T) {
 		t.Fatal("expected error for invalid YAML")
 	}
 }
+
+func TestBatchApplyRejectsOrphanFeatures(t *testing.T) {
+	yamlData := `
+features:
+  - title: "Orphan Feature"
+    priority: high
+`
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	_, err := executeBatchApply([]byte(yamlData), false)
+	if err == nil {
+		t.Fatal("expected error for features without track")
+	}
+	if !strings.Contains(err.Error(), "track") {
+		t.Errorf("error should mention track, got: %v", err)
+	}
+}
+
+func TestBatchApplyRejectsOrphanFeaturesDryRun(t *testing.T) {
+	yamlData := `
+features:
+  - title: "Orphan Feature"
+    priority: high
+`
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	_, err := executeBatchApply([]byte(yamlData), true)
+	if err == nil {
+		t.Fatal("expected error for features without track (dry-run)")
+	}
+	if !strings.Contains(err.Error(), "track") {
+		t.Errorf("error should mention track, got: %v", err)
+	}
+}

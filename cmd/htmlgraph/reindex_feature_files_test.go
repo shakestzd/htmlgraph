@@ -279,7 +279,6 @@ func TestSanitizePathID(t *testing.T) {
 		{"src/foo.go", "src-foo-go"},
 		{"a/b/c.go", "a-b-c-go"},
 		{"simple", "simple"},
-		{strings.Repeat("x", 40), strings.Repeat("x", 32)},
 	}
 	for _, tc := range cases {
 		got := sanitizePathID(tc.input)
@@ -289,5 +288,33 @@ func TestSanitizePathID(t *testing.T) {
 		if len(got) > 32 {
 			t.Errorf("sanitizePathID(%q) too long: %d chars", tc.input, len(got))
 		}
+	}
+
+	// Long paths get truncated to exactly 32 chars (with hash suffix).
+	long := strings.Repeat("x", 40)
+	got := sanitizePathID(long)
+	if len(got) != 32 {
+		t.Errorf("sanitizePathID(long) length = %d, want 32", len(got))
+	}
+}
+
+// TestSanitizePathID_NoCollision verifies that two paths sharing the same first
+// 32 sanitized characters produce distinct IDs after truncation.
+func TestSanitizePathID_NoCollision(t *testing.T) {
+	// Two paths that share the same first 32 sanitized characters.
+	pathA := "internal/very/long/deeply/nested/directory/structure/fileA.go"
+	pathB := "internal/very/long/deeply/nested/directory/structure/fileB.go"
+
+	idA := sanitizePathID(pathA)
+	idB := sanitizePathID(pathB)
+
+	if idA == idB {
+		t.Errorf("collision: sanitizePathID(%q) == sanitizePathID(%q) == %q", pathA, pathB, idA)
+	}
+	if len(idA) > 32 {
+		t.Errorf("sanitizePathID too long: %d chars", len(idA))
+	}
+	if len(idB) > 32 {
+		t.Errorf("sanitizePathID too long: %d chars", len(idB))
 	}
 }
