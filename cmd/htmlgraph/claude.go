@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -126,23 +124,6 @@ func launchClaudeDev(extraArgs []string, auto bool) error {
 		}
 	}
 
-	// Reinstall marketplace plugin on exit so non-dev sessions work normally.
-	reinstallFn := func() {
-		fmt.Println("Reinstalling marketplace htmlgraph plugin...")
-		if err := ensureHtmlgraphPlugin(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not reinstall plugin: %v\n", err)
-			fmt.Fprintf(os.Stderr, "  Run manually: claude plugin marketplace add %s && claude plugin install htmlgraph@htmlgraph\n", htmlgraphMarketplaceRepo)
-		}
-		fmt.Println("Dev mode cleanup complete.")
-	}
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		reinstallFn()
-		os.Exit(0)
-	}()
 
 	if auto {
 		fmt.Printf("Launching Claude Code with local plugin (--plugin-dir mode) + auto mode\n")
@@ -151,7 +132,7 @@ func launchClaudeDev(extraArgs []string, auto bool) error {
 	}
 	fmt.Printf("  Plugin source: %s\n", pluginDir)
 
-	launchErr := launchClaude(LaunchOpts{
+	return launchClaude(LaunchOpts{
 		Mode:               "go",
 		PluginDir:          pluginDir,
 		InjectSystemPrompt: true,
@@ -160,8 +141,6 @@ func launchClaudeDev(extraArgs []string, auto bool) error {
 		ExtraArgs:          extraArgs,
 		ProjectRoot:        projectRoot,
 	})
-	reinstallFn()
-	return launchErr
 }
 
 // autoPermissionMode returns "auto" when enabled is true, otherwise empty string.
