@@ -128,3 +128,4 @@ __marimo__/
 _build/
 archive/
 packages/go-plugin/hooks/bin/
+htmlgraph
