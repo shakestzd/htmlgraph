@@ -440,9 +440,7 @@ func checkYoloUIValidationGuard(event *CloudEvent, yolo bool, database *sql.DB, 
 			SELECT COUNT(*) FROM agent_events
 			WHERE session_id = ?
 			  AND (tool_name LIKE '%screenshot%'
-			    OR tool_name LIKE '%take_screenshot%'
-			    OR input_summary LIKE '%ui-review%'
-			    OR input_summary LIKE '%htmlgraph:ui-review%')`,
+			    OR tool_name LIKE '%take_screenshot%')`,
 			sid,
 		).Scan(&validationCount)
 		if validationCount > 0 {
@@ -451,5 +449,5 @@ func checkYoloUIValidationGuard(event *CloudEvent, yolo bool, database *sql.DB, 
 	}
 
 	return "UI files were modified but no visual validation was performed. " +
-		"Take a screenshot or run /htmlgraph:ui-review before committing."
+		"Take a screenshot before committing."
 }
