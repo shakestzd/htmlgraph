@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/hooks"
 	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/shakestzd/htmlgraph/internal/workowners"
 )
 
 // detectActiveFeature returns the active feature ID from the session DB, or "".
@@ -119,13 +121,28 @@ func warnMissingFields(typeName string, o *wiCreateOpts) error {
 	return nil
 }
 
-// suggestTrackFromFiles resolves file ownership for the first affected file
-// and returns a suggestion string like "--track trk-abc (Feature Title owns cmd/foo.go)".
+// suggestTrackFromFiles resolves file ownership for the first affected file.
+// Checks WORKOWNERS static map first, then falls back to DB heuristic.
+// Returns a suggestion string like "--track trk-abc (owns cmd/foo.go)".
 func suggestTrackFromFiles(files string) string {
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return ""
 	}
+
+	// Check WORKOWNERS static map first.
+	wf, _ := workowners.Parse(filepath.Join(dir, "WORKOWNERS"))
+	for _, f := range strings.Split(files, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		if ownerID := wf.Resolve(f); ownerID != "" {
+			return fmt.Sprintf("--track %s (WORKOWNERS: %s)", ownerID, f)
+		}
+	}
+
+	// Fall back to DB heuristic.
 	database := openTrackDB(dir)
 	if database == nil {
 		return ""
