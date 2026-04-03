@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/spf13/cobra"
 )
@@ -79,7 +80,7 @@ func runPlanGenerate(sourceID string) error {
 		return fmt.Errorf("read plan template: %w", err)
 	}
 
-	graphNodes, sliceCards, sectionsJSON, totalSections := buildPlanSections(nodePath)
+	graphNodes, sliceCards, sectionsJSON, totalSections := buildPlanSections(nodePath, htmlgraphDir)
 
 	content := applyPlanTemplateVars(string(tmplData), planTemplateVars{
 		PlanID:        planID,
@@ -347,7 +348,7 @@ type planFeature struct {
 // buildPlanSections parses the source node for "contains" edges and generates
 // graph node HTML, slice card HTML, sections JSON, and total section count.
 // Falls back to empty strings (leaving template placeholders intact) on any error.
-func buildPlanSections(nodePath string) (graphNodes, sliceCards, sectionsJSON, totalSections string) {
+func buildPlanSections(nodePath, htmlgraphDir string) (graphNodes, sliceCards, sectionsJSON, totalSections string) {
 	node, err := htmlparse.ParseFile(nodePath)
 	if err != nil {
 		return
@@ -374,8 +375,13 @@ func buildPlanSections(nodePath string) (graphNodes, sliceCards, sectionsJSON, t
 		features = append(features, planFeature{num: num, id: edge.TargetID, title: title})
 	}
 
-	// Read each child feature's blocked_by edges and description.
-	htmlgraphDir := filepath.Dir(filepath.Dir(nodePath)) // nodePath is .htmlgraph/tracks/trk-xxx.html
+	// Open SQLite for file count queries (best-effort).
+	database, dbErr := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	if dbErr == nil {
+		defer database.Close()
+	}
+
+	// Read each child feature's blocked_by edges, description, and file count.
 	featureDeps := make(map[int]string, len(features))
 	featureDescs := make(map[int]string, len(features))
 	featureFiles := make(map[int]int, len(features))
@@ -399,8 +405,12 @@ func buildPlanSections(nodePath string) (graphNodes, sliceCards, sectionsJSON, t
 			}
 			featureDescs[f.num] = desc
 		}
-		// Count files from implemented_in edges as a rough file count.
-		featureFiles[f.num] = len(childNode.Edges["implemented_in"])
+		// Query actual file count from SQLite feature_files table.
+		if database != nil {
+			if count, err := dbpkg.CountFilesByFeature(database, f.id); err == nil {
+				featureFiles[f.num] = count
+			}
+		}
 		var depNums []string
 		for _, blockedEdge := range childNode.Edges["blocked_by"] {
 			if num, ok := idToNum[blockedEdge.TargetID]; ok {

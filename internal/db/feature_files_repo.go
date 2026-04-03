@@ -29,6 +29,16 @@ func UpsertFeatureFile(db *sql.DB, ff *models.FeatureFile) error {
 	return nil
 }
 
+// CountFilesByFeature returns the number of distinct files touched by a feature.
+func CountFilesByFeature(db *sql.DB, featureID string) (int, error) {
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM feature_files WHERE feature_id = ?`, featureID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count files for %s: %w", featureID, err)
+	}
+	return count, nil
+}
+
 // ListFilesByFeature returns all file paths recorded for a feature.
 func ListFilesByFeature(db *sql.DB, featureID string) ([]models.FeatureFile, error) {
 	rows, err := db.Query(`
