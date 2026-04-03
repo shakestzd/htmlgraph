@@ -7,7 +7,7 @@ tools:
   - Bash
   - Read
   - Grep
-maxTurns: 5
+maxTurns: 10
 skills:
   - agent-context
 initialPrompt: "Run `htmlgraph agent-init` to load project context."
