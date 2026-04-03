@@ -64,7 +64,7 @@ Report:
 - The command output
 - Any errors encountered
 
-## Safety Rules
+## Git Safety Rules
 
 - NEVER use `git push --force` directly — use copilot with `--deny-tool "shell(git push --force)"`
 - NEVER commit sensitive files (.env, credentials)
