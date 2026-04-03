@@ -50,7 +50,7 @@ Show project progress and current feature
 
 ## Project Status
 
-**Progress:** {status['done_count']}/{status['total_nodes']} ({percentage}%)
+**Progress:** {done_count}/{total_nodes} ({percentage}%)
 **Active:** {status['in_progress_count']} features in progress
 
 ### Current Feature(s)

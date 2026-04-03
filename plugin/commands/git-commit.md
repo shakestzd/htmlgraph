@@ -39,7 +39,7 @@ If no message was provided, draft one from the diff using conventional commit fo
 
 ### Priority 1: Delegate to copilot-operator agent (preferred)
 
-```python
+```text
 Agent(
     subagent_type="htmlgraph:copilot-operator",
     description="Commit: <message>",

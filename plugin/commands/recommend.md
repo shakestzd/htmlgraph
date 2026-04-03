@@ -35,12 +35,10 @@ The command displays:
 
 ## Instructions for Claude
 
-This skill invokes the `/htmlgraph:recommend` command via the CLI, which provides all analytics in one unified output.
+This command invokes `htmlgraph recommend` via the CLI, which provides all analytics in one unified output.
 
 **Key workflow:**
 1. Run `htmlgraph recommend [--top N]` where N is user's choice or default 5
 2. Present the output with light markdown formatting
 3. Analyze the **recommended items** for parallel execution opportunities
 4. Propose next action: either parallel launch or sequential plan
-
-**See the skill:** `/htmlgraph:recommend` (in Claude Code plugin menu)

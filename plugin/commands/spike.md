@@ -5,14 +5,14 @@ Create a research/planning spike
 ## Usage
 
 ```
-/htmlgraph:spike <title> [--context TEXT] [--timebox HOURS]
+/htmlgraph:spike <title> [--description TEXT] [--track ID]
 ```
 
 ## Parameters
 
 - `title` (required): Spike title (e.g., "Research authentication options")
-- `--context` (optional) (default: ): Background information for the spike
-- `--timebox` (optional) (default: 4.0): Time limit in hours
+- `--description` (optional): Description text for the spike
+- `--track` (optional): Track ID to link to
 
 
 ## Examples
@@ -20,17 +20,17 @@ Create a research/planning spike
 ```bash
 /htmlgraph:spike "Research OAuth providers"
 ```
-Create a 4-hour research spike
+Create a spike
 
 ```bash
-/htmlgraph:spike "Investigate caching strategies" --timebox 2
+/htmlgraph:spike "Investigate caching strategies" --description "Focus on Redis vs Memcached"
 ```
-Create a 2-hour spike
+Create a spike with description
 
 ```bash
-/htmlgraph:spike "Plan data migration" --context "Moving from SQL to NoSQL"
+/htmlgraph:spike "Plan data migration" --track trk-abc123
 ```
-Spike with background context
+Spike linked to a track
 
 
 

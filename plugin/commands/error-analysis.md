@@ -39,7 +39,7 @@ Interactive error capture workflow
 
 **CRITICAL: This command implements systematic error investigation using HtmlGraph spikes.**
 
-This command follows the research-first debugging methodology from `.claude/rules/debugging.md`. It ensures errors are properly documented, investigated systematically, and tracked in HtmlGraph.
+This command follows a research-first debugging methodology: capture the error, categorize it, investigate systematically, and track progress in HtmlGraph.
 
 ### Implementation:
 
