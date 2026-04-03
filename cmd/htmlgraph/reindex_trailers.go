@@ -126,7 +126,7 @@ func parseTrailers(message string) []string {
 
 // isWorkItemID returns true if s looks like a valid work item ID prefix.
 func isWorkItemID(s string) bool {
-	for _, prefix := range []string{"feat-", "bug-", "spk-", "trk-"} {
+	for _, prefix := range []string{"feat-", "bug-", "spk-", "trk-", "pln-", "spc-", "plan-", "spec-"} {
 		if strings.HasPrefix(s, prefix) {
 			return true
 		}

@@ -73,6 +73,48 @@ func TestParseTrailers_Deduplication(t *testing.T) {
 	}
 }
 
+func TestParseTrailers_PlanAndSpecPrefixes(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want []string
+	}{
+		{"pln prefix", "Refs: pln-abc123", []string{"pln-abc123"}},
+		{"spc prefix", "Refs: spc-def456", []string{"spc-def456"}},
+		{"plan prefix", "Refs: plan-abc123", []string{"plan-abc123"}},
+		{"spec prefix", "Refs: spec-def456", []string{"spec-def456"}},
+		{"mixed with plan", "Refs: feat-a\nFixes: pln-b", []string{"feat-a", "pln-b"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ids := parseTrailers(tc.msg)
+			if len(ids) != len(tc.want) {
+				t.Fatalf("got %v, want %v", ids, tc.want)
+			}
+			for i, id := range ids {
+				if id != tc.want[i] {
+					t.Errorf("ids[%d] = %q, want %q", i, id, tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestIsWorkItemID_AllPrefixes(t *testing.T) {
+	valid := []string{"feat-a", "bug-b", "spk-c", "trk-d", "pln-e", "spc-f", "plan-g", "spec-h"}
+	for _, id := range valid {
+		if !isWorkItemID(id) {
+			t.Errorf("isWorkItemID(%q) = false, want true", id)
+		}
+	}
+	invalid := []string{"xyz-a", "feature-a", "task-b", ""}
+	for _, id := range invalid {
+		if isWorkItemID(id) {
+			t.Errorf("isWorkItemID(%q) = true, want false", id)
+		}
+	}
+}
+
 func TestReindexCommitTrailers_IngestsFromGit(t *testing.T) {
 	tmpDir := t.TempDir()
 
