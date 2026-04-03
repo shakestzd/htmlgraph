@@ -38,14 +38,13 @@ Research JWT security and attach findings to existing spike
 
 **CRITICAL: This command MUST be used before planning complex features.**
 
-This command implements the mandatory research phase from PARALLEL_WORKFLOW.md. Research reduces:
+This command implements the mandatory research phase. Research reduces:
 - Implementation mistakes (learn from others' experiences)
 - Context usage (targeted research vs reading entire codebases)
 - Time waste (proven patterns vs trial-and-error)
 
 ### Implementation:
 
-```python
 **DO THIS:**
 
 1. **Parse the research topic:**
@@ -90,14 +89,13 @@ This command implements the mandatory research phase from PARALLEL_WORKFLOW.md. 
    Check that findings include:
    - ✅ At least 3 different sources
    - ✅ Specific recommendations (not vague)
-   - ✅ Modern practices (2024-2025)
+   - ✅ Modern practices (2025-2026)
    - ✅ Code examples or patterns
    - ✅ Links to sources
 
 6. **Suggest next steps:**
    - If spike exists → "Complete spike steps, then use /htmlgraph:plan"
    - If no spike → "Use /htmlgraph:plan to create track from findings"
-```
 
 ### Research Structure Template:
 
@@ -147,7 +145,7 @@ Key points:
 
 ### Research Validated
 - ✅ Multiple sources consulted
-- ✅ Modern practices (2024-2025)
+- ✅ Modern practices (2025-2026)
 - ✅ Specific recommendations provided
 - ✅ Code patterns identified
 - ✅ Links documented
@@ -176,7 +174,7 @@ Before completing research, verify:
 
 - [ ] **Breadth:** Covered multiple aspects (implementation, security, performance)
 - [ ] **Depth:** Specific recommendations, not generic advice
-- [ ] **Currency:** Sources from 2024-2025, not outdated
+- [ ] **Currency:** Sources from 2025-2026, not outdated
 - [ ] **Practical:** Code examples or concrete patterns
 - [ ] **Traceable:** Links to all sources
 - [ ] **Structured:** Findings organized clearly
@@ -253,7 +251,7 @@ The complete planning workflow is:
 # - Identify risks (from anti-patterns)
 
 # Step 4: Create track from spike
-# Uses SDK.create_track_from_plan() with spike findings
+# Use: htmlgraph track create "title" with spike findings
 
 # Step 5: Implement features
 # With confidence from research-backed design

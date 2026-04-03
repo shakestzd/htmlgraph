@@ -103,7 +103,7 @@ After the agent reports back, present findings to the user in this format:
 
 ### Next Steps
 - [ ] Implement fix
-- [ ] Run tests: `(cd packages/go && go test ./...)`
+- [ ] Run tests: `go test ./...`
 - [ ] Verify: <specific verification command>
 ```
 

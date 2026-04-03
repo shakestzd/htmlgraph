@@ -33,7 +33,6 @@ Begin a new development session and choose what to work on
    ```bash
    htmlgraph snapshot --summary
    htmlgraph analytics summary
-   htmlgraph analytics summary
    ```
 
 2. **Parse the output** to extract:
@@ -100,7 +99,7 @@ Begin a new development session and choose what to work on
 
 ---
 
-### 🎯 Strategic Insights
+### Strategic Insights
 
 #### Bottlenecks ({bottleneck_count})
 {bottleneck_list}

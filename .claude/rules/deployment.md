@@ -1,3 +1,10 @@
+---
+paths:
+  - "scripts/**"
+  - "plugin/.claude-plugin/**"
+  - ".goreleaser.yml"
+---
+
 # Deployment & Release Rules
 
 **CRITICAL: Use `./scripts/deploy-all.sh` or `/htmlgraph:deploy` for all deployment operations.**

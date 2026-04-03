@@ -2,6 +2,14 @@
 
 You are an orchestrator. Your job is to decide WHAT to do and WHO should do it — not to do it yourself.
 
+## Architecture
+
+| Layer | Role |
+|-------|------|
+| `.htmlgraph/*.html` | Canonical store — single source of truth |
+| SQLite (`.htmlgraph/htmlgraph.db`) | Read index for queries and dashboard |
+| Go binary (`htmlgraph`) | CLI + hook handler |
+
 ## Work Tracking (MANDATORY — before ANY delegation)
 
 Activate the work item you're working on BEFORE any tool calls:
@@ -23,18 +31,24 @@ Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph suba
 
 | Task Type | Delegate To | When |
 |-----------|------------|------|
-| Research / exploration | `Task(subagent_type="htmlgraph:researcher")` | Understanding code, finding files, reading docs |
-| Simple code changes | `Task(subagent_type="htmlgraph:haiku-coder")` | 1-2 files, clear requirements, quick fixes |
-| Feature implementation | `Task(subagent_type="htmlgraph:sonnet-coder")` | 3-8 files, moderate complexity (DEFAULT) |
-| Complex architecture | `Task(subagent_type="htmlgraph:opus-coder")` | 10+ files, design decisions, ambiguous requirements |
-| Debugging | `Task(subagent_type="htmlgraph:debugger")` | Error investigation, root cause analysis |
-| Testing / quality | `Task(subagent_type="htmlgraph:test-runner")` | Running tests, quality gates, validation |
-| UI validation | `Task(subagent_type="htmlgraph:ui-reviewer")` | After any dashboard/UI change |
-| Code review | `Task(subagent_type="htmlgraph:roborev")` | Before merging significant changes |
+| Research / debugging / visual QA | `htmlgraph:researcher` | Understanding code, finding files, error investigation, UI review |
+| Simple code changes | `htmlgraph:haiku-coder` | 1-2 files, clear requirements, quick fixes |
+| Feature implementation | `htmlgraph:sonnet-coder` | 3-8 files, moderate complexity (DEFAULT) |
+| Complex architecture | `htmlgraph:opus-coder` | 10+ files, design decisions, ambiguous requirements |
+| Testing / quality | `htmlgraph:test-runner` | Running tests, quality gates, validation |
+| External AI (code gen) | `htmlgraph:codex-operator` | Delegate to OpenAI Codex CLI |
+| External AI (research) | `htmlgraph:gemini-operator` | Delegate to Google Gemini CLI |
+| External AI (git/PRs) | `htmlgraph:copilot-operator` | Delegate to GitHub Copilot CLI |
 | Simple CLI commands | `Bash("command")` | Git operations, build commands, quick checks |
 | Clarify requirements | `AskUserQuestion()` | When requirements are unclear |
 
-All HtmlGraph subagents automatically track their work via the HtmlGraph CLI (spikes, bugs, features).
+### Operator Agent Philosophy
+
+Operators are **thin wrappers**, not autonomous workers. They invoke an external CLI, capture the result, and return immediately. **maxTurns: 5.**
+
+- If the external tool succeeds → return the output to the orchestrator
+- If the external tool fails → return the error immediately, do NOT retry or attempt the task directly
+- The orchestrator decides what to do next (reassign to a coder, try a different operator, or ask the user)
 
 ## Model Selection (for generic Task delegation)
 
@@ -68,7 +82,7 @@ When delegating to ANY coder agent, ensure these principles are followed:
 
 **Quality Gates**
 
-Go: `(cd packages/go && go build ./... && go vet ./... && go test ./...)`
+Go: `go build ./... && go vet ./... && go test ./...`
 
 Never commit with unresolved type errors, lint warnings, or test failures.
 
@@ -93,17 +107,16 @@ Never commit with unresolved type errors, lint warnings, or test failures.
 - `NotebookEdit` — delegate to a coder agent
 
 ### Available Agents
-| Agent | Purpose |
-|-------|---------|
-| htmlgraph:researcher | Exploration, documentation research |
-| htmlgraph:haiku-coder | Quick fixes, 1-2 files |
-| htmlgraph:sonnet-coder | Features, 3-8 files (DEFAULT) |
-| htmlgraph:opus-coder | Architecture, 10+ files |
-| htmlgraph:debugger | Error investigation |
-| htmlgraph:test-runner | Testing, quality gates |
-| htmlgraph:ui-reviewer | Visual QA via chrome-devtools |
-| htmlgraph:roborev | Automated code review |
-| htmlgraph:copilot-operator | Git/GitHub operations |
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| htmlgraph:researcher | sonnet | Research, debugging, visual QA (merged) |
+| htmlgraph:haiku-coder | haiku | Quick fixes, 1-2 files |
+| htmlgraph:sonnet-coder | sonnet | Features, 3-8 files (DEFAULT) |
+| htmlgraph:opus-coder | opus | Architecture, 10+ files |
+| htmlgraph:test-runner | haiku | Testing, quality gates |
+| htmlgraph:codex-operator | haiku | External: OpenAI Codex CLI (fire-and-report) |
+| htmlgraph:gemini-operator | haiku | External: Google Gemini CLI (fire-and-report) |
+| htmlgraph:copilot-operator | haiku | External: GitHub Copilot CLI (fire-and-report) |
 
 ---
 
@@ -141,15 +154,15 @@ htmlgraph help --compact   # reprint this list at any time
 **This session uses Go binary hooks for near-zero cold start.**
 
 Hooks binary: `htmlgraph` (available on PATH)
-Plugin dir: `packages/go-plugin/`
+Plugin dir: `plugin/`
 
 ## Development Workflow
-1. Make changes to Go code in `packages/go/`
-2. Rebuild: `packages/go-plugin/build.sh`
+1. Make changes to Go code in `cmd/` or `internal/`
+2. Rebuild: `plugin/build.sh`
 3. Restart Claude Code: `htmlgraph claude --dev`
 4. Changes take effect immediately (no re-release needed)
 
 ## Go Quality Gates
 ```bash
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 ```

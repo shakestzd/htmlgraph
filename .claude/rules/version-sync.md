@@ -1,3 +1,9 @@
+---
+paths:
+  - "scripts/**"
+  - "plugin/.claude-plugin/**"
+---
+
 # Version Synchronization Rules
 
 **CRITICAL: Plugin version and GitHub Release version MUST always match.**

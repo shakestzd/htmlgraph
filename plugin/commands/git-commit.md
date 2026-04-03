@@ -19,7 +19,7 @@ Commit changes using the copilot-operator delegation pattern.
 ```
 /htmlgraph:git-commit "feat: add user authentication"
 /htmlgraph:git-commit --push
-/htmlgraph:git-commit --files src/foo.py tests/test_foo.py "fix: resolve null pointer"
+/htmlgraph:git-commit --files internal/foo.go internal/foo_test.go "fix: resolve null pointer"
 ```
 
 ## Instructions for Claude
@@ -92,8 +92,7 @@ Always append the Co-Authored-By line.
 
 ## Pre-commit Checks
 
-This project uses `.githooks/` with pre-commit checks (ruff, mypy, systematic change
-detection). If pre-commit fails, the commit fails — fix the reported issues and retry.
+This project uses `.githooks/` with pre-commit checks (go build, go vet, go test). If pre-commit fails, the commit fails — fix the reported issues and retry.
 
 ## Output Format
 

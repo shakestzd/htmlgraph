@@ -43,7 +43,7 @@ This command follows the research-first debugging methodology from `.claude/rule
 
 ### Implementation:
 
-```python
+```
 **DO THIS:**
 
 1. **Capture error details:**
@@ -76,9 +76,9 @@ This command follows the research-first debugging methodology from `.claude/rule
 
    For Build Errors:
    ```bash
-   uv run ruff check        # Linting errors
-   uv run mypy src/         # Type errors
-   uv run pytest -v         # Test failures
+   go build ./...           # Build errors
+   go vet ./...             # Vet warnings
+   go test ./...            # Test failures
    ```
 
    For Runtime Errors:
@@ -116,9 +116,9 @@ This command follows the research-first debugging methodology from `.claude/rule
    - [ ] Check network connectivity
 
    **Build Errors:**
-   - [ ] Run linters: `uv run ruff check --fix`
-   - [ ] Check types: `uv run mypy src/`
-   - [ ] Run tests: `uv run pytest -v`
+   - [ ] Build check: `go build ./...`
+   - [ ] Run vet: `go vet ./...`
+   - [ ] Run tests: `go test ./...`
    - [ ] Review recent code changes
    - [ ] Check dependency versions
 
@@ -205,7 +205,7 @@ This command follows the research-first debugging methodology from `.claude/rule
 - `/hooks` - List active hooks
 - `claude --debug <command>` - Verbose output
 - `/doctor` - System diagnostics
-- Quality gates: `uv run ruff check && uv run mypy src/ && uv run pytest`
+- Quality gates: `go build ./... && go vet ./... && go test ./...`
 
 ### Next Steps
 1. Complete investigation checklist items
@@ -236,36 +236,14 @@ htmlgraph serve
 
 Use these patterns to categorize errors:
 
-```python
-error_categories = {
-    "hook": [
-        "PreToolUse", "PostToolUse", "SessionStart", "SessionEnd",
-        "hook", "plugin", "marketplace"
-    ],
-    "api": [
-        "API", "authentication", "rate limit", "network", "timeout",
-        "HTTP", "request failed", "connection"
-    ],
-    "build": [
-        "ruff", "mypy", "pytest", "lint", "type error", "test failed",
-        "compilation", "syntax error"
-    ],
-    "runtime": [
-        "Exception", "Error:", "Traceback", "crash", "failed",
-        "unexpected", "assertion"
-    ],
-    "config": [
-        "configuration", "settings", "environment", "missing",
-        "invalid", "not found", ".env", "credentials"
-    ]
-}
+```bash
+# Error category keywords for classification:
 
-def categorize_error(error_text: str) -> str:
-    error_lower = error_text.lower()
-    for category, keywords in error_categories.items():
-        if any(kw.lower() in error_lower for kw in keywords):
-            return category
-    return "unknown"
+# hook: PreToolUse PostToolUse SessionStart SessionEnd hook plugin marketplace
+# api: API authentication rate-limit network timeout HTTP request-failed connection
+# build: go-build go-vet go-test lint build-error vet-warning test-failed compilation syntax-error
+# runtime: panic error crash failed unexpected assertion goroutine nil-pointer
+# config: configuration settings environment missing invalid not-found .env credentials
 ```
 
 ### Integration with Debugging Workflow

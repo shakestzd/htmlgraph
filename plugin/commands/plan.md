@@ -81,7 +81,6 @@ Example: /htmlgraph:research "{description}"
 
 ```bash
 htmlgraph analytics summary
-htmlgraph analytics summary
 ```
 
 **STEP 3: Create spike or track**
@@ -93,7 +92,7 @@ htmlgraph spike create "Plan: {description}"
 
 For track (well-defined work):
 ```bash
-htmlgraph track new "{title}"
+htmlgraph track create "{title}"
 ```
 
 **STEP 4: Display result**
@@ -105,7 +104,7 @@ Show spike/track ID and next steps based on CLI output.
 If the spike reveals a well-defined plan, create a track directly:
 
 ```bash
-htmlgraph track new "User Authentication System"
+htmlgraph track create "User Authentication System"
 ```
 
 Then create features under it:
@@ -154,7 +153,7 @@ htmlgraph spike show {spike_id}
 # Do: Search for specific patterns
 
 # 3. Create track from findings
-htmlgraph track new "User Authentication"
+htmlgraph track create "User Authentication"
 htmlgraph feature create "Configure OAuth providers"
 htmlgraph feature create "Implement JWT signing"
 htmlgraph feature create "Write integration tests"

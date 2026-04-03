@@ -14,5 +14,6 @@
     "command": "/Users/shakes/.claude/omp-claude-wrapper.sh",
     "padding": 0
   },
-  "enabledPlugins": {}
+  "enabledPlugins": {},
+  "claudeMdExcludes": ["AGENTS.md"]
 }

@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 2, Bash calls: 0, Context: ~5% -->
-
 # /htmlgraph:track
 
 Manually track an activity or note
@@ -53,7 +51,11 @@ Track a general note
    htmlgraph status
    ```
 
-3. **Record the activity note manually** in the output template below, since manual tracking is primarily a documentation step. Activity is tracked automatically by hooks — this command surfaces the context.
+3. **Persist the track** using the CLI:
+   ```bash
+   htmlgraph track create "{title}"
+   ```
+   Manual tracking is primarily a documentation step. Activity is tracked automatically by hooks — this command surfaces and persists the context.
 
 4. **Present summary** using the output template below.
 

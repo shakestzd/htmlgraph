@@ -24,7 +24,7 @@ When the user invokes this command:
 1. If no title provided, ask the user to describe the issue they're experiencing
 2. Gather context automatically:
    - HtmlGraph version: `htmlgraph version`
-   - Python version: `python3 --version`
+   - Go version: `go version`
    - OS: `uname -s -r`
    - Claude Code version: check `claude --version` if available
    - Recent errors: check last 20 lines of any relevant error output the user shared
@@ -44,7 +44,7 @@ gh issue create --repo shakestzd/htmlgraph \
 
 ### Environment
 - HtmlGraph version: <version>
-- Python version: <version>
+- Go version: <version>
 - OS: <os>
 - Claude Code version: <version>
 

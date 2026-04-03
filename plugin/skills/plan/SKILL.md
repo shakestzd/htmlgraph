@@ -262,8 +262,35 @@ Default to sonnet unless the task is trivially simple (haiku) or requires deep r
 
 ---
 
+## Plan Review (Optional Multi-AI Critique)
+
+Before human finalization, dispatch gemini-operator (design critic) and codex-operator (feasibility checker) in parallel to enrich the plan with structured critique. Skip for plans with fewer than 3 slices or pure cleanup tasks.
+
+```
+Agent(description="Design critique: <plan-id>", subagent_type="htmlgraph:gemini-operator",
+      prompt="Read .htmlgraph/plans/{plan-id}.html. For each slice assess scope, file coverage,
+              dependencies, test strategy, and risks. Write findings via:
+              htmlgraph plan set-section {plan-id} PLAN_DESIGN_CONTENT '<p>...</p>'
+              htmlgraph plan set-slice {plan-id} {N} --files '...' --deps '...' --tests '...'
+              htmlgraph plan add-question {plan-id} 'Concern?' --options 'a:...,b:...'")
+
+Agent(description="Feasibility check: <plan-id>", subagent_type="htmlgraph:codex-operator",
+      prompt="Read .htmlgraph/plans/{plan-id}.html. For each function signature: check package
+              exists, types exist, no naming conflicts. Scaffold stubs and run go build ./...
+              Report compilation errors via plan set-section PLAN_OUTLINE_CONTENT.
+              Add feasibility questions via plan add-question. Clean up stubs after validation.")
+```
+
+After both reviewers complete, open the enriched plan:
+
+```bash
+htmlgraph plan open <plan-id>
+htmlgraph plan wait <plan-id> --timeout 1h   # blocks until human finalizes
+htmlgraph plan read-feedback <plan-id>        # read approvals + answers
+```
+
+---
+
 ## Related Skills
 
 - **[/htmlgraph:execute](/htmlgraph:execute)** — Execute the finalized task list with dependency-driven dispatch
-- **[/htmlgraph:parallel-status](/htmlgraph:parallel-status)** — Monitor slice execution progress
-- **[/htmlgraph:cleanup](/htmlgraph:cleanup)** — Clean up worktrees after completion

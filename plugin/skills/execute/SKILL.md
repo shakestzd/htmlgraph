@@ -130,8 +130,7 @@ Now write the minimum implementation to make all tests pass.
 Do not add code that isn't covered by a test.
 
 ## Step 3: Quality Gate (MANDATORY before commit)
-Go:     (cd packages/go && go build ./... && go vet ./... && go test ./...)
-Python: uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
+go build ./... && go vet ./... && go test ./...
 
 ## Commit
 git add {specific files}
@@ -178,11 +177,7 @@ git merge --no-ff worktree-agent-XXXX -m "feat: merge {task title} ({feature_id}
 Run full quality gates on the merged result:
 
 ```bash
-# Go
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
-
-# Python (if applicable)
-uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run pytest
+go build ./... && go vet ./... && go test ./...
 ```
 
 If gates fail:
@@ -237,7 +232,7 @@ git merge --no-ff <branch> -m "feat: merge <track> — <title>"
 # Then: git add <resolved files> && git commit
 
 # Final quality gate on merged result
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 ```
 
 ### 6c. Clean Up
@@ -340,8 +335,46 @@ TaskList()  # Shows status + blockedBy for each task
 
 ---
 
+---
+
+## Monitoring During Parallel Execution
+
+```bash
+# Task dependency graph status
+TaskList()
+# Shows: id, subject, status, owner, blockedBy
+
+# Worktree state
+git worktree list
+
+# Recent commits across all branches
+git for-each-ref --sort=-committerdate refs/heads/ \
+  --format='%(refname:short) %(committerdate:relative) %(subject)' | head -20
+```
+
+Status categories: **ready** (pending, no blockedBy) | **in_progress** | **blocked** (pending, has blockedBy) | **completed**
+
+---
+
+## Cleanup After Completion
+
+```bash
+# Prune all merged worktrees
+git worktree prune
+
+# Remove a specific worktree
+git worktree remove <path>
+
+# Remove stale branches
+git branch -D worktree-agent-XXXX
+
+# Confirm clean state + run quality gates
+git worktree list
+go build ./... && go vet ./... && go test ./...
+```
+
+---
+
 ## Related Skills
 
 - **[/htmlgraph:plan](/htmlgraph:plan)** - Create the dependency graph before executing
-- **[/htmlgraph:parallel-status](/htmlgraph:parallel-status)** - Monitor progress
-- **[/htmlgraph:cleanup](/htmlgraph:cleanup)** - Clean up after completion

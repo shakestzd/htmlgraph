@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 1, Bash calls: 0, Context: ~3% -->
-
 # /htmlgraph:feature-add
 
 Add a new feature to the backlog

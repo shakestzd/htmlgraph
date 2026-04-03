@@ -771,6 +771,35 @@ Never commit with unresolved type errors, lint warnings, or test failures.
 
 ---
 
+---
+
+## Pre-Work Validation (YOLO Mode Hook)
+
+The PreToolUse hook enforces attribution before code changes. Behavior by scenario:
+
+| Active Work Item | Tool | Action |
+|-----------------|------|--------|
+| Feature | Read | Allow |
+| Feature | Write/Edit/Delete | Allow |
+| Spike | Read | Allow |
+| Spike | Write/Edit/Delete | Warn + Allow |
+| None | Read | Allow |
+| None | Write/Edit (1 file) | Warn + Allow |
+| None | Write/Edit (3+ files) | **Deny** |
+
+**When denied:** Create a work item first, then retry.
+
+```bash
+htmlgraph feature create "Title"   # creates + returns feat-id
+htmlgraph feature start <feat-id>  # sets attribution for this session
+```
+
+**Decision rule for code changes:**
+- Single file, <30 min → direct change (warns, allows)
+- 3+ files, or new tests, or multi-component → create feature first
+
+---
+
 ## Related Skills
 
 - **[/multi-ai-orchestration](/multi-ai-orchestration)** - Comprehensive model selection guide with detailed decision matrix

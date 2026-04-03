@@ -22,9 +22,9 @@ Quality gate runs should be attributed. Before fixing errors:
 
 ```bash
 # Before EVERY commit:
-(cd packages/go && go build ./...)           # Type checking + compile
-(cd packages/go && go vet ./...)             # Linting
-(cd packages/go && go test ./...)            # Run tests
+go build ./...           # Type checking + compile
+go vet ./...             # Linting
+go test ./...            # Run tests
 
 # Only commit when ALL checks pass
 git commit -m "..."
@@ -36,7 +36,7 @@ git commit -m "..."
 
 - Search Go ecosystem (pkg.go.dev, etc.) for existing libraries before writing custom implementations
 - Check `go.mod` for what is already available as a dependency
-- Check `packages/go/internal/` for shared utilities before duplicating logic
+- Check `internal/` for shared utilities before duplicating logic
 - Prefer well-maintained packages over one-off custom code
 
 ## Philosophy
@@ -63,42 +63,42 @@ This is intentional - maintain quality gates.
 
 ```bash
 # Build all packages
-(cd packages/go && go build ./...)
+go build ./...
 
 # Build specific package
-(cd packages/go && go build ./cmd/htmlgraph)
+go build ./cmd/htmlgraph
 
 # Verbose output
-(cd packages/go && go build -v ./...)
+go build -v ./...
 ```
 
 ### Go Vet (Linting)
 
 ```bash
 # Check all packages
-(cd packages/go && go vet ./...)
+go vet ./...
 
 # Check specific package
-(cd packages/go && go vet ./cmd/htmlgraph)
+go vet ./cmd/htmlgraph
 
 # Verbose output
-(cd packages/go && go vet -v ./...)
+go vet -v ./...
 ```
 
 ### Go Test (Testing)
 
 ```bash
 # Run all tests
-(cd packages/go && go test ./...)
+go test ./...
 
 # Verbose output
-(cd packages/go && go test -v ./...)
+go test -v ./...
 
 # Run specific test
-(cd packages/go && go test -run TestName ./...)
+go test -run TestName ./...
 
 # Run with coverage
-(cd packages/go && go test -cover ./...)
+go test -cover ./...
 ```
 
 ## Common Fix Patterns
@@ -136,7 +136,7 @@ var x = 1
 ```bash
 # Go automatically formats with gofmt
 # Most editors auto-format on save
-(cd packages/go && gofmt -w .)
+gofmt -w .
 ```
 
 ## Integration with HtmlGraph

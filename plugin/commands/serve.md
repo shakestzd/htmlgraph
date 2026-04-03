@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 1, Bash calls: 0, Context: ~3% -->
-
 # /htmlgraph:serve
 
 Start the dashboard server

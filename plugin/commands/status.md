@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 1, Bash calls: 0, Context: ~5% -->
-
 # /htmlgraph:status
 
 Check project status and active features

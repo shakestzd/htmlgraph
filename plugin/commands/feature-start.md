@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 2, Bash calls: 0, Context: ~5% -->
-
 # /htmlgraph:feature-start
 
 Start working on a feature (moves it to in-progress)

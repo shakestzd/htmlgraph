@@ -222,3 +222,25 @@ htmlgraph find features --status in-progress
 # Find todo work (parallelizable candidates)
 htmlgraph find features --status todo
 ```
+
+---
+
+## Recommend Workflow
+
+Run `htmlgraph recommend [--top N]` (default N=5) for scored recommendations:
+
+```bash
+htmlgraph recommend --top 5
+```
+
+After presenting output, analyze whether the top recommendations can run in parallel:
+
+1. Check dependencies — do any recommended items block each other?
+2. Check file overlap — do they modify the same files or modules?
+3. If independent → propose `/htmlgraph:execute` for parallel dispatch
+4. If dependent → identify critical path, propose sequential order
+
+**Propose next action:**
+- 2+ independent items → `/htmlgraph:execute` (parallel)
+- Blocked items → start with the blocker using `/htmlgraph:plan <id>`
+- Single item → delegate to appropriate agent tier (haiku/sonnet/opus)

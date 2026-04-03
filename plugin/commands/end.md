@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 2-3, Bash calls: 0, Context: ~5% -->
-
 # /htmlgraph:end
 
 End the current session and record work summary

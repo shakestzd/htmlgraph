@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 2, Bash calls: 0, Context: ~4% -->
-
 # /htmlgraph:feature-primary
 
 Set the primary feature for activity attribution

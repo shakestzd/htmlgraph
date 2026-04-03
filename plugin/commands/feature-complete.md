@@ -1,5 +1,3 @@
-<!-- Efficiency: SDK calls: 2, Bash calls: 0, Context: ~5% -->
-
 # /htmlgraph:feature-complete
 
 Mark a feature as complete
