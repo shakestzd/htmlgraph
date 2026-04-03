@@ -121,7 +121,8 @@ func updateLastQuery(database *sql.DB, sessionID, prompt string) {
 
 // compactCLIRef is a per-turn CLI quick-reference injected into CIGS guidance.
 // Keep in sync with the constant in help.go.
-const compactCLIRef = `**htmlgraph CLI** — feature|bug|spike|track|plan [create|show|start|complete|list|add-step|delete] · find <q> · wip · status · snapshot · link [add|remove|list] · session [list|show] · analytics [summary|velocity] · check · health · spec|tdd|review|compliance <id> · batch [apply|export] · ingest · reindex · yolo --feature <id>`
+const compactCLIRef = `**htmlgraph CLI** — feature|bug|spike|track|plan [create|show|start|complete|list|add-step|delete] · find <q> · wip · status · snapshot · link [add|remove|list] · session [list|show] · analytics [summary|velocity] · check · health · spec|tdd|review|compliance <id> · batch [apply|export] · ingest · reindex · yolo --feature <id>
+**Required flags:** feature/bug/spike create need --track <id> --description "…"`
 
 // buildAttributionGuidance returns a compact CIGS attribution block listing
 // open work items so Claude can call htmlgraph feature start for the right item.

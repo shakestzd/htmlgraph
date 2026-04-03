@@ -224,6 +224,15 @@ func TestUserPrompt_SanitizesXMLBlocks(t *testing.T) {
 	}
 }
 
+func TestCompactCLIRef_MentionsTrackRequirement(t *testing.T) {
+	if !strings.Contains(compactCLIRef, "--track") {
+		t.Error("compactCLIRef should mention --track requirement")
+	}
+	if !strings.Contains(compactCLIRef, "--description") {
+		t.Error("compactCLIRef should mention --description requirement")
+	}
+}
+
 func TestGetActiveWorkItemType(t *testing.T) {
 	td := setupTestDB(t)
 	defer td.DB.Close()
