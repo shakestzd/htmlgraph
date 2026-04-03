@@ -19,6 +19,13 @@ htmlgraph feature start <id>   # or bug start / spike start
 3. Only create a new work item if the prompt genuinely contains no ID
 4. If htmlgraph is unavailable, proceed — attribution is not a blocker
 
+## Work Completion
+
+When your task is done and quality gates pass:
+1. Run `htmlgraph feature complete <id>` (or `bug complete`, `spike complete`)
+2. Do this BEFORE reporting back to the orchestrator
+3. If the CLI is unavailable, report completion — the orchestrator will handle it
+
 ## Safety Rules
 
 **FORBIDDEN:** Never edit `.htmlgraph/` files directly. Use the CLI:

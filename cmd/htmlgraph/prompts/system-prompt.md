@@ -25,6 +25,12 @@ The CIGS guidance (injected per-turn) lists open work items — pick from those.
 
 **When delegating to subagents, always include the work item ID in the prompt** (e.g., "Feature: feat-123"). The subagent must run `htmlgraph feature start <id>` to claim the work before writing code.
 
+**After an agent returns, verify the work item was completed:**
+```bash
+htmlgraph find <id>   # check status
+```
+If the item is still in-progress, run `htmlgraph feature complete <id>` yourself. This is the orchestrator's responsibility as a safety net.
+
 ## Delegation Enforcement
 
 Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate to HtmlGraph subagents:
