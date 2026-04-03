@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -39,6 +40,8 @@ type LaunchOpts struct {
 	SystemPromptFile string
 	// PermissionMode, if set, passes --permission-mode to claude (e.g. "bypassPermissions").
 	PermissionMode string
+	// EnableAutoMode, when true, passes --enable-auto-mode to claude.
+	EnableAutoMode bool
 	// Name, if set, passes --name to claude for session naming.
 	Name string
 	// ExtraArgs are forwarded to the claude process.
@@ -50,7 +53,7 @@ type LaunchOpts struct {
 }
 
 func claudeCmd() *cobra.Command {
-	var dev, init_, continue_ bool
+	var dev, init_, continue_, auto bool
 
 	cmd := &cobra.Command{
 		Use:   "claude",
@@ -58,7 +61,9 @@ func claudeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
 			case dev:
-				return launchClaudeDev(args)
+				return launchClaudeDev(args, auto)
+			case auto:
+				return launchClaudeAuto(args)
 			case init_:
 				return launchClaudeInit(args)
 			case continue_:
@@ -69,13 +74,14 @@ func claudeCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&dev, "dev", false, "Launch with local Go plugin for development")
+	cmd.Flags().BoolVar(&auto, "auto", false, "Launch with auto mode enabled (autonomous operation)")
 	cmd.Flags().BoolVar(&init_, "init", false, "Launch with marketplace plugin installation")
 	cmd.Flags().BoolVar(&continue_, "continue", false, "Resume last session with marketplace plugin")
 	cmd.AddCommand(yoloCmd())
 	return cmd
 }
 
-func launchClaudeDev(extraArgs []string) error {
+func launchClaudeDev(extraArgs []string, auto bool) error {
 	// Dev mode resolves the plugin from local source, NOT the marketplace.
 	// resolveProjectPluginDir walks up from CWD to find plugin/.claude-plugin/plugin.json.
 	pluginDir := resolveProjectPluginDir()
@@ -123,7 +129,10 @@ func launchClaudeDev(extraArgs []string) error {
 	// Reinstall marketplace plugin on exit so non-dev sessions work normally.
 	reinstallFn := func() {
 		fmt.Println("Reinstalling marketplace htmlgraph plugin...")
-		ensureHtmlgraphPlugin()
+		if err := ensureHtmlgraphPlugin(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not reinstall plugin: %v\n", err)
+			fmt.Fprintf(os.Stderr, "  Run manually: claude plugin marketplace add %s && claude plugin install htmlgraph@htmlgraph\n", htmlgraphMarketplaceRepo)
+		}
 		fmt.Println("Dev mode cleanup complete.")
 	}
 
@@ -135,18 +144,52 @@ func launchClaudeDev(extraArgs []string) error {
 		os.Exit(0)
 	}()
 
-	fmt.Printf("Launching Claude Code with local plugin (--plugin-dir mode)\n")
+	if auto {
+		fmt.Printf("Launching Claude Code with local plugin (--plugin-dir mode) + auto mode\n")
+	} else {
+		fmt.Printf("Launching Claude Code with local plugin (--plugin-dir mode)\n")
+	}
 	fmt.Printf("  Plugin source: %s\n", pluginDir)
 
 	launchErr := launchClaude(LaunchOpts{
 		Mode:               "go",
 		PluginDir:          pluginDir,
 		InjectSystemPrompt: true,
+		EnableAutoMode:     auto,
+		PermissionMode:     autoPermissionMode(auto),
 		ExtraArgs:          extraArgs,
 		ProjectRoot:        projectRoot,
 	})
 	reinstallFn()
 	return launchErr
+}
+
+// autoPermissionMode returns "auto" when enabled is true, otherwise empty string.
+// This avoids passing --permission-mode when auto mode is not requested.
+func autoPermissionMode(enabled bool) string {
+	if enabled {
+		return "auto"
+	}
+	return ""
+}
+
+// launchClaudeAuto launches Claude Code with auto mode enabled for autonomous operation.
+// It uses the marketplace plugin (like normal mode) but adds --enable-auto-mode and
+// --permission-mode auto so Claude starts in autonomous operation immediately.
+func launchClaudeAuto(extraArgs []string) error {
+	projectRoot, _ := resolveProjectRoot()
+	cleanupStaleDev(projectRoot)
+	ensurePluginOnLaunch()
+	fmt.Println("Launching Claude Code in auto mode (autonomous operation)...")
+	fmt.Println("  Actions will be approved by the background classifier, not prompted.")
+	return launchClaude(LaunchOpts{
+		Mode:               "auto",
+		InjectSystemPrompt: true,
+		EnableAutoMode:     true,
+		PermissionMode:     "auto",
+		ExtraArgs:          extraArgs,
+		ProjectRoot:        projectRoot,
+	})
 }
 
 // installedPluginsJSON is the path to the Claude Code installed plugins registry.
@@ -301,8 +344,8 @@ func launchClaudeDefault(extraArgs []string) error {
 const htmlgraphMarketplaceRepo = "shakestzd/htmlgraph"
 
 // ensureHtmlgraphPlugin registers the htmlgraph marketplace (if needed) and
-// installs or updates the plugin.
-func ensureHtmlgraphPlugin() {
+// installs or updates the plugin. Returns an error if both install and update fail.
+func ensureHtmlgraphPlugin() error {
 	// Step 1: Register marketplace if not already known.
 	fmt.Println("Registering htmlgraph marketplace...")
 	exec.Command("claude", "plugin", "marketplace", "add",
@@ -312,9 +355,11 @@ func ensureHtmlgraphPlugin() {
 	fmt.Println("Installing/updating htmlgraph plugin...")
 	if out, err := exec.Command("claude", "plugin", "install", "htmlgraph@htmlgraph").CombinedOutput(); err != nil {
 		if out2, err2 := exec.Command("claude", "plugin", "update", "htmlgraph").CombinedOutput(); err2 != nil {
-			fmt.Fprintf(os.Stderr, "warning: plugin install: %s\nwarning: plugin update: %s\n", out, out2)
+			return fmt.Errorf("plugin install failed: %s\nplugin update failed: %s",
+				strings.TrimSpace(string(out)), strings.TrimSpace(string(out2)))
 		}
 	}
+	return nil
 }
 
 // launchClaude is the shared launcher used by all modes.
@@ -337,6 +382,9 @@ func launchClaude(opts LaunchOpts) error {
 	}
 	if opts.PluginDir != "" {
 		claudeArgs = append(claudeArgs, "--plugin-dir", opts.PluginDir)
+	}
+	if opts.EnableAutoMode {
+		claudeArgs = append(claudeArgs, "--enable-auto-mode")
 	}
 	if opts.PermissionMode != "" {
 		claudeArgs = append(claudeArgs, "--permission-mode", opts.PermissionMode)

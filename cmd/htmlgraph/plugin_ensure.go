@@ -125,8 +125,12 @@ func interactivePluginInstall() {
 	switch choice {
 	case "1", "":
 		fmt.Println()
-		ensureHtmlgraphPlugin()
-		fmt.Println("Plugin installed successfully.")
+		if err := ensureHtmlgraphPlugin(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: plugin installation failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "  Run manually: claude plugin marketplace add shakestzd/htmlgraph && claude plugin install htmlgraph@htmlgraph\n")
+		} else {
+			fmt.Println("Plugin installed successfully.")
+		}
 	case "2":
 		fmt.Println("Continuing without plugin. Run 'htmlgraph plugin install' later to add it.")
 	default:
@@ -141,6 +145,11 @@ func interactivePluginInstall() {
 func ensurePluginOnLaunch() {
 	if !isPluginInstalled() {
 		interactivePluginInstall()
+		// Post-install verification: confirm the install actually took effect.
+		if !isPluginInstalled() {
+			fmt.Fprintln(os.Stderr, "warning: plugin installation did not complete — launching without plugin")
+			fmt.Fprintln(os.Stderr, "  Run manually: claude plugin marketplace add shakestzd/htmlgraph && claude plugin install htmlgraph@htmlgraph")
+		}
 		return
 	}
 
