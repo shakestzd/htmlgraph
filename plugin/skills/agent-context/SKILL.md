@@ -7,12 +7,17 @@ description: Shared agent context — work attribution, safety rules, and develo
 
 ## Work Attribution
 
-Before starting work, register what you're working on:
+The orchestrator always provides the work item ID in your task prompt (e.g., "Feature: feat-580dc00b"). Use it:
+
 ```bash
-htmlgraph feature start <id>   # or bug start, spike start
+htmlgraph feature start <id>   # or bug start / spike start
 ```
-If no work item exists, create one first: `htmlgraph feature create "title"` or `htmlgraph bug create "title"`.
-If htmlgraph is not available, proceed with the work — attribution is recommended, not mandatory.
+
+**Rules:**
+1. Look for a feature/bug/spike ID in the task prompt first
+2. If found, run `start` on it — do NOT create a new one
+3. Only create a new work item if the prompt genuinely contains no ID
+4. If htmlgraph is unavailable, proceed — attribution is not a blocker
 
 ## Safety Rules
 
