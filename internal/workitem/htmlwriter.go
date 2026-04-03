@@ -182,8 +182,13 @@ func newNodeTemplateData(n *models.Node) *nodeTemplateData {
 
 	if n.Content != "" {
 		d.HasContent = true
-		// Content may contain trusted HTML (e.g. <p>, <ul> from AddNote).
-		d.TrustedContent = template.HTML(n.Content) // #nosec: authored HTML
+		content := n.Content
+		// Wrap plain text in <p> so it survives the HTML round-trip.
+		// The parser reads element children only, not text nodes.
+		if !strings.HasPrefix(strings.TrimSpace(content), "<") {
+			content = "<p>" + content + "</p>"
+		}
+		d.TrustedContent = template.HTML(content) // #nosec: authored HTML
 	}
 
 	return d
