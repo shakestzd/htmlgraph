@@ -119,16 +119,22 @@ func runPlanOpen(planID string) error {
 		return err
 	}
 
-	if isServerRunning("http://localhost:8080") {
-		url := "http://localhost:8080/plans/" + planID + ".html"
-		return openBrowser(url)
-	}
-
 	planPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
 	if _, err := os.Stat(planPath); err != nil {
 		return fmt.Errorf("plan %q not found at %s", planID, planPath)
 	}
-	return openBrowser(planPath)
+
+	if !isServerRunning("http://localhost:8080") {
+		// Auto-start server so plan feedback API works.
+		cmd := exec.Command(os.Args[0], "serve", "-p", "8080")
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		_ = cmd.Start()
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	url := "http://localhost:8080/plans/" + planID + ".html"
+	return openBrowser(url)
 }
 
 // planWaitCmd blocks until a plan is finalized.
@@ -248,10 +254,21 @@ func extractPlanNodeInfo(html string) planNodeInfo {
 		}
 	}
 
+	// Try data-section="description" first, fall back to first <p> after </header>.
 	if s := strings.Index(html, `data-section="description"`); s >= 0 {
 		rest := html[s:]
 		if p := strings.Index(rest, "<p>"); p >= 0 {
 			rest2 := rest[p+3:]
+			if e := strings.Index(rest2, "</p>"); e >= 0 {
+				info.description = strings.TrimSpace(rest2[:e])
+			}
+		}
+	} else if headerEnd := strings.Index(html, "</header>"); headerEnd >= 0 {
+		rest := html[headerEnd:]
+		pIdx := strings.Index(rest, "<p>")
+		navIdx := strings.Index(rest, "<nav")
+		if pIdx >= 0 && (navIdx < 0 || pIdx < navIdx) {
+			rest2 := rest[pIdx+3:]
 			if e := strings.Index(rest2, "</p>"); e >= 0 {
 				info.description = strings.TrimSpace(rest2[:e])
 			}
@@ -292,11 +309,10 @@ func applyPlanTemplateVars(tmpl string, v planTemplateVars) string {
 
 	tmpl = strings.ReplaceAll(tmpl, "2026-04-01", v.Date)
 
-	if v.SectionsJSON != "" {
-		sliceCount := strings.Count(v.SectionsJSON, `"slice-`)
-		meta := fmt.Sprintf("%d slices &middot; Created %s", sliceCount, v.Date)
-		tmpl = strings.ReplaceAll(tmpl, "<!--PLAN_META-->", meta)
-	}
+	// Always populate PLAN_META regardless of whether slices exist.
+	sliceCount := strings.Count(v.SectionsJSON, `"slice-`)
+	meta := fmt.Sprintf("%d slices &middot; Created %s", sliceCount, v.Date)
+	tmpl = strings.ReplaceAll(tmpl, "<!--PLAN_META-->", meta)
 
 	if v.GraphNodes != "" {
 		tmpl = strings.ReplaceAll(tmpl, "<!--PLAN_GRAPH_NODES-->", v.GraphNodes)
@@ -452,7 +468,7 @@ func derivePlanID(title string) string {
 	result := strings.Trim(b.String(), "-")
 	if len(result) > 40 {
 		truncated := result[:40]
-		if lastHyphen := strings.LastIndex(truncated, "-"); lastHyphen > 10 {
+		if lastHyphen := strings.LastIndex(truncated, "-"); lastHyphen > 0 {
 			truncated = truncated[:lastHyphen]
 		}
 		result = truncated
@@ -739,9 +755,12 @@ func runPlanAddQuestion(planID, question, description, optionsRaw string) error 
 		content = strings.Replace(content, `<div class="approval-row">`, qHTML.String()+`      <div class="approval-row">`, 1)
 	}
 
-	// Insert recap row.
-	if strings.Contains(content, "<!--PLAN_QUESTIONS_RECAP-->") {
-		content = strings.Replace(content, "<!--PLAN_QUESTIONS_RECAP-->", recapHTML+"\n        <!--PLAN_QUESTIONS_RECAP-->", 1)
+	// Insert recap row (idempotent — skip if already exists for this question).
+	recapAttr := fmt.Sprintf(`data-recap-for="%s"`, html.EscapeString(qID))
+	if !strings.Contains(content, recapAttr) {
+		if strings.Contains(content, "<!--PLAN_QUESTIONS_RECAP-->") {
+			content = strings.Replace(content, "<!--PLAN_QUESTIONS_RECAP-->", recapHTML+"\n        <!--PLAN_QUESTIONS_RECAP-->", 1)
+		}
 	}
 
 	if err := os.WriteFile(planPath, []byte(content), 0o644); err != nil {

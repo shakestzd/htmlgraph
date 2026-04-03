@@ -179,7 +179,7 @@ Design decisions made:
 These answers are wired into each slice's task description.
 ```
 
-Reconcile question answers into slice specs. If the human chose "async delivery", the dispatch slice description must say "implement async delivery, not sync."
+**You MUST embed each question answer into every affected slice's task description under 'Accepted Design Decisions'.** If the human chose "async delivery", the dispatch slice description must explicitly say "implement async delivery, not sync." Never omit question answers — they are binding constraints from the plan review.
 
 ---
 
@@ -203,6 +203,8 @@ TaskCreate(
 
 ## Accepted Design Decisions
 [List any question answers that affect this slice]
+
+**For each entry in `question_answers` from `read-feedback`, determine which slices it affects and add a bullet point to that slice's "Accepted Design Decisions" section. If a decision affects all slices, add it to every slice task description. Never omit question answers — they are binding constraints from the plan review.**
 
 ## Test Plan (TDD — write tests FIRST)
 [Concrete input/output examples; tests must compile and FAIL before implementation]
