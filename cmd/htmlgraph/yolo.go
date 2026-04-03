@@ -358,9 +358,10 @@ func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, ext
 }
 
 func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []string) error {
-	pluginDir := resolvePluginDir()
+	// Dev mode resolves the plugin from local source, NOT the marketplace.
+	pluginDir := resolveProjectPluginDir()
 	if pluginDir == "" {
-		return fmt.Errorf("could not find plugin directory. The binary may not be installed at the expected location (plugin/hooks/bin/htmlgraph)")
+		return fmt.Errorf("could not find plugin/ directory relative to project root. Run from the project directory containing .htmlgraph/ and plugin/")
 	}
 	if _, err := os.Stat(filepath.Join(pluginDir, ".claude-plugin", "plugin.json")); os.IsNotExist(err) {
 		return fmt.Errorf("plugin.json not found at %s. The binary may not be installed at the expected location (plugin/hooks/bin/htmlgraph)",
