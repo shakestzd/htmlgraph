@@ -173,11 +173,10 @@ Use CLI analytics to inform planning decisions:
 ```bash
 # Get full picture before planning
 htmlgraph analytics summary
-htmlgraph analytics summary
 htmlgraph snapshot --summary
 
-# Then create a spike to document the plan
-htmlgraph spike create "Plan: Real-time collaboration — [analysis findings]"
+# Use htmlgraph plan generate to create formal plans
+htmlgraph plan generate <track-id>
 ```
 
 ---

@@ -87,16 +87,11 @@ This command follows a research-first debugging methodology: capture the error, 
    - Dependency versions
    - Stack traces
 
-4. **Create HtmlGraph spike for investigation:**
+4. **Document error details in HtmlGraph:**
+   Use `htmlgraph bug create` to track the error investigation and findings:
    ```bash
-   # Check for similar past spikes
-   htmlgraph spike list
-
-   # Create spike for this investigation
-   htmlgraph spike create "Error Investigation: {error_category} - {brief_description}"
+   htmlgraph bug create "Error Analysis: {error_category} - {brief_description}"
    ```
-
-   Review the spike list output to identify similar past issues by title. Note any relevant past spikes and their resolutions before proceeding.
 
 5. **Provide systematic investigation prompts:**
    Based on error category, guide investigation:

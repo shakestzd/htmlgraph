@@ -23,7 +23,6 @@ Do NOT use Read, Edit, Write, Grep, or Glob directly. Delegate those to subagent
 ## HtmlGraph CLI
 ```bash
 htmlgraph feature create "Feature name"   # Track features
-htmlgraph spike create "Investigation"    # Track research
 htmlgraph status                          # Check project status
 htmlgraph snapshot --summary              # Full overview
 ```

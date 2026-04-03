@@ -192,9 +192,8 @@ Only these can be executed directly by orchestrator:
    - Create/update todo lists
    - Example: `TodoWrite(todos=[...])`
 
-**HtmlGraph CLI operations** (create features, spikes, bugs):
+**HtmlGraph CLI operations** (create features and bugs):
 - `htmlgraph feature create "title"`
-- `htmlgraph spike create "title"`
 - `htmlgraph bug create "title"`
 
 Everything else MUST be delegated.

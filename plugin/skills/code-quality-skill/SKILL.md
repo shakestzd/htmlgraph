@@ -146,13 +146,7 @@ uv run ruff check --fix .
 
 ## Integration with HtmlGraph
 
-Track quality improvements:
-
-```bash
-# Create a spike to document fixes
-htmlgraph spike create "Fix lint errors in models.go"
-# Then add findings via htmlgraph spike edit <id>
-```
+Track quality improvements in active work items (features, bugs) using `htmlgraph feature edit <id>` or `htmlgraph bug edit <id>`.
 
 ---
 
