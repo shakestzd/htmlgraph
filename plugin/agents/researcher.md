@@ -9,6 +9,7 @@ tools:
   - Glob
   - Bash
   - Edit
+  - Skill
   - WebSearch
   - WebFetch
   - mcp__plugin_htmlgraph_chrome-devtools__navigate_page

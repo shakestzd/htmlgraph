@@ -155,11 +155,11 @@ func goQualityGates() string {
 
 Before committing ANY changes, ALL checks must pass:
 ` + "```bash" + `
-(cd packages/go && go build ./... && go vet ./... && go test ./...)
+go build ./... && go vet ./... && go test ./...
 ` + "```" + `
 
 ### Development Principles
-- **DRY** — Check ` + "`packages/go/internal/`" + ` for existing utilities before writing new ones
+- **DRY** — Check ` + "`internal/`" + ` for existing utilities before writing new ones
 - **SRP** — Each package has one clear purpose
 - **KISS** — Simplest solution that works
 - **YAGNI** — Only implement what's needed now

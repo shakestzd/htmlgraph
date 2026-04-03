@@ -230,7 +230,7 @@ func cigsImperatives(intent PromptIntent) string {
 	}
 	if intent.InvolvesGit {
 		lines = append(lines,
-			"[CIGS] Git operations detected — consider delegating to copilot subagent.")
+			"[CIGS] Git operations detected — consider delegating to copilot-operator agent.")
 	}
 
 	if len(lines) == 0 {

@@ -49,7 +49,7 @@ Returns exit code 0 if all gates pass, 1 if any fail.`,
 			}
 
 			if !ranAny {
-				fmt.Println("No supported project detected (Go: packages/go/, Python: src/python/).")
+				fmt.Println("No supported project detected (Go: look for go.mod at project root or subdirectories).")
 				return nil
 			}
 

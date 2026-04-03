@@ -179,7 +179,7 @@ func checkBashCwdGuard(event *CloudEvent) string {
 //   - cd /absolute/path && pwd  — going to project root is fine... actually still bad
 //
 // It matches:
-//   - cd packages/go && go build
+//   - cd some-dir && go build
 //   - cd dir && cmd1 && cmd2
 var bareCdPattern = regexp.MustCompile(`^cd\s+[^;)]+&&`)
 
