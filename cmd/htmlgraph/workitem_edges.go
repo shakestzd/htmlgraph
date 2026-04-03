@@ -138,7 +138,21 @@ func suggestTrackFromFiles(files string) string {
 			continue
 		}
 		if ownerID := wf.Resolve(f); ownerID != "" {
-			return fmt.Sprintf("--track %s (WORKOWNERS: %s)", ownerID, f)
+			if strings.HasPrefix(ownerID, "trk-") {
+				return fmt.Sprintf("--track %s (WORKOWNERS: %s)", ownerID, f)
+			}
+			// Owner is a feature — resolve its track from DB if possible.
+			if database := openTrackDB(dir); database != nil {
+				var trackID string
+				database.QueryRow("SELECT COALESCE(track_id, '') FROM features WHERE id = ?",
+					ownerID).Scan(&trackID) //nolint:errcheck
+				database.Close()
+				if trackID != "" {
+					return fmt.Sprintf("--track %s (WORKOWNERS: %s via %s)", trackID, f, ownerID)
+				}
+			}
+			return fmt.Sprintf("feature %s owns %s (WORKOWNERS) — find its track with: htmlgraph feature show %s",
+				ownerID, f, ownerID)
 		}
 	}
 

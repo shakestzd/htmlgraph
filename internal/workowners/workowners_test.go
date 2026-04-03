@@ -105,3 +105,72 @@ func TestMatchPattern_ExactPath(t *testing.T) {
 		t.Error("different file should not match")
 	}
 }
+
+// Negative tests for ** false positives (roborev finding #2).
+
+func TestResolve_DoubleStarSuffix_NoOvermatch(t *testing.T) {
+	// "**/test.go" must NOT match "src/mytest.go" (partial filename match).
+	wf := &File{Rules: []Rule{
+		{Pattern: "**/test.go", OwnerID: "trk-test"},
+	}}
+	if got := wf.Resolve("src/mytest.go"); got != "" {
+		t.Errorf("**/test.go should NOT match src/mytest.go, got %q", got)
+	}
+	// But it should match "src/test.go" (exact segment).
+	if got := wf.Resolve("src/test.go"); got != "trk-test" {
+		t.Errorf("**/test.go should match src/test.go, got %q", got)
+	}
+	// And "test.go" at root.
+	if got := wf.Resolve("test.go"); got != "trk-test" {
+		t.Errorf("**/test.go should match test.go, got %q", got)
+	}
+}
+
+func TestResolve_MiddleDoubleStar_NoOvermatch(t *testing.T) {
+	// "cmd/**/bar.go" must NOT match "cmd/sub/notbar.go".
+	wf := &File{Rules: []Rule{
+		{Pattern: "cmd/**/bar.go", OwnerID: "trk-cmd"},
+	}}
+	if got := wf.Resolve("cmd/sub/notbar.go"); got != "" {
+		t.Errorf("cmd/**/bar.go should NOT match cmd/sub/notbar.go, got %q", got)
+	}
+	// But it should match "cmd/sub/bar.go".
+	if got := wf.Resolve("cmd/sub/bar.go"); got != "trk-cmd" {
+		t.Errorf("cmd/**/bar.go should match cmd/sub/bar.go, got %q", got)
+	}
+	// And "cmd/a/b/bar.go" (deep nesting).
+	if got := wf.Resolve("cmd/a/b/bar.go"); got != "trk-cmd" {
+		t.Errorf("cmd/**/bar.go should match cmd/a/b/bar.go, got %q", got)
+	}
+}
+
+func TestResolve_DoubleStarGlob_NoOvermatch(t *testing.T) {
+	// "**/.*go" should NOT be a valid concern — test "**/*.go" specifics.
+	wf := &File{Rules: []Rule{
+		{Pattern: "**/*.go", OwnerID: "trk-go"},
+	}}
+	// Should match any .go file at any depth.
+	if got := wf.Resolve("cmd/main.go"); got != "trk-go" {
+		t.Errorf("**/*.go should match cmd/main.go, got %q", got)
+	}
+	// Should NOT match .gob or .gohtml files.
+	if got := wf.Resolve("data/file.gob"); got != "" {
+		t.Errorf("**/*.go should NOT match file.gob, got %q", got)
+	}
+}
+
+func TestResolve_BasenameGlob_NoSlash(t *testing.T) {
+	// "*.md" without path should match at any depth (basename match).
+	wf := &File{Rules: []Rule{
+		{Pattern: "*.md", OwnerID: "trk-docs"},
+	}}
+	if got := wf.Resolve("README.md"); got != "trk-docs" {
+		t.Errorf("*.md should match README.md, got %q", got)
+	}
+	if got := wf.Resolve("docs/guide.md"); got != "trk-docs" {
+		t.Errorf("*.md should match docs/guide.md, got %q", got)
+	}
+	if got := wf.Resolve("docs/guide.txt"); got != "" {
+		t.Errorf("*.md should NOT match guide.txt, got %q", got)
+	}
+}

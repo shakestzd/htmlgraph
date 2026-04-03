@@ -78,37 +78,66 @@ func (wf *File) Resolve(filePath string) string {
 }
 
 // matchPattern checks if filePath matches a gitignore-style pattern.
-// Supports ** for recursive directory matching.
+// Supports ** for recursive directory matching using segment-aware logic.
 func matchPattern(pattern, filePath string) bool {
-	// Handle ** patterns by splitting into segments.
 	if strings.Contains(pattern, "**") {
-		// "dir/**" matches everything under dir/
-		prefix := strings.TrimSuffix(pattern, "/**")
-		if prefix != pattern {
-			return strings.HasPrefix(filePath, prefix+"/") || filePath == prefix
-		}
-		// "**/suffix" matches suffix at any depth
-		suffix := strings.TrimPrefix(pattern, "**/")
-		if suffix != pattern {
-			return strings.HasSuffix(filePath, suffix) ||
-				strings.Contains(filePath, "/"+suffix)
-		}
-		// General **: try matching with each directory removed
-		parts := strings.Split(pattern, "/**/")
-		if len(parts) == 2 {
-			if !strings.HasPrefix(filePath, parts[0]+"/") {
-				return false
-			}
-			rest := filePath[len(parts[0])+1:]
-			matched, _ := filepath.Match(parts[1], filepath.Base(rest))
-			return matched || strings.HasSuffix(rest, parts[1])
-		}
+		return matchDoubleStar(pattern, filePath)
 	}
-	matched, _ := filepath.Match(pattern, filePath)
-	if matched {
+	// No **: try exact filepath.Match, then match against basename only
+	// (e.g. "*.md" matches "docs/README.md").
+	if matched, _ := filepath.Match(pattern, filePath); matched {
 		return true
 	}
-	// Also try matching against just the filename.
-	matched, _ = filepath.Match(pattern, filepath.Base(filePath))
-	return matched
+	if !strings.Contains(pattern, "/") {
+		matched, _ := filepath.Match(pattern, filepath.Base(filePath))
+		return matched
+	}
+	return false
+}
+
+// matchDoubleStar handles ** patterns by splitting into prefix/**/suffix
+// segments and matching each path segment individually.
+func matchDoubleStar(pattern, filePath string) bool {
+	// "dir/**" — matches everything under dir/
+	if strings.HasSuffix(pattern, "/**") {
+		prefix := pattern[:len(pattern)-3]
+		return strings.HasPrefix(filePath, prefix+"/") || filePath == prefix
+	}
+	// "**/name" — matches name as a complete path segment at any depth
+	if strings.HasPrefix(pattern, "**/") {
+		suffix := pattern[3:]
+		return matchSegmentSuffix(suffix, filePath)
+	}
+	// "prefix/**/suffix" — prefix must match start, suffix must match end
+	// with any number of intermediate segments.
+	if idx := strings.Index(pattern, "/**/"); idx >= 0 {
+		prefix := pattern[:idx]
+		suffix := pattern[idx+4:]
+		if !strings.HasPrefix(filePath, prefix+"/") {
+			return false
+		}
+		rest := filePath[len(prefix)+1:]
+		return matchSegmentSuffix(suffix, rest)
+	}
+	return false
+}
+
+// matchSegmentSuffix checks if suffix matches the tail segments of filePath.
+// Each segment is matched individually with filepath.Match so that "*.go"
+// matches "foo.go" but NOT "myfoo.goX".
+func matchSegmentSuffix(suffix, filePath string) bool {
+	suffixParts := strings.Split(suffix, "/")
+	pathParts := strings.Split(filePath, "/")
+	if len(suffixParts) > len(pathParts) {
+		return false
+	}
+	// Try matching suffix segments against the tail of path segments.
+	tail := pathParts[len(pathParts)-len(suffixParts):]
+	for i, sp := range suffixParts {
+		matched, _ := filepath.Match(sp, tail[i])
+		if !matched {
+			return false
+		}
+	}
+	return true
 }
