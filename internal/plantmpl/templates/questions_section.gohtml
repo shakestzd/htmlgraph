@@ -1,0 +1,27 @@
+<details id="questions" class="section-card" data-phase="questions" data-status="pending">
+  <summary><span>D. Open Questions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
+  <div class="section-body">
+    {{range .Cards}}
+    <div class="question-block" id="{{.ID}}">
+      <p>{{.Text}}</p>
+      {{$id := .ID}}{{$sel := .Selected}}
+      {{range .Options}}
+      <label><input type="radio" name="{{$id}}" data-question="{{$id}}" value="{{.}}"{{if eq . $sel}} checked{{end}}> {{.}}</label>
+      {{end}}
+      <textarea data-section="questions" data-question-rationale="{{.ID}}" placeholder="Rationale for {{.ID}}...">{{.Rationale}}</textarea>
+    </div>
+    {{end}}
+    <table class="q-table">
+      <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
+      <tbody id="questionsRecap">
+        {{range .Cards}}
+        <tr data-recap-for="{{.ID}}">
+          <td>{{.Text}}</td>
+          <td class="recap-answer">{{if .Selected}}{{.Selected}}{{else}}&mdash;{{end}}</td>
+          <td><span class="badge {{if .Selected}}badge-approved{{else}}badge-pending{{end}}">{{if .Selected}}Decided{{else}}Pending{{end}}</span></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</details>

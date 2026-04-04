@@ -1,8 +1,12 @@
 package plantmpl
 
 import (
-	"fmt"
+	"html/template"
 	"io"
+)
+
+var questionsTmpl = template.Must(
+	template.ParseFS(templateFS, "templates/questions_section.gohtml"),
 )
 
 // QuestionsSection renders the open questions and decision cards zone.
@@ -19,8 +23,7 @@ type DecisionCard struct {
 	Rationale string
 }
 
-// Render writes the questions section zone placeholder.
+// Render writes the questions section zone HTML.
 func (q *QuestionsSection) Render(w io.Writer) error {
-	_, err := fmt.Fprint(w, "<!-- questions-section zone placeholder -->")
-	return err
+	return questionsTmpl.Execute(w, q)
 }
