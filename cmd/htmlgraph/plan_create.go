@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/internal/plantmpl"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
@@ -76,33 +77,25 @@ func createPlanFromTopic(htmlgraphDir, title, description string) (string, error
 	return node.ID, nil
 }
 
-// scaffoldCRISPIPlan reads the embedded plan-template.html and populates it
-// with the given plan metadata, writing the result to plans/planID.html.
-// This produces the full interactive CRISPI HTML with dagre graphs, approval
-// checkboxes, progress bars, and the finalize button.
+// scaffoldCRISPIPlan renders the CRISPI interactive plan HTML using the
+// typed plantmpl package. This produces the full interactive HTML with
+// dagre graphs, approval checkboxes, progress bars, and the finalize button.
 func scaffoldCRISPIPlan(htmlgraphDir, planID, title, description string) error {
 	plansDir := filepath.Join(htmlgraphDir, "plans")
 	if err := os.MkdirAll(plansDir, 0o755); err != nil {
 		return fmt.Errorf("create plans dir: %w", err)
 	}
 
-	tmplData, err := planTemplateFS.ReadFile("templates/plan-template.html")
-	if err != nil {
-		return fmt.Errorf("read plan template: %w", err)
-	}
-
-	content := applyPlanTemplateVars(string(tmplData), planTemplateVars{
-		PlanID:        planID,
-		FeatureID:     "",
-		Title:         title,
-		Description:   description,
-		Date:          time.Now().UTC().Format("2006-01-02"),
-		SectionsJSON:  `["design","outline"]`,
-		TotalSections: "2",
-	})
+	page := plantmpl.BuildFromTopic(planID, title, description, time.Now().UTC().Format("2006-01-02"))
 
 	outPath := filepath.Join(plansDir, planID+".html")
-	return os.WriteFile(outPath, []byte(content), 0o644)
+	f, err := os.Create(outPath)
+	if err != nil {
+		return fmt.Errorf("create plan file: %w", err)
+	}
+	defer f.Close()
+
+	return page.Render(f)
 }
 
 // scaffoldCRISPIPlanFromNode regenerates the CRISPI template from a full node,
@@ -113,55 +106,43 @@ func scaffoldCRISPIPlanFromNode(htmlgraphDir string, node *models.Node) error {
 		return fmt.Errorf("create plans dir: %w", err)
 	}
 
-	tmplData, err := planTemplateFS.ReadFile("templates/plan-template.html")
-	if err != nil {
-		return fmt.Errorf("read plan template: %w", err)
+	page := plantmpl.BuildFromWorkItem(
+		node.ID, node.TrackID, node.Title, node.Content,
+		time.Now().UTC().Format("2006-01-02"),
+	)
+
+	// Convert node steps into typed SliceCards and GraphNodes.
+	for i, step := range node.Steps {
+		num := i + 1
+		page.Slices = append(page.Slices, plantmpl.SliceCard{
+			Num:    num,
+			Title:  step.Description,
+			Status: "pending",
+		})
+		page.Graph = ensureGraph(page.Graph)
+		page.Graph.Nodes = append(page.Graph.Nodes, plantmpl.GraphNode{
+			Num:    num,
+			Name:   step.Description,
+			Status: "pending",
+		})
 	}
-
-	// Build graph nodes, slice cards, and sections from existing steps.
-	graphNodes, sliceCards, sectionsJSON, totalSections := buildSectionsFromSteps(node.Steps)
-
-	content := applyPlanTemplateVars(string(tmplData), planTemplateVars{
-		PlanID:        node.ID,
-		FeatureID:     node.TrackID,
-		Title:         node.Title,
-		Description:   node.Content,
-		Date:          time.Now().UTC().Format("2006-01-02"),
-		GraphNodes:    graphNodes,
-		SliceCards:    sliceCards,
-		SectionsJSON:  sectionsJSON,
-		TotalSections: totalSections,
-	})
 
 	outPath := filepath.Join(plansDir, node.ID+".html")
-	return os.WriteFile(outPath, []byte(content), 0o644)
+	f, err := os.Create(outPath)
+	if err != nil {
+		return fmt.Errorf("create plan file: %w", err)
+	}
+	defer f.Close()
+
+	return page.Render(f)
 }
 
-// buildSectionsFromSteps builds graph nodes, slice cards, SECTIONS_JSON, and
-// total sections count from a plan's step list (used for re-scaffolding).
-func buildSectionsFromSteps(steps []models.Step) (graphNodes, sliceCards, sectionsJSON, totalSections string) {
-	sections := []string{`"design"`, `"outline"`}
-
-	var gnBuf, scBuf strings.Builder
-	for i, step := range steps {
-		num := i + 1
-		title := step.Description
-
-		gnBuf.WriteString(fmt.Sprintf(
-			`    <div data-node="%d" data-name="%s" data-status="pending" data-deps=""></div>`+"\n",
-			num, html.EscapeString(title),
-		))
-
-		scBuf.WriteString(buildSliceCardHTML(num, title, sliceFlags{}))
-
-		sections = append(sections, fmt.Sprintf(`"slice-%d"`, num))
+// ensureGraph lazily initializes the DependencyGraph if nil.
+func ensureGraph(g *plantmpl.DependencyGraph) *plantmpl.DependencyGraph {
+	if g == nil {
+		return &plantmpl.DependencyGraph{}
 	}
-
-	graphNodes = gnBuf.String()
-	sliceCards = scBuf.String()
-	sectionsJSON = "[" + strings.Join(sections, ",") + "]"
-	totalSections = fmt.Sprintf("%d", len(sections))
-	return
+	return g
 }
 
 // ---- plan add-slice ---------------------------------------------------------

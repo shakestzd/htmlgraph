@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shakestzd/htmlgraph/internal/plantmpl"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
@@ -169,35 +171,33 @@ func runPlanGenerateFromWorkItem(htmlgraphDir, sourceID string) (string, error) 
 	if err := os.MkdirAll(plansDir, 0o755); err != nil {
 		return "", fmt.Errorf("create plans dir: %w", err)
 	}
-	outPath := filepath.Join(plansDir, planID+".html")
 
-	tmplData, err := planTemplateFS.ReadFile("templates/plan-template.html")
-	if err != nil {
-		return "", fmt.Errorf("read plan template: %w", err)
+	date := time.Now().UTC().Format("2006-01-02")
+	page := plantmpl.BuildFromWorkItem(planID, resolved, info.title, info.description, date)
+
+	// Populate zones from the work item's features.
+	slices, graph := buildTypedPlanSections(nodePath, htmlgraphDir)
+	page.Slices = slices
+	page.Graph = graph
+
+	designHTML := buildDesignContent(info, nodePath, htmlgraphDir)
+	if designHTML != "" {
+		page.Design = &plantmpl.DesignSection{Content: template.HTML(designHTML)}
+	}
+	outlineHTML := buildOutlineContent(nodePath, htmlgraphDir)
+	if outlineHTML != "" {
+		page.Outline = &plantmpl.OutlineSection{Content: template.HTML(outlineHTML)}
 	}
 
-	graphNodes, sliceCards, sectionsJSON, totalSections := buildPlanSections(nodePath, htmlgraphDir)
+	outPath := filepath.Join(plansDir, planID+".html")
+	f, err := os.Create(outPath)
+	if err != nil {
+		return "", fmt.Errorf("create plan file: %w", err)
+	}
+	defer f.Close()
 
-	// Generate design discussion from the track description and feature summary.
-	designContent := buildDesignContent(info, nodePath, htmlgraphDir)
-	outlineContent := buildOutlineContent(nodePath, htmlgraphDir)
-
-	content := applyPlanTemplateVars(string(tmplData), planTemplateVars{
-		PlanID:         planID,
-		FeatureID:      resolved,
-		Title:          info.title,
-		Description:    info.description,
-		Date:           time.Now().UTC().Format("2006-01-02"),
-		GraphNodes:     graphNodes,
-		SliceCards:     sliceCards,
-		SectionsJSON:   sectionsJSON,
-		TotalSections:  totalSections,
-		DesignContent:  designContent,
-		OutlineContent: outlineContent,
-	})
-
-	if err := os.WriteFile(outPath, []byte(content), 0o644); err != nil {
-		return "", fmt.Errorf("write plan: %w", err)
+	if err := page.Render(f); err != nil {
+		return "", fmt.Errorf("render plan: %w", err)
 	}
 
 	return planID, nil
