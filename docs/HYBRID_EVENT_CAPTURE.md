@@ -1,1 +1,0 @@
-architecture/hybrid-event-capture.md

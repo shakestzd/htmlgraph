@@ -3,7 +3,6 @@ site_description: Local-first observability and coordination platform for AI-ass
 site_url: https://shakestzd.github.io/htmlgraph/
 repo_url: https://github.com/shakestzd/htmlgraph
 repo_name: shakestzd/htmlgraph
-edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2025 TZDLabs
 
 exclude_docs: |
@@ -15,22 +14,13 @@ theme:
   favicon: assets/favicon.png
 
   features:
-    - navigation.instant        # Fast navigation without page reload
-    - navigation.tracking       # URL updates on scroll
-    - navigation.tabs           # Top-level tabs
-    - navigation.tabs.sticky    # Sticky tabs on scroll
-    - navigation.sections       # Collapsible sections in sidebar
-    - navigation.expand         # Expand all sections by default
-    - navigation.indexes        # Section index pages
-    - navigation.top            # Back-to-top button
-    - navigation.footer         # Prev/next footer
-    - toc.integrate             # Integrate TOC into left sidebar (nested)
-    - search.suggest            # Search suggestions
-    - search.highlight          # Highlight search matches
-    - search.share              # Share search query
-    - content.code.copy         # Copy button on code blocks
-    - content.code.annotate     # Code annotations
-    - content.tabs.link         # Link content tabs
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
 
   palette:
     - media: "(prefers-color-scheme: dark)"
@@ -48,115 +38,34 @@ theme:
         icon: material/brightness-7
         name: Switch to dark mode
 
-  font: false  # Disable Google Fonts, use JetBrains Mono from custom CSS
+  font: false
 
 plugins:
   - search:
       lang: en
-      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
 
 markdown_extensions:
-  # Python Markdown
-  - abbr
-  - admonition
-  - attr_list
-  - def_list
-  - footnotes
-  - md_in_html
   - tables
   - toc:
       permalink: true
-      permalink_title: Anchor link to this section
-      toc_depth: 3
-
-  # PyMdown Extensions
-  - pymdownx.arithmatex:
-      generic: true
-  - pymdownx.betterem:
-      smart_enable: all
-  - pymdownx.caret
-  - pymdownx.details
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
-  - pymdownx.inlinehilite
-  - pymdownx.keys
-  - pymdownx.mark
-  - pymdownx.smartsymbols
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.tilde
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
 
 extra_css:
   - stylesheets/extra.css
 
 extra:
-  analytics:
-    provider: google
-    property: !ENV GOOGLE_ANALYTICS_KEY
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/shakestzd/htmlgraph
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/htmlgraph/
-    - icon: fontawesome/brands/twitter
-      link: https://twitter.com/shakestzd
-  version:
-    provider: mike
-    default: latest
 
 nav:
   - Home: index.md
-  - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quick-start.md
-    - Core Concepts: getting-started/concepts.md
-  - User Guide:
-    - Overview: guide/index.md
-    - Features & Tracks: guide/features-tracks.md
-    - TrackBuilder: guide/track-builder.md
-    - Sessions: guide/sessions.md
-    - Agents: guide/agents.md
-    - Dashboard: guide/dashboard.md
-    - SQLite Index: guide/sqlite-index.md
-  - API Reference:
-    - Overview: api/index.md
-    - SDK: api/sdk.md
-    - HtmlGraph: api/graph.md
-    - Models: api/models.md
-    - Planning: api/planning.md
-    - Agents: api/agents.md
-    - Server: api/server.md
-    - TrackBuilder: api/track-builder.md
-    - ID Generation: api/ids.md
-  - Examples:
-    - Overview: examples/index.md
-    - Basic Usage: examples/basic.md
-    - Agent Workflows: examples/agents.md
-    - Track Creation: examples/tracks.md
-  - Cookbook:
-    - Overview: cookbook/index.md
-    - Project Setup: cookbook/setup.md
-    - Features: cookbook/features.md
-    - Tracks & Planning: cookbook/tracks.md
-    - Analytics: cookbook/analytics.md
-  - Philosophy:
-    - Why HTML: philosophy/why-html.md
-    - Comparisons: philosophy/comparisons.md
-    - Design Decisions: philosophy/decisions.md
-  - Contributing:
-    - Overview: contributing/index.md
-    - Development: contributing/development.md
-    - Publishing: contributing/publishing.md
-  - Changelog: changelog.md
+  - CLI Reference: reference/cli.md

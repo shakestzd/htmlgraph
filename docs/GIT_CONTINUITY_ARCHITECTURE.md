@@ -1,1 +1,0 @@
-architecture/git-continuity.md

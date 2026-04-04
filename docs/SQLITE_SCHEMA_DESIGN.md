@@ -1,1 +1,0 @@
-architecture/sqlite-schema.md

@@ -1,1 +1,0 @@
-guide/quality-gates.md

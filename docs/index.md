@@ -1,256 +1,194 @@
-# HtmlGraph
+---
+hide:
+  - navigation
+  - toc
+title: HtmlGraph
+---
 
-<div class="hero-subtitle" style="text-align: center; margin: 2rem 0 3rem; font-size: 1.5rem; font-weight: 300; letter-spacing: 0.02em;">
-Local-first observability and coordination platform for AI-assisted development
+<div class="hg-hero" markdown>
+
+<div class="hg-hero__bolt">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+  </svg>
 </div>
 
-<div style="text-align: center; margin: 2rem 0;">
-<img src="assets/graph-hero.png" alt="HtmlGraph - AI-assisted development observability" style="width: 100%; max-width: 1200px; border-radius: 8px; box-shadow: 0 4px 20px rgba(205, 255, 0, 0.2);">
+<h1 class="hg-hero__headline">HtmlGraph</h1>
+
+<p class="hg-hero__sub">
+Local-first observability and coordination platform for AI-assisted development.
+</p>
+
+<p class="hg-hero__solution">
+Work items, session tracking, custom agents, hooks, slash commands, quality gates,
+and a real-time dashboard &mdash; managed by a single Go binary, stored as HTML files in your repo.
+No external infrastructure required.
+</p>
+
+<div class="hg-hero__buttons">
+  <a class="hg-btn hg-btn--primary" href="#install">Install</a>
+  <a class="hg-btn hg-btn--secondary" href="reference/cli/">CLI Reference</a>
 </div>
 
-<div class="quick-start">
+</div>
 
-## Install HtmlGraph
+<!-- ======================================== -->
+
+<section class="hg-section" markdown>
+
+<h2 class="hg-section__title">What it does</h2>
+
+<div class="hg-cards hg-cards--3col" markdown>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Work item tracking</span>
+
+Features, bugs, spikes, and tracks as HTML files in `.htmlgraph/`. Every change is a git diff. Every item has a lifecycle: create, start, complete.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Session observability</span>
+
+Hooks capture every tool call, every prompt, and attribute them to the active work item. See exactly what happened in any session via the dashboard.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Custom agents</span>
+
+Define specialized agents with specific models, tools, and system prompts. A researcher agent for investigation, a coder for implementation, a test runner for quality &mdash; each scoped to its job.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Hooks &amp; automation</span>
+
+Event-driven hooks on SessionStart, PreToolUse, PostToolUse, and Stop. Enforce safety rules, capture telemetry, block dangerous operations, or trigger custom workflows automatically.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Skills &amp; slash commands</span>
+
+Reusable workflows as slash commands: `/deploy`, `/diagnose`, `/plan`, `/code-quality`. Package complex multi-step procedures into single invocations that agents and humans can both use.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Quality gates</span>
+
+Enforce software engineering discipline: build, lint, and test before every commit. Spec compliance scoring, code health metrics, and structured diff reviews built into the CLI.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Real-time dashboard</span>
+
+Activity feed, kanban board, session viewer, and work item detail &mdash; served locally by `htmlgraph serve`. See what every agent is doing right now.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Multi-agent coordination</span>
+
+Claude Code, Gemini CLI, Codex, and GitHub Copilot all read from and write to the same work items. Orchestration patterns control which agent handles which task.
+</div>
+
+<div class="hg-card" markdown>
+<span class="hg-card__title">Plans &amp; specifications</span>
+
+CRISPI plans break initiatives into trackable steps. Feature specs define acceptance criteria. Agents execute against the plan and report progress.
+</div>
+
+</div>
+
+</section>
+
+<!-- ======================================== -->
+
+<section class="hg-section" markdown>
+
+<h2 class="hg-section__title">Everything is a file in your repo</h2>
+
+<div class="hg-cards hg-cards--3col hg-cards--arch" markdown>
+
+<div class="hg-card hg-card--arch" markdown>
+<code class="hg-card__label">.htmlgraph/*.html</code>
+
+**HTML files** &mdash; Work items are the source of truth. Human-readable. Git-diffable. No proprietary format.
+</div>
+
+<div class="hg-card hg-card--arch" markdown>
+<code class="hg-card__label">.htmlgraph/htmlgraph.db</code>
+
+**SQLite index** &mdash; A derived read index for fast queries and dashboard rendering. Gitignored. Rebuilt from HTML anytime.
+</div>
+
+<div class="hg-card hg-card--arch" markdown>
+<code class="hg-card__label">htmlgraph</code>
+
+**Go binary** &mdash; One CLI that does everything: create work items, manage sessions, serve the dashboard, run hooks.
+</div>
+
+</div>
+
+</section>
+
+<!-- ======================================== -->
+
+<section class="hg-section" markdown>
+
+<h2 class="hg-section__title">Quick start</h2>
 
 ```bash
-pip install htmlgraph
+# Initialize in your repo
+htmlgraph init
+
+# Create a track and feature
+htmlgraph track create "Auth Overhaul"
+htmlgraph feature create "Add OAuth support" --track trk-abc123 --description "Implement OAuth2 flow"
+htmlgraph feature start feat-def456
+
+# Work with any AI agent — context is shared
+# ... Claude Code, Gemini, Codex all see the active work item ...
+
+htmlgraph feature complete feat-def456
+htmlgraph serve    # see everything at localhost:4000
 ```
 
-## Start Tracking Your Work
+</section>
 
-```python
-from htmlgraph import SDK
+<!-- ======================================== -->
 
-# Initialize SDK (auto-discovers .htmlgraph directory)
-sdk = SDK(agent="claude")
+<section class="hg-section" id="install" markdown>
 
-# Create a feature with fluent API
-feature = sdk.features.create("User Authentication") \
-    .set_priority("high") \
-    .add_steps([
-        "Create login endpoint",
-        "Add JWT middleware",
-        "Write tests"
-    ]) \
-    .save()
+<h2 class="hg-section__title">Install</h2>
 
-# Query with filters
-high_priority = sdk.features.where(status="todo", priority="high")
+```bash
+# Claude Code plugin (recommended)
+claude plugin install htmlgraph
 
-# Create tracks with specs and plans
-track = sdk.tracks.builder() \
-    .title("OAuth Integration") \
-    .with_spec(overview="Add OAuth 2.0 support") \
-    .with_plan_phases([
-        ("Phase 1", ["Setup OAuth (2h)", "Add JWT (3h)"])
-    ]) \
-    .create()
+# Or build from source
+git clone https://github.com/shakestzd/htmlgraph.git
+cd htmlgraph && go build -o htmlgraph ./cmd/htmlgraph/
 ```
 
-</div>
+</section>
 
-<div class="feature-grid">
+<!-- ======================================== -->
 
-<div class="feature-card">
-<span class="feature-icon">&#128196;</span>
-<div class="feature-title">HTML Work Items</div>
-<div class="feature-desc">
-Features, bugs, spikes, and tracks stored as HTML files. Git-diffable, browser-readable, and human-inspectable without any tooling.
-</div>
-</div>
+<section class="hg-section" markdown>
 
-<div class="feature-card">
-<span class="feature-icon">&#128065;</span>
-<div class="feature-title">Live Dashboard</div>
-<div class="feature-desc">
-Phoenix LiveView dashboard with real-time event feed, session tracking, and agent activity monitoring — all local, no external services.
-</div>
-</div>
+<h2 class="hg-section__title">Work item types</h2>
 
-<div class="feature-card">
-<span class="feature-icon">&#9889;</span>
-<div class="feature-title">Local-First Core</div>
-<div class="feature-desc">
-HTML files and SQLite require no external servers. Git-diffable, browser-readable, and fully offline. The optional Phoenix dashboard adds real-time observability.
-</div>
-</div>
+| Type | Prefix | Purpose |
+|------|--------|---------|
+| Feature | `feat-` | Units of deliverable work |
+| Bug | `bug-` | Defects to fix |
+| Spike | `spk-` | Time-boxed investigations |
+| Track | `trk-` | Initiatives grouping related work |
+| Plan | `plan-` | CRISPI implementation plans |
 
-<div class="feature-card">
-<span class="feature-icon">&#128226;</span>
-<div class="feature-title">Multi-AI Coordination</div>
-<div class="feature-desc">
-Works with Claude Code, Gemini CLI, Codex, and Copilot. Event-driven hook system captures every agent action automatically.
-</div>
-</div>
+</section>
 
-<div class="feature-card">
-<span class="feature-icon">&#128200;</span>
-<div class="feature-title">Git Native</div>
-<div class="feature-desc">
-Text-based storage means perfect version control. Diffs show what changed. Merge conflicts are human-readable.
-</div>
-</div>
+<!-- ======================================== -->
 
-<div class="feature-card">
-<span class="feature-icon">&#128640;</span>
-<div class="feature-title">SDK for Programmatic Access</div>
-<div class="feature-desc">
-Fluent Python SDK with Pydantic validation. TrackBuilder for deterministic workflows. Full type safety throughout.
-</div>
-</div>
+<div class="hg-footer-links" markdown>
+
+[CLI Reference](reference/cli.md) &nbsp;&middot;&nbsp; [GitHub](https://github.com/shakestzd/htmlgraph) &nbsp;&middot;&nbsp; [Claude Code Plugin](https://github.com/shakestzd/htmlgraph)
 
 </div>
-
----
-
-## Why HtmlGraph?
-
-AI-assisted development creates an observability gap: multiple agents running across sessions, no unified view of what was done, why, or by whom.
-
-- ✅ **Purpose-built for Claude Code**: Understands Claude Code concepts natively — sessions, hooks, features, spikes, agent attribution. Not a generic APM tool adapted for AI; built from the ground up for how developers actually work with AI coding agents.
-- ✅ **Local-first**: HTML files and SQLite require no servers or cloud services to configure or maintain
-- ✅ **Observable**: every AI agent action is tracked and browsable in the dashboard
-- ✅ **Multi-AI**: works with Claude Code, Gemini CLI, Codex, Copilot — not locked to one tool
-- ✅ **Human-readable**: HTML files you can open in any browser, inspect with DevTools, and diff in git
-- ✅ **Git-native**: all work items are diffable, versionable, and mergeable
-
----
-
-## Core Philosophy
-
-!!! quote "Local-first observability"
-    Track, coordinate, and observe AI-assisted development workflows. HTML files as canonical work items, SQLite for operational queries, and an optional Phoenix LiveView dashboard for real-time observability — local-first, no external infrastructure required for the core.
-
----
-
-## Quick Comparisons
-
-### vs External Tracking Tools
-
-| Feature | External Tools | HtmlGraph |
-|---------|---------------|-----------|
-| Setup | Accounts, APIs, cloud config | `pip install htmlgraph` |
-| Offline | ❌ Requires internet | ✅ Fully offline |
-| Human readable | 🟡 Web UI only | ✅ Any browser or text editor |
-| Version control | ❌ Not git-native | ✅ Git diff works perfectly |
-| Multi-AI support | ❌ Usually one tool | ✅ Claude, Gemini, Codex, Copilot |
-
-### vs JSON/YAML Files
-
-| Feature | JSON | HtmlGraph |
-|---------|------|-----------|
-| Human readable | 🟡 Text editor | ✅ Browser with styling |
-| Query | ❌ jq or custom | ✅ SQLite + CSS selectors |
-| Live dashboard | ❌ Needs UI | ✅ Optional Phoenix LiveView |
-| Agent hooks | ❌ Manual | ✅ Automatic event capture |
-
----
-
-## Next Steps
-
-<div class="feature-grid">
-
-<div class="feature-card">
-<div class="feature-title">📚 Get Started</div>
-<div class="feature-desc">
-<a href="getting-started/">Installation guide, first project, and core concepts →</a>
-</div>
-</div>
-
-<div class="feature-card">
-<div class="feature-title">🔌 SDK Reference</div>
-<div class="feature-desc">
-<a href="api/sdk/">Complete SDK documentation with examples →</a>
-</div>
-</div>
-
-<div class="feature-card">
-<div class="feature-title">📖 User Guide</div>
-<div class="feature-desc">
-<a href="guide/">Learn tracks, features, and session management →</a>
-</div>
-</div>
-
-<div class="feature-card">
-<div class="feature-title">⚡ Examples</div>
-<div class="feature-desc">
-<a href="examples/">Real-world use cases and code samples →</a>
-</div>
-</div>
-
-</div>
-
----
-
-<div style="text-align: center; margin: 4rem 0 2rem; font-size: 0.875rem; color: var(--hg-text-muted);">
-<p>Built with web standards. Designed for AI-assisted development.</p>
-<p style="color: var(--hg-accent); font-weight: 600; margin-top: 1rem;">Local-first. Observable. Multi-AI.</p>
-</div>
-
-<script>
-// Animated Graph Visualization
-(function() {
-  const container = document.getElementById('graph-viz');
-  if (!container) return;
-
-  const width = container.offsetWidth;
-  const height = container.offsetHeight || 400;
-
-  // Create nodes
-  const nodes = [];
-  const nodeCount = 25;
-  for (let i = 0; i < nodeCount; i++) {
-    const node = document.createElement('div');
-    node.className = 'graph-node';
-    node.style.left = Math.random() * (width - 20) + 'px';
-    node.style.top = Math.random() * (height - 20) + 'px';
-    node.style.animationDelay = Math.random() * 2 + 's';
-    container.appendChild(node);
-    nodes.push({
-      element: node,
-      x: parseFloat(node.style.left),
-      y: parseFloat(node.style.top)
-    });
-  }
-
-  // Create edges between nearby nodes
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const dx = nodes[j].x - nodes[i].x;
-      const dy = nodes[j].y - nodes[i].y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < 150 && Math.random() > 0.7) {
-        const edge = document.createElement('div');
-        edge.className = 'graph-edge';
-        edge.style.left = nodes[i].x + 6 + 'px';
-        edge.style.top = nodes[i].y + 6 + 'px';
-        edge.style.width = distance + 'px';
-        edge.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
-        edge.style.animationDelay = Math.random() * 3 + 's';
-        container.appendChild(edge);
-      }
-    }
-  }
-
-  // Slowly animate nodes
-  setInterval(() => {
-    nodes.forEach((node, i) => {
-      const x = parseFloat(node.element.style.left);
-      const y = parseFloat(node.element.style.top);
-      const newX = x + (Math.random() - 0.5) * 2;
-      const newY = y + (Math.random() - 0.5) * 2;
-
-      // Boundary check
-      if (newX > 0 && newX < width - 20) {
-        node.element.style.left = newX + 'px';
-        node.x = newX;
-      }
-      if (newY > 0 && newY < height - 20) {
-        node.element.style.top = newY + 'px';
-        node.y = newY;
-      }
-    });
-  }, 100);
-})();
-</script>
