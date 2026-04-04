@@ -1,0 +1,19 @@
+<div class="slice-card" data-slice="{{.Num}}" data-slice-name="{{.ID}}" data-status="{{if .Status}}{{.Status}}{{else}}pending{{end}}">
+  <div class="slice-header">
+    <span class="slice-num">#{{.Num}}</span>
+    <span class="slice-name">{{.Title}}</span>
+    {{if .Effort}}<span class="badge {{.EffortClass}}">{{.Effort}}</span>{{end}}
+    {{if .Risk}}<span class="badge {{.RiskClass}}">{{.Risk}} Risk</span>{{end}}
+    <span class="badge badge-pending" data-badge-for="slice-{{.Num}}">Pending</span>
+  </div>
+  <div class="slice-meta"><span>{{.ID}}</span></div>
+  {{if .Description}}<p style="font-size:.9rem;margin:8px 0">{{.Description}}</p>{{end}}
+  {{if .Files}}<div class="slice-meta"><span>Files: {{.Files}}</span></div>{{end}}
+  <h4>Test Strategy</h4>
+  <ul><li>Add test strategy here</li></ul>
+  <p style="font-size:.8rem;color:var(--text-muted);margin-top:6px">Dependencies: {{.DepsLabel}}</p>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-{{.Num}}" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-{{.Num}}" data-comment-for="slice-{{.Num}}" placeholder="Comments on slice {{.Num}}..."></textarea>
+  </div>
+</div>

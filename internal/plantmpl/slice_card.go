@@ -1,8 +1,12 @@
 package plantmpl
 
 import (
-	"fmt"
+	"html/template"
 	"io"
+)
+
+var sliceCardTmpl = template.Must(
+	template.ParseFS(templateFS, "templates/slice_card.gohtml"),
 )
 
 // SliceCard renders a single implementation slice with its metadata,
@@ -19,8 +23,41 @@ type SliceCard struct {
 	Status      string
 }
 
-// Render writes the slice card zone placeholder.
+// Render writes the slice card HTML.
 func (sc *SliceCard) Render(w io.Writer) error {
-	_, err := fmt.Fprint(w, "<!-- slice-card zone placeholder -->")
-	return err
+	return sliceCardTmpl.Execute(w, sc)
+}
+
+// EffortClass returns the CSS class for the effort badge.
+func (sc *SliceCard) EffortClass() string {
+	switch sc.Effort {
+	case "S":
+		return "badge-pending"
+	case "M":
+		return "badge-revision"
+	case "L":
+		return "badge-blocked"
+	default:
+		return "badge-pending"
+	}
+}
+
+// RiskClass returns the CSS class for the risk badge.
+func (sc *SliceCard) RiskClass() string {
+	switch sc.Risk {
+	case "High":
+		return "badge-blocked"
+	case "Med", "Medium":
+		return "badge-revision"
+	default:
+		return "badge-pending"
+	}
+}
+
+// DepsLabel returns a human-readable dependency string.
+func (sc *SliceCard) DepsLabel() string {
+	if sc.Deps == "" {
+		return "none"
+	}
+	return "slices " + sc.Deps
 }
