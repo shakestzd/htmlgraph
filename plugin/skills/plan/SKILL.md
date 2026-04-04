@@ -119,6 +119,52 @@ Checks: required sections exist, slice/graph node counts match, sections JSON is
 
 ---
 
+## Step 4b: Browser QA (for CRISPI plans — use Chrome MCP tools)
+
+After structural validation passes, use Chrome browser automation to verify the plan renders correctly before opening it for human review. This catches JavaScript errors and rendering failures that the structural validator cannot detect.
+
+**Trigger condition:** Skip this step if the plan has 0 slices (nothing to render in the graph).
+
+### Chrome QA Checklist
+
+Open the plan URL in Chrome:
+```
+http://localhost:8080/plans/<plan-id>.html
+```
+
+Run each check using Chrome MCP tools:
+
+1. **Page loads without JS errors**
+   - Open browser console (DevTools → Console)
+   - Verify no `Uncaught` or `TypeError` errors
+   - Common cause: missing dagre-d3 CDN or SECTIONS_JSON parse failure
+
+2. **Dependency graph renders**
+   - Inspect `#dep-graph-svg` — it should contain `.node` elements (one per slice)
+   - If SVG is empty, the dagre-d3 render function failed silently
+
+3. **Approval checkboxes are interactive**
+   - Click one checkbox — badge should change from "Pending" to "Approved"
+   - The progress bar should advance
+
+4. **Finalize button state updates**
+   - Approve all sections — verify `#finalizeBtn` becomes enabled
+   - Leave one section unapproved — verify button stays disabled
+
+5. **Feedback POSTs succeed (if server is running)**
+   - Open Network tab in DevTools
+   - Click an approval checkbox
+   - Verify POST to `/api/plans/<plan-id>/feedback` returns 200
+
+### On QA Failure
+
+If any check fails:
+- Report the specific error (console log text, failing assertion)
+- Re-run `htmlgraph plan validate <plan-id>` — it may surface the root cause
+- Common fixes: re-run `htmlgraph plan generate` to refresh the HTML, check server is running with `htmlgraph serve`
+
+---
+
 ## Step 5: Critique (if >= 3 slices)
 
 ```bash
