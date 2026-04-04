@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Component-driven plan HTML — replace monolithic template with typed zone structs</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-c4673603"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T19:30:24.972349"
+             data-updated="2026-04-04T19:32:45.856068" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Component-driven plan HTML — replace monolithic template with typed zone structs</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T19:30:24.973929">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="contains">
+                <h3>Contains:</h3>
+                <ul>
+                    <li><a href="feat-330af246.html" data-relationship="contains" data-since="2026-04-04T19:32:45.726359">plantmpl package — PlanPage struct, zone interfaces, AssetRegistry</a></li>
+                    <li><a href="feat-85b4959d.html" data-relationship="contains" data-since="2026-04-04T19:32:45.744695">SliceCard zone — typed struct with grid header, What/Why/Files/Done body</a></li>
+                    <li><a href="feat-709742f6.html" data-relationship="contains" data-since="2026-04-04T19:32:45.760297">DependencyGraph zone — typed nodes/edges with dagre-d3 rendering</a></li>
+                    <li><a href="feat-fa3a976e.html" data-relationship="contains" data-since="2026-04-04T19:32:45.776699">Design and Outline section zones — typed content with approval</a></li>
+                    <li><a href="feat-d736f337.html" data-relationship="contains" data-since="2026-04-04T19:32:45.791369">Questions zone — DecisionCard structs with radio buttons and recap table</a></li>
+                    <li><a href="feat-c77914ba.html" data-relationship="contains" data-since="2026-04-04T19:32:45.806057">Critique zone — assumption verification, dual-critic columns, synthesis</a></li>
+                    <li><a href="feat-3ea12c29.html" data-relationship="contains" data-since="2026-04-04T19:32:45.82354">Finalize preview zone — reactive table of generated features</a></li>
+                    <li><a href="feat-4c6ec9de.html" data-relationship="contains" data-since="2026-04-04T19:32:45.839307">Progress bar, JS behavior, CSS consolidation, finalized state guard</a></li>
+                    <li><a href="feat-91f88d6d.html" data-relationship="contains" data-since="2026-04-04T19:32:45.855912">Wire PlanPage.Render into plan create/generate — delete monolithic template</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Replace the plan-template.html monolithic template + strings.ReplaceAll approach with composable Go structs (PlanPage, SliceCard, DependencyGraph, etc.) that render via embedded html/template subtemplates. Each zone is a typed struct with its own .gohtml file. Full re-render on every mutation. Data embedded as JSON blob. Zero new dependencies — stdlib html/template only. Migration path: one zone at a time, delete monolithic template when all zones migrated.</p>
+        </section>
+    </article>
+</body>
+</html>

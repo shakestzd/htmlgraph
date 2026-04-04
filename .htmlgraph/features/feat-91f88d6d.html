@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Wire PlanPage.Render into plan create/generate — delete monolithic template</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-91f88d6d"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T19:30:58.4108"
+             data-updated="2026-04-04T19:32:45.709458" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Wire PlanPage.Render into plan create/generate — delete monolithic template</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-85b4959d.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.610974">SliceCard zone — typed struct with grid header, What/Why/Files/Done body</a></li>
+                    <li><a href="feat-709742f6.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.625622">DependencyGraph zone — typed nodes/edges with dagre-d3 rendering</a></li>
+                    <li><a href="feat-fa3a976e.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.640965">Design and Outline section zones — typed content with approval</a></li>
+                    <li><a href="feat-d736f337.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.65552">Questions zone — DecisionCard structs with radio buttons and recap table</a></li>
+                    <li><a href="feat-c77914ba.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.670299">Critique zone — assumption verification, dual-critic columns, synthesis</a></li>
+                    <li><a href="feat-3ea12c29.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.689403">Finalize preview zone — reactive table of generated features</a></li>
+                    <li><a href="feat-4c6ec9de.html" data-relationship="blocked_by" data-since="2026-04-04T19:32:45.709295">Progress bar, JS behavior, CSS consolidation, finalized state guard</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T19:30:58.411727">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Replace scaffoldCRISPIPlan() and applyPlanTemplateVars() with PlanPage.Render(). plan create builds PlanPage struct from args, renders to file. plan generate builds PlanPage from work item data, renders to file. plan add-slice reads plan data, adds SliceCard to struct, full re-render. plan add-question adds DecisionCard, full re-render. Delete plan-template.html and all string surgery in plan_mutations.go. Update plan_create.go, plan_template.go, plan_mutations.go.</p>
+        </section>
+    </article>
+</body>
+</html>
