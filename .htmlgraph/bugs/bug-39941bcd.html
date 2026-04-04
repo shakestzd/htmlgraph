@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Slice card structure mismatch — missing What/Why/Files/Done-when and badges</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-39941bcd"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T16:15:22.23862"
+             data-updated="2026-04-04T16:16:04.367428" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Slice card structure mismatch — missing What/Why/Files/Done-when and badges</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T16:15:22.239676">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-9ee13f65.html" data-relationship="caused_by" data-since="2026-04-04T16:16:04.367333">Plan create from topic — no track required</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Template slice cards use a simple flex header with .slice-num/.slice-name and inline description. Benchmark uses 5-column grid header with .slice-number/.slice-title, effort badges (S/M/L), risk badges (Low/Med/High), dependency pills (.slice-deps), and structured body with What/Why/Files/Done-when sections. CSS needed: .badge-sm, .effort-s/m/l, .risk-low/med/high, .slice-footer, .slice-deps. add-slice must accept --effort, --risk, --files, --acceptance flags.</p>
+        </section>
+    </article>
+</body>
+</html>

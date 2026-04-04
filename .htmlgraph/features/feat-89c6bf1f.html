@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Smart work item placement — auto-resolve track and parent feature on create</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-89c6bf1f"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T15:01:42.131934"
+             data-updated="2026-04-04T15:01:42.133212" data-agent-assigned="claude-code" data-track-id="trk-f2a1a880">
+
+        <header>
+            <h1>Smart work item placement — auto-resolve track and parent feature on create</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f2a1a880.html" data-relationship="part_of" data-since="2026-04-04T15:01:42.133154">trk-f2a1a880</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When creating a bug or feature, the system should automatically determine the correct track and parent feature based on semantic content matching — not just accept the --track flag blindly or auto-link to an arbitrary feature. Current behavior: auto-linker picks the wrong feature (e.g., bug about work item completion linked to session ingester). Expected behavior: analyze the bug/feature title and description, search existing tracks and features for semantic relevance, suggest or auto-assign the correct parent. This could be: (1) a CLI pre-create step that proposes placement, (2) orchestrator/agent rules that validate placement before delegation, or (3) a post-create 'htmlgraph lint' that flags misplaced items.</p>
+        </section>
+    </article>
+</body>
+</html>

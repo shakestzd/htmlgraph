@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>JS missing finalized state guard — button always enables</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-16228848"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T16:15:22.287907"
+             data-updated="2026-04-04T16:16:04.410678" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>JS missing finalized state guard — button always enables</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T16:15:22.288923">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-9ee13f65.html" data-relationship="caused_by" data-since="2026-04-04T16:16:04.410565">Plan create from topic — no track required</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Template JS does not check article.dataset.status === 'finalized' on load. When a finalized plan is reopened, the finalize button should show 'Plan Finalized' (disabled, green background) and all approval checkboxes should be locked. Benchmark has this guard; template does not.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Work item status not auto-completed when implementation is committed</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-1688c886"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T14:54:03.87828"
+             data-updated="2026-04-04T14:58:37.279938" data-agent-assigned="claude-code" data-track-id="trk-9ae9e043">
+
+        <header>
+            <h1>Work item status not auto-completed when implementation is committed</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-d5cb2353.html" data-relationship="caused_by" data-since="2026-04-04T14:58:37.264931">Auto-complete work items when implementation is committed</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f2a1a880.html" data-relationship="part_of" data-since="2026-04-04T14:58:37.279845">Work Item Traceability — hierarchy enforcement, file attribution, smart linking</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When a feature's implementation is committed in a worktree (code done, tests passing), the work item status remains 'todo'. The developer must manually run 'htmlgraph feature complete feat-xxx' for each item. This led to trk-f8fd5c66 showing 1/8 done when 7/8 were actually implemented. The system should auto-detect completion — either via post-commit hooks that match commit messages to feature IDs (e.g., feat-xxx in commit trailer), or via the YOLO/worktree workflow that runs 'complete' after quality gates pass. At minimum, 'htmlgraph review' or 'htmlgraph check' should flag features with committed code but todo status.</p>
+        </section>
+    </article>
+</body>
+</html>
