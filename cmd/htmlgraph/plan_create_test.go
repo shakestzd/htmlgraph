@@ -10,9 +10,8 @@ import (
 
 func TestRunPlanCreateFromTopic(t *testing.T) {
 	dir := t.TempDir()
-	plansDir := filepath.Join(dir, "plans")
-	if err := os.MkdirAll(plansDir, 0o755); err != nil {
-		t.Fatal(err)
+	for _, sub := range []string{"plans"} {
+		os.MkdirAll(filepath.Join(dir, sub), 0o755)
 	}
 
 	planID, err := createPlanFromTopic(dir, "Auth Middleware Rewrite", "Rewrite auth for compliance")
@@ -27,43 +26,40 @@ func TestRunPlanCreateFromTopic(t *testing.T) {
 	}
 
 	// Verify file exists.
-	planPath := filepath.Join(plansDir, planID+".html")
+	planPath := filepath.Join(dir, "plans", planID+".html")
 	data, err := os.ReadFile(planPath)
 	if err != nil {
 		t.Fatalf("plan file not found: %v", err)
 	}
 	html := string(data)
 
-	// Verify title is injected.
+	// Verify title is present.
 	if !strings.Contains(html, "Auth Middleware Rewrite") {
 		t.Error("plan HTML missing title")
 	}
 
-	// Verify description is injected.
+	// Verify description is present.
 	if !strings.Contains(html, "Rewrite auth for compliance") {
 		t.Error("plan HTML missing description")
 	}
 
-	// Verify it's a CRISPI plan (has interactive elements).
-	if !strings.Contains(html, "data-status=\"draft\"") {
-		t.Error("plan HTML missing draft status")
-	}
-	if !strings.Contains(html, "btn-finalize") {
-		t.Error("plan HTML missing finalize button")
+	// Verify it uses the standard node template (links to styles.css).
+	if !strings.Contains(html, `href="../styles.css"`) {
+		t.Error("plan HTML should use styles.css (standard node template)")
 	}
 
-	// Verify no track/feature references.
-	if strings.Contains(html, "feat-xxx") {
-		t.Error("plan HTML still has feat-xxx placeholder")
+	// Verify it does NOT use the old CRISPI template.
+	if strings.Contains(html, "btn-finalize") {
+		t.Error("plan HTML should NOT contain CRISPI btn-finalize")
+	}
+	if strings.Contains(html, "plan-sidebar") {
+		t.Error("plan HTML should NOT contain CRISPI sidebar")
 	}
 }
 
 func TestRunPlanAddSlice(t *testing.T) {
 	dir := t.TempDir()
-	plansDir := filepath.Join(dir, "plans")
-	if err := os.MkdirAll(plansDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)
 
 	planID, err := createPlanFromTopic(dir, "Test Plan", "A test plan")
 	if err != nil {
@@ -75,8 +71,8 @@ func TestRunPlanAddSlice(t *testing.T) {
 		t.Fatalf("addSliceToPlan: %v", err)
 	}
 
-	// Verify slice exists in HTML.
-	planPath := filepath.Join(plansDir, planID+".html")
+	// Verify slice exists as a step in the plan HTML.
+	planPath := filepath.Join(dir, "plans", planID+".html")
 	data, err := os.ReadFile(planPath)
 	if err != nil {
 		t.Fatal(err)
@@ -84,10 +80,7 @@ func TestRunPlanAddSlice(t *testing.T) {
 	html := string(data)
 
 	if !strings.Contains(html, "Implement error handling") {
-		t.Error("plan HTML missing slice title")
-	}
-	if !strings.Contains(html, `data-slice="1"`) {
-		t.Error("plan HTML missing slice-1 marker")
+		t.Error("plan HTML missing slice title as step")
 	}
 
 	// Add a second slice.
@@ -97,7 +90,7 @@ func TestRunPlanAddSlice(t *testing.T) {
 
 	data, _ = os.ReadFile(planPath)
 	html = string(data)
-	if !strings.Contains(html, `data-slice="2"`) {
-		t.Error("plan HTML missing slice-2 marker")
+	if !strings.Contains(html, "Add tests") {
+		t.Error("plan HTML missing second slice")
 	}
 }

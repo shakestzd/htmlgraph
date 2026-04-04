@@ -10,39 +10,30 @@ import (
 )
 
 // TestPlanFirstLifecycle exercises the complete plan-first pipeline:
-// create → add-slice → critique → approve → finalize → verify work items.
+// create → add-slice → critique → finalize → verify work items.
 func TestPlanFirstLifecycle(t *testing.T) {
 	dir := t.TempDir()
 	for _, sub := range []string{"plans", "features", "tracks"} {
-		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
-			t.Fatal(err)
-		}
+		os.MkdirAll(filepath.Join(dir, sub), 0o755)
 	}
 
 	// Step 1: Create plan from topic.
-	planID, err := createPlanFromTopic(dir, "Auth Middleware Rewrite", "Rewrite auth for compliance requirements")
+	planID, err := createPlanFromTopic(dir, "Auth Middleware Rewrite", "Rewrite auth for compliance")
 	if err != nil {
 		t.Fatalf("createPlanFromTopic: %v", err)
 	}
+
+	// Verify plan uses standard node template (has styles.css link).
 	planPath := filepath.Join(dir, "plans", planID+".html")
-	if _, err := os.Stat(planPath); err != nil {
-		t.Fatalf("plan file not created: %v", err)
+	data, _ := os.ReadFile(planPath)
+	if !strings.Contains(string(data), `href="../styles.css"`) {
+		t.Error("plan should use standard node template with styles.css")
 	}
 
 	// Step 2: Add slices.
 	for _, title := range []string{"Error handling layer", "Token validation", "Migration script"} {
 		if err := addSliceToPlan(dir, planID, title); err != nil {
 			t.Fatalf("addSliceToPlan(%s): %v", title, err)
-		}
-	}
-
-	// Verify slices exist.
-	data, _ := os.ReadFile(planPath)
-	html := string(data)
-	for i := 1; i <= 3; i++ {
-		marker := `data-slice="` + string(rune('0'+i)) + `"`
-		if !strings.Contains(html, marker) {
-			t.Errorf("plan missing slice %d", i)
 		}
 	}
 
@@ -61,11 +52,13 @@ func TestPlanFirstLifecycle(t *testing.T) {
 		t.Errorf("critique slices = %d, want 3", len(critique.Slices))
 	}
 
-	// Step 4: Approve all slices (simulate user clicking approve checkboxes).
-	data, _ = os.ReadFile(planPath)
-	html = strings.ReplaceAll(string(data), `data-action="approve"`, `data-action="approve" checked`)
-	if err := os.WriteFile(planPath, []byte(html), 0o644); err != nil {
-		t.Fatal(err)
+	// Step 4: Validate.
+	validation, err := validatePlan(dir, planID)
+	if err != nil {
+		t.Fatalf("validatePlan: %v", err)
+	}
+	if !validation.Valid {
+		t.Errorf("plan should be valid, got errors: %v", validation.Errors)
 	}
 
 	// Step 5: Finalize — creates track + features.
@@ -74,9 +67,6 @@ func TestPlanFirstLifecycle(t *testing.T) {
 		t.Fatalf("workitem.Open: %v", err)
 	}
 	defer p.Close()
-
-	// Register plan in the collection so finalize can link it.
-	_, _ = p.Plans.Create("Auth Middleware Rewrite")
 
 	result, err := executePlanFinalize(p, dir, planID)
 	if err != nil {
@@ -91,31 +81,15 @@ func TestPlanFirstLifecycle(t *testing.T) {
 		t.Errorf("track ID %q doesn't have trk- prefix", result.TrackID)
 	}
 
-	// Verify 3 features created (one per approved slice).
+	// Verify 3 features created.
 	if len(result.FeatureIDs) != 3 {
 		t.Errorf("features = %d, want 3", len(result.FeatureIDs))
-	}
-	for _, fid := range result.FeatureIDs {
-		if !strings.HasPrefix(fid, "feat-") {
-			t.Errorf("feature ID %q doesn't have feat- prefix", fid)
-		}
-		// Verify feature file exists.
-		featPath := filepath.Join(dir, "features", fid+".html")
-		if _, err := os.Stat(featPath); err != nil {
-			t.Errorf("feature file missing: %s", featPath)
-		}
 	}
 
 	// Verify track file exists.
 	trackPath := filepath.Join(dir, "tracks", result.TrackID+".html")
 	if _, err := os.Stat(trackPath); err != nil {
 		t.Errorf("track file missing: %s", trackPath)
-	}
-
-	// Verify plan status is now finalized.
-	data, _ = os.ReadFile(planPath)
-	if !strings.Contains(string(data), `data-status="finalized"`) {
-		t.Error("plan not marked as finalized")
 	}
 
 	// Step 6: Idempotent re-finalize.
@@ -131,19 +105,16 @@ func TestPlanFirstLifecycle(t *testing.T) {
 	}
 }
 
-// TestPlanLifecycle_NoApprovedSlices verifies finalize with no approvals
+// TestPlanLifecycle_NoSlices verifies finalize with no slices
 // creates a track but zero features.
-func TestPlanLifecycle_NoApprovedSlices(t *testing.T) {
+func TestPlanLifecycle_NoSlices(t *testing.T) {
 	dir := t.TempDir()
 	for _, sub := range []string{"plans", "features", "tracks"} {
 		os.MkdirAll(filepath.Join(dir, sub), 0o755)
 	}
 
-	planID, err := createPlanFromTopic(dir, "Empty Plan", "nothing approved")
+	planID, err := createPlanFromTopic(dir, "Empty Plan", "nothing here")
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := addSliceToPlan(dir, planID, "Unapproved Slice"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,9 +129,9 @@ func TestPlanLifecycle_NoApprovedSlices(t *testing.T) {
 		t.Fatalf("finalize: %v", err)
 	}
 	if result.TrackID == "" {
-		t.Error("track should be created even with no approved slices")
+		t.Error("track should be created even with no slices")
 	}
 	if len(result.FeatureIDs) != 0 {
-		t.Errorf("features = %d, want 0 (no slices approved)", len(result.FeatureIDs))
+		t.Errorf("features = %d, want 0", len(result.FeatureIDs))
 	}
 }

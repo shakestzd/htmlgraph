@@ -2,13 +2,9 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
@@ -25,9 +21,9 @@ type finalizeResult struct {
 func planFinalizeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "finalize <plan-id>",
-		Short: "Generate a work item graph from a finalized plan",
-		Long: `Read a plan's approved slices and generate the work item graph:
-a track, features per approved slice, and edges for dependencies.
+		Short: "Generate a work item graph from a plan",
+		Long: `Read a plan's steps (slices) and generate the work item graph:
+a track, features per slice, and edges for dependencies.
 
 Idempotent: re-running on an already-finalized plan is a no-op.
 
@@ -69,19 +65,17 @@ Example:
 	}
 }
 
-// executePlanFinalize reads a plan, creates a track and features from approved
-// slices, wires edges, and marks the plan as finalized. Idempotent.
+// executePlanFinalize reads a plan's steps, creates a track and features,
+// wires edges, and marks the plan as finalized. Idempotent.
 func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*finalizeResult, error) {
-	planPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
-
-	// Parse plan HTML.
-	status, err := parsePlanHTMLStatus(planPath)
+	// Get the plan node.
+	planNode, err := p.Plans.Get(planID)
 	if err != nil {
-		return nil, fmt.Errorf("read plan %s: %w", planID, err)
+		return nil, fmt.Errorf("plan %s not found: %w", planID, err)
 	}
 
 	// Idempotent: if already finalized, find existing track + features and return.
-	if status == "finalized" {
+	if planNode.Status == "finalized" || planNode.Status == "done" {
 		trackID := findTrackForPlan(p, planID)
 		featureIDs := findFeaturesForTrack(p, trackID)
 		return &finalizeResult{
@@ -91,59 +85,25 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 		}, nil
 	}
 
-	// Parse feedback from the HTML file.
-	feedback, err := parseFeedbackFromHTML(planID, planPath)
-	if err != nil {
-		return nil, fmt.Errorf("read feedback: %w", err)
-	}
+	// Use plan steps as slices — all steps are treated as approved.
+	slices := parsePlanStepsAsSlices(planNode)
 
-	// Parse slice metadata from the HTML.
-	slices, err := parsePlanSlices(planPath)
-	if err != nil {
-		return nil, fmt.Errorf("parse slices: %w", err)
-	}
-
-	// Filter to approved slices only.
-	var approvedSlices []planSlice
-	for _, s := range slices {
-		sectionKey := fmt.Sprintf("slice-%d", s.num)
-		if feedback.SliceApprovals[sectionKey] {
-			approvedSlices = append(approvedSlices, s)
-		}
-	}
-
-	// Extract plan title.
-	planTitle := parsePlanTitle(planPath)
-	if planTitle == "" {
-		planTitle = planID
-	}
-
-	// Create track.
-	trackNode, err := p.Tracks.Create(planTitle,
+	// Create track from the plan title.
+	trackNode, err := p.Tracks.Create(planNode.Title,
 		workitem.TrackWithStatus("in-progress"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create track: %w", err)
 	}
 
-	// Build a map from slice number to feature ID for dependency wiring.
-	sliceNumToFeatureID := make(map[int]string, len(approvedSlices))
+	// Create features for each slice.
 	var featureIDs []string
-
-	// Create features for each approved slice.
-	for _, s := range approvedSlices {
-		// Build description from slice comments if available.
-		sectionKey := fmt.Sprintf("slice-%d", s.num)
-		desc := ""
-		if comment, ok := feedback.Comments[sectionKey]; ok && comment != "" {
-			desc = comment
-		}
-
+	for _, s := range slices {
 		opts := []workitem.FeatureOption{
 			workitem.FeatWithTrack(trackNode.ID),
 		}
-		if desc != "" {
-			opts = append(opts, workitem.FeatWithContent(desc))
+		if planNode.Content != "" {
+			opts = append(opts, workitem.FeatWithContent(planNode.Content))
 		}
 
 		featNode, err := p.Features.Create(s.title, opts...)
@@ -151,7 +111,6 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 			return nil, fmt.Errorf("create feature for slice %d: %w", s.num, err)
 		}
 
-		sliceNumToFeatureID[s.num] = featNode.ID
 		featureIDs = append(featureIDs, featNode.ID)
 
 		// Wire bidirectional track <-> feature edges.
@@ -160,46 +119,21 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 		}
 	}
 
-	// Wire blocked_by edges based on slice dependencies.
-	for _, s := range approvedSlices {
-		featID, ok := sliceNumToFeatureID[s.num]
-		if !ok {
-			continue
-		}
-		for _, depNum := range s.depNums {
-			depFeatID, ok := sliceNumToFeatureID[depNum]
-			if !ok {
-				continue // dependency was not approved, skip
-			}
-			edge := models.Edge{
-				TargetID:     depFeatID,
-				Relationship: models.RelBlockedBy,
-				Title:        depFeatID,
-				Since:        time.Now().UTC(),
-			}
-			if _, err := p.Features.AddEdge(featID, edge); err != nil {
-				return nil, fmt.Errorf("wire blocked_by %s -> %s: %w", featID, depFeatID, err)
-			}
-		}
-	}
-
 	// Link plan to track: plan implemented_in track.
-	planCol := collectionFor(p, "plan")
-	planNode, err := planCol.Get(planID)
-	if err == nil {
-		edge := models.Edge{
-			TargetID:     trackNode.ID,
-			Relationship: models.RelImplementedIn,
-			Title:        trackNode.ID,
-			Since:        time.Now().UTC(),
-		}
-		_, _ = planCol.AddEdge(planNode.ID, edge)
+	edge := models.Edge{
+		TargetID:     trackNode.ID,
+		Relationship: models.RelImplementedIn,
+		Title:        trackNode.ID,
+		Since:        time.Now().UTC(),
 	}
+	_, _ = p.Plans.AddEdge(planNode.ID, edge)
 
-	// Update plan HTML status to "finalized".
-	if err := updatePlanHTMLStatus(planPath, "finalized"); err != nil {
-		// Non-fatal: the work items are already created.
-		fmt.Fprintf(os.Stderr, "Warning: failed to update plan status: %v\n", err)
+	// Mark plan as finalized.
+	if _, err := p.Plans.Complete(planID); err != nil {
+		// Best-effort: try updating status directly.
+		edit := p.Plans.Edit(planID)
+		edit = edit.SetStatus("finalized")
+		_ = edit.Save()
 	}
 
 	return &finalizeResult{
@@ -208,96 +142,12 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 	}, nil
 }
 
-// planSlice holds metadata for a single slice parsed from the plan HTML.
+// planSlice holds metadata for a single slice parsed from the plan.
 type planSlice struct {
 	num     int
-	name    string // data-slice-name (feature ID or slug)
-	title   string // human-readable title from slice-name span
-	depNums []int  // dependency slice numbers from data-deps
-}
-
-// parsePlanSlices reads slice cards and graph nodes from a plan HTML file.
-func parsePlanSlices(planPath string) ([]planSlice, error) {
-	f, err := os.Open(planPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	doc, err := goquery.NewDocumentFromReader(f)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build dep map from graph nodes: data-node -> data-deps.
-	depMap := make(map[int][]int)
-	doc.Find("[data-node]").Each(func(_ int, sel *goquery.Selection) {
-		nodeStr, _ := sel.Attr("data-node")
-		nodeNum, err := strconv.Atoi(nodeStr)
-		if err != nil {
-			return
-		}
-		depsStr, _ := sel.Attr("data-deps")
-		if depsStr == "" {
-			return
-		}
-		for _, d := range strings.Split(depsStr, ",") {
-			d = strings.TrimSpace(d)
-			if d == "" {
-				continue
-			}
-			if num, err := strconv.Atoi(d); err == nil {
-				depMap[nodeNum] = append(depMap[nodeNum], num)
-			}
-		}
-	})
-
-	// Parse slice cards.
-	var slices []planSlice
-	doc.Find(".slice-card[data-slice]").Each(func(_ int, sel *goquery.Selection) {
-		numStr, _ := sel.Attr("data-slice")
-		num, err := strconv.Atoi(numStr)
-		if err != nil {
-			return
-		}
-
-		name, _ := sel.Attr("data-slice-name")
-		title := strings.TrimSpace(sel.Find(".slice-name").First().Text())
-		if title == "" {
-			title = name
-		}
-		if title == "" {
-			title = fmt.Sprintf("Slice %d", num)
-		}
-
-		slices = append(slices, planSlice{
-			num:     num,
-			name:    name,
-			title:   title,
-			depNums: depMap[num],
-		})
-	})
-
-	return slices, nil
-}
-
-// parsePlanTitle reads the plan title from the <h1> element.
-func parsePlanTitle(planPath string) string {
-	f, err := os.Open(planPath)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-
-	doc, err := goquery.NewDocumentFromReader(f)
-	if err != nil {
-		return ""
-	}
-
-	title := strings.TrimSpace(doc.Find("h1").First().Text())
-	// Strip "Plan: " prefix if present.
-	title = strings.TrimPrefix(title, "Plan: ")
-	return title
+	name    string
+	title   string
+	depNums []int
 }
 
 // wireTrackEdges creates bidirectional part_of/contains edges between a
@@ -351,8 +201,7 @@ func findFeaturesForTrack(p *workitem.Project, trackID string) []string {
 // findTrackForPlan searches for an existing track linked to the plan via
 // an implemented_in edge. Returns the track ID or empty string.
 func findTrackForPlan(p *workitem.Project, planID string) string {
-	planCol := collectionFor(p, "plan")
-	node, err := planCol.Get(planID)
+	node, err := p.Plans.Get(planID)
 	if err != nil {
 		return ""
 	}
