@@ -9,16 +9,51 @@
 package plantmpl
 
 import (
+	"bytes"
 	"embed"
 	"html/template"
 	"io"
+	texttemplate "text/template"
 )
 
 //go:embed templates/*
 var templateFS embed.FS
 
-var planPageTmpl = template.Must(
-	template.ParseFS(templateFS, "templates/plan_page.gohtml"),
+// renderZone calls Render on a Component and returns the result as
+// template.HTML so it can be embedded directly in the page template.
+func renderZone(c Component) template.HTML {
+	if c == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := c.Render(&buf); err != nil {
+		return template.HTML("<!-- render error: " + err.Error() + " -->")
+	}
+	return template.HTML(buf.String())
+}
+
+// renderSlices renders all SliceCards and returns the concatenated HTML.
+func renderSlices(cards []SliceCard) template.HTML {
+	var buf bytes.Buffer
+	for i := range cards {
+		if err := cards[i].Render(&buf); err != nil {
+			buf.WriteString("<!-- slice render error: " + err.Error() + " -->")
+		}
+	}
+	return template.HTML(buf.String())
+}
+
+// planPageTmpl uses text/template (not html/template) because:
+//   - Zone components handle their own HTML escaping via html/template
+//   - The page shell contains static JS that must survive intact
+//     (including JS comment markers used by runtime HTML patching)
+//   - All dynamic values inserted at the page level are either
+//     pre-rendered template.HTML or known-safe format (SectionsJSON)
+var planPageTmpl = texttemplate.Must(
+	texttemplate.New("plan_page.gohtml").Funcs(texttemplate.FuncMap{
+		"renderZone":   renderZone,
+		"renderSlices": renderSlices,
+	}).ParseFS(templateFS, "templates/plan_page.gohtml"),
 )
 
 // Component is anything that can render itself into a plan zone.
