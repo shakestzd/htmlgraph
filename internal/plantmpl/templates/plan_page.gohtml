@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="htmlgraph-version" content="1.0">
+  <title>Plan: {{.Title}}</title>
+  <style>
+    {{range .Assets.CSS}}{{.}}
+    {{end}}
+  </style>
+</head>
+<body>
+  <nav class="plan-sidebar">
+    <ul>
+      <li><a href="#design">Design</a></li>
+      <li><a href="#outline">Outline</a></li>
+      <li><a href="#slices">Slices</a></li>
+      <li><a href="#questions">Questions</a></li>
+      <li><a href="#critique">Critique</a></li>
+      <li><a href="#progress">Progress</a></li>
+    </ul>
+  </nav>
+  <div class="plan-content">
+    <article id="{{.PlanID}}" data-feature-id="{{.FeatureID}}" data-status="{{.Status}}">
+      <header>
+        <h1>{{.Title}}</h1>
+        {{if .Description}}<p class="plan-description">{{.Description}}</p>{{end}}
+        {{if .Date}}<time>{{.Date}}</time>{{end}}
+      </header>
+
+      {{if .Graph}}
+      <section id="dependency-graph" class="plan-zone">
+        <!-- dependency-graph zone placeholder -->
+      </section>
+      {{end}}
+
+      {{if .Design}}
+      <section id="design" class="plan-zone">
+        <!-- design-section zone placeholder -->
+      </section>
+      {{end}}
+
+      {{if .Outline}}
+      <section id="outline" class="plan-zone">
+        <!-- outline-section zone placeholder -->
+      </section>
+      {{end}}
+
+      {{if .Slices}}
+      <section id="slices" class="plan-zone">
+        {{range .Slices}}
+        <!-- slice-card zone placeholder -->
+        {{end}}
+      </section>
+      {{end}}
+
+      {{if .Questions}}
+      <section id="questions" class="plan-zone">
+        <!-- questions-section zone placeholder -->
+      </section>
+      {{end}}
+
+      {{if .Critique}}
+      <section id="critique" class="plan-zone">
+        <!-- critique-zone zone placeholder -->
+      </section>
+      {{end}}
+
+      {{if .Preview}}
+      <section id="finalize-preview" class="plan-zone">
+        <!-- finalize-preview zone placeholder -->
+      </section>
+      {{end}}
+
+      {{if .Progress}}
+      <section id="progress" class="plan-zone">
+        <!-- progress-bar zone placeholder -->
+      </section>
+      {{end}}
+
+    </article>
+  </div>
+  <script>
+    {{range .Assets.JS}}{{.}}
+    {{end}}
+  </script>
+</body>
+</html>
