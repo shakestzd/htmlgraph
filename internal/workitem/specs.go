@@ -61,7 +61,7 @@ func (sc *SpecCollection) Create(title string, opts ...SpecOption) (*models.Node
 	}
 
 	now := time.Now().UTC()
-	id := generateID("spec", title)
+	id := GenerateID("spec", title)
 
 	var steps []models.Step
 	for i, desc := range cfg.steps {

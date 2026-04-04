@@ -61,7 +61,7 @@ func (pc *PlanCollection) Create(title string, opts ...PlanOption) (*models.Node
 	}
 
 	now := time.Now().UTC()
-	id := generateID("plan", title)
+	id := GenerateID("plan", title)
 
 	var steps []models.Step
 	for i, desc := range cfg.steps {

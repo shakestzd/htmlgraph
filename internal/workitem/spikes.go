@@ -90,7 +90,7 @@ func (sc *SpikeCollection) Create(title string, opts ...SpikeOption) (*models.No
 	}
 
 	now := time.Now().UTC()
-	id := generateID("spike", title)
+	id := GenerateID("spike", title)
 
 	var steps []models.Step
 	for i, desc := range cfg.steps {
