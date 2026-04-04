@@ -1,7 +1,6 @@
 package plantmpl
 
 import (
-	"fmt"
 	"html/template"
 	"io"
 )
@@ -30,8 +29,35 @@ type RiskRow struct {
 	Mitigation string
 }
 
-// Render writes the critique zone placeholder.
+var critiqueTmpl = template.Must(
+	template.ParseFS(templateFS, "templates/critique_zone.gohtml"),
+)
+
+// Render writes the critique zone HTML.
 func (c *CritiqueZone) Render(w io.Writer) error {
-	_, err := fmt.Fprint(w, "<!-- critique-zone zone placeholder -->")
-	return err
+	return critiqueTmpl.Execute(w, c)
+}
+
+// BadgeClass returns the CSS class for an assumption badge.
+func (a AssumptionResult) BadgeClass() string {
+	switch a.Badge {
+	case "verified":
+		return "badge-approved"
+	case "falsified":
+		return "badge-blocked"
+	default:
+		return "badge-pending"
+	}
+}
+
+// SeverityClass returns the CSS class for a risk severity.
+func (r RiskRow) SeverityClass() string {
+	switch r.Severity {
+	case "High":
+		return "badge-blocked"
+	case "Medium", "Med":
+		return "badge-revision"
+	default:
+		return "badge-pending"
+	}
 }
