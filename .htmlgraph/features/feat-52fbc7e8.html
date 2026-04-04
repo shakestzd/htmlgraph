@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Generative finalize — plan produces work item graph</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-52fbc7e8"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T00:25:30.39759"
+             data-updated="2026-04-04T00:25:48.069751" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Generative finalize — plan produces work item graph</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T00:25:30.398169">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-9ee13f65.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.069665">Plan create from topic — no track required</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Rearchitect plan finalize to be generative: creates trk-{hex8}, creates feat-{hex8} per approved slice, wires blocked_by/part_of/contains edges, bakes question answers into feature descriptions. Q2 decision: generate ALL slices, mark rejected as blocked with comment. Must be idempotent — re-finalize must not duplicate. Consider splitting into track-gen and feature-gen phases. Rollback on error. Est: L effort, Critical risk.</p>
+        </section>
+    </article>
+</body>
+</html>

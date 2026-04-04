@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>isWorkItemID missing pln-/spc- prefixes — trailer refs silently dropped</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-defbf5ae"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-03T16:27:05.053822"
+             data-updated="2026-04-03T19:01:09.870895" data-agent-assigned="claude-code" data-track-id="trk-f2a1a880">
+
+        <header>
+            <h1>isWorkItemID missing pln-/spc- prefixes — trailer refs silently dropped</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="spk-865a44af.html" data-relationship="caused_by" data-since="2026-04-03T16:27:05.054462">spk-865a44af</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f2a1a880.html" data-relationship="part_of" data-since="2026-04-03T16:27:05.054703">trk-f2a1a880</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Commit trailer parser in reindex_trailers.go only recognizes feat-, bug-, spk-, trk- prefixes. Refs: pln-abc and Refs: spc-abc trailers are silently discarded during reindex. Plans and specs are first-class work item types. Fix: add pln- and spc- to isWorkItemID.</p>
+        </section>
+    </article>
+</body>
+</html>

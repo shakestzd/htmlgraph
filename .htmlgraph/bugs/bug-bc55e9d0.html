@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Yolo agent uses wrong CLI syntax — htmlgraph show instead of htmlgraph track show</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-bc55e9d0"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-03T15:13:29.729554"
+             data-updated="2026-04-03T15:18:56.361018" data-agent-assigned="claude-code" data-track-id="trk-9ae9e043">
+
+        <header>
+            <h1>Yolo agent uses wrong CLI syntax — htmlgraph show instead of htmlgraph track show</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-7b97a429.html" data-relationship="caused_by" data-since="2026-04-03T15:13:29.731738">bug-7b97a429</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-9ae9e043.html" data-relationship="part_of" data-since="2026-04-03T15:13:29.732613">trk-9ae9e043</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5997b45f-43ae-42bb-84f8-f8a56e56b28b.html" data-relationship="implemented_in" data-since="2026-04-03T15:14:27.818268">session 5997b45f-43ae-42bb-84f8-f8a56e56b28b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>The yolo session agent tried 'htmlgraph show trk-f2a1a880' which doesn't exist. Should use 'htmlgraph track show trk-f2a1a880'. The execute skill and yolo system prompt need to include the correct CLI command patterns. Also tried bare 'cd' which the hook blocks — should use subshells.</p>
+        </section>
+    </article>
+</body>
+</html>

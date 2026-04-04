@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Tests and quality gates — plan-first lifecycle</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-02241739"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T00:25:30.46405"
+             data-updated="2026-04-04T00:25:48.213547" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Tests and quality gates — plan-first lifecycle</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-2854380d.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.161848">Plan hex8 IDs — unify slug and hex8 ID generation</a></li>
+                    <li><a href="feat-9ee13f65.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.174772">Plan create from topic — no track required</a></li>
+                    <li><a href="feat-52fbc7e8.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.187674">Generative finalize — plan produces work item graph</a></li>
+                    <li><a href="feat-6dd56b28.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.200649">Plan generate dual-mode — detect track vs topic</a></li>
+                    <li><a href="feat-b597b7c6.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.213471">Plan critique command — multi-AI review</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T00:25:30.464577">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Unit tests for plan create, generative finalize, dual-mode generate, hex8 IDs. Integration test for full plan-first lifecycle (create → populate → critique → finalize → verify track+features+edges). Use internal/htmlparse for structured assertions, not raw strings. Est: M effort, Low risk.</p>
+        </section>
+    </article>
+</body>
+</html>

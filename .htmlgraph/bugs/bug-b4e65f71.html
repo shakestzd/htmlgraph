@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Fix: plan-b06fe2db.html has JavaScript syntax errors</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-b4e65f71"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-03T23:55:58.708498"
+             data-updated="2026-04-03T23:55:58.710951" data-agent-assigned="claude-code" data-track-id="trk-bbf223f6">
+
+        <header>
+            <h1>Fix: plan-b06fe2db.html has JavaScript syntax errors</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-b06fe2db.html" data-relationship="caused_by" data-since="2026-04-03T23:55:58.710183">feat-b06fe2db</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-bbf223f6.html" data-relationship="part_of" data-since="2026-04-03T23:55:58.710891">trk-bbf223f6</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Line 801: escaped  followed by HTML breaks JS parser. The escaped tag <\/script> should be an actual  closing tag with HTML content on next line. Line 1172: addEventListener('finalizeBtn') fails due to JS syntax error on line 801 killing parser.</p>
+        </section>
+    </article>
+</body>
+</html>

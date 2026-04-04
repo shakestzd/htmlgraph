@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Plan skill rewrite — plan-first orchestration flow</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-25eb426b"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-04T00:25:30.43691"
+             data-updated="2026-04-04T00:25:48.136662" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Plan skill rewrite — plan-first orchestration flow</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-04T00:25:30.437452">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-52fbc7e8.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.109373">Generative finalize — plan produces work item graph</a></li>
+                    <li><a href="feat-6dd56b28.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.12276">Plan generate dual-mode — detect track vs topic</a></li>
+                    <li><a href="feat-b597b7c6.html" data-relationship="blocked_by" data-since="2026-04-04T00:25:48.136587">Plan critique command — multi-AI review</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Full rewrite of plugin/skills/plan/SKILL.md. Reverse the flow: topic → plan create → populate → plan critique → plan open → plan finalize → dispatch. Old track-first path documented as alternative. Must release in tandem with binary. Est: M effort, High risk.</p>
+        </section>
+    </article>
+</body>
+</html>

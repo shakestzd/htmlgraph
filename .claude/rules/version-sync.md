@@ -16,7 +16,6 @@ The Go binary is distributed via GitHub Releases. The plugin bootstrap script do
 
 ```
 plugin/.claude-plugin/plugin.json:                "version": "X.Y.Z"
-packages/gemini-extension/gemini-extension.json:  "version": "X.Y.Z"
 ```
 
 ## For Claude: Always Check Version

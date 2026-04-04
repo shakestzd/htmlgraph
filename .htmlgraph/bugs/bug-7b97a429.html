@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Yolo worktree uses isolated .htmlgraph/ instead of sharing main</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-7b97a429"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-03T14:50:27.340225"
+             data-updated="2026-04-03T14:59:28.815196" data-agent-assigned="claude-code" data-track-id="trk-9ae9e043">
+
+        <header>
+            <h1>Yolo worktree uses isolated .htmlgraph/ instead of sharing main</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-b06fe2db.html" data-relationship="caused_by" data-since="2026-04-03T14:50:27.342272">feat-b06fe2db</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-9ae9e043.html" data-relationship="part_of" data-since="2026-04-03T14:50:27.342583">trk-9ae9e043</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5997b45f-43ae-42bb-84f8-f8a56e56b28b.html" data-relationship="implemented_in" data-since="2026-04-03T14:51:16.268278">session 5997b45f-43ae-42bb-84f8-f8a56e56b28b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Yolo mode creates a git worktree which copies .htmlgraph/ from the commit point. Work items created after that commit are invisible. Tracking events recorded in the worktree are lost when it's cleaned up. The fix: .htmlgraph/ should always resolve to main's copy, not the worktree's. All CLI commands and hooks should read/write to the main project's .htmlgraph/ regardless of CWD. This means the --project-dir flag or CLAUDE_PROJECT_DIR env var should point to main, not the worktree.</p>
+        </section>
+    </article>
+</body>
+</html>

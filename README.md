@@ -23,6 +23,8 @@ git clone https://github.com/shakestzd/htmlgraph.git
 cd htmlgraph && go build -o htmlgraph ./cmd/htmlgraph/
 ```
 
+For subsequent rebuilds after the binary is on your PATH, use `htmlgraph build` instead.
+
 ## Quick Start
 
 ```bash

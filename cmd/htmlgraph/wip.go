@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const wipLimit = 3
+const wipLimit = 5
 
 func wipCmd() *cobra.Command {
 	cmd := &cobra.Command{
