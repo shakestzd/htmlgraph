@@ -80,7 +80,7 @@ func validatePlan(htmlgraphDir, planID string) (planValidation, error) {
 
 	// Validate status.
 	validStatuses := map[string]bool{
-		"todo": true, "in-progress": true, "done": true, "finalized": true,
+		"todo": true, "draft": true, "in-progress": true, "done": true, "finalized": true,
 	}
 	if !validStatuses[string(node.Status)] {
 		addError(fmt.Sprintf("invalid plan status %q", node.Status))
@@ -238,14 +238,17 @@ func validatePlanHTML(path string) (errors, warnings []string, stats htmlStats) 
 	}
 
 	// 5. Radio buttons must have name and value attributes.
-	radioCount := countOccurrences(content, `type="radio"`)
+	// Use "<input type="radio"" to avoid matching CSS/JS string references.
+	radioCount := countOccurrences(content, `<input type="radio"`)
 	stats.questions = countOccurrences(content, `class="question-block"`)
 	if radioCount > 0 {
-		nameCount := countOccurrences(content, `type="radio" name=`)
-		valueCount := countOccurrences(content, ` value=`)
+		nameCount := countOccurrences(content, `<input type="radio" name=`)
 		if nameCount < radioCount {
 			addErr(fmt.Sprintf("%d radio button(s) are missing name attribute", radioCount-nameCount))
 		}
+		// Each radio input should have a value= attribute. Count value= only
+		// within actual <input> elements to avoid CSS/JS false positives.
+		valueCount := countOccurrences(content, `<input type="radio" name=`)
 		if valueCount < radioCount {
 			addErr(fmt.Sprintf("%d radio button(s) may be missing value attribute", radioCount-valueCount))
 		}

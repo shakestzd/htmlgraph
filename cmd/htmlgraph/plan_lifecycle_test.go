@@ -23,11 +23,11 @@ func TestPlanFirstLifecycle(t *testing.T) {
 		t.Fatalf("createPlanFromTopic: %v", err)
 	}
 
-	// Verify plan uses standard node template (has styles.css link).
+	// Verify plan uses the CRISPI interactive template.
 	planPath := filepath.Join(dir, "plans", planID+".html")
 	data, _ := os.ReadFile(planPath)
-	if !strings.Contains(string(data), `href="../styles.css"`) {
-		t.Error("plan should use standard node template with styles.css")
+	if !strings.Contains(string(data), "btn-finalize") {
+		t.Error("plan should use CRISPI template with btn-finalize")
 	}
 
 	// Step 2: Add slices.

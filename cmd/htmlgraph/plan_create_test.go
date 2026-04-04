@@ -43,17 +43,20 @@ func TestRunPlanCreateFromTopic(t *testing.T) {
 		t.Error("plan HTML missing description")
 	}
 
-	// Verify it uses the standard node template (links to styles.css).
-	if !strings.Contains(html, `href="../styles.css"`) {
-		t.Error("plan HTML should use styles.css (standard node template)")
+	// Verify it uses the CRISPI interactive template.
+	if !strings.Contains(html, "btn-finalize") {
+		t.Error("plan HTML should contain CRISPI btn-finalize")
+	}
+	if !strings.Contains(html, "dep-graph-svg") {
+		t.Error("plan HTML should contain dep-graph-svg")
+	}
+	if !strings.Contains(html, "PLAN_SECTIONS_JSON") {
+		t.Error("plan HTML should contain PLAN_SECTIONS_JSON")
 	}
 
-	// Verify it does NOT use the old CRISPI template.
-	if strings.Contains(html, "btn-finalize") {
-		t.Error("plan HTML should NOT contain CRISPI btn-finalize")
-	}
-	if strings.Contains(html, "plan-sidebar") {
-		t.Error("plan HTML should NOT contain CRISPI sidebar")
+	// Verify SECTIONS_JSON starts with just design and outline (no slices yet).
+	if !strings.Contains(html, `["design","outline"]`) {
+		t.Error("CRISPI plan should start with [design,outline] sections")
 	}
 }
 
@@ -71,7 +74,7 @@ func TestRunPlanAddSlice(t *testing.T) {
 		t.Fatalf("addSliceToPlan: %v", err)
 	}
 
-	// Verify slice exists as a step in the plan HTML.
+	// Verify slice exists in the CRISPI HTML.
 	planPath := filepath.Join(dir, "plans", planID+".html")
 	data, err := os.ReadFile(planPath)
 	if err != nil {
@@ -80,7 +83,18 @@ func TestRunPlanAddSlice(t *testing.T) {
 	html := string(data)
 
 	if !strings.Contains(html, "Implement error handling") {
-		t.Error("plan HTML missing slice title as step")
+		t.Error("plan HTML missing slice title")
+	}
+
+	// Verify CRISPI-specific elements were injected.
+	if !strings.Contains(html, `data-node="1"`) {
+		t.Error("plan HTML missing graph node data-node=1")
+	}
+	if !strings.Contains(html, `data-slice="1"`) {
+		t.Error("plan HTML missing slice card data-slice=1")
+	}
+	if !strings.Contains(html, `"slice-1"`) {
+		t.Error("plan HTML SECTIONS_JSON missing slice-1")
 	}
 
 	// Add a second slice.
@@ -92,5 +106,14 @@ func TestRunPlanAddSlice(t *testing.T) {
 	html = string(data)
 	if !strings.Contains(html, "Add tests") {
 		t.Error("plan HTML missing second slice")
+	}
+	if !strings.Contains(html, `data-node="2"`) {
+		t.Error("plan HTML missing graph node data-node=2")
+	}
+	if !strings.Contains(html, `data-slice="2"`) {
+		t.Error("plan HTML missing slice card data-slice=2")
+	}
+	if !strings.Contains(html, `"slice-2"`) {
+		t.Error("plan HTML SECTIONS_JSON missing slice-2")
 	}
 }

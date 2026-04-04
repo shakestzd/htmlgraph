@@ -103,7 +103,8 @@ func runPlanGenerate(sourceID string) error {
 func routePlanGenerateByArg(htmlgraphDir, sourceID string) (string, error) {
 	switch {
 	case strings.HasPrefix(sourceID, "plan-"):
-		return "", fmt.Errorf("re-scaffold of existing plans not yet implemented: %s", sourceID)
+		// Re-scaffold mode: regenerate CRISPI HTML from current plan data.
+		return rescaffoldExistingPlan(htmlgraphDir, sourceID)
 
 	case isWorkItemPrefix(sourceID):
 		// Retroactive mode: resolve then scaffold from the work item.
@@ -117,6 +118,27 @@ func routePlanGenerateByArg(htmlgraphDir, sourceID string) (string, error) {
 		// Plan-first mode: treat the argument as a free-text topic title.
 		return createPlanFromTopic(htmlgraphDir, sourceID, "")
 	}
+}
+
+// rescaffoldExistingPlan re-reads a plan node and regenerates the CRISPI
+// template with all current data (title, description, slices, questions).
+func rescaffoldExistingPlan(htmlgraphDir, planID string) (string, error) {
+	p, err := workitem.Open(htmlgraphDir, agentForClaim())
+	if err != nil {
+		return "", fmt.Errorf("open project: %w", err)
+	}
+	defer p.Close()
+
+	node, err := p.Plans.Get(planID)
+	if err != nil {
+		return "", fmt.Errorf("plan %q not found: %w", planID, err)
+	}
+
+	if err := scaffoldCRISPIPlanFromNode(htmlgraphDir, node); err != nil {
+		return "", fmt.Errorf("re-scaffold %s: %w", planID, err)
+	}
+
+	return planID, nil
 }
 
 // runPlanGenerateFromWorkItem scaffolds a plan from an existing work item.

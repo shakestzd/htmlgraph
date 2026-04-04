@@ -124,17 +124,43 @@ func TestPlanGenerateFreeTextRoutes(t *testing.T) {
 	}
 }
 
-// TestPlanGeneratePlanPrefixErrors verifies that a plan-* argument returns an error
-// (re-scaffold not yet implemented).
-func TestPlanGeneratePlanPrefixErrors(t *testing.T) {
+// TestPlanGeneratePlanPrefixRescaffolds verifies that a plan-* argument
+// attempts to re-scaffold the plan (returns error if plan not found).
+func TestPlanGeneratePlanPrefixRescaffolds(t *testing.T) {
 	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)
 
-	_, err := routePlanGenerateByArg(dir, "plan-a1b2c3d4")
+	// Non-existent plan should error.
+	_, err := routePlanGenerateByArg(dir, "plan-nonexist")
 	if err == nil {
-		t.Fatal("expected error for plan-* argument, got nil")
+		t.Fatal("expected error for non-existent plan-* argument, got nil")
 	}
-	if !strings.Contains(err.Error(), "plan-a1b2c3d4") {
-		t.Errorf("error should mention plan ID, got: %v", err)
+
+	// Create a plan, then re-scaffold it.
+	planID, err := createPlanFromTopic(dir, "Rescaffold Test", "desc")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Add a slice so we can verify it appears after re-scaffold.
+	if err := addSliceToPlan(dir, planID, "Slice Alpha"); err != nil {
+		t.Fatalf("add slice: %v", err)
+	}
+
+	got, err := routePlanGenerateByArg(dir, planID)
+	if err != nil {
+		t.Fatalf("re-scaffold: %v", err)
+	}
+	if got != planID {
+		t.Errorf("re-scaffold returned %q, want %q", got, planID)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, "plans", planID+".html"))
+	html := string(data)
+	if !strings.Contains(html, "Rescaffold Test") {
+		t.Error("re-scaffolded HTML missing title")
+	}
+	if !strings.Contains(html, "btn-finalize") {
+		t.Error("re-scaffolded HTML missing CRISPI btn-finalize")
 	}
 }
 

@@ -190,6 +190,57 @@ func (pc *PlanCollection) Complete(id string) (*models.Node, error) {
 	return node, nil
 }
 
+// Get overrides Collection.Get for plans: after the standard parse it
+// synthesizes steps from CRISPI slice cards when node.Steps is empty.
+// CRISPI HTML doesn't use section[data-steps], so htmlparse returns no
+// steps for CRISPI files. This override recovers the slice list from the
+// slice-title elements so callers (critique, finalize, validate) work correctly.
+func (pc *PlanCollection) Get(id string) (*models.Node, error) {
+	node, err := pc.Collection.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	if len(node.Steps) == 0 {
+		node.Steps = parseCRISPISteps(filepath.Join(pc.Dir(), id+".html"), id)
+	}
+	return node, nil
+}
+
+// parseCRISPISteps reads slice titles from a CRISPI plan HTML file and
+// returns them as Step values. Returns nil if the file is not a CRISPI file
+// or has no slice cards.
+func parseCRISPISteps(path, nodeID string) []models.Step {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	content := string(data)
+	// CRISPI slice cards have: <strong class="slice-title">TITLE</strong>
+	const openTag = `<strong class="slice-title">`
+	const closeTag = `</strong>`
+	var steps []models.Step
+	i := 0
+	for {
+		start := strings.Index(content[i:], openTag)
+		if start < 0 {
+			break
+		}
+		start += i + len(openTag)
+		end := strings.Index(content[start:], closeTag)
+		if end < 0 {
+			break
+		}
+		title := content[start : start+end]
+		stepIdx := len(steps)
+		steps = append(steps, models.Step{
+			StepID:      fmt.Sprintf("step-%s-%d", nodeID, stepIdx),
+			Description: title,
+		})
+		i = start + end + len(closeTag)
+	}
+	return steps
+}
+
 // isCRISPIPlanFile returns true when the file at path is an existing CRISPI
 // interactive plan. Detection is based on the presence of data-zone= which
 // only appears in CRISPI-generated plans, not in generic node HTML.
