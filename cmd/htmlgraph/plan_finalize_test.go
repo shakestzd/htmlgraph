@@ -95,6 +95,39 @@ func TestPlanFinalize_Idempotent(t *testing.T) {
 	}
 }
 
+func TestPlanFinalize_ExecuteCmd(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+
+	node, err := p.Plans.Create("Execute Cmd Plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	edit := p.Plans.Edit(node.ID)
+	edit = edit.AddStep("First slice")
+	if err := edit.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := executePlanFinalize(p, dir, node.ID)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	want := "htmlgraph yolo --track " + result.TrackID
+	if result.ExecuteCmd != want {
+		t.Errorf("ExecuteCmd = %q, want %q", result.ExecuteCmd, want)
+	}
+}
+
+func TestBuildExecuteCmd(t *testing.T) {
+	if got := buildExecuteCmd("trk-abc123"); got != "htmlgraph yolo --track trk-abc123" {
+		t.Errorf("got %q", got)
+	}
+	if got := buildExecuteCmd(""); got != "" {
+		t.Errorf("empty track should return empty, got %q", got)
+	}
+}
+
 func TestPlanFinalize_EmptyPlan(t *testing.T) {
 	p, dir := setupFinalizeProject(t)
 
