@@ -15,7 +15,7 @@ import (
 func planSetSectionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-section <plan-id> <placeholder> <html-content>",
-		Short: "Set content for a plan section placeholder",
+		Short: "(deprecated) Set content for a plan section placeholder",
 		Long: `Inject HTML content into a named placeholder in the plan.
 
 Placeholders: PLAN_DESIGN_CONTENT, PLAN_OUTLINE_CONTENT, PLAN_QUESTIONS,
@@ -28,6 +28,7 @@ Example:
   htmlgraph plan set-section plan-my-feature PLAN_OUTLINE_CONTENT '<h4>Helpers</h4><pre><code>func ErrNotFound(kind, id string) error</code></pre>'`,
 		Args: cobra.ExactArgs(3),
 		RunE: func(_ *cobra.Command, args []string) error {
+			fmt.Fprintln(os.Stderr, "⚠ Deprecated: use 'plan set-design-yaml' for YAML plans")
 			return runPlanSetSection(args[0], args[1], args[2])
 		},
 	}
@@ -66,7 +67,7 @@ func planSetSliceCmd() *cobra.Command {
 	var tests, deps, files string
 	cmd := &cobra.Command{
 		Use:   "set-slice <plan-id> <slice-number>",
-		Short: "Update a slice's test strategy, dependencies, and files",
+		Short: "(deprecated) Update a slice's test strategy, dependencies, and files",
 		Long: `Update a vertical slice's metadata in a plan.
 
 Example:
@@ -181,7 +182,7 @@ func planAddQuestionCmd() *cobra.Command {
 	var desc, options string
 	cmd := &cobra.Command{
 		Use:   `add-question <plan-id> <question> --options "opt1:explanation1,opt2:explanation2"`,
-		Short: "Add a design question to a plan",
+		Short: "(deprecated) Add a design question to a plan",
 		Long: `Add an interactive question to a plan's design section.
 
 Each option has a short label and an explanation separated by ":".

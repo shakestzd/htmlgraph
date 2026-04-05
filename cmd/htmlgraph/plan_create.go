@@ -161,7 +161,7 @@ func planAddSliceCmd() *cobra.Command {
 	var sf sliceFlags
 	cmd := &cobra.Command{
 		Use:   "add-slice <plan-id> <title>",
-		Short: "Add a vertical slice to a plan",
+		Short: "(deprecated) Add a vertical slice to a plan",
 		Long: `Add a new slice as a step to an existing plan.
 
 Example:
@@ -174,7 +174,8 @@ Example:
 			if err != nil {
 				return err
 			}
-			return addSliceToPlan(htmlgraphDir, args[0], args[1], sf)
+			fmt.Fprintln(os.Stderr, "⚠ Deprecated: use 'plan add-slice-yaml' for YAML plans")
+				return addSliceToPlan(htmlgraphDir, args[0], args[1], sf)
 		},
 	}
 	cmd.Flags().StringVar(&sf.description, "description", "", "what this slice does and why")
