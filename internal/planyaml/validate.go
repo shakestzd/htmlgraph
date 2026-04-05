@@ -96,5 +96,30 @@ func Validate(plan *PlanYAML) []string {
 			}
 		}
 	}
+	// Validate critique section if present.
+	if plan.Critique != nil {
+		c := plan.Critique
+		if c.ReviewedAt == "" {
+			errs = append(errs, "critique.reviewed_at is required")
+		}
+		for i, a := range c.Assumptions {
+			prefix := fmt.Sprintf("critique.assumptions[%d]", i)
+			switch a.Status {
+			case "verified", "plausible", "unverified", "questionable", "falsified":
+			default:
+				errs = append(errs, fmt.Sprintf("%s.status %q is invalid", prefix, a.Status))
+			}
+			if a.Text == "" {
+				errs = append(errs, prefix+".text is required")
+			}
+		}
+		for i, r := range c.Risks {
+			switch r.Severity {
+			case "High", "Medium", "Low":
+			default:
+				errs = append(errs, fmt.Sprintf("critique.risks[%d].severity %q is invalid", i, r.Severity))
+			}
+		}
+	}
 	return errs
 }
