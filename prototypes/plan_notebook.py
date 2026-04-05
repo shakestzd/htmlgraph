@@ -49,13 +49,18 @@ def _():
 @app.cell
 def _(Path, mo, yaml):
     import os as _os
-    _cwd = Path.cwd()
-    _candidates = [
-        _cwd / ".htmlgraph",
-        _cwd.parent / ".htmlgraph",
-        _cwd.parent.parent / ".htmlgraph",
-    ]
-    htmlgraph_dir = next((p for p in _candidates if p.exists()), None)
+    # Check env var first (set by `htmlgraph plan review` when running from embedded temp dir).
+    _env_hg = _os.environ.get("HTMLGRAPH_DIR", "")
+    if _env_hg and Path(_env_hg).exists():
+        htmlgraph_dir = Path(_env_hg)
+    else:
+        _cwd = Path.cwd()
+        _candidates = [
+            _cwd / ".htmlgraph",
+            _cwd.parent / ".htmlgraph",
+            _cwd.parent.parent / ".htmlgraph",
+        ]
+        htmlgraph_dir = next((p for p in _candidates if p.exists()), None)
 
     # Scan for available YAML plans and build a dropdown.
     _plans = {}

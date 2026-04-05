@@ -244,7 +244,11 @@ func runPlanReview(planID string, port int, wait bool) error {
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	// Only clean up in wait mode — in background mode the temp dir must
+	// survive until marimo exits (the OS cleans up on reboot).
+	if wait {
+		defer os.RemoveAll(tmpDir)
+	}
 
 	if err := notebook.WriteToDir(tmpDir); err != nil {
 		return fmt.Errorf("extract notebook files: %w", err)
@@ -254,17 +258,21 @@ func runPlanReview(planID string, port int, wait bool) error {
 	fmt.Printf("URL:      http://localhost:%d\n", port)
 	fmt.Println()
 
-	// Launch via uvx marimo edit --sandbox.
+	// Launch via uvx marimo run --sandbox (app mode, plan pre-selected).
 	args := []string{
-		"marimo", "edit", "--sandbox",
+		"marimo", "run", "--sandbox",
 		"--headless", "--no-token",
 		"--port", fmt.Sprintf("%d", port),
 		filepath.Join(tmpDir, "plan_notebook.py"),
+		"--", "--plan", absYAMLPath,
 	}
 
 	marimoCmd := exec.Command("uvx", args...)
 	marimoCmd.Dir = tmpDir
-	marimoCmd.Env = append(os.Environ(), "PLAN_YAML_PATH="+absYAMLPath)
+	marimoCmd.Env = append(os.Environ(),
+		"PLAN_YAML_PATH="+absYAMLPath,
+		"HTMLGRAPH_DIR="+htmlgraphDir,
+	)
 	marimoCmd.Stdout = os.Stdout
 	marimoCmd.Stderr = os.Stderr
 
