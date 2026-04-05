@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/planyaml"
 	"github.com/spf13/cobra"
 )
@@ -366,4 +367,69 @@ func splitTrimmed(s string) []string {
 		}
 	}
 	return result
+}
+
+// planReadFeedbackYAMLCmd queries plan_feedback for a YAML plan and outputs JSON.
+func planReadFeedbackYAMLCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "read-feedback-yaml <plan-id>",
+		Short: "Read human feedback for a YAML plan from SQLite",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runReadFeedbackYAML(args[0])
+		},
+	}
+}
+
+func runReadFeedbackYAML(planID string) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	// Read YAML status.
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		return fmt.Errorf("load plan: %w", err)
+	}
+	// Query SQLite.
+	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	db, err := dbpkg.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+	rows, err := db.Query("SELECT section, action, value, question_id FROM plan_feedback WHERE plan_id = ?", planID)
+	if err != nil {
+		return fmt.Errorf("query feedback: %w", err)
+	}
+	defer rows.Close()
+
+	result := map[string]interface{}{
+		"plan_id":          planID,
+		"status":           plan.Meta.Status,
+		"design_approved":  false,
+		"slice_approvals":  map[string]bool{},
+		"question_answers": map[string]string{},
+		"comments":         map[string]string{},
+	}
+	for rows.Next() {
+		var section, action, value, qid string
+		rows.Scan(&section, &action, &value, &qid)
+		switch action {
+		case "approve":
+			if section == "design" {
+				result["design_approved"] = strings.EqualFold(value, "true")
+			} else {
+				result["slice_approvals"].(map[string]bool)[section] = strings.EqualFold(value, "true")
+			}
+		case "answer":
+			result["question_answers"].(map[string]string)[qid] = value
+		case "comment":
+			result["comments"].(map[string]string)[section] = value
+		}
+	}
+	out, _ := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(out))
+	return nil
 }
