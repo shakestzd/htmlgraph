@@ -275,11 +275,26 @@ func runPlanReview(planID string, port int, wait bool) error {
 }
 
 func findNotebookTemplate(htmlgraphDir string) string {
+	// 1. Environment variable override
+	if p := os.Getenv("PLAN_NOTEBOOK_PATH"); p != "" {
+		if _, err := os.Stat(p); err == nil {
+			abs, _ := filepath.Abs(p)
+			return abs
+		}
+	}
+
+	// 2. Relative to project
 	candidates := []string{
 		filepath.Join(filepath.Dir(htmlgraphDir), "prototypes", "plan_notebook.py"),
 		filepath.Join(htmlgraphDir, "..", "prototypes", "plan_notebook.py"),
 		filepath.Join(htmlgraphDir, "..", "plugin", "templates", "plan_notebook.py"),
 	}
+
+	// 3. User install location
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, ".local", "share", "htmlgraph", "plan_notebook.py"))
+	}
+
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
 			abs, _ := filepath.Abs(p)
