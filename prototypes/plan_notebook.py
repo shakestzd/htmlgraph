@@ -37,7 +37,8 @@ def _():
 
 
 @app.cell
-def _(Path, mo):
+def _(Path, mo, yaml):
+    import os as _os
     _cwd = Path.cwd()
     _candidates = [
         _cwd / ".htmlgraph",
@@ -45,20 +46,46 @@ def _(Path, mo):
         _cwd.parent.parent / ".htmlgraph",
     ]
     htmlgraph_dir = next((p for p in _candidates if p.exists()), None)
-    plan_yaml_input = mo.ui.text(
-        value=str(Path.cwd() / "sample_plan.yaml"),
-        label="Source:",
-        full_width=True,
-    )
+
+    # Scan for available YAML plans and build a dropdown.
+    _plans = {}
+    if htmlgraph_dir:
+        _plans_dir = htmlgraph_dir / "plans"
+        if _plans_dir.exists():
+            for _f in sorted(_plans_dir.glob("*.yaml")):
+                try:
+                    _p = yaml.safe_load(_f.read_text())
+                    _label = f"{_p['meta']['id']} — {_p['meta']['title']}"
+                    _plans[_label] = str(_f)
+                except Exception:
+                    pass
+    # Also include sample_plan.yaml if it exists locally.
+    _sample = Path.cwd() / "sample_plan.yaml"
+    if _sample.exists() and str(_sample) not in _plans.values():
+        _plans["sample_plan.yaml — Sample"] = str(_sample)
+
+    # Check env var override from `plan review` command.
+    _env_path = mo.cli_args().get("plan") or _os.environ.get("PLAN_YAML_PATH", "")
+
+    if len(_plans) > 0:
+        plan_yaml_input = mo.ui.dropdown(options=_plans, value=None, label="Select Plan")
+    else:
+        plan_yaml_input = mo.ui.text(value=_env_path or str(_sample), label="Plan YAML path", full_width=True)
+    # Hide selector in export mode (CLI arg provides the plan path).
+    if not mo.cli_args().get("plan"):
+        mo.output.replace(plan_yaml_input)
     return htmlgraph_dir, plan_yaml_input
 
 
 @app.cell
 def _(Path, htmlgraph_dir, mo, plan_yaml_input, sqlite3, yaml):
     # --- Load plan content from YAML + feedback from SQLite ---
-    _path = Path(plan_yaml_input.value)
-    plan_yaml_text = _path.read_text()
+    _cli_plan = mo.cli_args().get("plan")
+    _selected = _cli_plan or plan_yaml_input.value or ""
+    mo.stop(not _selected, mo.md("**Select a plan from the dropdown above.**"))
+    _path = Path(_selected)
     mo.stop(not _path.exists(), mo.md(f"File not found: `{_path}`"))
+    plan_yaml_text = _path.read_text()
     plan = yaml.safe_load(plan_yaml_text)
     plan_path = _path
     plan_id = plan["meta"]["id"]
@@ -308,16 +335,17 @@ def _(mo, plan, saved_feedback):
 
     # Restore saved answers from SQLite — must match _build_options labels.
     def _restore_answer(q):
-        _saved = saved_feedback.get(f"questions:answer:{q['id']}")
-        if _saved:
-            _rec = q.get("recommended", "")
+        _rec = q.get("recommended", "")
+        _saved = saved_feedback.get(f"questions:answer:{q['id']}") or q.get("answer")
+        _key_to_find = _saved or _rec  # saved > yaml answer > recommended
+        if _key_to_find:
             for opt in q["options"]:
-                if opt["key"] == _saved:
+                if opt["key"] == _key_to_find:
                     _lbl = opt["label"]
                     if _rec and opt["key"] == _rec:
                         _lbl += " ⭐ recommended"
                     return _lbl
-        return q.get("answer")
+        return None
 
 
     # Mark recommended option in label.
@@ -472,12 +500,10 @@ def _(
             ),
             _progress_bar,
             _decisions_table,
-            finalize_btn
-            if _all_ok
-            else mo.callout(
-                mo.md("All sections must be approved before finalizing."),
-                kind="warn",
-            ),
+            (mo.callout(mo.md("**Plan finalized** — exported as static HTML"), kind="success")
+            if mo.cli_args().get("plan") else
+            (finalize_btn if _all_ok else mo.callout(
+                mo.md("All sections must be approved before finalizing."), kind="warn"))),
         ]
     )
     return (finalize_btn,)
@@ -514,11 +540,36 @@ def _(
         f"- {q['text']}: **{q.get('answer', 'pending')}**"
         for q in _plan.get("questions", [])
     )
+    # Export static HTML archive via marimo export with CLI args.
+    import subprocess as _sp
+    _plan_id = _plan["meta"]["id"]
+    _export_path = plan_path.parent / f"{_plan_id}.html"
+    _notebook_dir = Path.cwd()
+    _notebook_file = _notebook_dir / "plan_notebook.py"
+    if not _notebook_file.exists():
+        _notebook_file = plan_path.parent.parent / "prototypes" / "plan_notebook.py"
+    _export_result = ""
+    try:
+        _r = _sp.run(
+            ["marimo", "export", "html", str(_notebook_file),
+             "-o", str(_export_path), "--no-include-code",
+             "--", "--plan", str(plan_path)],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(_notebook_file.parent),
+        )
+        if _export_path.exists() and _export_path.stat().st_size > 1000:
+            _export_result = f"\n\n**Exported:** `{_export_path}` ({_export_path.stat().st_size // 1024}KB)"
+        else:
+            _export_result = f"\n\n**Export warning:** file created but may be incomplete"
+    except Exception as _e:
+        _export_result = f"\n\n**Export skipped:** {_e}"
+
     mo.callout(
         mo.md(
             f"## Plan Finalized\n\n**{_plan['meta']['title']}** — {len(_approved)} slices approved.\n\n"
             f"**Features:**\n{_feature_lines}\n\n**Decisions:**\n{_decision_lines}\n\n"
-            f"Saved to `{plan_path}` with status: **finalized**\n\n"
+            f"Saved to `{plan_path}` with status: **finalized**"
+            f"{_export_result}\n\n"
             f"> Next: run `/htmlgraph:execute` to dispatch approved slices."
         ),
         kind="success",
