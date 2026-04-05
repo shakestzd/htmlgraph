@@ -288,3 +288,67 @@ func findNotebookTemplate(htmlgraphDir string) string {
 	}
 	return ""
 }
+
+// planSetDesignYAMLCmd sets the structured design subsections on a YAML plan.
+func planSetDesignYAMLCmd() *cobra.Command {
+	var problem, goals, constraints string
+
+	cmd := &cobra.Command{
+		Use:   "set-design-yaml <plan-id>",
+		Short: "Set problem, goals, and constraints on a YAML plan",
+		Long: `Set the structured design subsections on a YAML plan.
+
+Example:
+  htmlgraph plan set-design-yaml plan-a1b2c3d4 \
+    --problem "The current system has X limitation..." \
+    --goals "Goal 1,Goal 2,Goal 3" \
+    --constraints "Must not break X,Must support Y"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runSetDesignYAML(args[0], problem, goals, constraints)
+		},
+	}
+	cmd.Flags().StringVar(&problem, "problem", "", "problem statement (what's wrong and why)")
+	cmd.Flags().StringVar(&goals, "goals", "", "comma-separated measurable goals")
+	cmd.Flags().StringVar(&constraints, "constraints", "", "comma-separated constraints")
+	return cmd
+}
+
+func runSetDesignYAML(planID, problem, goals, constraints string) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		return fmt.Errorf("load plan: %w", err)
+	}
+	if problem != "" {
+		plan.Design.Problem = problem
+	}
+	if goals != "" {
+		plan.Design.Goals = splitTrimmed(goals)
+	}
+	if constraints != "" {
+		plan.Design.Constraints = splitTrimmed(constraints)
+	}
+	if err := planyaml.Save(planPath, plan); err != nil {
+		return fmt.Errorf("save plan: %w", err)
+	}
+	fmt.Printf("Design updated for %s: problem=%v goals=%d constraints=%d\n",
+		planID, problem != "", len(plan.Design.Goals), len(plan.Design.Constraints))
+	return nil
+}
+
+func splitTrimmed(s string) []string {
+	parts := strings.Split(s, ",")
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
