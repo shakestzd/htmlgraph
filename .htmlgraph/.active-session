@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 {"session_id":"9bf1e19c-b737-4e7f-b82f-aea5b2d947ba","parent_session":"9bf1e19c-b737-4e7f-b82f-aea5b2d947ba","parent_agent":"claude-code","nesting_depth":0,"project_dir":"/Users/shakes/DevProjects/htmlgraph","git_remote_url":"https://github.com/shakestzd/htmlgraph.git","timestamp":1775312965.447608}
+=======
+{"session_id":"4f750727-d1d9-4b3b-a4a0-49402fb68c91","parent_session":"4f750727-d1d9-4b3b-a4a0-49402fb68c91","parent_agent":"claude-code","nesting_depth":0,"project_dir":"/Users/shakes/DevProjects/htmlgraph/.claude/worktrees/trk-f8fd5c66","git_remote_url":"https://github.com/shakestzd/htmlgraph.git","timestamp":1775262825.74351}
+>>>>>>> trk-f8fd5c66

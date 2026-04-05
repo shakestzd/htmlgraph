@@ -1,0 +1,10 @@
+<details id="design" class="section-card" open data-phase="design" data-status="pending">
+  <summary><span>A. Design Discussion</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
+  <div class="section-body">
+    {{if .Content}}{{.Content}}{{end}}
+    <div class="approval-row">
+      <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
+      <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
+    </div>
+  </div>
+</details>

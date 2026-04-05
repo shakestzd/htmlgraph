@@ -1,0 +1,17 @@
+<section id="progress" class="progress-zone" data-zone="feedback-summary">
+  <h2>Feedback Summary</h2>
+  <div class="progress-stats">
+    <div class="progress-stat"><strong id="approvedCount">{{.Approved}}</strong> approved</div>
+    <div class="progress-stat"><strong id="totalSections">{{.Total}}</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">{{.Pending}}</strong> pending</div>
+  </div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:{{.Percent}}%"></div></div>
+  <div class="comments-summary">
+    <h3>Decisions &amp; Comments</h3>
+    <div id="commentsFeed"><p style="font-size:.8rem;color:var(--text-muted);font-style:italic">No comments yet.</p></div>
+  </div>
+  <div class="finalize-area">
+    <button class="btn-finalize" id="finalizeBtn" disabled>Finalize Plan</button>
+    <p style="font-size:.75rem;color:var(--text-muted);margin-top:6px">All sections must be approved before finalizing.</p>
+  </div>
+</section>

@@ -128,10 +128,11 @@ textarea::placeholder{color:var(--text-muted)}
 
 <nav class="plan-sidebar">
   <a href="/" class="brand">HtmlGraph</a>
-  <a href="/#activity" class="nav-link">Activity</a>
-  <a href="/#sessions" class="nav-link">Sessions</a>
-  <a href="/#work" class="nav-link">Work</a>
-  <a href="/#plans" class="nav-link active">Plans</a>
+  <a href="#design" class="nav-link active" data-spy="design">Design</a>
+  <a href="#outline" class="nav-link" data-spy="outline">Outline</a>
+  <a href="#slices" class="nav-link" data-spy="slices">Slices</a>
+  <a href="#questions" class="nav-link" data-spy="questions">Questions</a>
+  <a href="#progress" class="nav-link" data-spy="progress">Progress</a>
 </nav>
 <div class="plan-content">
 <article id="plan-webhook-support" data-feature-id="feat-xxx" data-status="draft">
@@ -161,7 +162,7 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- ZONE 2: Interactive Sections -->
 
 <!-- A: Design Discussion -->
-<details class="section-card" open data-phase="design" data-status="pending">
+<details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>A. Design Discussion</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
     <!--PLAN_DESIGN_CONTENT-->
@@ -177,7 +178,7 @@ textarea::placeholder{color:var(--text-muted)}
 </details>
 
 <!-- B: Structure Outline -->
-<details class="section-card" data-phase="outline" data-status="pending">
+<details id="outline" class="section-card" data-phase="outline" data-status="pending">
   <summary><span>B. Structure Outline</span><span class="badge badge-pending" data-badge-for="outline">Pending</span></summary>
   <div class="section-body">
     <!--PLAN_OUTLINE_CONTENT-->
@@ -189,7 +190,7 @@ textarea::placeholder{color:var(--text-muted)}
 </details>
 
 <!-- C: Vertical Slices -->
-<details class="section-card" open data-phase="slices" data-status="pending">
+<details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>C. Vertical Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
     <!--PLAN_SLICE_CARDS-->
@@ -197,7 +198,7 @@ textarea::placeholder{color:var(--text-muted)}
 </details>
 
 <!-- D: Open Questions Recap -->
-<details class="section-card" data-phase="questions" data-status="pending">
+<details id="questions" class="section-card" data-phase="questions" data-status="pending">
   <summary><span>D. Open Questions Recap</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
   <div class="section-body">
     <table class="q-table">
@@ -210,7 +211,7 @@ textarea::placeholder{color:var(--text-muted)}
 </details>
 
 <!-- ZONE 3: Feedback Summary -->
-<section class="progress-zone" data-zone="feedback-summary">
+<section id="progress" class="progress-zone" data-zone="feedback-summary">
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
@@ -560,6 +561,26 @@ textarea::placeholder{color:var(--text-muted)}
   } else {
     renderGraph();
   }
+})();
+
+// Scroll-spy: highlight sidebar link for the section currently in view
+(function(){
+  'use strict';
+  var links=document.querySelectorAll('.plan-sidebar a[data-spy]');
+  if(!links.length) return;
+  var ids=Array.prototype.map.call(links,function(a){return a.dataset.spy;});
+  function update(){
+    var current='';
+    ids.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el&&el.getBoundingClientRect().top<=80) current=id;
+    });
+    links.forEach(function(a){
+      a.classList.toggle('active',a.dataset.spy===current);
+    });
+  }
+  window.addEventListener('scroll',update,{passive:true});
+  update();
 })();
 </script>
 </div><!-- .plan-content -->

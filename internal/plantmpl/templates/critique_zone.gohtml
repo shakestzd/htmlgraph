@@ -1,0 +1,67 @@
+<details id="critique" class="section-card" data-phase="critique" data-status="pending">
+  <summary><span>E. Plan Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
+  <div class="section-body">
+
+    {{if .Assumptions}}
+    <div class="sub-section">
+      <h4>Assumption Verification</h4>
+      {{range .Assumptions}}
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge {{.BadgeClass}}">{{.Badge}}</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">{{.Text}}</p>
+          {{if .Evidence}}<p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">{{.Evidence}}</p>{{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+
+    {{if or .GeminiCritique .CopilotCritique}}
+    <div class="sub-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      {{if .GeminiCritique}}
+      <div>
+        <h4>Gemini Critique</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)">{{.GeminiCritique}}</div>
+      </div>
+      {{end}}
+      {{if .CopilotCritique}}
+      <div>
+        <h4>Copilot Critique</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)">{{.CopilotCritique}}</div>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+
+    {{if .Synthesis}}
+    <div class="sub-section">
+      <h4>Synthesis</h4>
+      <div style="font-size:.85rem;color:var(--text-dim)">{{.Synthesis}}</div>
+    </div>
+    {{end}}
+
+    {{if .RiskTable}}
+    <div class="sub-section">
+      <h4>Risk Assessment</h4>
+      <table class="q-table">
+        <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          {{range .RiskTable}}
+          <tr>
+            <td>{{.Risk}}</td>
+            <td><span class="badge {{.SeverityClass}}">{{.Severity}}</span></td>
+            <td>{{.Mitigation}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
+
+    {{if not (or .Assumptions .GeminiCritique .CopilotCritique .Synthesis .RiskTable)}}
+    <p style="font-size:.85rem;color:var(--text-muted);font-style:italic">Critique not yet run. Use: htmlgraph plan critique &lt;plan-id&gt;</p>
+    {{end}}
+
+  </div>
+</details>

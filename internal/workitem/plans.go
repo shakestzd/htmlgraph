@@ -2,6 +2,9 @@ package workitem
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
@@ -105,4 +108,269 @@ func (pc *PlanCollection) Create(title string, opts ...PlanOption) (*models.Node
 	}
 
 	return node, nil
+}
+
+// writeNode overrides Collection.writeNode for plans: if the file already
+// exists and is a CRISPI interactive plan (detected by data-zone= attribute),
+// only the data-status attribute and <nav data-graph-edges> section are
+// updated. All other content (design discussion, slices, JS, CSS) is preserved.
+// For new plans or generic plan nodes, the standard WriteNodeHTML path is used.
+func (pc *PlanCollection) writeNode(node *models.Node) (string, error) {
+	path := filepath.Join(pc.Dir(), node.ID+".html")
+	if isCRISPIPlanFile(path) {
+		return path, patchPlanHTML(path, node)
+	}
+	return WriteNodeHTML(pc.Dir(), node)
+}
+
+// AddEdge overrides Collection.AddEdge for plans to preserve CRISPI HTML.
+func (pc *PlanCollection) AddEdge(id string, e models.Edge) (*models.Node, error) {
+	node, err := pc.Get(id)
+	if err != nil {
+		return nil, fmt.Errorf("add edge %s: %w", id, err)
+	}
+	node.AddEdge(e)
+	if _, err := pc.writeNode(node); err != nil {
+		return nil, fmt.Errorf("add edge %s: %w", id, err)
+	}
+
+	if pc.base.DB != nil {
+		edgeID := fmt.Sprintf("%s-%s-%s", id, string(e.Relationship), e.TargetID)
+		_ = dbpkg.InsertEdge(
+			pc.base.DB,
+			edgeID, id, "plan",
+			e.TargetID, inferNodeType(e.TargetID),
+			string(e.Relationship),
+			e.Properties,
+		)
+	}
+
+	return node, nil
+}
+
+// Start overrides Collection.Start for plans to preserve CRISPI HTML.
+func (pc *PlanCollection) Start(id string) (*models.Node, error) {
+	node, err := pc.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	node.Status = models.StatusInProgress
+	node.AgentAssigned = pc.base.Agent
+	node.UpdatedAt = time.Now().UTC()
+	if _, err := pc.writeNode(node); err != nil {
+		return nil, err
+	}
+	if pc.base.DB != nil {
+		_ = dbpkg.UpdateFeatureStatus(pc.base.DB, id, "in-progress")
+	}
+	return node, nil
+}
+
+// Complete overrides Collection.Complete for plans to preserve CRISPI HTML.
+func (pc *PlanCollection) Complete(id string) (*models.Node, error) {
+	node, err := pc.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	for i := range node.Steps {
+		if !node.Steps[i].Completed {
+			node.Steps[i].Completed = true
+			node.Steps[i].Agent = pc.base.Agent
+			node.Steps[i].Timestamp = time.Now().UTC()
+		}
+	}
+	node.Status = models.StatusDone
+	node.UpdatedAt = time.Now().UTC()
+	if _, err := pc.writeNode(node); err != nil {
+		return nil, err
+	}
+	if pc.base.DB != nil {
+		_ = dbpkg.UpdateFeatureStatus(pc.base.DB, id, "done")
+	}
+	return node, nil
+}
+
+// Get overrides Collection.Get for plans: after the standard parse it
+// synthesizes steps from CRISPI slice cards when node.Steps is empty.
+// CRISPI HTML doesn't use section[data-steps], so htmlparse returns no
+// steps for CRISPI files. This override recovers the slice list from the
+// slice-title elements so callers (critique, finalize, validate) work correctly.
+func (pc *PlanCollection) Get(id string) (*models.Node, error) {
+	node, err := pc.Collection.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	if len(node.Steps) == 0 {
+		node.Steps = parseCRISPISteps(filepath.Join(pc.Dir(), id+".html"), id)
+	}
+	return node, nil
+}
+
+// parseCRISPISteps reads slice titles from a CRISPI plan HTML file and
+// returns them as Step values. Returns nil if the file is not a CRISPI file
+// or has no slice cards. Supports both the current format
+// (<span class="slice-name">) and the legacy format (<strong class="slice-title">).
+func parseCRISPISteps(path, nodeID string) []models.Step {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	content := string(data)
+
+	// Try current format first, fall back to legacy.
+	steps := extractSliceTitles(content, nodeID, `<span class="slice-name">`, `</span>`)
+	if len(steps) == 0 {
+		steps = extractSliceTitles(content, nodeID, `<strong class="slice-title">`, `</strong>`)
+	}
+	return steps
+}
+
+// extractSliceTitles scans content for slice titles delimited by openTag/closeTag.
+func extractSliceTitles(content, nodeID, openTag, closeTag string) []models.Step {
+	var steps []models.Step
+	i := 0
+	for {
+		start := strings.Index(content[i:], openTag)
+		if start < 0 {
+			break
+		}
+		start += i + len(openTag)
+		end := strings.Index(content[start:], closeTag)
+		if end < 0 {
+			break
+		}
+		title := content[start : start+end]
+		stepIdx := len(steps)
+		steps = append(steps, models.Step{
+			StepID:      fmt.Sprintf("step-%s-%d", nodeID, stepIdx),
+			Description: title,
+		})
+		i = start + end + len(closeTag)
+	}
+	return steps
+}
+
+// isCRISPIPlanFile returns true when the file at path is an existing CRISPI
+// interactive plan. Detection is based on the presence of data-zone= which
+// only appears in CRISPI-generated plans, not in generic node HTML.
+func isCRISPIPlanFile(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false // file doesn't exist — use standard WriteNodeHTML
+	}
+	return strings.Contains(string(data), `data-zone=`)
+}
+
+// patchPlanHTML surgically updates only the data-status attribute on the
+// <article> element and the <nav data-graph-edges> section of a CRISPI plan
+// file. All other content (design sections, slices, JS, CSS) is preserved.
+func patchPlanHTML(path string, node *models.Node) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("patch plan html read %s: %w", path, err)
+	}
+	content := string(data)
+
+	// --- 1. Update data-status on the <article> element ---
+	content = patchDataStatus(content, string(node.Status))
+
+	// --- 2. Replace the <nav data-graph-edges> section ---
+	content = patchEdgesNav(content, node)
+
+	return os.WriteFile(path, []byte(content), 0o644)
+}
+
+// patchDataStatus replaces data-status="..." in the <article> element.
+// It replaces only the first occurrence so we don't touch <details data-status>.
+func patchDataStatus(content, newStatus string) string {
+	const articlePrefix = `<article `
+	articleIdx := strings.Index(content, articlePrefix)
+	if articleIdx < 0 {
+		return content
+	}
+	// Find the end of the <article ...> opening tag.
+	tagEnd := strings.Index(content[articleIdx:], ">")
+	if tagEnd < 0 {
+		return content
+	}
+	openTag := content[articleIdx : articleIdx+tagEnd+1]
+
+	// Replace data-status="..." within the opening tag only.
+	for _, old := range []string{"todo", "draft", "in-progress", "done", "finalized"} {
+		oldAttr := fmt.Sprintf(`data-status="%s"`, old)
+		if strings.Contains(openTag, oldAttr) {
+			newAttr := fmt.Sprintf(`data-status="%s"`, newStatus)
+			newTag := strings.Replace(openTag, oldAttr, newAttr, 1)
+			return content[:articleIdx] + newTag + content[articleIdx+tagEnd+1:]
+		}
+	}
+	return content
+}
+
+// patchEdgesNav replaces or inserts the <nav data-graph-edges> section.
+// If the section already exists it is replaced. If it doesn't exist but
+// </article> is present, the section is inserted before </article>.
+func patchEdgesNav(content string, node *models.Node) string {
+	newNav := buildEdgesNavHTML(node)
+
+	const navOpen = `<nav data-graph-edges>`
+	const navClose = `</nav>`
+	const articleClose = `</article>`
+
+	startIdx := strings.Index(content, navOpen)
+	if startIdx >= 0 {
+		// Find the matching </nav> after the opening tag.
+		closeIdx := strings.Index(content[startIdx:], navClose)
+		if closeIdx >= 0 {
+			absEnd := startIdx + closeIdx + len(navClose)
+			return content[:startIdx] + newNav + content[absEnd:]
+		}
+	}
+
+	// No existing nav — insert before </article>.
+	closeArticle := strings.LastIndex(content, articleClose)
+	if closeArticle >= 0 {
+		insert := "\n" + newNav + "\n"
+		return content[:closeArticle] + insert + content[closeArticle:]
+	}
+
+	return content
+}
+
+// buildEdgesNavHTML renders a <nav data-graph-edges> block from a node's edges.
+// Returns an empty string if the node has no edges.
+func buildEdgesNavHTML(node *models.Node) string {
+	if len(node.Edges) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<nav data-graph-edges>\n")
+	for relType, edges := range node.Edges {
+		if len(edges) == 0 {
+			continue
+		}
+		relLabel := titleCase(strings.ReplaceAll(relType, "_", " "))
+		sb.WriteString(fmt.Sprintf("  <section data-edge-type=%q>\n", relType))
+		sb.WriteString(fmt.Sprintf("    <h3>%s:</h3>\n", relLabel))
+		sb.WriteString("    <ul>\n")
+		for _, e := range edges {
+			label := e.Title
+			if label == "" {
+				label = e.TargetID
+			}
+			since := ""
+			if !e.Since.IsZero() {
+				since = fmt.Sprintf(` data-since=%q`, fmtTime(e.Since))
+			}
+			sb.WriteString(fmt.Sprintf(
+				"      <li><a href=%q data-relationship=%q%s>%s</a></li>\n",
+				e.TargetID+".html", string(e.Relationship), since, label,
+			))
+		}
+		sb.WriteString("    </ul>\n")
+		sb.WriteString("  </section>\n")
+	}
+	sb.WriteString("</nav>")
+	return sb.String()
 }

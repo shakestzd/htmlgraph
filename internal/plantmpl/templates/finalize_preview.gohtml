@@ -1,0 +1,22 @@
+<details id="finalize-preview" class="section-card" data-phase="finalize-preview" data-status="pending">
+  <summary><span>F. Finalization Preview</span><span class="badge badge-pending">{{.ApprovedCount}}/{{len .Features}} approved</span></summary>
+  <div class="section-body">
+    {{if .TrackID}}<p style="font-size:.85rem;color:var(--text-muted)">Track: <code>{{.TrackID}}</code></p>{{end}}
+    {{if .Features}}
+    <table class="q-table">
+      <thead><tr><th>Feature</th><th>Dependencies</th><th>Status</th></tr></thead>
+      <tbody>
+        {{range .Features}}
+        <tr{{if not .Approved}} style="text-decoration:line-through;opacity:0.5"{{end}}>
+          <td>{{.Name}}</td>
+          <td>{{if .Deps}}{{.Deps}}{{else}}&mdash;{{end}}</td>
+          <td><span class="badge {{if .Approved}}badge-approved{{else}}badge-pending{{end}}">{{if .Approved}}Approved{{else}}Skipped{{end}}</span></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p style="font-size:.85rem;color:var(--text-muted);font-style:italic">No features to preview. Add slices first.</p>
+    {{end}}
+  </div>
+</details>

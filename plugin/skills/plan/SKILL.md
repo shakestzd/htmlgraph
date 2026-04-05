@@ -1,21 +1,25 @@
 ---
 name: htmlgraph:plan
-description: Plan development work with interactive HTML review before any code is written. Generates a human-reviewable HTML plan file via `htmlgraph plan generate`, waits for structured feedback, then hands off to execute. Use when asked to plan, create a development plan, generate a plan HTML file, parallelize work, or build a feature with design clarity first.
+description: Plan development work with interactive marimo notebook review before any code is written. Generates a YAML plan, populates slices and questions, runs dual-agent critique, opens marimo for human review (approvals persist to SQLite), then reads finalized decisions to dispatch tasks. Use when asked to plan, create a development plan, or build a feature with design clarity first.
 ---
 
 # HtmlGraph Plan
 
 Use this skill when asked to plan development work, create a parallel execution plan, organize tasks for multi-agent execution, or build a feature with human review before implementation.
 
-**Trigger keywords:** create plan, development plan, parallel plan, plan tasks, parallelize work, organize work, task breakdown, crispi, interactive plan, plan with review, design and build, plan this feature, review before building, generate plan html, plan html file, planning htmlfile, generate the plan, scaffold plan
+**Trigger keywords:** create plan, development plan, parallel plan, plan tasks, parallelize work, organize work, task breakdown, crispi, interactive plan, plan with review, design and build, plan this feature, review before building, generate plan, scaffold plan
 
 ---
 
 ## What This Skill Does
 
-Generates an interactive HTML plan, opens it for human review, reads structured feedback, then hands off to `/htmlgraph:execute`.
+Generates a structured YAML plan, populates it with vertical slices, design questions with recommendations, and dual-agent critique. Opens a marimo notebook for interactive human review — approvals persist to SQLite on every click. After finalization, reads approved slices and design decisions to dispatch tasks via `/htmlgraph:execute`.
 
-The human sees the plan, approves sections, answers open design questions, and clicks Finalize — before any code is written. Only finalized, approved slices are dispatched.
+**Architecture:**
+- **YAML** = plan content (agent-written, read by notebook)
+- **SQLite `plan_feedback`** = human approvals (persisted on every interaction)
+- **Marimo notebook** = interactive review UI (reads both, writes approvals to SQLite)
+- **Static HTML** = archival export (on finalize)
 
 ---
 
@@ -49,206 +53,361 @@ Research must answer:
 - Open design questions (choices that affect the architecture)
 - Candidate vertical slices (end-to-end, not horizontal layers)
 - Real dependencies between slices
+- Prior art or existing patterns to leverage
+
+**Skip research only for:** trivial changes (<10 lines), bug fixes with known root cause, documentation-only changes.
 
 ---
 
-## Step 2: Generate the Interactive Plan HTML
+## Step 2: Generate Plan YAML
 
-### 2a. Create Feature IDs for Each Slice
+Create the plan YAML file. The orchestrator agent constructs the full YAML structure and writes it directly. The file goes in `.htmlgraph/plans/plan-<hex8>.yaml`.
 
-Design vertical slices (not horizontal layers). Each slice is independently deployable with CLI + storage + tests in one unit. Each slice has a concrete test strategy.
-
+Generate the plan ID:
 ```bash
-htmlgraph feature create "<slice-title>" --track <track-id>
-# Repeat for each slice. Note the returned feature IDs.
+htmlgraph plan create "<title>" --description "<description>"
+```
+Note the returned plan ID. Then create the YAML file at `.htmlgraph/plans/<plan-id>.yaml`.
+
+### YAML Schema
+
+Every plan YAML MUST follow this exact structure:
+
+```yaml
+meta:
+  id: plan-<hex8>          # from plan create
+  track_id: <trk-id>       # if retroactive, empty if plan-first
+  title: "<plan title>"
+  description: >
+    One paragraph describing what this plan designs and why.
+  created_at: "YYYY-MM-DD"
+  status: draft             # draft | review | finalized
+  created_by: claude-opus   # agent that generated it
+
+design:
+  problem: >
+    What is the current state? What's wrong? Why does this matter?
+    Include measurements, evidence, or user impact.
+  goals:
+    - "**Goal 1** — measurable outcome"
+    - "**Goal 2** — measurable outcome"
+  constraints:
+    - "Constraint 1 — why it exists"
+    - "Constraint 2 — why it exists"
+  approved: false
+  comment: ""
+
+slices:
+  - id: feat-<hex8>         # existing feature ID or generated
+    num: 1
+    title: "<slice title>"
+    what: >
+      What exactly will be implemented. Be specific — name functions,
+      files, APIs. An agent reading this should know what to build.
+    why: >
+      Why this slice exists. What problem does it solve? What breaks
+      without it? Link to the design goals.
+    files:
+      - path/to/file1.go
+      - path/to/file2.go
+    deps: []                 # slice numbers this depends on, e.g. [1, 3]
+    done_when:
+      - "Acceptance criterion 1 — testable, concrete"
+      - "Acceptance criterion 2 — testable, concrete"
+    effort: S                # S | M | L
+    risk: Low                # Low | Med | High
+    tests: |
+      Unit: specific test description with expected input/output
+      Integration: specific integration test
+      Regression: what existing tests must still pass
+    approved: false
+    comment: ""
+
+questions:
+  - id: q-<kebab-name>
+    text: "The design question in plain English?"
+    description: >
+      Context paragraph explaining WHY this question matters, what
+      tradeoffs are involved, and what evidence exists for each option.
+      The reviewer needs this to make an informed decision.
+    recommended: <option-key>  # agent's best judgment
+    options:
+      - key: option-a
+        label: "A: Short name — Full description of what this option means and its implications"
+      - key: option-b
+        label: "B: Short name — Full description of what this option means and its implications"
+    answer: null               # null = unanswered, set by human
+
+critique: null                 # null = not yet run, populated by Step 4
 ```
 
-**Dependency vs file conflict:** Use `addBlockedBy` only when Task B literally cannot be written until Task A's code exists (imports, interfaces). File conflicts (both tasks edit main.go) are handled at merge time, NOT with blockers.
+### Quality Requirements for Each Section
 
-### 2b. Generate the Plan HTML
+**Slices — ALL fields are MANDATORY:**
+- `what`: Specific enough that an agent can implement it without asking questions
+- `why`: Links to a design goal or explains the business need
+- `files`: At least one file path (check codebase if unsure)
+- `done_when`: At least two concrete, testable acceptance criteria
+- `tests`: At least one unit test and one integration/regression test
+- `effort`: S (<50 lines), M (50-200 lines), L (>200 lines)
+- `risk`: Low (pure addition), Med (modifies existing), High (changes hot path or shared interfaces)
 
-**YOU (the orchestrator) must run this Bash command directly. Do NOT delegate this to a subagent. Do NOT write plan HTML manually. Do NOT use `htmlgraph spec generate`. The plan HTML is generated by ONE CLI command:**
+**Questions — ALL fields are MANDATORY:**
+- `description`: At least 2 sentences explaining context and tradeoffs
+- `recommended`: Agent MUST pick a default — the human overrides only where they disagree
+- `options`: At least 2 options, each with a descriptive label (not just a key)
 
-```bash
-htmlgraph plan generate <track-id>
-```
-
-This creates `.htmlgraph/plans/plan-<kebab-id>.html` with slice cards, dependency graph, and interactive review UI. The file is complete — no subagent needed to write HTML.
-
-### 2c. Populate Plan Content
-
-After generating, fill in the plan sections using CLI commands:
-
-**Add design questions** (pre-select sensible defaults — human overrides only where they disagree):
-
-```bash
-htmlgraph plan add-question <plan-id> "Error message length?" \
-  --options "one-line:Keep hints to a single sentence,two-line:Allow a second line with more context" \
-  --description "Longer messages give agents more guidance but consume more context tokens."
-```
-
-**Set section content** (Summary, Outline, etc.):
-
-```bash
-htmlgraph plan set-section <plan-id> PLAN_DESIGN_CONTENT '<p>Summary of what will be built and why.</p>'
-htmlgraph plan set-section <plan-id> PLAN_OUTLINE_CONTENT '<h4>Key Changes</h4><pre><code>func NewHelper() error</code></pre>'
-```
-
-**Set slice details** (test strategy, dependencies, affected files):
-
-```bash
-htmlgraph plan set-slice <plan-id> 1 \
-  --tests "Unit: ErrNotFound returns correct format. Integration: resolveID failure includes hint." \
-  --deps "none (foundation slice)" \
-  --files "internal/workitem/errors.go, internal/workitem/resolve.go"
-```
-
-Repeat `set-slice` for each slice number.
+**Design — ALL subsections are MANDATORY:**
+- `problem`: Evidence-based description of current state
+- `goals`: Measurable outcomes (not vague aspirations)
+- `constraints`: Real limitations that affect design choices
 
 ---
 
-## Step 3: Open for Human Review (PAUSE HERE)
+## Step 3: Validate Plan Structure
 
-Start the dashboard if not already running:
+Before proceeding, validate the YAML:
+
+1. All required fields present on every slice
+2. All questions have description + recommended
+3. Design has problem + goals + constraints
+4. Slice deps reference valid slice numbers
+5. Effort and risk values are valid (S/M/L, Low/Med/High)
+6. No duplicate slice numbers or question IDs
 
 ```bash
-htmlgraph serve &
+# Validate YAML structure (TODO: add CLI command)
+# For now, the agent should self-check the YAML before proceeding
+```
+
+---
+
+## Step 4: Critique (Parallel Agents)
+
+**Trigger:** Always run critique for plans with >= 3 slices. Skip for trivial plans.
+
+Dispatch two critique agents in parallel. Each reads the plan YAML and produces structured findings.
+
+```
+Agent(description="Design critique", subagent_type="htmlgraph:haiku-coder",
+      prompt="Read [plan.yaml]. Produce structured critique. [See prompt template below]")
+
+Agent(description="Feasibility critique", subagent_type="htmlgraph:sonnet-coder",
+      prompt="Read [plan.yaml]. Verify feasibility. [See prompt template below]")
+```
+
+### What Critique Agents Must Do
+
+**For ALL plan types:**
+- **Identify gaps** — what does the plan not address? What's missing?
+- **Challenge assumptions** — what might be wrong? What is the plan taking for granted?
+- **Suggest prior art** — what existing solutions, patterns, libraries, or examples are relevant?
+- **Assess risks** — what could go wrong? What's the worst case? What's the blast radius?
+- **Propose alternatives** — is there a simpler or different approach the plan missed?
+
+**For plans involving existing code, also:**
+- Verify claims against actual code (cite file:line numbers)
+- Check if proposed changes conflict with existing patterns
+- Identify functions/utilities that already exist and can be leveraged
+
+**For greenfield or new ideas, also:**
+- Question user/market assumptions — is there evidence of demand?
+- Identify MVP scope vs full scope — what can be cut?
+- Find real-world examples of similar systems — what can we learn from them?
+- Flag "unknown unknowns" — what will we only discover by building?
+
+### Critique Output Format
+
+Each critique agent produces text in this format:
+
+```
+ASSUMPTIONS:
+A1: [VERIFIED|PLAUSIBLE|UNVERIFIED|QUESTIONABLE|FALSIFIED] text | evidence
+
+SLICE_ASSESSMENTS:
+S1: [assessment with specific concerns]
+
+RISKS:
+R1: risk description | severity: Low/Medium/High | mitigation
+
+GAPS:
+- What the plan doesn't address
+
+ALTERNATIVES:
+- Different approaches worth considering
+
+PRIOR_ART:
+- Relevant existing solutions or patterns
+```
+
+### Writing Critique to YAML
+
+The orchestrator parses both agents' output and writes the `critique` section:
+
+```yaml
+critique:
+  reviewed_at: "YYYY-MM-DD"
+  reviewers:
+    - "Haiku (design review)"
+    - "Sonnet (feasibility)"
+  assumptions:
+    - id: A1
+      status: verified       # verified|plausible|unverified|questionable|falsified
+      text: "The assumption being tested"
+      evidence: "file:line or reasoning"
+  critics:
+    - title: "DESIGN CRITIC"
+      sections:
+        - heading: "Slice Assessment"
+          items:
+            - badge: "S1"
+              kind: success   # success|warn|danger|info
+              text: "Assessment text"
+        - heading: "Gaps & Missing Considerations"
+          items:
+            - badge: "Gap"
+              kind: warn
+              text: "What the plan doesn't address"
+        - heading: "Alternative Approaches"
+          items:
+            - badge: "Alt"
+              kind: info
+              text: "A different approach worth considering"
+    - title: "FEASIBILITY CRITIC"
+      sections:
+        - heading: "What Exists to Leverage"
+          items: [...]
+        - heading: "What the Plan Gets Wrong"
+          items: [...]
+        - heading: "Prior Art & Examples"
+          items: [...]
+  risks:
+    - risk: "Risk description"
+      severity: High          # High|Medium|Low
+      mitigation: "How to mitigate"
+  synthesis: >
+    Summary of key findings. What must change before the plan is approved?
+    Numbered action items.
+```
+
+---
+
+## Step 5: Open for Human Review (PAUSE HERE)
+
+Launch the marimo notebook for interactive review:
+
+```bash
+# From the project root or prototypes directory:
+marimo edit prototypes/plan_notebook.py --port 3001 --headless --no-token
 ```
 
 Tell the human:
 
 ```
-Plan ready for review: http://localhost:8080/plans/plan-<id>.html
+Plan ready for review: http://localhost:3001
+
+The notebook loads your plan from: .htmlgraph/plans/<plan-id>.yaml
 
 Please:
-1. Read the Summary — does it describe what you want built?
-2. Review the Open Questions — defaults are pre-selected, override where you disagree
-3. Check each Slice — approve or flag for revision
-4. Add comments on any section
-5. Click Finalize when ready
+1. Read the Design Discussion — Problem, Goals, Constraints
+2. Review each Slice — approve or leave unchecked
+3. Answer the Open Questions — defaults are recommended, override where you disagree
+4. Read the AI Critique — note any risks or gaps
+5. Check the Feedback Summary — progress bar shows completion
+6. Click Finalize when all sections are approved
+
+Your approvals persist automatically — you can close and reopen without losing progress.
 
 I will wait until you finalize the plan before writing any code.
 ```
 
 **STOP. Do not proceed until the human finalizes the plan.**
 
----
+### Monitoring Review Progress
 
-## Step 4: Read Structured Feedback
-
-After the human finalizes:
+Poll SQLite to check if the human has finalized:
 
 ```bash
-htmlgraph plan read-feedback <plan-id>
-```
+# Check approval progress
+sqlite3 .htmlgraph/htmlgraph.db \
+  "SELECT section, value FROM plan_feedback WHERE plan_id='<plan-id>' AND action='approve'"
 
-This outputs JSON:
-```json
-{
-  "status": "finalized",
-  "section_approvals": { "summary": true, "questions": true },
-  "question_answers": { "q-delivery-model": "async", "q-storage-format": "sqlite" },
-  "slice_approvals": { "slice-1": true, "slice-2": false },
-  "comments": { "slice-2": "Needs rate limiting" }
-}
-```
+# Check if all slices approved
+sqlite3 .htmlgraph/htmlgraph.db \
+  "SELECT COUNT(*) as approved FROM plan_feedback WHERE plan_id='<plan-id>' AND action='approve' AND value='True'"
 
-Parse it:
-- If any slice has `false`: summarize what needs revision. Ask the human — revise now, or proceed without it?
-- If revising: update the plan HTML, set status back to `draft`, loop to Step 3.
-- If proceeding: note which slices are excluded from execution.
+# Check question answers
+sqlite3 .htmlgraph/htmlgraph.db \
+  "SELECT question_id, value FROM plan_feedback WHERE plan_id='<plan-id>' AND action='answer'"
+```
 
 ---
 
-## Step 5: Announce Finalized Plan
+## Step 6: Read Finalized Decisions
 
-Announce what was decided:
+After the human clicks Finalize in marimo, the YAML status updates to `finalized`. Read the results:
 
+```python
+import yaml, sqlite3
+
+# Read plan content
+plan = yaml.safe_load(open(f".htmlgraph/plans/{plan_id}.yaml").read())
+assert plan["meta"]["status"] == "finalized"
+
+# Read approvals from SQLite
+conn = sqlite3.connect(".htmlgraph/htmlgraph.db")
+approvals = {row[0]: row[1] for row in conn.execute(
+    "SELECT section, value FROM plan_feedback WHERE plan_id=? AND action='approve'",
+    (plan_id,)
+).fetchall()}
+
+# Read question answers from SQLite
+answers = {row[0]: row[1] for row in conn.execute(
+    "SELECT question_id, value FROM plan_feedback WHERE plan_id=? AND action='answer'",
+    (plan_id,)
+).fetchall()}
 ```
-Plan finalized. Here's what was approved:
 
-Slices (3 of 3 approved):
-  slice-1  feat-XXXX  CLI command skeleton       -> implement
-  slice-2  feat-XXXX  Storage layer              -> implement
-  slice-3  feat-XXXX  Integration tests          -> implement
-
-Design decisions made:
-  Delivery model: async (overridden from default "sync")
-  Storage format: sqlite (default accepted)
-
-These answers are wired into each slice's task description.
-```
-
-**You MUST embed each question answer into every affected slice's task description under 'Accepted Design Decisions'.** If the human chose "async delivery", the dispatch slice description must explicitly say "implement async delivery, not sync." Never omit question answers — they are binding constraints from the plan review.
+Parse the results:
+- If any slice has `value='False'`: summarize what was rejected. Ask the human — revise or proceed without?
+- If revising: update the YAML, loop to Step 5.
+- If proceeding: note excluded slices.
 
 ---
 
-## Step 6: Create Tasks and Hand Off to Execute
+## Step 7: Create Work Items and Dispatch
 
-Create a `TaskCreate` for each approved slice. Descriptions must be self-contained — the executing agent has no other context. **TDD is mandatory** — every task includes test specifications written before implementation.
+For each approved slice, create a feature and wire dependencies:
 
-```
-TaskCreate(
-  subject="{feature_id}: {slice_name}",
-  description="""
-## Goal
-[One sentence from the plan, incorporating question answers]
+```bash
+# Create features for approved slices
+htmlgraph feature create "<slice title>" --track <track-id> --description "<what + why>"
 
-## Files to Create/Edit
-- NEW: path/to/new_file.go
-- EDIT: path/to/existing_file.go (add registration line)
-
-## Shared Files (expect merge conflict)
-- main.go: Add registration line — orchestrator resolves conflicts
-
-## Accepted Design Decisions
-[List any question answers that affect this slice]
-
-**For each entry in `question_answers` from `read-feedback`, determine which slices it affects and add a bullet point to that slice's "Accepted Design Decisions" section. If a decision affects all slices, add it to every slice task description. Never omit question answers — they are binding constraints from the plan review.**
-
-## Test Plan (TDD — write tests FIRST)
-[Concrete input/output examples; tests must compile and FAIL before implementation]
-
-## Quality Gate
-go build ./... && go vet ./... && go test ./...
-
-## Attribution
-htmlgraph feature start {feature_id}
-htmlgraph feature complete {feature_id}
-""",
-  metadata={"feature_id": "feat-XXXX", "slice_num": 1, "plan_id": "<id>",
-            "agent_tier": "sonnet"}
-)
+# Wire dependencies
+htmlgraph link add <feat-blocked> <feat-blocker> --rel blocked_by
 ```
 
-Wire real dependencies only:
+### Announce Finalized Plan
 
 ```
-TaskUpdate(taskId="2", addBlockedBy=["1"])  # only if slice-2 imports slice-1's output
+Plan finalized. Track: <track-id>
+
+Approved slices (N of M):
+  feat-XXXX  Slice 1 title       -> implement
+  feat-XXXX  Slice 2 title       -> implement
+
+Rejected slices:
+  Slice 3 title                  -> excluded (not approved)
+
+Design decisions:
+  Q1: Migration caching: schema-version (recommended, accepted)
+  Q2: Error handling: metric-counter (overrode recommendation: structured-log)
+  Q3: SessionStart scope: git-only (recommended, accepted)
 ```
 
-After all tasks are created, present the dispatch summary:
+**Embed each question answer into every affected slice's task description** under "Accepted Design Decisions". If the human chose "metric-counter" for error handling, the dispatch description must explicitly say that.
 
-```
-Plan: [Name]
-Total slices: N | Independent: X | Blocked: Y
-
-DISPATCH IMMEDIATELY (X slices, all parallel):
-  #1  feat-001 [sonnet] CLI command skeleton     files: cmd.go, main.go
-  #2  feat-002 [sonnet] Storage layer            files: store.go
-
-BLOCKED (dispatch after dependencies complete):
-  #3  feat-003 [sonnet] Integration tests        blocked-by: #1, #2
-
-To execute: /htmlgraph:execute
-```
-
-### Human Review Between Slices
-
-After each slice completes, before dispatching the next:
-1. Show a diff summary: files changed, lines added, tests added
-2. Ask: "Slice N complete. Approve and continue, or review code first?"
-3. Wait for approval. Do not auto-dispatch the next slice.
+Then hand off to `/htmlgraph:execute`.
 
 ---
 
@@ -256,41 +415,22 @@ After each slice completes, before dispatching the next:
 
 | Agent | When to Use |
 |-------|------------|
-| `htmlgraph:haiku-coder` | Single-file, clear spec, <50 lines, no design decisions |
-| `htmlgraph:sonnet-coder` | Multi-file, needs codebase context, moderate complexity |
+| `htmlgraph:haiku-coder` | Critique (design review), single-file tasks, <50 lines |
+| `htmlgraph:sonnet-coder` | Critique (feasibility), multi-file tasks, moderate complexity |
 | `htmlgraph:opus-coder` | Architecture decisions, complex algorithms, novel design |
 
 Default to sonnet unless the task is trivially simple (haiku) or requires deep reasoning (opus).
 
 ---
 
-## Plan Review (Optional Multi-AI Critique)
+## Key Rules
 
-Before human finalization, dispatch design critique and feasibility checks in parallel to enrich the plan with structured critique. Skip for plans with fewer than 3 slices or pure cleanup tasks.
-
-```
-# Design critique via Gemini CLI (falls back to htmlgraph:haiku-coder if unavailable)
-Bash("gemini -p 'Read .htmlgraph/plans/{plan-id}.html. For each slice assess scope, file coverage,
-      dependencies, test strategy, and risks.' --yolo --output-format json")
-# Write findings via: htmlgraph plan set-section {plan-id} PLAN_DESIGN_CONTENT '<p>...</p>'
-
-# Feasibility check via Codex CLI (falls back to htmlgraph:sonnet-coder if unavailable)
-Bash("codex exec 'Read .htmlgraph/plans/{plan-id}.html. For each function signature: check package
-      exists, types exist, no naming conflicts. Scaffold stubs and run go build ./...' --full-auto --json")
-# Report compilation errors via: htmlgraph plan set-section {plan-id} PLAN_OUTLINE_CONTENT
-# Add questions via: htmlgraph plan add-question {plan-id} '...' --options '...'
-```
-
-After both reviewers complete, open the enriched plan:
-
-```bash
-htmlgraph plan open <plan-id>
-htmlgraph plan wait <plan-id> --timeout 1h   # blocks until human finalizes
-htmlgraph plan read-feedback <plan-id>        # read approvals + answers
-```
-
----
-
-## Related Skills
-
-- **[/htmlgraph:execute](/htmlgraph:execute)** — Execute the finalized task list with dependency-driven dispatch
+- **Plans are YAML files** — agents write structured data, not HTML strings
+- **All slice fields are mandatory** — What, Why, Files, DoneWhen, Tests, Effort, Risk
+- **All questions need context** — description + recommended option
+- **Design has three subsections** — Problem, Goals, Constraints (not a single blob)
+- **Critique challenges assumptions** — not just verifies code
+- **Approvals persist to SQLite** — human can close and reopen without losing state
+- **Finalize is explicit** — human clicks the button, not the agent
+- **TDD is mandatory** — every dispatched task includes tests before implementation
+- **Only approved slices** become features on dispatch
