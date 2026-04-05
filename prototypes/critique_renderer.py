@@ -9,9 +9,11 @@ def _badge(text, bg, fg):
 
 
 _STATUS = {
-    "verified":  ("#dcfce7", "#166534", "Verified"),
-    "unknown":   ("#fef3c7", "#92400e", "Unknown"),
-    "falsified": ("#fee2e2", "#991b1b", "Falsified"),
+    "verified":     ("#dcfce7", "#166534", "Verified"),
+    "plausible":    ("#dbeafe", "#1e40af", "Plausible"),
+    "unverified":   ("#fef3c7", "#92400e", "Unverified"),
+    "questionable": ("#ffedd5", "#9a3412", "Questionable"),
+    "falsified":    ("#fee2e2", "#991b1b", "Falsified"),
 }
 
 _ITEM_KIND = {
@@ -36,7 +38,7 @@ def render_critique(data):
     # Assumptions.
     _assumption_html = ""
     for a in data.get("assumptions", []):
-        bg, fg, label = _STATUS.get(a["status"], _STATUS["unknown"])
+        bg, fg, label = _STATUS.get(a["status"], ("#fef3c7", "#92400e", "Unverified"))
         ev = f' — <code>{a["evidence"]}</code>' if a.get("evidence") else ""
         _assumption_html += (
             f'<div style="display:flex;align-items:center;gap:8px;padding:6px 0">'
