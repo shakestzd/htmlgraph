@@ -45,25 +45,18 @@ class DependencyGraphWidget(anywidget.AnyWidget):
       }
 
       function themeColors(theme) {
-        if (theme === "light") {
-          return {
-            containerBg: "var(--marimo-monochrome-50, #f8f8f6)",
-            containerBorder: "var(--marimo-monochrome-200, #d0d0c8)",
-            headerColor: "var(--marimo-monochrome-900, #1a1a1a)",
-            edgeColor: "#b0b0a8",
-            done:     { fill: "#dcfce7", stroke: "#16a34a", text: "#15803d" },
-            approved: { fill: "#f0fdf4", stroke: "#65a30d", text: "#3f6212" },
-            todo:     { fill: "#ffffff", stroke: "#d0d0c8", text: "#555555" },
-          };
-        }
+        const isLight = theme === "light";
         return {
-          containerBg: "var(--marimo-monochrome-50, #1c1c20)",
-          containerBorder: "var(--marimo-monochrome-200, #333338)",
-          headerColor: "var(--marimo-monochrome-900, #e0ded8)",
-          edgeColor: "#555",
-          done:     { fill: "#16a34a", stroke: "#0d6e2a", text: "#ffffff" },
-          approved: { fill: "#1a2e00", stroke: "#cdff00", text: "#cdff00" },
-          todo:     { fill: "#252528", stroke: "#6b7280", text: "#e0ded8" },
+          containerBg: "transparent",
+          containerBorder: "transparent",
+          headerColor: isLight ? "#1a1a1a" : "#e0ded8",
+          edgeColor: isLight ? "#b0b0a8" : "#555",
+          done:     isLight ? { fill: "#dcfce7", stroke: "#16a34a", text: "#15803d" }
+                            : { fill: "#16a34a", stroke: "#0d6e2a", text: "#ffffff" },
+          approved: isLight ? { fill: "#f0fdf4", stroke: "#65a30d", text: "#3f6212" }
+                            : { fill: "#1a2e00", stroke: "#cdff00", text: "#cdff00" },
+          todo:     isLight ? { fill: "#f5f5f0", stroke: "#d0d0c8", text: "#555555" }
+                            : { fill: "#2a2a2f", stroke: "#6b7280", text: "#e0ded8" },
         };
       }
 
@@ -71,11 +64,6 @@ class DependencyGraphWidget(anywidget.AnyWidget):
       el.style.borderRadius = "6px";
       el.style.padding = "16px";
       el.style.overflowX = "auto";
-
-      const header = document.createElement("h2");
-      header.textContent = "Dependency Graph";
-      header.style.cssText = "font-size:1.1rem;font-weight:600;margin:0 0 12px;font-family:system-ui";
-      el.appendChild(header);
 
       const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svgEl.setAttribute("width", "100%");
@@ -108,7 +96,6 @@ class DependencyGraphWidget(anywidget.AnyWidget):
         // Apply theme to container.
         el.style.background = tc.containerBg;
         el.style.border = "1px solid " + tc.containerBorder;
-        header.style.color = tc.headerColor;
 
         if (nodes.length === 0) { svgEl.innerHTML = ""; return; }
 

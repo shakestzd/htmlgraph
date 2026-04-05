@@ -10,7 +10,14 @@ def _():
     from pathlib import Path
     import yaml
     import sqlite3
-    from plan_ui import stat_card, status_badge, priority_badge, effort_badge, risk_badge, STATUS_COLORS
+    from plan_ui import (
+        stat_card,
+        status_badge,
+        priority_badge,
+        effort_badge,
+        risk_badge,
+        STATUS_COLORS,
+    )
     from critique_renderer import render_critique
     from dagre_widget import DependencyGraphWidget
 
@@ -169,7 +176,7 @@ def _(DependencyGraphWidget, mo, plan):
     graph_widget = mo.ui.anywidget(
         DependencyGraphWidget(nodes=_nodes, approved_ids=[])
     )
-    graph_widget
+    mo.vstack([mo.md("### Dependency Graph"), graph_widget])
     return (graph_widget,)
 
 
@@ -177,10 +184,14 @@ def _(DependencyGraphWidget, mo, plan):
 def _(mo, plan, saved_feedback):
     # --- A. Design Discussion (structured subsections from YAML) ---
     _design = plan.get("design", {})
-    _saved_design = saved_feedback.get("design:approve", "false") == "true"
-    _saved_comment = saved_feedback.get("design:comment", _design.get("comment", ""))
+    _saved_design = saved_feedback.get("design:approve", "false").lower() == "true"
+    _saved_comment = saved_feedback.get(
+        "design:comment", _design.get("comment", "")
+    )
     design_approved = mo.ui.checkbox(label="Approve design", value=_saved_design)
-    design_comment = mo.ui.text_area(placeholder="Comments on design...", full_width=True, value=_saved_comment)
+    design_comment = mo.ui.text_area(
+        placeholder="Comments on design...", full_width=True, value=_saved_comment
+    )
 
     _sections = []
     if _design.get("problem"):
@@ -197,8 +208,9 @@ def _(mo, plan, saved_feedback):
         _sections.append(mo.md("_No design content yet._"))
 
     mo.vstack(
-        [mo.md("## A. Design Discussion")] + _sections +
-        [design_approved, mo.accordion({"Add Comments": design_comment})]
+        [mo.md("## A. Design Discussion")]
+        + _sections
+        + [design_approved, mo.accordion({"Add Comments": design_comment})]
     )
     return design_approved, design_comment
 
@@ -221,7 +233,7 @@ def _(effort_badge, mo, plan, risk_badge, saved_feedback):
         {
             s["id"]: mo.ui.checkbox(
                 label="Approve",
-                value=saved_feedback.get(f"slice-{s['num']}:approve", "false")
+                value=saved_feedback.get(f"slice-{s['num']}:approve", "false").lower()
                 == "true",
             )
             for s in _slices
@@ -231,26 +243,43 @@ def _(effort_badge, mo, plan, risk_badge, saved_feedback):
     for _s in _slices:
         _effort = effort_badge(_s["effort"]) if _s.get("effort") else None
         _risk = risk_badge(_s["risk"]) if _s.get("risk") else None
-        _badges = mo.hstack([b for b in [_effort, _risk] if b], justify="start", gap=0.25)
-        _top_row = mo.hstack([_badges, slice_approvals[_s["id"]]], justify="space-between")
+        _badges = mo.hstack(
+            [b for b in [_effort, _risk] if b], justify="start", gap=0.25
+        )
+        _top_row = mo.hstack(
+            [slice_approvals[_s["id"]], _badges], justify="space-between"
+        )
         _body = [_top_row]
         if _s.get("what"):
             _body.append(mo.md(f"**What:** {_s['what']}"))
         if _s.get("why"):
             _body.append(mo.md(f"**Why:** {_s['why']}"))
         if _s.get("files"):
-            _body.append(mo.md(f"**Files:** {', '.join(f'`{f}`' for f in _s['files'])}"))
+            _body.append(
+                mo.md(f"**Files:** {', '.join(f'`{f}`' for f in _s['files'])}")
+            )
         if _s.get("done_when"):
-            _body.append(mo.md("**Done when:**\n" + "\n".join(f"- {d}" for d in _s["done_when"])))
+            _body.append(
+                mo.md(
+                    "**Done when:**\n"
+                    + "\n".join(f"- {d}" for d in _s["done_when"])
+                )
+            )
         if _s.get("deps"):
-            _body.append(mo.md(f"**Depends on:** {', '.join(_num_to_title.get(d, f'#{d}') for d in _s['deps'])}"))
+            _body.append(
+                mo.md(
+                    f"**Depends on:** {', '.join(_num_to_title.get(d, f'#{d}') for d in _s['deps'])}"
+                )
+            )
         if _s.get("tests"):
             _body.append(mo.md(f"**Tests:**\n```\n{_s['tests'].strip()}\n```"))
         _label = f"Slice {_s['num']}: {_s['title']}"
         _cards[_label] = mo.vstack(_body)
     mo.vstack(
-        [mo.md("## B. Vertical Slices\n\nApprove slices individually."),
-         mo.accordion(_cards, multiple=True)],
+        [
+            mo.md("## B. Vertical Slices\n\nApprove slices individually."),
+            mo.accordion(_cards, multiple=True),
+        ],
     )
     return (slice_approvals,)
 
@@ -277,14 +306,17 @@ def _(mo, plan, saved_feedback):
     _questions = plan.get("questions", [])
 
 
-    # Restore saved answers from SQLite.
+    # Restore saved answers from SQLite — must match _build_options labels.
     def _restore_answer(q):
         _saved = saved_feedback.get(f"questions:answer:{q['id']}")
         if _saved:
-            # Find the label that maps to this saved key.
+            _rec = q.get("recommended", "")
             for opt in q["options"]:
                 if opt["key"] == _saved:
-                    return opt["label"]
+                    _lbl = opt["label"]
+                    if _rec and opt["key"] == _rec:
+                        _lbl += " ⭐ recommended"
+                    return _lbl
         return q.get("answer")
 
 
@@ -299,14 +331,19 @@ def _(mo, plan, saved_feedback):
             _opts[_lbl] = opt["key"]
         return _opts
 
-    question_inputs = mo.ui.dictionary({
-        q["id"]: mo.ui.radio(options=_build_options(q), value=_restore_answer(q))
-        for i, q in enumerate(_questions)
-    })
+
+    question_inputs = mo.ui.dictionary(
+        {
+            q["id"]: mo.ui.radio(
+                options=_build_options(q), value=_restore_answer(q)
+            )
+            for i, q in enumerate(_questions)
+        }
+    )
     _parts = []
     for _i, _q in enumerate(_questions):
         _desc = _q.get("description", "")
-        _heading = f"**Q{_i+1}. {_q['text']}**" 
+        _heading = f"**Q{_i + 1}. {_q['text']}**"
         _parts.append(mo.md(_heading))
         _parts.append(mo.md((f" `{_desc}`" if _desc else "")))
         _parts.append(question_inputs[_q["id"]])
