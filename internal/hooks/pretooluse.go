@@ -24,10 +24,17 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	// Guard: never intercept writes to .htmlgraph/ — mirror of
 	// pretooluse-htmlgraph-guard.py to prevent accidental DB corruption.
+	// Covers Write/Edit/MultiEdit tools AND Bash commands that target .htmlgraph/.
 	if isHtmlGraphWrite(event) {
 		return &HookResult{
 			Decision: "block",
 			Reason:   ".htmlgraph/ is managed by HtmlGraph SDK. Use SDK methods instead.",
+		}, nil
+	}
+	if isBashHtmlGraphWrite(event) {
+		return &HookResult{
+			Decision: "block",
+			Reason:   ".htmlgraph/ is managed by HtmlGraph CLI. Use `htmlgraph` commands instead of direct file manipulation.",
 		}, nil
 	}
 
@@ -59,7 +66,15 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	// YOLO mode enforcement: session-scoped attribution check.
+	// Covers Write/Edit/MultiEdit tools directly.
 	if warn := checkYoloWorkItemGuard(event.ToolName, ctx.FeatureID, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
+		return &HookResult{
+			Decision: "block",
+			Reason:   warn,
+		}, nil
+	}
+	// Extend work-item guard to Bash file-write commands (sed -i, rm, redirects, etc.).
+	if warn := checkYoloBashWorkItemGuard(event, ctx.FeatureID, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
 		return &HookResult{
 			Decision: "block",
 			Reason:   warn,
@@ -79,7 +94,16 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		if warn := checkYoloWorktreeGuard(event.ToolName, branch, ctx.IsYoloMode); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
-		if warn := checkYoloResearchGuard(event.ToolName, ctx.IsYoloMode, hasRecentResearch(database, ctx.SessionID)); warn != "" {
+		// Extend worktree guard to Bash file-write commands.
+		if warn := checkYoloBashWorktreeGuard(event, branch, ctx.IsYoloMode); warn != "" {
+			return &HookResult{Decision: "block", Reason: warn}, nil
+		}
+		hasResearch := hasRecentResearch(database, ctx.SessionID)
+		if warn := checkYoloResearchGuard(event.ToolName, ctx.IsYoloMode, hasResearch); warn != "" {
+			return &HookResult{Decision: "block", Reason: warn}, nil
+		}
+		// Extend research guard to Bash file-write commands.
+		if warn := checkYoloBashResearchGuard(event, ctx.IsYoloMode, hasResearch); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
 		if warn := checkYoloCodeHealthGuard(event, ctx.IsYoloMode); warn != "" {
@@ -97,6 +121,12 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		}
 		if warn := checkYoloBudgetGuard(event, ctx.IsYoloMode); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
+		}
+
+		// Warn (not block) when the orchestrator writes directly instead of
+		// delegating to a subagent (bug-06627817).
+		if warn := checkYoloOrchestratorWriteGuard(event, ctx.IsSubagent); warn != "" {
+			debugLog(ctx.ProjectDir, "[htmlgraph] YOLO orchestrator write warning: %s", warn)
 		}
 	}
 
@@ -205,6 +235,97 @@ func containsHtmlgraphDir(path string) bool {
 	}
 	return path == ".htmlgraph"
 }
+
+// isBashHtmlGraphWrite detects Bash commands that directly manipulate
+// .htmlgraph/ files (rm, sed, echo/cat redirect, python -c, mv, cp, etc.).
+// These bypass the structured Write/Edit tools and must be blocked.
+func isBashHtmlGraphWrite(event *CloudEvent) bool {
+	if event.ToolName != "Bash" {
+		return false
+	}
+	cmd, _ := event.ToolInput["command"].(string)
+	if cmd == "" {
+		return false
+	}
+	// Skip commands that are HtmlGraph CLI invocations — those are allowed.
+	if bashHtmlGraphCLI.MatchString(cmd) {
+		return false
+	}
+	return bashHtmlGraphWritePattern.MatchString(cmd)
+}
+
+// bashHtmlGraphCLI matches commands that invoke the htmlgraph CLI binary.
+// These are allowed since the CLI is the approved interface to .htmlgraph/.
+var bashHtmlGraphCLI = regexp.MustCompile(`\bhtmlgraph\b`)
+
+// bashHtmlGraphWritePattern matches Bash commands that write to .htmlgraph/.
+// Covers: rm, sed -i, echo/cat/tee redirects (> or >>), mv, cp, python -c,
+// touch, chmod, mkdir, and any other direct manipulation.
+var bashHtmlGraphWritePattern = regexp.MustCompile(
+	`(?:` +
+		`\brm\s+.*\.htmlgraph/` +
+		`|` +
+		`\bsed\s+-i.*\.htmlgraph/` +
+		`|` +
+		`>\s*\S*\.htmlgraph/` +
+		`|` +
+		`>>\s*\S*\.htmlgraph/` +
+		`|` +
+		`\btee\s+\S*\.htmlgraph/` +
+		`|` +
+		`\bmv\s+.*\.htmlgraph/` +
+		`|` +
+		`\bcp\s+.*\.htmlgraph/` +
+		`|` +
+		`\btouch\s+\S*\.htmlgraph/` +
+		`|` +
+		`\bchmod\s+.*\.htmlgraph/` +
+		`|` +
+		`\bmkdir\s+.*\.htmlgraph/` +
+		`|` +
+		`\bpython[23]?\s+-c\s+.*\.htmlgraph/` +
+		`)`,
+)
+
+// isBashFileWrite detects Bash commands that modify source files (as opposed
+// to read-only commands like git status, ls, grep, etc.). Used by YOLO guards
+// to extend Write/Edit/MultiEdit protections to Bash file manipulation.
+func isBashFileWrite(event *CloudEvent) bool {
+	if event.ToolName != "Bash" {
+		return false
+	}
+	cmd, _ := event.ToolInput["command"].(string)
+	if cmd == "" {
+		return false
+	}
+	return bashFileWritePattern.MatchString(cmd)
+}
+
+// bashFileWritePattern matches Bash commands that write/modify files.
+// Intentionally conservative — matches known destructive patterns only.
+var bashFileWritePattern = regexp.MustCompile(
+	`(?:` +
+		`\bsed\s+-i` +
+		`|` +
+		`\bperl\s+-[pi]` +
+		`|` +
+		`\bawk\s+-i` +
+		`|` +
+		`>\s*\S+` +
+		`|` +
+		`>>\s*\S+` +
+		`|` +
+		`\brm\s` +
+		`|` +
+		`\bmv\s` +
+		`|` +
+		`\bpatch\s` +
+		`|` +
+		`\bdd\s` +
+		`|` +
+		`\bpython[23]?\s+-c\s+.*(?:open|write)` +
+		`)`,
+)
 
 // summariseInput builds a short human-readable summary of tool input.
 func summariseInput(toolName string, input map[string]any) string {

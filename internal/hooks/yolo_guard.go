@@ -88,6 +88,26 @@ func checkYoloWorkItemGuard(toolName, featureID string, yolo bool, sessionID str
 		"Run: htmlgraph feature start <id>  or  htmlgraph feature create \"title\" --track <trk-id>"
 }
 
+// checkYoloBashWorkItemGuard extends the work-item guard to Bash file-write
+// commands (sed -i, rm, redirects, etc.). Separated from the main guard to
+// avoid changing the existing function signature used by tests.
+func checkYoloBashWorkItemGuard(event *CloudEvent, featureID string, yolo bool, sessionID string, database *sql.DB) string {
+	if !yolo {
+		return ""
+	}
+	if !isBashFileWrite(event) {
+		return ""
+	}
+	if featureID != "" {
+		return ""
+	}
+	if sessionID != "" && database != nil && sessionHasLinkedFeature(database, sessionID) {
+		return ""
+	}
+	return "YOLO mode requires an active work item before writing code via Bash. " +
+		"Run: htmlgraph feature start <id>  or  htmlgraph feature create \"title\" --track <trk-id>"
+}
+
 // sessionHasLinkedFeature returns true when the given session has a feature
 // linked via sessions.active_feature_id OR when a recent feature-start command
 // updated the session's feature association. This replaces the old global
@@ -236,6 +256,25 @@ func checkYoloWorktreeGuard(toolName, branch string, yolo bool) string {
 	return ""
 }
 
+// checkYoloBashWorktreeGuard extends the worktree guard to Bash file-write
+// commands on main/master branch.
+func checkYoloBashWorktreeGuard(event *CloudEvent, branch string, yolo bool) string {
+	if !yolo {
+		return ""
+	}
+	if !isBashFileWrite(event) {
+		return ""
+	}
+	if branch == "main" || branch == "master" {
+		if isMergeInProgress() {
+			return ""
+		}
+		return "YOLO mode requires a feature or track branch for Bash file writes. " +
+			"Use: htmlgraph yolo --track <id> or htmlgraph yolo --feature <id>"
+	}
+	return ""
+}
+
 // checkYoloResearchGuard blocks Write/Edit when no Read/Grep/Glob has
 // occurred in the session (research-first principle).
 func checkYoloResearchGuard(toolName string, yolo, hasResearch bool) string {
@@ -252,6 +291,38 @@ func checkYoloResearchGuard(toolName string, yolo, hasResearch bool) string {
 	}
 	return "YOLO mode requires research before writing code. " +
 		"Read existing code first: use Read, Grep, or Glob tools."
+}
+
+// checkYoloBashResearchGuard extends the research guard to Bash file-write commands.
+func checkYoloBashResearchGuard(event *CloudEvent, yolo, hasResearch bool) string {
+	if !yolo {
+		return ""
+	}
+	if !isBashFileWrite(event) {
+		return ""
+	}
+	if hasResearch {
+		return ""
+	}
+	return "YOLO mode requires research before writing code via Bash. " +
+		"Read existing code first: use Read, Grep, or Glob tools."
+}
+
+// checkYoloOrchestratorWriteGuard warns (does not block) when the top-level
+// orchestrator session writes files directly instead of delegating to a
+// subagent. This is a soft enforcement of the "delegate, don't implement"
+// rule — logged for observability but not blocking to avoid breaking
+// non-YOLO or legitimate orchestrator writes.
+func checkYoloOrchestratorWriteGuard(event *CloudEvent, isSubagent bool) string {
+	if isSubagent {
+		return "" // Subagents are expected to write files.
+	}
+	switch event.ToolName {
+	case "Write", "Edit", "MultiEdit":
+		return "Orchestrator writing directly instead of delegating. " +
+			"Consider using a coder agent for implementation work."
+	}
+	return ""
 }
 
 // checkYoloDiffReviewGuard blocks git commit when no git diff has been
@@ -271,8 +342,9 @@ func checkYoloDiffReviewGuard(event *CloudEvent, yolo, diffRan bool) string {
 		"Run: git diff --stat"
 }
 
-// checkYoloCodeHealthGuard blocks writes that would create oversized
-// Go/Python files (>yoloCodeHealthMaxLines) in YOLO mode.
+// checkYoloCodeHealthGuard blocks writes that would create oversized source
+// files (>yoloCodeHealthMaxLines) in YOLO mode. Covers Go, Python, JavaScript,
+// and TypeScript files.
 func checkYoloCodeHealthGuard(event *CloudEvent, yolo bool) string {
 	if !yolo {
 		return ""
@@ -286,7 +358,7 @@ func checkYoloCodeHealthGuard(event *CloudEvent, yolo bool) string {
 	if path == "" {
 		path, _ = event.ToolInput["path"].(string)
 	}
-	if !strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, ".py") {
+	if !isCodeHealthCheckedFile(path) {
 		return ""
 	}
 	// Check existing file size — if it's already >yoloCodeHealthMaxLines, warn
@@ -303,12 +375,25 @@ func checkYoloCodeHealthGuard(event *CloudEvent, yolo bool) string {
 	return ""
 }
 
+// isCodeHealthCheckedFile returns true for file extensions that are subject
+// to the YOLO code-health line-count guard.
+func isCodeHealthCheckedFile(path string) bool {
+	for _, ext := range []string{".go", ".py", ".js", ".ts", ".tsx", ".jsx"} {
+		if strings.HasSuffix(path, ext) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasRecentResearch checks if Read/Grep/Glob was used in this session.
+// Agent events are excluded — actual source reading (Read/Grep/Glob) is
+// required, not just delegation to a subagent.
 func hasRecentResearch(database *sql.DB, sessionID string) bool {
 	var count int
 	database.QueryRow(`
 		SELECT COUNT(*) FROM agent_events
-		WHERE session_id = ? AND tool_name IN ('Read', 'Grep', 'Glob', 'Agent')
+		WHERE session_id = ? AND tool_name IN ('Read', 'Grep', 'Glob')
 		LIMIT 1`,
 		sessionID,
 	).Scan(&count)

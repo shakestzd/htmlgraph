@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>HIGH: Orchestrator read-only is prompt-only, not enforced by hooks</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-06627817"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-05T22:10:56.677918"
+             data-updated="2026-04-05T22:25:34.681412" data-agent-assigned="claude-code" data-track-id="trk-3178213c">
+
+        <header>
+            <h1>HIGH: Orchestrator read-only is prompt-only, not enforced by hooks</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-247410b9.html" data-relationship="caused_by" data-since="2026-04-05T22:10:56.678559">bug-247410b9</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-9ae9e043.html" data-relationship="part_of" data-since="2026-04-05T22:11:54.228391">Hooks System Optimization</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>The guidance layer tells the orchestrator to delegate implementation, but hooks only enforce claim-specific write checks on subagents, not the main Claude session. If safety depends on the top-level orchestrator staying read-only, that guarantee does not exist. Refs: prompt_classifier.go:177, pretooluse.go:48</p>
+        </section>
+    </article>
+</body>
+</html>

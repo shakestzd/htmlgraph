@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Orchestrator creates duplicate tracks instead of searching existing ones first</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-a10a45f7"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-05T22:14:12.095889"
+             data-updated="2026-04-05T22:20:36.105826" data-agent-assigned="claude-code" data-track-id="trk-17ffea69">
+
+        <header>
+            <h1>Orchestrator creates duplicate tracks instead of searching existing ones first</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5665bdc0-905a-4027-abdc-074637dca139.html" data-relationship="implemented_in" data-since="2026-04-05T22:17:06.594548">session 5665bdc0-905a-4027-abdc-074637dca139</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-7fdb2e7a.html" data-relationship="part_of" data-since="2026-04-05T22:14:58.160946">Agent Prompt Rewrite — project-agnostic, guideline-compliant</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-247410b9.html" data-relationship="caused_by" data-since="2026-04-05T22:14:12.096849">bug-247410b9</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When adding work items from external reviews (e.g. Codex audit), the orchestrator created a new track without first searching existing tracks for a match. trk-9ae9e043 (Hooks System Optimization) was the correct home. Root cause: no enforced search-before-create step in the orchestrator delegation flow. Fix: update orchestrator directives skill to mandate htmlgraph track list + grep before track create.</p>
+        </section>
+    </article>
+</body>
+</html>

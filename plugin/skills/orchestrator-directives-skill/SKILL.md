@@ -196,6 +196,17 @@ Only these can be executed directly by orchestrator:
 - `htmlgraph feature create "title" --track <trk-id>`
 - `htmlgraph bug create "title" --track <trk-id>`
 
+**Track Assignment (MANDATORY before creating work items):**
+
+Before creating ANY new track:
+1. Run `htmlgraph track list` to see all existing tracks
+2. Match the new work against existing track titles and descriptions
+3. Only create a new track if NO existing track covers the scope
+4. When in doubt, ask the user which track to use
+
+This also applies when creating bugs, features, or spikes with `--track`:
+- Search existing tracks first, create a new track only as last resort
+
 Everything else MUST be delegated.
 
 </details>
