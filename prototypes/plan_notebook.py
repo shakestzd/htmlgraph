@@ -516,7 +516,7 @@ def _(
             _progress_bar,
             _decisions_table,
             (mo.callout(mo.md("**Plan finalized** — exported as static HTML"), kind="success")
-            if mo.cli_args().get("plan") else
+            if plan.get("meta", {}).get("status") == "finalized" else
             (finalize_btn if _all_ok else mo.callout(
                 mo.md("All sections must be approved before finalizing."), kind="warn"))),
         ]

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Plan finalize does not write YAML status or export HTML</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-231aed08"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-05T23:38:12.737223"
+             data-updated="2026-04-05T23:41:41.425676" data-agent-assigned="claude-code" data-track-id="trk-84bcad47">
+
+        <header>
+            <h1>Plan finalize does not write YAML status or export HTML</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-84bcad47.html" data-relationship="part_of" data-since="2026-04-05T23:38:12.73847">trk-84bcad47</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5665bdc0-905a-4027-abdc-074637dca139.html" data-relationship="implemented_in" data-since="2026-04-05T23:38:15.953003">session 5665bdc0-905a-4027-abdc-074637dca139</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-c7b26399.html" data-relationship="caused_by" data-since="2026-04-05T23:38:12.738153">bug-c7b26399</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>In uvx sandbox mode, the finalize cell fails silently: (1) YAML status stays draft because plan_path write may fail in sandbox, (2) HTML export fails because marimo is not on PATH for subprocess call inside sandbox. The green Plan finalized callout shows based on in-memory state, not disk state.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,257 +1,343 @@
 meta:
-    id: plan-102b4e0e
-    title: 'Planbook: standalone open-source CRISPI planning tool'
-    description: Package the CRISPI plan notebook system as a standalone open-source tool that any development team can use — YAML plans, marimo review, SQLite feedback, AI critique, static HTML export.
-    created_at: "2026-04-05"
-    status: draft
+  id: plan-102b4e0e
+  title: 'Planbook: standalone open-source CRISPI planning tool'
+  description: Package the CRISPI plan notebook system as a standalone open-source
+    tool that any development team can use — YAML plans, marimo review, SQLite feedback,
+    AI critique, static HTML export.
+  created_at: '2026-04-05'
+  status: finalized
 design:
-    problem: Development teams using AI agents (Claude Code, Cursor, Copilot) jump straight from idea to code. There is no structured plan review step where humans approve scope, answer design questions, and see AI critique before a single line is written. Existing tools (spec-kit, Kiro, adr-tools) are either markdown-only, IDE-locked, or lack feedback persistence.
-    goals:
-        - Let any team define development plans as validated YAML files versioned in git
-        - Provide interactive plan review via marimo notebooks with persistent feedback to SQLite
-        - Run AI critique (single-model in v0.1, dual-agent in v0.2) on plans before human review
-        - Export finalized plans as self-contained static HTML archives
-        - Ship as pip-installable Python package with CLI entry points and optional extras
-    constraints:
-        - 'Local-first: no external infrastructure required (no Postgres, no Redis, no cloud sync)'
-        - marimo must be optional dependency (core validate/critique/export works without it)
-        - YAML schema must be conservative in v0.1 — changes after adoption break user plans
-        - Must work for solo developers without auth/multi-user features
-        - LiteLLM for provider flexibility — no vendor lock-in to specific LLM provider
-    approved: false
-    comment: ""
+  problem: Development teams using AI agents (Claude Code, Cursor, Copilot) jump straight
+    from idea to code. There is no structured plan review step where humans approve
+    scope, answer design questions, and see AI critique before a single line is written.
+    Existing tools (spec-kit, Kiro, adr-tools) are either markdown-only, IDE-locked,
+    or lack feedback persistence.
+  goals:
+  - Let any team define development plans as validated YAML files versioned in git
+  - Provide interactive plan review via marimo notebooks with persistent feedback
+    to SQLite
+  - Run AI critique (single-model in v0.1, dual-agent in v0.2) on plans before human
+    review
+  - Export finalized plans as self-contained static HTML archives
+  - Ship as pip-installable Python package with CLI entry points and optional extras
+  constraints:
+  - 'Local-first: no external infrastructure required (no Postgres, no Redis, no cloud
+    sync)'
+  - marimo must be optional dependency (core validate/critique/export works without
+    it)
+  - YAML schema must be conservative in v0.1 — changes after adoption break user plans
+  - Must work for solo developers without auth/multi-user features
+  - LiteLLM for provider flexibility — no vendor lock-in to specific LLM provider
+  approved: true
+  comment: ''
 slices:
-    - id: feat-fa5345ba
-      num: 1
-      title: YAML Schema & Validation Library
-      what: Pydantic models for CRISPI plan YAML (Plan, Slice, Question, Critique sections). Click CLI with init/validate commands. planbook init creates starter plan.yaml from template. Foundation for everything — all other slices consume the validated Plan model. JSON Schema export for editor autocomplete.
-      why: Foundation for everything — all other slices consume the validated Plan model. No review, export, or critique without a schema.
-      files:
-        - src/planbook/schema.py
-        - src/planbook/cli.py
-        - src/planbook/__init__.py
-        - templates/plan.yaml
-      deps: []
-      done_when:
-        - planbook init creates valid YAML. planbook validate catches missing fields
-        - bad types
-        - unknown keys. Pydantic model exports JSON Schema for editor autocomplete. ruamel.yaml used for clear parse error positions.
-      effort: M
-      risk: Low
-      tests: 'Unit: Plan model validates valid YAML, rejects missing title, rejects unknown fields. Unit: planbook init creates valid YAML that passes validate. Unit: JSON Schema export matches Pydantic model. Integration: CLI init + validate roundtrip.'
-      approved: false
-      comment: ""
-    - id: feat-13dfa8d0
-      num: 2
-      title: Marimo Review Notebook Template
-      what: Interactive plan review app launched via planbook review. Loads YAML plan, renders sections (design, slices, questions, critique), approval checkboxes, radio buttons. Persists feedback to SQLite on every interaction. Progress bar tracks completion. Finalize button updates YAML status. Extracted from existing prototypes (plan_notebook.py, plan_ui.py, dagre_widget.py).
-      why: This IS the product differentiator — reactive notebook review with persistent feedback. No other tool offers interactive plan review in a local notebook. Novel delivery mechanism for structured human review of development plans.
-      files:
-        - src/planbook/review/app.py
-        - src/planbook/review/ui.py
-        - src/planbook/review/critique_view.py
-        - src/planbook/review/graph.py
-      deps:
-        - 1
-        - 3
-      done_when:
-        - planbook review opens marimo app. All YAML sections render correctly. Checkboxes persist across sessions via SQLite. Progress bar tracks approval percentage. Finalize button updates YAML status to finalized.
-      effort: L
-      risk: High
-      tests: 'Unit: YAML plan renders all sections (design, slices, questions). Unit: approval checkboxes call persist_feedback(). Unit: progress bar calculates correct percentage. Integration: full review session — load plan, approve sections, finalize, verify YAML status updated.'
-      approved: false
-      comment: ""
-    - id: feat-99538f2f
-      num: 3
-      title: SQLite Feedback Persistence Layer
-      what: 'Feedback persistence layer: create/read/update feedback records keyed by (plan_id, section, action). IsPlanFullyApproved() query. One .planbook.db per project. Auto-created on first write. WAL mode enabled for concurrent marimo+CLI access.'
-      why: The review notebook and export both depend on persisted feedback state. Without this, checkbox/radio state is lost between sessions. Queryable approval state is something git alone cannot provide.
-      files:
-        - src/planbook/store.py
-      deps: []
-      done_when:
-        - store.persist_feedback() upserts correctly. store.get_feedback() returns structured dict matching the plan feedback schema. store.is_fully_approved() checks all sections. DB auto-created on first write with WAL mode.
-      effort: S
-      risk: Low
-      tests: 'Unit: persist_feedback() upserts correctly (insert then update same key). Unit: get_feedback() returns structured dict. Unit: is_fully_approved() returns false when any section missing. Integration: DB auto-created on first write, survives process restart.'
-      approved: false
-      comment: ""
-    - id: feat-168edce7
-      num: 4
-      title: CLI Tool (planbook init/validate/review/export)
-      what: 'Click-based CLI entry point unifying all planbook commands: init (scaffold starter YAML), validate (Pydantic check), review (launch marimo), export (generate HTML), critique (run AI analysis). Consistent --format flag for JSON/YAML/text output. Error messages include fix suggestions.'
-      why: CLI is the primary interface for solo developers. planbook must be invocable from terminal, CI pipelines, and AI agent frameworks. Click provides subcommand routing, help generation, and shell completion.
-      files:
-        - src/planbook/cli.py
-        - src/planbook/__init__.py
-      deps:
-        - 1
-        - 2
-        - 3
-      done_when:
-        - planbook --help shows all subcommands. planbook init creates valid YAML in CWD. planbook validate reports errors with line numbers. planbook review launches marimo. planbook export generates HTML. All commands return proper exit codes.
-      effort: M
-      risk: Low
-      tests: 'Unit: each subcommand parses args correctly. Unit: init creates valid YAML. Unit: validate catches schema errors. Integration: full CLI workflow — init, validate, review, export. Integration: JSON output mode for CI consumption.'
-      approved: false
-      comment: ""
-    - id: feat-88914f1b
-      num: 5
-      title: AI Critique Engine
-      what: 'Dual-agent critique: two LLMs independently review the plan, then a synthesis step merges findings. Uses LiteLLM for provider flexibility (OpenAI, Anthropic, local models). planbook critique runs analysis, writes results to YAML critique section. Assumption verification, risk table, and synthesis. Complexity-gated: skip for plans with fewer than 3 slices.'
-      why: Pre-implementation AI critique is the biggest competitive differentiator — no other tool does this. Both critics flagged that shipping without this risks launch silence. Single-model critique in v0.1, dual-agent synthesis in v0.2.
-      files:
-        - src/planbook/critique.py
-      deps:
-        - 1
-        - 3
-      done_when:
-        - planbook critique calls configured model(s)
-        - produces assumption verification + risk table + synthesis. Results written to plan YAML critique section. Complexity gating skips for <3 slices. Works with any LiteLLM-supported provider.
-      effort: L
-      risk: High
-      tests: 'Unit: critique engine calls model (mock LiteLLM). Unit: synthesis merges findings from two models. Unit: complexity gate skips for <3 slices. Unit: results conform to critique YAML schema. Integration: critique results appear in review notebook.'
-      approved: false
-      comment: ""
-    - id: feat-3874f73d
-      num: 6
-      title: PyPI Packaging & CI
-      what: 'pyproject.toml with Hatch build backend and optional extras: [review] adds marimo, [critique] adds LiteLLM. GitHub Actions for test + lint + publish to PyPI. README with 5-minute quickstart. MIT license. JSON Schema published to SchemaStore for editor autocomplete without installing planbook.'
-      why: An open-source tool that is not pip-installable is not a tool. CI ensures quality on every PR. SchemaStore publication is the highest-leverage distribution move — free editor autocomplete for anyone.
-      files:
-        - pyproject.toml
-        - .github/workflows/ci.yml
-        - .github/workflows/release.yml
-        - README.md
-        - LICENSE
-      deps:
-        - 1
-      done_when:
-        - pip install planbook works from PyPI. pip install planbook[review] adds marimo. pip install planbook[critique] adds LiteLLM. GitHub Actions run tests on push. README has working quickstart. JSON Schema submitted to SchemaStore.
-      effort: S
-      risk: Low
-      tests: 'Unit: pyproject.toml valid (hatch build succeeds). Integration: pip install planbook installs CLI entry point. Integration: pip install planbook[review] includes marimo. Integration: pip install planbook[critique] includes litellm. CI: GitHub Actions pass on clean checkout.'
-      approved: false
-      comment: ""
+- id: feat-fa5345ba
+  num: 1
+  title: YAML Schema & Validation Library
+  what: Pydantic models for CRISPI plan YAML (Plan, Slice, Question, Critique sections).
+    Click CLI with init/validate commands. planbook init creates starter plan.yaml
+    from template. Foundation for everything — all other slices consume the validated
+    Plan model. JSON Schema export for editor autocomplete.
+  why: Foundation for everything — all other slices consume the validated Plan model.
+    No review, export, or critique without a schema.
+  files:
+  - src/planbook/schema.py
+  - src/planbook/cli.py
+  - src/planbook/__init__.py
+  - templates/plan.yaml
+  deps: []
+  done_when:
+  - planbook init creates valid YAML. planbook validate catches missing fields
+  - bad types
+  - unknown keys. Pydantic model exports JSON Schema for editor autocomplete. ruamel.yaml
+    used for clear parse error positions.
+  effort: M
+  risk: Low
+  tests: 'Unit: Plan model validates valid YAML, rejects missing title, rejects unknown
+    fields. Unit: planbook init creates valid YAML that passes validate. Unit: JSON
+    Schema export matches Pydantic model. Integration: CLI init + validate roundtrip.'
+  approved: true
+  comment: ''
+- id: feat-13dfa8d0
+  num: 2
+  title: Marimo Review Notebook Template
+  what: Interactive plan review app launched via planbook review. Loads YAML plan,
+    renders sections (design, slices, questions, critique), approval checkboxes, radio
+    buttons. Persists feedback to SQLite on every interaction. Progress bar tracks
+    completion. Finalize button updates YAML status. Extracted from existing prototypes
+    (plan_notebook.py, plan_ui.py, dagre_widget.py).
+  why: This IS the product differentiator — reactive notebook review with persistent
+    feedback. No other tool offers interactive plan review in a local notebook. Novel
+    delivery mechanism for structured human review of development plans.
+  files:
+  - src/planbook/review/app.py
+  - src/planbook/review/ui.py
+  - src/planbook/review/critique_view.py
+  - src/planbook/review/graph.py
+  deps:
+  - 1
+  - 3
+  done_when:
+  - planbook review opens marimo app. All YAML sections render correctly. Checkboxes
+    persist across sessions via SQLite. Progress bar tracks approval percentage. Finalize
+    button updates YAML status to finalized.
+  effort: L
+  risk: High
+  tests: 'Unit: YAML plan renders all sections (design, slices, questions). Unit:
+    approval checkboxes call persist_feedback(). Unit: progress bar calculates correct
+    percentage. Integration: full review session — load plan, approve sections, finalize,
+    verify YAML status updated.'
+  approved: true
+  comment: ''
+- id: feat-99538f2f
+  num: 3
+  title: SQLite Feedback Persistence Layer
+  what: 'Feedback persistence layer: create/read/update feedback records keyed by
+    (plan_id, section, action). IsPlanFullyApproved() query. One .planbook.db per
+    project. Auto-created on first write. WAL mode enabled for concurrent marimo+CLI
+    access.'
+  why: The review notebook and export both depend on persisted feedback state. Without
+    this, checkbox/radio state is lost between sessions. Queryable approval state
+    is something git alone cannot provide.
+  files:
+  - src/planbook/store.py
+  deps: []
+  done_when:
+  - store.persist_feedback() upserts correctly. store.get_feedback() returns structured
+    dict matching the plan feedback schema. store.is_fully_approved() checks all sections.
+    DB auto-created on first write with WAL mode.
+  effort: S
+  risk: Low
+  tests: 'Unit: persist_feedback() upserts correctly (insert then update same key).
+    Unit: get_feedback() returns structured dict. Unit: is_fully_approved() returns
+    false when any section missing. Integration: DB auto-created on first write, survives
+    process restart.'
+  approved: true
+  comment: ''
+- id: feat-168edce7
+  num: 4
+  title: CLI Tool (planbook init/validate/review/export)
+  what: 'Click-based CLI entry point unifying all planbook commands: init (scaffold
+    starter YAML), validate (Pydantic check), review (launch marimo), export (generate
+    HTML), critique (run AI analysis). Consistent --format flag for JSON/YAML/text
+    output. Error messages include fix suggestions.'
+  why: CLI is the primary interface for solo developers. planbook must be invocable
+    from terminal, CI pipelines, and AI agent frameworks. Click provides subcommand
+    routing, help generation, and shell completion.
+  files:
+  - src/planbook/cli.py
+  - src/planbook/__init__.py
+  deps:
+  - 1
+  - 2
+  - 3
+  done_when:
+  - planbook --help shows all subcommands. planbook init creates valid YAML in CWD.
+    planbook validate reports errors with line numbers. planbook review launches marimo.
+    planbook export generates HTML. All commands return proper exit codes.
+  effort: M
+  risk: Low
+  tests: 'Unit: each subcommand parses args correctly. Unit: init creates valid YAML.
+    Unit: validate catches schema errors. Integration: full CLI workflow — init, validate,
+    review, export. Integration: JSON output mode for CI consumption.'
+  approved: true
+  comment: ''
+- id: feat-88914f1b
+  num: 5
+  title: AI Critique Engine
+  what: 'Dual-agent critique: two LLMs independently review the plan, then a synthesis
+    step merges findings. Uses LiteLLM for provider flexibility (OpenAI, Anthropic,
+    local models). planbook critique runs analysis, writes results to YAML critique
+    section. Assumption verification, risk table, and synthesis. Complexity-gated:
+    skip for plans with fewer than 3 slices.'
+  why: Pre-implementation AI critique is the biggest competitive differentiator —
+    no other tool does this. Both critics flagged that shipping without this risks
+    launch silence. Single-model critique in v0.1, dual-agent synthesis in v0.2.
+  files:
+  - src/planbook/critique.py
+  deps:
+  - 1
+  - 3
+  done_when:
+  - planbook critique calls configured model(s)
+  - produces assumption verification + risk table + synthesis. Results written to
+    plan YAML critique section. Complexity gating skips for <3 slices. Works with
+    any LiteLLM-supported provider.
+  effort: L
+  risk: High
+  tests: 'Unit: critique engine calls model (mock LiteLLM). Unit: synthesis merges
+    findings from two models. Unit: complexity gate skips for <3 slices. Unit: results
+    conform to critique YAML schema. Integration: critique results appear in review
+    notebook.'
+  approved: true
+  comment: ''
+- id: feat-3874f73d
+  num: 6
+  title: PyPI Packaging & CI
+  what: 'pyproject.toml with Hatch build backend and optional extras: [review] adds
+    marimo, [critique] adds LiteLLM. GitHub Actions for test + lint + publish to PyPI.
+    README with 5-minute quickstart. MIT license. JSON Schema published to SchemaStore
+    for editor autocomplete without installing planbook.'
+  why: An open-source tool that is not pip-installable is not a tool. CI ensures quality
+    on every PR. SchemaStore publication is the highest-leverage distribution move
+    — free editor autocomplete for anyone.
+  files:
+  - pyproject.toml
+  - .github/workflows/ci.yml
+  - .github/workflows/release.yml
+  - README.md
+  - LICENSE
+  deps:
+  - 1
+  done_when:
+  - pip install planbook works from PyPI. pip install planbook[review] adds marimo.
+    pip install planbook[critique] adds LiteLLM. GitHub Actions run tests on push.
+    README has working quickstart. JSON Schema submitted to SchemaStore.
+  effort: S
+  risk: Low
+  tests: 'Unit: pyproject.toml valid (hatch build succeeds). Integration: pip install
+    planbook installs CLI entry point. Integration: pip install planbook[review] includes
+    marimo. Integration: pip install planbook[critique] includes litellm. CI: GitHub
+    Actions pass on clean checkout.'
+  approved: true
+  comment: ''
 questions:
-    - id: q-should-planbook-be-a-python-package-cli
-      text: Should planbook be a Python package, CLI tool, or both?
-      description: Both gives maximum flexibility — solo devs use CLI, agent frameworks import the library. cli-only is simpler but limits programmatic use. library-only has no discoverability for new users.
-      recommended: both
-      options:
-        - key: both
-          label: 'A: Python package with CLI entry points (pip install planbook and import planbook)'
-        - key: cli-only
-          label: 'B: CLI-only via pipx (no library API)'
-        - key: library-only
-          label: 'C: Library-only (no CLI — users call planbook.validate() etc)'
-      answer: null
-    - id: q-should-marimo-be-a-required-or-optional
-      text: Should marimo be a required or optional dependency?
-      description: Optional keeps the core package lightweight — validate, critique, and export all work without marimo. Required simplifies install but forces marimo on users who only want CLI. Peer dependency is confusing for new users.
-      recommended: optional
-      options:
-        - key: optional
-          label: 'A: Optional extra via pip install planbook[review] — core works without it'
-        - key: required
-          label: 'B: Required — marimo is the core review runtime'
-        - key: peer
-          label: 'C: Peer dependency — user installs marimo separately'
-      answer: null
-    - id: q-how-should-the-yaml-schema-be-validated
-      text: How should the YAML schema be validated?
-      description: Pydantic gives the best developer experience (autocomplete, error messages, Python types). JSON Schema is more portable but less ergonomic. Flexible risks silent errors. Use ruamel.yaml over PyYAML for better parse error positions.
-      recommended: pydantic
-      options:
-        - key: pydantic
-          label: 'A: Strict Pydantic models — reject unknown fields with clear errors'
-        - key: flexible
-          label: 'B: Accept unknown fields with warnings — extensible but less safe'
-        - key: json-schema
-          label: 'C: External JSON Schema file — standard tooling but no Python type safety'
-      answer: null
-    - id: q-who-is-the-primary-target-user-for-mvp
-      text: Who is the primary target user for MVP?
-      description: Solo devs are the easiest first market — no auth/multi-user needed. spec-kit 85k stars proves demand for plan-before-code. Teams need collaboration features. Agent frameworks need stable API. Start narrow, expand later.
-      recommended: solo-devs
-      options:
-        - key: solo-devs
-          label: 'A: Solo developers using AI coding agents (simplest UX)'
-        - key: teams
-          label: 'B: Small teams (2-5 devs) doing async plan review'
-        - key: agent-frameworks
-          label: 'C: AI agent framework builders (machine-readable plans)'
-      answer: null
-    - id: q-should-ai-critique-ship-in-v0-1-or-be-de
-      text: Should AI critique ship in v0.1 or be deferred to v0.2?
-      description: 'Both critics flagged this as the highest-risk MVP decision. AI critique is the biggest differentiator but also the most complex. Counter-proposal from market critique: ship single-model critique in v0.1 (not dual-agent), dual-agent synthesis in v0.2. Without critique, v0.1 is achievable with existing tools in 30 minutes.'
-      recommended: single-model-v01
-      options:
-        - key: single-model-v01
-          label: 'A: Single-model critique in v0.1 — dual-agent in v0.2 (critic recommendation)'
-        - key: defer-v02
-          label: 'B: Defer all AI critique to v0.2 — ship review loop first (original plan)'
-        - key: full-v01
-          label: 'C: Full dual-agent critique in v0.1 (ambitious but risky)'
-      answer: null
+- id: q-should-planbook-be-a-python-package-cli
+  text: Should planbook be a Python package, CLI tool, or both?
+  description: Both gives maximum flexibility — solo devs use CLI, agent frameworks
+    import the library. cli-only is simpler but limits programmatic use. library-only
+    has no discoverability for new users.
+  recommended: both
+  options:
+  - key: both
+    label: 'A: Python package with CLI entry points (pip install planbook and import
+      planbook)'
+  - key: cli-only
+    label: 'B: CLI-only via pipx (no library API)'
+  - key: library-only
+    label: 'C: Library-only (no CLI — users call planbook.validate() etc)'
+  answer: both
+- id: q-should-marimo-be-a-required-or-optional
+  text: Should marimo be a required or optional dependency?
+  description: Optional keeps the core package lightweight — validate, critique, and
+    export all work without marimo. Required simplifies install but forces marimo
+    on users who only want CLI. Peer dependency is confusing for new users.
+  recommended: optional
+  options:
+  - key: optional
+    label: 'A: Optional extra via pip install planbook[review] — core works without
+      it'
+  - key: required
+    label: 'B: Required — marimo is the core review runtime'
+  - key: peer
+    label: 'C: Peer dependency — user installs marimo separately'
+  answer: optional
+- id: q-how-should-the-yaml-schema-be-validated
+  text: How should the YAML schema be validated?
+  description: Pydantic gives the best developer experience (autocomplete, error messages,
+    Python types). JSON Schema is more portable but less ergonomic. Flexible risks
+    silent errors. Use ruamel.yaml over PyYAML for better parse error positions.
+  recommended: pydantic
+  options:
+  - key: pydantic
+    label: 'A: Strict Pydantic models — reject unknown fields with clear errors'
+  - key: flexible
+    label: 'B: Accept unknown fields with warnings — extensible but less safe'
+  - key: json-schema
+    label: 'C: External JSON Schema file — standard tooling but no Python type safety'
+  answer: pydantic
+- id: q-who-is-the-primary-target-user-for-mvp
+  text: Who is the primary target user for MVP?
+  description: Solo devs are the easiest first market — no auth/multi-user needed.
+    spec-kit 85k stars proves demand for plan-before-code. Teams need collaboration
+    features. Agent frameworks need stable API. Start narrow, expand later.
+  recommended: solo-devs
+  options:
+  - key: solo-devs
+    label: 'A: Solo developers using AI coding agents (simplest UX)'
+  - key: teams
+    label: 'B: Small teams (2-5 devs) doing async plan review'
+  - key: agent-frameworks
+    label: 'C: AI agent framework builders (machine-readable plans)'
+  answer: solo-devs
+- id: q-should-ai-critique-ship-in-v0-1-or-be-de
+  text: Should AI critique ship in v0.1 or be deferred to v0.2?
+  description: 'Both critics flagged this as the highest-risk MVP decision. AI critique
+    is the biggest differentiator but also the most complex. Counter-proposal from
+    market critique: ship single-model critique in v0.1 (not dual-agent), dual-agent
+    synthesis in v0.2. Without critique, v0.1 is achievable with existing tools in
+    30 minutes.'
+  recommended: single-model-v01
+  options:
+  - key: single-model-v01
+    label: 'A: Single-model critique in v0.1 — dual-agent in v0.2 (critic recommendation)'
+  - key: defer-v02
+    label: 'B: Defer all AI critique to v0.2 — ship review loop first (original plan)'
+  - key: full-v01
+    label: 'C: Full dual-agent critique in v0.1 (ambitious but risky)'
+  answer: single-model-v01
 critique:
-    reviewed_at: "2026-04-05"
-    reviewers:
-        - design-critic
-        - market-critic
-    assumptions:
-        - id: pydantic-validation
-          status: verified
-          text: Pydantic is the right validation choice
-          evidence: De facto standard, JSON Schema export, no credible alternative.
-        - id: marimo-review-ui
-          status: questionable
-          text: Marimo is viable as plan review UI
-          evidence: Prototype works but CDN dep breaks offline, no production precedent, hardcoded finalize path.
-        - id: litellm-reliable
-          status: plausible
-          text: LiteLLM provides reliable multi-provider critique
-          evidence: 15k+ stars but 3 breaking changes in 12 months. Pin and wrap.
-        - id: solo-devs-first
-          status: plausible
-          text: Solo developers are the right first audience
-          evidence: spec-kit 85k stars proves demand. Agent-framework audience has different needs.
-        - id: sqlite-sufficient
-          status: verified
-          text: SQLite is sufficient for feedback persistence
-          evidence: Single-user local-first. WAL mode. Prototype works.
-        - id: offline-export
-          status: questionable
-          text: Static HTML export works offline
-          evidence: dagre_widget loads d3 from CDN. Must verify with offline test.
-        - id: uvx-distribution
-          status: plausible
-          text: uv/uvx eliminates packaging friction
-          evidence: Fast, isolated. marimo in uvx untested. SchemaStore is higher leverage.
-    critics: []
-    risks:
-        - risk: CDN dependency breaks offline
-          severity: High
-          mitigation: Bundle d3 inline or replace with SVG renderer.
-        - risk: Finalize path breaks when packaged
-          severity: High
-          mitigation: Use importlib.resources.
-        - risk: spec-kit competitive absorption
-          severity: High
-          mitigation: Launch with AI critique in v0.1.
-        - risk: No launch timeline
-          severity: High
-          mitigation: 4-week ship date.
-        - risk: Schema lock-in
-          severity: Medium
-          mitigation: Add schema_version field.
-        - risk: LiteLLM breaking changes
-          severity: Medium
-          mitigation: Pin version, wrap in llm.py.
-        - risk: Sustainability deferred
-          severity: Medium
-          mitigation: Decide before Slice 1.
-        - risk: Status enum drift
-          severity: Low
-          mitigation: Update renderer dict.
-    synthesis: 'Architecturally sound with genuinely vertical slices. Four issues: CDN breaks offline, finalize path breaks in package, sustainability must be decided pre-Slice 1, no ship date. Reorder: 1->3->4->6->5->2.'
+  reviewed_at: '2026-04-05'
+  reviewers:
+  - design-critic
+  - market-critic
+  assumptions:
+  - id: pydantic-validation
+    status: verified
+    text: Pydantic is the right validation choice
+    evidence: De facto standard, JSON Schema export, no credible alternative.
+  - id: marimo-review-ui
+    status: questionable
+    text: Marimo is viable as plan review UI
+    evidence: Prototype works but CDN dep breaks offline, no production precedent,
+      hardcoded finalize path.
+  - id: litellm-reliable
+    status: plausible
+    text: LiteLLM provides reliable multi-provider critique
+    evidence: 15k+ stars but 3 breaking changes in 12 months. Pin and wrap.
+  - id: solo-devs-first
+    status: plausible
+    text: Solo developers are the right first audience
+    evidence: spec-kit 85k stars proves demand. Agent-framework audience has different
+      needs.
+  - id: sqlite-sufficient
+    status: verified
+    text: SQLite is sufficient for feedback persistence
+    evidence: Single-user local-first. WAL mode. Prototype works.
+  - id: offline-export
+    status: questionable
+    text: Static HTML export works offline
+    evidence: dagre_widget loads d3 from CDN. Must verify with offline test.
+  - id: uvx-distribution
+    status: plausible
+    text: uv/uvx eliminates packaging friction
+    evidence: Fast, isolated. marimo in uvx untested. SchemaStore is higher leverage.
+  critics: []
+  risks:
+  - risk: CDN dependency breaks offline
+    severity: High
+    mitigation: Bundle d3 inline or replace with SVG renderer.
+  - risk: Finalize path breaks when packaged
+    severity: High
+    mitigation: Use importlib.resources.
+  - risk: spec-kit competitive absorption
+    severity: High
+    mitigation: Launch with AI critique in v0.1.
+  - risk: No launch timeline
+    severity: High
+    mitigation: 4-week ship date.
+  - risk: Schema lock-in
+    severity: Medium
+    mitigation: Add schema_version field.
+  - risk: LiteLLM breaking changes
+    severity: Medium
+    mitigation: Pin version, wrap in llm.py.
+  - risk: Sustainability deferred
+    severity: Medium
+    mitigation: Decide before Slice 1.
+  - risk: Status enum drift
+    severity: Low
+    mitigation: Update renderer dict.
+  synthesis: 'Architecturally sound with genuinely vertical slices. Four issues: CDN
+    breaks offline, finalize path breaks in package, sustainability must be decided
+    pre-Slice 1, no ship date. Reorder: 1->3->4->6->5->2.'
