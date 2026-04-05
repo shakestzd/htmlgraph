@@ -85,7 +85,7 @@ func (fc *FeatureCollection) Create(title string, opts ...FeatureOption) (*model
 	}
 
 	now := time.Now().UTC()
-	id := generateID("feature", title)
+	id := GenerateID("feature", title)
 
 	// Build steps
 	var steps []models.Step

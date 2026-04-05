@@ -34,12 +34,12 @@ var prefixes = map[string]string{
 	"event":   "evt",
 }
 
-// generateID creates a collision-resistant ID matching the Python format.
+// GenerateID creates a collision-resistant ID matching the Python format.
 //
 // Format: {prefix}-{hex8} (e.g., feat-a1b2c3d4)
 //
 // The hash combines: title + UTC timestamp (nanosecond) + 4 random bytes.
-func generateID(nodeType, title string) string {
+func GenerateID(nodeType, title string) string {
 	prefix, ok := prefixes[nodeType]
 	if !ok && len(nodeType) >= 4 {
 		prefix = nodeType[:4]

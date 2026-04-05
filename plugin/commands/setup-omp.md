@@ -51,6 +51,19 @@ Write `~/.claude/omp-claude-wrapper.sh`:
 # HtmlGraph + Oh My Posh wrapper for Claude Code status line
 # Reads session JSON from stdin, queries active work item, renders via OMP
 
+# Guard: only show status when CWD is inside an htmlgraph project.
+# This prevents CLAUDE_PROJECT_DIR env bleed from a previous session resolving
+# htmlgraph statusline to the wrong project when in an unrelated directory.
+_dir="$(pwd)"
+while [ "$_dir" != "/" ]; do
+    [ -d "$_dir/.htmlgraph" ] && break
+    _dir=$(dirname "$_dir")
+done
+if [ "$_dir" = "/" ]; then
+    echo ""
+    exit 0
+fi
+
 INPUT=$(cat)
 
 # Extract session ID (use python3 for JSON parsing — always available on macOS/Linux)
@@ -59,10 +72,9 @@ SESS_ID=$(echo "$INPUT" | python3 -c "import sys, json; print(json.load(sys.stdi
 # Get active work item for THIS session via fast Go binary
 ACTIVE_WORK=$(htmlgraph statusline --session "$SESS_ID" 2>/dev/null)
 
-# Fallback: read file cache if statusline returned empty (subagent support)
-if [ -z "$ACTIVE_WORK" ] && [ -f "$HOME/.htmlgraph-statusline-cache" ]; then
-    ACTIVE_WORK=$(cat "$HOME/.htmlgraph-statusline-cache" 2>/dev/null)
-fi
+# No cache fallback — if statusline returns empty, show nothing.
+# The global cache ($HOME/.htmlgraph-statusline-cache) caused cross-project bleed
+# when switching directories, showing stale items from unrelated projects.
 
 # Export for Oh My Posh template to use
 export HTMLGRAPH_ACTIVE="$ACTIVE_WORK"

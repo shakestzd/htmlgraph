@@ -68,7 +68,7 @@ func (tc *TrackCollection) Create(title string, opts ...TrackOption) (*models.No
 	}
 
 	now := time.Now().UTC()
-	id := generateID("track", title)
+	id := GenerateID("track", title)
 
 	// Build steps from phases
 	var steps []models.Step

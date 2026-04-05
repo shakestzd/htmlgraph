@@ -82,7 +82,7 @@ func (bc *BugCollection) Create(title string, opts ...BugOption) (*models.Node, 
 	}
 
 	now := time.Now().UTC()
-	id := generateID("bug", title)
+	id := GenerateID("bug", title)
 
 	// Build steps from both explicit steps and repro steps
 	var steps []models.Step

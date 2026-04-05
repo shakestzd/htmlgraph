@@ -16,6 +16,7 @@ import (
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +69,7 @@ func runPlanGenerate(sourceID string) error {
 		return fmt.Errorf("parse work item: %w", err)
 	}
 
-	planID := derivePlanID(info.title)
+	planID := workitem.GenerateID("plan", info.title)
 	plansDir := filepath.Join(htmlgraphDir, "plans")
 	if err := os.MkdirAll(plansDir, 0o755); err != nil {
 		return fmt.Errorf("create plans dir: %w", err)
@@ -885,8 +886,7 @@ func runPlanAddQuestion(planID, question, description, optionsRaw string) error 
 	}
 
 	// Build a kebab-case question ID from the question text.
-	qID := derivePlanID(question)
-	qID = strings.TrimPrefix(qID, "plan-")
+	qID := slugify(question)
 	radioName := "q-" + qID
 
 	// Build question block HTML.
@@ -975,4 +975,34 @@ func openBrowser(target string) error {
 		return fmt.Errorf("open browser: %w", err)
 	}
 	return nil
+}
+
+// slugify converts text to a kebab-case identifier suitable for use as HTML
+// attribute values (e.g., radio group names, data attributes). Unlike hex8 IDs,
+// slugs are human-readable and only need to be unique within a single plan.
+func slugify(text string) string {
+	if text == "" {
+		return "untitled"
+	}
+	slug := strings.ToLower(text)
+	var b strings.Builder
+	prevDash := false
+	for _, r := range slug {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			prevDash = false
+		} else if !prevDash {
+			b.WriteRune('-')
+			prevDash = true
+		}
+	}
+	result := strings.Trim(b.String(), "-")
+	if len(result) > 40 {
+		truncated := result[:40]
+		if lastHyphen := strings.LastIndex(truncated, "-"); lastHyphen > 0 {
+			truncated = truncated[:lastHyphen]
+		}
+		result = truncated
+	}
+	return result
 }
