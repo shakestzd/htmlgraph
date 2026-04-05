@@ -15,6 +15,7 @@ type finalizeResult struct {
 	TrackID          string
 	FeatureIDs       []string
 	AlreadyFinalized bool
+	ExecuteCmd       string // CLI command to start working on the track
 }
 
 // planFinalizeCmd creates a cobra command for plan finalize.
@@ -52,6 +53,9 @@ Example:
 					fmt.Printf(" (track: %s)", result.TrackID)
 				}
 				fmt.Println()
+				if result.ExecuteCmd != "" {
+					fmt.Printf("\nExecute:\n  %s\n", result.ExecuteCmd)
+				}
 				return nil
 			}
 
@@ -59,6 +63,9 @@ Example:
 			fmt.Printf("Created %d features\n", len(result.FeatureIDs))
 			for _, fid := range result.FeatureIDs {
 				fmt.Printf("  %s\n", fid)
+			}
+			if result.ExecuteCmd != "" {
+				fmt.Printf("\nExecute:\n  %s\n", result.ExecuteCmd)
 			}
 			return nil
 		},
@@ -82,6 +89,7 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 			TrackID:          trackID,
 			FeatureIDs:       featureIDs,
 			AlreadyFinalized: true,
+			ExecuteCmd:       buildExecuteCmd(trackID),
 		}, nil
 	}
 
@@ -139,6 +147,7 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 	return &finalizeResult{
 		TrackID:    trackNode.ID,
 		FeatureIDs: featureIDs,
+		ExecuteCmd: buildExecuteCmd(trackNode.ID),
 	}, nil
 }
 
@@ -178,6 +187,14 @@ func wireTrackEdges(p *workitem.Project, featureID, trackID, featureTitle string
 	}
 
 	return nil
+}
+
+// buildExecuteCmd returns the CLI command to start working on a finalized track.
+func buildExecuteCmd(trackID string) string {
+	if trackID == "" {
+		return ""
+	}
+	return "htmlgraph yolo --track " + trackID
 }
 
 // findFeaturesForTrack returns feature IDs linked to a track via contains edges.

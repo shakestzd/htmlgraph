@@ -127,7 +127,7 @@ textarea::placeholder{color:var(--text-muted)}
   <a href="#slices" class="nav-link" data-spy="slices">Slices</a>
   <a href="#questions" class="nav-link" data-spy="questions">Questions</a>
   <a href="#critique" class="nav-link" data-spy="critique">Critique</a>
-  <a href="#progress" class="nav-link" data-spy="progress">Progress</a>
+  <a href="#feedback-summary" class="nav-link" data-spy="feedback-summary">Progress</a>
 </nav>
 <div class="plan-content">
 <article id="{{.PlanID}}" data-feature-id="{{.FeatureID}}" data-status="{{.Status}}">
@@ -217,7 +217,7 @@ textarea::placeholder{color:var(--text-muted)}
 {{end}}
 
 <!-- ZONE 3: Feedback Summary -->
-<section id="progress" class="progress-zone" data-zone="feedback-summary">
+<section id="feedback-summary" class="progress-zone" data-zone="feedback-summary">
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>

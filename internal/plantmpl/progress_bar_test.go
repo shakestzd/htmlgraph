@@ -15,8 +15,8 @@ func TestProgressBarRendersSection(t *testing.T) {
 		t.Fatalf("Render: %v", err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="progress"`) {
-		t.Error(`output missing id="progress"`)
+	if !strings.Contains(html, `id="feedback-summary"`) {
+		t.Error(`output missing id="feedback-summary"`)
 	}
 	if !strings.Contains(html, `class="progress-zone"`) {
 		t.Error(`output missing class="progress-zone"`)
