@@ -1,0 +1,288 @@
+meta:
+  id: plan-56492d7a
+  track_id: trk-84bcad47
+  title: Plan Review AI Chat — anywidget + Claude headless in marimo notebook
+  description: 'Add an interactive AI chat assistant to the CRISPI plan review notebook.
+    Uses anywidget for a custom chat UI and Claude Code headless mode (claude -p)
+    as the backend. Zero API key required — uses the reviewer''s existing Claude Code
+    session. Conversation is fully isolated from the orchestrating Claude Code context.
+    Verified against Claude Code headless docs and marimo''s mo.ui.chat / anywidget
+    APIs.
+
+    '
+  created_at: '2026-04-06'
+  status: draft
+  created_by: claude-opus
+design:
+  problem: 'During plan review in the marimo notebook, reviewers encounter design
+    tradeoffs, unfamiliar assumptions, and critique findings they want to discuss
+    with an AI. Currently they must switch back to their Claude Code session, which
+    pollutes the orchestrator''s context with review-specific questions. There is
+    no way to ask "why does slice 3 conflict with constraint 2?" within the review
+    notebook itself. The plan YAML, critique data, and approval state are all available
+    in the notebook''s Python runtime but no AI can reason about them inline.
+
+    '
+  goals:
+  - Reviewers can ask questions about the plan within the review notebook via a chat
+    widget
+  - Chat uses Claude Code headless mode — zero API key setup, uses existing auth
+  - Conversation is fully isolated from the main Claude Code orchestrator context
+  - Plan YAML, critique data, and feedback state are injected as system context
+  - Chat streams responses in real-time with markdown rendering
+  - Conversation persists across page reloads via --resume session_id
+  constraints:
+  - Must work in marimo run mode (app mode) — not just edit mode
+  - Claude CLI must be on PATH (claude -p); graceful fallback if not available
+  - anywidget is already a dependency (used by dagre_widget.py) — no new deps
+  - Chat widget must not block notebook reactivity — async/streaming required
+  - System prompt must use --append-system-prompt (preserves Claude Code capabilities)
+  - No ANTHROPIC_API_KEY required — headless mode uses existing Claude Code OAuth
+    session
+  approved: false
+  comment: ''
+slices:
+- id: feat-chat-widget
+  num: 1
+  title: Chat anywidget with streaming markdown UI
+  what: 'Create prototypes/chat_widget.py as an anywidget.AnyWidget subclass. JavaScript
+    frontend renders a chat interface with: message history (user/assistant bubbles),
+    markdown rendering (code blocks, bold, lists), streaming text display (character-by-character
+    from backend), input field with send button, and auto-scroll. Python backend exposes
+    traitlets: messages (list of dicts), pending_message (str), and response_stream
+    (str for incremental updates). Widget communicates via anywidget''s send/on_msg
+    protocol for streaming. Follow the existing dagre_widget.py pattern for inline
+    ESM JavaScript.
+
+    '
+  why: 'mo.ui.chat exists but using anywidget gives full control over the UX — plan-aware
+    formatting, critique badge rendering, slice references, and custom streaming behavior.
+    The dagre_widget.py pattern is proven in this codebase. anywidget is already a
+    dependency.
+
+    '
+  files:
+  - prototypes/chat_widget.py
+  deps: []
+  done_when:
+  - Widget renders in marimo cell with message history and input field
+  - Messages display with markdown rendering (code blocks, bold, lists)
+  - Streaming text appears character-by-character as backend yields
+  - Auto-scrolls to latest message
+  - Works in both marimo edit and run (app) mode
+  effort: M
+  risk: Med
+  tests: 'Unit: widget instantiates without errors.
+
+    Unit: sending a message updates messages traitlet.
+
+    Integration: widget renders in marimo cell and accepts input.
+
+    Integration: streaming updates display incrementally.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-claude-headless-backend
+  num: 2
+  title: Claude headless chat backend with session persistence
+  what: 'Create prototypes/claude_chat.py with a ClaudeChatBackend class that: (1)
+    Invokes claude -p via subprocess.Popen with --output-format stream-json --verbose
+    for streaming (no --include-partial-messages). (2) Captures session_id from type=system,
+    subtype=init events on first call. (3) Passes --resume <session_id> on subsequent
+    calls for multi-turn conversation. (4) Injects plan context via --append-system-prompt
+    with the plan YAML text, critique synthesis, and current approval state. (5) Yields
+    text deltas by filtering stream events for type=assistant and reading message.content[].text
+    from each event. (6) Uses threading.Thread for background subprocess reading to
+    prevent blocking (verified non-blocking architecture). (7) Implements 60s timeout
+    with proc.terminate() for clean termination (verified clean shutdown). (8) Detects
+    if claude CLI is available via shutil.which("claude") with explicit fallback to
+    ~/.local/bin/claude; returns graceful error if not found. (9) Persists session_id
+    to SQLite plan_feedback table so conversation resumes across notebook restarts.'
+  why: 'Claude headless mode uses the reviewer''s existing Claude Code auth — zero
+    API key setup. Each -p call is a subprocess, not a shared session, so the main
+    Claude Code context is never polluted. The --resume flag maintains conversation
+    history across chat turns. Streaming via stream-json with type=assistant events
+    gives real-time response display. Prototype spike verified two critical risks:
+    (1) Blocking reads — MITIGATED via threading.Thread for background subprocess
+    reading. (2) Timeout/hang — MITIGATED via 60s timeout and proc.terminate() for
+    clean process termination.'
+  files:
+  - prototypes/claude_chat.py
+  deps: []
+  done_when:
+  - ClaudeChatBackend.send(message) yields text deltas as strings from type=assistant
+    events at message.content[].text
+  - First call captures session_id from type=system, subtype=init events; subsequent
+    calls pass --resume
+  - Plan YAML injected via --append-system-prompt
+  - Graceful fallback when claude CLI not found (check shutil.which + ~/.local/bin/claude)
+  - Background threading prevents blocking reads; 60s timeout with proc.terminate()
+    prevents hangs
+  - session_id persisted to SQLite for cross-restart continuity
+  effort: M
+  risk: Low
+  tests: 'Unit: ClaudeChatBackend detects claude on PATH via shutil.which and explicit
+    ~/.local/bin/claude check.
+
+    Unit: stream event parsing extracts text correctly from type=assistant events
+    at message.content[].text.
+
+    Unit: session_id captured from type=system, subtype=init events and reused.
+
+    Unit: threading.Thread correctly reads subprocess output without blocking.
+
+    Unit: 60s timeout triggers proc.terminate() for clean shutdown.
+
+    Integration: multi-turn conversation maintains context (ask follow-up).
+
+    Integration: session_id survives notebook restart via SQLite.'
+  approved: false
+  comment: ''
+- id: feat-wire-chat-to-notebook
+  num: 3
+  title: Wire chat widget into plan review notebook
+  what: 'Add a new section "F. Plan Discussion" to plan_notebook.py after the Feedback
+    Summary (section E). The cell imports ChatWidget and ClaudeChatBackend, constructs
+    the backend with the current plan_yaml_text, critique data, and approval state
+    as context, and renders the widget. The system prompt includes: plan title, problem
+    statement, all slice summaries, all question answers, critique synthesis, and
+    current approval percentages. Context updates reactively when approvals change
+    (marimo cell dependency on plan variables). Show a callout when claude CLI is
+    not available explaining how to install Claude Code.
+
+    '
+  why: 'This is the integration point — connecting the widget (slice 1) to the backend
+    (slice 2) within the review notebook. The reviewer sees the chat below the feedback
+    summary, after they''ve reviewed all sections. Reactive context means the AI always
+    has current approval state.
+
+    '
+  files:
+  - prototypes/plan_notebook.py
+  deps:
+  - 1
+  - 2
+  done_when:
+  - Section F visible in plan review notebook below Feedback Summary
+  - Chat widget renders with plan context injected
+  - Reviewer can ask questions and get streamed responses
+  - Context updates when approvals change (reactive)
+  - Graceful callout shown when claude CLI not available
+  effort: S
+  risk: Low
+  tests: 'Unit: section F cell renders without errors when claude is available.
+
+    Unit: section F shows fallback callout when claude is missing.
+
+    Integration: full flow — open notebook, ask about plan, get response.
+
+    Integration: approve a slice, ask again — response reflects new approval state.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-embed-and-rebuild
+  num: 4
+  title: Embed new files in Go binary and rebuild
+  what: 'Add chat_widget.py and claude_chat.py to the go:embed directive in internal/notebook/embed.go.
+    Update plugin/build.sh to copy the new files alongside the existing 4 notebook
+    files. Verify the embedded binary launches the notebook with the chat section
+    working.
+
+    '
+  why: 'The plan review notebook is embedded in the Go binary via go:embed and written
+    to a temp dir at runtime. New Python files must be included or the chat widget
+    will fail with ImportError.
+
+    '
+  files:
+  - internal/notebook/embed.go
+  - plugin/build.sh
+  deps:
+  - 3
+  done_when:
+  - go:embed includes chat_widget.py and claude_chat.py
+  - build.sh copies 6 files (was 4) to internal/notebook/files/
+  - htmlgraph plan review launches with chat section visible
+  - go build && go vet && go test all pass
+  effort: S
+  risk: Low
+  tests: 'Unit: go build succeeds with new embed directives.
+
+    Integration: htmlgraph plan review shows section F with chat widget.
+
+    '
+  approved: false
+  comment: ''
+questions:
+- id: q-chat-placement
+  text: Where should the chat widget appear in the notebook?
+  description: 'The chat could go after the Feedback Summary (section F) so reviewers
+    see it after reviewing everything, or as a floating sidebar visible at all times,
+    or as a collapsible panel at the top. Placement affects when reviewers discover
+    and use it.
+
+    '
+  recommended: after-summary
+  options:
+  - key: after-summary
+    label: 'A: Section F after Feedback Summary — reviewers see it after reviewing
+      all sections'
+  - key: floating-sidebar
+    label: 'B: Floating sidebar — always visible, accessible during any section review'
+  - key: collapsible-top
+    label: 'C: Collapsible panel at top — opt-in, doesn''t distract from review flow'
+  answer: null
+- id: q-context-scope
+  text: How much plan context should be injected into the system prompt?
+  description: 'More context means better answers but higher token cost per message.
+    Full plan YAML can be 500+ lines. Minimal context (title + critique synthesis)
+    keeps costs low. The --append-system-prompt has no documented size limit but very
+    large prompts may slow startup.
+
+    '
+  recommended: full-plan
+  options:
+  - key: full-plan
+    label: 'A: Full plan YAML + critique + approval state — best answers, highest
+      cost'
+  - key: summary-only
+    label: 'B: Title + problem + critique synthesis + approval percentages — balanced'
+  - key: minimal
+    label: 'C: Title + critique synthesis only — cheapest, may miss context'
+  answer: null
+- id: q-conversation-persistence
+  text: Should chat history persist across notebook restarts?
+  description: 'Claude headless --resume requires a session_id. Storing it in SQLite
+    plan_feedback lets the conversation resume after closing and reopening the notebook.
+    Without persistence, each restart starts a fresh conversation. Persistence adds
+    a SQLite write but the infrastructure already exists.
+
+    '
+  recommended: persist
+  options:
+  - key: persist
+    label: 'A: Persist session_id to SQLite — conversation resumes across restarts'
+  - key: ephemeral
+    label: 'B: Ephemeral — fresh conversation each time notebook opens'
+  answer: null
+- id: q-fallback-when-no-claude
+  text: What should happen when claude CLI is not available?
+  description: 'Not all reviewers will have Claude Code installed. The chat widget
+    could show a disabled state with install instructions, hide entirely, or fall
+    back to a simpler mechanism (e.g., direct Anthropic API if ANTHROPIC_API_KEY is
+    set).
+
+    '
+  recommended: callout-with-fallback
+  options:
+  - key: callout-with-fallback
+    label: 'A: Show install callout, fall back to Anthropic API if ANTHROPIC_API_KEY
+      is set'
+  - key: callout-only
+    label: 'B: Show install callout, disable chat — no fallback'
+  - key: hide
+    label: 'C: Hide section entirely when claude not available'
+  answer: null
+critique: null

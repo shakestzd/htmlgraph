@@ -126,6 +126,12 @@ func runFinalizeYAML(planID string) error {
 		return fmt.Errorf("save plan: %w", err)
 	}
 
+	approvedCount := 0
+	for range numToFeatID {
+		approvedCount++
+	}
+	commitPlanChange(planPath, fmt.Sprintf("plan(%s): finalize — %d slices approved", planID, approvedCount))
+
 	fmt.Printf("\nFinalized: %s\n", planID)
 	fmt.Printf("Track: %s  %s\n", track.ID, track.Title)
 	fmt.Printf("Features: %d created, %d skipped\n", len(numToFeatID), len(plan.Slices)-len(numToFeatID))

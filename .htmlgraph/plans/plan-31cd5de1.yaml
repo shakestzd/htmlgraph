@@ -1,0 +1,371 @@
+meta:
+  id: plan-31cd5de1
+  track_id: trk-8c4a586e
+  title: Codex Interoperability — host-neutral core + Codex adapter
+  description: 'Port HtmlGraph from Claude-only to host-neutral architecture with
+    a Codex adapter. Skills, agents, hooks, and MCP server for Codex compatibility.
+    Verified against live OpenAI Codex documentation (developers.openai.com/codex/).
+
+    '
+  created_at: '2026-04-05'
+  status: draft
+  created_by: claude-opus
+design:
+  problem: 'HtmlGraph''s Go binary already implements the ''CLI as engine'' pattern
+    — internal/ packages contain all business logic shared by both CLI commands and
+    hooks. cmd/htmlgraph/hook.go is a thin wrapper that reads stdin, opens DB, calls
+    internal/hooks/, writes stdout. Hooks even call CLI commands via selfBinary()
+    for operations like auto-complete. The architecture is correct. The gap is narrower
+    than originally scoped: Codex needs thin adapter layers that normalize its event
+    format and response schema into the existing internal/ types. No business logic
+    reimplementation is needed. Codex CLI (v0.116.0, 67K GitHub stars, Rust-based)
+    has 5 hook events (verified), TOML agent definitions with developer_instructions
+    field (verified), and MCP support via config.toml (verified). Two community bridges
+    exist but no native HtmlGraph Codex plugin.'
+  goals:
+  - Codex users can install and use HtmlGraph for work tracking, attribution, and
+    quality gates
+  - Skills that are host-neutral (agent-context, code-quality, orchestrator-directives)
+    work in Codex unchanged
+  - MCP server exposes structured tools using official Go MCP SDK (modelcontextprotocol/go-sdk)
+  - Hook handler normalizes Codex's 5 events into existing Go binary via adapter pattern
+  - Agent definitions exist in Codex TOML format using developer_instructions field
+  - Maintain CLI-as-engine pattern — all new host adapters call internal/ packages
+    directly, enabling future hosts (Gemini CLI, OpenCode) with thin adapters only
+  constraints:
+  - Codex hooks only support 5 events with PreToolUse/PostToolUse Bash-only (verified
+    via docs)
+  - Agent TOML uses developer_instructions not system_prompt, and mcp_servers/skills.config
+    not tools (verified)
+  - Standalone MCP uses config.toml not .mcp.json; .mcp.json only within plugin bundles
+    (verified)
+  - Must not break existing Claude plugin — additive changes only
+  - Go binary is the single hook handler for both hosts — no code duplication
+  - 'Hook blocking response format differs: Codex uses permissionDecision/permissionDecisionReason'
+  - 'All host adapters must call internal/ packages directly — no business logic duplication
+    (verified: architecture already supports this)'
+  approved: false
+  comment: ''
+slices:
+- id: feat-codex-fix-docs
+  num: 1
+  title: Fix stale CODEX.md references
+  what: 'Remove references to nonexistent packages/codex-skill and docs/codex_headless.md.
+    Fix uv run htmlgraph to plain htmlgraph (Go binary, not Python). Update quick
+    start workflow to reflect current CLI. Remove Prefer uv run instruction entirely.
+
+    '
+  why: 'First impression for Codex users. Stale docs erode trust. Both paths verified
+    nonexistent in current repo.
+
+    '
+  files:
+  - CODEX.md
+  deps: []
+  done_when:
+  - All file paths referenced in CODEX.md exist in the repo
+  - No uv run prefix in any htmlgraph invocation
+  - Quick start commands actually work when run
+  effort: S
+  risk: Low
+  tests: 'Manual: verify every path referenced in CODEX.md exists.
+
+    Manual: run each command in CODEX.md and confirm it works.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-codex-plugin-scaffold
+  num: 2
+  title: Codex plugin scaffold with hooks.json
+  what: 'Create plugins/htmlgraph-codex/ with .codex-plugin/plugin.json manifest (required
+    field: name as kebab-case), skills/ directory, and .codex/hooks.json routing 5
+    supported events to htmlgraph hook binary. The hooks.json uses regex matchers
+    per Codex spec. Add marketplace entry stub at .agents/plugins/marketplace.json.
+
+    '
+  why: 'Codex requires this specific layout for plugin discovery. Plugins install
+    to ~/.codex/plugins/cache/. Without this scaffold, nothing else can be tested.
+
+    '
+  files:
+  - plugins/htmlgraph-codex/.codex-plugin/plugin.json
+  - plugins/htmlgraph-codex/.codex/hooks.json
+  - .agents/plugins/marketplace.json
+  deps: []
+  done_when:
+  - plugin.json has required name field in kebab-case
+  - hooks.json routes 5 events to htmlgraph hook binary with regex matchers
+  - marketplace.json stub exists for local installation
+  effort: S
+  risk: Med
+  tests: 'Unit: plugin.json validates against documented Codex schema.
+
+    Unit: hooks.json has entries for all 5 supported events.
+
+    Integration: codex plugin install from local marketplace succeeds.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-codex-skills-port
+  num: 3
+  title: Port host-neutral skills to Codex plugin
+  what: 'Copy 3 genuinely host-neutral skills into the Codex plugin: agent-context,
+    code-quality-skill, strategic-planning. These contain CLI commands (htmlgraph
+    feature start) and language-agnostic quality gates — no Claude API syntax. orchestrator-directives
+    requires rewriting Task()/Agent() patterns to Codex equivalents — defer to a separate
+    slice or strip those sections.
+
+    '
+  why: 'Work attribution, quality gates, and analytics are the foundation. Without
+    these, Codex agents have no guidance for HtmlGraph workflows.
+
+    '
+  files:
+  - plugins/htmlgraph-codex/skills/agent-context/SKILL.md
+  - plugins/htmlgraph-codex/skills/code-quality-skill/SKILL.md
+  - plugins/htmlgraph-codex/skills/strategic-planning/SKILL.md
+  deps:
+  - 2
+  done_when:
+  - 3 skills load in Codex without errors
+  - No Claude-specific API references remain (no Task(), no Agent())
+  - Work attribution workflow (feature start/complete) works via CLI
+  effort: S
+  risk: Low
+  tests: 'Unit: grep for Task() and Agent() returns zero matches in Codex skill files.
+
+    Integration: Codex agent can reference skills and follow attribution workflow.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-codex-agents-toml
+  num: 4
+  title: Agent roster in Codex TOML format
+  what: 'Re-encode 5 Claude agents as Codex TOML files under plugins/htmlgraph-codex/.codex/agents/.
+    Use developer_instructions field (not system_prompt) for role guidance. Use mcp_servers
+    and skills.config for tool access (not tools list). Map model names via config.
+    Required TOML fields: name, description, developer_instructions. Optional: model,
+    model_reasoning_effort, sandbox_mode, mcp_servers, skills.config.
+
+    '
+  why: 'Codex uses TOML agent definitions with different field names than Claude.
+    Without re-encoded agents, Codex users have no specialized subagents for research,
+    coding, or testing.
+
+    '
+  files:
+  - plugins/htmlgraph-codex/.codex/agents/haiku-coder.toml
+  - plugins/htmlgraph-codex/.codex/agents/sonnet-coder.toml
+  - plugins/htmlgraph-codex/.codex/agents/opus-coder.toml
+  - plugins/htmlgraph-codex/.codex/agents/researcher.toml
+  - plugins/htmlgraph-codex/.codex/agents/test-runner.toml
+  deps:
+  - 3
+  done_when:
+  - 5 TOML files parse without errors with required fields (name, description, developer_instructions)
+  - No system_prompt or tools fields used (use developer_instructions, mcp_servers,
+    skills.config)
+  - Each agent has equivalent role guidance from Claude markdown body
+  effort: M
+  risk: Med
+  tests: 'Unit: each TOML file has name, description, developer_instructions fields.
+
+    Unit: no system_prompt or tools fields present.
+
+    Integration: codex agent list shows all 5 agents.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-codex-hook-adapter
+  num: 5
+  title: Codex hook event adapter in Go binary
+  what: 'Add internal/hooks/codex_adapter.go — a thin normalization layer. The Go
+    binary already implements CLI-as-engine: internal/hooks/ contains all guard logic,
+    event recording, and session management. The adapter only needs to: (1) Normalize
+    Codex JSON field names (hook_event_name, tool_input.command) into the existing
+    CloudEvent struct. (2) Output permissionDecision/permissionDecisionReason format
+    for Codex (vs decision/reason for Claude). (3) Detect host via --host=codex CLI
+    flag passed in hooks.json entries. All guard logic, event recording, session management
+    stays unchanged — zero business logic reimplementation. Add AGENTS.md prohibiting
+    direct .htmlgraph/ writes (since Codex PreToolUse only fires for Bash).'
+  why: The adapter is thin because internal/hooks/ already IS the engine. The Codex
+    adapter just normalizes the wire format. This is the same pattern the CLI uses
+    — cmd/htmlgraph/hook.go is already a thin wrapper calling internal/hooks/ functions.
+    Adding Codex is adding another thin wrapper, not reimplementing logic.
+  files:
+  - internal/hooks/codex_adapter.go
+  - internal/hooks/codex_adapter_test.go
+  - plugins/htmlgraph-codex/AGENTS.md
+  deps:
+  - 2
+  done_when:
+  - Codex JSON payloads normalize into CloudEvent struct correctly
+  - Hook blocking returns permissionDecision format for Codex, decision format for
+    Claude
+  - AGENTS.md explicitly prohibits direct .htmlgraph/ file writes
+  - Session tracking works (htmlgraph status shows Codex session)
+  effort: S
+  risk: High
+  tests: 'Unit: Codex PreToolUse JSON normalizes to CloudEvent with correct field
+    values.
+
+    Unit: Codex Stop JSON normalizes correctly.
+
+    Unit: blocking response uses permissionDecision format.
+
+    Integration: Codex session triggers SessionStart and creates session record.
+
+    '
+  approved: false
+  comment: ''
+- id: feat-codex-mcp-server
+  num: 6
+  title: HtmlGraph MCP server using official Go SDK
+  what: 'Implement MCP server as htmlgraph mcp-server subcommand using the official
+    modelcontextprotocol/go-sdk (v1.4.1). Each MCP tool calls the same internal/ functions
+    that CLI commands use — internal/workitem for feature operations, internal/db
+    for queries, internal/htmlparse for HTML parsing. Direct Go function calls, not
+    subprocess overhead. Expose tools: htmlgraph_status, htmlgraph_feature_list, htmlgraph_feature_start,
+    htmlgraph_feature_complete, htmlgraph_snapshot, htmlgraph_find, htmlgraph_session_link_transcript.
+    STDIO transport. Host-neutral — works with Claude, Codex, Cursor, any MCP client.'
+  why: 'MCP tools call the same internal/ packages as CLI commands — the CLI-as-engine
+    pattern means zero duplication. The official Go SDK handles JSON-RPC 2.0 protocol
+    complexity. Host-neutral by design: one implementation serves all AI coding agents.'
+  files:
+  - cmd/htmlgraph/mcp_server.go
+  - internal/mcp/server.go
+  - internal/mcp/tools.go
+  - plugins/htmlgraph-codex/.mcp.json
+  - go.mod
+  deps:
+  - 2
+  done_when:
+  - htmlgraph mcp-server starts and responds to initialize request
+  - 7 tools registered and callable via MCP protocol
+  - STDIO transport works with both Codex and Claude MCP clients
+  - go.mod includes modelcontextprotocol/go-sdk dependency
+  effort: L
+  risk: High
+  tests: 'Unit: each tool handler returns valid MCP response.
+
+    Unit: tool parameter validation rejects bad input.
+
+    Integration: MCP client can call htmlgraph_status and get project stats.
+
+    Integration: htmlgraph_feature_start creates a work item claim.
+
+    Integration: Codex discovers server via plugin .mcp.json.
+
+    '
+  approved: false
+  comment: ''
+questions:
+- id: q-codex-plugin-location
+  text: Where should the Codex plugin live in the repo?
+  description: 'The review doc suggests plugins/htmlgraph-codex/ as a separate directory.
+    Alternative: .codex/ at repo root (Codex convention for repo-local config). The
+    tradeoff is separation from Claude plugin vs Codex convention compliance. Codex
+    installs plugins to ~/.codex/plugins/cache/$MARKETPLACE/$PLUGIN/$VERSION/.
+
+    '
+  recommended: separate-dir
+  options:
+  - key: separate-dir
+    label: 'A: plugins/htmlgraph-codex/ — separate from Claude plugin, explicit boundary'
+  - key: repo-root
+    label: 'B: .codex/ at repo root — Codex convention for repo-local config'
+  - key: shared-plugin
+    label: 'C: Extend existing plugin/ with Codex-specific subdirectories'
+  answer: null
+- id: q-mcp-scope
+  text: Should the MCP server be Codex-only or host-neutral?
+  description: 'An MCP server using the official Go SDK works with any MCP-compatible
+    host (Claude, Codex, Cursor). Building host-neutral means Claude could also use
+    structured tools instead of shell-outs. Codex-only is faster to ship but misses
+    the bigger win. The official Go MCP SDK (4.3K stars, v1.4.1) handles protocol
+    complexity.
+
+    '
+  recommended: host-neutral
+  options:
+  - key: host-neutral
+    label: 'A: Host-neutral — works with Claude, Codex, Cursor, any MCP client'
+  - key: codex-only
+    label: 'B: Codex-only — wire into Codex plugin only, Claude keeps shell-outs'
+  answer: null
+- id: q-go-mcp-library
+  text: Which Go MCP library should we use?
+  description: 'Three options exist. Official SDK (modelcontextprotocol/go-sdk, 4.3K
+    stars, v1.4.1, Google collab) has institutional backing. Community mark3labs/mcp-go
+    (8.5K stars, 1880 importers) has broader adoption and battle-testing. The official
+    SDK README acknowledges mcp-go as inspiration and viable alternative.
+
+    '
+  recommended: official-sdk
+  options:
+  - key: official-sdk
+    label: 'A: Official modelcontextprotocol/go-sdk — institutional backing, Google
+      collab'
+  - key: mcp-go
+    label: 'B: mark3labs/mcp-go — broader adoption (8.5K stars), more battle-tested'
+  - key: minimal
+    label: 'C: Minimal hand-rolled JSON-RPC — no dependency, full control'
+  answer: null
+- id: q-hook-event-gap
+  text: How should we handle the 13 Claude hook events Codex doesn't support?
+  description: 'Codex only supports 5 events. 13 Claude events (SessionEnd, SubagentStart/Stop,
+    PostToolUseFailure, PreCompact, etc.) have no equivalent. The .htmlgraph write
+    guard is the critical safety gap — PreToolUse only fires for Bash in Codex so
+    Write/Edit/MultiEdit to .htmlgraph/ is unguarded. hatayama/codex-hooks exists
+    as a community bridge but only for side effects (cannot block).
+
+    '
+  recommended: graceful-degrade
+  options:
+  - key: graceful-degrade
+    label: 'A: Graceful degradation — skip unsupported events, document gaps, guard
+      via AGENTS.md + MCP'
+  - key: transcript-simulate
+    label: 'B: Simulate missing events from transcript_path parsing where possible'
+  - key: community-bridge
+    label: 'C: Adopt hatayama/codex-hooks bridge as starting point, extend for blocking'
+  answer: null
+- id: q-skill-sync
+  text: How should Codex plugin skills stay in sync with Claude plugin skills?
+  description: 'Copying skills creates a fork that diverges over time. Options range
+    from manual copy (simple but drifts) to build-time generation (automated but adds
+    tooling) to symlinks (no drift but fragile across platforms).
+
+    '
+  recommended: build-step
+  options:
+  - key: build-step
+    label: 'A: Build step copies from plugin/skills/ to plugins/htmlgraph-codex/skills/
+      — automated, CI-checkable'
+  - key: symlinks
+    label: 'B: Symlinks to canonical plugin/skills/ — zero drift but fragile on Windows/in
+      archives'
+  - key: manual
+    label: 'C: Manual copy — simplest, accept drift risk'
+  answer: null
+- id: q-future-hosts
+  text: Should the adapter layer be formalized as an internal/adapter package?
+  description: Currently Claude hooks are in internal/hooks/ and the Codex adapter
+    would be codex_adapter.go in the same package. As more hosts are added (Gemini
+    CLI, OpenCode, Cursor), a dedicated internal/adapter/ package with a Host interface
+    could formalize the pattern. The tradeoff is premature abstraction vs clean extension
+    point.
+  recommended: same-package
+  options:
+  - key: same-package
+    label: 'A: Keep adapters in internal/hooks/ — simpler, wait for third host before
+      abstracting'
+  - key: adapter-package
+    label: 'B: Create internal/adapter/ with Host interface now — cleaner but may
+      be premature'
+  answer: null
+critique: null

@@ -68,6 +68,13 @@ func runAddQuestionYAML(planID, text, description, recommended, optionsStr strin
 	if err := planyaml.Save(planPath, plan); err != nil {
 		return fmt.Errorf("save plan: %w", err)
 	}
+
+	truncated := text
+	if len(truncated) > 50 {
+		truncated = truncated[:50]
+	}
+	commitPlanChange(planPath, fmt.Sprintf("plan(%s): add question — %s", planID, truncated))
+
 	fmt.Printf("Added question: %s (%d options)\n", qid, len(opts))
 	return nil
 }
@@ -150,6 +157,10 @@ func runSetCritiqueYAML(planID, dataStr string) error {
 	if err := planyaml.Save(planPath, plan); err != nil {
 		return fmt.Errorf("save plan: %w", err)
 	}
+
+	commitPlanChange(planPath, fmt.Sprintf("plan(%s): set critique — %d assumptions, %d risks",
+		planID, len(critique.Assumptions), len(critique.Risks)))
+
 	fmt.Printf("Critique set for %s: %d assumptions, %d risks\n",
 		planID, len(critique.Assumptions), len(critique.Risks))
 	return nil
@@ -339,6 +350,9 @@ func runSetDesignYAML(planID, problem, goals, constraints string) error {
 	if err := planyaml.Save(planPath, plan); err != nil {
 		return fmt.Errorf("save plan: %w", err)
 	}
+
+	commitPlanChange(planPath, fmt.Sprintf("plan(%s): update design", planID))
+
 	fmt.Printf("Design updated for %s: problem=%v goals=%d constraints=%d\n",
 		planID, problem != "", len(plan.Design.Goals), len(plan.Design.Constraints))
 	return nil
@@ -354,6 +368,89 @@ func splitTrimmed(s string) []string {
 		}
 	}
 	return result
+}
+
+// planRewriteYAMLCmd replaces an existing YAML plan file with validated new content.
+func planRewriteYAMLCmd() *cobra.Command {
+	var filePath string
+
+	cmd := &cobra.Command{
+		Use:   "rewrite-yaml <plan-id>",
+		Short: "Replace a YAML plan file with validated new content",
+		Long: `Replace an existing YAML plan file with new content from a file or stdin.
+
+The new content is validated before writing. The meta.id in the new content
+must match the existing plan ID to prevent accidental overwrites.
+
+Example:
+  htmlgraph plan rewrite-yaml plan-abc12345 --file /tmp/updated-plan.yaml
+  cat /tmp/updated-plan.yaml | htmlgraph plan rewrite-yaml plan-abc12345`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runRewriteYAML(args[0], filePath)
+		},
+	}
+	cmd.Flags().StringVar(&filePath, "file", "", "path to YAML file (reads stdin if empty)")
+	return cmd
+}
+
+func runRewriteYAML(planID, filePath string) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+
+	// Confirm the plan exists.
+	if _, err := os.Stat(planPath); err != nil {
+		return fmt.Errorf("plan %q not found at %s", planID, planPath)
+	}
+
+	// Read the new YAML content.
+	var yamlBytes []byte
+	if filePath != "" {
+		yamlBytes, err = os.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("read file %q: %w", filePath, err)
+		}
+	} else {
+		yamlBytes, err = io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+	}
+
+	// Parse with planyaml.Load equivalent — unmarshal into PlanYAML.
+	newPlan, err := planyaml.LoadBytes(yamlBytes)
+	if err != nil {
+		return fmt.Errorf("parse YAML: %w", err)
+	}
+
+	// Validate.
+	errs := planyaml.Validate(newPlan)
+	if len(errs) > 0 {
+		for _, e := range errs {
+			fmt.Fprintf(os.Stderr, "  - %s\n", e)
+		}
+		return fmt.Errorf("%d validation error(s)", len(errs))
+	}
+
+	// Ensure meta.id matches.
+	if newPlan.Meta.ID != planID {
+		return fmt.Errorf("meta.id %q in new content does not match plan ID %q", newPlan.Meta.ID, planID)
+	}
+
+	// Write validated content.
+	if err := planyaml.Save(planPath, newPlan); err != nil {
+		return fmt.Errorf("save plan: %w", err)
+	}
+
+	commitPlanChange(planPath, fmt.Sprintf("plan(%s): rewrite — %d slices, %d questions",
+		planID, len(newPlan.Slices), len(newPlan.Questions)))
+
+	fmt.Printf("Plan %s rewritten: %d slices, %d questions\n", planID, len(newPlan.Slices), len(newPlan.Questions))
+	return nil
 }
 
 // planReadFeedbackYAMLCmd queries plan_feedback for a YAML plan and outputs JSON.

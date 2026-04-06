@@ -32,6 +32,18 @@ When your task is done and quality gates pass:
 - `htmlgraph feature complete <id>` not `Edit(".htmlgraph/features/...")`
 - `htmlgraph bug create "title"` not `Write(".htmlgraph/bugs/...")`
 
+### Plan YAML Updates
+
+Plan YAML files (`.htmlgraph/plans/*.yaml`) are validated assets — never write them directly.
+Use the CLI to ensure valid structure:
+
+- **Create:** `htmlgraph plan create-yaml "<title>"`
+- **Update:** `htmlgraph plan rewrite-yaml <plan-id> --file /tmp/updated.yaml`
+- **Validate:** `htmlgraph plan validate-yaml <plan-id>`
+
+The `rewrite-yaml` command validates schema, checks meta.id match, and writes atomically.
+Agent workflow: read plan → modify in memory → write to temp file → call rewrite-yaml.
+
 ## Development Principles
 
 - DRY — check for existing utilities before creating new ones

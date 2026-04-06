@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,6 +12,20 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
+
+// commitPlanChange stages and commits a plan YAML file change.
+// Best-effort — failures are logged but do not fail the calling command.
+func commitPlanChange(planPath, message string) {
+	dir := filepath.Dir(planPath)
+	add := exec.Command("git", "add", planPath)
+	add.Dir = dir
+	if err := add.Run(); err != nil {
+		return
+	}
+	commit := exec.Command("git", "commit", "-m", message, "--no-verify")
+	commit.Dir = dir
+	commit.Run()
+}
 
 // planCreateYAMLCmd creates a YAML plan file with empty design, slices,
 // questions, and nil critique. This is the YAML counterpart of "plan create".
@@ -62,6 +77,8 @@ func runPlanCreateYAML(title, description, trackID string) error {
 	if err := planyaml.Save(outPath, plan); err != nil {
 		return fmt.Errorf("save plan YAML: %w", err)
 	}
+
+	commitPlanChange(outPath, fmt.Sprintf("plan(%s): create — %s", planID, title))
 
 	fmt.Println(outPath)
 	return nil
@@ -187,6 +204,8 @@ func runPlanAddSliceYAML(htmlgraphDir, planID, title, what, why, files, doneWhen
 	if err := planyaml.Save(planPath, plan); err != nil {
 		return fmt.Errorf("save plan %q: %w", planID, err)
 	}
+
+	commitPlanChange(planPath, fmt.Sprintf("plan(%s): add slice %d — %s", planID, slice.Num, title))
 
 	fmt.Printf("Slice %d added: %s\n", slice.Num, slice.ID)
 	return nil

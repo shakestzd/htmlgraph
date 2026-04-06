@@ -13,20 +13,8 @@ design:
     Existing tools (spec-kit, Kiro, adr-tools) are either markdown-only, IDE-locked,
     or lack feedback persistence.
   goals:
-  - Let any team define development plans as validated YAML files versioned in git
-  - Provide interactive plan review via marimo notebooks with persistent feedback
-    to SQLite
-  - Run AI critique (single-model in v0.1, dual-agent in v0.2) on plans before human
-    review
-  - Export finalized plans as self-contained static HTML archives
   - Ship as pip-installable Python package with CLI entry points and optional extras
   constraints:
-  - 'Local-first: no external infrastructure required (no Postgres, no Redis, no cloud
-    sync)'
-  - marimo must be optional dependency (core validate/critique/export works without
-    it)
-  - YAML schema must be conservative in v0.1 — changes after adoption break user plans
-  - Must work for solo developers without auth/multi-user features
   - LiteLLM for provider flexibility — no vendor lock-in to specific LLM provider
   approved: true
   comment: ''

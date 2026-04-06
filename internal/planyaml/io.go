@@ -32,12 +32,15 @@ func Load(path string) (*PlanYAML, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read plan YAML: %w", err)
 	}
+	return LoadBytes(data)
+}
 
+// LoadBytes unmarshals a PlanYAML from raw YAML bytes.
+func LoadBytes(data []byte) (*PlanYAML, error) {
 	var plan PlanYAML
 	if err := yaml.Unmarshal(data, &plan); err != nil {
 		return nil, fmt.Errorf("unmarshal plan YAML: %w", err)
 	}
-
 	return &plan, nil
 }
 

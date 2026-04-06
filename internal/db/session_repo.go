@@ -152,6 +152,73 @@ func GetSessionProjectDir(database *sql.DB, sessionID string) string {
 	return projectDir.String
 }
 
+// ToolUseContextRow holds the batch-fetched session + claim fields used by
+// resolveToolUseContext. Replaces three separate queries (GetSession,
+// GetActiveFeatureID, HasActiveClaimByAgent) with a single SQL join.
+type ToolUseContextRow struct {
+	SessionID       string
+	ActiveFeatureID string
+	ParentSessionID string
+	IsSubagent      bool
+	CreatedAt       time.Time
+	// ClaimedItem is the work_item_id of the agent's active claim, or "".
+	ClaimedItem string
+}
+
+// GetToolUseContext fetches the session and active claim for agentID in a
+// single query, replacing three separate reads on the PreToolUse hot path.
+// Returns nil when the session does not exist.
+func GetToolUseContext(db *sql.DB, sessionID, agentID string) (*ToolUseContextRow, error) {
+	row := db.QueryRow(`
+		SELECT s.session_id,
+		       COALESCE(s.active_feature_id, '') AS active_feature_id,
+		       COALESCE(s.parent_session_id, '') AS parent_session_id,
+		       s.is_subagent,
+		       s.created_at,
+		       COALESCE(c.work_item_id, '')       AS claimed_item
+		FROM sessions s
+		LEFT JOIN claims c
+		       ON c.claimed_by_agent_id = ?
+		      AND c.status IN ('proposed','claimed','in_progress','blocked','handoff_pending')
+		WHERE s.session_id = ?
+		LIMIT 1`,
+		agentID, sessionID,
+	)
+
+	r := &ToolUseContextRow{}
+	var createdStr string
+	err := row.Scan(
+		&r.SessionID,
+		&r.ActiveFeatureID,
+		&r.ParentSessionID,
+		&r.IsSubagent,
+		&createdStr,
+		&r.ClaimedItem,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get tool use context %s: %w", sessionID, err)
+	}
+	r.CreatedAt, _ = time.Parse(time.RFC3339, createdStr)
+	return r, nil
+}
+
+// GetActiveFeatureIDForSession returns the active_feature_id for sessionID, or
+// "" when the session has none. Lightweight single-column lookup used by the
+// parent-session fallback in autoCompleteFromCommit.
+func GetActiveFeatureIDForSession(db *sql.DB, sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
+	var id sql.NullString
+	db.QueryRow(
+		`SELECT active_feature_id FROM sessions WHERE session_id = ?`, sessionID,
+	).Scan(&id)
+	return id.String
+}
+
 // nullStr converts an empty string to sql.NullString.
 func nullStr(s string) sql.NullString {
 	if s == "" {
