@@ -348,19 +348,36 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, plan_id, plan_yaml_text):
         _db = str(htmlgraph_dir / "htmlgraph.db") if htmlgraph_dir else None
         _backend = ClaudeChatBackend(plan_context=plan_yaml_text, db_path=_db, plan_id=plan_id)
 
-        # Render prior chat history from SQLite (read-only, above active chat).
+        # Render prior chat history from session transcript (read-only).
         _history = _backend.load_messages()
         if _history:
-            _bubbles = []
+            _html_parts = []
             for _m in _history:
-                _role, _text = _m.get("role", "user"), _m.get("content", "")
+                _role = _m.get("role", "user")
+                _text = _m.get("content", "").replace("<", "&lt;").replace(">", "&gt;")
+                # Truncate long messages for sidebar readability.
+                _preview = _text[:300] + ("..." if len(_text) > 300 else "")
                 if _role == "user":
-                    _bubbles.append(mo.md(f"> **You:** {_text}"))
+                    _html_parts.append(
+                        f'<div style="margin:6px 0;padding:8px 12px;background:#3b82f6;'
+                        f'color:#fff;border-radius:12px 12px 4px 12px;font-size:13px;'
+                        f'line-height:1.4;margin-left:20%">{_preview}</div>'
+                    )
                 else:
-                    _bubbles.append(mo.md(f"> **Assistant:** {_text}"))
-            _items.append(mo.accordion(
-                {"Prior conversation": mo.vstack(_bubbles)}, lazy=True,
-            ))
+                    _html_parts.append(
+                        f'<div style="margin:6px 0;padding:8px 12px;'
+                        f'background:var(--marimo-monochrome-100,#eee);'
+                        f'color:var(--marimo-monochrome-900,#1a1a1a);'
+                        f'border-radius:12px 12px 12px 4px;font-size:13px;'
+                        f'line-height:1.4;margin-right:10%">{_preview}</div>'
+                    )
+            _count = len(_history)
+            _items.append(mo.accordion({
+                f"Prior conversation ({_count} messages)": mo.Html(
+                    f'<div style="max-height:300px;overflow-y:auto;padding:4px">'
+                    f'{"".join(_html_parts)}</div>'
+                ),
+            }))
 
         def _chat_model(messages, config):
             """Streaming model: yield text deltas, persist after each exchange."""
