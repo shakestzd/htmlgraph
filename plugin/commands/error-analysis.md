@@ -43,7 +43,6 @@ This command follows a research-first debugging methodology: capture the error, 
 
 ### Implementation:
 
-```
 **DO THIS:**
 
 1. **Capture error details:**
@@ -88,9 +87,14 @@ This command follows a research-first debugging methodology: capture the error, 
    - Stack traces
 
 4. **Document error details in HtmlGraph:**
+   Run `htmlgraph track list` to find the appropriate track. If none applies, omit `--track`.
    Use `htmlgraph bug create` to track the error investigation and findings:
    ```bash
    htmlgraph bug create "Error Analysis: {error_category} - {brief_description}" --track <trk-id>
+   ```
+   Then immediately start the bug:
+   ```bash
+   htmlgraph bug start <id>
    ```
 
 5. **Provide systematic investigation prompts:**
@@ -131,40 +135,17 @@ This command follows a research-first debugging methodology: capture the error, 
    - [ ] Review plugin settings
    - [ ] Compare with working configuration
 
-6. **Offer debugging agent integration:**
-   Based on investigation needs:
-
-   ```
-   ## Debugging Resources Available
-
-   **DELEGATION**: Use `Task(subagent_type="htmlgraph:researcher")` for researching documentation and prior art.
+6. **Dispatch codebase investigation:**
+   If the error requires codebase investigation, dispatch the researcher agent immediately.
+   Use `Task(subagent_type="htmlgraph:researcher")` for researching documentation and prior art.
    Use `Task(subagent_type="htmlgraph:debugger")` for systematic error investigation.
    Use `Task(subagent_type="htmlgraph:test-runner")` to validate fixes.
 
-   ### Researcher Agent (htmlgraph:researcher)
-   Use when you need to understand unfamiliar concepts or APIs:
-   - Research Claude Code hook behavior
-   - Look up library documentation
-   - Find best practices for error handling
-
-   ### Debugger Agent (htmlgraph:debugger)
-   Use for systematic error analysis:
-   - Reproduce errors consistently
-   - Isolate root causes
-   - Test hypotheses systematically
-
-   ### Test Runner Agent (htmlgraph:test-runner)
-   Use to validate fixes:
-   - Run quality gates (lint, type, test)
-   - Verify error is resolved
-   - Prevent regression
-   ```
-
 7. **Document investigation workflow:**
 
-   After creating the spike, record progress as you investigate:
+   After creating the bug, record progress as you investigate:
    ```bash
-   htmlgraph spike show <spike-id>
+   htmlgraph bug show <bug-id>
    ```
 
    Follow these investigation steps:
@@ -177,8 +158,7 @@ This command follows a research-first debugging methodology: capture the error, 
    - Document learning
 
 8. **Output structured investigation plan:**
-   Show spike details and next steps
-```
+   Show bug details and next steps
 
 ### Output Format:
 

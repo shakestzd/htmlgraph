@@ -2,12 +2,7 @@
 
 Perform structured research before planning implementation. Uses WebSearch to gather best practices, patterns, and solutions from the web.
 
-**DELEGATION**: This command delegates research to `Task(subagent_type="htmlgraph:researcher")`.
-The researcher agent will:
-1. Search the web first (official docs, GitHub issues, Stack Overflow)
-2. Query HtmlGraph database for institutional memory
-3. Search local codebase for relevant patterns
-4. Return structured findings
+Claude performs the searches directly using WebSearch — this is not delegated to a subagent.
 
 ## Usage
 
@@ -29,7 +24,7 @@ The researcher agent will:
 Research WebSocket patterns and document findings
 
 ```bash
-/htmlgraph:research "JWT token security 2025" --spike spike-abc123
+/htmlgraph:research "JWT token security" --spike spike-abc123
 ```
 Research JWT security and attach findings to existing spike
 
@@ -55,7 +50,7 @@ This command implements the mandatory research phase. Research reduces:
    Use WebSearch to gather information:
 
    ```
-   Search 1: "{topic} best practices 2025"
+   Search 1: "{topic} best practices"
    Search 2: "{topic} implementation patterns"
    Search 3: "{topic} common pitfalls"
    ```
@@ -83,13 +78,15 @@ This command implements the mandatory research phase. Research reduces:
    ```
    Record findings by presenting them in the structured format below, referencing the spike ID.
 
+   Note: spike findings are captured in the chat output. Run `htmlgraph spike complete <id>` when investigation is done.
+
    Otherwise, present findings in structured format.
 
 5. **Validate research quality:**
    Check that findings include:
    - ✅ At least 3 different sources
    - ✅ Specific recommendations (not vague)
-   - ✅ Modern practices (2025-2026)
+   - ✅ Modern practices (current year)
    - ✅ Code examples or patterns
    - ✅ Links to sources
 
@@ -145,7 +142,7 @@ Key points:
 
 ### Research Validated
 - ✅ Multiple sources consulted
-- ✅ Modern practices (2025-2026)
+- ✅ Modern practices (current year)
 - ✅ Specific recommendations provided
 - ✅ Code patterns identified
 - ✅ Links documented
@@ -174,7 +171,7 @@ Before completing research, verify:
 
 - [ ] **Breadth:** Covered multiple aspects (implementation, security, performance)
 - [ ] **Depth:** Specific recommendations, not generic advice
-- [ ] **Currency:** Sources from 2025-2026, not outdated
+- [ ] **Currency:** Sources are current, not outdated
 - [ ] **Practical:** Code examples or concrete patterns
 - [ ] **Traceable:** Links to all sources
 - [ ] **Structured:** Findings organized clearly

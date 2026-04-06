@@ -33,11 +33,13 @@ Start dashboard on port 3000
 
 **DO THIS:**
 
-1. **Start the dashboard server:**
+1. **Start the dashboard server in the background:**
    ```bash
-   htmlgraph serve --port {port}
+   htmlgraph serve --port {port} &
    ```
    Default port is 8080 if not specified.
+
+   Note: `htmlgraph serve` blocks the terminal if run in the foreground. Use `&` to background it, or run it in a separate terminal if you need to see its output.
 
 2. **Present dashboard information** using the output template below.
 
@@ -48,8 +50,8 @@ Start dashboard on port 3000
    - Dependency graph visualization
 
 4. **Provide stop instructions:**
-   - Server runs in background until stopped
-   - Press Ctrl+C to stop if running in foreground
+   - If backgrounded: `kill %1` or `kill $(lsof -ti :{port})`
+   - If running in a separate terminal: press Ctrl+C in that terminal
 
 ### Output Format:
 
@@ -62,4 +64,4 @@ The dashboard shows:
 - Session history with activity logs
 - Graph visualization of dependencies
 
-To stop: press Ctrl+C or kill the background process.
+Server is running in the background. To stop: `kill %1` or `kill $(lsof -ti :{port})`.

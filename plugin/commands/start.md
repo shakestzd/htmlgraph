@@ -55,10 +55,10 @@ Begin a new development session and choose what to work on
 
 5. **Ask the user what they want to work on** with data-driven options
 
-6. **Wait for user direction** before taking any action
+6. **Wait for user direction** before taking any action. If invoked programmatically (no human in the loop), use the top recommendation from `htmlgraph recommend` automatically instead of waiting.
 
 7. **Apply constraints:**
-   - Maximum 3 features can be in progress (WIP limit)
+   - Maximum 5 features can be in progress (WIP limit)
    - Prioritize unblocking bottlenecks
    - Prioritize finishing existing work over starting new
    - Use CLI for all operations
@@ -68,7 +68,6 @@ Begin a new development session and choose what to work on
    - All activity is automatically tracked to features
    - View progress in browser: `htmlgraph serve` → http://localhost:8080
    - Use `/htmlgraph:plan` to start new work with proper planning
-```
 
 ### Output Format:
 

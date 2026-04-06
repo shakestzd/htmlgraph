@@ -38,22 +38,30 @@ Spike linked to a track
 
 ### Implementation:
 
+Run spike create, passing `--description` and `--track` when provided:
+
 ```bash
-htmlgraph spike create "{title}"
+htmlgraph spike create "{title}" [--description "{description}"] [--track {track_id}]
+```
+
+Then immediately start the spike:
+
+```bash
+htmlgraph spike start {id}
 ```
 
 Present the spike ID and title from CLI output using the output template below.
 
 ### Output Format:
 
-## Spike Created
+## Spike Created and Started
 
 **ID:** {id}
 **Title:** {title}
-**Status:** {status}
+**Status:** in_progress
 **Timebox:** {timebox_hours} hours
 
 ### Steps
 {steps}
 
-Spike is now active. Complete the steps to finish planning.
+Spike is active. Complete the steps to finish planning.
