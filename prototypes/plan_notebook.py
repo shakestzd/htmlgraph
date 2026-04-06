@@ -398,7 +398,8 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
             "and ensure `claude` is on PATH, or set `ANTHROPIC_API_KEY`."), kind="warn"))
     else:
         _db = str(htmlgraph_dir / "htmlgraph.db") if htmlgraph_dir else None
-        _backend = ClaudeChatBackend(plan_context=plan_yaml_text, db_path=_db, plan_id=plan_id)
+        _project_dir = str(htmlgraph_dir.parent) if htmlgraph_dir else None
+        _backend = ClaudeChatBackend(plan_context=plan_yaml_text, db_path=_db, plan_id=plan_id, project_dir=_project_dir)
 
         # Render prior chat history from session transcript (read-only).
         _history = _backend.load_messages()

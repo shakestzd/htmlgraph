@@ -25,8 +25,10 @@ from typing import Optional
 class ClaudeChatBackend:
     """Headless Claude chat backend using subprocess or Anthropic API fallback.
 
-    Session persistence: session_id is stored in SQLite plan_feedback table
-    so conversations survive process restarts.
+    Session persistence: sessions are named with the plan_id so they survive
+    notebook restarts. The subprocess cwd is set to the project root (parent of
+    HTMLGRAPH_DIR) so Claude Code binds the session to the real project, not the
+    temp dir where the notebook files are extracted.
 
     Prompt injection defense: plan_context is wrapped in <plan-context> XML tags
     and injected via --append-system-prompt, not the user message.
@@ -37,17 +39,23 @@ class ClaudeChatBackend:
         plan_context: str,
         db_path: Optional[str] = None,
         plan_id: Optional[str] = None,
+        project_dir: Optional[str] = None,
     ) -> None:
         """
         Args:
             plan_context: Full plan YAML text + critique synthesis + approval state.
             db_path: Path to htmlgraph.db for session persistence (optional).
-            plan_id: Plan ID for SQLite lookup (optional).
+            plan_id: Plan ID for SQLite lookup and session naming (optional).
+            project_dir: Project root directory for claude subprocess cwd (optional).
+                         Derived from HTMLGRAPH_DIR parent. If not set, the subprocess
+                         inherits the current working directory (temp dir).
         """
         self.plan_context = plan_context
         self.db_path = db_path
         self.plan_id = plan_id
+        self.project_dir = project_dir
         self.session_id: Optional[str] = None
+        self._first_message = True
         self._load_session_id()
 
     # ------------------------------------------------------------------
@@ -142,7 +150,12 @@ class ClaudeChatBackend:
             self._build_system_prompt(),
         ]
         if self.session_id:
+            # Resume existing session by UUID.
             cmd += ["--resume", self.session_id]
+        elif self.plan_id and self._first_message:
+            # First message in a new session: try resuming by plan name.
+            # If no session exists with this name, Claude creates one.
+            cmd += ["--resume", self.plan_id]
         return cmd
 
     @staticmethod
@@ -157,16 +170,23 @@ class ClaudeChatBackend:
             output_queue.put(None)  # sentinel — stream ended
 
     def _send_via_subprocess(self, message: str) -> Generator[str, None, None]:
-        """Invoke claude CLI and stream text deltas."""
+        """Invoke claude CLI and stream text deltas.
+
+        The subprocess cwd is set to project_dir (the real project root) so
+        Claude Code binds the session to the project, not the temp notebook dir.
+        """
         cmd = self._build_cmd(message)
+        self._first_message = False
+        popen_kwargs: dict = dict(
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        if self.project_dir and os.path.isdir(self.project_dir):
+            popen_kwargs["cwd"] = self.project_dir
         try:
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-            )
+            proc = subprocess.Popen(cmd, **popen_kwargs)
         except FileNotFoundError as exc:
             raise RuntimeError(f"Failed to start claude CLI: {exc}") from exc
 
@@ -317,7 +337,12 @@ class ClaudeChatBackend:
     # ------------------------------------------------------------------
 
     def save_messages(self, messages: list) -> None:
-        """Persist chat messages to SQLite for history display on reload."""
+        """Accumulate chat messages in SQLite for history display on reload.
+
+        Loads existing history first and appends only new messages (those not
+        already in the stored list). This prevents overwriting earlier exchanges
+        when mo.ui.chat calls this with only the current turn's messages.
+        """
         if not self.plan_id:
             return
         conn = self._db_conn()
@@ -326,11 +351,34 @@ class ClaudeChatBackend:
         try:
             import json as _json
 
-            serialized = _json.dumps([
+            # Load existing history.
+            existing = []
+            row = conn.execute(
+                "SELECT value FROM plan_feedback "
+                "WHERE plan_id = ? AND section = 'chat' AND action = 'messages'",
+                (self.plan_id,),
+            ).fetchone()
+            if row:
+                try:
+                    existing = _json.loads(row[0])
+                except (ValueError, TypeError):
+                    existing = []
+
+            # Normalize incoming messages.
+            incoming = [
                 {"role": getattr(m, "role", m.get("role", "user")),
-                 "content": getattr(m, "content", m.get("content", ""))}
+                 "content": str(getattr(m, "content", m.get("content", "")))}
                 for m in messages
-            ])
+            ]
+
+            # Append only messages not already stored (compare role+content).
+            existing_set = {(m["role"], m["content"]) for m in existing}
+            for m in incoming:
+                if (m["role"], m["content"]) not in existing_set:
+                    existing.append(m)
+                    existing_set.add((m["role"], m["content"]))
+
+            serialized = _json.dumps(existing)
             conn.execute(
                 """INSERT OR REPLACE INTO plan_feedback
                        (plan_id, section, action, value, question_id, updated_at)
@@ -344,18 +392,10 @@ class ClaudeChatBackend:
             conn.close()
 
     def load_messages(self) -> list[dict]:
-        """Load chat history from Claude session JSONL transcript.
+        """Load chat history from SQLite (authoritative source).
 
-        Falls back to SQLite-persisted messages if session file not found.
-        Returns list of {role, content} dicts.
+        Returns list of {role, content} dicts accumulated across all sessions.
         """
-        # Primary: read from Claude CLI session transcript.
-        if self.session_id:
-            msgs = self._load_from_session_jsonl()
-            if msgs:
-                return msgs
-
-        # Fallback: SQLite-persisted messages.
         if not self.plan_id:
             return []
         conn = self._db_conn()
@@ -376,38 +416,3 @@ class ClaudeChatBackend:
         finally:
             conn.close()
         return []
-
-    def _load_from_session_jsonl(self) -> list[dict]:
-        """Parse Claude CLI session JSONL for user/assistant message pairs."""
-        import json as _json
-        from pathlib import Path as _P
-
-        # Session files live under ~/.claude/projects/<project-key>/<session_id>.jsonl
-        claude_dir = _P.home() / ".claude"
-        matches = list(claude_dir.glob(f"projects/*/{self.session_id}.jsonl"))
-        if not matches:
-            return []
-        try:
-            messages = []
-            for line in matches[0].read_text().splitlines():
-                if not line.strip():
-                    continue
-                event = _json.loads(line)
-                etype = event.get("type", "")
-                if etype == "user":
-                    content = event.get("message", {}).get("content", "")
-                    if isinstance(content, str) and content:
-                        messages.append({"role": "user", "content": content})
-                elif etype == "assistant":
-                    blocks = event.get("message", {}).get("content", [])
-                    text_parts = [
-                        b.get("text", "")
-                        for b in blocks
-                        if isinstance(b, dict) and b.get("type") == "text"
-                    ]
-                    text = "".join(text_parts)
-                    if text:
-                        messages.append({"role": "assistant", "content": text})
-            return messages
-        except Exception:
-            return []
