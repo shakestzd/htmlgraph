@@ -85,6 +85,47 @@ func validateWorkItem(trackID, featureID, projectRoot string) (id, kind string, 
 	}
 }
 
+// excludeHtmlgraphFromWorktree adds .htmlgraph/ to the worktree's local git exclude file.
+// In git worktrees, .git is a file (not a directory) containing "gitdir: <path>".
+// The actual git metadata is at the gitdir path, so the exclude file is at gitdir/info/exclude.
+// Best-effort: errors are printed but do not abort.
+func excludeHtmlgraphFromWorktree(worktreePath string) {
+	gitFile := filepath.Join(worktreePath, ".git")
+	content, err := os.ReadFile(gitFile)
+	if err != nil {
+		fmt.Printf("  Warning: could not read .git file for exclude setup: %v\n", err)
+		return
+	}
+
+	// Parse the gitdir from the .git file
+	gitdirLine := strings.TrimSpace(string(content))
+	gitdir := strings.TrimPrefix(gitdirLine, "gitdir: ")
+	if gitdir == gitdirLine {
+		// No gitdir prefix found — not a worktree
+		return
+	}
+
+	excludePath := filepath.Join(gitdir, "info", "exclude")
+
+	// Ensure info/ directory exists
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0755); err != nil {
+		fmt.Printf("  Warning: could not create exclude directory: %v\n", err)
+		return
+	}
+
+	// Append .htmlgraph/ to the exclude file
+	f, err := os.OpenFile(excludePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("  Warning: could not open exclude file: %v\n", err)
+		return
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString("\n.htmlgraph/\n"); err != nil {
+		fmt.Printf("  Warning: could not write to exclude file: %v\n", err)
+	}
+}
+
 // createFeatureWorktree creates a git worktree at .claude/worktrees/<featureID> on branch
 // yolo-<featureID>. If the worktree path already exists it is reused. Returns the worktree
 // path and a cleanup function that removes the worktree on error.
@@ -110,6 +151,9 @@ func createFeatureWorktree(featureID, projectRoot string) (string, func(), error
 	}
 
 	fmt.Printf("  Worktree: %s (branch: %s)\n", worktreePath, branchName)
+
+	// Exclude .htmlgraph/ from git status — all CLI ops route to main via HTMLGRAPH_PROJECT_DIR.
+	excludeHtmlgraphFromWorktree(worktreePath)
 
 	// Reindex the worktree SQLite so it reflects current HTML state.
 	reindexWorktree(worktreePath)
@@ -146,6 +190,9 @@ func createTrackWorktree(trackID, projectRoot string) (string, func(), error) {
 	}
 
 	fmt.Printf("  Worktree: %s (branch: %s)\n", worktreePath, branchName)
+
+	// Exclude .htmlgraph/ from git status — all CLI ops route to main via HTMLGRAPH_PROJECT_DIR.
+	excludeHtmlgraphFromWorktree(worktreePath)
 
 	// Reindex the worktree SQLite so it reflects current HTML state.
 	reindexWorktree(worktreePath)
