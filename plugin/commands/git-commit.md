@@ -24,7 +24,7 @@ Commit changes using Bash-copilot first, haiku-coder as fallback.
 
 ## Instructions for Claude
 
-Follow this priority order. Never skip straight to direct git — always try earlier paths first.
+**MANDATORY: You MUST follow these steps in order. Do NOT skip to direct git.**
 
 ### Step 1: Analyze what to commit
 
@@ -37,7 +37,17 @@ Select source files to stage. Exclude `.htmlgraph/` directory unless explicitly 
 
 If no message was provided, draft one from the diff using conventional commit format.
 
-### Priority 1: Bash-copilot (preferred)
+### Step 2: Check copilot availability
+
+```bash
+which copilot 2>/dev/null && echo "COPILOT AVAILABLE" || echo "COPILOT NOT FOUND"
+```
+
+**This check is MANDATORY.** You must run it before proceeding.
+
+### Step 3: Commit (follow priority order strictly)
+
+**If copilot is available (Step 2 returned AVAILABLE) — use it:**
 
 ```bash
 copilot -p "Stage files: <list>. Commit with message: '<message>'. Do NOT push." \
@@ -46,9 +56,7 @@ copilot -p "Stage files: <list>. Commit with message: '<message>'. Do NOT push."
 
 If `--push` was passed, add: "Then push to origin." to the prompt.
 
-### Priority 2: Delegate to haiku-coder (fallback)
-
-If copilot is not installed, times out, or errors:
+**Only if copilot failed, timed out, or was not found — delegate to haiku-coder:**
 
 ```text
 Agent(
@@ -58,13 +66,13 @@ Agent(
 )
 ```
 
-### Priority 3: Direct git (last resort)
-
-Only if both above have failed or are unavailable:
+**Only if BOTH copilot and haiku-coder failed — use direct git as last resort:**
 
 ```bash
 git add <files> && git commit -m "<message>"
 ```
+
+**NEVER use direct git without first trying copilot.** If you find yourself writing `git add && git commit` without having run `which copilot` first, STOP and go back to Step 2.
 
 ## Commit Message Format
 
