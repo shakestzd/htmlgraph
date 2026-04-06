@@ -161,7 +161,9 @@ func extractClosingIDs(commitMsg string) []string {
 //  1. Keyword/parenthetical mode (all sessions): when commit message contains
 //     closing keywords or parenthetical work item refs, complete those items.
 //  2. YOLO mode: also complete the session's active feature on any commit,
-//     even without explicit references.
+//     even without explicit references. When the current session has no
+//     FeatureID (e.g. a worktree subagent whose orchestrator started the work
+//     item), falls back to the parent session's active feature.
 //
 // Uses the selfBinary() + exec.Command() pattern to avoid importing workitem.
 func autoCompleteFromCommit(commitMsg string, ctx *toolUseContext, database *sql.DB) []string {
@@ -176,18 +178,26 @@ func autoCompleteFromCommit(commitMsg string, ctx *toolUseContext, database *sql
 	}
 
 	// Mode 2: YOLO auto-complete of active feature (no keywords needed).
-	if ctx.IsYoloMode && ctx.FeatureID != "" {
-		// Don't double-complete if already handled above.
-		alreadyDone := false
-		for _, id := range completed {
-			if id == ctx.FeatureID {
-				alreadyDone = true
-				break
-			}
+	if ctx.IsYoloMode {
+		featureID := ctx.FeatureID
+		// Fallback: worktree subagents may have no FeatureID of their own when
+		// the orchestrator's session started the work item. Check the parent.
+		if featureID == "" && ctx.ParentSessionID != "" {
+			featureID = db.GetActiveFeatureIDForSession(database, ctx.ParentSessionID)
 		}
-		if !alreadyDone {
-			if completeIfInProgress(ctx.FeatureID, database) {
-				completed = append(completed, ctx.FeatureID)
+		if featureID != "" {
+			// Don't double-complete if already handled above.
+			alreadyDone := false
+			for _, id := range completed {
+				if id == featureID {
+					alreadyDone = true
+					break
+				}
+			}
+			if !alreadyDone {
+				if completeIfInProgress(featureID, database) {
+					completed = append(completed, featureID)
+				}
 			}
 		}
 	}

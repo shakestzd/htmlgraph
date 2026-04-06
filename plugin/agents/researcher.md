@@ -21,7 +21,7 @@ skills:
   - agent-context
   - diagnose
 memory: project
-initialPrompt: "Run `htmlgraph agent-init` to load project context, then `htmlgraph snapshot --summary` to orient."
+initialPrompt: "Begin with research and documentation before making changes."
 ---
 
 # Researcher Agent
@@ -49,12 +49,7 @@ WebSearch("Claude Code hook merging behavior")
 WebFetch("https://code.claude.com/docs/en/hooks.md", "How do hooks merge?")
 ```
 
-**2. HtmlGraph Institutional Memory** — query the database for past work before investigating.
-
-```bash
-htmlgraph find "<topic>"
-htmlgraph snapshot --summary
-```
+**2. Project-Specific Tools** — check work tracking and documentation if available.
 
 **3. Official Documentation**
 - Claude Code docs: https://code.claude.com/docs
@@ -70,10 +65,10 @@ claude --debug    # Verbose output
 
 ### Research Checklist
 Before implementing ANY fix:
-- [ ] Has this been researched before? (Query HtmlGraph database)
+- [ ] Has this been researched before? (Check project work tracking if available)
 - [ ] What does official documentation say? (Web search first)
 - [ ] Are there example implementations to reference?
-- [ ] Have I used WebSearch/WebFetch for Claude-specific questions?
+- [ ] Have I used WebSearch/WebFetch for domain-specific questions?
 
 ### Anti-Patterns to Avoid
 - ❌ Multiple trial-and-error attempts before researching
@@ -99,11 +94,11 @@ Before implementing ANY fix:
 6. **Test Hypothesis** — design a specific test to validate or refute; observe and refine
 7. **Implement Fix** — minimal change targeting root cause, not symptoms; verify no regressions
 
-### HtmlGraph Debug Commands
+### Debug Commands
 ```bash
-htmlgraph status
-htmlgraph feature show <id>
-htmlgraph session list --active
+claude --debug <command>   # Verbose output
+/hooks                     # List active hooks
+/doctor                    # System diagnostics
 ```
 
 ### Common Scenarios
@@ -112,7 +107,7 @@ htmlgraph session list --active
 
 **Hook Not Executing** — Verify registration with `/hooks`; validate JSON syntax; test command manually; check `~/.claude/logs/` for errors.
 
-**Orchestrator Not Enforcing** — Run `htmlgraph orchestrator status`; verify "enabled (strict enforcement)"; restart Claude Code if needed.
+**Tests Failing** — Run the test suite and read error messages carefully; isolate one failure at a time; verify the fix doesn't break related tests.
 
 ---
 
@@ -124,7 +119,7 @@ htmlgraph session list --active
 
 ### Workflow
 
-1. **Determine target URL** — use provided URL, or auto-detect by probing ports `5173 3000 4000 8080 8000`
+1. **Determine target URL** — use provided URL, or auto-detect by probing common development ports
 2. **Navigate** to root page via chrome-devtools MCP
 3. **Discover pages** — find navigation links and menu items
 4. **Screenshot** each page (viewport + full-page if scrollable); save to `ui-review/`
@@ -155,9 +150,9 @@ End with a summary table across all pages reviewed.
 
 ---
 
-## Integration with HtmlGraph
+## Core Discipline
 
 All three modes enforce:
 - **Evidence-based decisions** — no guessing
-- **Knowledge capture** — document findings in spikes
-- **Pattern recognition** — learn from past issues via `htmlgraph find`
+- **Research first** — documentation and testing before implementation
+- **Minimal changes** — fix the root cause, not symptoms

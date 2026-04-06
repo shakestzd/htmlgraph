@@ -54,10 +54,11 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	// Guard: block Write/Edit/MultiEdit from subagents when THIS AGENT has no
 	// active claim. Subagents are checked per-agent via claimed_by_agent_id in
-	// the claims table; the orchestrator falls back to session-scoped FeatureID.
+	// the claims table (now supplied by the batch context query); the
+	// orchestrator falls back to session-scoped FeatureID.
 	hasAgentClaim := false
 	if ctx.IsSubagent {
-		hasAgentClaim = db.HasActiveClaimByAgent(database, event.AgentID)
+		hasAgentClaim = ctx.ClaimedItem != ""
 	} else {
 		hasAgentClaim = ctx.FeatureID != ""
 	}
@@ -66,19 +67,33 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	// YOLO mode enforcement: session-scoped attribution check.
-	// Covers Write/Edit/MultiEdit tools directly.
-	if warn := checkYoloWorkItemGuard(event.ToolName, ctx.FeatureID, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
-		return &HookResult{
-			Decision: "block",
-			Reason:   warn,
-		}, nil
+	// Subagents get a short grace period on session start to claim a work item
+	// before the guard fires — the parent session's active feature serves as
+	// confirmation that the orchestrator has already registered intent.
+	subagentGrace := checkYoloSubagentGrace(
+		ctx.IsYoloMode, ctx.IsSubagent,
+		ctx.SessionCreatedAt, ctx.ParentSessionID, database,
+	)
+	if subagentGrace {
+		debugLog(ctx.ProjectDir, "[htmlgraph] subagent grace period active for session %s — allowing write before claim",
+			ctx.SessionID)
 	}
-	// Extend work-item guard to Bash file-write commands (sed -i, rm, redirects, etc.).
-	if warn := checkYoloBashWorkItemGuard(event, ctx.FeatureID, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
-		return &HookResult{
-			Decision: "block",
-			Reason:   warn,
-		}, nil
+
+	// Covers Write/Edit/MultiEdit tools directly.
+	if !subagentGrace {
+		if warn := checkYoloWorkItemGuard(event.ToolName, ctx.FeatureID, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
+			return &HookResult{
+				Decision: "block",
+				Reason:   warn,
+			}, nil
+		}
+		// Extend work-item guard to Bash file-write commands (sed -i, rm, redirects, etc.).
+		if warn := checkYoloBashWorkItemGuard(event, ctx.FeatureID, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
+			return &HookResult{
+				Decision: "block",
+				Reason:   warn,
+			}, nil
+		}
 	}
 
 	if ctx.IsYoloMode {

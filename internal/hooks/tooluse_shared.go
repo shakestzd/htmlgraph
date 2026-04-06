@@ -38,21 +38,29 @@ func cachedGetActiveFeatureID(database *sql.DB, sessionID string) string {
 
 // toolUseContext holds resolved identifiers shared by PreToolUse and PostToolUse.
 type toolUseContext struct {
-	SessionID     string
-	FeatureID     string
-	AgentID       string
-	AgentType     string
-	IsSubagent    bool
-	ProjectDir    string
-	HgDir         string
-	IsYoloMode    bool
-	ParentEventID string
+	SessionID       string
+	FeatureID       string
+	AgentID         string
+	AgentType       string
+	IsSubagent      bool
+	ProjectDir      string
+	HgDir           string
+	IsYoloMode      bool
+	ParentEventID   string
+	ParentSessionID string // parent session ID for subagent context lookups
+	SessionCreatedAt time.Time // used for subagent grace period
+	ClaimedItem     string // work_item_id of agent's active claim, or ""
 }
 
 // resolveToolUseContext resolves session, feature, agent identifiers, project
 // directory, YOLO mode, and parent event ID from a CloudEvent and database.
 // Returns nil when no active session is found, indicating the caller should
 // skip all DB operations.
+//
+// Item 1 (feat-8b6fdf86): replaces 3 separate queries (GetSession,
+// GetActiveFeatureID, HasActiveClaimByAgent) with a single SQL join via
+// db.GetToolUseContext. The YOLO conditional queries remain separate since
+// they only run in YOLO mode.
 func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext {
 	start := time.Now()
 
@@ -61,9 +69,31 @@ func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext 
 		return nil
 	}
 
-	featureID := cachedGetActiveFeatureID(database, sessionID)
 	agentID := resolveAgentID(event)
 	isSubagent := isSubagentEvent(event)
+
+	// Batch fetch: session row + active claim in one query (Item 1).
+	var (
+		featureID        string
+		parentSessionID  string
+		sessionCreatedAt time.Time
+		claimedItem      string
+	)
+	if row, err := db.GetToolUseContext(database, sessionID, agentID); err == nil && row != nil {
+		featureID = row.ActiveFeatureID
+		parentSessionID = row.ParentSessionID
+		sessionCreatedAt = row.CreatedAt
+		claimedItem = row.ClaimedItem
+		// Keep the process-level cache warm for other callers (missing_events etc.)
+		featureIDCache = featureIDCacheEntry{
+			sessionID: sessionID,
+			featureID: featureID,
+			populated: true,
+		}
+	} else {
+		// Fallback: session not in DB yet (race during session-start).
+		featureID = cachedGetActiveFeatureID(database, sessionID)
+	}
 
 	agentType := event.AgentType
 	if agentType == "" {
@@ -82,15 +112,18 @@ func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext 
 	}, start, "context resolved")
 
 	return &toolUseContext{
-		SessionID:     sessionID,
-		FeatureID:     featureID,
-		AgentID:       agentID,
-		AgentType:     agentType,
-		IsSubagent:    isSubagent,
-		ProjectDir:    projectDir,
-		HgDir:         hgDir,
-		IsYoloMode:    yolo,
-		ParentEventID: parentEventID,
+		SessionID:        sessionID,
+		FeatureID:        featureID,
+		AgentID:          agentID,
+		AgentType:        agentType,
+		IsSubagent:       isSubagent,
+		ProjectDir:       projectDir,
+		HgDir:            hgDir,
+		IsYoloMode:       yolo,
+		ParentEventID:    parentEventID,
+		ParentSessionID:  parentSessionID,
+		SessionCreatedAt: sessionCreatedAt,
+		ClaimedItem:      claimedItem,
 	}
 }
 

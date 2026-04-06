@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/shakestzd/htmlgraph/internal/db"
 )
 
 // yoloModeCache stores per-directory launch-mode results for the lifetime of
@@ -86,6 +89,29 @@ func checkYoloWorkItemGuard(toolName, featureID string, yolo bool, sessionID str
 	}
 	return "YOLO mode requires an active work item before writing code. " +
 		"Run: htmlgraph feature start <id>  or  htmlgraph feature create \"title\" --track <trk-id>"
+}
+
+// yoloSubagentGracePeriod is the window after session start during which a
+// subagent is allowed to write files before claiming a work item. This gives
+// the subagent time to run `htmlgraph feature start <id>` as its first action.
+const yoloSubagentGracePeriod = 30 * time.Second
+
+// checkYoloSubagentGrace returns true when the session qualifies for the
+// subagent grace period: it must be a subagent (nesting_depth > 0 per
+// is_subagent flag), the session must be younger than yoloSubagentGracePeriod,
+// and the parent session must have an active feature. When these conditions
+// hold the caller should allow the write with a warning instead of blocking.
+func checkYoloSubagentGrace(yolo, isSubagent bool, sessionCreatedAt time.Time, parentSessionID string, database *sql.DB) bool {
+	if !yolo || !isSubagent {
+		return false
+	}
+	if time.Since(sessionCreatedAt) >= yoloSubagentGracePeriod {
+		return false
+	}
+	if parentSessionID == "" || database == nil {
+		return false
+	}
+	return db.GetActiveFeatureIDForSession(database, parentSessionID) != ""
 }
 
 // checkYoloBashWorkItemGuard extends the work-item guard to Bash file-write
