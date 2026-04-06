@@ -351,32 +351,23 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, plan_id, plan_yaml_text):
         # Render prior chat history from session transcript (read-only).
         _history = _backend.load_messages()
         if _history:
-            _html_parts = []
+            _bubbles = []
             for _m in _history:
                 _role = _m.get("role", "user")
-                _text = _m.get("content", "").replace("<", "&lt;").replace(">", "&gt;")
-                # Truncate long messages for sidebar readability.
-                _preview = _text[:300] + ("..." if len(_text) > 300 else "")
+                _text = _m.get("content", "")
+                _preview = _text[:500] + ("\n\n..." if len(_text) > 500 else "")
                 if _role == "user":
-                    _html_parts.append(
+                    _esc = _preview.replace("<", "&lt;").replace(">", "&gt;")
+                    _bubbles.append(mo.Html(
                         f'<div style="margin:6px 0;padding:8px 12px;background:#3b82f6;'
                         f'color:#fff;border-radius:12px 12px 4px 12px;font-size:13px;'
-                        f'line-height:1.4;margin-left:20%">{_preview}</div>'
-                    )
+                        f'line-height:1.4;margin-left:20%">{_esc}</div>'
+                    ))
                 else:
-                    _html_parts.append(
-                        f'<div style="margin:6px 0;padding:8px 12px;'
-                        f'background:var(--marimo-monochrome-100,#eee);'
-                        f'color:var(--marimo-monochrome-900,#1a1a1a);'
-                        f'border-radius:12px 12px 12px 4px;font-size:13px;'
-                        f'line-height:1.4;margin-right:10%">{_preview}</div>'
-                    )
+                    _bubbles.append(mo.callout(mo.md(_preview), kind="neutral"))
             _count = len(_history)
             _items.append(mo.accordion({
-                f"Prior conversation ({_count} messages)": mo.Html(
-                    f'<div style="max-height:300px;overflow-y:auto;padding:4px">'
-                    f'{"".join(_html_parts)}</div>'
-                ),
+                f"Prior conversation ({_count} messages)": mo.vstack(_bubbles),
             }))
 
         def _chat_model(messages, config):
