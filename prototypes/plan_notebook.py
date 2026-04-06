@@ -421,8 +421,7 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
                 mo.md(f"## Plan Discussion\n\n*{len(_history)} messages*"),
                 *_bubbles,
             ], width="360px")
-        # No sidebar at all if no chat history in export.
-        return
+        mo.stop(_is_export)  # Skip interactive chat widget in export mode.
 
     # Interactive mode: full chat widget.
     _available, _avail_msg = ClaudeChatBackend.is_available()
