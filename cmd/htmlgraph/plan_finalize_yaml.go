@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/models"
@@ -95,6 +96,15 @@ func runFinalizeYAML(planID string) error {
 			continue
 		}
 		numToFeatID[s.Num] = feat.ID
+
+		// Link feature back to source plan (planned_in).
+		p.Features.AddEdge(feat.ID, models.Edge{
+			TargetID:     planID,
+			Relationship: models.RelPlannedIn,
+			Title:        planID,
+			Since:        time.Now().UTC(),
+		})
+
 		fmt.Printf("  Created feature: %s  %s\n", feat.ID, feat.Title)
 	}
 

@@ -20,6 +20,7 @@ const (
 	RelImplementedIn RelationshipType = "implemented_in"
 	RelPartOf        RelationshipType = "part_of"
 	RelContains      RelationshipType = "contains"
+	RelPlannedIn     RelationshipType = "planned_in"
 )
 
 // ValidRelationshipTypes lists all known relationship types.
@@ -33,6 +34,7 @@ var ValidRelationshipTypes = []RelationshipType{
 	RelImplementedIn,
 	RelPartOf,
 	RelContains,
+	RelPlannedIn,
 }
 
 // relationshipAliases maps convenience short-forms to canonical relationship types.

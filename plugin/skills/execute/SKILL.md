@@ -110,6 +110,21 @@ Each agent receives a self-contained prompt with TDD enforcement.
 ## Step 0: Attribution (FIRST — before any code)
 htmlgraph feature start {metadata.feature_id}
 
+## Plan Context (if available)
+This feature is part of plan {plan_id} on track {track_id}.
+
+**Design decisions affecting this feature:**
+{relevant_design_decisions}
+
+**Critique notes (HIGH/DANGER only):**
+{high_danger_critique_items}
+
+**Sibling features (for awareness, do NOT implement):**
+{sibling_feature_list}
+
+For full plan context: `htmlgraph plan show {plan_id}`
+For track context: `htmlgraph track show {track_id}`
+
 ## Goal
 {task.description}
 
@@ -149,6 +164,23 @@ htmlgraph feature complete {metadata.feature_id}
 
 Report: files changed, lines added, tests passing, test names.
 ```
+
+### Populating Plan Context
+
+When dispatching features that originated from a plan (features with a `planned_in` edge), the orchestrator should inject compact plan context into each agent's prompt. This ensures agents understand the design rationale and constraints without reading the full plan.
+
+**Steps to populate the template variables:**
+
+1. **plan_id / track_id**: Read from the feature's `planned_in` edge (target is the plan ID) and the feature's `part_of` edge (target is the track ID).
+2. **relevant_design_decisions**: Read the plan YAML (`htmlgraph plan show {plan_id}` or `.htmlgraph/plans/{plan_id}.yaml`). Extract answered `questions:` entries that are relevant to this specific slice. Keep to 3-5 lines.
+3. **high_danger_critique_items**: From the plan YAML `critique:` section, extract any HIGH or DANGER severity items that reference this slice or the feature's scope. Omit LOW/MEDIUM items.
+4. **sibling_feature_list**: Run `htmlgraph track show {track_id}` to list all features on the same track. Format as a compact list of ID + title. Mark which are in-progress, done, or todo so the agent knows what is already handled.
+
+**Guidelines:**
+- Keep the injected context to 5-10 lines total. Agents can run `htmlgraph plan show` for details.
+- If no plan exists (feature was created manually), omit the "Plan Context" section entirely.
+- Design decisions prevent agents from making conflicting architectural choices.
+- Critique notes prevent agents from repeating known risks the reviewer flagged.
 
 ---
 

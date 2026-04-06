@@ -125,6 +125,15 @@ func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*fin
 		if err := wireTrackEdges(p, featNode.ID, trackNode.ID, s.title); err != nil {
 			return nil, fmt.Errorf("wire track edges for %s: %w", featNode.ID, err)
 		}
+
+		// Link feature back to source plan (planned_in).
+		plannedIn := models.Edge{
+			TargetID:     planID,
+			Relationship: models.RelPlannedIn,
+			Title:        planID,
+			Since:        time.Now().UTC(),
+		}
+		_, _ = p.Features.AddEdge(featNode.ID, plannedIn)
 	}
 
 	// Link plan to track: plan implemented_in track.
