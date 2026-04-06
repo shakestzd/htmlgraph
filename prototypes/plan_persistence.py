@@ -1,10 +1,11 @@
 """Persistence helpers for CRISPI plan notebooks.
 
-Handles SQLite feedback storage and plan finalization (YAML update + HTML export).
+Handles SQLite feedback storage, amendment tracking, and plan finalization.
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,73 @@ def persist_feedback(
            (plan_id, section, action, value, question_id, updated_at)
            VALUES (?, ?, ?, ?, ?, datetime('now'))""",
         (plan_id, section, action, str(value), question_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _get_db():
+    """Return (sqlite3, db_path) or (None, None) if DB not found."""
+    import os
+    import sqlite3
+
+    env_hg = os.environ.get("HTMLGRAPH_DIR", "")
+    if env_hg and Path(env_hg).exists():
+        hg = Path(env_hg)
+    else:
+        cwd = Path.cwd()
+        candidates = [
+            cwd / ".htmlgraph",
+            cwd.parent / ".htmlgraph",
+            cwd.parent.parent / ".htmlgraph",
+        ]
+        hg = next((p for p in candidates if p.exists()), None)
+    if not hg:
+        return None, None
+    db = hg / "htmlgraph.db"
+    if not db.exists():
+        return None, None
+    return sqlite3, str(db)
+
+
+def persist_amendment(plan_id: str, amendment: dict, amendment_id: str) -> None:
+    """Store a proposed amendment from chat."""
+    persist_feedback(plan_id, "amendment", "proposed", json.dumps(amendment), question_id=amendment_id)
+
+
+def get_amendments(plan_id: str) -> list[dict]:
+    """Retrieve all amendments for a plan with their current status."""
+    sqlite3_mod, db_path = _get_db()
+    if sqlite3_mod is None:
+        return []
+    conn = sqlite3_mod.connect(db_path)
+    conn.row_factory = sqlite3_mod.Row
+    rows = conn.execute(
+        "SELECT action, value, question_id FROM plan_feedback "
+        "WHERE plan_id = ? AND section = 'amendment' ORDER BY created_at ASC",
+        (plan_id,),
+    ).fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        try:
+            val = json.loads(r["value"])
+        except (json.JSONDecodeError, TypeError):
+            val = {}
+        results.append({"id": r["question_id"], "action": r["action"], "value": val})
+    return results
+
+
+def update_amendment_status(plan_id: str, amendment_id: str, new_action: str) -> None:
+    """Change an amendment's status (proposed -> accepted/rejected)."""
+    sqlite3_mod, db_path = _get_db()
+    if sqlite3_mod is None:
+        return
+    conn = sqlite3_mod.connect(db_path)
+    conn.execute(
+        "UPDATE plan_feedback SET action = ?, updated_at = datetime('now') "
+        "WHERE plan_id = ? AND section = 'amendment' AND question_id = ?",
+        (new_action, plan_id, amendment_id),
     )
     conn.commit()
     conn.close()
@@ -111,5 +179,7 @@ def finalize_plan(
         f"**Decisions:**\n{decision_lines}\n\n"
         f"Saved to `{plan_path}` with status: **finalized**"
         f"{export_result}\n\n"
-        f"> Next: run `/htmlgraph:execute` to dispatch approved slices."
+        f"> **Next steps:**\n>\n"
+        f"> 1. `htmlgraph plan finalize-yaml {plan_id}` — create track and features from approved slices\n>\n"
+        f"> 2. `/htmlgraph:execute` — dispatch agents to implement features"
     )

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,14 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
+
+// planAmendment represents a structured amendment directive from the chat review system.
+type planAmendment struct {
+	SliceNum  int    `json:"slice_num"`
+	Field     string `json:"field"`
+	Operation string `json:"operation"`
+	Content   string `json:"content"`
+}
 
 // planFinalizeYAMLCmd creates track + features from approved slices in a YAML plan.
 func planFinalizeYAMLCmd() *cobra.Command {
@@ -63,6 +72,32 @@ func runFinalizeYAML(planID string) error {
 		var section, value string
 		rows.Scan(&section, &value)
 		approvals[section] = strings.EqualFold(value, "true")
+	}
+
+	// Read accepted amendments from SQLite.
+	amendRows, err := db.Query(
+		"SELECT value FROM plan_feedback WHERE plan_id = ? AND section = 'amendment' AND action = 'accepted'",
+		planID,
+	)
+	if err != nil {
+		return fmt.Errorf("query amendments: %w", err)
+	}
+	defer amendRows.Close()
+
+	var amendments []planAmendment
+	for amendRows.Next() {
+		var raw string
+		amendRows.Scan(&raw)
+		var a planAmendment
+		if json.Unmarshal([]byte(raw), &a) == nil {
+			amendments = append(amendments, a)
+		}
+	}
+
+	// Apply accepted amendments to plan slices in memory.
+	applyAmendments(plan, amendments)
+	if len(amendments) > 0 {
+		fmt.Printf("Applied %d amendment(s) to plan\n", len(amendments))
 	}
 
 	// Open project for work item creation.
@@ -149,4 +184,65 @@ func runFinalizeYAML(planID string) error {
 		fmt.Printf("\nExecute:\n  %s\n", cmd)
 	}
 	return nil
+}
+
+// applyAmendments applies accepted amendment directives to plan slices in memory.
+// Amendments are applied in order; later amendments for the same field win.
+func applyAmendments(plan *planyaml.PlanYAML, amendments []planAmendment) {
+	for _, a := range amendments {
+		idx := -1
+		for i, s := range plan.Slices {
+			if s.Num == a.SliceNum {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			fmt.Fprintf(os.Stderr, "  Amendment skipped: slice %d not found\n", a.SliceNum)
+			continue
+		}
+		s := &plan.Slices[idx]
+
+		switch a.Operation {
+		case "add":
+			switch a.Field {
+			case "done_when":
+				s.DoneWhen = append(s.DoneWhen, a.Content)
+			case "files":
+				s.Files = append(s.Files, a.Content)
+			}
+		case "remove":
+			switch a.Field {
+			case "done_when":
+				s.DoneWhen = removeStr(s.DoneWhen, a.Content)
+			case "files":
+				s.Files = removeStr(s.Files, a.Content)
+			}
+		case "set":
+			switch a.Field {
+			case "title":
+				s.Title = a.Content
+			case "what":
+				s.What = a.Content
+			case "why":
+				s.Why = a.Content
+			case "effort":
+				s.Effort = a.Content
+			case "risk":
+				s.Risk = a.Content
+			}
+		}
+		fmt.Printf("  Applied amendment: slice-%d %s %s\n", a.SliceNum, a.Operation, a.Field)
+	}
+}
+
+// removeStr returns a new slice with all occurrences of target removed.
+func removeStr(slice []string, target string) []string {
+	result := make([]string, 0, len(slice))
+	for _, s := range slice {
+		if s != target {
+			result = append(result, s)
+		}
+	}
+	return result
 }
