@@ -1,0 +1,14 @@
+Timestamp: 2026-01-13T04:10:18.852838
+Context: {'command': 'report', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 124, in main
+    command.run(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 650, in run
+    result = self.execute()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/report.py", line 115, in execute
+    session_data = self._get_session_data(conn, session_id)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/report.py", line 218, in _get_session_data
+    duration = datetime.now() - start
+TypeError: can't subtract offset-naive and offset-aware datetimes

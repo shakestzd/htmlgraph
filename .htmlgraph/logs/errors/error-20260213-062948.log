@@ -1,0 +1,26 @@
+Timestamp: 2026-02-13T06:29:48.989742
+Context: {'command': 'session', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 125, in main
+    command.run(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 672, in run
+    result = self.execute()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/sessions.py", line 167, in execute
+    session = sdk.start_session(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/session/manager.py", line 72, in start_session
+    return self.session_manager.start_session(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_manager.py", line 227, in start_session
+    return self._lifecycle.start_session(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py", line 126, in start_session
+    self.normalize_active_sessions()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py", line 86, in normalize_active_sessions
+    canonical = self._choose_canonical_active_session(sessions)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py", line 57, in _choose_canonical_active_session
+    return max(sessions, key=lambda s: s.created_at)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py", line 57, in <lambda>
+    return max(sessions, key=lambda s: s.created_at)
+  File "/Users/shakes/DevProjects/htmlgraph/.venv/lib/python3.10/site-packages/pydantic/main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'Session' object has no attribute 'created_at'

@@ -1,0 +1,10 @@
+Timestamp: 2026-01-14T12:07:23.347826
+Context: {'command': 'serve', 'port': 8080}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 243, in execute
+    result = start_fastapi_server(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py", line 101, in start_fastapi_server
+    raise PortInUseError(
+htmlgraph.operations.fastapi_server.PortInUseError: Port 8080 is already in use. Use auto_port=True or choose a different port.

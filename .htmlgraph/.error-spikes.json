@@ -1,0 +1,452 @@
+{
+  "unknown:No error message": {
+    "spike_id": "spk-2c7170e9",
+    "created": "2026-01-01T16:37:41.702179",
+    "occurrences": 3
+  },
+  "Bash:Exit code 2\nusage: htmlgraph [-h] [--format {text,json}] [--quiet] [--verbose]\n                 {ser": {
+    "spike_id": "spk-e9debd38",
+    "created": "2026-01-04T05:03:08.044830",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\n\u001b[1m============================= test session starts ==============================\u001b[0m": {
+    "spike_id": "spk-1475f8ec",
+    "created": "2026-01-04T05:46:18.891660",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\n\ud83d\udd0d Running pre-commit checks...\n  \u2192 ruff check...\nAll checks passed!\n  \u2192 ruff format --ch": {
+    "spike_id": "spk-90e72288",
+    "created": "2026-01-04T07:51:49.957246",
+    "occurrences": 3
+  },
+  "Read:EISDIR: illegal operation on a directory, read": {
+    "spike_id": "spk-c3a1bca6",
+    "created": "2026-01-04T16:05:24.379424",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1": {
+    "spike_id": "spk-4503e53a",
+    "created": "2026-01-04T16:05:42.704047",
+    "occurrences": 53
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"/Users/shakes/DevProjects/htmlgraph/src/pytho": {
+    "spike_id": "spk-c86397a1",
+    "created": "2026-01-04T17:42:44.975607",
+    "occurrences": 3
+  },
+  "Bash:Exit code 2": {
+    "spike_id": "spk-ead5e716",
+    "created": "2026-01-04T17:45:41.032688",
+    "occurrences": 8
+  },
+  "Bash:Exit code 1\n   Building htmlgraph @ file:///Users/shakes/DevProjects/htmlgraph\n      Built htmlgraph": {
+    "spike_id": "spk-8f6c43ef",
+    "created": "2026-01-04T19:05:35.655218",
+    "occurrences": 3
+  },
+  "Read:File content (61230 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-b76569df",
+    "created": "2026-01-04T19:27:52.703552",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 7, in <module>\nAttributeError": {
+    "spike_id": "spk-88143ce4",
+    "created": "2026-01-04T19:30:01.822913",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 8, in <module>\nAttributeError": {
+    "spike_id": "spk-fe90985b",
+    "created": "2026-01-04T19:31:51.257661",
+    "occurrences": 4
+  },
+  "Read:File content (60352 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-34cc9599",
+    "created": "2026-01-04T22:37:02.371744",
+    "occurrences": 4
+  },
+  "Read:File content (60398 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-c1243d9d",
+    "created": "2026-01-04T22:38:48.333488",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nsrc/python/htmlgraph/cli_framework.py:84: error: Function is missing a return type annot": {
+    "spike_id": "spk-a892f842",
+    "created": "2026-01-04T22:46:44.437526",
+    "occurrences": 4
+  },
+  "Read:File content (61904 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-bdab6aa8",
+    "created": "2026-01-04T23:27:08.941492",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nsrc/python/htmlgraph/config.py:14: error: Class cannot subclass \"BaseSettings\" (has type": {
+    "spike_id": "spk-7e53b685",
+    "created": "2026-01-05T00:26:06.861791",
+    "occurrences": 4
+  },
+  "Read:File content (35735 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-38528a33",
+    "created": "2026-01-05T01:33:56.908146",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nF841 Local variable `state1` is assigned to but never used\n   --> tests/integration/test": {
+    "spike_id": "spk-d0a22a05",
+    "created": "2026-01-05T05:31:14.000579",
+    "occurrences": 4
+  },
+  "Read:File content (64721 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-288a3855",
+    "created": "2026-01-05T05:53:14.582641",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_navigate:### Result\nError: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8080/\nCall log:\n\u001b[2m  -": {
+    "spike_id": "spk-f97b8b1e",
+    "created": "2026-01-05T06:04:20.525312",
+    "occurrences": 4
+  },
+  "Read:File content (46398 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-bd716f60",
+    "created": "2026-01-05T06:51:34.700026",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 /User": {
+    "spike_id": "spk-0fe14212",
+    "created": "2026-01-05T07:30:35.234294",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 8, in <module>\nTypeError: can": {
+    "spike_id": "spk-cb800421",
+    "created": "2026-01-06T03:24:48.903217",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_navigate:### Result\nError: Browser is already in use for /Users/shakes/Library/Caches/ms-playwright/mcp-chrom": {
+    "spike_id": "spk-9e6ef877",
+    "created": "2026-01-06T03:56:36.362211",
+    "occurrences": 4
+  },
+  "Read:File content (52321 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-957fb8d2",
+    "created": "2026-01-06T04:05:50.733369",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 13, in <module>\n  File \"/User": {
+    "spike_id": "spk-f64758d3",
+    "created": "2026-01-06T05:35:03.331982",
+    "occurrences": 4
+  },
+  "Read:File content (54290 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-8291a7a6",
+    "created": "2026-01-06T05:35:47.633163",
+    "occurrences": 8
+  },
+  "Bash:Exit code 1\nF841 Local variable `steps_pct` is assigned to but never used\n   --> analyze_features.py": {
+    "spike_id": "spk-d1a8998e",
+    "created": "2026-01-06T05:38:12.028347",
+    "occurrences": 4
+  },
+  "Read:File content (53031 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-a7574821",
+    "created": "2026-01-06T05:47:47.847763",
+    "occurrences": 6
+  },
+  "Read:File content (64644 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-9def0eac",
+    "created": "2026-01-06T06:09:16.777652",
+    "occurrences": 7
+  },
+  "Bash:Exit code 1\n\ud83d\udd0d Running pre-commit checks...\n  \u2192 ruff check...\nI001 [*] Import block is un-sorted or u": {
+    "spike_id": "spk-d74bd590",
+    "created": "2026-01-06T08:07:04.435791",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/Users": {
+    "spike_id": "spk-442d0fdb",
+    "created": "2026-01-06T08:14:31.405619",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"/Users/shakes/DevProjects/htmlgraph/demo_sdk_": {
+    "spike_id": "spk-70fd33bc",
+    "created": "2026-01-06T08:32:17.430531",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_run_code:### Result\nTimeoutError: locator.textContent: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for": {
+    "spike_id": "spk-c0177894",
+    "created": "2026-01-06T08:32:29.986573",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 10, in <module>\nAttributeErro": {
+    "spike_id": "spk-4ebdaa72",
+    "created": "2026-01-06T09:08:21.200762",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 7, in <module>\nAttributeError:": {
+    "spike_id": "spk-e586564b",
+    "created": "2026-01-06T09:19:57.789204",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 108, in <module>\nAttributeErro": {
+    "spike_id": "spk-33ad151a",
+    "created": "2026-01-06T09:22:05.107173",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nSession sess-fd50862f: Removed 1 stale work item references: ['spk-05ddee15']\nTraceback ": {
+    "spike_id": "spk-42c62a66",
+    "created": "2026-01-06T09:31:38.963960",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"/Users/shakes/DevProjects/htmlgraph/create_de": {
+    "spike_id": "spk-ca2e4711",
+    "created": "2026-01-06T09:48:21.791966",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_navigate:Not connected": {
+    "spike_id": "spk-fb075047",
+    "created": "2026-01-06T09:57:49.601872",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nError: in prepare, no such table: agent_collaboration": {
+    "spike_id": "spk-5108177e",
+    "created": "2026-01-06T09:59:30.909667",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_run_code:Not connected": {
+    "spike_id": "spk-70ac1c16",
+    "created": "2026-01-06T10:01:28.636773",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAttributeError": {
+    "spike_id": "spk-7ae4179b",
+    "created": "2026-01-06T10:11:32.584797",
+    "occurrences": 4
+  },
+  "Bash:Exit code 1\n\ud83d\udd0d Running pre-commit checks...\n  \u2192 ruff check...\nF841 Local variable `sqlite_event_id` i": {
+    "spike_id": "spk-013753cb",
+    "created": "2026-01-06T11:16:30.630925",
+    "occurrences": 4
+  },
+  "Bash:Failed to parse command: Bad substitution: escapeHtml": {
+    "spike_id": "spk-80b62afa",
+    "created": "2026-01-06T13:29:58.238144",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_wait_for:### Result\nTimeoutError: locator.waitFor: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for get": {
+    "spike_id": "spk-ef465836",
+    "created": "2026-01-06T16:19:49.806211",
+    "occurrences": 4
+  },
+  "mcp__plugin_htmlgraph_chrome-devtools__new_page:net::ERR_CONNECTION_REFUSED at http://localhost:8000": {
+    "spike_id": "spk-87d2971f",
+    "created": "2026-01-06T16:58:45.050366",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 7, in <module>\n  File \"/Users/": {
+    "spike_id": "spk-3344bede",
+    "created": "2026-01-07T22:44:52.732931",
+    "occurrences": 4
+  },
+  "mcp__plugin_playwright_playwright__browser_tabs:### Result\nError: Browser is already in use for /Users/shakes/Library/Caches/ms-playwright/mcp-chrom": {
+    "spike_id": "spk-2141f11d",
+    "created": "2026-01-07T23:59:47.288210",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 12, in <module>\n  File \"/User": {
+    "spike_id": "spk-1064c364",
+    "created": "2026-01-08T00:04:05.678218",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 20, in <module>\n  File \"/User": {
+    "spike_id": "spk-2fdbb22c",
+    "created": "2026-01-08T00:21:17.438382",
+    "occurrences": 3
+  },
+  "Bash:Exit code 7": {
+    "spike_id": "spk-31561b85",
+    "created": "2026-01-08T09:55:23.709816",
+    "occurrences": 3
+  },
+  "Read:File content (74410 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-bdb29978",
+    "created": "2026-01-08T13:35:14.915505",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nIndex creation warning: no such column: subagent_type\nIndex creation warning: no such co": {
+    "spike_id": "spk-8510a990",
+    "created": "2026-01-08T14:00:15.614367",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nImportError: c": {
+    "spike_id": "spk-89d3fc24",
+    "created": "2026-01-08T17:14:40.265028",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nExpecting value: line 1 column 1 (char 0)": {
+    "spike_id": "spk-c49b24c7",
+    "created": "2026-01-08T18:07:10.758432",
+    "occurrences": 3
+  },
+  "Read:File content (28797 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit para": {
+    "spike_id": "spk-3c8a6fb3",
+    "created": "2026-01-09T03:56:00.497955",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 19, in <module>\n  File \"/Users": {
+    "spike_id": "spk-dd7f82ab",
+    "created": "2026-01-09T13:45:56.878335",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 6, in <module>\n  File \"/Users/": {
+    "spike_id": "spk-880d3b01",
+    "created": "2026-01-09T13:46:12.434377",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\n\n\u001b[0;34m========================================\u001b[0m\n\u001b[0;34mHtmlGraph Deployment - Versi": {
+    "spike_id": "spk-ee724434",
+    "created": "2026-01-09T13:52:23.524550",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 6, in <module>\n  File \"/Librar": {
+    "spike_id": "spk-8855b960",
+    "created": "2026-01-09T13:57:58.099603",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"<strin": {
+    "spike_id": "spk-8af4ccf6",
+    "created": "2026-01-09T18:14:16.138206",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 5, in <module>\n  File \"/Users": {
+    "spike_id": "spk-d7542a8e",
+    "created": "2026-01-09T19:55:19.802772",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\n\u2718 Failed to update plugin \"htmlgraph\": Plugin \"htmlgraph\" not found\n\nChecking for update": {
+    "spike_id": "spk-e490d3b9",
+    "created": "2026-01-09T20:24:24.274145",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\nNameError: name": {
+    "spike_id": "spk-c2f5f0e5",
+    "created": "2026-01-09T20:38:13.665471",
+    "occurrences": 3
+  },
+  "Bash:No error message": {
+    "spike_id": "spk-7d196fbf",
+    "created": "2026-01-11T18:37:21.886370",
+    "occurrences": 3
+  },
+  "Bash:Exit code 4\nERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecogn": {
+    "spike_id": "spk-9d1c2c78",
+    "created": "2026-02-11T23:15:38.806782",
+    "occurrences": 3
+  },
+  "Bash:Exit code 7\n000": {
+    "spike_id": "spk-ed878d96",
+    "created": "2026-02-11T23:27:49.555586",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nsrc/python/htmlgraph/sessions/features.py:399: error: \"SessionManager\" has no attribute ": {
+    "spike_id": "spk-483cee38",
+    "created": "2026-02-14T18:04:47.206239",
+    "occurrences": 3
+  },
+  "WebFetch:Request failed with status code 404": {
+    "spike_id": "spk-f97c50d1",
+    "created": "2026-03-05T09:39:50.122664",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\n\ud83d\udd0d Running pre-commit checks...\n  \u2192 checking for incomplete systematic changes...\nerror: ": {
+    "spike_id": "spk-a63b3b8b",
+    "created": "2026-03-06T06:19:07.934482",
+    "occurrences": 3
+  },
+  "Bash:Exit code 2\nerror: Failed to spawn: `mypy`\n  Caused by: No such file or directory (os error 2)": {
+    "spike_id": "spk-46c347f4",
+    "created": "2026-03-07T03:23:03.153490",
+    "occurrences": 3
+  },
+  "Read:File does not exist. Note: your current working directory is /Users/shakes/DevProjects/htmlgraph.": {
+    "spike_id": "spk-b7209381",
+    "created": "2026-03-09T00:47:26.981095",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nerror: Your local changes to the following files would be overwritten by merge:\n\t.htmlgr": {
+    "spike_id": "spk-22f72205",
+    "created": "2026-03-10T01:44:04.264352",
+    "occurrences": 3
+  },
+  "Read:File content (30404 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters ": {
+    "spike_id": "spk-d5b45988",
+    "created": "2026-03-11T08:03:16.975546",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 6, in <module>\nAttributeError:": {
+    "spike_id": "spk-bcf69cba",
+    "created": "2026-03-13T13:42:15.639342",
+    "occurrences": 3
+  },
+  "Read:EISDIR: illegal operation on a directory, read '/Users/shakes/DevProjects/htmlgraph/src/python/htmlg": {
+    "spike_id": "spk-86f49294",
+    "created": "2026-03-13T14:05:17.627098",
+    "occurrences": 3
+  },
+  "Bash:Exit code 2\nlsd: /Users/shakes/DevProjects/htmlgraph/.claude/worktrees/agent-a6c0b1ba/.claude/worktr": {
+    "spike_id": "spk-8cf80cf7",
+    "created": "2026-03-13T21:05:07.605898",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nerror: Your local changes to the following files would be overwritten by checkout:\n\t.htm": {
+    "spike_id": "spk-bba8e299",
+    "created": "2026-03-15T10:53:06.808131",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nCannot connect to the Docker daemon at unix:///Users/shakes/.docker/run/docker.sock. Is ": {
+    "spike_id": "spk-240c55e6",
+    "created": "2026-03-21T02:23:44.818560",
+    "occurrences": 3
+  },
+  "Edit:File has been unexpectedly modified. Read it again before attempting to write it.": {
+    "spike_id": "spk-3dbc5db9",
+    "created": "2026-03-21T05:59:43.655636",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nerror: Your local changes to the following files would be overwritten by merge:\n\tuv.lock": {
+    "spike_id": "spk-45136589",
+    "created": "2026-03-21T06:06:05.248639",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nN806 Variable `_PRIORITY_WEIGHT` in function should be lowercase\n   --> src/python/htmlg": {
+    "spike_id": "spk-2e57b16b",
+    "created": "2026-03-21T06:17:10.413711",
+    "occurrences": 3
+  },
+  "Read:EISDIR: illegal operation on a directory, read '/Users/shakes/DevProjects/htmlgraph/packages/claude-": {
+    "spike_id": "spk-0e46df6e",
+    "created": "2026-03-21T17:28:30.363234",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\n\ud83d\udd0d Running pre-commit checks...\n  \u2192 checking for incomplete systematic changes...\n  \u2192 ruf": {
+    "spike_id": "spk-3725c333",
+    "created": "2026-03-21T20:21:12.208384",
+    "occurrences": 3
+  },
+  "Bash:Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nModuleNotFound": {
+    "spike_id": "spk-af78d882",
+    "created": "2026-03-22T00:39:45.272473",
+    "occurrences": 3
+  },
+  "WebFetch:Request failed with status code 403": {
+    "spike_id": "spk-c6369f75",
+    "created": "2026-03-22T14:11:48.309077",
+    "occurrences": 3
+  },
+  "Bash:Exit code 2\nusage: htmlgraph [-h] [--format {json,text,plain}] [--quiet] [--verbose]\n               ": {
+    "spike_id": "spk-e997b36e",
+    "created": "2026-03-23T18:40:37.687270",
+    "occurrences": 4
+  },
+  "Read:File does not exist. Note: your current working directory is /Users/shakes/DevProjects/htmlgraph. Di": {
+    "spike_id": "spk-616eff71",
+    "created": "2026-03-26T08:23:52.836967",
+    "occurrences": 3
+  }
+}

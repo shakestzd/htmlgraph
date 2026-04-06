@@ -1,0 +1,20 @@
+Timestamp: 2026-03-11T14:02:37.198454
+Context: {'command': 'session', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 134, in main
+    command.run(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 672, in run
+    result = self.execute()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/sessions.py", line 440, in execute
+    sdk = self.get_sdk()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 601, in get_sdk
+    self._sdk = SDK(directory=self.graph_dir, agent=self.agent)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/__init__.py", line 203, in __init__
+    self._db = HtmlGraphDB(resolved_db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 76, in __init__
+    self.create_tables()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 123, in create_tables
+    self.connection.commit()
+sqlite3.DatabaseError: database disk image is malformed

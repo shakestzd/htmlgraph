@@ -1,0 +1,31 @@
+Timestamp: 2026-03-10T17:14:13.592003
+Context: {'command': 'serve', 'port': 8081}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 144, in _ensure_database_initialized
+    db = HtmlGraphDB(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 76, in __init__
+    self.create_tables()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 123, in create_tables
+    self.connection.commit()
+sqlite3.DatabaseError: database disk image is malformed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 320, in execute
+    result = start_fastapi_server(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py", line 107, in start_fastapi_server
+    app = create_app(db_path=db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 335, in create_app
+    return get_app(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 198, in get_app
+    _ensure_database_initialized(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 164, in _ensure_database_initialized
+    db = HtmlGraphDB(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 76, in __init__
+    self.create_tables()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 123, in create_tables
+    self.connection.commit()
+sqlite3.DatabaseError: database disk image is malformed

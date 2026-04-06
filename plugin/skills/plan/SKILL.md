@@ -292,6 +292,34 @@ critique:
 
 ---
 
+## Step 4b: Address Critique Findings (MANDATORY before review)
+
+After critique agents return, the orchestrator MUST update the plan to address findings before launching review. The human should review the critique-informed version, not the stale original.
+
+**For each FALSIFIED assumption:**
+- Update the affected slice's `what` and `done_when` to address the falsification
+- Add the corrected understanding to `design.constraints` if it affects the whole plan
+
+**For each HIGH severity risk:**
+- Add the mitigation as a `done_when` criterion on the affected slice
+- If no slice owns the risk, add it to design constraints
+
+**For each missing consideration identified by critics:**
+- Add as a new question (if it's a design choice) or a new constraint (if it's a fact)
+
+**Process:**
+1. Parse both critique outputs for FALSIFIED/HIGH items
+2. Read the current plan YAML
+3. Modify the affected sections in memory
+4. Write to temp file
+5. Run: `htmlgraph plan rewrite-yaml <plan-id> --file /tmp/revised.yaml`
+6. Git auto-commits the revision with message: `plan(<id>): address critique findings`
+7. Proceed to Step 5 (review) with the updated plan
+
+**Skip Step 4b only if:** all assumptions are verified/plausible AND no HIGH severity risks exist.
+
+---
+
 ## Step 5: Open for Human Review (PAUSE HERE)
 
 Launch the marimo notebook for interactive review:

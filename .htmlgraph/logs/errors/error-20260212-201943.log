@@ -1,0 +1,23 @@
+Timestamp: 2026-02-12T20:19:43.582492
+Context: {'command': 'serve', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 221, in from_args
+    config = ServeConfig(
+  File "/Users/shakes/DevProjects/htmlgraph/.venv/lib/python3.10/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ServeConfig
+port
+  Input should be greater than or equal to 1024 [type=greater_than_equal, input_value=500, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 122, in main
+    command = args.func(args)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 230, in from_args
+    raise CommandError(format_validation_error(e))
+htmlgraph.cli.base.CommandError: Validation error:
+  • port: Input should be greater than or equal to 1024

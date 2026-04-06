@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Chat amendments — structured plan feedback from review chat to finalization</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-091f4ce3"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-06T19:36:17.439243"
+             data-updated="2026-04-06T19:36:17.44133" data-agent-assigned="claude-code" data-track-id="trk-84bcad47">
+
+        <header>
+            <h1>Chat amendments — structured plan feedback from review chat to finalization</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-84bcad47.html" data-relationship="part_of" data-since="2026-04-06T19:36:17.441266">trk-84bcad47</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Level 2 chat integration: chat system prompt instructs Claude to format actionable feedback as structured amendments (AMEND slice-5: add done_when ...). Notebook parses these, writes to SQLite as action=amendment. Review UI shows pending amendments for accept/reject. Finalize incorporates accepted amendments into plan YAML before creating features. Closes the feedback loop between review discussion and dispatched work.</p>
+        </section>
+    </article>
+</body>
+</html>

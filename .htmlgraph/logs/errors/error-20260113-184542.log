@@ -1,0 +1,12 @@
+Timestamp: 2026-01-13T18:45:42.347683
+Context: {'command': 'snapshot', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 124, in main
+    command.run(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 676, in run
+    formatter.output(result)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 525, in output
+    sys.stdout.write(result.text)
+BrokenPipeError: [Errno 32] Broken pipe

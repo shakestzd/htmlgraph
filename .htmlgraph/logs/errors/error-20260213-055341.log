@@ -1,0 +1,20 @@
+Timestamp: 2026-02-13T05:53:41.961602
+Context: {'command': 'activity', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 125, in main
+    command.run(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 672, in run
+    result = self.execute()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/activity.py", line 108, in execute
+    entry = sdk.track_activity(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/session/info.py", line 288, in track_activity
+    active = self.session_manager.get_active_session(agent=self._agent_id)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_manager.py", line 270, in get_active_session
+    return self._lifecycle.get_active_session(agent)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py", line 324, in get_active_session
+    active_sessions = self._list_active_sessions()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py", line 45, in _list_active_sessions
+    return [Session.from_node(node) for node in nodes]
+TypeError: 'NoneType' object is not iterable

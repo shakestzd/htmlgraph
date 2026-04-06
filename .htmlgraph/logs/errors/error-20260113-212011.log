@@ -1,0 +1,31 @@
+Timestamp: 2026-01-13T21:20:11.417499
+Context: {'command': 'serve', 'port': 8080}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 139, in _ensure_database_initialized
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+sqlite3.OperationalError: database is locked
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 243, in execute
+    result = start_fastapi_server(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py", line 73, in start_fastapi_server
+    from htmlgraph.api.main import create_app
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 2393, in <module>
+    app = create_app()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 2389, in create_app
+    return get_app(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 184, in get_app
+    _ensure_database_initialized(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 164, in _ensure_database_initialized
+    db = HtmlGraphDB(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 59, in __init__
+    self.create_tables()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 209, in create_tables
+    self._migrate_agent_events_table(cursor)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 87, in _migrate_agent_events_table
+    cursor.execute(
+sqlite3.OperationalError: database is locked

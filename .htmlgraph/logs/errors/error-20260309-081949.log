@@ -1,0 +1,33 @@
+Timestamp: 2026-03-09T08:19:49.230180
+Context: {'command': 'serve', 'port': 8084}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 135, in _ensure_database_initialized
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+  File "/Users/shakes/DevProjects/htmlgraph/.venv/lib/python3.10/site-packages/opentelemetry/instrumentation/dbapi/__init__.py", line 814, in execute
+    return self._self_cursor_tracer.traced_execution(
+  File "/Users/shakes/DevProjects/htmlgraph/.venv/lib/python3.10/site-packages/opentelemetry/instrumentation/dbapi/__init__.py", line 761, in traced_execution
+    return query_method(*args, **kwargs)
+sqlite3.DatabaseError: database disk image is malformed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 320, in execute
+    result = start_fastapi_server(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py", line 107, in start_fastapi_server
+    app = create_app(db_path=db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 335, in create_app
+    return get_app(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 198, in get_app
+    _ensure_database_initialized(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 164, in _ensure_database_initialized
+    db = HtmlGraphDB(db_path)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 75, in __init__
+    self.connect()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py", line 87, in connect
+    apply_sync_pragmas(self.connection)
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/pragmas.py", line 23, in apply_sync_pragmas
+    conn.execute(f"PRAGMA {pragma} = {value}")
+sqlite3.DatabaseError: database disk image is malformed

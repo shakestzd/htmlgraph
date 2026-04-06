@@ -1,0 +1,14 @@
+Timestamp: 2026-02-05T05:49:52.807032
+Context: {'command': 'serve', 'port': 8080}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py", line 244, in execute
+    result = start_fastapi_server(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py", line 74, in start_fastapi_server
+    from htmlgraph.api.main import create_app
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py", line 28, in <module>
+    from htmlgraph.api.cache import QueryCache, init_cache_backend
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/cache.py", line 12, in <module>
+    from fastapi_cache2 import FastAPICache
+ModuleNotFoundError: No module named 'fastapi_cache2'

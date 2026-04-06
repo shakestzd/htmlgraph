@@ -1,0 +1,14 @@
+Timestamp: 2026-02-13T06:05:28.728396
+Context: {'command': 'session', 'cwd': '.htmlgraph'}
+
+--- Traceback ---
+Traceback (most recent call last):
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py", line 125, in main
+    command.run(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py", line 672, in run
+    result = self.execute()
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/sessions.py", line 167, in execute
+    session = sdk.start_session(
+  File "/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/session/manager.py", line 72, in start_session
+    return self.session_manager.start_session(
+TypeError: SessionManager.start_session() got an unexpected keyword argument 'title'

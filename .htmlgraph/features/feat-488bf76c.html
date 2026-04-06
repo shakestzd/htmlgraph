@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Agent drift prevention — periodic plan context re-injection during execution</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-488bf76c"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-06T21:15:03.295901"
+             data-updated="2026-04-06T21:15:03.296903" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Agent drift prevention — periodic plan context re-injection during execution</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-06T21:15:03.296836">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Manus insight: agents lose plan context during long executions as their context fills with code and errors. Add guidance to agent-context skill: before each commit, re-read feature plan context via htmlgraph feature show. Consider PostToolUse hook reminder after N tool calls. Prevents plan drift without full plan injection on every tool call.</p>
+        </section>
+    </article>
+</body>
+</html>
