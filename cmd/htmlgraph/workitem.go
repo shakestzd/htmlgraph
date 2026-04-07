@@ -199,7 +199,7 @@ func runWiSetStatus(typeName, id, status string) error {
 				}
 				_ = dbpkg.ClaimItem(p.DB, claim, 30*time.Minute)
 			}
-			autoImplementedInEdge(col, id, sessionID)
+			autoImplementedInEdge(col, id, sessionID, p.DB)
 		}
 	}
 

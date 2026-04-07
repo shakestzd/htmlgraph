@@ -109,6 +109,46 @@ func TestDeleteEdge(t *testing.T) {
 	}
 }
 
+func TestInsertEdge_SessionToWorkItem(t *testing.T) {
+	database := openTestDB(t)
+
+	// Bidirectional session-to-work-item edges.
+	err := db.InsertEdge(
+		database,
+		"edge-feat-abc-sess-xyz-implemented_in",
+		"feat-abc", "feature", "sess-xyz", "session",
+		"implemented_in", nil,
+	)
+	if err != nil {
+		t.Fatalf("InsertEdge (implemented_in): %v", err)
+	}
+
+	err = db.InsertEdge(
+		database,
+		"edge-sess-xyz-feat-abc-implements",
+		"sess-xyz", "session", "feat-abc", "feature",
+		"implements", nil,
+	)
+	if err != nil {
+		t.Fatalf("InsertEdge (implements): %v", err)
+	}
+
+	var count int
+	database.QueryRow(`SELECT COUNT(*) FROM graph_edges
+		WHERE relationship_type IN ('implemented_in','implements')`).Scan(&count)
+	if count != 2 {
+		t.Errorf("expected 2 session edges, got %d", count)
+	}
+
+	// Verify reverse lookup: session → features.
+	var fromNode string
+	database.QueryRow(`SELECT from_node_id FROM graph_edges
+		WHERE relationship_type = 'implements' AND to_node_id = 'feat-abc'`).Scan(&fromNode)
+	if fromNode != "sess-xyz" {
+		t.Errorf("reverse lookup: got %q, want sess-xyz", fromNode)
+	}
+}
+
 func TestDeleteEdge_NonExistent(t *testing.T) {
 	database := openTestDB(t)
 

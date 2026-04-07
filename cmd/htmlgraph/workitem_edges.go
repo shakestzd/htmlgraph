@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,9 +38,11 @@ func autoCausedByEdge(p *workitem.Project, bugID, featureID string) {
 	_, _ = p.Bugs.AddEdge(bugID, edge)
 }
 
-// autoImplementedInEdge creates an implemented_in edge from a work item to
-// a session. Idempotent: skips if edge already exists. Non-fatal on error.
-func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string) {
+// autoImplementedInEdge creates bidirectional edges between a work item and
+// a session: implemented_in (item→session in HTML+SQLite) and implements
+// (session→item in SQLite only, since sessions have no HTML files).
+// Idempotent: skips if the forward edge already exists. Non-fatal on error.
+func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string, database *sql.DB) {
 	node, err := col.Get(itemID)
 	if err != nil {
 		return
@@ -56,7 +59,15 @@ func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string) {
 		Title:        "session " + sessionID,
 		Since:        time.Now().UTC(),
 	}
-	_, _ = col.AddEdge(itemID, edge)
+	_, _ = col.AddEdge(itemID, edge) // writes HTML + SQLite via dual-write
+
+	// Reverse edge: session→item (SQLite only — sessions have no HTML files).
+	if database != nil {
+		nodeType := kindFromPrefix(itemID)
+		revID := fmt.Sprintf("%s-%s-%s", sessionID, string(models.RelImplements), itemID)
+		_ = dbpkg.InsertEdge(database, revID, sessionID, "session", itemID,
+			nodeType, string(models.RelImplements), nil)
+	}
 }
 
 // autoTrackEdges creates bidirectional part_of/contains edges between a work
