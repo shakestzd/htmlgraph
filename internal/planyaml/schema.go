@@ -21,6 +21,7 @@ type PlanMeta struct {
 	CreatedAt   string `yaml:"created_at"`
 	Status      string `yaml:"status"` // draft | review | finalized
 	CreatedBy   string `yaml:"created_by,omitempty"`
+	Version     int    `yaml:"version"`
 }
 
 // PlanDesign captures the problem statement, goals, constraints, and

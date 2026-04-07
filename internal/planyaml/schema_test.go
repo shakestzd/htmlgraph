@@ -425,6 +425,57 @@ func TestSave_CreatesFile(t *testing.T) {
 	}
 }
 
+func TestNewPlan_VersionDefault(t *testing.T) {
+	p := NewPlan("plan-ver12345", "Version Test", "desc")
+	if p.Meta.Version != 1 {
+		t.Errorf("Meta.Version = %d, want 1", p.Meta.Version)
+	}
+}
+
+func TestSave_IncrementsVersion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "plan-ver.yaml")
+
+	p := NewPlan("plan-ver12345", "Version Test", "desc")
+	// Version starts at 1 from NewPlan
+
+	if err := Save(path, p); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+	// After first Save, version should be 2 (1 + 1 increment)
+	if p.Meta.Version != 2 {
+		t.Errorf("After first save: Meta.Version = %d, want 2", p.Meta.Version)
+	}
+
+	// Save again
+	if err := Save(path, p); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+	if p.Meta.Version != 3 {
+		t.Errorf("After second save: Meta.Version = %d, want 3", p.Meta.Version)
+	}
+
+	// Verify on disk
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if loaded.Meta.Version != 3 {
+		t.Errorf("Loaded version = %d, want 3", loaded.Meta.Version)
+	}
+}
+
+func TestVersion_InYAMLOutput(t *testing.T) {
+	p := NewPlan("plan-ver12345", "Version Test", "desc")
+	data, err := yaml.Marshal(p)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+	if !strings.Contains(string(data), "version: 1") {
+		t.Errorf("Expected 'version: 1' in YAML output, got:\n%s", string(data))
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.yaml")

@@ -6,6 +6,7 @@ Handles SQLite feedback storage, amendment tracking, and plan finalization.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -153,6 +154,7 @@ def finalize_plan(
         notebook_file = plan_path.parent.parent / "prototypes" / "plan_notebook.py"
     export_result = ""
     try:
+        export_env = {**os.environ, "PLAN_EXPORT_MODE": "1"}
         subprocess.run(
             [
                 "marimo", "export", "html", str(notebook_file),
@@ -161,6 +163,7 @@ def finalize_plan(
             ],
             capture_output=True, text=True, timeout=120,
             cwd=str(notebook_file.parent),
+            env=export_env,
         )
         if export_path.exists() and export_path.stat().st_size > 1000:
             export_result = (

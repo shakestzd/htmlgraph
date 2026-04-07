@@ -18,6 +18,7 @@ func NewPlan(id, title, description string) *PlanYAML {
 			Description: description,
 			CreatedAt:   time.Now().UTC().Format("2006-01-02"),
 			Status:      "draft",
+			Version:     1,
 		},
 		Design:    PlanDesign{},
 		Slices:    []PlanSlice{},
@@ -45,7 +46,11 @@ func LoadBytes(data []byte) (*PlanYAML, error) {
 }
 
 // Save marshals the plan to YAML and writes it to the given path.
+// It auto-increments plan.Meta.Version before every write so every
+// mutation is tracked as a distinct revision.
 func Save(path string, plan *PlanYAML) error {
+	plan.Meta.Version++
+
 	data, err := yaml.Marshal(plan)
 	if err != nil {
 		return fmt.Errorf("marshal plan YAML: %w", err)
