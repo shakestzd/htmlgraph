@@ -86,6 +86,136 @@ def risk_badge(risk):
     )
 
 
+def render_plan_header(meta, mo, stat_card_fn):
+    """Render the plan header: title, description, stat cards, and ID/SOURCE accordion."""
+    _slices_count = meta.get("_slices_count", 0)
+    _status = meta["status"].capitalize()
+    _sb, _sf, _sc = STATUS_COLORS.get(meta["status"], STATUS_COLORS["todo"])
+    return mo.vstack([
+        mo.md(f"# Plan: {meta['title']}"),
+        mo.md(f"### {meta.get('description', '')}"),
+        mo.hstack([
+            stat_card_fn("Status", _status, _sb, _sf, _sc),
+            stat_card_fn("Slices", _slices_count, "#f0f4ff", "#1e3a5f", "#93c5fd"),
+            stat_card_fn("Created", meta.get("created_at", ""), "#f0f4ff", "#1e3a5f", "#93c5fd"),
+            stat_card_fn("Version", f"v{meta.get('version', 1)}", "#f5f3ff", "#4c1d95", "#a78bfa"),
+        ], justify="space-between", gap=0.75),
+    ])
+
+
+def render_slice_cards(slices, saved_feedback, effort_badge_fn, risk_badge_fn, mo,
+                       slice_approvals=None):
+    """Render accordion cards for all slices. Returns a dict of accordion items.
+
+    slice_approvals: a mo.ui.dictionary of checkboxes (interactive mode) or None.
+    When None, approval state is read from saved_feedback for static display.
+    """
+    _num_to_title = {s["num"]: s["title"] for s in slices}
+    _cards = {}
+    for _s in slices:
+        _effort = effort_badge_fn(_s["effort"]) if _s.get("effort") else None
+        _risk = risk_badge_fn(_s["risk"]) if _s.get("risk") else None
+        _badges = mo.hstack([b for b in [_effort, _risk] if b], justify="start", gap=0.25)
+
+        if slice_approvals is not None:
+            # Interactive mode: checkbox widget
+            _top_row = mo.hstack([slice_approvals[_s["id"]], _badges], justify="space-between")
+        else:
+            # Static mode: read from saved_feedback
+            _approved_val = saved_feedback.get(f"slice-{_s['num']}:approve", "false").lower() == "true"
+            _a_bg, _a_fg = ("#dcfce7", "#166534") if _approved_val else ("#f3f4f6", "#6b7280")
+            _a_label = "✓ Approved" if _approved_val else "○ Not approved"
+            _approval_badge = mo.Html(
+                f'<span style="display:inline-block;padding:2px 10px;border-radius:12px;'
+                f'font-size:0.8rem;font-weight:500;background:{_a_bg};color:{_a_fg}">'
+                f'{_a_label}</span>'
+            )
+            _top_row = mo.hstack([_approval_badge, _badges], justify="space-between")
+
+        _body = [_top_row]
+        if _s.get("what"):
+            _body.append(mo.md(f"**What:** {_s['what']}"))
+        if _s.get("why"):
+            _body.append(mo.md(f"**Why:** {_s['why']}"))
+        if _s.get("files"):
+            _body.append(mo.md(f"**Files:** {', '.join(f'`{f}`' for f in _s['files'])}"))
+        if _s.get("done_when"):
+            _body.append(mo.md("**Done when:**\n" + "\n".join(f"- {d}" for d in _s["done_when"])))
+        if _s.get("deps"):
+            _body.append(mo.md(
+                f"**Depends on:** {', '.join(_num_to_title.get(d, f'#{d}') for d in _s['deps'])}"
+            ))
+        if _s.get("tests"):
+            _body.append(mo.md(f"**Tests:**\n```\n{_s['tests'].strip()}\n```"))
+        _cards[f"### Slice {_s['num']}: {_s['title']}"] = mo.vstack(_body)
+    return _cards
+
+
+def render_questions(questions, saved_feedback, mo, question_inputs=None):
+    """Render section C: Open Questions.
+
+    question_inputs: a mo.ui.dictionary of radio widgets (interactive mode) or None.
+    When None, answers are read from saved_feedback for static display.
+    Returns rendered vstack output.
+    """
+    def _restore_answer(q):
+        _rec = q.get("recommended", "")
+        _saved = saved_feedback.get(f"questions:answer:{q['id']}") or q.get("answer")
+        _key = _saved or _rec
+        if _key:
+            for opt in q["options"]:
+                if opt["key"] == _key:
+                    lbl = opt["label"]
+                    if _rec and opt["key"] == _rec:
+                        lbl += " ⭐ recommended"
+                    return lbl
+        return None
+
+    _parts = []
+    for _i, _q in enumerate(questions):
+        _desc = _q.get("description", "")
+        _parts.append(mo.md(f"**Q{_i + 1}. {_q['text']}**"))
+        _parts.append(mo.md((f" `{_desc}`" if _desc else "")))
+        if question_inputs is not None:
+            # Interactive mode: radio widget
+            _parts.append(question_inputs[_q["id"]])
+        else:
+            # Static mode: read answer from saved_feedback
+            _answer = _restore_answer(_q)
+            _parts.append(mo.callout(
+                mo.md(f"Answer: {_answer}" if _answer else "_No answer recorded._"),
+                kind="neutral",
+            ))
+        _parts.append(mo.md("---"))
+    return mo.vstack(_parts[:-1])
+
+
+def render_chat_history_bubbles(history, mo):
+    """Render chat messages as styled bubbles.
+
+    User messages appear in blue on the right; assistant messages as neutral callouts.
+    Returns a list of mo.Html / mo.callout elements.
+    """
+    _bubbles = []
+    for _m in history:
+        _role = _m.get("role", "user")
+        _text = _m.get("content", "")
+        # Unescape double-encoded JSON strings (\\n -> \n, \\" -> ")
+        if isinstance(_text, str):
+            _text = _text.replace("\\n", "\n").replace('\\"', '"')
+        _preview = _text
+        if _role == "user":
+            _esc = _preview.replace("<", "&lt;").replace(">", "&gt;")
+            _bubbles.append(mo.Html(
+                f'<div style="margin:6px 0;padding:8px 12px;background:#3b82f6;'
+                f'color:#fff;border-radius:12px 12px 4px 12px;font-size:13px;'
+                f'line-height:1.4;margin-left:20%">{_esc}</div>'
+            ))
+        else:
+            _bubbles.append(mo.callout(mo.md(_preview), kind="neutral"))
+    return _bubbles
+
+
 def render_feedback_summary(plan, design_ok, approved_slices, total_slices,
                             answered_qs, total_qs, answers, questions):
     """Render the feedback summary section (E) and return (vstack, finalize_btn, all_ok)."""
@@ -117,17 +247,23 @@ def render_feedback_summary(plan, design_ok, approved_slices, total_slices,
 
     finalize_btn = mo.ui.run_button(label="Finalize Plan")
 
-    def decision_display(answer):
-        return mo.md(f"**{answer}**") if answer else status_badge("unanswered")
-
-    decisions_table = mo.ui.table(
-        [{"Question": q["text"], "Decision": decision_display(answers.get(q["id"]))}
-         for q in questions],
-        selection=None, label="Decisions Made",
+    _decision_rows = "".join(
+        f"<tr><td style='padding:8px 12px;border-bottom:1px solid #e5e7eb'>{q['text']}</td>"
+        f"<td style='padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600'>"
+        f"{answers.get(q['id']) or '<em>pending</em>'}</td></tr>"
+        for q in questions
+    )
+    decisions_table = mo.Html(
+        f"<div style='margin:8px 0'><strong>Decisions Made</strong>"
+        f"<table style='width:100%;border-collapse:collapse;margin-top:8px'>"
+        f"<thead><tr style='border-bottom:2px solid #d1d5db'>"
+        f"<th style='text-align:left;padding:8px 12px'>Question</th>"
+        f"<th style='text-align:left;padding:8px 12px'>Decision</th></tr></thead>"
+        f"<tbody>{_decision_rows}</tbody></table></div>"
     )
 
     summary = mo.vstack([
-        mo.md("## E. Feedback Summary"),
+        mo.md("**Feedback Summary**"),
         mo.hstack([
             stat_card("Slices", f"{approved_slices}/{total_slices}",
                       "#f0f4ff", "#1e3a5f", "#93c5fd"),
