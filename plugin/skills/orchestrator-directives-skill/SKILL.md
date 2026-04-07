@@ -564,6 +564,33 @@ codex exec "Implement authentication based on auth pattern research findings..."
 </details>
 
 <details>
+<summary><strong>Debugging Delegation Order (Third-Party Libraries)</strong></summary>
+
+## Debugging Delegation Order
+
+When debugging third-party library issues, enforce this order:
+
+1. **Reproduce the failure** — run Bash commands to confirm the error message
+2. **Delegate doc search to researcher** — WebSearch for official docs (FREE via gemini or researcher agent)
+3. **Delegate GitHub issues search to researcher** — check for known issues or recent changes
+4. **Only THEN delegate source code reading** — last resort if docs and issues didn't resolve it
+
+Do NOT delegate source code reading as the first debugging step.
+
+**Pattern:**
+```bash
+# Step 1: Reproduce (direct Bash)
+Bash("run command that triggers the error")
+
+# Step 2 & 3: Delegate research (try gemini CLI first — FREE)
+gemini -p "Search official docs and GitHub issues for: <library> <error message>" \
+  --output-format json --yolo 2>&1
+# fallback → researcher agent with WebSearch
+```
+
+</details>
+
+<details>
 <summary><strong>Error Handling & Retries</strong></summary>
 
 **Let subagents handle retries:**

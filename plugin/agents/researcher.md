@@ -84,6 +84,17 @@ Before implementing ANY fix:
 - Tests are failing or hooks/plugins aren't working as expected
 - Need to trace execution flow or investigate performance
 
+## Debugging & Fault-Finding Order (MANDATORY)
+
+When investigating third-party library behavior, errors, or unexpected results:
+
+1. **Reproduce locally** — confirm the failure, get the actual error message
+2. **Search official documentation** — WebSearch for the library's docs site
+3. **Search GitHub issues/changelog** — check for known issues or recent changes
+4. **Read source code** — only as last resort if docs and issues didn't resolve it
+
+Never skip to reading library source code before checking documentation.
+
 ### Debugging Methodology
 
 1. **Gather Evidence** — enable debug mode (`claude --debug`), check `/hooks`, run `/doctor`, inspect logs at `~/.claude/logs/`

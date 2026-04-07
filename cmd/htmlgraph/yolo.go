@@ -493,6 +493,21 @@ func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []strin
 		}
 	}
 
+	// Ensure worktree has the latest plugin binary.
+	if workDir != projectRoot {
+		srcBin := filepath.Join(projectRoot, "plugin", "hooks", "bin", "htmlgraph")
+		dstBin := filepath.Join(workDir, "plugin", "hooks", "bin", "htmlgraph")
+		if srcInfo, err := os.Stat(srcBin); err == nil {
+			if dstInfo, err := os.Stat(dstBin); err != nil || dstInfo.ModTime().Before(srcInfo.ModTime()) {
+				// Copy only if source is newer or dest doesn't exist.
+				if data, err := os.ReadFile(srcBin); err == nil {
+					os.MkdirAll(filepath.Dir(dstBin), 0o755)       //nolint:errcheck
+					os.WriteFile(dstBin, data, 0o755)               //nolint:errcheck
+				}
+			}
+		}
+	}
+
 	// Disable marketplace plugin to prevent duplicate hooks/agents/skills.
 	fmt.Println("Disabling marketplace htmlgraph plugin...")
 	for _, scope := range []string{"htmlgraph@htmlgraph", "htmlgraph@local-marketplace"} {
