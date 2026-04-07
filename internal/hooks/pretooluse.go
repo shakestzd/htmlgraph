@@ -427,14 +427,6 @@ func toInt(v any) int {
 	return 0
 }
 
-// agentIDFromEnv returns the current agent ID.
-func agentIDFromEnv() string {
-	if v := os.Getenv("HTMLGRAPH_AGENT_ID"); v != "" {
-		return v
-	}
-	return "claude-code"
-}
-
 // checkProjectDivergence compares the CWD of the current event against the
 // project_dir stored in the session row. When they resolve to different
 // .htmlgraph/ roots:

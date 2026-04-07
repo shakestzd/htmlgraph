@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/shakestzd/htmlgraph/internal/agent"
 	"github.com/shakestzd/htmlgraph/internal/db"
 )
 
@@ -134,22 +135,22 @@ func isSubagentEvent(event *CloudEvent) bool {
 }
 
 // resolveAgentID returns the effective agent ID: the CloudEvent agent_id when
-// present (subagent case), falling back to the env-var-based agent identity.
+// present (subagent case), falling back to the detected agent identity.
 func resolveAgentID(event *CloudEvent) string {
 	if event.AgentID != "" {
 		return event.AgentID
 	}
-	return agentIDFromEnv()
+	return agent.Detect().ID
 }
 
 // resolveEventAgentID returns the agent ID from the CloudEvent, falling back
-// to the env-var-based agent identity. Use this for non-tooluse handlers
+// to the detected agent identity. Use this for non-tooluse handlers
 // (Stop, TrackEvent, etc.) that receive a raw CloudEvent.
 func resolveEventAgentID(event *CloudEvent) string {
 	if event.AgentID != "" {
 		return event.AgentID
 	}
-	return agentIDFromEnv()
+	return agent.Detect().ID
 }
 
 // resolveEventAgentType returns the agent type from the CloudEvent, falling
