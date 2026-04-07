@@ -1,0 +1,142 @@
+meta:
+    id: plan-3a88d8a9
+    track_id: trk-06a29a51
+    title: Agent-Agnostic Lazy Session Registration
+    description: Every CLI command self-heals by detecting the agent, resolving a session ID, and registering it on-the-fly. Fixes broken attribution chains when session-start hooks fail to fire and positions HtmlGraph as a multi-agent observability tool beyond just Claude Code.
+    created_at: "2026-04-07"
+    status: draft
+    version: 2
+design:
+    problem: HtmlGraph's attribution chain (work item → session → commit) breaks when the session-start hook fails to fire. This happens when Claude Code sessions restart without triggering hooks, and will always happen for non-Claude agents (Codex, Gemini) that have no hook integration. No global session-ensure mechanism exists today — EnsureSession must be added to 30+ commands individually without a shared insertion point.
+    goals:
+        - Every CLI command lazily registers a session if one is not already active, healing broken attribution chains
+        - Agent detection (Claude Code, Codex, Gemini, human) is centralised in a new internal/agent/ package, not scattered across hook files
+        - PersistentPreRunE on the root cobra command provides a single insertion point covering all subcommands
+        - Hot path (session already exists) adds less than 5ms to any CLI command
+        - Non-Claude agents that have no hook integration get attribution parity with Claude Code
+    constraints:
+        - New internal/agent/ package must not import internal/hooks/ to avoid import cycles
+        - Transient "cli-*" sessions must not pollute the sessions table
+        - PersistentPreRunE must not interfere with subcommands that already have their own PreRunE (cobra chains them)
+        - Hook subtree (hook subcommands) must be skipped — hooks manage their own session lifecycle
+        - Session registration must degrade gracefully when no .htmlgraph/ directory exists
+    approved: false
+    comment: ""
+slices:
+    - id: feat-17a993f0
+      num: 1
+      title: internal/agent/ package — detect.go
+      what: 'New package internal/agent/ with detect.go exporting two functions: Detect() returning Info{ID, Model} (agent detection from env vars with priority HTMLGRAPH_AGENT_ID → CLAUDECODE=1 → fallback "human") and ResolveSessionID() implementing a 4-step fallback chain (HTMLGRAPH_SESSION_ID env → CLAUDE_SESSION_ID env normalised → .active-session file → generate "cli-<PID>-<timestamp>"). NormaliseSessionID() moved from internal/hooks/runner.go into this package to avoid import cycles.'
+      why: Centralised agent detection eliminates the hardcoded "claude-code" fallback in pretooluse.go and provides a single canonical source for session ID resolution. Moving NormaliseSessionID here avoids import cycles when ensure.go (slice 2) calls both functions. Clean separation from hooks package.
+      files:
+        - internal/agent/detect.go
+        - internal/agent/detect_test.go
+        - internal/hooks/runner.go
+      deps: []
+      done_when:
+        - agent.Detect() returns correct ID for each env var combination
+        - agent.ResolveSessionID() returns session ID from each of the 4 fallback steps in priority order
+        - agent.NormaliseSessionID() extracts UUID from session ID strings correctly
+        - internal/hooks/runner.go delegates to agent.NormaliseSessionID() with no behaviour change
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: M
+      risk: Med
+      tests: 'Unit: Detect() returns HTMLGRAPH_AGENT_ID value when set. Unit: Detect() returns "claude-code" when CLAUDECODE=1. Unit: Detect() returns "human" when no env set. Unit: ResolveSessionID() returns HTMLGRAPH_SESSION_ID when set. Unit: ResolveSessionID() falls back to CLAUDE_SESSION_ID and normalises. Unit: ResolveSessionID() reads .active-session file as third fallback. Unit: ResolveSessionID() generates "cli-<PID>-<timestamp>" when all others absent. Unit: NormaliseSessionID() extracts UUID from session ID string. Integration: runner.go delegation produces same output as before the move.'
+      approved: false
+      comment: ""
+    - id: feat-2043d0b4
+      num: 2
+      title: EnsureSession guard — ensure.go
+      what: 'New file internal/agent/ensure.go exporting EnsureSession(db *sql.DB, projectDir string) (string, error). Flow: (1) ResolveSessionID() to get session ID, (2) Detect() to get agent info, (3) if ID starts with "cli-" skip DB and return (transient), (4) SELECT COUNT(*) FROM sessions WHERE session_id = ? hot path indexed PK, (5) if exists set env and return, (6) if missing INSERT OR IGNORE minimal session row + WriteActiveSession() + os.Setenv. Minimal session row: session_id, agent_assigned, created_at, status=active, model, project_dir, git_remote_url. Export WriteActiveSession() and ReadActiveSession() from internal/hooks/session_start.go.'
+      why: Idempotent INSERT OR IGNORE means EnsureSession is safe to call on every CLI invocation. Hot path (session exists) is less than 1ms. Transient "cli-*" IDs skip DB entirely so human CLI usage does not pollute the sessions table. os.Setenv after resolve means downstream EnvSessionID() calls in hook code work automatically without changes.
+      files:
+        - internal/agent/ensure.go
+        - internal/agent/ensure_test.go
+        - internal/hooks/session_start.go
+      deps:
+        - 1
+      done_when:
+        - EnsureSession returns existing session ID without INSERT when session already in DB (hot path)
+        - EnsureSession inserts minimal session row when session missing from DB (cold path)
+        - EnsureSession skips DB entirely for "cli-*" prefixed session IDs
+        - WriteActiveSession() and ReadActiveSession() exported from session_start.go
+        - os.Setenv("HTMLGRAPH_SESSION_ID") called after successful resolution
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: M
+      risk: Low
+      tests: 'Unit: EnsureSession hot path — session exists in DB, returns ID, no INSERT. Unit: EnsureSession cold path — session missing, inserts row, writes .active-session, sets env. Unit: EnsureSession transient — "cli-12345-67890" ID skips DB entirely. Unit: WriteActiveSession writes to correct path. Unit: ReadActiveSession reads back what WriteActiveSession wrote. Integration: cold path creates session retrievable by GetSession.'
+      approved: false
+      comment: ""
+    - id: feat-76121073
+      num: 3
+      title: PersistentPreRunE wiring in main.go
+      what: 'Add PersistentPreRunE to rootCmd in cmd/htmlgraph/main.go before rootCmd.Execute(). Skip list: version, help, init, build, install-hooks, setup, setup-cli. Walk parent chain to skip hook subtree. Call agent.EnsureSession(database, projectDir) after opening DB. Degrade gracefully if findHtmlgraphDir() or db.Open() fails — return nil, not an error.'
+      why: Single insertion point covers all 30+ subcommands without per-command changes. Cobra chains PersistentPreRunE from root with subcommand PreRunE — subcommands are not broken. Graceful degradation is essential — commands like version and help must work outside any project directory.
+      files:
+        - cmd/htmlgraph/main.go
+      deps:
+        - 1
+        - 2
+      done_when:
+        - PersistentPreRunE is registered on rootCmd and called before every non-skipped subcommand
+        - version, help, init, build, install-hooks, setup, setup-cli all skip EnsureSession
+        - hook subcommands skip EnsureSession via parent chain walk
+        - EnsureSession called for feature, bug, session, find, status subcommands
+        - findHtmlgraphDir() failure returns nil (not an error) — works outside projects
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: S
+      risk: Med
+      tests: 'Unit: PersistentPreRunE skips "version" command. Unit: PersistentPreRunE skips "hook" subtree by parent chain walk. Unit: PersistentPreRunE calls EnsureSession for "feature" subcommand. Integration: htmlgraph feature start <id> with no active session creates session lazily. Integration: htmlgraph status outside any project exits 0 with no error.'
+      approved: false
+      comment: ""
+    - id: feat-b1fd2979
+      num: 4
+      title: Refactor existing agent detection to use internal/agent/
+      what: 'Two targeted refactors: (1) internal/hooks/pretooluse.go — replace agentIDFromEnv() local function with agent.Detect().ID, (2) internal/hooks/runner.go — replace inline NormaliseSessionID() with agent.NormaliseSessionID() (moved in slice 1). No behaviour change in either file — pure delegation to the new package.'
+      why: Eliminates duplicate detection logic. agentIDFromEnv() in pretooluse.go hardcodes "claude-code" as fallback — replacing with agent.Detect().ID means future agent additions only require changes in internal/agent/. runner.go already calls NormaliseSessionID — after the move it simply delegates.
+      files:
+        - internal/hooks/pretooluse.go
+        - internal/hooks/runner.go
+      deps:
+        - 1
+      done_when:
+        - pretooluse.go no longer defines agentIDFromEnv() — uses agent.Detect().ID instead
+        - runner.go no longer defines NormaliseSessionID() — delegates to agent.NormaliseSessionID()
+        - All existing hook tests pass with no behaviour change
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: S
+      risk: Low
+      tests: 'Unit: existing pretooluse tests pass after refactor (pure delegation — no new tests). Unit: existing runner tests pass after refactor. Integration: hook attribution produces same agent ID as before the refactor.'
+      approved: false
+      comment: ""
+questions:
+    - id: q-normalise-session-id-location
+      text: Should NormaliseSessionID move to internal/agent/ or stay in internal/hooks/ with a wrapper?
+      description: Moving to internal/agent/ gives clean separation — ensure.go can call it without importing hooks, avoiding the import cycle. Leaving in hooks/ with a thin wrapper in agent/ that delegates would create the exact import cycle we are trying to avoid. Recommended is to move it.
+      recommended: move-to-agent
+      options:
+        - key: move-to-agent
+          label: 'A: Move to internal/agent/ — clean separation, no import cycle'
+        - key: wrapper-in-hooks
+          label: 'B: Leave in hooks/, thin wrapper in agent/ that delegates (creates import cycle)'
+      answer: move-to-agent
+    - id: q-persistent-pre-run-e-vs-pre-run
+      text: Should PersistentPreRunE or PersistentPreRun be used on the root command?
+      description: PersistentPreRunE propagates errors up and cobra chains it with subcommand PreRunE — both root and subcommand hooks are called in sequence. PersistentPreRun (non-error version) cannot return errors. Since EnsureSession degrades gracefully (never returns a fatal error), both technically work. PersistentPreRunE is idiomatic when the function signature matches. Cobra docs confirm it does NOT override subcommand PreRunE.
+      recommended: persistent-pre-run-e
+      options:
+        - key: persistent-pre-run-e
+          label: 'A: PersistentPreRunE — idiomatic, error-aware, cobra chains with subcommand PreRunE'
+        - key: persistent-pre-run
+          label: 'B: PersistentPreRun — non-error version, simpler but less idiomatic'
+      answer: persistent-pre-run-e
+    - id: q-cli-sessions-in-active-session-file
+      text: Should transient "cli-*" sessions be written to the .active-session file?
+      description: Transient sessions are ephemeral by design — human CLI usage should not pollute .active-session. Writing them would overwrite hook-set sessions and break attribution for subsequent hook-managed sessions. The "cli-*" prefix specifically signals skip behaviour in EnsureSession.
+      recommended: no-file-write
+      options:
+        - key: no-file-write
+          label: 'A: No — transient sessions skip file IO entirely (recommended)'
+        - key: yes-file-write
+          label: 'B: Yes — write to .active-session to enable attribution for manual CLI work'
+      answer: no-file-write
