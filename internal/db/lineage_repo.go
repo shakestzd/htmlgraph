@@ -159,7 +159,18 @@ func (s *singleRowResult) Err() error { return s.err }
 
 // InsertGitCommit records a git commit linked to a session and optional feature.
 func InsertGitCommit(database *sql.DB, commit *models.GitCommit) error {
-	_, err := database.Exec(`
+	_, err := insertGitCommit(database, commit)
+	return err
+}
+
+// InsertGitCommitResult records a git commit and returns the number of rows
+// actually inserted (0 when the row already existed, 1 when new).
+func InsertGitCommitResult(database *sql.DB, commit *models.GitCommit) (int64, error) {
+	return insertGitCommit(database, commit)
+}
+
+func insertGitCommit(database *sql.DB, commit *models.GitCommit) (int64, error) {
+	res, err := database.Exec(`
 		INSERT OR IGNORE INTO git_commits (
 			commit_hash, session_id, feature_id, tool_event_id, message, timestamp
 		) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -171,9 +182,10 @@ func InsertGitCommit(database *sql.DB, commit *models.GitCommit) error {
 		commit.Timestamp.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
-		return fmt.Errorf("insert git commit %s: %w", commit.CommitHash, err)
+		return 0, fmt.Errorf("insert git commit %s: %w", commit.CommitHash, err)
 	}
-	return nil
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // GetCommitsByFeature returns all git commits linked to a feature, ordered by timestamp DESC.
@@ -185,6 +197,37 @@ func GetCommitsByFeature(database *sql.DB, featureID string) ([]models.GitCommit
 		ORDER BY timestamp DESC`, featureID)
 	if err != nil {
 		return nil, fmt.Errorf("get commits for feature %s: %w", featureID, err)
+	}
+	defer rows.Close()
+
+	var commits []models.GitCommit
+	for rows.Next() {
+		var c models.GitCommit
+		var tsStr string
+		var featID, toolEventID, message sql.NullString
+		if err := rows.Scan(
+			&c.CommitHash, &c.SessionID, &featID, &toolEventID, &message, &tsStr,
+		); err != nil {
+			return nil, err
+		}
+		c.Timestamp, _ = time.Parse(time.RFC3339, tsStr)
+		c.FeatureID = featID.String
+		c.ToolEventID = toolEventID.String
+		c.Message = message.String
+		commits = append(commits, c)
+	}
+	return commits, rows.Err()
+}
+
+// GetCommitsBySession returns all git commits linked to a session,
+// ordered by timestamp DESC.
+func GetCommitsBySession(database *sql.DB, sessionID string) ([]models.GitCommit, error) {
+	rows, err := database.Query(`
+		SELECT commit_hash, session_id, feature_id, tool_event_id, message, timestamp
+		FROM git_commits WHERE session_id = ?
+		ORDER BY timestamp DESC`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("get commits for session %s: %w", sessionID, err)
 	}
 	defer rows.Close()
 

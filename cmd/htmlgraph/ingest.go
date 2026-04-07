@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
@@ -40,6 +44,8 @@ ingest all projects, or --session to target a specific session.`,
 	cmd.Flags().StringVar(&project, "project", "", "filter by project name (substring match)")
 	cmd.Flags().BoolVar(&all, "all", false, "ingest all discovered sessions")
 	cmd.Flags().BoolVar(&force, "force", false, "re-ingest even if already synced")
+
+	cmd.AddCommand(ingestCommitsCmd())
 
 	return cmd
 }
@@ -347,6 +353,149 @@ func extractIngestFilePath(inputJSON string) string {
 				return s
 			}
 		}
+	}
+	return ""
+}
+
+// ingestCommitsCmd returns a subcommand that bulk-imports git log history into
+// git_commits. It uses "backfill" as the session_id sentinel since the original
+// session that produced each commit is unknown.
+func ingestCommitsCmd() *cobra.Command {
+	var since string
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "commits",
+		Short: "Bulk-import git commit history into git_commits table",
+		Long: `Reads git log from the current repository and inserts commits into the
+git_commits table. Each backfilled commit uses session_id="backfill".
+
+Feature attribution is extracted from commit messages using two patterns:
+  - Parenthetical: (feat-abc12345)
+  - Closing keywords: completes/closes/fixes/resolves feat-abc12345`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runIngestCommits(since, limit)
+		},
+	}
+
+	cmd.Flags().StringVar(&since, "since", "", "only import commits after this date (e.g. 2024-01-01)")
+	cmd.Flags().IntVar(&limit, "limit", 0, "maximum number of commits to import (0 = no limit)")
+
+	return cmd
+}
+
+func runIngestCommits(since string, limit int) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer database.Close()
+
+	repoDir := filepath.Dir(htmlgraphDir)
+
+	inserted, attributed, err := ingestCommitsFromRepo(database, repoDir, since, limit)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Done: %d commits ingested (%d with feature attribution)\n", inserted, attributed)
+	return nil
+}
+
+// ingestCommitsFromRepo reads git log from repoDir and inserts commits into
+// the git_commits table. It returns the number of newly inserted rows and the
+// subset that carry a work-item feature_id.
+//
+// Parameters:
+//   - since: ISO date string for --after filter (empty = all history)
+//   - limit: max commits to read (0 = no limit)
+func ingestCommitsFromRepo(database *sql.DB, repoDir, since string, limit int) (inserted, attributed int, err error) {
+	args := []string{"log", "--format=%H|%s|%aI"}
+	if since != "" {
+		args = append(args, "--after="+since)
+	}
+	if limit > 0 {
+		args = append(args, fmt.Sprintf("--max-count=%d", limit))
+	}
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoDir
+	out, gitErr := cmd.Output()
+	if gitErr != nil {
+		if len(out) == 0 {
+			return 0, 0, nil
+		}
+		return 0, 0, fmt.Errorf("git log: %w", gitErr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	now := time.Now().UTC()
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 3)
+		if len(parts) < 2 {
+			continue
+		}
+		hash := strings.TrimSpace(parts[0])
+		msg := strings.TrimSpace(parts[1])
+		ts := now
+		if len(parts) == 3 {
+			if parsed, parseErr := time.Parse(time.RFC3339, strings.TrimSpace(parts[2])); parseErr == nil {
+				ts = parsed
+			}
+		}
+
+		featureID := extractFeatureIDFromCommitMsg(msg)
+
+		gitCommit := &models.GitCommit{
+			CommitHash: hash,
+			SessionID:  "backfill",
+			FeatureID:  featureID,
+			Message:    msg,
+			Timestamp:  ts,
+		}
+
+		n, insertErr := dbpkg.InsertGitCommitResult(database, gitCommit)
+		if insertErr != nil {
+			fmt.Fprintf(os.Stderr, "warn: insert commit %s: %v\n", truncate(hash, 10), insertErr)
+			continue
+		}
+
+		if n > 0 {
+			inserted++
+			if featureID != "" {
+				attributed++
+			}
+		}
+	}
+
+	return inserted, attributed, nil
+}
+
+// ingestCommitClosingRe matches closing keywords followed by a work item ID.
+var ingestCommitClosingRe = regexp.MustCompile(`(?:completes?|closes?|fix(?:es)?|resolves?)\s+((?:feat|bug|spk)-[0-9a-f]{8})`)
+
+// ingestCommitParenRe matches parenthetical work item references, e.g. "(feat-abc12345)".
+var ingestCommitParenRe = regexp.MustCompile(`\(\s*((?:feat|bug|spk)-[0-9a-f]{8})\s*\)`)
+
+// extractFeatureIDFromCommitMsg returns the first work-item ID found in a
+// commit message. Checks closing-keyword pattern first, then parenthetical.
+// Returns "" when no ID is found. Matching is case-insensitive.
+func extractFeatureIDFromCommitMsg(msg string) string {
+	lower := strings.ToLower(msg)
+	if m := ingestCommitClosingRe.FindStringSubmatch(lower); len(m) == 2 {
+		return m[1]
+	}
+	if m := ingestCommitParenRe.FindStringSubmatch(lower); len(m) == 2 {
+		return m[1]
 	}
 	return ""
 }
