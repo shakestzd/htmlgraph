@@ -75,7 +75,11 @@ def _(Path, mo, yaml):
     _env_path = mo.cli_args().get("plan") or _os.environ.get("PLAN_YAML_PATH", "")
 
     if len(_plans) > 0:
-        plan_yaml_input = mo.ui.dropdown(options=_plans, value=None, label="Select Plan")
+        # Pre-select if env var or CLI arg matches a known plan path.
+        _default = None
+        if _env_path:
+            _default = next((k for k, v in _plans.items() if v == _env_path), None)
+        plan_yaml_input = mo.ui.dropdown(options=_plans, value=_default, label="Select Plan")
     else:
         plan_yaml_input = mo.ui.text(value=_env_path or str(_sample), label="Plan YAML path", full_width=True)
     # Hide selector in export mode (CLI arg provides the plan path).
@@ -399,7 +403,10 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
         for _m in history:
             _role = _m.get("role", "user")
             _text = _m.get("content", "")
-            _preview = _text[:500] + ("\n\n..." if len(_text) > 500 else "")
+            # Unescape double-encoded JSON strings (\\n → \n, \\" → ")
+            if isinstance(_text, str):
+                _text = _text.replace("\\n", "\n").replace('\\"', '"')
+            _preview = _text
             if _role == "user":
                 _esc = _preview.replace("<", "&lt;").replace(">", "&gt;")
                 _bubbles.append(mo.Html(
@@ -423,7 +430,7 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
             mo.sidebar([
                 mo.md(f"## Plan Discussion\n\n*{len(_history)} messages*"),
                 *_bubbles,
-            ], width="360px")
+            ], width="480px")
         mo.stop(_is_export)  # Skip interactive chat widget in export mode.
 
     # Interactive mode: full chat widget.
@@ -470,7 +477,7 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
             prompts=["What are the main risks?", "Summarize the design decisions"],
         ))
 
-    mo.sidebar(_items, width="360px")
+    mo.sidebar(_items, width="480px")
 
 
 if __name__ == "__main__":

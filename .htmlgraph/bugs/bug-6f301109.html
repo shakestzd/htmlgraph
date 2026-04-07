@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>YOLO mode fails silently because htmlgraph find is broken — agent loses all track context</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-6f301109"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T03:35:15.241278"
+             data-updated="2026-04-07T03:35:15.245752" data-agent-assigned="claude-code" data-track-id="trk-3719d8f3">
+
+        <header>
+            <h1>YOLO mode fails silently because htmlgraph find is broken — agent loses all track context</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-6b9d363a.html" data-relationship="caused_by" data-since="2026-04-07T03:35:15.243663">bug-6b9d363a</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-3719d8f3.html" data-relationship="part_of" data-since="2026-04-07T03:35:15.245571">trk-3719d8f3</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Root cause: htmlgraph find parses ID prefixes (trk-, feat-, bug-) as collection names and fails with 'unknown collection'. Since yolo mode uses find as the entry point for context discovery, the agent concludes the track does not exist and has no work items to execute. Workaround: use track show / feature show directly. Fix: feat-7fa61af2 in trk-c26a29ab.</p>
+        </section>
+    </article>
+</body>
+</html>

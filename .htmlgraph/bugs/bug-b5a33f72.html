@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Orchestrator and researcher agent do not prioritize documentation search in debugging workflows</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-b5a33f72"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T16:17:41.882657"
+             data-updated="2026-04-07T16:17:41.884676" data-agent-assigned="claude-code" data-track-id="trk-3ab54383">
+
+        <header>
+            <h1>Orchestrator and researcher agent do not prioritize documentation search in debugging workflows</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-f4106ebf.html" data-relationship="caused_by" data-since="2026-04-07T16:17:41.884381">feat-f4106ebf</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-3ab54383.html" data-relationship="part_of" data-since="2026-04-07T16:17:41.884621">trk-3ab54383</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When debugging third-party library issues (e.g. marimo mo.ui.chat), the orchestrator delegates source code reading and guesswork instead of requiring documentation search first. The researcher agent prompts also lack 'search official docs first' as a mandatory step. This led to 20+ minutes wasted reading marimo Python source when the official docs would have answered the question immediately. Fix: (1) Orchestrator system prompt must enforce docs-first debugging order: official docs → changelog → GitHub issues → then source code. (2) Researcher agent definition must include web search of official documentation as step 1 for any third-party library investigation.</p>
+        </section>
+    </article>
+</body>
+</html>

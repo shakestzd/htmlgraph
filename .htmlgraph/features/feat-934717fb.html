@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Commit-to-work-item reverse lookup — htmlgraph trace &lt;commit-sha&gt;</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-934717fb"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-07T03:22:47.310864"
+             data-updated="2026-04-07T04:35:16.153467" data-agent-assigned="claude-code" data-track-id="trk-c26a29ab">
+
+        <header>
+            <h1>Commit-to-work-item reverse lookup — htmlgraph trace &lt;commit-sha&gt;</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-4939067a.html" data-relationship="blocked_by" data-since="2026-04-07T03:23:12.297146">Live git commit ingestion — auto-populate git_commits table via post-commit hook</a></li>
+                    <li><a href="feat-32b4d4fc.html" data-relationship="blocked_by" data-since="2026-04-07T03:23:12.314283">Wire session-to-work-item graph edges</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="613b438b-9d88-4ba1-89d2-7ba782d77aec.html" data-relationship="implemented_in" data-since="2026-04-07T04:30:43.194607">session 613b438b-9d88-4ba1-89d2-7ba782d77aec</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c26a29ab.html" data-relationship="part_of" data-since="2026-04-07T03:22:47.311369">trk-c26a29ab</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>No database path from a commit hash to its work item. Add a trace command that takes a commit SHA and returns: the session that produced it, the feature(s) active during that session, and the parent track.</p>
+        </section>
+    </article>
+</body>
+</html>

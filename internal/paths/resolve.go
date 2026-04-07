@@ -36,9 +36,9 @@ type ProjectDirOptions struct {
 // .htmlgraph/) using the following priority order:
 //
 //  1. opts.ExplicitDir (--project-dir flag) — hard error if set but invalid
-//  2. CLAUDE_PROJECT_DIR env var — fall through on miss (not an error)
-//  3. HTMLGRAPH_PROJECT_DIR env var — written by SubagentStart for subagents
-//     whose EventCWD is a temp dir (e.g. /private/tmp/claude-501/...)
+//  2. HTMLGRAPH_PROJECT_DIR env var — written by yolo mode (subagent override);
+//     takes precedence over ambient CLAUDE_PROJECT_DIR
+//  3. CLAUDE_PROJECT_DIR env var — fall through on miss (not an error)
 //  4. Session-scoped hint file — written by SubagentStart for worktree
 //     subagents whose CLAUDE_ENV_FILE is unset; read via ReadSessionHint()
 //  5. ResolveViaGitCommonDir() — worktree → main repo root
@@ -59,25 +59,25 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found", opts.ExplicitDir)
 	}
 
-	// 2. CLAUDE_PROJECT_DIR env var — fall through on miss.
-	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
-		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
-			return d, nil
-		}
-	}
-
-	// 3. HTMLGRAPH_PROJECT_DIR env var — written by SubagentStart so that
-	// subagent hook invocations can find the real project when EventCWD is a
-	// temp directory (e.g. /private/tmp/claude-501/...).
+	// 2. HTMLGRAPH_PROJECT_DIR env var — written by yolo mode (subagent override);
+	// takes precedence over ambient CLAUDE_PROJECT_DIR.
 	if d := os.Getenv("HTMLGRAPH_PROJECT_DIR"); d != "" {
 		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
 			return d, nil
 		}
 	}
 
+	// 3. CLAUDE_PROJECT_DIR env var — fall through on miss (not an error).
+	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" {
+		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
+			return d, nil
+		}
+	}
+
 	// 4. Session-scoped hint file — written by SubagentStart for worktree
-	// subagents whose CLAUDE_ENV_FILE is unset. Only consulted when SessionID
-	// is provided (hook context). CLI callers don't set SessionID and skip this.
+	// subagents whose CLAUDE_ENV_FILE is unset; read via ReadSessionHint().
+	// Only consulted when SessionID is provided (hook context). CLI callers
+	// don't set SessionID and skip this.
 	if opts.SessionID != "" {
 		if d := ReadSessionHint(opts.SessionID); d != "" {
 			if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {

@@ -2,12 +2,26 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
+
+// workItemIDPattern matches canonical work item IDs like feat-abc12345, bug-abc12345, etc.
+var workItemIDPattern = regexp.MustCompile(`^(feat|bug|spk|trk|pln|spc)-[0-9a-f]{8}$`)
+
+// knownCollections is the set of valid collection names for find.
+var knownCollections = map[string]bool{
+	"features": true,
+	"bugs":     true,
+	"spikes":   true,
+	"tracks":   true,
+	"all":      true,
+}
 
 func findCmd() *cobra.Command {
 	var (
@@ -81,6 +95,17 @@ func runFind(collection string, opts findOpts) error {
 		return err
 	}
 
+	// If the argument looks like a work item ID, do a direct lookup.
+	if workItemIDPattern.MatchString(collection) {
+		return runFindByID(dir, collection)
+	}
+
+	// If the argument is not a known collection name, treat it as a title search.
+	if !knownCollections[collection] {
+		opts.title = collection
+		collection = "all"
+	}
+
 	p, err := workitem.Open(dir, "claude-code")
 	if err != nil {
 		return fmt.Errorf("open project: %w", err)
@@ -133,6 +158,20 @@ func runFind(collection string, opts findOpts) error {
 	}
 
 	printFindResults(nodes)
+	return nil
+}
+
+// runFindByID resolves a work item by its canonical ID and prints it.
+func runFindByID(dir, id string) error {
+	path := resolveNodePath(dir, id)
+	if path == "" {
+		return fmt.Errorf("find: no item found with ID %q", id)
+	}
+	node, err := htmlparse.ParseFile(path)
+	if err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	printFindResults([]*models.Node{node})
 	return nil
 }
 

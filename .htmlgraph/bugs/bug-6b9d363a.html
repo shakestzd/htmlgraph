@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Work items completed in worktrees not auto-closed</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-6b9d363a"
+             data-type="bug"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-07T02:23:12.63729"
+             data-updated="2026-04-07T02:23:42.493435" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>Work items completed in worktrees not auto-closed</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="90f35b01-f3f4-4536-a950-42c2eae34c80.html" data-relationship="implemented_in" data-since="2026-04-07T02:23:17.029809">session 90f35b01-f3f4-4536-a950-42c2eae34c80</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-07T02:23:12.638564">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-a4f2a1d0.html" data-relationship="caused_by" data-since="2026-04-07T02:23:12.638286">feat-a4f2a1d0</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Features worked on in git worktrees stay in-progress after all code is committed. No mechanism triggers feature complete when work finishes in a worktree branch. Found 6 stale WIP items on trk-84bcad47 that were fully committed but never closed.</p>
+        </section>
+    </article>
+</body>
+</html>

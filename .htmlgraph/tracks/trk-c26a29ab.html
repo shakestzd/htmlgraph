@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Attribution Chain — Close the Gap Between Designed and Working</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="trk-c26a29ab"
+             data-type="track"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-07T03:22:28.810029"
+             data-updated="2026-04-07T04:35:27.709734" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Attribution Chain — Close the Gap Between Designed and Working</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="contains">
+                <h3>Contains:</h3>
+                <ul>
+                    <li><a href="feat-4939067a.html" data-relationship="contains" data-since="2026-04-07T03:22:35.857577">Live git commit ingestion — auto-populate git_commits table via post-commit hook</a></li>
+                    <li><a href="feat-32b4d4fc.html" data-relationship="contains" data-since="2026-04-07T03:22:37.836459">Wire session-to-work-item graph edges</a></li>
+                    <li><a href="feat-470d7405.html" data-relationship="contains" data-since="2026-04-07T03:22:40.424571">Populate features_worked_on JSON field on session completion</a></li>
+                    <li><a href="feat-b1fd2979.html" data-relationship="contains" data-since="2026-04-07T03:22:41.643977">Fix total_events counter — increment on each agent_event insert</a></li>
+                    <li><a href="feat-7d67a682.html" data-relationship="contains" data-since="2026-04-07T03:22:43.574374">Implement session show CLI command</a></li>
+                    <li><a href="feat-7fa61af2.html" data-relationship="contains" data-since="2026-04-07T03:22:45.791848">Fix htmlgraph find command — returns exit 1 for valid IDs</a></li>
+                    <li><a href="feat-934717fb.html" data-relationship="contains" data-since="2026-04-07T03:22:47.311369">Commit-to-work-item reverse lookup — htmlgraph trace &lt;commit-sha&gt;</a></li>
+                    <li><a href="feat-6afe0b82.html" data-relationship="contains" data-since="2026-04-07T03:22:48.548197">Attribution rate dashboard metric</a></li>
+                    <li><a href="bug-1c079cda.html" data-relationship="contains" data-since="2026-04-07T03:27:56.648478">YOLO mode worktree does not carry track/feature context from parent session</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="613b438b-9d88-4ba1-89d2-7ba782d77aec.html" data-relationship="implemented_in" data-since="2026-04-07T04:01:33.824472">session 613b438b-9d88-4ba1-89d2-7ba782d77aec</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>HtmlGraph's core differentiator (work item → session → commit attribution) has the right data model but broken wiring. 46.8% commit attribution rate, zero session-to-work-item graph edges, git_commits table at 0.6% coverage. This track closes every gap to make the audit trail actually work.</p>
+        </section>
+    </article>
+</body>
+</html>

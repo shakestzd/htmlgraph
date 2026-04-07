@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Close amendment loop — persist from chat, confirm to user, apply on rewrite-yaml</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-14537ac2"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T16:37:14.103657"
+             data-updated="2026-04-07T16:37:14.110361" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Close amendment loop — persist from chat, confirm to user, apply on rewrite-yaml</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-07T16:37:14.11028">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Three gaps in the amendment pipeline: (1) The chat model function in plan_notebook.py parses AMEND directives and calls persist_amendment(), but the user/agent gets no feedback that it was saved. Add a visible confirmation (e.g. callout or inline badge) after each amendment is persisted to SQLite. (2) The headless Claude chat doesn't know its amendments landed — update the system prompt or inject a follow-up message confirming 'Amendment logged: slice-N add done_when ...' so the agent can reference it. (3) htmlgraph plan rewrite-yaml does not read amendments from plan_feedback table and apply them to the YAML. Add a step that reads pending amendments, applies them to the matching slice fields, and writes the updated YAML. This closes the full loop: chat → DB → confirmation → rewrite-yaml → updated plan.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -128,7 +128,7 @@ __marimo__/
 _build/
 archive/
 packages/go-plugin/hooks/bin/
-htmlgraph
+/htmlgraph
 hooks/bin/
 
 # Notebook files copied at build time from prototypes/ (do not commit)

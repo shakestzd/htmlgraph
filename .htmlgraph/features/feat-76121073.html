@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Lazy session registration — CLI commands self-heal missing session records</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-76121073"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T04:54:59.392168"
+             data-updated="2026-04-07T04:54:59.393688" data-agent-assigned="claude-code" data-track-id="trk-06a29a51">
+
+        <header>
+            <h1>Lazy session registration — CLI commands self-heal missing session records</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-06a29a51.html" data-relationship="part_of" data-since="2026-04-07T04:54:59.393624">trk-06a29a51</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Every CLI command that runs inside a Claude Code session should ensure the session is registered in the DB. Resolution: (1) check HTMLGRAPH_SESSION_ID env var, (2) fallback to most recently modified .jsonl in ~/.claude/projects//, (3) if session not in DB or marked completed, upsert as active. This removes the single-point-of-failure dependency on the session-start hook.</p>
+        </section>
+    </article>
+</body>
+</html>

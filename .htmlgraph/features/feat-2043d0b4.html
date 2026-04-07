@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Session ensure guard — upsert on every CLI command</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-2043d0b4"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T04:57:14.890009"
+             data-updated="2026-04-07T04:57:20.105141" data-agent-assigned="claude-code" data-track-id="trk-06a29a51">
+
+        <header>
+            <h1>Session ensure guard — upsert on every CLI command</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-06a29a51.html" data-relationship="part_of" data-since="2026-04-07T04:57:14.890753">trk-06a29a51</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-17a993f0.html" data-relationship="blocked_by" data-since="2026-04-07T04:57:20.07135">AgentResolver interface — detect calling agent and resolve session ID</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="relates_to">
+                <h3>Relates To:</h3>
+                <ul>
+                    <li><a href="feat-76121073.html" data-relationship="relates_to" data-since="2026-04-07T04:57:20.105062">Lazy session registration — CLI commands self-heal missing session records</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Add EnsureSession() call at the top of every CLI command that modifies state (feature start/complete, bug start, etc). Uses AgentResolver to find session ID, checks DB, upserts if missing or stale. Must be fast (<5ms) to avoid slowing down every command.</p>
+        </section>
+    </article>
+</body>
+</html>

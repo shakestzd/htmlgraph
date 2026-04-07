@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Fix total_events counter — increment on each agent_event insert</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-b1fd2979"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-07T03:22:41.64339"
+             data-updated="2026-04-07T04:15:10.562936" data-agent-assigned="claude-code" data-track-id="trk-c26a29ab">
+
+        <header>
+            <h1>Fix total_events counter — increment on each agent_event insert</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c26a29ab.html" data-relationship="part_of" data-since="2026-04-07T03:22:41.643977">trk-c26a29ab</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="613b438b-9d88-4ba1-89d2-7ba782d77aec.html" data-relationship="implemented_in" data-since="2026-04-07T04:08:07.575035">session 613b438b-9d88-4ba1-89d2-7ba782d77aec</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>60/67 sessions show total_events=0 even when hundreds of events exist in agent_events. Either use a trigger or update the counter on each event write.</p>
+        </section>
+    </article>
+</body>
+</html>
