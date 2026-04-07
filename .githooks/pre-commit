@@ -36,4 +36,12 @@ if git diff --cached --name-only | grep -q '\.go$' || [ -f "$REPO_ROOT/go.mod" ]
     fi
 fi
 
+# Reject stray htmlgraph binary at repo root (use `htmlgraph build` instead)
+if git diff --cached --name-only | grep -q '^htmlgraph$'; then
+    echo "FAIL: A binary named 'htmlgraph' is staged at the repo root."
+    echo "      Run 'htmlgraph build' instead — it outputs to plugin/hooks/bin/htmlgraph."
+    echo "      Unstage it with: git reset HEAD htmlgraph"
+    exit 1
+fi
+
 echo "All pre-commit checks passed!"
