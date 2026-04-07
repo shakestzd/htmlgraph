@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
@@ -14,6 +15,92 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/planyaml"
 	"github.com/spf13/cobra"
 )
+
+func planListYAMLCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list-yaml",
+		Short: "List all YAML plans sorted by created_at descending",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runListYAML()
+		},
+	}
+}
+
+func runListYAML() error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	plansDir := filepath.Join(htmlgraphDir, "plans")
+	entries, err := os.ReadDir(plansDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No YAML plans found.")
+			return nil
+		}
+		return fmt.Errorf("read plans dir: %w", err)
+	}
+
+	type planInfo struct {
+		id        string
+		status    string
+		slices    int
+		createdAt string
+		title     string
+	}
+
+	var plans []planInfo
+
+	// Scan for YAML plan files
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+
+		planPath := filepath.Join(plansDir, entry.Name())
+
+		plan, err := planyaml.Load(planPath)
+		if err != nil {
+			// Skip files that fail to parse
+			continue
+		}
+
+		plans = append(plans, planInfo{
+			id:        plan.Meta.ID,
+			status:    plan.Meta.Status,
+			slices:    len(plan.Slices),
+			createdAt: plan.Meta.CreatedAt,
+			title:     plan.Meta.Title,
+		})
+	}
+
+	// Sort by created_at descending (newest first)
+	sort.Slice(plans, func(i, j int) bool {
+		if plans[i].createdAt != plans[j].createdAt {
+			return plans[i].createdAt > plans[j].createdAt
+		}
+		return plans[i].id < plans[j].id
+	})
+
+	if len(plans) == 0 {
+		fmt.Println("No YAML plans found.")
+		return nil
+	}
+
+	fmt.Printf("%-18s  %-11s  %-7s  %-12s  %s\n", "ID", "STATUS", "SLICES", "CREATED", "TITLE")
+	fmt.Println(strings.Repeat("-", 100))
+	for _, p := range plans {
+		title := p.title
+		if len(title) > 50 {
+			title = title[:47] + "..."
+		}
+		fmt.Printf("%-18s  %-11s  %-7d  %-12s  %s\n",
+			p.id, p.status, p.slices, p.createdAt, title)
+	}
+	fmt.Printf("\n%d YAML plan(s)\n", len(plans))
+	return nil
+}
 
 func planAddQuestionYAMLCmd() *cobra.Command {
 	var description, recommended, options string
