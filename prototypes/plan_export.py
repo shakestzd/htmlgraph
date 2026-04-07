@@ -366,14 +366,12 @@ def _(mo, plan_id, render_chat_history_bubbles, saved_feedback, sqlite3):
 
     if _history:
         _bubbles = render_chat_history_bubbles(_history, mo)
-        mo.sidebar([
-            mo.md(f"## Plan Discussion\n\n*{len(_history)} messages*"),
+        mo.output.replace(mo.vstack([
+            mo.md(f"## F. Plan Discussion\n\n*{len(_history)} messages*"),
             *_bubbles,
-        ], width="480px")
+        ]))
     else:
-        mo.sidebar([
-            mo.md("## Plan Discussion\n\n_No chat history recorded._"),
-        ], width="480px")
+        mo.output.replace(mo.md("## F. Plan Discussion\n\n_No chat history recorded._"))
     return
 
 
