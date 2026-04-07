@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/shakestzd/htmlgraph/internal/agent"
 	"github.com/shakestzd/htmlgraph/internal/paths"
 	versionpkg "github.com/shakestzd/htmlgraph/internal/version"
 	"github.com/spf13/cobra"
@@ -33,6 +34,35 @@ func main() {
 		"",
 		"explicit project root containing .htmlgraph/ (overrides CLAUDE_PROJECT_DIR and CWD walk-up)",
 	)
+
+	// Lazy session registration: every CLI command self-heals attribution
+	// chains by detecting the agent and ensuring a session row exists.
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		// Skip commands that must work without .htmlgraph/.
+		switch cmd.Name() {
+		case "version", "help", "init", "build", "install-hooks", "setup", "setup-cli":
+			return nil
+		}
+		// Skip hook subtree — hooks manage their own session lifecycle.
+		for p := cmd; p != nil; p = p.Parent() {
+			if p.Name() == "hook" {
+				return nil
+			}
+		}
+		// Degrade gracefully: commands must not fail because session
+		// registration is unavailable.
+		hgDir, err := findHtmlgraphDir()
+		if err != nil {
+			return nil
+		}
+		database, err := openDB(hgDir)
+		if err != nil {
+			return nil
+		}
+		defer database.Close()
+		_, _ = agent.EnsureSession(database, filepath.Dir(hgDir))
+		return nil
+	}
 
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(statusCmd())
