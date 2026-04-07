@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Separate export template — extract shared rendering, create plan_export.py</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-20cdc605"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-07T19:16:56.804704"
+             data-updated="2026-04-07T19:21:07.556916" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Separate export template — extract shared rendering, create plan_export.py</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-07T19:16:56.806295">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="90f35b01-f3f4-4536-a950-42c2eae34c80.html" data-relationship="implemented_in" data-since="2026-04-07T19:17:04.291896">session 90f35b01-f3f4-4536-a950-42c2eae34c80</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Instead of _is_export conditionals in plan_notebook.py, create a separate plan_export.py template for static HTML archival. Steps: (1) Extract slice card rendering, questions rendering, and plan header assembly from plan_notebook.py into plan_ui.py as reusable functions (render_slice_cards, render_questions, render_plan_header). (2) Revert all _is_export conditionals from plan_notebook.py — it stays purely interactive. (3) Create plan_export.py as a new marimo notebook that imports from the shared modules (plan_ui, plan_persistence, critique_renderer, dagre_widget) and renders everything as read-only static content — no checkboxes, no dropdowns, no finalize button, chat history as static bubbles. (4) Update finalize_plan() to export from plan_export.py instead of plan_notebook.py. Both templates read the same YAML + SQLite data, just render differently.</p>
+        </section>
+    </article>
+</body>
+</html>

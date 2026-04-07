@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Finalize pipeline: full orchestration from amendments through feature creation to HTML export</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-0a7b60d8"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T19:05:22.878111"
+             data-updated="2026-04-07T19:05:22.880347" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Finalize pipeline: full orchestration from amendments through feature creation to HTML export</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-07T19:05:22.88026">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>The finalize button should trigger a complete pipeline, not just YAML status update + HTML export. Steps: (1) Apply accepted amendments via rewrite-yaml. (2) Increment meta.version. (3) Create track + features from approved slices via htmlgraph plan finalize-yaml — this generates real work items. (4) Embed the generated track ID and feature IDs back into the YAML and notebook cells so the exported HTML links to them. (5) Export static HTML with all interactive widgets replaced by static text — the archival record includes chat history, track/feature links, and version number. The version number is critical because work items continue evolving after the plan is finalized — the version tracks which plan state generated them.</p>
+        </section>
+    </article>
+</body>
+</html>

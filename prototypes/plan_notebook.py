@@ -23,6 +23,7 @@ def _():
     from plan_ui import (
         stat_card, status_badge, priority_badge, effort_badge,
         risk_badge, render_feedback_summary, STATUS_COLORS,
+        render_slice_cards, render_questions, render_chat_history_bubbles,
     )
     from plan_persistence import persist_feedback, finalize_plan, persist_amendment, get_amendments, update_amendment_status
     from amendment_parser import parse_amendments
@@ -33,7 +34,8 @@ def _():
         ClaudeChatBackend, DependencyGraphWidget, Path,
         STATUS_COLORS, effort_badge, finalize_plan, get_amendments, mo,
         parse_amendments, persist_amendment, persist_feedback,
-        render_critique, render_feedback_summary, risk_badge, sqlite3,
+        render_chat_history_bubbles, render_critique, render_feedback_summary,
+        render_questions, render_slice_cards, risk_badge, sqlite3,
         stat_card, status_badge, update_amendment_status, yaml,
     )
 
@@ -91,9 +93,6 @@ def _(Path, mo, yaml):
 @app.cell
 def _(Path, htmlgraph_dir, mo, plan_yaml_input, sqlite3, yaml):
     # --- Load plan content from YAML + feedback from SQLite ---
-    import os as _os
-    _is_export = _os.environ.get("PLAN_EXPORT_MODE") == "1"
-
     _cli_plan = mo.cli_args().get("plan")
     _selected = _cli_plan or plan_yaml_input.value or ""
     mo.stop(not _selected, mo.md("**Select a plan from the dropdown above.**"))
@@ -120,7 +119,7 @@ def _(Path, htmlgraph_dir, mo, plan_yaml_input, sqlite3, yaml):
                 _key += f":{_r['question_id']}"
             saved_feedback[_key] = _r["value"]
         _conn.close()
-    return plan, plan_id, plan_path, plan_yaml_text, saved_feedback, _is_export
+    return plan, plan_id, plan_path, plan_yaml_text, saved_feedback
 
 
 @app.cell
@@ -205,72 +204,33 @@ def _(design_approved, design_comment, persist_feedback, plan_id):
 
 
 @app.cell
-def _(effort_badge, mo, plan, risk_badge, saved_feedback, _is_export):
+def _(effort_badge, mo, plan, render_slice_cards, risk_badge, saved_feedback):
     # --- B. Vertical Slices ---
     _slices = plan.get("slices", [])
-    _num_to_title = {s["num"]: s["title"] for s in _slices}
-    if _is_export:
-        # Export mode: static approval badges, no interactive checkboxes.
-        slice_approvals = {
-            s["id"]: saved_feedback.get(f"slice-{s['num']}:approve", "false").lower() == "true"
-            for s in _slices
-        }
-    else:
-        slice_approvals = mo.ui.dictionary({
-            s["id"]: mo.ui.checkbox(
-                label="Approve",
-                value=saved_feedback.get(f"slice-{s['num']}:approve", "false").lower() == "true",
-            )
-            for s in _slices
-        })
-    _cards = {}
-    for _s in _slices:
-        _effort = effort_badge(_s["effort"]) if _s.get("effort") else None
-        _risk = risk_badge(_s["risk"]) if _s.get("risk") else None
-        _badges = mo.hstack([b for b in [_effort, _risk] if b], justify="start", gap=0.25)
-        if _is_export:
-            _approved_val = slice_approvals[_s["id"]]
-            _approval_badge = mo.callout(
-                mo.md("Approved" if _approved_val else "Not approved"),
-                kind="success" if _approved_val else "neutral",
-            )
-            _top_row = mo.hstack([_approval_badge, _badges], justify="space-between")
-        else:
-            _top_row = mo.hstack([slice_approvals[_s["id"]], _badges], justify="space-between")
-        _body = [_top_row]
-        if _s.get("what"):
-            _body.append(mo.md(f"**What:** {_s['what']}"))
-        if _s.get("why"):
-            _body.append(mo.md(f"**Why:** {_s['why']}"))
-        if _s.get("files"):
-            _body.append(mo.md(f"**Files:** {', '.join(f'`{f}`' for f in _s['files'])}"))
-        if _s.get("done_when"):
-            _body.append(mo.md("**Done when:**\n" + "\n".join(f"- {d}" for d in _s["done_when"])))
-        if _s.get("deps"):
-            _body.append(mo.md(
-                f"**Depends on:** {', '.join(_num_to_title.get(d, f'#{d}') for d in _s['deps'])}"
-            ))
-        if _s.get("tests"):
-            _body.append(mo.md(f"**Tests:**\n```\n{_s['tests'].strip()}\n```"))
-        _cards[f"Slice {_s['num']}: {_s['title']}"] = mo.vstack(_body)
-    _subtitle = "Slice approvals (archived)" if _is_export else "Approve slices individually."
+    slice_approvals = mo.ui.dictionary({
+        s["id"]: mo.ui.checkbox(
+            label="Approve",
+            value=saved_feedback.get(f"slice-{s['num']}:approve", "false").lower() == "true",
+        )
+        for s in _slices
+    })
+    _cards = render_slice_cards(_slices, saved_feedback, effort_badge, risk_badge, mo,
+                                slice_approvals=slice_approvals)
     mo.vstack([
-        mo.md(f"## B. Vertical Slices\n\n{_subtitle}"),
+        mo.md("## B. Vertical Slices\n\nApprove slices individually."),
         mo.accordion(_cards, multiple=True),
     ])
     return (slice_approvals,)
 
 
 @app.cell
-def _(graph_widget, persist_feedback, plan, plan_id, slice_approvals, _is_export):
+def _(graph_widget, persist_feedback, plan, plan_id, slice_approvals):
     _slices = plan.get("slices", [])
     _id_to_num = {s["id"]: s["num"] for s in _slices}
     _approved_ids = []
-    # In export mode slice_approvals is a plain dict; otherwise it's a mo.ui.dictionary.
-    _approvals_map = slice_approvals if _is_export else slice_approvals.value
-    for _fid, _val in _approvals_map.items():
+    for _fid, _val in slice_approvals.value.items():
         _num = _id_to_num.get(_fid)
-        if _num is not None and not _is_export:
+        if _num is not None:
             persist_feedback(plan_id, f"slice-{_num}", "approve", _val)
         if _val:
             _approved_ids.append(_fid)
@@ -279,7 +239,7 @@ def _(graph_widget, persist_feedback, plan, plan_id, slice_approvals, _is_export
 
 
 @app.cell
-def _(mo, plan, saved_feedback, _is_export):
+def _(mo, plan, render_questions, saved_feedback):
     # --- C. Open Questions ---
     _questions = plan.get("questions", [])
 
@@ -306,42 +266,19 @@ def _(mo, plan, saved_feedback, _is_export):
             _opts[lbl] = opt["key"]
         return _opts
 
-    if _is_export:
-        # Export mode: static answer display, no interactive radios.
-        question_inputs = {
-            q["id"]: _restore_answer(q)
-            for q in _questions
-        }
-    else:
-        question_inputs = mo.ui.dictionary({
-            q["id"]: mo.ui.radio(options=_build_options(q), value=_restore_answer(q))
-            for i, q in enumerate(_questions)
-        })
-
-    _parts = []
-    for _i, _q in enumerate(_questions):
-        _desc = _q.get("description", "")
-        _parts.append(mo.md(f"**Q{_i + 1}. {_q['text']}**"))
-        _parts.append(mo.md((f" `{_desc}`" if _desc else "")))
-        if _is_export:
-            _answer = question_inputs[_q["id"]]
-            _parts.append(mo.callout(
-                mo.md(f"Answer: {_answer}" if _answer else "_No answer recorded._"),
-                kind="neutral",
-            ))
-        else:
-            _parts.append(question_inputs[_q["id"]])
-        _parts.append(mo.md("---"))
-    mo.vstack([mo.md("## C. Open Questions")] + _parts[:-1])
+    question_inputs = mo.ui.dictionary({
+        q["id"]: mo.ui.radio(options=_build_options(q), value=_restore_answer(q))
+        for i, q in enumerate(_questions)
+    })
+    render_questions(_questions, saved_feedback, mo, question_inputs=question_inputs)
     return (question_inputs,)
 
 
 @app.cell
-def _(persist_feedback, plan_id, question_inputs, _is_export):
-    if not _is_export:
-        for _qid, _val in question_inputs.value.items():
-            if _val is not None:
-                persist_feedback(plan_id, "questions", "answer", _val, question_id=_qid)
+def _(persist_feedback, plan_id, question_inputs):
+    for _qid, _val in question_inputs.value.items():
+        if _val is not None:
+            persist_feedback(plan_id, "questions", "answer", _val, question_id=_qid)
     return
 
 
@@ -353,14 +290,12 @@ def _(plan, render_critique):
 
 
 @app.cell
-def _(design_approved, mo, plan, question_inputs, render_feedback_summary, slice_approvals, _is_export):
+def _(design_approved, mo, plan, question_inputs, render_feedback_summary, slice_approvals):
     # --- E. Feedback Summary + Finalize ---
     _slices = plan.get("slices", [])
     _questions = plan.get("questions", [])
-    # In export mode both slice_approvals and question_inputs are plain dicts.
-    _approvals_map = slice_approvals if _is_export else slice_approvals.value
-    _approved_slices = sum(1 for v in _approvals_map.values() if v)
-    _answers = question_inputs if _is_export else question_inputs.value
+    _approved_slices = sum(1 for v in slice_approvals.value.values() if v)
+    _answers = question_inputs.value
     _answered_qs = sum(1 for v in _answers.values() if v is not None)
     _summary, finalize_btn = render_feedback_summary(
         plan, design_approved.value, _approved_slices, len(_slices),
@@ -371,11 +306,8 @@ def _(design_approved, mo, plan, question_inputs, render_feedback_summary, slice
 
 
 @app.cell
-def _(finalize_btn, finalize_plan, mo, plan, plan_path, question_inputs, slice_approvals, yaml, _is_export):
+def _(finalize_btn, finalize_plan, mo, plan, plan_path, question_inputs, slice_approvals, yaml):
     # --- Finalize → update YAML status + export summary ---
-    # In export mode finalize_btn is a static mo.md element, not a run_button.
-    if _is_export:
-        mo.stop(True)
     mo.stop(not finalize_btn.value)
     _result = finalize_plan(plan, plan_path, slice_approvals.value, question_inputs.value, yaml)
     mo.callout(mo.md(_result), kind="success")
@@ -383,7 +315,7 @@ def _(finalize_btn, finalize_plan, mo, plan, plan_path, question_inputs, slice_a
 
 
 @app.cell
-def _(get_amendments, mo, plan_id, update_amendment_status, _is_export):
+def _(get_amendments, mo, plan_id, update_amendment_status):
     # --- E2. Amendments from Chat ---
     _amendments = get_amendments(plan_id)
     if not _amendments:
@@ -399,101 +331,48 @@ def _(get_amendments, mo, plan_id, update_amendment_status, _is_export):
             f"**{len(_rejected)}** rejected"
         )
 
-        if _is_export:
-            # Export mode: static status badges, no interactive dropdowns.
-            _action_to_kind = {"accepted": "success", "rejected": "danger", "proposed": "neutral"}
-            _action_to_display = {"proposed": "Pending", "accepted": "Accepted", "rejected": "Rejected"}
-            _rows = []
-            for _a in _amendments:
-                _kind = _action_to_kind.get(_a["action"], "neutral")
-                _display = _action_to_display.get(_a["action"], "Pending")
-                _label = (
-                    f"Slice {_a['value'].get('slice_num', '?')}: "
-                    f"{_a['value'].get('operation', '?')} {_a['value'].get('field', '?')} "
-                    f"— {_a['value'].get('content', '')[:60]}"
-                )
-                _rows.append(mo.callout(mo.md(f"**{_display}** — {_label}"), kind=_kind))
-            mo.vstack([
-                mo.md(f"## Amendments\n\n{_status}"),
-                *_rows,
-            ])
-        else:
-            _action_to_label = {"proposed": "Pending", "accepted": "Accept", "rejected": "Reject"}
-            amendment_decisions = mo.ui.dictionary({
-                a["id"]: mo.ui.dropdown(
-                    options={"Pending": "proposed", "Accept": "accepted", "Reject": "rejected"},
-                    value=_action_to_label.get(a["action"], "Pending"),
-                    label=f"Slice {a['value'].get('slice_num', '?')}: "
-                          f"{a['value'].get('operation', '?')} {a['value'].get('field', '?')} "
-                          f"— {a['value'].get('content', '')[:60]}",
-                )
-                for a in _amendments
-            })
+        _action_to_label = {"proposed": "Pending", "accepted": "Accept", "rejected": "Reject"}
+        amendment_decisions = mo.ui.dictionary({
+            a["id"]: mo.ui.dropdown(
+                options={"Pending": "proposed", "Accept": "accepted", "Reject": "rejected"},
+                value=_action_to_label.get(a["action"], "Pending"),
+                label=f"Slice {a['value'].get('slice_num', '?')}: "
+                      f"{a['value'].get('operation', '?')} {a['value'].get('field', '?')} "
+                      f"— {a['value'].get('content', '')[:60]}",
+            )
+            for a in _amendments
+        })
 
-            mo.vstack([
-                mo.md(f"## Amendments\n\n{_status}"),
-                amendment_decisions,
-            ])
+        mo.vstack([
+            mo.md(f"## Amendments\n\n{_status}"),
+            amendment_decisions,
+        ])
     return
 
 
 @app.cell
-def _(get_amendments, plan_id, update_amendment_status, _is_export):
+def _(get_amendments, plan_id, update_amendment_status):
     # --- Persist amendment decisions ---
-    if not _is_export:
-        _amendments = get_amendments(plan_id)
-        _by_id = {a["id"]: a for a in _amendments}
-        _mod = __import__("sys").modules.get(__name__)
-        _decisions = getattr(_mod, "amendment_decisions", None) if _mod else None
-        if _decisions is not None:
-            for _aid, _new_action in _decisions.value.items():
-                _current = _by_id.get(_aid, {}).get("action")
-                if _current and _new_action != _current:
-                    update_amendment_status(plan_id, _aid, _new_action)
+    _amendments = get_amendments(plan_id)
+    _by_id = {a["id"]: a for a in _amendments}
+    _mod = __import__("sys").modules.get(__name__)
+    _decisions = getattr(_mod, "amendment_decisions", None) if _mod else None
+    if _decisions is not None:
+        for _aid, _new_action in _decisions.value.items():
+            _current = _by_id.get(_aid, {}).get("action")
+            if _current and _new_action != _current:
+                update_amendment_status(plan_id, _aid, _new_action)
     return
 
 
 @app.cell
-def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment, plan_id, plan_yaml_text, _is_export):
-    # --- F. Plan Discussion (sidebar chat or static transcript) ---
-
-    def _render_history_bubbles(history):
-        """Render chat messages as styled bubbles."""
-        _bubbles = []
-        for _m in history:
-            _role = _m.get("role", "user")
-            _text = _m.get("content", "")
-            # Unescape double-encoded JSON strings (\\n → \n, \\" → ")
-            if isinstance(_text, str):
-                _text = _text.replace("\\n", "\n").replace('\\"', '"')
-            _preview = _text
-            if _role == "user":
-                _esc = _preview.replace("<", "&lt;").replace(">", "&gt;")
-                _bubbles.append(mo.Html(
-                    f'<div style="margin:6px 0;padding:8px 12px;background:#3b82f6;'
-                    f'color:#fff;border-radius:12px 12px 4px 12px;font-size:13px;'
-                    f'line-height:1.4;margin-left:20%">{_esc}</div>'
-                ))
-            else:
-                _bubbles.append(mo.callout(mo.md(_preview), kind="neutral"))
-        return _bubbles
-
+def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment, plan_id, plan_yaml_text, render_chat_history_bubbles):
+    # --- F. Plan Discussion (interactive sidebar chat) ---
     _db = str(htmlgraph_dir / "htmlgraph.db") if htmlgraph_dir else None
     _project_dir = str(htmlgraph_dir.parent) if htmlgraph_dir else None
     _backend = ClaudeChatBackend(plan_context=plan_yaml_text, db_path=_db, plan_id=plan_id, project_dir=_project_dir)
     _history = _backend.load_messages()
 
-    if _is_export:
-        # Static HTML export: render chat history as a read-only transcript.
-        if _history:
-            _bubbles = _render_history_bubbles(_history)
-            mo.sidebar([
-                mo.md(f"## Plan Discussion\n\n*{len(_history)} messages*"),
-                *_bubbles,
-            ], width="480px")
-        mo.stop(_is_export)  # Skip interactive chat widget in export mode.
-
-    # Interactive mode: full chat widget.
     _available, _avail_msg = ClaudeChatBackend.is_available()
     _has_fallback = ClaudeChatBackend.has_api_fallback()
 
@@ -507,7 +386,7 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
             _count = len(_history)
             _items.append(mo.accordion({
                 f"Prior conversation ({_count} messages)": mo.vstack(
-                    _render_history_bubbles(_history)),
+                    render_chat_history_bubbles(_history, mo)),
             }))
 
         def _chat_model(messages, config):
