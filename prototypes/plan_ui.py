@@ -187,7 +187,7 @@ def render_questions(questions, saved_feedback, mo, question_inputs=None):
                 kind="neutral",
             ))
         _parts.append(mo.md("---"))
-    return mo.vstack([mo.md("## C. Open Questions")] + _parts[:-1])
+    return mo.vstack(_parts[:-1])
 
 
 def render_chat_history_bubbles(history, mo):
@@ -263,7 +263,7 @@ def render_feedback_summary(plan, design_ok, approved_slices, total_slices,
     )
 
     summary = mo.vstack([
-        mo.md("## E. Feedback Summary"),
+        mo.md("**Feedback Summary**"),
         mo.hstack([
             stat_card("Slices", f"{approved_slices}/{total_slices}",
                       "#f0f4ff", "#1e3a5f", "#93c5fd"),

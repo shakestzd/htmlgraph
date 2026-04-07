@@ -88,7 +88,6 @@ def render_critique(data):
                      f'<p style="font-size:.85rem">{_syn}</p>')
 
     return mo.vstack([
-        mo.md("### D. AI Critique Results"),
         mo.Html(
             f'<div style="border:1px solid var(--marimo-monochrome-200,#333);border-radius:8px;padding:16px">'
             f'<p style="color:#16a34a;font-size:.85rem;margin:0 0 16px">&#10003; Critique complete — {_reviewers} reviewed {_date}</p>'
