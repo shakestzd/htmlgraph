@@ -96,14 +96,15 @@ func SemanticSearch(db *sql.DB, query string, limit int) ([]SemanticResult, erro
 		SELECT
 			si.feature_id,
 			si.title,
-			COALESCE(f.type, ''),
-			COALESCE(f.status, ''),
-			COALESCE(f.priority, ''),
+			COALESCE(f.type, t.type, ''),
+			COALESCE(f.status, t.status, ''),
+			COALESCE(f.priority, t.priority, ''),
 			COALESCE(f.track_id, ''),
 			bm25(semantic_index, 0.0, 10.0, 5.0, 2.0, 8.0, 3.0, 4.0) AS rank,
 			snippet(semantic_index, 2, '<b>', '</b>', '...', 32) AS snippet
 		FROM semantic_index si
 		LEFT JOIN features f ON f.id = si.feature_id
+		LEFT JOIN tracks t ON t.id = si.feature_id
 		WHERE semantic_index MATCH ?
 		ORDER BY rank
 		LIMIT ?`, ftsQuery, limit)
@@ -155,14 +156,15 @@ func SemanticRelated(db *sql.DB, featureID string, limit int) ([]SemanticResult,
 		SELECT
 			si.feature_id,
 			si.title,
-			COALESCE(f.type, ''),
-			COALESCE(f.status, ''),
-			COALESCE(f.priority, ''),
+			COALESCE(f.type, t.type, ''),
+			COALESCE(f.status, t.status, ''),
+			COALESCE(f.priority, t.priority, ''),
 			COALESCE(f.track_id, ''),
 			bm25(semantic_index, 0.0, 10.0, 5.0, 2.0, 8.0, 3.0, 4.0) AS rank,
 			snippet(semantic_index, 2, '<b>', '</b>', '...', 32) AS snippet
 		FROM semantic_index si
 		LEFT JOIN features f ON f.id = si.feature_id
+		LEFT JOIN tracks t ON t.id = si.feature_id
 		WHERE semantic_index MATCH ?
 		  AND si.feature_id != ?
 		ORDER BY rank
@@ -249,7 +251,48 @@ func RebuildSemanticIndex(db *sql.DB) (int, error) {
 		count++
 	}
 
+	// Also index tracks (stored in separate table).
+	trackCount, err := indexTracks(db, relatedCtx)
+	if err == nil {
+		count += trackCount
+	}
+
 	return count, nil
+}
+
+// indexTracks adds tracks from the tracks table into the semantic index.
+func indexTracks(db *sql.DB, relatedCtx map[string]string) (int, error) {
+	rows, err := db.Query(`
+		SELECT id, title, COALESCE(description, ''), COALESCE(metadata, '')
+		FROM tracks`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var id, title, description, metadata string
+		if err := rows.Scan(&id, &title, &description, &metadata); err != nil {
+			continue
+		}
+		// For tracks, include titles of child features as related context.
+		childCtx := relatedCtx[id]
+		entry := &SemanticEntry{
+			FeatureID:      id,
+			Title:          title,
+			Description:    description,
+			Content:        description,
+			Tags:           normalizeJSONTags(metadata),
+			TrackTitle:     "", // tracks don't have a parent track
+			RelatedContext: childCtx,
+		}
+		if err := UpsertSemanticEntry(db, entry); err != nil {
+			continue
+		}
+		count++
+	}
+	return count, rows.Err()
 }
 
 // buildRelatedContext collects titles of features linked via graph_edges
@@ -259,9 +302,10 @@ func buildRelatedContext(db *sql.DB) map[string]string {
 
 	rows, err := db.Query(`
 		SELECT ge.from_node_id,
-		       GROUP_CONCAT(COALESCE(f.title, ge.to_node_id), ' | ')
+		       GROUP_CONCAT(COALESCE(f.title, t.title, ge.to_node_id), ' | ')
 		FROM graph_edges ge
 		LEFT JOIN features f ON f.id = ge.to_node_id
+		LEFT JOIN tracks t ON t.id = ge.to_node_id
 		GROUP BY ge.from_node_id`)
 	if err != nil {
 		return ctx
@@ -278,9 +322,10 @@ func buildRelatedContext(db *sql.DB) map[string]string {
 	// Also add reverse direction (to_node_id -> from_node titles).
 	rows2, err := db.Query(`
 		SELECT ge.to_node_id,
-		       GROUP_CONCAT(COALESCE(f.title, ge.from_node_id), ' | ')
+		       GROUP_CONCAT(COALESCE(f.title, t.title, ge.from_node_id), ' | ')
 		FROM graph_edges ge
 		LEFT JOIN features f ON f.id = ge.from_node_id
+		LEFT JOIN tracks t ON t.id = ge.from_node_id
 		GROUP BY ge.to_node_id`)
 	if err != nil {
 		return ctx
