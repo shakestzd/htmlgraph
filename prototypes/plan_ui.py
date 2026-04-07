@@ -147,7 +147,7 @@ def render_slice_cards(slices, saved_feedback, effort_badge_fn, risk_badge_fn, m
             ))
         if _s.get("tests"):
             _body.append(mo.md(f"**Tests:**\n```\n{_s['tests'].strip()}\n```"))
-        _cards[f"Slice {_s['num']}: {_s['title']}"] = mo.vstack(_body)
+        _cards[f"### Slice {_s['num']}: {_s['title']}"] = mo.vstack(_body)
     return _cards
 
 
