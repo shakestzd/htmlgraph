@@ -5,7 +5,7 @@ meta:
     description: Every CLI command self-heals by detecting the agent, resolving a session ID, and registering it on-the-fly. Fixes broken attribution chains when session-start hooks fail to fire and positions HtmlGraph as a multi-agent observability tool beyond just Claude Code.
     created_at: "2026-04-07"
     status: draft
-    version: 2
+    version: 3
 design:
     problem: HtmlGraph's attribution chain (work item → session → commit) breaks when the session-start hook fails to fire. This happens when Claude Code sessions restart without triggering hooks, and will always happen for non-Claude agents (Codex, Gemini) that have no hook integration. No global session-ensure mechanism exists today — EnsureSession must be added to 30+ commands individually without a shared insertion point.
     goals:
@@ -140,3 +140,97 @@ questions:
         - key: yes-file-write
           label: 'B: Yes — write to .active-session to enable attribution for manual CLI work'
       answer: no-file-write
+critique:
+    reviewed_at: "2026-04-07"
+    reviewers:
+        - Haiku (design review)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: plausible
+          text: Hook failures cause session gaps
+          evidence: 'Confirmed by dogfooding audit: 34/66 sessions had no active_feature_id'
+        - id: A2
+          status: verified
+          text: PersistentPreRunE chains with subcommand PreRunE
+          evidence: Cobra docs confirmed; no existing PreRunE in cmd/htmlgraph/
+        - id: A3
+          status: plausible
+          text: Hot path under 1ms on indexed PK
+          evidence: Standard SQLite performance; needs benchmark after implementation
+        - id: A4
+          status: verified
+          text: NormaliseSessionID can be moved safely
+          evidence: runner.go:148 — only called within hooks package
+        - id: A5
+          status: verified
+          text: writeActiveSession and readActiveSession can be exported
+          evidence: session_start.go:33,56 — pure helpers, no side effects beyond file IO
+        - id: A6
+          status: verified
+          text: No existing PersistentPreRunE on rootCmd
+          evidence: main.go:20-86 — confirmed by search
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Slice Assessment
+              items:
+                - badge: S1
+                  kind: success
+                  text: Clear spec. ResolveSessionID has concrete 4-step fallback.
+                - badge: S2
+                  kind: success
+                  text: INSERT OR IGNORE pattern is idempotent. Transient skip is clear.
+                - badge: S3
+                  kind: success
+                  text: Skip list explicit. Graceful degradation stated.
+                - badge: S4
+                  kind: warn
+                  text: Fallback changes from claude-code to human — deliberate but tests may break.
+            - heading: Gaps
+              items:
+                - badge: Gap
+                  kind: warn
+                  text: Schema for minimal session row not fully specified
+                - badge: Gap
+                  kind: warn
+                  text: Benchmark test needed for sub-5ms hot path claim
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: What Exists to Leverage
+              items:
+                - badge: OK
+                  kind: success
+                  text: runner.go:148 NormaliseSessionID plus uuidPattern — exact code to move
+                - badge: OK
+                  kind: success
+                  text: ingest.go:284 ensureSession — existing pattern to generalize
+                - badge: OK
+                  kind: success
+                  text: session_start.go:33 writeActiveSession — ready to export
+            - heading: Must Fix Before Implementation
+              items:
+                - badge: Fix
+                  kind: danger
+                  text: activeSessionData struct must be exported for ensure.go to use ReadActiveSession
+                - badge: Fix
+                  kind: danger
+                  text: WriteActiveSession hardcodes ParentAgent as claude-code — must parameterize
+                - badge: Fix
+                  kind: warn
+                  text: S4 test audit needed — tests assuming implicit claude-code fallback will break
+    risks:
+        - risk: activeSessionData unexported — blocks ensure.go from using ReadActiveSession
+          severity: High
+          mitigation: Export as ActiveSessionData in slice 1
+        - risk: S4 fallback change claude-code to human may break hook tests
+          severity: Medium
+          mitigation: Audit tests, add CLAUDECODE=1 to tests that assume claude-code
+        - risk: WriteActiveSession hardcodes agent name
+          severity: Medium
+          mitigation: Parameterize in slice 2
+        - risk: Double DB open in PersistentPreRunE plus command
+          severity: Low
+          mitigation: Acceptable — SQLite WAL handles concurrent opens
+    synthesis: |
+        Plan is feasible with three concrete fixes required before implementation: (1) Export activeSessionData alongside WriteActiveSession and ReadActiveSession. (2) Parameterize WriteActiveSession to accept agent name. (3) Audit hook tests for implicit claude-code assumptions before S4 refactor. All assumptions verified or plausible. No architectural blockers found.
