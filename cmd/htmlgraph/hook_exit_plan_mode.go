@@ -44,8 +44,16 @@ func handleExitPlanMode(event *hooks.CloudEvent, database *sql.DB, projectDir st
 	planID := workitem.GenerateID("plan", title)
 	plan := planyaml.NewPlan(planID, title, description)
 
-	slices := parseMarkdownToSlices(string(data))
-	plan.Slices = slices
+	parsed := parseMarkdown(string(data))
+	plan.Slices = parsed.slices
+
+	// Populate design section from structural headings.
+	if parsed.problem != "" {
+		plan.Design.Problem = parsed.problem
+	}
+	if len(parsed.doneWhen) > 0 && len(plan.Slices) > 0 {
+		plan.Slices[0].DoneWhen = parsed.doneWhen
+	}
 
 	if err := os.MkdirAll(plansDir, 0o755); err != nil {
 		hooks.LogError("exit-plan-mode", event.SessionID, fmt.Sprintf("mkdir plans: %v", err))
@@ -128,11 +136,64 @@ func extractPlanTitleFromMarkdown(content string) (title, description string) {
 // paths with slashes or common source file extensions.
 var mdFilePathPattern = regexp.MustCompile(`(?:^|\s)([\w./\-]+\.(?:go|py|ts|tsx|js|jsx|yaml|yml|json|html|css|sql|sh|toml|mod))`)
 
+// structuralHeadings is the set of markdown headings (lowercased, trimmed)
+// that represent plan metadata sections rather than delivery slices. Content
+// under these headings is routed to the design section, not to slices.
+var structuralHeadings = map[string]struct{}{
+	"context":            {},
+	"background":         {},
+	"overview":           {},
+	"summary":            {},
+	"verification":       {},
+	"testing":            {},
+	"test plan":          {},
+	"tests":              {},
+	"performance":        {},
+	"performance budget": {},
+	"files changed":      {},
+	"file changes":       {},
+	"key files":          {},
+	"dependencies":       {},
+	"prerequisites":      {},
+	"requirements":       {},
+	"risk":               {},
+	"risks":              {},
+	"risk assessment":    {},
+	"notes":              {},
+	"open questions":     {},
+	"key design decisions": {},
+}
+
+// isStructuralHeading reports whether a heading title represents a plan
+// metadata section rather than a delivery slice.
+func isStructuralHeading(title string) bool {
+	_, ok := structuralHeadings[strings.ToLower(strings.TrimSpace(title))]
+	return ok
+}
+
+// parsedPlanData holds intermediate results from markdown parsing before
+// the caller assembles the final YAML plan.
+type parsedPlanData struct {
+	slices      []planyaml.PlanSlice
+	problem     string   // from Context/Background/Overview heading
+	constraints []string // from Verification/Testing heading bullets
+	doneWhen    []string // from Verification/Testing heading bullets
+}
+
 // parseMarkdownToSlices parses markdown headings and their content into
-// PlanSlice structs. Each H2 or H3 heading becomes a slice. Bullet lists
-// under headings populate the "what" field. File paths mentioned in text
-// populate the "files" field. Defaults: effort=M, risk=Med, approved=false.
+// PlanSlice structs. H2/H3 headings that match structuralHeadings are skipped
+// as delivery slices; their content is routed to design metadata instead.
+// Bullet lists under delivery headings populate the "what" field. File paths
+// mentioned in text populate the "files" field.
+// Defaults: effort=M, risk=Med, approved=false.
 func parseMarkdownToSlices(content string) []planyaml.PlanSlice {
+	result := parseMarkdown(content)
+	return result.slices
+}
+
+// parseMarkdown performs full markdown parsing returning both slices and
+// structural metadata extracted from non-delivery sections.
+func parseMarkdown(content string) parsedPlanData {
 	lines := strings.Split(content, "\n")
 	var slices []planyaml.PlanSlice
 
@@ -141,9 +202,26 @@ func parseMarkdownToSlices(content string) []planyaml.PlanSlice {
 	var currentFiles []string
 	filesSeen := map[string]bool{}
 	sliceNum := 0
+	isStructural := false
+
+	var problemLines []string
+	var verificationBullets []string
+	var inProblemSection bool
+	var inVerificationSection bool
 
 	flushSlice := func() {
 		if currentTitle == "" {
+			return
+		}
+		if isStructural {
+			// Route structural section content to metadata, not slices.
+			currentTitle = ""
+			currentWhat = nil
+			currentFiles = nil
+			filesSeen = map[string]bool{}
+			isStructural = false
+			inProblemSection = false
+			inVerificationSection = false
 			return
 		}
 		sliceNum++
@@ -174,11 +252,35 @@ func parseMarkdownToSlices(content string) []planyaml.PlanSlice {
 		if strings.HasPrefix(trimmed, "## ") || strings.HasPrefix(trimmed, "### ") {
 			flushSlice()
 			currentTitle = strings.TrimSpace(strings.TrimLeft(trimmed, "# "))
+			isStructural = isStructuralHeading(currentTitle)
+
+			lower := strings.ToLower(currentTitle)
+			inProblemSection = lower == "context" || lower == "background" || lower == "overview"
+			inVerificationSection = lower == "verification" || lower == "testing" || lower == "test plan" || lower == "tests"
 			continue
 		}
 
 		// Skip H1 (plan title).
 		if strings.HasPrefix(trimmed, "# ") {
+			continue
+		}
+
+		if inProblemSection {
+			if trimmed != "" {
+				problemLines = append(problemLines, trimmed)
+			}
+			continue
+		}
+
+		if inVerificationSection {
+			if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+				verificationBullets = append(verificationBullets, strings.TrimSpace(trimmed[2:]))
+			}
+			continue
+		}
+
+		if isStructural {
+			// Skip content of other structural sections entirely.
 			continue
 		}
 
@@ -200,5 +302,10 @@ func parseMarkdownToSlices(content string) []planyaml.PlanSlice {
 	}
 
 	flushSlice()
-	return slices
+
+	return parsedPlanData{
+		slices:   slices,
+		problem:  strings.Join(problemLines, " "),
+		doneWhen: verificationBullets,
+	}
 }

@@ -35,6 +35,25 @@ Plans without attribution produce untracked work.
 
 ---
 
+## Step 1b: Check for Existing Plan from Plan Mode
+
+If the user just exited Claude Code's plan mode, the `ExitPlanMode` hook may have already created a skeleton YAML:
+
+```bash
+# Check for recently-created plan YAMLs (within last 5 minutes)
+find .htmlgraph/plans/ -name "plan-*.yaml" -mmin -5 2>/dev/null
+```
+
+If a recent YAML exists:
+1. Read it — it will have slices with `what` populated but `why`, `done_when`, `tests`, `files` empty
+2. **Do NOT create a new plan** — use this as the base
+3. Skip to Step 2 (research) to gather context, then enrich the existing YAML in Step 2's output
+4. Use `htmlgraph plan rewrite-yaml <plan-id>` to update the enriched version
+
+If no recent YAML exists, proceed to Step 2 as normal.
+
+---
+
 ## Step 1: Research (Parallel Agents)
 
 Spawn research agents in a single message — do not proceed until both complete:
@@ -322,12 +341,13 @@ After critique agents return, the orchestrator MUST update the plan to address f
 
 ## Step 5: Open for Human Review (PAUSE HERE)
 
-Launch the marimo notebook for interactive review:
+Launch the plan review notebook:
 
 ```bash
-# From the project root or prototypes directory:
-marimo edit prototypes/plan_notebook.py --port 3001 --headless --no-token
+htmlgraph plan review <plan-id> --port 3001
 ```
+
+The `htmlgraph plan review` command handles temp dir extraction, environment variables, and sandbox mode — do not launch marimo directly.
 
 Tell the human:
 

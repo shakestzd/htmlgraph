@@ -151,6 +151,142 @@ func TestParseMarkdownToSlices_Empty(t *testing.T) {
 	}
 }
 
+func TestParseMarkdownToSlices_SkipsStructuralHeadings(t *testing.T) {
+	md := `# My Plan
+
+## Context
+
+Background info about the problem.
+
+## Step 1: Do the thing
+
+- Action item one
+- Action item two
+
+## Verification
+
+- Run go test ./...
+- Check output
+
+## Step 2: Do another thing
+
+- More work here
+
+## Files Changed
+
+Some files listed here.
+
+## Performance
+
+Some perf notes.
+`
+
+	slices := parseMarkdownToSlices(md)
+
+	if len(slices) != 2 {
+		t.Fatalf("got %d slices, want 2 (structural headings should be filtered out)", len(slices))
+	}
+	if slices[0].Title != "Step 1: Do the thing" {
+		t.Errorf("slice[0].Title = %q, want Step 1: Do the thing", slices[0].Title)
+	}
+	if slices[1].Title != "Step 2: Do another thing" {
+		t.Errorf("slice[1].Title = %q, want Step 2: Do another thing", slices[1].Title)
+	}
+	if slices[0].Num != 1 {
+		t.Errorf("slice[0].Num = %d, want 1", slices[0].Num)
+	}
+	if slices[1].Num != 2 {
+		t.Errorf("slice[1].Num = %d, want 2", slices[1].Num)
+	}
+}
+
+func TestParseMarkdown_ContextPopulatesProblem(t *testing.T) {
+	md := `# Plan Title
+
+## Context
+
+This is the problem statement. It explains the background.
+
+## Slice One
+
+- Do something
+`
+
+	result := parseMarkdown(md)
+
+	if result.problem == "" {
+		t.Error("problem should be populated from Context heading")
+	}
+	if !strings.Contains(result.problem, "problem statement") {
+		t.Errorf("problem = %q, want to contain 'problem statement'", result.problem)
+	}
+	if len(result.slices) != 1 {
+		t.Fatalf("got %d slices, want 1", len(result.slices))
+	}
+	if result.slices[0].Title != "Slice One" {
+		t.Errorf("slice[0].Title = %q", result.slices[0].Title)
+	}
+}
+
+func TestParseMarkdown_VerificationPopulatesDoneWhen(t *testing.T) {
+	md := `# Plan Title
+
+## Slice One
+
+- Do the work
+
+## Verification
+
+- Run go test ./...
+- Check the output
+- Verify all pass
+`
+
+	result := parseMarkdown(md)
+
+	if len(result.doneWhen) != 3 {
+		t.Fatalf("got %d doneWhen items, want 3", len(result.doneWhen))
+	}
+	if result.doneWhen[0] != "Run go test ./..." {
+		t.Errorf("doneWhen[0] = %q", result.doneWhen[0])
+	}
+	if len(result.slices) != 1 {
+		t.Fatalf("got %d slices, want 1", len(result.slices))
+	}
+}
+
+func TestIsStructuralHeading(t *testing.T) {
+	structural := []string{
+		"Context", "context", "CONTEXT",
+		"Background", "Overview", "Summary",
+		"Verification", "Testing", "Test plan", "Tests",
+		"Performance", "Performance budget",
+		"Files Changed", "File Changes", "Key Files",
+		"Dependencies", "Prerequisites", "Requirements",
+		"Risk", "Risks", "Risk assessment",
+		"Notes", "Open questions",
+		"Key Design Decisions",
+	}
+	for _, h := range structural {
+		if !isStructuralHeading(h) {
+			t.Errorf("isStructuralHeading(%q) = false, want true", h)
+		}
+	}
+
+	notStructural := []string{
+		"Step 1: Setup",
+		"Implement caching",
+		"Refactor auth module",
+		"Add database migrations",
+		"Wire into CLI",
+	}
+	for _, h := range notStructural {
+		if isStructuralHeading(h) {
+			t.Errorf("isStructuralHeading(%q) = true, want false", h)
+		}
+	}
+}
+
 func TestMostRecentMarkdownFile(t *testing.T) {
 	dir := t.TempDir()
 

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Plan skill: detect and enrich ExitPlanMode hook output instead of creating new YAML</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-69a6b124"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-07T18:34:17.075051"
+             data-updated="2026-04-07T18:39:50.263596" data-agent-assigned="claude-code" data-track-id="trk-f8fd5c66">
+
+        <header>
+            <h1>Plan skill: detect and enrich ExitPlanMode hook output instead of creating new YAML</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f8fd5c66.html" data-relationship="part_of" data-since="2026-04-07T18:34:17.077414">trk-f8fd5c66</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="90f35b01-f3f4-4536-a950-42c2eae34c80.html" data-relationship="implemented_in" data-since="2026-04-07T18:34:30.164185">session 90f35b01-f3f4-4536-a950-42c2eae34c80</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>The /htmlgraph:plan skill has no awareness that ExitPlanMode hook auto-converts .md plans to skeleton YAML. The skill always creates a new plan from scratch. Fix: add a conditional branch at Step 2 — check .htmlgraph/plans/ for a recently-created YAML (within last 2 minutes), and if found, enrich it (populate why, done_when, tests, files, design) instead of creating a duplicate.</p>
+        </section>
+    </article>
+</body>
+</html>
