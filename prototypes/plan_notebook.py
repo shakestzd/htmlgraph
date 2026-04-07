@@ -462,12 +462,22 @@ def _(ClaudeChatBackend, htmlgraph_dir, mo, parse_amendments, persist_amendment,
                     for m in messages]
             _all.append({"role": "assistant", "content": _full})
             _backend.save_messages(_all)
+            _amendments = []
             try:
                 for _a in parse_amendments(_full):
                     _aid = f"amend-{hash((_a['slice_num'], _a['field'], _a['content'])) & 0xFFFFFF:06x}"
                     persist_amendment(plan_id, _a, _aid)
+                    _amendments.append(_a)
             except Exception:
                 pass
+
+            if _amendments:
+                _confirm = "\n\n---\n"
+                for _a in _amendments:
+                    _confirm += f"✅ **Amendment logged:** slice-{_a['slice_num']} {_a['operation']} {_a['field']}\n"
+                _confirm += "\n*Run `htmlgraph plan rewrite-yaml` to apply accepted amendments.*"
+                yield _confirm
+                _full += _confirm
 
         if not _available and _has_fallback:
             _items.append(mo.callout(mo.md(

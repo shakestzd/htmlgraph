@@ -441,6 +441,12 @@ func runRewriteYAML(planID, filePath string) error {
 		return fmt.Errorf("meta.id %q in new content does not match plan ID %q", newPlan.Meta.ID, planID)
 	}
 
+	// Apply accepted amendments from plan_feedback before saving.
+	amendmentsApplied, err := applyAcceptedAmendments(htmlgraphDir, planID, newPlan)
+	if err != nil {
+		return fmt.Errorf("apply amendments: %w", err)
+	}
+
 	// Write validated content.
 	if err := planyaml.Save(planPath, newPlan); err != nil {
 		return fmt.Errorf("save plan: %w", err)
@@ -449,8 +455,135 @@ func runRewriteYAML(planID, filePath string) error {
 	commitPlanChange(planPath, fmt.Sprintf("plan(%s): rewrite — %d slices, %d questions",
 		planID, len(newPlan.Slices), len(newPlan.Questions)))
 
+	if amendmentsApplied > 0 {
+		fmt.Printf("Amendments applied: %d\n", amendmentsApplied)
+	}
 	fmt.Printf("Plan %s rewritten: %d slices, %d questions\n", planID, len(newPlan.Slices), len(newPlan.Questions))
 	return nil
+}
+
+// amendmentValue is the JSON payload stored in plan_feedback.value for amendments.
+type amendmentValue struct {
+	SliceNum  int    `json:"slice_num"`
+	Operation string `json:"operation"`
+	Field     string `json:"field"`
+	Content   string `json:"content"`
+}
+
+// applyAcceptedAmendments queries accepted amendments for planID, applies them
+// to the in-memory plan, marks them applied in the DB, and returns the count.
+func applyAcceptedAmendments(htmlgraphDir, planID string, plan *planyaml.PlanYAML) (int, error) {
+	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	db, err := dbpkg.Open(dbPath)
+	if err != nil {
+		return 0, fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query(
+		`SELECT question_id, value FROM plan_feedback WHERE plan_id = ? AND section = 'amendment' AND action = 'accepted'`,
+		planID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("query amendments: %w", err)
+	}
+	defer rows.Close()
+
+	type pendingAmendment struct {
+		questionID string
+		amendment  amendmentValue
+	}
+	var pending []pendingAmendment
+	for rows.Next() {
+		var qid, value string
+		if err := rows.Scan(&qid, &value); err != nil {
+			return 0, fmt.Errorf("scan amendment row: %w", err)
+		}
+		var a amendmentValue
+		if err := json.Unmarshal([]byte(value), &a); err != nil {
+			return 0, fmt.Errorf("parse amendment JSON (question_id=%s): %w", qid, err)
+		}
+		pending = append(pending, pendingAmendment{questionID: qid, amendment: a})
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("iterate amendment rows: %w", err)
+	}
+	rows.Close()
+
+	if len(pending) == 0 {
+		return 0, nil
+	}
+
+	// Apply each amendment to the in-memory plan.
+	applied := 0
+	for _, p := range pending {
+		a := p.amendment
+		// Find target slice by slice_num (1-indexed).
+		sliceIdx := -1
+		for i, s := range plan.Slices {
+			if s.Num == a.SliceNum {
+				sliceIdx = i
+				break
+			}
+		}
+		if sliceIdx < 0 {
+			// Slice not found — skip but still mark applied so we don't retry forever.
+			fmt.Fprintf(os.Stderr, "amendment %s: slice_num %d not found, skipping\n", p.questionID, a.SliceNum)
+		} else {
+			switch a.Operation {
+			case "add":
+				switch a.Field {
+				case "done_when":
+					plan.Slices[sliceIdx].DoneWhen = append(plan.Slices[sliceIdx].DoneWhen, a.Content)
+				case "files":
+					plan.Slices[sliceIdx].Files = append(plan.Slices[sliceIdx].Files, a.Content)
+				}
+			case "remove":
+				switch a.Field {
+				case "done_when":
+					plan.Slices[sliceIdx].DoneWhen = removeString(plan.Slices[sliceIdx].DoneWhen, a.Content)
+				case "files":
+					plan.Slices[sliceIdx].Files = removeString(plan.Slices[sliceIdx].Files, a.Content)
+				}
+			case "set":
+				switch a.Field {
+				case "title":
+					plan.Slices[sliceIdx].Title = a.Content
+				case "what":
+					plan.Slices[sliceIdx].What = a.Content
+				case "why":
+					plan.Slices[sliceIdx].Why = a.Content
+				case "effort":
+					plan.Slices[sliceIdx].Effort = a.Content
+				case "risk":
+					plan.Slices[sliceIdx].Risk = a.Content
+				}
+			}
+		}
+
+		// Mark as applied regardless of whether the slice was found.
+		_, err = db.Exec(
+			`UPDATE plan_feedback SET action = 'applied' WHERE plan_id = ? AND question_id = ?`,
+			planID, p.questionID,
+		)
+		if err != nil {
+			return applied, fmt.Errorf("mark amendment applied (question_id=%s): %w", p.questionID, err)
+		}
+		applied++
+	}
+
+	return applied, nil
+}
+
+// removeString returns a copy of ss with all occurrences of s removed.
+func removeString(ss []string, s string) []string {
+	var result []string
+	for _, v := range ss {
+		if v != s {
+			result = append(result, v)
+		}
+	}
+	return result
 }
 
 // planReadFeedbackYAMLCmd queries plan_feedback for a YAML plan and outputs JSON.
