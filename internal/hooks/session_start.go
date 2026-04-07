@@ -15,10 +15,10 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
-// activeSessionData is the JSON structure written to .htmlgraph/.active-session
+// ActiveSessionData is the JSON structure written to .htmlgraph/.active-session
 // as a fallback propagation mechanism when CLAUDE_ENV_FILE is unset (worktree
 // subagents). All fields mirror what writeEnvVars() exports via CLAUDE_ENV_FILE.
-type activeSessionData struct {
+type ActiveSessionData struct {
 	SessionID     string  `json:"session_id"`
 	ParentSession string  `json:"parent_session,omitempty"`
 	ParentAgent   string  `json:"parent_agent,omitempty"`
@@ -28,13 +28,13 @@ type activeSessionData struct {
 	Timestamp     float64 `json:"timestamp"`
 }
 
-// writeActiveSession writes session context to .htmlgraph/.active-session so
+// WriteActiveSession writes session context to .htmlgraph/.active-session so
 // worktree subagent hooks can read session ID even when CLAUDE_ENV_FILE is unset.
-func writeActiveSession(sessionID, projectDir string) {
+func WriteActiveSession(sessionID, projectDir string) {
 	if projectDir == "" {
 		return
 	}
-	data := activeSessionData{
+	data := ActiveSessionData{
 		SessionID:    sessionID,
 		ParentSession: sessionID,
 		ParentAgent:  "claude-code",
@@ -51,9 +51,9 @@ func writeActiveSession(sessionID, projectDir string) {
 	_ = os.WriteFile(path, b, 0o644)
 }
 
-// readActiveSession reads session context from .htmlgraph/.active-session.
+// ReadActiveSession reads session context from .htmlgraph/.active-session.
 // Returns nil when the file doesn't exist or can't be parsed.
-func readActiveSession(projectDir string) *activeSessionData {
+func ReadActiveSession(projectDir string) *ActiveSessionData {
 	if projectDir == "" {
 		return nil
 	}
@@ -62,7 +62,7 @@ func readActiveSession(projectDir string) *activeSessionData {
 	if err != nil {
 		return nil
 	}
-	var data activeSessionData
+	var data ActiveSessionData
 	if err := json.Unmarshal(b, &data); err != nil {
 		return nil
 	}
@@ -297,7 +297,7 @@ func upsertSession(database *sql.DB, s *models.Session) error {
 // is unavailable (YOLO mode, worktree subagents, plugin-dir launches).
 func writeEnvVars(sessionID, projectDir string) {
 	// Always write .active-session as backup — prevents stale session IDs.
-	writeActiveSession(sessionID, projectDir)
+	WriteActiveSession(sessionID, projectDir)
 
 	envFile := os.Getenv("CLAUDE_ENV_FILE")
 	if envFile == "" {

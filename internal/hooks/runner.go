@@ -11,8 +11,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 
+	"github.com/shakestzd/htmlgraph/internal/agent"
 	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
@@ -135,33 +135,11 @@ func DBPath(projectDir string) string {
 	return filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db")
 }
 
-// uuidPattern matches RFC 4122 UUID format (8-4-4-4-12).
-// Pre-compiled at module load to avoid repeated compilation on every hook invocation.
-var uuidPattern = regexp.MustCompile(`([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`)
-
 // NormaliseSessionID extracts a UUID from a path-style session_id that Claude
-// Code sometimes provides for subagent sessions, e.g.:
-//
-//	/private/tmp/claude-501/-Users-shakes-.../550e8400-e29b-41d4-a716-446655440000
-//
-// If no UUID is found the original string is returned unchanged.
+// Code sometimes provides for subagent sessions. Delegates to agent package.
+// Kept here as a package-level alias so existing hooks callers are unchanged.
 func NormaliseSessionID(raw string) string {
-	if raw == "" || !containsSlash(raw) {
-		return raw
-	}
-	if m := uuidPattern.FindString(raw); m != "" {
-		return m
-	}
-	return raw
-}
-
-func containsSlash(s string) bool {
-	for _, c := range s {
-		if c == '/' {
-			return true
-		}
-	}
-	return false
+	return agent.NormaliseSessionID(raw)
 }
 
 // EnvSessionID returns the current session ID using a three-step fallback:
@@ -175,14 +153,14 @@ func EnvSessionID(eventSessionID string) string {
 	// Prefer the CloudEvent session_id — it's always correct for this hook
 	// invocation. The .active-session file can become stale when
 	// CLAUDE_ENV_FILE is unavailable (e.g. YOLO mode, worktree subagents).
-	if sid := NormaliseSessionID(eventSessionID); sid != "" {
+	if sid := agent.NormaliseSessionID(eventSessionID); sid != "" {
 		return sid
 	}
 	// Last resort: .active-session file.
 	cwd, _ := os.Getwd()
 	projectDir := ResolveProjectDir(cwd, "")
 	if projectDir != "" {
-		if as := readActiveSession(projectDir); as != nil && as.SessionID != "" {
+		if as := ReadActiveSession(projectDir); as != nil && as.SessionID != "" {
 			return as.SessionID
 		}
 	}

@@ -78,9 +78,9 @@ func TestSessionStartActiveSessionContainsProjectDir(t *testing.T) {
 	}
 
 	// .active-session should have been written (CLAUDE_ENV_FILE unset path).
-	active := readActiveSession(projectDir)
+	active := ReadActiveSession(projectDir)
 	if active == nil {
-		t.Fatal("readActiveSession returned nil — .active-session not written")
+		t.Fatal("ReadActiveSession returned nil — .active-session not written")
 	}
 	if active.ProjectDir != projectDir {
 		t.Errorf(".active-session project_dir mismatch: got %q, want %q", active.ProjectDir, projectDir)
@@ -122,13 +122,13 @@ func TestSessionStartWorktreeParentSessionIDPopulated(t *testing.T) {
 	}
 
 	// Write .active-session as the outer YOLO session would have done so that
-	// readActiveSession can return the parent session ID.
-	writeActiveSession(parentSessionID, mainDir)
+	// ReadActiveSession can return the parent session ID.
+	WriteActiveSession(parentSessionID, mainDir)
 
-	// Verify readActiveSession round-trips correctly.
-	as := readActiveSession(mainDir)
+	// Verify ReadActiveSession round-trips correctly.
+	as := ReadActiveSession(mainDir)
 	if as == nil || as.SessionID != parentSessionID {
-		t.Fatalf("readActiveSession: got %v, want session_id=%q", as, parentSessionID)
+		t.Fatalf("ReadActiveSession: got %v, want session_id=%q", as, parentSessionID)
 	}
 
 	// Simulate what SessionStart does after resolveWorktreeParentSession
