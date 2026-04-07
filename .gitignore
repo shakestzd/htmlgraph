@@ -129,6 +129,7 @@ _build/
 archive/
 packages/go-plugin/hooks/bin/
 hooks/bin/
+plugin/hooks/bin/htmlgraph
 
 # Notebook files copied at build time from prototypes/ (do not commit)
 internal/notebook/files/

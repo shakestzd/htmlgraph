@@ -116,7 +116,7 @@ if [[ "$BRANCH" != "main" ]]; then
     if ! confirm "Continue anyway?"; then exit 1; fi
 fi
 
-if [[ -n "$(git status --porcelain -- cmd/ internal/ go.mod plugin/hooks plugin/.claude-plugin)" ]]; then
+if [[ -n "$(git status --porcelain -- cmd/ internal/ go.mod plugin/hooks/hooks.json plugin/.claude-plugin)" ]]; then
     warn "Uncommitted changes in source files"
     git status --short -- cmd/ internal/ go.mod plugin/hooks plugin/.claude-plugin
     if ! confirm "Continue anyway?"; then exit 1; fi
@@ -214,7 +214,7 @@ fi
 step "Update local install"
 
 if $DRY_RUN; then
-    ok "[dry-run] Would pull marketplace clone and run claude plugin update"
+    ok "[dry-run] Would pull marketplace clone"
     ok "[dry-run] Would rebuild CLI binary via plugin/build.sh"
 else
     # 1. Pull the marketplace clone so `claude plugin update` sees the new version.
@@ -230,33 +230,10 @@ else
         warn "Marketplace clone not found at $MARKETPLACE_DIR — skipping pull"
     fi
 
-    # 2. Reinstall the plugin (uninstall + install).
-    #    A simple `claude plugin update` bumps the version but keeps the old
-    #    gitCommitSha, which Claude Code uses to resolve the plugin subdirectory
-    #    within the marketplace clone.  After a project restructure (e.g.
-    #    packages/go-plugin → plugin/) the stale SHA points to a path that no
-    #    longer exists, breaking hooks in ALL projects on this machine.
-    #    Reinstalling gives a clean gitCommitSha and installPath.
-    if command -v claude >/dev/null 2>&1; then
-        claude plugin uninstall htmlgraph@htmlgraph 2>/dev/null
-        claude plugin install htmlgraph@htmlgraph 2>&1 | tail -1
-        # Re-enable in settings (uninstall clears the enabled flag).
-        python3 -c "
-import json, os
-f = os.path.expanduser('~/.claude/settings.json')
-try:
-    d = json.load(open(f))
-    d.setdefault('enabledPlugins', {})['htmlgraph@htmlgraph'] = True
-    json.dump(d, open(f, 'w'), indent=2)
-except Exception:
-    pass
-" 2>/dev/null
-        ok "Plugin reinstalled"
-    else
-        warn "claude CLI not found — skipping plugin reinstall"
-    fi
-
-    # 3. Rebuild CLI binary so ~/.local/bin/htmlgraph matches the release.
+    # 2. Rebuild CLI binary so ~/.local/bin/htmlgraph matches the release.
+    #    Plugin hooks use `htmlgraph` (PATH lookup), not the bundled binary.
+    #    No plugin reinstall needed — the marketplace clone update (above)
+    #    is sufficient. Reinstalling interferes with dev mode (--plugin-dir).
     if [[ -f "$PROJECT_ROOT/plugin/build.sh" ]]; then
         sh "$PROJECT_ROOT/plugin/build.sh" 2>&1 | tail -1
         ok "CLI binary rebuilt"

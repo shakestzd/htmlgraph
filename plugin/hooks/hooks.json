@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook session-start"
+            "command": "htmlgraph hook session-start"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook session-end"
+            "command": "htmlgraph hook session-end"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook user-prompt"
+            "command": "htmlgraph hook user-prompt"
           }
         ]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook pretooluse"
+            "command": "htmlgraph hook pretooluse"
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook posttooluse"
+            "command": "htmlgraph hook posttooluse"
           }
         ]
       },
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook exit-plan-mode",
+            "command": "htmlgraph hook exit-plan-mode",
             "timeout": 30
           }
         ]
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook subagent-start"
+            "command": "htmlgraph hook subagent-start"
           }
         ]
       }
@@ -82,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook subagent-stop"
+            "command": "htmlgraph hook subagent-stop"
           }
         ]
       }
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook stop"
+            "command": "htmlgraph hook stop"
           }
         ]
       }
@@ -104,7 +104,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook posttooluse-failure"
+            "command": "htmlgraph hook posttooluse-failure"
           }
         ]
       }
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook pre-compact"
+            "command": "htmlgraph hook pre-compact"
           }
         ]
       }
@@ -126,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook teammate-idle"
+            "command": "htmlgraph hook teammate-idle"
           }
         ]
       }
@@ -137,7 +137,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook task-completed"
+            "command": "htmlgraph hook task-completed"
           }
         ]
       }
@@ -148,7 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook instructions-loaded"
+            "command": "htmlgraph hook instructions-loaded"
           }
         ]
       }
@@ -159,7 +159,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook worktree-create"
+            "command": "htmlgraph hook worktree-create"
           }
         ]
       }
@@ -170,7 +170,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook worktree-remove"
+            "command": "htmlgraph hook worktree-remove"
           }
         ]
       }
@@ -181,7 +181,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook post-compact"
+            "command": "htmlgraph hook post-compact"
           }
         ]
       }
@@ -192,7 +192,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook task-created"
+            "command": "htmlgraph hook task-created"
           }
         ]
       }
@@ -203,7 +203,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/bin/htmlgraph hook permission-request"
+            "command": "htmlgraph hook permission-request"
           }
         ]
       }
