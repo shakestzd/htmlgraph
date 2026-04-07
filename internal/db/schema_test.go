@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -195,6 +196,61 @@ func TestIntegrityCheck(t *testing.T) {
 	}
 	if !ok {
 		t.Error("integrity check failed on fresh database")
+	}
+}
+
+func TestTotalEventsIncrementTrigger(t *testing.T) {
+	database, err := db.Open("file::memory:?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer database.Close()
+
+	now := time.Now().UTC()
+	sess := &models.Session{
+		SessionID:     "sess-trigger-001",
+		AgentAssigned: "claude-code",
+		CreatedAt:     now,
+		Status:        "active",
+	}
+	if err := db.InsertSession(database, sess); err != nil {
+		t.Fatalf("InsertSession: %v", err)
+	}
+
+	// Verify total_events starts at 0.
+	got, err := db.GetSession(database, "sess-trigger-001")
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if got.TotalEvents != 0 {
+		t.Errorf("initial total_events: got %d, want 0", got.TotalEvents)
+	}
+
+	// Insert 3 events — trigger should increment total_events each time.
+	for i := 0; i < 3; i++ {
+		e := &models.AgentEvent{
+			EventID:   fmt.Sprintf("evt-trigger-%d", i),
+			AgentID:   "claude-code",
+			EventType: models.EventToolCall,
+			Timestamp: now.Add(time.Duration(i) * time.Second),
+			ToolName:  "Bash",
+			SessionID: "sess-trigger-001",
+			Status:    "recorded",
+			Source:    "hook",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := db.InsertEvent(database, e); err != nil {
+			t.Fatalf("InsertEvent[%d]: %v", i, err)
+		}
+	}
+
+	got, err = db.GetSession(database, "sess-trigger-001")
+	if err != nil {
+		t.Fatalf("GetSession after events: %v", err)
+	}
+	if got.TotalEvents != 3 {
+		t.Errorf("total_events after 3 inserts: got %d, want 3", got.TotalEvents)
 	}
 }
 

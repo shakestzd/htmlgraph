@@ -54,6 +54,23 @@ func Open(dbPath string) (*sql.DB, error) {
 	db.Exec(`DROP TABLE IF EXISTS agent_collaboration`)
 	db.Exec(`DROP TABLE IF EXISTS agent_presence`)
 
+	// Trigger: auto-increment sessions.total_events on each agent_event insert.
+	db.Exec(`CREATE TRIGGER IF NOT EXISTS trg_increment_total_events
+		AFTER INSERT ON agent_events
+		FOR EACH ROW
+		BEGIN
+			UPDATE sessions
+			SET total_events = total_events + 1
+			WHERE session_id = NEW.session_id;
+		END`)
+
+	// Backfill total_events for existing sessions that were created before the trigger.
+	db.Exec(`UPDATE sessions SET total_events = (
+		SELECT COUNT(*) FROM agent_events WHERE agent_events.session_id = sessions.session_id
+	) WHERE total_events = 0 AND EXISTS (
+		SELECT 1 FROM agent_events WHERE agent_events.session_id = sessions.session_id
+	)`)
+
 	return db, nil
 }
 
