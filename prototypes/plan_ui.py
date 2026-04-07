@@ -123,9 +123,12 @@ def render_slice_cards(slices, saved_feedback, effort_badge_fn, risk_badge_fn, m
         else:
             # Static mode: read from saved_feedback
             _approved_val = saved_feedback.get(f"slice-{_s['num']}:approve", "false").lower() == "true"
-            _approval_badge = mo.callout(
-                mo.md("Approved" if _approved_val else "Not approved"),
-                kind="success" if _approved_val else "neutral",
+            _a_bg, _a_fg = ("#dcfce7", "#166534") if _approved_val else ("#f3f4f6", "#6b7280")
+            _a_label = "✓ Approved" if _approved_val else "○ Not approved"
+            _approval_badge = mo.Html(
+                f'<span style="display:inline-block;padding:2px 10px;border-radius:12px;'
+                f'font-size:0.8rem;font-weight:500;background:{_a_bg};color:{_a_fg}">'
+                f'{_a_label}</span>'
             )
             _top_row = mo.hstack([_approval_badge, _badges], justify="space-between")
 
@@ -244,13 +247,19 @@ def render_feedback_summary(plan, design_ok, approved_slices, total_slices,
 
     finalize_btn = mo.ui.run_button(label="Finalize Plan")
 
-    def decision_display(answer):
-        return mo.md(f"**{answer}**") if answer else status_badge("unanswered")
-
-    decisions_table = mo.ui.table(
-        [{"Question": q["text"], "Decision": decision_display(answers.get(q["id"]))}
-         for q in questions],
-        selection=None, label="Decisions Made",
+    _decision_rows = "".join(
+        f"<tr><td style='padding:8px 12px;border-bottom:1px solid #e5e7eb'>{q['text']}</td>"
+        f"<td style='padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600'>"
+        f"{answers.get(q['id']) or '<em>pending</em>'}</td></tr>"
+        for q in questions
+    )
+    decisions_table = mo.Html(
+        f"<div style='margin:8px 0'><strong>Decisions Made</strong>"
+        f"<table style='width:100%;border-collapse:collapse;margin-top:8px'>"
+        f"<thead><tr style='border-bottom:2px solid #d1d5db'>"
+        f"<th style='text-align:left;padding:8px 12px'>Question</th>"
+        f"<th style='text-align:left;padding:8px 12px'>Decision</th></tr></thead>"
+        f"<tbody>{_decision_rows}</tbody></table></div>"
     )
 
     summary = mo.vstack([
