@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Auto-detect bare Claude launch and nudge orchestrator skill loading</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-a1c4abfb"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-07T22:48:00.448699"
+             data-updated="2026-04-07T22:51:49.841721" data-agent-assigned="claude-code" data-track-id="trk-06a29a51">
+
+        <header>
+            <h1>Auto-detect bare Claude launch and nudge orchestrator skill loading</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="90f35b01-f3f4-4536-a950-42c2eae34c80.html" data-relationship="implemented_in" data-since="2026-04-07T22:48:08.109943">session 90f35b01-f3f4-4536-a950-42c2eae34c80</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-06a29a51.html" data-relationship="part_of" data-since="2026-04-07T22:48:00.450181">trk-06a29a51</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When a user starts claude without htmlgraph CLI (bare launch), the session-start hook should detect this (no HTMLGRAPH_ORCHESTRATOR env var) and return AdditionalContext that nudges Claude to load the orchestrator skill. This ensures HtmlGraph's delegation guidance is active regardless of how Claude was started.</p>
+        </section>
+    </article>
+</body>
+</html>

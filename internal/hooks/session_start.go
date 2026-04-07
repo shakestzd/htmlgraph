@@ -69,6 +69,35 @@ func readActiveSession(projectDir string) *activeSessionData {
 	return &data
 }
 
+// launchModeFile is the JSON structure written to .htmlgraph/.launch-mode by
+// `htmlgraph claude`. It records how the current Claude session was started.
+type launchModeFile struct {
+	Mode      string `json:"mode"`
+	PID       int    `json:"pid"`
+	Timestamp string `json:"timestamp"`
+}
+
+// bareLaunchNudge returns a context nudge when Claude was started without
+// `htmlgraph claude` (i.e. .launch-mode is missing or older than 30 seconds).
+// Returns an empty string when the orchestrator system prompt is already active.
+func bareLaunchNudge(projectDir string) string {
+	if projectDir == "" {
+		return ""
+	}
+	path := filepath.Join(projectDir, ".htmlgraph", ".launch-mode")
+	info, err := os.Stat(path)
+	if err == nil {
+		// File exists — check if it was written within the last 30 seconds.
+		if time.Since(info.ModTime()) <= 30*time.Second {
+			return ""
+		}
+	}
+	return "HtmlGraph plugin is active in this project. For the best experience with orchestrated delegation, " +
+		"work tracking, and quality gates, use the /htmlgraph:orchestrator-directives-skill for guidance " +
+		"on how to delegate work, select models, and manage tasks. You can also start sessions with " +
+		"`htmlgraph claude` for automatic orchestrator mode."
+}
+
 // SessionStart handles the SessionStart Claude Code hook event.
 // It upserts a session row in SQLite and writes environment variables for
 // downstream hooks via CLAUDE_ENV_FILE.
@@ -149,6 +178,12 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 	if warning != "" {
 		debugLog(projectDir, "[session-start] version mismatch detected: %s", warning)
 		return &HookResult{AdditionalContext: warning}, nil
+	}
+
+	// Nudge the user toward the orchestrator skill when Claude was launched
+	// without `htmlgraph claude` (bare launch — no orchestrator system prompt).
+	if nudge := bareLaunchNudge(projectDir); nudge != "" {
+		return &HookResult{AdditionalContext: nudge}, nil
 	}
 
 	return &HookResult{}, nil

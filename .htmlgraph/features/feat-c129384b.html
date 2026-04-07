@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>PersistentPreRunE wiring in main.go</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-c129384b"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-07T22:36:28.296116"
+             data-updated="2026-04-07T22:36:28.297181" data-agent-assigned="claude-code" data-track-id="trk-16d4519d">
+
+        <header>
+            <h1>PersistentPreRunE wiring in main.go</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-3a88d8a9.html" data-relationship="planned_in" data-since="2026-04-07T22:36:28.296253">plan-3a88d8a9</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-1fc36075.html" data-relationship="blocked_by">feat-1fc36075</a></li>
+                    <li><a href="feat-4a9062d5.html" data-relationship="blocked_by">feat-4a9062d5</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Add PersistentPreRunE to rootCmd in cmd/htmlgraph/main.go before rootCmd.Execute(). Skip list: version, help, init, build, install-hooks, setup, setup-cli. Walk parent chain to skip hook subtree. Call agent.EnsureSession(database, projectDir) after opening DB. Degrade gracefully if findHtmlgraphDir() or db.Open() fails — return nil, not an error.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,7 +1,11 @@
 ---
 id: orchestrator-directives
 name: Orchestrator Directives Skill
-description: Cost-first delegation patterns and decision frameworks for multi-AI coordination
+description: >-
+  HtmlGraph orchestration patterns for AI-assisted development. Use when working on code in an
+  HtmlGraph project — provides delegation patterns, model selection, quality gates, and work
+  tracking guidance. Activate when planning work, delegating to agents, debugging, building
+  features, or managing tasks.
 trigger: "when user asks about delegation, orchestration, or cost optimization"
 visibility: "always"
 tags: ["delegation", "orchestration", "cost-optimization", "multi-ai", "spawners"]

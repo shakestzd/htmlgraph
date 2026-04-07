@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>EnsureSession guard — ensure.go</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-4a9062d5"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-07T22:36:28.295783"
+             data-updated="2026-04-07T22:51:21.285637" data-agent-assigned="claude-code" data-track-id="trk-16d4519d">
+
+        <header>
+            <h1>EnsureSession guard — ensure.go</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-3a88d8a9.html" data-relationship="planned_in" data-since="2026-04-07T22:36:28.29593">plan-3a88d8a9</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-1fc36075.html" data-relationship="blocked_by">feat-1fc36075</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="092e7ea2-6476-400e-9813-943e9e329622.html" data-relationship="implemented_in" data-since="2026-04-07T22:50:26.645494">session 092e7ea2-6476-400e-9813-943e9e329622</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>New file internal/agent/ensure.go exporting EnsureSession(db *sql.DB, projectDir string) (string, error). Flow: (1) ResolveSessionID() to get session ID, (2) Detect() to get agent info, (3) if ID starts with "cli-" skip DB and return (transient), (4) SELECT COUNT(*) FROM sessions WHERE session_id = ? hot path indexed PK, (5) if exists set env and return, (6) if missing INSERT OR IGNORE minimal session row + WriteActiveSession() + os.Setenv. Minimal session row: session_id, agent_assigned, created_at, status=active, model, project_dir, git_remote_url. Export WriteActiveSession() and ReadActiveSession() from internal/hooks/session_start.go.</p>
+        </section>
+    </article>
+</body>
+</html>
