@@ -54,9 +54,9 @@ func TestRunPlanCreateFromTopic(t *testing.T) {
 		t.Error("plan HTML should contain PLAN_SECTIONS_JSON")
 	}
 
-	// Verify SECTIONS_JSON starts with just design and outline (no slices yet).
-	if !strings.Contains(html, `["design","outline"]`) {
-		t.Error("CRISPI plan should start with [design,outline] sections")
+	// Verify SECTIONS_JSON starts with just design (outline hidden when empty).
+	if !strings.Contains(html, `["design"]`) {
+		t.Error("CRISPI plan should start with [design] section")
 	}
 }
 

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard integration: embedded plan detail panel</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-d99f8e77"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T01:05:56.516584"
+             data-updated="2026-04-08T01:05:56.51861" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>Dashboard integration: embedded plan detail panel</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-f096172b.html" data-relationship="planned_in" data-since="2026-04-08T01:05:56.516717">plan-f096172b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-57196d42.html" data-relationship="blocked_by">feat-57196d42</a></li>
+                    <li><a href="feat-b84cf383.html" data-relationship="blocked_by">feat-b84cf383</a></li>
+                    <li><a href="feat-90da6e9b.html" data-relationship="blocked_by">feat-90da6e9b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Replace the new-tab navigation pattern in cmd/htmlgraph/dashboard/js/app.js (window.open('/plans/{id}.html', '_blank')) with an in-dashboard detail panel. Add a plan-detail
+to cmd/htmlgraph/dashboard/index.html matching the existing transcript-detail and work-detail pattern. When a plan row is clicked, fetch the plan content via a new GET /api/plans/{id}/render endpoint in cmd/htmlgraph/api_plans.go that returns the plan body HTML (without the outer shell/sidebar — just the content zones). Inject the response into the plan-detail panel. Reconcile the plan CSS tokens with the dashboard design system — either scope plan styles under a .plan-detail container or migrate plan_page.gohtml to use dashboard token names (--bg-primary, --text-primary, --text-secondary). Add plan events via a scoped /api/plans/{id}/events SSE endpoint (not the global /api/events/stream) that pushes plan_feedback and plan_finalized events for the viewed plan only. Add a plan stats counter to the dashboard header (pending reviews count). Add status filter dropdown to the plans table matching the Activity view pattern.</p>
+        </section>
+    </article>
+</body>
+</html>

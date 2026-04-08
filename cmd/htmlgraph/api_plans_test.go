@@ -350,3 +350,213 @@ func TestBuildFeedbackResponse_NotAllApproved(t *testing.T) {
 		t.Errorf("status: got %q, want draft", resp.Status)
 	}
 }
+
+// ---- buildFeedbackResponse: chat messages ----------------------------------
+
+func TestBuildFeedbackResponse_IncludesChatMessages(t *testing.T) {
+	messagesJSON := `[{"role":"user","content":"hello","timestamp":"2026-04-07T10:00:00Z"},{"role":"assistant","content":"hi there","timestamp":"2026-04-07T10:00:01Z"}]`
+	entries := []db.PlanFeedback{
+		{PlanID: "p1", Section: "design", Action: "approve", Value: "true"},
+		{PlanID: "p1", Section: "chat", Action: "messages", Value: messagesJSON},
+	}
+	resp := buildFeedbackResponse("p1", entries)
+
+	if len(resp.ChatMessages) != 2 {
+		t.Fatalf("chat_messages count: got %d, want 2", len(resp.ChatMessages))
+	}
+	if resp.ChatMessages[0].Role != "user" || resp.ChatMessages[0].Content != "hello" {
+		t.Errorf("chat_messages[0]: got %+v", resp.ChatMessages[0])
+	}
+	if resp.ChatMessages[1].Role != "assistant" || resp.ChatMessages[1].Content != "hi there" {
+		t.Errorf("chat_messages[1]: got %+v", resp.ChatMessages[1])
+	}
+}
+
+func TestBuildFeedbackResponse_ChatDoesNotAffectApprovalStatus(t *testing.T) {
+	// Chat section entries (session_id, messages) should not count as
+	// "sections" for approval status calculation.
+	messagesJSON := `[{"role":"user","content":"q","timestamp":"2026-04-07T10:00:00Z"}]`
+	entries := []db.PlanFeedback{
+		{PlanID: "p1", Section: "a", Action: "approve", Value: "true"},
+		{PlanID: "p1", Section: "b", Action: "approve", Value: "true"},
+		{PlanID: "p1", Section: "chat", Action: "messages", Value: messagesJSON},
+		{PlanID: "p1", Section: "chat", Action: "session_id", Value: "sess-123"},
+	}
+	resp := buildFeedbackResponse("p1", entries)
+
+	// Should be "approved" because a and b are both approved.
+	// Chat section must not interfere.
+	if resp.Status != "approved" {
+		t.Errorf("status: got %q, want approved (chat should not affect approval)", resp.Status)
+	}
+	// Chat section should not appear in sections map.
+	if _, hasChatSection := resp.Sections["chat"]; hasChatSection {
+		t.Error("sections map should not contain 'chat' key")
+	}
+}
+
+func TestBuildFeedbackResponse_NoChatMessages(t *testing.T) {
+	entries := []db.PlanFeedback{
+		{PlanID: "p1", Section: "design", Action: "approve", Value: "true"},
+	}
+	resp := buildFeedbackResponse("p1", entries)
+	if len(resp.ChatMessages) != 0 {
+		t.Errorf("chat_messages: expected empty, got %d", len(resp.ChatMessages))
+	}
+}
+
+// ---- planChatHandler -------------------------------------------------------
+
+func TestPlanChatHandler_MethodNotAllowed(t *testing.T) {
+	database, planID := setupPlanTestDB(t)
+	htmlgraphDir := writeTempPlanHTML(t, planID)
+
+	router := planRouter(database, htmlgraphDir)
+	req := httptest.NewRequest(http.MethodGet, "/api/plans/"+planID+"/chat", nil)
+	w := httptest.NewRecorder()
+	router(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status: got %d, want 405", w.Code)
+	}
+}
+
+func TestPlanChatHandler_EmptyMessage(t *testing.T) {
+	database, planID := setupPlanTestDB(t)
+	htmlgraphDir := writeTempPlanHTML(t, planID)
+
+	router := planRouter(database, htmlgraphDir)
+	body, _ := json.Marshal(map[string]string{"message": ""})
+	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/chat", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPlanChatHandler_InvalidJSON(t *testing.T) {
+	database, planID := setupPlanTestDB(t)
+	htmlgraphDir := writeTempPlanHTML(t, planID)
+
+	router := planRouter(database, htmlgraphDir)
+	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/chat",
+		bytes.NewReader([]byte("not json")))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400", w.Code)
+	}
+}
+
+func TestPlanChatHandler_Unavailable(t *testing.T) {
+	// When claude is not on PATH and no API key, should return 503.
+	// This test only works reliably when claude is NOT installed,
+	// which is the CI default. Skip if claude is available.
+	database, planID := setupPlanTestDB(t)
+	htmlgraphDir := writeTempPlanHTML(t, planID)
+
+	// Override PATH to ensure claude is not found.
+	t.Setenv("PATH", "/nonexistent")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+
+	router := planRouter(database, htmlgraphDir)
+	body, _ := json.Marshal(map[string]string{"message": "hello"})
+	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/chat", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("status: got %d, want 503; body: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["error"] == "" {
+		t.Error("expected error message in response")
+	}
+}
+
+func TestExtractPlanID_Chat(t *testing.T) {
+	got, err := extractPlanID("/api/plans/plan-chat-test/chat", "/chat")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "plan-chat-test" {
+		t.Errorf("got %q, want plan-chat-test", got)
+	}
+}
+
+// ---- planYAMLHandler --------------------------------------------------------
+
+func writeTempPlanYAML(t *testing.T, planID, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	plansDir := filepath.Join(dir, "plans")
+	if err := os.MkdirAll(plansDir, 0o755); err != nil {
+		t.Fatalf("mkdir plans: %v", err)
+	}
+	path := filepath.Join(plansDir, planID+".yaml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write plan yaml: %v", err)
+	}
+	return dir
+}
+
+func TestPlanYAMLEndpoint_Found(t *testing.T) {
+	planID := "plan-yaml-test"
+	yamlContent := "meta:\n  id: " + planID + "\ntitle: Test Plan\n"
+	htmlgraphDir := writeTempPlanYAML(t, planID, yamlContent)
+
+	handler := planYAMLHandler(htmlgraphDir)
+	req := httptest.NewRequest(http.MethodGet, "/api/plans/"+planID+"/yaml", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	ct := w.Header().Get("Content-Type")
+	if ct != "text/plain; charset=utf-8" {
+		t.Errorf("Content-Type: got %q, want text/plain; charset=utf-8", ct)
+	}
+	if w.Body.String() != yamlContent {
+		t.Errorf("body: got %q, want %q", w.Body.String(), yamlContent)
+	}
+}
+
+func TestPlanYAMLEndpoint_NotFound(t *testing.T) {
+	htmlgraphDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(htmlgraphDir, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := planYAMLHandler(htmlgraphDir)
+	req := httptest.NewRequest(http.MethodGet, "/api/plans/nonexistent/yaml", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status: got %d, want 404; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPlanYAMLEndpoint_MethodNotAllowed(t *testing.T) {
+	htmlgraphDir := t.TempDir()
+
+	handler := planYAMLHandler(htmlgraphDir)
+	req := httptest.NewRequest(http.MethodPost, "/api/plans/some-plan/yaml", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status: got %d, want 405", w.Code)
+	}
+}

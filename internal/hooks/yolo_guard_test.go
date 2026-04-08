@@ -8,6 +8,12 @@ import (
 	"testing"
 )
 
+func init() {
+	// Override mergeInProgressFn in tests to always return false, preventing
+	// real git state from bleeding into test isolation.
+	mergeInProgressFn = func() bool { return false }
+}
+
 func TestIsYoloMode(t *testing.T) {
 	// Create temp .htmlgraph dir with launch-mode file
 	tmpDir := t.TempDir()

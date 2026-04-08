@@ -176,11 +176,11 @@ func TestCritiqueZoneRenderDualCriticColumns(t *testing.T) {
 	}
 
 	html := buf.String()
-	if !strings.Contains(html, "Gemini Critique") {
-		t.Error("missing Gemini Critique heading")
+	if !strings.Contains(html, "Design Critique") {
+		t.Error("missing Design Critique heading")
 	}
-	if !strings.Contains(html, "Copilot Critique") {
-		t.Error("missing Copilot Critique heading")
+	if !strings.Contains(html, "Feasibility Critique") {
+		t.Error("missing Feasibility Critique heading")
 	}
 	if !strings.Contains(html, "Gemini says this is risky.") {
 		t.Error("Gemini critique content not rendered")
@@ -205,11 +205,11 @@ func TestCritiqueZoneRenderOnlyGeminiCritique(t *testing.T) {
 	}
 
 	html := buf.String()
-	if !strings.Contains(html, "Gemini Critique") {
-		t.Error("missing Gemini Critique heading when only Gemini present")
+	if !strings.Contains(html, "Design Critique") {
+		t.Error("missing Design Critique heading when only first critic present")
 	}
-	if strings.Contains(html, "Copilot Critique") {
-		t.Error("Copilot Critique should not appear when empty")
+	if strings.Contains(html, "Feasibility Critique") {
+		t.Error("Feasibility Critique should not appear when empty")
 	}
 }
 

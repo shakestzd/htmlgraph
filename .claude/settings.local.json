@@ -341,7 +341,8 @@
       "WebFetch(domain:jules.google)",
       "WebFetch(domain:www.atlassian.com)",
       "WebFetch(domain:www.anthropic.com)",
-      "WebFetch(domain:claudefa.st)"
+      "WebFetch(domain:claudefa.st)",
+      "Bash(/Users/shakes/.cache/uv/archive-v0/LlyCad5yaUHPf0qqjiFMX/bin/python -c \"import marimo; print\\(marimo.__version__\\)\")"
     ]
   },
   "enabledPlugins": {

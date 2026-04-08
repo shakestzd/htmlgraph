@@ -132,8 +132,8 @@ func TestBuildFromWorkItemWithDesignAndOutline(t *testing.T) {
 func TestSectionsJSONNoSlices(t *testing.T) {
 	page := plantmpl.BuildFromTopic("plan-noslice", "No Slices", "", "2026-04-04")
 	got := page.SectionsJSON()
-	if got != `["design","outline"]` {
-		t.Errorf("SectionsJSON: got %q, want %q", got, `["design","outline"]`)
+	if got != `["design"]` {
+		t.Errorf("SectionsJSON: got %q, want %q", got, `["design"]`)
 	}
 }
 
@@ -143,7 +143,7 @@ func TestSectionsJSONWithSlices(t *testing.T) {
 		{Num: 1}, {Num: 2}, {Num: 3},
 	}
 	got := page.SectionsJSON()
-	want := `["design","outline","slice-1","slice-2","slice-3"]`
+	want := `["design","slice-1","slice-2","slice-3"]`
 	if got != want {
 		t.Errorf("SectionsJSON: got %q, want %q", got, want)
 	}
@@ -162,12 +162,12 @@ func TestSliceCount(t *testing.T) {
 
 func TestTotalSections(t *testing.T) {
 	page := plantmpl.BuildFromTopic("plan-tot", "Total", "", "2026-04-04")
-	if page.TotalSections() != 2 {
-		t.Errorf("TotalSections empty: got %d, want 2", page.TotalSections())
+	if page.TotalSections() != 1 {
+		t.Errorf("TotalSections empty: got %d, want 1", page.TotalSections())
 	}
 	page.Slices = []plantmpl.SliceCard{{Num: 1}, {Num: 2}}
-	if page.TotalSections() != 4 {
-		t.Errorf("TotalSections: got %d, want 4", page.TotalSections())
+	if page.TotalSections() != 3 {
+		t.Errorf("TotalSections: got %d, want 3", page.TotalSections())
 	}
 }
 

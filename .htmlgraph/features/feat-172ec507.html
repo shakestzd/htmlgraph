@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Cleanup: remove Marimo infra, update docs and skill</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-172ec507"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T01:05:56.516237"
+             data-updated="2026-04-08T01:05:56.517998" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>Cleanup: remove Marimo infra, update docs and skill</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-f096172b.html" data-relationship="planned_in" data-since="2026-04-08T01:05:56.516388">plan-f096172b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-57196d42.html" data-relationship="blocked_by">feat-57196d42</a></li>
+                    <li><a href="feat-b84cf383.html" data-relationship="blocked_by">feat-b84cf383</a></li>
+                    <li><a href="feat-90da6e9b.html" data-relationship="blocked_by">feat-90da6e9b</a></li>
+                    <li><a href="feat-d99f8e77.html" data-relationship="blocked_by">feat-d99f8e77</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Delete internal/notebook/ package (embed.go + files/ directory: plan_notebook.py, plan_ui.py, plan_persistence.py, critique_renderer.py, dagre_widget.py, chat_widget.py, claude_chat.py, amendment_parser.py, sample_plan.yaml). Move prototypes/ contents to prototypes/archive/ with a README noting they were the Marimo prototypes that graduated to production. In cmd/htmlgraph/plan_yaml_extras.go remove planReviewCmd() function, runPlanReview() function, the import of internal/notebook, and the import of os/exec used solely for uvx/marimo launch. Update planCmds() in cmd/htmlgraph/plan_cmds.go to drop AddCommand(planReviewCmd()). Update plugin/skills/plan/SKILL.md step 5 from "htmlgraph plan review " (Marimo) to "htmlgraph serve" and open /plans/{id}.html in browser. Remove uv/marimo install references from docs, README, and SKILL.md wherever they appear.</p>
+        </section>
+    </article>
+</body>
+</html>

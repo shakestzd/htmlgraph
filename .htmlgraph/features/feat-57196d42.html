@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SSE chat endpoint &#43; streaming bubble UI</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-57196d42"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T01:05:56.514935"
+             data-updated="2026-04-08T01:05:56.515236" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>SSE chat endpoint &#43; streaming bubble UI</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-f096172b.html" data-relationship="planned_in" data-since="2026-04-08T01:05:56.515153">plan-f096172b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Add Go SSE endpoint POST /api/plans/{id}/chat in cmd/htmlgraph/api_plans.go and register it in the planRouter switch in the same file. The handler reads the user message from the request body, opens a subprocess to Claude CLI (or Anthropic API via ANTHROPIC_API_KEY), streams token chunks back as text/event-stream, and persists each exchange to plan_feedback with action="chat_message". Port the session-ID tracking logic from internal/notebook/files/claude_chat.py (~423 lines) into a new package internal/planchat/backend.go. On the JS side, add a chat panel to internal/plantmpl/templates/plan_page.gohtml: input textarea, send button, scrollable bubble list (user/assistant differentiated by data-role attr), streaming text append via EventSource, auto-scroll. Load chat history via GET /api/plans/{id}/feedback on page open (filter action="chat_message" rows). Graceful degradation: hide panel when /api/plans/{id}/chat returns 503 (Claude unavailable). Extend buildFeedbackResponse() in api_plans.go to include action='chat_message' rows in GET /api/plans/{id}/feedback responses.</p>
+        </section>
+    </article>
+</body>
+</html>

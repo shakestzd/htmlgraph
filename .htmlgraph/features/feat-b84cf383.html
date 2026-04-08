@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Amendment management UI &#43; Go parser</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-b84cf383"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T01:05:56.515539"
+             data-updated="2026-04-08T01:05:56.51697" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>Amendment management UI &#43; Go parser</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-f096172b.html" data-relationship="planned_in" data-since="2026-04-08T01:05:56.515697">plan-f096172b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-57196d42.html" data-relationship="blocked_by">feat-57196d42</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Port amendment_parser.py (41-line regex from internal/notebook/files/amendment_parser.py) to Go as internal/planamend/parser.go with a ParseAmendments(text string) []Amendment function. Call it in the SSE handler (api_plans.go) after each complete assistant message; store detected amendments in plan_feedback with action="amendment", value=JSON-encoded Amendment struct. Add GET /api/plans/{id}/amendments endpoint in api_plans.go (registered in planRouter) that returns pending/accepted/rejected amendments as JSON. In internal/plantmpl/templates/plan_page.gohtml, add an Amendments section below the chat panel: one  per amendment (options: Pending / Accept / Reject) wired to POST /api/plans/{id}/feedback with action="amendment_status". Show a summary line "N amendments — X accepted, Y pending".</p>
+        </section>
+    </article>
+</body>
+</html>

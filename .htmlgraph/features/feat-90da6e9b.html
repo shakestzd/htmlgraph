@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Polish: YAML viewer, chat history accordion, graph node colors</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-90da6e9b"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T01:05:56.515892"
+             data-updated="2026-04-08T01:05:56.517178" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>Polish: YAML viewer, chat history accordion, graph node colors</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-f096172b.html" data-relationship="planned_in" data-since="2026-04-08T01:05:56.516032">plan-f096172b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-57196d42.html" data-relationship="blocked_by">feat-57196d42</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Three additions to internal/plantmpl/templates/plan_page.gohtml and internal/plantmpl/templates/dependency_graph.gohtml: (1) YAML viewer — collapsible
+block using highlight.js (already loaded via CDN at plan_page.gohtml line 13) to syntax-highlight the raw plan YAML. Add GET /api/plans/{id}/yaml endpoint in api_plans.go that serves .htmlgraph/plans/{id}.yaml as text/plain; JS fetches and injects into a  block. (2) Chat history accordion — on page load, if action=chat_message rows exist in the GET /api/plans/{id}/feedback response, render prior turns inside a  above the live chat input rather than mixing them into the stream area. (3) Graph node highlighting — STATUS_COLORS map and stroke update already exist at plan_page.gohtml:468-476; only the fill patch is missing. Extend renderGraph() in dependency_graph.gohtml to colour nodes by approval state: green=approved, amber=pending, grey=blocked. Wire approval checkbox change events to a lightweight updateGraphNode(id, status) helper that patches the SVG fill without a full re-render.</p>
+        </section>
+    </article>
+</body>
+</html>

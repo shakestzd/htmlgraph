@@ -1,0 +1,405 @@
+meta:
+    id: plan-f096172b
+    track_id: trk-b0377def
+    title: Internal Plan Review — Marimo Migration
+    description: |
+        Eliminate Marimo/Python dependency from plan review by completing the internal Go/HTML/JS implementation in internal/plantmpl/. ~960 lines new code to replace ~1,712 lines embedded Python. Single-binary, offline-first, instant startup. Seamless dashboard integration with unified navigation and visual design.
+    created_at: "2026-04-07"
+    status: finalized
+    created_by: claude-opus
+    version: 1
+design:
+    problem: |
+        Plan review currently depends on Marimo, a Python notebook framework, introducing a full toolchain dependency chain: uv on PATH → temp dir extraction of 7 .py files → uvx marimo run --sandbox resolving marimo>=0.22.4, pyyaml, anywidget, traitlets → Python interpreter → runtime CDN fetches for d3@7 and dagre-d3. This results in a 3-8 second cold start, network requirements for both package resolution and CDN assets, and 1,712 lines of embedded Python business logic that must be extracted, written to disk, and executed as a subprocess on every invocation. The dependency is disproportionate: Marimo serves one screen (plan review) but mandates the entire Python toolchain across every deployment environment. Critically, 70-80% of a fully internal equivalent already exists in internal/plantmpl/ and cmd/htmlgraph/api_plans.go — the migration is closing a ~960-line gap, not starting from scratch.
+    goals:
+        - '**Single binary** — `htmlgraph serve` opens plan review in browser, no Python/uv/CDN required'
+        - '**Instant startup** — <50ms vs current 3-8s cold start (Python + package resolution)'
+        - '**Offline-first** — vendor D3/dagre-d3 so plan review works with zero network access'
+        - '**Smaller footprint** — remove ~1,712 lines of embedded Python and ~200 lines of Go embedding infrastructure from the binary'
+        - '**Architectural alignment** — plan review becomes a route in `htmlgraph serve`, unified with the existing dashboard rather than a separate subprocess'
+        - '**Dashboard integration** — plan review renders inside the `htmlgraph serve` dashboard shell, not as a standalone page in a new tab; unified navigation, visual design, and SSE updates'
+    constraints:
+        - 'Chat widget is the single largest gap (~600 lines of new JS/Go): SSE endpoint, bubble renderer, streaming display, and message history must be built from scratch'
+        - Amendment management UI (~150 lines) does not exist yet and must be completed before Marimo can be fully removed
+        - D3/dagre-d3 are currently CDN-loaded; vendoring them is required to meet the offline-first goal and adds bundle management overhead
+        - Marimo notebooks in prototypes/ serve as the reference implementation and must remain accessible until the internal system reaches full feature parity
+        - The migration cannot ship without the chat widget if plan review without AI assistance is considered incomplete — Phase 1 (chat) gates the Marimo removal
+        - Plan HTML currently has its own CSS token namespace and sidebar layout; embedding in dashboard requires reconciling design systems or rendering via iframe
+        - The dashboard embedding strategy (iframe vs HTML fragment) must be decided before any slice begins — S1 and S3 modify plan_page.gohtml, and S5 may restructure the template for embedding
+    approved: false
+    comment: ""
+slices:
+    - id: feat-c47132ea
+      num: 1
+      title: SSE chat endpoint + streaming bubble UI
+      what: |
+        Add Go SSE endpoint POST /api/plans/{id}/chat in cmd/htmlgraph/api_plans.go and register it in the planRouter switch in the same file. The handler reads the user message from the request body, opens a subprocess to Claude CLI (or Anthropic API via ANTHROPIC_API_KEY), streams token chunks back as text/event-stream, and persists each exchange to plan_feedback with action="chat_message". Port the session-ID tracking logic from internal/notebook/files/claude_chat.py (~423 lines) into a new package internal/planchat/backend.go. On the JS side, add a chat panel to internal/plantmpl/templates/plan_page.gohtml: input textarea, send button, scrollable bubble list (user/assistant differentiated by data-role attr), streaming text append via EventSource, auto-scroll. Load chat history via GET /api/plans/{id}/feedback on page open (filter action="chat_message" rows). Graceful degradation: hide panel when /api/plans/{id}/chat returns 503 (Claude unavailable). Extend buildFeedbackResponse() in api_plans.go to include action='chat_message' rows in GET /api/plans/{id}/feedback responses.
+      why: |
+        The chat widget is the single largest missing piece blocking the Marimo removal. Everything else in the internal plan review system already has parity. Without this slice the migration cannot proceed because the review workflow depends on the AI discussion sidebar to surface amendments and unblock approvals.
+      files:
+        - cmd/htmlgraph/api_plans.go
+        - internal/plantmpl/templates/plan_page.gohtml
+        - internal/planchat/backend.go
+        - internal/notebook/files/claude_chat.py
+      deps: []
+      done_when:
+        - POST /api/plans/{id}/chat streams SSE chunks; curl -N test confirms token-by-token output
+        - JS panel appends streamed text in real time with auto-scroll; no full-page reload required
+        - Chat history survives page refresh (loaded from plan_feedback action=chat_message rows)
+        - Panel hidden gracefully when Claude CLI/API unavailable (503 response)
+        - GET /api/plans/{id}/feedback includes chat_message rows in response JSON
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: L
+      risk: Med
+      tests: |
+        Unit: internal/planchat/backend_test.go — mock exec.Cmd, verify session ID round-trip and
+        message persistence to plan_feedback table with correct action and value fields.
+        Integration: api_plans_test.go — httptest.NewRecorder, POST /api/plans/test-id/chat,
+        assert Content-Type: text/event-stream and at least one data: chunk in response body.
+      approved: true
+      comment: ""
+    - id: feat-091f4ce3
+      num: 2
+      title: Amendment management UI + Go parser
+      what: |
+        Port amendment_parser.py (41-line regex from internal/notebook/files/amendment_parser.py) to Go as internal/planamend/parser.go with a ParseAmendments(text string) []Amendment function. Call it in the SSE handler (api_plans.go) after each complete assistant message; store detected amendments in plan_feedback with action="amendment", value=JSON-encoded Amendment struct. Add GET /api/plans/{id}/amendments endpoint in api_plans.go (registered in planRouter) that returns pending/accepted/rejected amendments as JSON. In internal/plantmpl/templates/plan_page.gohtml, add an Amendments section below the chat panel: one <select> per amendment (options: Pending / Accept / Reject) wired to POST /api/plans/{id}/feedback with action="amendment_status". Show a summary line "N amendments — X accepted, Y pending".
+      why: |
+        Amendments are how review chat produces actionable changes to plan slices. Without the management UI a reviewer has no structured way to accept or reject AI suggestions before finalizing. This is the feedback-loop closure the analysis calls "level 2 chat integration" — closing the path from discussion to dispatched work.
+      files:
+        - internal/planamend/parser.go
+        - cmd/htmlgraph/api_plans.go
+        - internal/plantmpl/templates/plan_page.gohtml
+        - internal/notebook/files/amendment_parser.py
+      deps:
+        - 1
+      done_when:
+        - ParseAmendments correctly extracts AMEND directives from sample assistant messages (unit tested)
+        - GET /api/plans/{id}/amendments returns correct JSON for plans with stored amendment rows
+        - Dropdown status changes POST to feedback endpoint and survive page refresh
+        - Summary line shows correct accepted/pending counts
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: M
+      risk: Low
+      tests: |
+        Unit: internal/planamend/parser_test.go — table-driven tests covering AMEND directive
+        variations (single-line, multiline, missing fields, malformed input).
+        Integration: api_plans_test.go — seed plan_feedback rows with action=amendment, GET
+        /api/plans/test-id/amendments, assert correct amendment count and status fields in JSON.
+      approved: true
+      comment: ""
+    - id: feat-3a7d1c9f
+      num: 3
+      title: 'Polish: YAML viewer, chat history accordion, graph node colors'
+      what: |
+        Three additions to internal/plantmpl/templates/plan_page.gohtml and internal/plantmpl/templates/dependency_graph.gohtml: (1) YAML viewer — collapsible <details> block using highlight.js (already loaded via CDN at plan_page.gohtml line 13) to syntax-highlight the raw plan YAML. Add GET /api/plans/{id}/yaml endpoint in api_plans.go that serves .htmlgraph/plans/{id}.yaml as text/plain; JS fetches and injects into a <pre><code class="language-yaml"> block. (2) Chat history accordion — on page load, if action=chat_message rows exist in the GET /api/plans/{id}/feedback response, render prior turns inside a <details> above the live chat input rather than mixing them into the stream area. (3) Graph node highlighting — STATUS_COLORS map and stroke update already exist at plan_page.gohtml:468-476; only the fill patch is missing. Extend renderGraph() in dependency_graph.gohtml to colour nodes by approval state: green=approved, amber=pending, grey=blocked. Wire approval checkbox change events to a lightweight updateGraphNode(id, status) helper that patches the SVG fill without a full re-render.
+      why: |
+        Without these three items the internal system has visible UX regressions vs Marimo: no way to inspect raw YAML during review, chat history lost on refresh (persistence exists from slice 1 but needs UI presentation), and the dependency graph is static despite live approvals. These gaps would make reviewers miss Marimo.
+      files:
+        - internal/plantmpl/templates/plan_page.gohtml
+        - internal/plantmpl/templates/dependency_graph.gohtml
+        - cmd/htmlgraph/api_plans.go
+      deps:
+        - 1
+      done_when:
+        - YAML viewer panel renders syntax-highlighted YAML in a collapsible block on plan page
+        - Chat history accordion shows prior turns on page load, distinct from live stream area
+        - Graph node colour updates within 100ms of checkbox approval toggle without full re-render
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: S
+      risk: Low
+      tests: |
+        Unit: api_plans_test.go — GET /api/plans/test-id/yaml returns 200 with Content-Type
+        text/plain and non-empty body when yaml file exists; 404 when yaml missing.
+        Manual: open plan page, approve a slice checkbox, confirm graph node turns green without
+        page reload; confirm YAML viewer shows highlighted YAML content.
+      approved: true
+      comment: ""
+    - id: feat-b82e0fd4
+      num: 4
+      title: 'Cleanup: remove Marimo infra, update docs and skill'
+      what: |
+        Delete internal/notebook/ package (embed.go + files/ directory: plan_notebook.py, plan_ui.py, plan_persistence.py, critique_renderer.py, dagre_widget.py, chat_widget.py, claude_chat.py, amendment_parser.py, sample_plan.yaml). Move prototypes/ contents to prototypes/archive/ with a README noting they were the Marimo prototypes that graduated to production. In cmd/htmlgraph/plan_yaml_extras.go remove planReviewCmd() function, runPlanReview() function, the import of internal/notebook, and the import of os/exec used solely for uvx/marimo launch. Update planCmds() in cmd/htmlgraph/plan_cmds.go to drop AddCommand(planReviewCmd()). Update plugin/skills/plan/SKILL.md step 5 from "htmlgraph plan review <plan-id>" (Marimo) to "htmlgraph serve" and open /plans/{id}.html in browser. Remove uv/marimo install references from docs, README, and SKILL.md wherever they appear.
+      why: |
+        Without this slice the binary still embeds ~1,712 lines of Python, uv is still required on PATH for the dead review command, and SKILL.md still directs agents to launch Marimo. This slice is what makes the migration complete and prevents future maintainers from accidentally re-activating the Marimo path.
+      files:
+        - internal/notebook/embed.go
+        - cmd/htmlgraph/plan_yaml_extras.go
+        - cmd/htmlgraph/plan_cmds.go
+        - plugin/skills/plan/SKILL.md
+        - prototypes/plan_notebook.py
+        - prototypes/plan_ui.py
+        - prototypes/plan_persistence.py
+        - prototypes/claude_chat.py
+        - prototypes/critique_renderer.py
+        - prototypes/dagre_widget.py
+        - prototypes/amendment_parser.py
+        - prototypes/plan_export.py
+        - prototypes/sample_plan.yaml
+      deps:
+        - 1
+        - 2
+        - 3
+        - 5
+      done_when:
+        - go build ./... succeeds with internal/notebook package deleted (no dangling imports)
+        - htmlgraph plan --help shows no 'review' subcommand
+        - prototypes/ contains only archive/ subdirectory with README (plan_export.py and sample_plan.yaml also archived)
+        - SKILL.md step 5 references htmlgraph serve route, not marimo
+        - grep -r 'marimo\|uvx\|notebook.WriteToDir' cmd/ internal/ returns zero matches
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: S
+      risk: Low
+      tests: |
+        Unit: go build ./... is the primary gate — compiler catches any dangling import of
+        internal/notebook. Run go test ./... to confirm no test file imports the deleted package.
+        Smoke: htmlgraph plan --help to confirm 'review' absent from subcommand list.
+      approved: true
+      comment: ""
+    - id: feat-d4e81a2f
+      num: 5
+      title: 'Dashboard integration: embedded plan detail panel'
+      what: |
+        Replace the new-tab navigation pattern in cmd/htmlgraph/dashboard/js/app.js (window.open('/plans/{id}.html', '_blank')) with an in-dashboard detail panel. Add a plan-detail <div> to cmd/htmlgraph/dashboard/index.html matching the existing transcript-detail and work-detail pattern. When a plan row is clicked, fetch the plan content via a new GET /api/plans/{id}/render endpoint in cmd/htmlgraph/api_plans.go that returns the plan body HTML (without the outer shell/sidebar — just the content zones). Inject the response into the plan-detail panel. Reconcile the plan CSS tokens with the dashboard design system — either scope plan styles under a .plan-detail container or migrate plan_page.gohtml to use dashboard token names (--bg-primary, --text-primary, --text-secondary). Add plan events via a scoped /api/plans/{id}/events SSE endpoint (not the global /api/events/stream) that pushes plan_feedback and plan_finalized events for the viewed plan only. Add a plan stats counter to the dashboard header (pending reviews count). Add status filter dropdown to the plans table matching the Activity view pattern.
+      why: |
+        The user explicitly requires seamless dashboard integration. Currently plans open in a new browser tab, breaking the navigation context. The plan page has its own CSS system and sidebar that conflicts with the dashboard shell. Without this slice, plan review feels like a separate tool bolted on rather than a native part of HtmlGraph. The dashboard already has the pattern (transcript-detail, work-detail) — plan-detail follows the same approach.
+      files:
+        - cmd/htmlgraph/dashboard/index.html
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/api_plans.go
+        - internal/plantmpl/templates/plan_page.gohtml
+        - cmd/htmlgraph/dashboard/css/components.css
+      deps:
+        - 1
+        - 2
+        - 3
+      done_when:
+        - Plan row click renders detail panel inside dashboard shell — no new tab opened
+        - Plan CSS tokens use dashboard design system (--bg-primary, --text-primary) — no visual inconsistency
+        - Plan sidebar hidden when embedded; dashboard nav provides section navigation
+        - Scoped /api/plans/{id}/events SSE endpoint pushes plan_feedback and plan_finalized events for the viewed plan
+        - buildFeedbackResponse() includes chat_message action type in GET responses
+        - Header stats bar shows pending plan review count
+        - Plans table has status filter dropdown (Draft / In Progress / Finalized / All)
+        - Chat widget, amendments, and dependency graph all function correctly inside the embedded panel
+        - go build ./... && go vet ./... && go test ./... all pass
+      effort: L
+      risk: High
+      tests: |
+        Unit: api_plans_test.go — GET /api/plans/{id}/render returns HTML fragment (no <html>
+        wrapper), Content-Type text/html, contains plan zone classes.
+        Integration: SSE test — submit feedback via POST, assert plan_feedback event arrives
+        on /api/plans/{id}/events within 1 second.
+        Manual: open dashboard, click a plan row, verify detail panel renders with correct
+        styling, approve a slice, verify graph node updates and SSE refreshes the list.
+      approved: true
+      comment: ""
+questions:
+    - id: q-chat-streaming
+      text: How should the chat widget stream responses?
+      description: |
+        The Marimo system uses `mo.ui.chat()` with a custom streaming model function, completely abstracted by the framework. The internal replacement requires explicit infrastructure: an SSE (Server-Sent Events) endpoint in Go that proxies to Claude CLI or the Anthropic API, plus JavaScript to render bubbles and append text as events arrive. The choice between SSE and WebSocket is not just an implementation detail — it determines whether plan reviewers can cancel in-progress responses, whether the server can push amendments back to clients, and whether the chat can support future features like real-time collaboration or interrupts. SSE is simpler and HTTP-native (minimal firewall issues), but WebSocket provides bidirectional control. The Marimo system currently has no cancel capability, so SSE is sufficient today, but the decision affects extensibility.
+      recommended: sse
+      options:
+        - key: sse
+          label: 'A: SSE — Server-Sent Events (unidirectional stream, simpler, HTTP-native)'
+        - key: websocket
+          label: 'B: WebSocket — Bidirectional socket (supports cancel/interrupt, more complex infrastructure)'
+      answer: null
+    - id: q-chat-scope
+      text: Should the chat widget display live Claude API responses or pre-recorded history?
+      description: |
+        The analysis assumes the internal chat widget will proxy directly to Claude's API (or the Claude CLI) in real-time, mirroring the Marimo behavior. However, an alternative approach is to record conversations during plan development, embed the chat history in the plan YAML as a conversation transcript, and render that history read-only in the plan review UI. This would decouple plan review from live API access, enable offline review, reduce infrastructure complexity, and align with HtmlGraph's local-first philosophy. It also means chat happens only during plan creation (when the Marimo notebook runs), not during review. The tradeoff: live chat during review is more powerful (reviewers can ask clarifying questions), but pre-recorded chat is simpler to implement and integrates more naturally with the HTML-as-canonical-store architecture.
+      recommended: live_api
+      options:
+        - key: live_api
+          label: 'A: Live Claude API — Chat widget connects to Claude API in real-time during review (current Marimo model)'
+        - key: recorded_history
+          label: 'B: Pre-recorded history — Conversations recorded in YAML during plan creation, displayed read-only during review (local-first)'
+      answer: null
+    - id: q-migration-strategy
+      text: Should we remove Marimo immediately or keep it as a fallback during transition?
+      description: |
+        The recommendation is to migrate fully to the internal Go/HTML/JS system, but the question is tactical: should plan review immediately flag over to `htmlgraph serve` (the new internal system), or should we run both Marimo and the internal system in parallel while phasing out Marimo once the internal system proves stable? Immediate removal reduces maintenance burden and forces a single code path (reducing debugging complexity), but it risks shipping a broken plan review if the internal implementation has bugs. Gradual migration allows reviewers to use Marimo as a fallback if the new system fails, and provides time to validate the chat widget UX before cutting the old system. The decision affects release planning, testing scope, and how aggressively we remove Python infrastructure from CI/CD.
+      recommended: immediate
+      options:
+        - key: immediate
+          label: 'A: Big-bang removal — Replace `htmlgraph plan review` immediately, delete Marimo notebooks once new system ships'
+        - key: gradual
+          label: 'B: Gradual migration — Run both systems in parallel (e.g., `--use-marimo` flag), fade Marimo out over 2-3 releases'
+      answer: null
+    - id: q-planbook-dependency
+      text: Does removing Marimo from htmlgraph affect the standalone Planbook tool planned in trk-84bcad47?
+      description: |
+        HtmlGraph and Planbook are separate concerns: htmlgraph handles session observability and plan coordination, while Planbook is a dedicated tool for narrative plan review (using Marimo according to trk-84bcad47). The current analysis assumes we remove Marimo from htmlgraph only, implying Planbook continues to depend on Marimo separately. However, if Planbook also needs a plan review UI, the internal Go/HTML/JS system could be shared between both tools, avoiding duplication and allowing us to drop Marimo entirely (and uv from the CI matrix). This is a strategic decision: do we maintain two separate chat/review frontends (one in htmlgraph, one in Planbook), or consolidate on a single internal system that serves both products? The analysis doesn't yet clarify the scope of Planbook or whether it needs real-time chat.
+      recommended: clarify_planbook_scope
+      options:
+        - key: htmlgraph_only
+          label: 'A: Htmlgraph-only — Remove Marimo from htmlgraph only; Planbook depends on Marimo separately (allows independent iteration)'
+        - key: unified_frontend
+          label: 'B: Unified frontend — Both htmlgraph and Planbook use the same internal Go/HTML/JS system (drops Marimo entirely)'
+        - key: clarify_planbook_scope
+          label: 'C: Needs clarification — Planbook scope and requirements not yet defined; defer decision until trk-84bcad47 is detailed'
+      answer: null
+    - id: q-cdn-dependencies
+      text: Should we vendor JavaScript dependencies or continue relying on CDN for D3/dagre-d3?
+      description: |
+        The internal plan review system uses D3.js and dagre-d3 from a CDN for the dependency graph visualization. This is lightweight (two external requests at runtime) but introduces a network dependency and offline-unfriendliness — the graph won't render if the CDN is unavailable or if the user is offline. HtmlGraph's philosophy is local-first and no external infrastructure. Vendoring the JS files (embedding them in the binary or serving them locally) ensures offline availability and faster load times. However, it increases the binary size slightly and adds a maintenance task (updating D3 versions, checking for security vulnerabilities). Since the analysis mentions CDN as a potential liability ("Offline-first: No CDN dependency for Marimo's own assets"), this is an implicit design choice that should be surfaced and decided deliberately.
+      recommended: vendor
+      options:
+        - key: cdn
+          label: 'A: CDN — Load D3 and dagre-d3 from CDN (lighter binary, requires network)'
+        - key: vendor
+          label: 'B: Vendor — Embed JS files in the binary or `plugin/static/`, serve locally (offline-first, larger binary)'
+      answer: null
+    - id: q-dashboard-embedding
+      text: How should plan review be embedded in the dashboard?
+      description: |
+        Plan HTML is currently a standalone page with its own shell, sidebar nav, CSS tokens, and CDN dependencies. To render inside the dashboard there are two approaches: (A) fetch a shell-stripped HTML fragment from a /render endpoint and inject it into a detail panel div, reconciling CSS tokens to use the dashboard design system — this gives full control but requires CSS migration and JS re-wiring; (B) embed the plan page in an iframe within the dashboard shell, preserving the plan's own styles and JS isolation — simpler to implement but creates a nested scrolling context, complicates inter-frame communication for SSE updates, and feels less integrated. The existing transcript-detail and work-detail panels use approach A (direct HTML injection), so approach A is consistent with dashboard patterns but has higher implementation cost for plans specifically because of the richer interactivity (chat, graphs, checkboxes).
+      recommended: html_fragment
+      options:
+        - key: html_fragment
+          label: 'A: HTML fragment — New /render endpoint returns shell-stripped HTML, inject into dashboard panel (consistent with existing patterns, requires CSS reconciliation)'
+        - key: iframe
+          label: 'B: Iframe embed — Load plan page in an iframe within the dashboard (simpler, preserves isolation, but nested scroll and SSE complications)'
+      answer: null
+critique:
+    reviewed_at: "2026-04-07"
+    reviewers:
+        - Haiku (design review)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: verified
+          text: planRouter exists in api_plans.go
+          evidence: api_plans.go:408 — function planRouter() dispatches via switch on path suffix
+        - id: A2
+          status: verified
+          text: ~70-80% of internal equivalent already exists in internal/plantmpl/
+          evidence: plan_page.gohtml is 579 lines with full feedback UI, approval checkboxes, D3 graph, finalize flow
+        - id: A3
+          status: verified
+          text: Graph node color update on approval is already partially implemented
+          evidence: plan_page.gohtml:468-476 STATUS_COLORS map + stroke update exist; only fill patch missing
+        - id: A4
+          status: verified
+          text: applyAcceptedAmendments() Go logic already exists
+          evidence: plan_yaml_extras.go:465-576 handles section='amendment', action='accepted'; only text parser missing
+        - id: A5
+          status: falsified
+          text: chat_message action exists in plan_feedback schema
+          evidence: buildFeedbackResponse() filters by known actions only (approve, comment, answer); chat_message not handled
+        - id: A6
+          status: falsified
+          text: Slice 4 file list is complete for prototypes/
+          evidence: prototypes/ also contains plan_export.py (414 lines) and sample_plan.yaml (306 lines), not listed
+        - id: A7
+          status: falsified
+          text: SSE stream can push plan events with minimal wiring
+          evidence: sseHandler() polls agent_events only; no plan event write path exists; requires new DB writes + SSE query
+        - id: A8
+          status: verified
+          text: SSE endpoint exists at /api/events/stream
+          evidence: serve.go:54, api_transcript.go:254 — polls agent_events table every 2s
+        - id: A9
+          status: verified
+          text: highlight.js already loaded via CDN in plan_page.gohtml
+          evidence: plan_page.gohtml line 13 — cdn.jsdelivr.net
+        - id: A10
+          status: plausible
+          text: Chat widget requires ~600 lines of new JS/Go
+          evidence: Python reference is 422+312=734 lines; Go reimplementation may differ but estimate is rough
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Slice Assessment
+              items:
+                - badge: S1
+                  kind: warn
+                  text: Chat widget 'what' underspecifies Claude CLI invocation strategy and session ID semantics
+                - badge: S2
+                  kind: success
+                  text: Amendment parser scope is clear; existing Go apply-logic (plan_yaml_extras.go:465) reduces work
+                - badge: S3
+                  kind: info
+                  text: Graph node coloring is ~80% done (STATUS_COLORS exists); effort should be S not M
+                - badge: S4
+                  kind: warn
+                  text: File list incomplete — missing prototypes/plan_export.py and sample_plan.yaml
+                - badge: S5
+                  kind: danger
+                  text: CSS reconciliation underestimated — 117 CSS rules with different token names; needs design spec before start
+            - heading: Gaps
+              items:
+                - badge: Gap
+                  kind: warn
+                  text: Claude CLI invocation strategy (subprocess vs API) not specified
+                - badge: Gap
+                  kind: warn
+                  text: Amendment persistence model unclear — transient per-session or persistent in YAML?
+                - badge: Gap
+                  kind: danger
+                  text: S5 embedding strategy must be decided BEFORE S1-S3 to avoid rework of plan_page.gohtml
+            - heading: Alternatives
+              items:
+                - badge: Alt
+                  kind: info
+                  text: Defer live chat — ship read-only plan review first (S3+S4+S5) for 70% value at lower risk
+                - badge: Alt
+                  kind: info
+                  text: Pre-record chat history in YAML during creation; render read-only during review (aligns with local-first)
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: What Exists to Leverage
+              items:
+                - badge: OK
+                  kind: success
+                  text: planRouter switch pattern (api_plans.go:413) — new endpoints just add case suffix
+                - badge: OK
+                  kind: success
+                  text: dbpkg.StorePlanFeedback() handles arbitrary action/value pairs — no DB migration for chat_message
+                - badge: OK
+                  kind: success
+                  text: sseHandler() boilerplate (flusher, ticker, WAL) reusable for chat SSE endpoint
+                - badge: OK
+                  kind: success
+                  text: work-detail panel pattern (app.js:610-800) directly copyable for plan-detail in S5
+            - heading: What the Plan Gets Wrong
+              items:
+                - badge: Fix
+                  kind: danger
+                  text: SSE stream has NO plan events — sseHandler polls agent_events only; S5 needs new event write path + query logic
+                - badge: Fix
+                  kind: danger
+                  text: plan_page.gohtml has 117 CSS rules with completely different token names from dashboard; not a quick scope fix
+                - badge: Fix
+                  kind: warn
+                  text: S4 omits prototypes/plan_export.py (414 lines) and sample_plan.yaml (306 lines)
+                - badge: Fix
+                  kind: warn
+                  text: buildFeedbackResponse() filters by known actions only; chat_message rows would be silently dropped from GET responses
+                - badge: Fix
+                  kind: info
+                  text: 4 CDN deps not 2 — d3js.org, cdn.jsdelivr.net/dagre-d3, cdn.jsdelivr.net/highlightjs, fonts.googleapis.com
+            - heading: 'Risk: Rework if S5 strategy not decided early'
+              items:
+                - badge: R6
+                  kind: danger
+                  text: S1 and S3 modify plan_page.gohtml; if S5 later changes template structure for embedding, those changes may need rework
+    risks:
+        - risk: CSS token reconciliation is larger than estimated (117 rules, different namespace)
+          severity: High
+          mitigation: Decide iframe vs fragment strategy and create CSS migration spec BEFORE S1 begins
+        - risk: SSE plan events require new infrastructure (write path + query), not just wiring
+          severity: High
+          mitigation: Use scoped /api/plans/{id}/events endpoint instead of adding to global stream
+        - risk: S5 embedding strategy affects S1-S3 template changes; deciding late causes rework
+          severity: High
+          mitigation: Promote embedding strategy question to a blocker — answer before any slice starts
+        - risk: Claude CLI subprocess lifecycle — goroutine leaks on abandoned chat requests
+          severity: Medium
+          mitigation: Use exec.CommandContext with request context; test with mock subprocess in backend_test.go
+        - risk: buildFeedbackResponse() silently ignores unknown action types (chat_message)
+          severity: Medium
+          mitigation: Extend buildFeedbackResponse() in S1 to include chat_message rows
+    synthesis: |
+        The plan is structurally sound but has three critical issues to resolve before approval: (1) The dashboard embedding strategy (q-dashboard-embedding) must be answered BEFORE any slice begins, because S1 and S3 modify plan_page.gohtml and S5 may require restructuring it. (2) S4's file list is incomplete — add prototypes/plan_export.py and sample_plan.yaml. (3) SSE plan events are larger than stated — use a scoped endpoint per plan instead of modifying the global stream. Additionally, S3 effort should drop from M to S given graph node coloring is 80% done.

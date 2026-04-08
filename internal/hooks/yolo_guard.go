@@ -29,6 +29,11 @@ func resetYoloModeCache() {
 	})
 }
 
+// mergeInProgressFn is injected for testing. In production, it checks the real
+// git state. In tests, it can be overridden to return false to avoid git state
+// bleeding into test isolation.
+var mergeInProgressFn = isMergeInProgress
+
 // isYoloMode determines if the current session is in YOLO mode.
 //
 // Primary source: the CloudEvent permission_mode field, which reflects
@@ -226,7 +231,7 @@ func checkYoloBudgetGuard(event *CloudEvent, yolo bool) string {
 	if !gitCommitPattern.MatchString(cmd) {
 		return ""
 	}
-	if isMergeInProgress() {
+	if mergeInProgressFn() {
 		return ""
 	}
 	out, err := exec.Command("git", "diff", "--cached", "--numstat").Output()
@@ -278,7 +283,7 @@ func checkYoloWorktreeGuard(toolName, branch string, yolo bool) string {
 		return ""
 	}
 	if branch == "main" || branch == "master" {
-		if isMergeInProgress() {
+		if mergeInProgressFn() {
 			return ""
 		}
 		return "YOLO mode requires a feature or track branch. " +
@@ -302,7 +307,7 @@ func checkYoloBashWorktreeGuard(event *CloudEvent, branch string, yolo bool) str
 		return ""
 	}
 	if branch == "main" || branch == "master" {
-		if isMergeInProgress() {
+		if mergeInProgressFn() {
 			return ""
 		}
 		return "YOLO mode requires a feature or track branch for Bash file writes. " +

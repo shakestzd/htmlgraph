@@ -25,11 +25,13 @@
       <div class="stat-pill" id="sp-feat-ip"><span class="label">In-Progress</span> <span class="val" id="sv-feat-ip">--</span></div>
       <div class="stat-pill" id="sp-done-today"><span class="label">Done</span> <span class="val" id="sv-done-today">--</span></div>
       <div class="stat-pill" id="sp-cost"><span class="label">Cost</span> <span class="val" id="sv-cost">--</span></div>
+      <div class="stat-pill" id="sp-plans" style="display:none"><span class="label">Reviews</span> <span class="val" id="sv-plans">0</span></div>
       <div class="stat-pill stat-pill-warn" id="sp-errors" style="display:none"><span class="label">Errors</span> <span class="val" id="sv-errors">0</span></div>
       <div class="stat-pill" style="gap:4px">
         <span class="conn-dot live" id="conn-dot"></span>
         <span class="conn-label" id="conn-label">Connected</span>
       </div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">&#9788;</button>
     </div>
   </header>
 
@@ -56,6 +58,7 @@
       </svg>
       Plans
     </button>
+    <div class="plan-subnav" id="plan-subnav"></div>
   </nav>
 
   <!-- Content -->
@@ -128,21 +131,41 @@
     </section>
 
     <section class="view" id="v-plans">
-      <h2 class="view-title">Plans <span class="count" id="plans-count">0</span></h2>
-      <table class="tbl" id="plans-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Progress</th>
-            <th>Linked To</th>
-            <th>Updated</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="plans-body"></tbody>
-      </table>
-      <p class="empty" id="plans-empty" style="display:none">No plans yet. Create one with <code>htmlgraph plan generate &lt;feature-id&gt;</code></p>
+      <div class="view-title">
+        Plans <span class="count" id="plans-count">0</span>
+        <select class="filter-select" id="plan-status-filter" style="margin-left:auto;font-size:0.75rem">
+          <option value="all">All</option>
+          <option value="draft">Draft</option>
+          <option value="in-progress">In Progress</option>
+          <option value="finalized">Finalized</option>
+        </select>
+      </div>
+      <div id="plans-list-view">
+        <table class="tbl" id="plans-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Progress</th>
+              <th>Linked To</th>
+              <th>Updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="plans-body"></tbody>
+        </table>
+        <p class="empty" id="plans-empty" style="display:none">No plans yet. Create one with <code>htmlgraph plan generate &lt;feature-id&gt;</code></p>
+      </div>
+      <div class="plan-detail" id="plan-detail">
+        <div class="plan-detail-header">
+          <button class="transcript-back plan-detail-back" id="plan-detail-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to Plans
+          </button>
+          <h3 id="plan-detail-title" style="margin:0;font-size:0.95rem"></h3>
+        </div>
+        <div class="plan-detail-body" id="plan-detail-body"></div>
+      </div>
     </section>
 
   </main>
