@@ -84,6 +84,20 @@ a:hover{opacity:.8}
 .plan-header::after{content:'';position:absolute;bottom:-1px;left:0;width:120px;height:1px;background:var(--accent);opacity:.5}
 .plan-header .meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;align-items:center}
 
+/* ── Related Work ── */
+.related-work{margin-bottom:24px;padding:16px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;gap:12px}
+.related-track{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.related-label{font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;min-width:70px}
+.related-link{color:var(--accent);font-weight:600;font-size:.9rem;text-decoration:none}
+.related-link:hover{text-decoration:underline}
+.related-features{display:flex;flex-direction:column;gap:6px}
+.related-feature-list{display:flex;flex-direction:column;gap:4px}
+.related-feature{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);text-decoration:none;transition:border-color var(--transition)}
+.related-feature:hover{border-color:var(--accent)}
+.related-feature-id{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);min-width:110px}
+.related-feature-title{flex:1;font-size:.85rem;color:var(--text-dim)}
+.related-feature .badge{flex-shrink:0}
+
 /* ── Badges ── */
 .badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:4px 12px;border-radius:9999px;border:1px solid transparent;transition:all var(--transition)}
 .badge::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0}
@@ -264,20 +278,24 @@ textarea::placeholder{color:var(--text-muted)}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-368a5cd2" data-plan-id="plan-368a5cd2" data-feature-id="" data-status="draft">
+<article id="plan-368a5cd2" data-plan-id="plan-368a5cd2" data-feature-id="trk-66dcbbf7" data-status="draft">
 
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Multi-Project MVP</h1>
-  <p style="color:var(--text-dim)">Auto-registering project registry, project listing CLI, and unified read-only dashboard aggregating across all HtmlGraph-enabled projects</p>
+  <p style="color:var(--text-dim)">Auto-registering project registry, project listing CLI, and unified read-only dashboard aggregating across all HtmlGraph-enabled projects.
+</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">0 slices · Created 2026-04-08</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">5 slices · Created 2026-04-08</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
   &#9728; Light
 </button>
+
+<!-- Related Work -->
+
 
 <!-- Plan YAML source (collapsible) -->
 <details class="yaml-viewer" id="yaml-viewer">
@@ -289,6 +307,11 @@ textarea::placeholder{color:var(--text-muted)}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Registry package — internal/registry/" data-status="pending" data-deps="" data-files="2"></div>
+    <div data-node="2" data-name="Auto-registration in PersistentPreRunE" data-status="pending" data-deps="1" data-files="1"></div>
+    <div data-node="3" data-name="htmlgraph projects subcommand (list + prune)" data-status="pending" data-deps="1" data-files="2"></div>
+    <div data-node="4" data-name="Global dashboard backend — htmlgraph serve --global" data-status="pending" data-deps="1" data-files="1"></div>
+    <div data-node="5" data-name="Global dashboard frontend — project switcher UI" data-status="pending" data-deps="4" data-files="2"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -301,17 +324,36 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
-    <!--PLAN_DESIGN_CONTENT-->
-    <div class="sub-section">
-      <h4>Open Questions</h4>
-      <!--PLAN_QUESTIONS-->
-    </div>
+    <h4>Problem</h4>
+<p>HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask &#34;what work is happening across all my projects right now?&#34; without manually cd-ing into each repo and running `htmlgraph snapshot`.
+
+The gap is real and the building blocks are already in place. The `sessions` table already stores `project_dir` and `git_remote_url` per row, meaning project identity is tracked at the row level inside each SQLite DB. `internal/workitem/project.go` has `Project.Open()` which opens a project&#39;s SQLite DB by directory — the pattern for multi-DB access exists (though it runs migrations so cross-project reads need a lightweight read-only alternative). `~/.local/share/htmlgraph/` is established as a global location (used today for `version-check.json` and `.binary-version`) but holds no project registry. Every CLI invocation in a new project has no memory of the others.
+
+The deleted Elixir/Phoenix implementation had a full `ProjectRegistry` GenServer and workspace scanner. That code is gone but the problem it solved is not. Power users with 5–20 active repos get zero cross-project visibility: no way to see which projects have in-progress work, which sessions are running, or which bugs are blocked. The dashboard (`htmlgraph serve`) only sees the current project. There is no global entry point.
+
+The MVP scope is deliberately narrow: passive registry growth via upsert-on-invocation, a `projects list` command, and a `--global` flag on `serve` that aggregates read-only data across all known project DBs. Everything else stays project-local.
+</p>
+<h4>Goals</h4>
+<ol>
+<li>**Auto-registering project registry** — every `htmlgraph` invocation inside a project upserts that project&#39;s metadata (path, name, git remote, last-seen timestamp) into `~/.local/share/htmlgraph/projects.json`, so the registry grows passively without any user action and always reflects recently active projects</li>
+<li>**`htmlgraph projects list` command** — a new top-level command that reads the registry and prints all known projects with their path, last-active timestamp, and in-progress work item count; usable from any directory, not just inside a project</li>
+<li>**`htmlgraph serve --global` unified dashboard** — extends the existing embedded dashboard server to aggregate read-only data from all registered project DBs when `--global` is passed, presenting a single view of in-progress work items and recent sessions without breaking the default single-project `htmlgraph serve`</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li>No external infrastructure — registry must be a local JSON file at `~/.local/share/htmlgraph/projects.json`; no Postgres, Redis, or cloud sync; consistent with the core project constraint</li>
+<li>Read-only cross-project aggregation — the global dashboard and `projects list` must never write to any project&#39;s `.htmlgraph/` directory or SQLite DB; all cross-project DB access uses read-only SQLite connections (`?mode=ro` URI) that skip schema migrations; SQLite supports concurrent readers so aggregation is safe, but cross-project writes are explicitly out of scope for this MVP</li>
+<li>Zero breakage of existing single-project workflows — `htmlgraph serve` without `--global`, all hook behaviour, and all project-local commands must behave identically; the registry upsert must be a silent side-effect with no latency impact on normal CLI invocations</li>
+<li>No build step or framework additions to the dashboard — the SPA is vanilla JS served via `embed.FS`; the global view must use the same constraint, adding only new API endpoints to the existing Go HTTP server and new JS fetch calls, not a bundler or frontend framework</li>
+</ul>
+
     <div class="approval-row">
       <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
 </details>
+
 
 <!-- Structure Outline (hidden when empty) -->
 
@@ -320,7 +362,147 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    
+    <div class="slice-card" data-slice="1" data-slice-name="feat-3c8a1e72" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">Registry package — internal/registry/</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Create `internal/registry/` with a single file `registry.go`. Define `Entry` struct: `{ProjectDir, Name, GitRemoteURL, LastSeen, ID string}` where `ID` is the first 8 characters of the SHA256 hash of `ProjectDir`, computed once on first upsert and stored in the entry. Define `Registry` struct wrapping the file path and a `[]Entry` slice. Implement `Load(path string) (*Registry, error)` — reads and JSON-decodes the file; returns empty registry (not error) if file does not exist. Implement `(*Registry) Save() error` — JSON-encodes with indentation, writes atomically via a tempfile &#43; `os.Rename()` pattern (write to `&lt;path&gt;.tmp`, then rename) to the registry path, ensuring crash-safe writes. Implement `(*Registry) Upsert(dir, name, remoteURL string)` — finds existing entry by `ProjectDir` (filepath.Clean comparison), updates `LastSeen` / `GitRemoteURL` / `Name` in-place or appends a new entry with a freshly computed `ID`; uses `time.Now().UTC().Format(time.RFC3339)` for `LastSeen`. Implement `(*Registry) List() []Entry` returning a copy of entries. Implement `(*Registry) Prune() []string` — removes entries whose `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;)` does not exist via `os.Stat`; returns list of pruned dirs. Expose `DefaultPath() string` helper returning `~/.local/share/htmlgraph/projects.json` (resolved via `os.UserHomeDir`). Add `OpenReadOnly(dbPath string) (*sql.DB, error)` — opens SQLite with `file:&lt;dbPath&gt;?mode=ro&amp;_busy_timeout=5000` URI; does NOT call `ApplyPragmas` or `CreateAllTables`; returns a read-only `*sql.DB` for use by cross-project queries. No external dependencies — stdlib only (database/sql &#43; modernc.org/sqlite already in go.mod).
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">All other slices depend on a well-defined, tested registry abstraction. Isolating it in `internal/registry/` keeps the CLI commands thin and makes the persistence layer independently testable. The atomic write pattern prevents registry corruption on crash. The read-only DB helper prevents schema mutations on foreign project databases.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/registry/registry.go, internal/registry/registry_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`go build ./internal/registry/...` passes</li><li>`go test ./internal/registry/...` passes with coverage of Load/Save/Upsert/List/Prune/OpenReadOnly</li><li>Upsert is idempotent: calling twice with same dir updates LastSeen, does not duplicate</li><li>Load on missing file returns empty registry, no error</li><li>Prune removes entries whose .htmlgraph/ dir is absent and returns their paths</li><li>Save uses tempfile&#43;rename — power-loss during write does not corrupt the registry</li><li>Each Entry has a stable ID (8-char SHA256 prefix of ProjectDir) set on first upsert and preserved on subsequent upserts</li><li>OpenReadOnly returns a *sql.DB that can query but cannot write or run migrations</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestLoad_MissingFile, TestUpsert_NewEntry, TestUpsert_UpdatesExisting,
+      TestSave_RoundTrip, TestSave_Atomic (interrupt mid-write via tmpdir),
+      TestPrune_RemovesStale, TestDefaultPath, TestOpenReadOnly_RejectsWrite,
+      TestEntry_StableID (same dir always yields same ID)
+Integration: none (pure file I/O &#43; SQLite, tmpdir-based in unit tests)
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="2" data-slice-name="feat-7d4b2f91" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#2</span>
+    <span class="slice-name">Auto-registration in PersistentPreRunE</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">In `cmd/htmlgraph/main.go`, extend the existing `rootCmd.PersistentPreRunE` to call `registry.Load(registry.DefaultPath())`, then `reg.Upsert(projectDir, name, gitRemoteURL)`, then `reg.Save()` after the existing `agent.EnsureSession` call. Derive `projectDir` from the already-resolved `filepath.Dir(hgDir)`. Derive `name` as `filepath.Base(projectDir)`. Derive `gitRemoteURL` via `paths.GetGitRemoteURL(projectDir)` — but ONLY when the existing registry entry for `projectDir` has an empty `GitRemoteURL`; if the entry already has a URL populated, skip the `git remote get-url origin` subprocess entirely and pass the cached value to `Upsert`. This ensures the git subprocess runs at most once per project, not on every CLI invocation. Skip the registry upsert (return `nil`) when `findHtmlgraphDir()` returns an error (same graceful-degradation pattern already used for EnsureSession). The entire upsert &#43; save must complete within 10 ms on an SSD for the common case (cached remote URL, no git subprocess); the first-invocation case may take up to 30 ms due to git process startup.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Self-maintaining registry without any daemon. Every `htmlgraph` invocation silently keeps the registry fresh, which makes `projects list` reliable without manual maintenance. Caching the remote URL after first write prevents a git subprocess on every CLI call — critical for latency since git process startup is 5–20 ms on macOS.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/main.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>Running `htmlgraph status` in a project dir creates/updates an entry in `~/.local/share/htmlgraph/projects.json`</li><li>LastSeen timestamp advances on each invocation</li><li>git remote get-url is called ONLY on first registration (when GitRemoteURL is empty); subsequent invocations use the cached value</li><li>Commands excluded from PersistentPreRunE (version, help, init, etc.) do not touch registry</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestPersistentPreRunE_UpsertsCalled (mock registry via tmpdir),
+      TestPersistentPreRunE_GitSubprocessCalledOnce (assert GetGitRemoteURL not called
+      when entry already has URL)
+Integration: Run `htmlgraph status` twice in a temp project dir; assert projects.json
+             contains exactly one entry with updated LastSeen; assert git subprocess
+             not invoked on second run (mock or count via test hook)
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="3" data-slice-name="feat-c1e5a83d" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#3</span>
+    <span class="slice-name">htmlgraph projects subcommand (list &#43; prune)</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-3">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Create `cmd/htmlgraph/projects.go` with a `projectsCmd()` function returning a `*cobra.Command` for `htmlgraph projects`. Add two subcommands: `htmlgraph projects list` — calls `registry.Load(registry.DefaultPath())`, iterates entries, prints a table with columns: NAME, DIR, LAST_SEEN, STATUS (exists/missing), ITEMS. STATUS is &#34;exists&#34; if `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;)` is stat-able, &#34;missing&#34; otherwise. ITEMS count is derived by opening the project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;, &#34;htmlgraph.db&#34;))` and querying feature &#43; bug &#43; spike counts — skip silently on open error. Do NOT use `workitem.Open(entry.ProjectDir, ...)` here as that runs schema migrations. `htmlgraph projects prune` — calls `reg.Prune()`, prints pruned dirs, calls `reg.Save()`. Register `projectsCmd()` in `main.go` via `rootCmd.AddCommand(projectsCmd())`. Add &#34;projects&#34; to the PersistentPreRunE skip list so the subcommand works without a local `.htmlgraph/` directory.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Gives users visibility into all known projects and a manual cleanup path for stale entries — the primary user-facing surface of the registry. Using read-only DB connections for ITEMS counts ensures no schema mutations are applied to foreign project databases.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/projects.go, cmd/htmlgraph/main.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`htmlgraph projects list` prints a table row for each entry in the registry</li><li>`htmlgraph projects prune` removes entries with missing `.htmlgraph/` and prints them</li><li>Running either command in a directory without `.htmlgraph/` does not error</li><li>ITEMS count uses read-only DB connection via `registry.OpenReadOnly` — no migrations run on foreign DBs</li><li>DB path is constructed as `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;, &#34;htmlgraph.db&#34;)` not `entry.ProjectDir` directly</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestProjectsList_Output, TestProjectsPrune_RemovesAndSaves (tmpdir registry)
+Integration: Populate registry with two entries (one real, one fake dir);
+             assert `list` shows both, `prune` removes the fake one;
+             assert no schema tables created in real project DB after `list` runs
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-3" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="4" data-slice-name="feat-9a7e6c04" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#4</span>
+    <span class="slice-name">Global dashboard backend — htmlgraph serve --global</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-4">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">In `cmd/htmlgraph/serve.go`, add a `--global` bool flag to `serveCmd()`. When `--global` is set, call a new `runGlobalServer(port int)` function instead of `runServer`. `runGlobalServer` loads the registry, iterates entries where status==exists, opens each project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;, &#34;htmlgraph.db&#34;))` — never via `workitem.Open` which runs migrations. Collect `[]*sql.DB` mapped by stable project ID (`entry.ID`, the 8-char SHA256 prefix stored in the registry entry). Add new API routes to the mux: `GET /api/projects` — returns `[]ProjectSummary` JSON where each summary contains `{id, name, dir, lastSeen, featureCount, bugCount, spikeCount}` using the stable `entry.ID` as the project ID. `GET /api/mode` — returns `{&#34;mode&#34;:&#34;global&#34;,&#34;projects&#34;:[...]}` in global mode; this endpoint is also added to the single-project server returning `{&#34;mode&#34;:&#34;single&#34;}`. Extend existing routes with a `?project=&lt;id&gt;` query parameter: `GET /api/sessions?project=&lt;id&gt;` dispatches to `sessionsHandler` for the matched project&#39;s `*sql.DB`; `GET /api/features?project=&lt;id&gt;` dispatches to `featuresHandler`; `GET /api/stats?project=&lt;id&gt;` dispatches to `statsHandler`. `GET /api/projects/all/stats` — aggregates stat counts across all projects. When `?project` is absent or the route is hit without global context, fall through to single-project behaviour. Reuse existing `corsMiddleware` and handler functions — pass `*sql.DB` and `htmlgraphDir` as explicit arguments rather than closures where needed. All cross-project DB connections are read-only. Existing `runServer` (single-project) must remain unchanged.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">The backend aggregation layer enables the global dashboard without duplicating data. All reads are at query time against per-project SQLite files opened read-only via URI mode — no migrations, no schema mutations, no data merging or synchronisation needed. Using query parameters on existing routes aligns with the Q3 recommended answer and avoids a separate route tree.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/serve.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`htmlgraph serve --global` starts without error</li><li>`GET /api/projects` returns JSON array with one entry per registry project that exists on disk; each entry has a stable `id` (SHA256-derived, not array index)</li><li>`GET /api/mode` returns `{&#34;mode&#34;:&#34;global&#34;,...}` in global mode and `{&#34;mode&#34;:&#34;single&#34;}` in single-project mode</li><li>`GET /api/sessions?project=&lt;id&gt;` returns sessions from that project&#39;s DB</li><li>`GET /api/features?project=&lt;id&gt;` returns features from that project&#39;s DB</li><li>`GET /api/projects/all/stats` returns aggregated counts across all loaded projects</li><li>All cross-project DB access uses read-only connections — no schema mutations on foreign projects</li><li>Single-project `htmlgraph serve` (no flag) behaviour is unchanged; `/api/mode` returns `{&#34;mode&#34;:&#34;single&#34;}`</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestRunGlobalServer_RoutesRegistered, TestProjectIDStable (same dir always same id),
+      TestModeEndpoint_Single, TestModeEndpoint_Global
+Integration: Start global server against a tmpdir with two project dirs;
+             assert /api/projects returns two entries with stable IDs;
+             assert /api/sessions?project=&lt;id&gt; returns data from the correct DB;
+             assert no new tables created in project DBs after server startup
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-4" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="5" data-slice-name="feat-e2f8b17a" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#5</span>
+    <span class="slice-name">Global dashboard frontend — project switcher UI</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-5">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Extend `cmd/htmlgraph/dashboard/js/app.js` to detect global mode by calling `GET /api/mode` on startup (not `/api/projects`, which returns an HTML 404 in single-project mode due to the file server fallback). If the response has `mode == &#34;global&#34;` the app enters global mode. In global mode, render a project switcher panel above the existing nav — a `&lt;select&gt;` or pill-list of project names plus an &#34;All Projects&#34; option. Selecting a specific project re-scopes all subsequent API calls using the `?project=&lt;id&gt;` query parameter on existing routes (e.g., `/api/sessions?project=&lt;id&gt;`, `/api/features?project=&lt;id&gt;`). Selecting &#34;All Projects&#34; calls `/api/projects/all/stats` for the stats panel and renders a merged session list from all projects. Add a `buildProjectUrl(projectId, endpoint)` helper in `helpers.js` that returns `/api/${endpoint}?project=${projectId}` when `projectId` is set or `/api/${endpoint}` for the single-project fallback. Single-project mode (when `/api/mode` returns `{&#34;mode&#34;:&#34;single&#34;}`) must behave exactly as today — no regressions. No new JS dependencies — vanilla JS only, matching the existing codebase style.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">The frontend switcher is the user-visible payoff of the global backend. Using `/api/mode` as the detection mechanism avoids the HTML-404 trap from the static file server fallback on `/api/projects`. The `?project=` query parameter pattern aligns with the aligned Slice 4 implementation.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/js/helpers.js</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>Opening `htmlgraph serve --global` in a browser shows a project switcher with all registered projects</li><li>Switching projects re-fetches sessions and features for the selected project using `?project=&lt;id&gt;` query params</li><li>`All Projects` view shows aggregated stats</li><li>Single-project `htmlgraph serve` shows no switcher and all existing behaviour is preserved</li><li>Mode detection uses `GET /api/mode` — not `/api/projects` which returns HTML 404 in single-project mode</li><li>No new JS libraries introduced</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: none (vanilla JS; verified via manual browser walkthrough)
+Integration: Start global server with two projects; load dashboard; assert switcher
+             renders both project names; assert feature list changes on selection;
+             assert single-project server shows no switcher
+</div></div>
+  <div class="slice-deps">Dependencies: slices 4</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-5" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
+  </div>
+</div>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
@@ -329,12 +511,281 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="questions" class="section-card" data-phase="questions" data-status="pending">
   <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
   <div class="section-body">
+    
+    <div class="question-block" id="q-registry-format">
+      <p>Should the project registry use JSON file or SQLite database?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-registry-format" data-question="q-registry-format" value="A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped"> A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-registry-format" data-question="q-registry-format" value="B: SQLite database — queryable, consistent with internal architecture, more overhead"> B: SQLite database — queryable, consistent with internal architecture, more overhead</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-registry-format" placeholder="Rationale for q-registry-format..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-auto-registration-trigger">
+      <p>When should a project auto-register: every CLI invocation, first-use only, or htmlgraph init only?</p>
+      
+      
+      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command"> A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command</label>
+      
+      <label class="recommended"><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly"> B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="C: htmlgraph init only — explicit opt-in, manual multi-project setup required"> C: htmlgraph init only — explicit opt-in, manual multi-project setup required</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-auto-registration-trigger" placeholder="Rationale for q-auto-registration-trigger..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-global-api-design">
+      <p>Should multi-project API routes be separate (e.g., /api/global/sessions) or a query parameter on existing routes?</p>
+      
+      
+      <label><input type="radio" name="q-global-api-design" data-question="q-global-api-design" value="A: Separate /api/global/* routes — cleaner separation, requires handler duplication"> A: Separate /api/global/* routes — cleaner separation, requires handler duplication</label>
+      
+      <label><input type="radio" name="q-global-api-design" data-question="q-global-api-design" value="B: Query parameter ?project=all on existing routes — minimal code, blends concerns" checked> B: Query parameter ?project=all on existing routes — minimal code, blends concerns</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-global-api-design" placeholder="Rationale for q-global-api-design..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-project-identity">
+      <p>Should project identity be git remote URL or absolute project directory path?</p>
+      
+      
+      <label><input type="radio" name="q-project-identity" data-question="q-project-identity" value="A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness"> A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness</label>
+      
+      <label class="recommended"><input type="radio" name="q-project-identity" data-question="q-project-identity" value="B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management"> B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management <span class="rec-tag">recommended</span></label>
+      
+      <textarea data-section="questions" data-question-rationale="q-project-identity" placeholder="Rationale for q-project-identity..."></textarea>
+    </div>
+    
     <table class="q-table">
       <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
       <tbody id="questionsRecap">
-        <!--PLAN_QUESTIONS_RECAP-->
+        
+        <tr data-recap-for="q-registry-format">
+          <td>Should the project registry use JSON file or SQLite database?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-auto-registration-trigger">
+          <td>When should a project auto-register: every CLI invocation, first-use only, or htmlgraph init only?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-global-api-design">
+          <td>Should multi-project API routes be separate (e.g., /api/global/sessions) or a query parameter on existing routes?</td>
+          <td class="recap-answer">B: Query parameter ?project=all on existing routes — minimal code, blends concerns</td>
+          <td><span class="badge badge-approved">Decided</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-project-identity">
+          <td>Should project identity be git remote URL or absolute project directory path?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
       </tbody>
     </table>
+  </div>
+</details>
+
+
+
+<details id="critique" class="section-card" data-phase="critique" data-status="pending">
+  <summary><span>Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
+  <div class="section-body">
+
+    
+    <div class="sub-section">
+      <h4>Assumption Verification</h4>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">sessions table stores project_dir and git_remote_url</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">internal/db/schema.go migrations</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">workitem.Project.Open() exists and opens a project DB</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">internal/workitem/project.go:57</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">Project.Open() works for read-only multi-DB access</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Open() calls ApplyPragmas &#43; CreateAllTables — always mutates</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">~/.local/share/htmlgraph/ is established global location</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">internal/version/check.go:29, plugin/hooks/bin/bootstrap.sh:27</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">HTMLGRAPH_WORKSPACE is wired in resolve.go</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Zero occurrences in resolve.go — only in archived docs</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">PersistentPreRunE skip list is a switch-case</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">cmd/htmlgraph/main.go:42-45</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">All dashboard handlers accept *sql.DB explicitly, not closures</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">cmd/htmlgraph/api.go:108,175,289; api_timeline.go:12</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">GetGitRemoteURL exists in paths package</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">internal/paths/resolve.go:211-221</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-pending">questionable</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">Registry upsert completes within 10ms including git subprocess</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">git process startup is 5-20ms on macOS — dominates the budget</p>
+        </div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      
+      <div>
+        <h4>Haiku (design review)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>Slice Assessment</h5>
+<ul>
+  <li><span class="badge badge-success">S1</span> Registry package well-scoped, testable, stdlib-only. Fixed: use tempfile+rename for atomic writes.</li>
+  <li><span class="badge badge-warn">S2</span> Auto-registration adds git subprocess to every CLI call. Fixed: cache remote URL after first write.</li>
+  <li><span class="badge badge-warn">S3</span> ITEMS counting opens full read-write DB connections. Fixed: use read-only SQLite URI.</li>
+  <li><span class="badge badge-warn">S4</span> Project ID as array index is unstable. Fixed: use SHA256 hash of projectDir.</li>
+  <li><span class="badge badge-info">S5</span> Frontend detection of global mode via /api/projects 404 returns HTML. Fixed: use /api/mode endpoint.</li>
+</ul>
+<h5>Gaps &amp; Missing Considerations</h5>
+<ul>
+  <li><span class="badge badge-warn">Gap</span> No refresh mechanism when registry changes while global dashboard is running</li>
+  <li><span class="badge badge-warn">Gap</span> No migration path for existing projects — must invoke CLI once per project to register</li>
+  <li><span class="badge badge-info">Gap</span> Git worktrees resolve to main repo root — correct but may surprise users</li>
+</ul>
+<h5>Alternative Approaches</h5>
+<ul>
+  <li><span class="badge badge-info">Alt</span> SQLite ATTACH for cross-project queries — cleaner than N separate connections. Deferred to post-MVP.</li>
+  <li><span class="badge badge-info">Alt</span> Query existing sessions table for project discovery — avoids parallel registry. Deferred.</li>
+</ul>
+</div>
+      </div>
+      
+      
+      <div>
+        <h4>Sonnet (feasibility)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>What Exists to Leverage</h5>
+<ul>
+  <li><span class="badge badge-success">Prior</span> version/check.go has JSON read/write pattern for ~/.local/share/htmlgraph/ — model Registry on it</li>
+  <li><span class="badge badge-success">Prior</span> All API handlers accept *sql.DB explicitly — zero refactoring needed for global dispatch</li>
+  <li><span class="badge badge-success">Prior</span> PersistentPreRunE skip list is the established pattern — extending it for &#39;projects&#39; is clean</li>
+</ul>
+<h5>What the Plan Gets Wrong</h5>
+<ul>
+  <li><span class="badge badge-danger">Bug</span> workitem.Open expects .htmlgraph/ dir but plan passes project root — fixed: use filepath.Join</li>
+  <li><span class="badge badge-danger">Bug</span> Slice 4 implements separate route tree but Q3 recommends query params — fixed: aligned</li>
+</ul>
+<h5>Prior Art &amp; Examples</h5>
+<ul>
+  <li><span class="badge badge-info">Ref</span> version-check.json in ~/.local/share/htmlgraph/ — identical load/save pattern for registry</li>
+  <li><span class="badge badge-info">Ref</span> corsMiddleware in serve.go — reusable handler wrapper pattern</li>
+</ul>
+</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Synthesis</h4>
+      <div style="font-size:.85rem;color:var(--text-dim)">Two critical findings require plan revision: (1) workitem.Open() is NOT read-only — all cross-project DB access must use a lightweight read-only connection, and (2) HTMLGRAPH_WORKSPACE is not wired in Go code. Additionally, the git subprocess latency on auto-registration should be mitigated by caching the remote URL. The plan&#39;s implementation approach for Slice 4 conflicted with its own recommended design question answer — aligned to use query parameters. All findings addressed in the revised slices.
+</div>
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Risk Assessment</h4>
+      <table class="q-table">
+        <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          
+          <tr>
+            <td>workitem.Open() runs schema migrations on foreign project DBs</td>
+            <td><span class="badge badge-blocked">High</span></td>
+            <td>Use read-only SQLite URI (?mode=ro) for all cross-project access</td>
+          </tr>
+          
+          <tr>
+            <td>GetGitRemoteURL spawns git subprocess on every CLI invocation</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Cache remote URL in registry; skip git call if already populated</td>
+          </tr>
+          
+          <tr>
+            <td>os.WriteFile truncates then writes — not crash-safe</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Use tempfile &#43; os.Rename for atomic writes</td>
+          </tr>
+          
+          <tr>
+            <td>Array-index project IDs are unstable across server restarts</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Use SHA256 hash of projectDir as deterministic stable ID</td>
+          </tr>
+          
+          <tr>
+            <td>N open SQLite connections with 64MB cache each in global mode</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Read-only connections skip cache pragmas; lazy-open on first access</td>
+          </tr>
+          
+          <tr>
+            <td>Concurrent CLI invocations may corrupt JSON registry</td>
+            <td><span class="badge badge-pending">Low</span></td>
+            <td>Atomic rename prevents partial writes; flock for additional safety if needed post-MVP</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+
+    
+
   </div>
 </details>
 
@@ -347,8 +798,8 @@ textarea::placeholder{color:var(--text-muted)}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">6</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">6</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -436,7 +887,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
@@ -962,15 +1413,13 @@ function syncHljsTheme(){
 }
 syncHljsTheme();
 
-// YAML viewer — lazy-loads plan YAML on first open
+// YAML viewer — lazy-loads plan YAML on first open or re-highlights on reopen
 (function(){
   var viewer=document.getElementById('yaml-viewer');
   var codeEl=document.getElementById('yaml-content');
   if(!viewer||!codeEl)return;
-  var loaded=false;
-  viewer.addEventListener('toggle',function(){
-    if(!viewer.open||loaded)return;
-    loaded=true;
+
+  function loadAndHighlight(){
     var planEl=document.querySelector('[data-plan-id]');
     if(!planEl)return;
     var id=planEl.getAttribute('data-plan-id');
@@ -978,6 +1427,8 @@ syncHljsTheme();
       .then(function(r){if(!r.ok)throw new Error('err');return r.text();})
       .then(function(t){
         codeEl.textContent=t;
+        delete codeEl.dataset.highlighted; // allow re-highlighting
+        syncHljsTheme();
         function tryHighlight(){
           if(window.hljs&&hljs.getLanguage&&hljs.getLanguage('yaml')){
             hljs.highlightElement(codeEl);
@@ -988,7 +1439,16 @@ syncHljsTheme();
         tryHighlight();
       })
       .catch(function(){codeEl.textContent='YAML not available';});
+  }
+
+  var loaded=false;
+  viewer.addEventListener('toggle',function(){
+    if(!viewer.open||loaded)return;
+    loaded=true;
+    loadAndHighlight();
   });
+  // If already open (e.g. re-rendered in embedded view), load immediately
+  if(viewer.open){loaded=true;loadAndHighlight();}
 })();
 
 // Amendments panel

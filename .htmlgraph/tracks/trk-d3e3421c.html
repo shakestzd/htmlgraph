@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>File-to-Feature Attribution Index</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="trk-d3e3421c"
+             data-type="track"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-08T12:11:23.864316"
+             data-updated="2026-04-08T12:35:37.461425" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>File-to-Feature Attribution Index</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="contains">
+                <h3>Contains:</h3>
+                <ul>
+                    <li><a href="feat-58926752.html" data-relationship="contains" data-since="2026-04-08T12:11:43.135332">Git commit → feature index — scan commit messages for feat/bug IDs, build SQLite reverse index</a></li>
+                    <li><a href="feat-6ee8c049.html" data-relationship="contains" data-since="2026-04-08T12:11:43.151273">htmlgraph trace &lt;file&gt; command — reverse-query file ownership</a></li>
+                    <li><a href="feat-6803cb30.html" data-relationship="contains" data-since="2026-04-08T12:11:43.168693">PostToolUse:Edit hook — record file-to-feature edges on every edit</a></li>
+                    <li><a href="bug-4e2fb1e2.html" data-relationship="contains" data-since="2026-04-08T12:35:37.460958">Minor gaps in file-to-feature attribution index</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Build the reverse query index: given a file path, find all features that touched it, and their parent tracks. Enables 'htmlgraph trace ' to answer 'who owns this code?' without manual git log archaeology. Bundles semantic indexing, unified work item linking, and the query DSL.</p>
+        </section>
+    </article>
+</body>
+</html>

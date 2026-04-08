@@ -13,7 +13,7 @@
              data-status="todo"
              data-priority="high"
              data-created="2026-01-13T19:55:34.664097"
-             data-updated="2026-01-13T19:55:34.674021+00:00" data-agent-assigned="claude" data-track-id="trk-991c5af1">
+             data-updated="2026-04-08T12:11:52.238478" data-agent-assigned="claude" data-track-id="trk-991c5af1">
 
         <header>
             <h1>Design semantic query DSL</h1>
@@ -24,20 +24,27 @@
         </header>
 
         <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-58926752.html" data-relationship="blocked_by" data-since="2026-04-08T12:11:52.222746">Git commit → feature index — scan commit messages for feat/bug IDs, build SQLite reverse index</a></li>
+                    <li><a href="feat-f7964b8a.html" data-relationship="blocked_by" data-since="2026-04-08T12:11:52.238393">Unified work item linking — AddEdge/RemoveEdge API, link CLI, plan and spec types</a></li>
+                </ul>
+            </section>
             <section data-edge-type="implemented-in">
-                <h3>Implemented-In:</h3>
+                <h3>Implemented-in:</h3>
                 <ul>
                     <li><a href="sess-6c56e756.html" data-relationship="implemented-in" data-since="2026-01-13T19:55:34.674012">sess-6c56e756</a></li>
                 </ul>
             </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-d3e3421c.html" data-relationship="part_of" data-since="2026-04-08T12:11:31.20787">File-to-Feature Attribution Index</a></li>
+                </ul>
+            </section>
         </nav>
-        <section data-required-capabilities>
-            <h3>Required Capabilities</h3>
-            <ul>
-                <li data-tag="design" class="tag">design</li>
-<li data-tag="core" class="tag">core</li>
-            </ul>
-        </section>
+
         <section data-steps>
             <h3>Implementation Steps</h3>
             <ol>
@@ -48,6 +55,7 @@
                 <li data-completed="false">⏳ Document DSL in docs/QUERY_DSL.md</li>
             </ol>
         </section>
+
         <section data-content>
             <h3>Description</h3>
             <p>Design a semantic query language inspired by agent-browser's 'find role button --name Submit' pattern. For HtmlGraph: sdk.find('features').where(status='blocked').execute(). Document the DSL syntax and semantics.</p>

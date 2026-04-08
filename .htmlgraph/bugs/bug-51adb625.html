@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>plan rewrite-yaml does not increment version number</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-51adb625"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T11:48:50.014071"
+             data-updated="2026-04-08T11:50:19.267006" data-agent-assigned="claude-code" data-track-id="trk-d8fa810e">
+
+        <header>
+            <h1>plan rewrite-yaml does not increment version number</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-955ae5a0.html" data-relationship="caused_by" data-since="2026-04-08T11:48:50.015776">feat-955ae5a0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-d8fa810e.html" data-relationship="part_of" data-since="2026-04-08T11:48:50.016038">trk-d8fa810e</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="relates_to">
+                <h3>Relates To:</h3>
+                <ul>
+                    <li><a href="bug-51ba094a.html" data-relationship="relates_to" data-since="2026-04-08T11:50:19.26693">Plan YAML/HTML ID mismatch — YAML-only plans invisible in dashboard</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When plan rewrite-yaml rewrites a plan with substantive changes (e.g., adding critique section, changing slice count, adding questions), the meta.version field should auto-increment. Currently it stays at the same value. The version should bump on every rewrite so reviewers can see which version they're reviewing and track the plan's evolution.</p>
+        </section>
+    </article>
+</body>
+</html>

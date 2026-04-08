@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>agent_events not persisted to HTML — lost on DB rebuild</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-43ff4efa"
+             data-type="bug"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-08T19:08:25.139028"
+             data-updated="2026-04-08T19:09:35.196931" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>agent_events not persisted to HTML — lost on DB rebuild</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-08T19:08:25.140598">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="559faa0b-464a-43ca-95a6-65097d374f34.html" data-relationship="implemented_in" data-since="2026-04-08T19:09:35.196878">session 559faa0b-464a-43ca-95a6-65097d374f34</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>agent_events are only stored in SQLite, not written to session HTML files. When DB is deleted and rebuilt via reindex, all activity feed data is lost. Fix: persist agent_events to .htmlgraph/sessions/sess-{id}.html and reconstruct from HTML during reindex, matching the canonical HTML store pattern used by features/bugs/tracks.</p>
+        </section>
+    </article>
+</body>
+</html>

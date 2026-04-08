@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Dashboard activity feed missing current session events</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-7362384a"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T11:46:25.878811"
+             data-updated="2026-04-08T11:46:25.87982" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>Dashboard activity feed missing current session events</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-598523de.html" data-relationship="caused_by" data-since="2026-04-08T11:46:25.879474">bug-598523de</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-08T11:46:25.879767">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Activity feed shows events from other parallel sessions but not from the active session. Current session's planning, chat testing, and bug fixing work does not appear. Likely an ingestion issue — the auto-ingest loop in serve.go may not be picking up the active session's JSONL, or the session filter is too restrictive.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -28,6 +28,7 @@ No external infrastructure required.
 <div class="hg-hero__buttons">
   <a class="hg-btn hg-btn--primary" href="#install">Install</a>
   <a class="hg-btn hg-btn--secondary" href="reference/cli/">CLI Reference</a>
+  <a class="hg-btn hg-btn--secondary" href="blog/">Blog</a>
 </div>
 
 </div>
@@ -189,6 +190,6 @@ cd htmlgraph && go build -o htmlgraph ./cmd/htmlgraph/
 
 <div class="hg-footer-links" markdown>
 
-[CLI Reference](reference/cli.md) &nbsp;&middot;&nbsp; [GitHub](https://github.com/shakestzd/htmlgraph) &nbsp;&middot;&nbsp; [Claude Code Plugin](https://github.com/shakestzd/htmlgraph)
+[CLI Reference](reference/cli.md) &nbsp;&middot;&nbsp; [Blog](blog/index.md) &nbsp;&middot;&nbsp; [GitHub](https://github.com/shakestzd/htmlgraph) &nbsp;&middot;&nbsp; [Claude Code Plugin](https://github.com/shakestzd/htmlgraph)
 
 </div>

@@ -2,10 +2,58 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://shakestzd.github.io/htmlgraph/</loc>
-         <lastmod>2026-04-04</lastmod>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/codex-interoperability-review/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/internal-plan-system-analysis/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/introducing-htmlgraph/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/plan-mode-structured-plans/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/python-to-go/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/sub-agent-orchestration/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/yolo-mode-autonomous-guardrails/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://shakestzd.github.io/htmlgraph/reference/cli/</loc>
-         <lastmod>2026-04-04</lastmod>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/archive/2026/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/category/architecture/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/category/features/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://shakestzd.github.io/htmlgraph/blog/category/engineering/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
 </urlset>

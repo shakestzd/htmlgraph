@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>htmlgraph find cannot look up plan IDs — prefix mismatch</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-d7c80546"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-08T11:48:55.122135"
+             data-updated="2026-04-08T14:53:21.434414" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>htmlgraph find cannot look up plan IDs — prefix mismatch</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-b0377def.html" data-relationship="part_of" data-since="2026-04-08T11:48:55.123065">trk-b0377def</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="fc553141-26ab-4a3d-bd94-60d8e520d4c1.html" data-relationship="implemented_in" data-since="2026-04-08T11:55:01.064741">session fc553141-26ab-4a3d-bd94-60d8e520d4c1</a></li>
+                    <li><a href="a058c6a7-e12f-425f-8348-eac21e3753d7.html" data-relationship="implemented_in" data-since="2026-04-08T14:02:47.900187">session a058c6a7-e12f-425f-8348-eac21e3753d7</a></li>
+                    <li><a href="87836270-17a6-421b-9df8-bbbe49c09694.html" data-relationship="implemented_in" data-since="2026-04-08T14:26:26.281223">session 87836270-17a6-421b-9df8-bbbe49c09694</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-598523de.html" data-relationship="caused_by" data-since="2026-04-08T11:48:55.122761">bug-598523de</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-0" data-agent="claude-code">✅ Task 1 [task:1]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-1" data-agent="claude-code">✅ Task 2 [task:2]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-2" data-agent="claude-code">✅ Task 3 [task:3]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-3" data-agent="claude-code">✅ Task 4 [task:4]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-4" data-agent="claude-code">✅ Task 1 [task:1]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-5" data-agent="claude-code">✅ Task 2 [task:2]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-6" data-agent="claude-code">✅ Task 3 [task:3]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-7" data-agent="claude-code">✅ Task 4 [task:4]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-8" data-agent="claude-code">✅ Task 5 [task:5]</li>
+                <li data-completed="true" data-step-id="step-bug-d7c80546-9" data-agent="claude-code">✅ Task 6 [task:6]</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>workItemIDPattern in find.go:15 accepts pln- but plan files use plan- prefix. plan-fb6d9774 is a valid plan but find returns nothing because the regex doesn't match. Fix: add plan| to the pattern regex. Also knownCollections is missing plans/specs entries.</p>
+        </section>
+    </article>
+</body>
+</html>

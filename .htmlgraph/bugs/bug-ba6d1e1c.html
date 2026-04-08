@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Work item guard firing outside YOLO mode for sub-agents</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-ba6d1e1c"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-08T10:58:52.287057"
+             data-updated="2026-04-08T10:58:52.28868" data-agent-assigned="claude-code" data-track-id="trk-d8fa810e">
+
+        <header>
+            <h1>Work item guard firing outside YOLO mode for sub-agents</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-88e84ed3.html" data-relationship="caused_by" data-since="2026-04-08T10:58:52.288294">feat-88e84ed3</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-d8fa810e.html" data-relationship="part_of" data-since="2026-04-08T10:58:52.288629">trk-d8fa810e</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>checkSubagentWorkItemGuard in pretooluse.go blocked a sub-agent write during a normal (non-YOLO) session. The guard at line ~79 checks 'if !yolo { return "" }' but the subagent work item guard at line ~501 appears to fire regardless of YOLO state. Sub-agents dispatched from a normal orchestrator session should not be subject to YOLO guards.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -342,7 +342,15 @@
       "WebFetch(domain:www.atlassian.com)",
       "WebFetch(domain:www.anthropic.com)",
       "WebFetch(domain:claudefa.st)",
-      "Bash(/Users/shakes/.cache/uv/archive-v0/LlyCad5yaUHPf0qqjiFMX/bin/python -c \"import marimo; print\\(marimo.__version__\\)\")"
+      "Bash(/Users/shakes/.cache/uv/archive-v0/LlyCad5yaUHPf0qqjiFMX/bin/python -c \"import marimo; print\\(marimo.__version__\\)\")",
+      "WebFetch(domain:www.ytyng.com)",
+      "WebFetch(domain:cobra.dev)",
+      "Bash(claude -p \"say hello in one word\" --output-format stream-json --verbose --include-partial-messages)",
+      "WebFetch(domain:www.emmanuelgautier.com)",
+      "Bash(go list:*)",
+      "Bash(CLAUDE_SESSION_ID=\"2e606e4c-030e-486f-a351-3f7aeb8ea9bd\" htmlgraph feature:*)",
+      "Bash(mkdir -p /Users/shakes/DevProjects/shakestzd/private/htmlgraph-blog)",
+      "Bash(mv /Users/shakes/DevProjects/htmlgraph/docs/blog/linkedin-posts.md /Users/shakes/DevProjects/shakestzd/private/htmlgraph-blog/linkedin-posts.md)"
     ]
   },
   "enabledPlugins": {
