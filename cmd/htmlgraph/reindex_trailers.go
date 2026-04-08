@@ -95,7 +95,7 @@ func splitTrailerBlocks(output string) []commitBlock {
 
 // parenWorkItemRe matches parenthesized work item references in commit messages,
 // e.g. "(feat-abc12345)". This is the primary HtmlGraph commit convention.
-var parenWorkItemRe = regexp.MustCompile(`\(\s*((?:feat|bug|spk|trk|pln|spc|plan|spec)-[0-9a-zA-Z]+)\s*\)`)
+var parenWorkItemRe = regexp.MustCompile(`\(\s*((?:feat|bug|spk|trk|pln|spc|plan|spec)-[0-9a-f]{8})\s*\)`)
 
 // parseTrailers extracts work item IDs from a git commit message.
 // Supported formats:

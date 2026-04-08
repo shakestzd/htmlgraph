@@ -226,6 +226,15 @@ func allSameLine(lines []string) bool {
 
 // extractFilePath returns the file path from Write/Edit/MultiEdit tool input.
 func extractFilePath(input map[string]any) string {
+	// MultiEdit: extract the first file path from the edits array.
+	if edits, ok := input["edits"].([]any); ok && len(edits) > 0 {
+		if edit, ok := edits[0].(map[string]any); ok {
+			if fp, ok := edit["file_path"].(string); ok && fp != "" {
+				return fp
+			}
+		}
+	}
+	// Standard path for Write/Edit.
 	for _, key := range []string{"file_path", "path"} {
 		if v, ok := input[key].(string); ok && v != "" {
 			return v

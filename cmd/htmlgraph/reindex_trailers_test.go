@@ -164,7 +164,7 @@ func TestReindexCommitTrailers_ParenthesizedCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	run("add", "file.go")
-	run("commit", "-m", "fix: resolve crash (feat-paren001)")
+	run("commit", "-m", "fix: resolve crash (feat-a1b2c3d4)")
 
 	database, err := dbpkg.Open(":memory:")
 	if err != nil {
@@ -183,8 +183,8 @@ func TestReindexCommitTrailers_ParenthesizedCommit(t *testing.T) {
 	var featureID string
 	database.QueryRow("SELECT feature_id FROM git_commits WHERE session_id = ?",
 		trailerSessionID).Scan(&featureID)
-	if featureID != "feat-paren001" {
-		t.Errorf("expected feature_id=feat-paren001, got %q", featureID)
+	if featureID != "feat-a1b2c3d4" {
+		t.Errorf("expected feature_id=feat-a1b2c3d4, got %q", featureID)
 	}
 }
 

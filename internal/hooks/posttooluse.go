@@ -113,6 +113,10 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 				_ = db.UpsertFeatureFile(database, ff)
 			}
 		}
+	} else if event.ToolName == "Edit" || event.ToolName == "Write" || event.ToolName == "MultiEdit" {
+		if filePath := extractFilePath(event.ToolInput); filePath != "" {
+			debugLog(ctx.ProjectDir, "[posttooluse] skipped file attribution for %s (no active feature)", filePath)
+		}
 	}
 
 	// Auto-complete work items referenced in commit messages.
