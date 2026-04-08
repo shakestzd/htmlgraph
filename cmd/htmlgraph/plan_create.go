@@ -76,6 +76,16 @@ func createPlanFromTopic(htmlgraphDir, title, description string) (string, error
 		return "", fmt.Errorf("scaffold CRISPI: %w", err)
 	}
 
+	// Also create the paired YAML scaffold for structured planning.
+	yamlPath := filepath.Join(htmlgraphDir, "plans", node.ID+".yaml")
+	if _, err := os.Stat(yamlPath); os.IsNotExist(err) {
+		emptyPlan := planyaml.NewPlan(node.ID, title, description)
+		if err := planyaml.Save(yamlPath, emptyPlan); err != nil {
+			// Log but don't fail — HTML is the primary artifact.
+			fmt.Fprintf(os.Stderr, "warning: could not create YAML scaffold: %v\n", err)
+		}
+	}
+
 	return node.ID, nil
 }
 
