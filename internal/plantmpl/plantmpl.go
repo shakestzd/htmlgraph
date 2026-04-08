@@ -79,6 +79,28 @@ func (a *AssetRegistry) CSS() []string { return a.css }
 // JS returns all collected JS blocks.
 func (a *AssetRegistry) JS() []string { return a.js }
 
+// RelatedWorkItem represents a linked track or feature shown in the Related Work section.
+type RelatedWorkItem struct {
+	ID     string // e.g. "trk-16d4519d" or "feat-17a993f0"
+	Title  string
+	Type   string // "track", "feature", "bug"
+	Status string // "todo", "in-progress", "done"
+}
+
+// StatusClass returns the CSS badge class suffix for the work item status.
+func (r *RelatedWorkItem) StatusClass() string {
+	switch r.Status {
+	case "done":
+		return "done"
+	case "in-progress":
+		return "ip"
+	case "blocked":
+		return "blocked"
+	default:
+		return "todo"
+	}
+}
+
 // PlanPage is the top-level struct that assembles all zones into a
 // complete plan HTML document.
 type PlanPage struct {
@@ -98,6 +120,10 @@ type PlanPage struct {
 	Critique  *CritiqueZone
 	Preview   *FinalizePreview
 	Progress  *ProgressBar
+
+	// Related work items (track, generated features)
+	RelatedTrack    *RelatedWorkItem
+	RelatedFeatures []RelatedWorkItem
 
 	// Consolidated assets
 	Assets *AssetRegistry

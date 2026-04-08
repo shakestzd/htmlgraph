@@ -16,11 +16,12 @@ type QuestionsSection struct {
 
 // DecisionCard represents a single decision point requiring human input.
 type DecisionCard struct {
-	ID        string
-	Text      string
-	Options   []string
-	Selected  string
-	Rationale string
+	ID          string
+	Text        string
+	Options     []string
+	Selected    string // only set when human has explicitly chosen
+	Recommended string // highlighted but not pre-selected
+	Rationale   string
 }
 
 // Render writes the questions section zone HTML.

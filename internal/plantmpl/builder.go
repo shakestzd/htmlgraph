@@ -31,10 +31,13 @@ func BuildFromWorkItem(planID, featureID, title, description, date string) *Plan
 }
 
 // SectionsJSON returns the JavaScript array literal of section IDs used
-// by the CRISPI interactive plan. Always includes "design" and "outline",
-// plus one entry per slice.
+// by the CRISPI interactive plan. Always includes "design", includes
+// "outline" only when the Outline zone is populated, plus one entry per slice.
 func (p *PlanPage) SectionsJSON() string {
-	sections := []string{`"design"`, `"outline"`}
+	sections := []string{`"design"`}
+	if p.Outline != nil {
+		sections = append(sections, `"outline"`)
+	}
 	for _, sc := range p.Slices {
 		sections = append(sections, fmt.Sprintf(`"slice-%d"`, sc.Num))
 	}
@@ -55,9 +58,13 @@ func (p *PlanPage) SliceCount() int {
 }
 
 // TotalSections returns the total number of approvable sections
-// (design + outline + each slice).
+// (design + outline if present + each slice).
 func (p *PlanPage) TotalSections() int {
-	return 2 + len(p.Slices)
+	n := 1 + len(p.Slices) // design + slices
+	if p.Outline != nil {
+		n++
+	}
+	return n
 }
 
 // PlanMeta returns the human-readable metadata string shown in the

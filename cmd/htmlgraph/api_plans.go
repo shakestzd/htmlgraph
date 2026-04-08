@@ -16,6 +16,7 @@ import (
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/planamend"
 	"github.com/shakestzd/htmlgraph/internal/planchat"
+	"github.com/shakestzd/htmlgraph/internal/plantmpl"
 )
 
 // planListItem is a single entry in the GET /api/plans response.
@@ -540,7 +541,7 @@ func planRouter(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	chatH := planChatHandler(database, htmlgraphDir)
 	amendmentsH := planAmendmentsHandler(database)
 	yamlH := planYAMLHandler(htmlgraphDir)
-	renderH := planRenderHandler(htmlgraphDir)
+	renderH := planRenderHandler(database, htmlgraphDir)
 	eventsH := planEventsHandler(database)
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -569,9 +570,11 @@ func planRouter(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	}
 }
 
-// planRenderHandler returns plan HTML content without the outer shell.
+// planRenderHandler dynamically renders plan HTML from the YAML source.
+// Returns just the plan content (no outer HTML shell/sidebar) for embedding
+// in the dashboard detail panel.
 // GET /api/plans/{id}/render
-func planRenderHandler(htmlgraphDir string) http.HandlerFunc {
+func planRenderHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -582,24 +585,158 @@ func planRenderHandler(htmlgraphDir string) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		htmlPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
-		data, err := os.ReadFile(htmlPath)
-		if err != nil {
-			http.Error(w, "plan not found", http.StatusNotFound)
+
+		// Build a PlanPage dynamically from the YAML source so the content
+		// is always up-to-date — the static HTML may be stale or empty.
+		page := plantmpl.BuildFromTopic(planID, "", "", "")
+		enrichPageFromYAML(htmlgraphDir, planID, page)
+		enrichRelatedWork(database, page)
+
+		// If YAML enrichment didn't populate the title, fall back to
+		// extracting it from the static HTML file.
+		if page.Title == "" {
+			htmlPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
+			if data, err := os.ReadFile(htmlPath); err == nil {
+				if doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(data))); err == nil {
+					page.Title = doc.Find("h1").First().Text()
+				}
+			}
+		}
+		if page.Title == "" {
+			page.Title = planID
+		}
+
+		// Render the full page, then extract styles + article + scripts
+		// so the embedded view has complete CSS and interactivity.
+		var buf strings.Builder
+		if err := page.Render(&buf); err != nil {
+			http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(data)))
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(buf.String()))
 		if err != nil {
 			http.Error(w, "parse error", http.StatusInternalServerError)
 			return
 		}
-		// Extract article content (the main plan body without shell/head)
-		article, err := doc.Find("article").Html()
-		if err != nil || article == "" {
-			article, _ = doc.Find("body").Html()
+
+		var out strings.Builder
+
+		// Include plan CSS, stripping rules that would conflict with
+		// the dashboard shell (body grid, html reset, sidebar styles).
+		doc.Find("style").Each(func(_ int, s *goquery.Selection) {
+			css, _ := s.Html()
+			if css == "" {
+				return
+			}
+			// Remove rules that target body/html layout (they'd override dashboard)
+			for _, strip := range []string{
+				":root{", ":root {", "[data-theme",
+				"*,", "body{", "html{",
+				".plan-sidebar{", ".plan-sidebar ",
+				".plan-sidebar.", "@media(max-width",
+			} {
+				for {
+					idx := strings.Index(css, strip)
+					if idx < 0 {
+						break
+					}
+					// Find the matching closing brace
+					depth := 0
+					end := idx
+					for i := idx; i < len(css); i++ {
+						if css[i] == '{' {
+							depth++
+						} else if css[i] == '}' {
+							depth--
+							if depth == 0 {
+								end = i + 1
+								break
+							}
+						}
+					}
+					css = css[:idx] + css[end:]
+				}
+			}
+			out.WriteString("<style>")
+			out.WriteString(css)
+			out.WriteString("</style>\n")
+		})
+
+		// Include CDN link tags (highlight.js, fonts)
+		doc.Find("link[rel='stylesheet'], link[rel='preconnect']").Each(func(_ int, s *goquery.Selection) {
+			outerHTML, _ := goquery.OuterHtml(s)
+			out.WriteString(outerHTML)
+			out.WriteString("\n")
+		})
+
+		// Plan layout (content + chat sidebar + drag handle).
+		// Extract .plan-layout which wraps article + chat-sidebar,
+		// falling back to article or body if layout wrapper missing.
+		layout, _ := goquery.OuterHtml(doc.Find(".plan-layout").First())
+		if layout == "" {
+			layout, _ = doc.Find("article").Html()
 		}
+		if layout == "" {
+			layout, _ = doc.Find("body").Html()
+		}
+		out.WriteString(layout)
+
+		// Include scripts (D3, dagre-d3, plan JS)
+		doc.Find("script").Each(func(_ int, s *goquery.Selection) {
+			outerHTML, _ := goquery.OuterHtml(s)
+			out.WriteString(outerHTML)
+			out.WriteString("\n")
+		})
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprint(w, article)
+		fmt.Fprint(w, out.String())
+	}
+}
+
+// enrichRelatedWork populates the plan page's related track and features
+// by looking up their titles and statuses from the features table.
+func enrichRelatedWork(database *sql.DB, page *plantmpl.PlanPage) {
+	if database == nil {
+		return
+	}
+
+	// Look up the linked track
+	if page.FeatureID != "" {
+		var title, status string
+		err := database.QueryRow(
+			`SELECT COALESCE(title, id), COALESCE(status, 'todo') FROM features WHERE id = ?`,
+			page.FeatureID,
+		).Scan(&title, &status)
+		if err == nil && title != "" {
+			page.RelatedTrack = &plantmpl.RelatedWorkItem{
+				ID:     page.FeatureID,
+				Title:  title,
+				Type:   "track",
+				Status: status,
+			}
+		}
+	}
+
+	// Look up slice features
+	for _, sc := range page.Slices {
+		if sc.ID == "" {
+			continue
+		}
+		var title, status string
+		err := database.QueryRow(
+			`SELECT COALESCE(title, id), COALESCE(status, 'todo') FROM features WHERE id = ?`,
+			sc.ID,
+		).Scan(&title, &status)
+		if err != nil {
+			title = sc.Title
+			status = "todo"
+		}
+		page.RelatedFeatures = append(page.RelatedFeatures, plantmpl.RelatedWorkItem{
+			ID:     sc.ID,
+			Title:  title,
+			Type:   "feature",
+			Status: status,
+		})
 	}
 }
 

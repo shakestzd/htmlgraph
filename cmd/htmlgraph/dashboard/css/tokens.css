@@ -28,9 +28,58 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
 }
 
+/* ── Light mode ───────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-primary: #f4f3ef;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eeeee8;
+  --bg-hover: #e4e4de;
+  --text-primary: #1a1a1e;
+  --text-secondary: #4a4a50;
+  --text-muted: #6a6a72;
+  --border: #d4d4cc;
+  --border-strong: #b0b0a8;
+  --accent: #4a6e00;
+  --accent-dim: rgba(74, 110, 0, 0.08);
+  --accent-text: #ffffff;
+  --status-todo: #6b7280;
+  --status-ip: #2563eb;
+  --status-done: #16a34a;
+  --status-blocked: #dc2626;
+  --priority-low: #6b7280;
+  --priority-medium: #4a4a50;
+  --priority-high: #d97706;
+  --priority-critical: #dc2626;
+  --error: #dc2626;
+  --warning: #d97706;
+}
+/* Light mode — event row adjustments */
+[data-theme="light"] .event-row:hover { background: rgba(74,110,0,0.04) !important; }
+[data-theme="light"] .clickable-row[data-session]:hover { background: rgba(74,110,0,0.06) !important; }
+[data-theme="light"] .user-query-row { border-left-color: #2563eb; background: rgba(37,99,235,0.04); }
+[data-theme="light"] .border-task { border-left-color: #be185d !important; }
+[data-theme="light"] .border-error { border-left-color: #dc2626 !important; }
+
+/* ── Theme toggle ─────────────────────────────────────────── */
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: border-color 150ms, background 150ms;
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
 /* ── Reset & base ──────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 13px; }
+html { font-size: 18px; }
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);

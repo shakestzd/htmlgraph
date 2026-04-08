@@ -1,5 +1,5 @@
 <details id="critique" class="section-card" data-phase="critique" data-status="pending">
-  <summary><span>E. Plan Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
+  <summary><span>Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
   <div class="section-body">
 
     {{if .Assumptions}}
@@ -21,13 +21,13 @@
     <div class="sub-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       {{if .GeminiCritique}}
       <div>
-        <h4>Gemini Critique</h4>
+        <h4>{{if .GeminiTitle}}{{.GeminiTitle}}{{else}}Design Critique{{end}}</h4>
         <div style="font-size:.85rem;color:var(--text-dim)">{{.GeminiCritique}}</div>
       </div>
       {{end}}
       {{if .CopilotCritique}}
       <div>
-        <h4>Copilot Critique</h4>
+        <h4>{{if .CopilotTitle}}{{.CopilotTitle}}{{else}}Feasibility Critique{{end}}</h4>
         <div style="font-size:.85rem;color:var(--text-dim)">{{.CopilotCritique}}</div>
       </div>
       {{end}}

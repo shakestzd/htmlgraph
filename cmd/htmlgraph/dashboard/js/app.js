@@ -868,6 +868,40 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+// Theme toggle — single source of truth for dashboard theme
+(function() {
+  // Clean up stale theme keys from the old plan review system
+  localStorage.removeItem('crispi-theme');
+  localStorage.removeItem('theme');
+
+  var btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  var saved = localStorage.getItem('htmlgraph-theme');
+  if (!saved) {
+    saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    localStorage.setItem('htmlgraph-theme', saved);
+  }
+  document.documentElement.dataset.theme = saved;
+  btn.textContent = saved === 'light' ? '\u263E' : '\u2600';
+  btn.addEventListener('click', function() {
+    var current = document.documentElement.dataset.theme || 'dark';
+    var next = current === 'dark' ? 'light' : 'dark';
+    window._htmlgraphTheme = next;
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('htmlgraph-theme', next);
+    btn.textContent = next === 'light' ? '\u263E' : '\u2600';
+  });
+
+  // Re-assert theme after any dynamic content injection (plan scripts may alter it)
+  window._htmlgraphTheme = saved;
+  var observer = new MutationObserver(function() {
+    if (document.documentElement.dataset.theme !== window._htmlgraphTheme) {
+      document.documentElement.dataset.theme = window._htmlgraphTheme;
+    }
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();
+
 Promise.all([fetchStats(), fetchEvents()]);
 setInterval(fetchStats, 30000);
 
@@ -879,6 +913,9 @@ function closePlanDetail() {
   detail.classList.remove('active');
   listView.style.display = '';
   if (viewTitle) viewTitle.style.display = '';
+  // Clear plan subnav
+  var subnav = document.getElementById('plan-subnav');
+  if (subnav) { subnav.classList.remove('active'); subnav.innerHTML = ''; }
 }
 
 function openPlanDetail(planId, title) {
@@ -901,8 +938,90 @@ function openPlanDetail(planId, title) {
     })
     .then(function(html) {
       body.innerHTML = html;
+      // Scripts via innerHTML don't execute. Load external scripts first
+      // (D3, dagre-d3, hljs), then run inline scripts after they're ready.
+      var scripts = Array.from(body.querySelectorAll('script'));
+      var externals = scripts.filter(function(s) { return !!s.src; });
+      var inlines = scripts.filter(function(s) { return !s.src && s.textContent.trim(); });
+
+      // Remove all old script tags
+      scripts.forEach(function(s) { s.remove(); });
+
+      // Build plan subnav from section cards in the loaded content
+      buildPlanSubnav(body);
+
+      // Load external scripts sequentially, then run inlines
+      function loadNext(i) {
+        if (i >= externals.length) {
+          inlines.forEach(function(oldScript) {
+            var s = document.createElement('script');
+            s.textContent = oldScript.textContent;
+            body.appendChild(s);
+          });
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = externals[i].src;
+        s.onload = function() { loadNext(i + 1); };
+        s.onerror = function() { loadNext(i + 1); };
+        body.appendChild(s);
+      }
+      loadNext(0);
     })
     .catch(function() {
       body.innerHTML = '<div class="empty">Could not load plan: ' + planId + '</div>';
     });
+}
+
+function buildPlanSubnav(container) {
+  var subnav = document.getElementById('plan-subnav');
+  if (!subnav) return;
+  subnav.innerHTML = '';
+
+  var sections = [];
+  var graph = container.querySelector('.dep-graph');
+  if (graph) sections.push({ id: graph.id || 'dep-graph', label: 'Graph' });
+
+  container.querySelectorAll('.section-card[id]').forEach(function(el) {
+    var summary = el.querySelector('summary span:first-child');
+    var label = summary ? summary.textContent.trim() : el.id;
+    sections.push({ id: el.id, label: label });
+  });
+
+  var progress = container.querySelector('.progress-zone');
+  if (progress) sections.push({ id: progress.id || 'feedback-summary', label: 'Progress' });
+
+  // Scroll container is .plan-content inside .plan-detail-body
+  var scrollTarget = container.querySelector('.plan-content') || container;
+
+  sections.forEach(function(sec) {
+    var a = document.createElement('a');
+    a.href = '#';
+    a.textContent = sec.label;
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var target = container.querySelector('#' + sec.id);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      subnav.querySelectorAll('a').forEach(function(l) { l.classList.remove('active'); });
+      a.classList.add('active');
+    });
+    subnav.appendChild(a);
+  });
+
+  // Chat link — the chat sidebar is always visible on the right
+  var chatSidebar = container.querySelector('.chat-sidebar');
+  if (chatSidebar) {
+    var chatLink = document.createElement('a');
+    chatLink.href = '#';
+    chatLink.textContent = 'Chat';
+    chatLink.style.color = 'var(--accent)';
+    chatLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      var input = chatSidebar.querySelector('#chat-input');
+      if (input) input.focus();
+    });
+    subnav.appendChild(chatLink);
+  }
+
+  subnav.classList.add('active');
 }

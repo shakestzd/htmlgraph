@@ -158,11 +158,94 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 	yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
 	plan, err := planyaml.Load(yamlPath)
 	if err != nil {
-		// No YAML file — silently skip.
 		return
 	}
 
+	// Map meta fields when the page was built with empty/default values.
+	if page.Title == "" && plan.Meta.Title != "" {
+		page.Title = plan.Meta.Title
+	}
+	if page.Description == "" && plan.Meta.Description != "" {
+		page.Description = plan.Meta.Description
+	}
+	if plan.Meta.Status != "" {
+		page.Status = plan.Meta.Status
+	}
+	if plan.Meta.TrackID != "" && page.FeatureID == "" {
+		page.FeatureID = plan.Meta.TrackID
+	}
+
+	// Map design section (problem + goals + constraints → HTML).
+	if plan.Design.Problem != "" || len(plan.Design.Goals) > 0 {
+		var b strings.Builder
+		if plan.Design.Problem != "" {
+			b.WriteString("<h4>Problem</h4>\n<p>")
+			b.WriteString(html.EscapeString(plan.Design.Problem))
+			b.WriteString("</p>\n")
+		}
+		if len(plan.Design.Goals) > 0 {
+			b.WriteString("<h4>Goals</h4>\n<ol>\n")
+			for _, g := range plan.Design.Goals {
+				b.WriteString("<li>")
+				b.WriteString(html.EscapeString(g))
+				b.WriteString("</li>\n")
+			}
+			b.WriteString("</ol>\n")
+		}
+		if len(plan.Design.Constraints) > 0 {
+			b.WriteString("<h4>Constraints</h4>\n<ul>\n")
+			for _, c := range plan.Design.Constraints {
+				b.WriteString("<li>")
+				b.WriteString(html.EscapeString(c))
+				b.WriteString("</li>\n")
+			}
+			b.WriteString("</ul>\n")
+		}
+		page.Design = &plantmpl.DesignSection{
+			Content: htmltemplate.HTML(b.String()), //nolint:gosec
+		}
+	}
+
+	// Map slices from YAML (overrides any existing slices from node steps).
+	if len(plan.Slices) > 0 {
+		page.Slices = nil
+		page.Graph = &plantmpl.DependencyGraph{}
+		for _, s := range plan.Slices {
+			depsStr := ""
+			for i, d := range s.Deps {
+				if i > 0 {
+					depsStr += ","
+				}
+				depsStr += fmt.Sprintf("%d", d)
+			}
+			filesStr := strings.Join(s.Files, ", ")
+			page.Slices = append(page.Slices, plantmpl.SliceCard{
+				Num:      s.Num,
+				ID:       s.ID,
+				Title:    s.Title,
+				What:     s.What,
+				Why:      s.Why,
+				DoneWhen: s.DoneWhen,
+				Tests:    s.Tests,
+				Effort:   s.Effort,
+				Risk:     s.Risk,
+				Deps:     depsStr,
+				Files:    filesStr,
+				Status:   "pending",
+			})
+			page.Graph.Nodes = append(page.Graph.Nodes, plantmpl.GraphNode{
+				Num:    s.Num,
+				Name:   s.Title,
+				Deps:   depsStr,
+				Files:  len(s.Files),
+				Status: "pending",
+			})
+		}
+	}
+
 	// Map questions to DecisionCards.
+	// Only set Selected when a human has explicitly answered (q.Answer != nil).
+	// Recommended is highlighted but not pre-selected.
 	if len(plan.Questions) > 0 {
 		var cards []plantmpl.DecisionCard
 		for _, q := range plan.Questions {
@@ -170,15 +253,32 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 			for _, o := range q.Options {
 				opts = append(opts, o.Label)
 			}
+			// Map answer key to label for template comparison
 			selected := ""
 			if q.Answer != nil {
-				selected = *q.Answer
+				for _, o := range q.Options {
+					if o.Key == *q.Answer {
+						selected = o.Label
+						break
+					}
+				}
+			}
+			// Find the recommended option's label
+			recommended := ""
+			if q.Recommended != "" {
+				for _, o := range q.Options {
+					if o.Key == q.Recommended {
+						recommended = o.Label
+						break
+					}
+				}
 			}
 			cards = append(cards, plantmpl.DecisionCard{
-				ID:       q.ID,
-				Text:     q.Text,
-				Options:  opts,
-				Selected: selected,
+				ID:          q.ID,
+				Text:        q.Text,
+				Options:     opts,
+				Selected:    selected,
+				Recommended: recommended,
 			})
 		}
 		page.Questions = &plantmpl.QuestionsSection{Cards: cards}
@@ -208,12 +308,23 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 			cz.Synthesis = htmltemplate.HTML(html.EscapeString(plan.Critique.Synthesis)) //nolint:gosec
 		}
 
-		// Positional mapping: Critics[0] → GeminiCritique, Critics[1] → CopilotCritique.
+		// Positional mapping: Critics[0] → first critic, Critics[1] → second critic.
+		// Use reviewer names from YAML as titles, falling back to critic titles.
 		if len(plan.Critique.Critics) > 0 {
 			cz.GeminiCritique = renderCriticSectionHTML(plan.Critique.Critics[0])
+			if len(plan.Critique.Reviewers) > 0 {
+				cz.GeminiTitle = plan.Critique.Reviewers[0]
+			} else {
+				cz.GeminiTitle = plan.Critique.Critics[0].Title
+			}
 		}
 		if len(plan.Critique.Critics) > 1 {
 			cz.CopilotCritique = renderCriticSectionHTML(plan.Critique.Critics[1])
+			if len(plan.Critique.Reviewers) > 1 {
+				cz.CopilotTitle = plan.Critique.Reviewers[1]
+			} else {
+				cz.CopilotTitle = plan.Critique.Critics[1].Title
+			}
 		}
 
 		page.Critique = cz

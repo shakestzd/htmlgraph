@@ -1,12 +1,12 @@
 <details id="questions" class="section-card" data-phase="questions" data-status="pending">
-  <summary><span>D. Open Questions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
+  <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
   <div class="section-body">
     {{range .Cards}}
     <div class="question-block" id="{{.ID}}">
       <p>{{.Text}}</p>
-      {{$id := .ID}}{{$sel := .Selected}}
+      {{$id := .ID}}{{$sel := .Selected}}{{$rec := .Recommended}}
       {{range .Options}}
-      <label><input type="radio" name="{{$id}}" data-question="{{$id}}" value="{{.}}"{{if eq . $sel}} checked{{end}}> {{.}}</label>
+      <label{{if and (eq . $rec) (eq $sel "")}} class="recommended"{{end}}><input type="radio" name="{{$id}}" data-question="{{$id}}" value="{{.}}"{{if eq . $sel}} checked{{end}}> {{.}}{{if and (eq . $rec) (eq $sel "")}} <span class="rec-tag">recommended</span>{{end}}</label>
       {{end}}
       <textarea data-section="questions" data-question-rationale="{{.ID}}" placeholder="Rationale for {{.ID}}...">{{.Rationale}}</textarea>
     </div>
