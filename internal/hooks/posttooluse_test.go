@@ -110,6 +110,22 @@ func TestExtractClosingIDs(t *testing.T) {
 	}
 }
 
+func TestFilePathHash(t *testing.T) {
+	h1 := filePathHash("/path/to/file.go")
+	h2 := filePathHash("/path/to/file.go")
+	h3 := filePathHash("/different/path.go")
+
+	if h1 != h2 {
+		t.Errorf("same path should produce same hash: %q != %q", h1, h2)
+	}
+	if h1 == h3 {
+		t.Errorf("different paths should produce different hashes: %q == %q", h1, h3)
+	}
+	if len(h1) != 8 {
+		t.Errorf("hash should be 8 hex chars, got %d: %q", len(h1), h1)
+	}
+}
+
 func TestLooksLikeGitCommit(t *testing.T) {
 	tests := []struct {
 		cmd  string

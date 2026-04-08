@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -92,16 +93,31 @@ func splitTrailerBlocks(output string) []commitBlock {
 	return blocks
 }
 
-// parseTrailers extracts Refs: and Fixes: values from a git commit message.
-// Returns a slice of work item IDs found in trailers.
+// parenWorkItemRe matches parenthesized work item references in commit messages,
+// e.g. "(feat-abc12345)". This is the primary HtmlGraph commit convention.
+var parenWorkItemRe = regexp.MustCompile(`\(\s*((?:feat|bug|spk|trk|pln|spc|plan|spec)-[0-9a-zA-Z]+)\s*\)`)
+
+// parseTrailers extracts work item IDs from a git commit message.
 // Supported formats:
 //
 //	Refs: feat-abc123
 //	Fixes: bug-def456
 //	Refs: feat-abc123, feat-def456
+//	fix: resolve crash (feat-abc12345)     — parenthesized convention
 func parseTrailers(message string) []string {
 	var ids []string
 	seen := make(map[string]bool)
+
+	// Parenthesized work item refs — the primary HtmlGraph convention.
+	for _, m := range parenWorkItemRe.FindAllStringSubmatch(message, -1) {
+		id := m[1]
+		if !seen[id] {
+			ids = append(ids, id)
+			seen[id] = true
+		}
+	}
+
+	// Explicit Refs:/Fixes: trailers.
 	for _, line := range strings.Split(message, "\n") {
 		line = strings.TrimSpace(line)
 		for _, prefix := range []string{"Refs:", "Fixes:"} {

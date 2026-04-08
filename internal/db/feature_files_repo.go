@@ -138,6 +138,47 @@ func FindRelatedFeatures(db *sql.DB, featureID string) ([]RelatedFeature, error)
 	return related, nil
 }
 
+// FileTraceResult represents a feature that touched a file, enriched with
+// title, status, track ID, and operation metadata for the trace command.
+type FileTraceResult struct {
+	FeatureID string
+	Title     string
+	Status    string
+	TrackID   string
+	Operation string
+	LastSeen  string
+}
+
+// TraceFile returns all features that touched a given file path, enriched
+// with title, status, and parent track. Used by `htmlgraph trace <file>`.
+func TraceFile(database *sql.DB, filePath string) ([]FileTraceResult, error) {
+	rows, err := database.Query(`
+		SELECT ff.feature_id,
+		       COALESCE(f.title, ''),
+		       COALESCE(f.status, ''),
+		       COALESCE(f.track_id, ''),
+		       ff.operation,
+		       ff.last_seen
+		FROM feature_files ff
+		LEFT JOIN features f ON f.id = ff.feature_id
+		WHERE ff.file_path = ?
+		ORDER BY ff.last_seen DESC`, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("trace file %s: %w", filePath, err)
+	}
+	defer rows.Close()
+
+	var results []FileTraceResult
+	for rows.Next() {
+		var r FileTraceResult
+		if err := rows.Scan(&r.FeatureID, &r.Title, &r.Status, &r.TrackID, &r.Operation, &r.LastSeen); err != nil {
+			continue
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
 // FileOwner identifies a feature/track that owns a file path.
 type FileOwner struct {
 	FeatureID string

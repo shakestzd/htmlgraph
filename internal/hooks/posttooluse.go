@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"os/exec"
@@ -93,6 +94,23 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		if filePath := extractFilePath(event.ToolInput); filePath != "" {
 			if warnings := CheckFileQuality(filePath); warnings != "" {
 				result.AdditionalContext = warnings
+			}
+		}
+	}
+
+	// Record file attribution when Edit/Write tools are used with an active feature.
+	if ctx.FeatureID != "" {
+		switch event.ToolName {
+		case "Edit", "Write", "MultiEdit":
+			if filePath := extractFilePath(event.ToolInput); filePath != "" {
+				ff := &models.FeatureFile{
+					ID:        ctx.FeatureID + "-" + filePathHash(filePath),
+					FeatureID: ctx.FeatureID,
+					FilePath:  filePath,
+					Operation: strings.ToLower(event.ToolName),
+					SessionID: ctx.SessionID,
+				}
+				_ = db.UpsertFeatureFile(database, ff)
 			}
 		}
 	}
@@ -273,6 +291,13 @@ func summarizeToolOutput(result map[string]any) string {
 	return ""
 }
 
+
+// filePathHash returns an 8-char hex digest of a file path, used to generate
+// deterministic IDs for feature_files rows.
+func filePathHash(filePath string) string {
+	h := sha256.Sum256([]byte(filePath))
+	return fmt.Sprintf("%x", h[:4])
+}
 
 // isSuccess returns false when the tool result contains an explicit error flag.
 func isSuccess(result map[string]any) bool {

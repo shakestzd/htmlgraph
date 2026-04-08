@@ -115,6 +115,79 @@ func TestIsWorkItemID_AllPrefixes(t *testing.T) {
 	}
 }
 
+func TestParseTrailers_ParenthesizedRefs(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want []string
+	}{
+		{"subject paren", "fix: resolve null pointer (feat-abc12345)", []string{"feat-abc12345"}},
+		{"subject paren bug", "fix: edge case (bug-def45678)", []string{"bug-def45678"}},
+		{"subject paren spike", "investigate crash (spk-aaa11111)", []string{"spk-aaa11111"}},
+		{"paren + trailer", "fix: thing (feat-aaa11111)\n\nRefs: bug-bbb22222", []string{"feat-aaa11111", "bug-bbb22222"}},
+		{"paren dedup with trailer", "fix: thing (feat-abc12345)\n\nRefs: feat-abc12345", []string{"feat-abc12345"}},
+		{"no paren", "fix: simple fix without parens", nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ids := parseTrailers(tc.msg)
+			if len(ids) != len(tc.want) {
+				t.Fatalf("got %v (len %d), want %v (len %d)", ids, len(ids), tc.want, len(tc.want))
+			}
+			for i, id := range ids {
+				if id != tc.want[i] {
+					t.Errorf("ids[%d] = %q, want %q", i, id, tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestReindexCommitTrailers_ParenthesizedCommit(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = tmpDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+
+	run("init", "-b", "main")
+	run("config", "user.email", "test@test.com")
+	run("config", "user.name", "Test")
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "file.go"), []byte("package x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "file.go")
+	run("commit", "-m", "fix: resolve crash (feat-paren001)")
+
+	database, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	count, err := reindexCommitTrailers(database, tmpDir)
+	if err != nil {
+		t.Fatalf("reindexCommitTrailers: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 ingested parenthesized ref, got %d", count)
+	}
+
+	var featureID string
+	database.QueryRow("SELECT feature_id FROM git_commits WHERE session_id = ?",
+		trailerSessionID).Scan(&featureID)
+	if featureID != "feat-paren001" {
+		t.Errorf("expected feature_id=feat-paren001, got %q", featureID)
+	}
+}
+
 func TestReindexCommitTrailers_IngestsFromGit(t *testing.T) {
 	tmpDir := t.TempDir()
 
