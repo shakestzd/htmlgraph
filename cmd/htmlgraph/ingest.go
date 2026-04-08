@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -270,6 +272,41 @@ func storeParseResult(database *sql.DB, sessionID, agentID string, result *inges
 		}
 	}
 
+	// Derive agent_events from tool_calls to populate the activity feed.
+	// Uses UpsertEvent (INSERT OR REPLACE) so re-ingestion is idempotent.
+	msgTimestamps := make(map[int]time.Time, len(result.Messages))
+	for _, m := range result.Messages {
+		msgTimestamps[m.Ordinal] = m.Timestamp
+	}
+	now := time.Now().UTC()
+	resolvedAgent := agentID
+	if resolvedAgent == "" {
+		resolvedAgent = "claude-code"
+	}
+	for i, tc := range result.ToolCalls {
+		evtID := ingestEventID(sessionID, tc.ToolUseID, tc.ToolName, i)
+		ts := now
+		if t, ok := msgTimestamps[tc.MessageOrdinal]; ok {
+			ts = t
+		}
+		ev := &models.AgentEvent{
+			EventID:      evtID,
+			AgentID:      resolvedAgent,
+			EventType:    models.EventToolCall,
+			Timestamp:    ts,
+			ToolName:     tc.ToolName,
+			InputSummary: truncate(tc.InputJSON, 200),
+			ToolInput:    tc.InputJSON,
+			SessionID:    sessionID,
+			FeatureID:    featureID,
+			Status:       "completed",
+			Source:        "ingest",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		_ = dbpkg.UpsertEvent(database, ev)
+	}
+
 	// Update session model if we detected one.
 	if result.Model != "" {
 		database.Exec(`UPDATE sessions SET model = ? WHERE session_id = ? AND (model IS NULL OR model = '')`,
@@ -277,6 +314,17 @@ func storeParseResult(database *sql.DB, sessionID, agentID string, result *inges
 	}
 
 	return msgCount, toolCount
+}
+
+// ingestEventID generates a deterministic event ID from session, tool use ID,
+// tool name, and index. Uses SHA-256 hash formatted as "evt-" + 8 hex chars.
+func ingestEventID(sessionID, toolUseID, toolName string, index int) string {
+	key := sessionID + "|" + toolUseID
+	if toolUseID == "" {
+		key = sessionID + "|" + toolName + "|" + strconv.Itoa(index)
+	}
+	h := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("evt-%x", h[:4])
 }
 
 // ensureSession creates a session row if one doesn't already exist.
