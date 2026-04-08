@@ -190,6 +190,8 @@ func (b *Backend) sendViaSubprocess(ctx context.Context, claudePath, message str
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 256*1024), 256*1024) // 256KB buffer for large JSON lines
 
+	var gotStreamChunks bool
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
@@ -223,6 +225,7 @@ func (b *Backend) sendViaSubprocess(ctx context.Context, claudePath, message str
 				delta, _ := inner["delta"].(map[string]any)
 				if deltaType, _ := delta["type"].(string); deltaType == "text_delta" {
 					if text, _ := delta["text"].(string); text != "" {
+						gotStreamChunks = true
 						select {
 						case <-ctx.Done():
 							_ = cmd.Process.Kill()
@@ -234,6 +237,12 @@ func (b *Backend) sendViaSubprocess(ctx context.Context, claudePath, message str
 			}
 
 		case "assistant":
+			// Skip if we already got text via stream_event chunks —
+			// the assistant event contains the complete text again,
+			// which would duplicate the response.
+			if gotStreamChunks {
+				continue
+			}
 			for _, text := range extractTextChunks(event) {
 				select {
 				case <-ctx.Done():
