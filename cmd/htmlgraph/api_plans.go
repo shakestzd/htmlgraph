@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/planchat"
 )
 
 // planListItem is a single entry in the GET /api/plans response.
@@ -156,15 +158,23 @@ type planStatusResponse struct {
 
 // planFeedbackResponse is returned by GET /api/plans/{id}/feedback.
 type planFeedbackResponse struct {
-	PlanID    string                     `json:"plan_id"`
-	Status    string                     `json:"status"`
-	Sections  map[string]sectionFeedback `json:"sections"`
-	Questions map[string]string          `json:"questions"`
+	PlanID       string                     `json:"plan_id"`
+	Status       string                     `json:"status"`
+	Sections     map[string]sectionFeedback `json:"sections"`
+	Questions    map[string]string          `json:"questions"`
+	ChatMessages []chatMessageEntry         `json:"chat_messages,omitempty"`
 }
 
 type sectionFeedback struct {
 	Approved bool   `json:"approved"`
 	Comment  string `json:"comment"`
+}
+
+// chatMessageEntry is a single chat message in the feedback response.
+type chatMessageEntry struct {
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"`
 }
 
 // planFeedbackRequest is the body for POST /api/plans/{id}/feedback.
@@ -403,6 +413,122 @@ func planDeleteHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	}
 }
 
+// planChatRequest is the body for POST /api/plans/{id}/chat.
+type planChatRequest struct {
+	Message string `json:"message"`
+}
+
+// planChatHandler streams Claude responses as SSE for a plan chat session.
+// POST /api/plans/{id}/chat
+func planChatHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		planID, err := extractPlanID(r.URL.Path, "/chat")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var req planChatRequest
+		body, err := io.ReadAll(io.LimitReader(r.Body, 64*1024))
+		if err != nil {
+			http.Error(w, "reading request body", http.StatusBadRequest)
+			return
+		}
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+			return
+		}
+		if req.Message == "" {
+			http.Error(w, "message is required", http.StatusBadRequest)
+			return
+		}
+
+		// Load plan YAML for context.
+		planContext := loadPlanContext(htmlgraphDir, planID)
+
+		// Resolve project dir (parent of .htmlgraph/).
+		projectDir := filepath.Dir(htmlgraphDir)
+
+		backend := planchat.New(database, planID, planContext, projectDir)
+		if !backend.IsAvailable() {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Claude unavailable. Install claude CLI or set ANTHROPIC_API_KEY.",
+			})
+			return
+		}
+
+		// Store user message.
+		_ = backend.SaveMessage("user", req.Message)
+
+		// Set SSE headers.
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming not supported", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Stream response.
+		chunks, errCh := backend.Send(r.Context(), req.Message)
+
+		var fullResponse strings.Builder
+		for chunk := range chunks {
+			fullResponse.WriteString(chunk)
+			payload, _ := json.Marshal(map[string]string{
+				"type": "chunk",
+				"text": chunk,
+			})
+			fmt.Fprintf(w, "data: %s\n\n", payload)
+			flusher.Flush()
+		}
+
+		// Check for errors.
+		if err := <-errCh; err != nil {
+			payload, _ := json.Marshal(map[string]string{
+				"type":  "error",
+				"error": err.Error(),
+			})
+			fmt.Fprintf(w, "data: %s\n\n", payload)
+			flusher.Flush()
+		}
+
+		// Store assistant message.
+		if fullResponse.Len() > 0 {
+			_ = backend.SaveMessage("assistant", fullResponse.String())
+		}
+
+		// Send done event.
+		fmt.Fprintf(w, "data: %s\n\n", `{"type":"done"}`)
+		flusher.Flush()
+	}
+}
+
+// loadPlanContext reads the plan YAML file for use as Claude context.
+// Falls back to empty string if the file is not found.
+func loadPlanContext(htmlgraphDir, planID string) string {
+	yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	data, err := os.ReadFile(yamlPath)
+	if err != nil {
+		// Try HTML fallback for plan context.
+		htmlPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
+		data, err = os.ReadFile(htmlPath)
+		if err != nil {
+			return ""
+		}
+	}
+	return string(data)
+}
+
 // planRouter dispatches /api/plans/{id}/{action} to the appropriate handler.
 // Registered under /api/plans/ in serve.go.
 func planRouter(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
@@ -410,9 +536,12 @@ func planRouter(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	feedbackH := planFeedbackHandler(database)
 	finalizeH := planFinalizeHandler(database, htmlgraphDir)
 	deleteH := planDeleteHandler(database, htmlgraphDir)
+	chatH := planChatHandler(database, htmlgraphDir)
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
+		case strings.HasSuffix(path, "/chat"):
+			chatH(w, r)
 		case strings.HasSuffix(path, "/status"):
 			statusH(w, r)
 		case strings.HasSuffix(path, "/feedback"):
@@ -569,6 +698,7 @@ func buildFeedbackResponse(planID string, entries []dbpkg.PlanFeedback) planFeed
 	sections := make(map[string]sectionFeedback)
 	questions := make(map[string]string)
 	approvedSections := make(map[string]bool)
+	var chatMessages []chatMessageEntry
 
 	for _, e := range entries {
 		switch e.Action {
@@ -589,8 +719,20 @@ func buildFeedbackResponse(planID string, entries []dbpkg.PlanFeedback) planFeed
 			if e.QuestionID != "" {
 				questions[e.QuestionID] = e.Value
 			}
+		case "messages":
+			// Chat messages stored as a JSON array under section='chat'.
+			if e.Section == "chat" && e.Value != "" {
+				var msgs []chatMessageEntry
+				if json.Unmarshal([]byte(e.Value), &msgs) == nil {
+					chatMessages = msgs
+				}
+			}
 		}
 	}
+
+	// Exclude chat section from approval status calculation.
+	delete(sections, "chat")
+	delete(approvedSections, "chat")
 
 	status := "draft"
 	if len(sections) > 0 && len(approvedSections) == len(sections) {
@@ -598,9 +740,10 @@ func buildFeedbackResponse(planID string, entries []dbpkg.PlanFeedback) planFeed
 	}
 
 	return planFeedbackResponse{
-		PlanID:    planID,
-		Status:    status,
-		Sections:  sections,
-		Questions: questions,
+		PlanID:       planID,
+		Status:       status,
+		Sections:     sections,
+		Questions:    questions,
+		ChatMessages: chatMessages,
 	}
 }
