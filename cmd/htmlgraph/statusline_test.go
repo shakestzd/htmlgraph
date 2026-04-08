@@ -161,7 +161,8 @@ func TestWriteStatuslineCache_WritesFile(t *testing.T) {
 
 	WriteStatuslineCache(hgDir, featNode.ID)
 
-	data, err := os.ReadFile(filepath.Join(cacheDir, ".htmlgraph-statusline-cache"))
+	cachePath := statuslineCachePath(hgDir)
+	data, err := os.ReadFile(cachePath)
 	if err != nil {
 		t.Fatalf("read cache: %v", err)
 	}
@@ -174,11 +175,12 @@ func TestWriteStatuslineCache_ClearsOnComplete(t *testing.T) {
 	cacheDir := t.TempDir()
 	t.Setenv("HTMLGRAPH_CACHE_DIR", cacheDir)
 
-	cachePath := filepath.Join(cacheDir, ".htmlgraph-statusline-cache")
+	hgDir := "/tmp/test-clear/.htmlgraph"
+	cachePath := statuslineCachePath(hgDir)
 	os.WriteFile(cachePath, []byte("old data"), 0o644)
 
 	// Clear cache (empty featureID = complete)
-	WriteStatuslineCache("", "")
+	WriteStatuslineCache(hgDir, "")
 
 	data, _ := os.ReadFile(cachePath)
 	if len(data) != 0 {
@@ -190,10 +192,12 @@ func TestReadStatuslineCache_ReadsFile(t *testing.T) {
 	cacheDir := t.TempDir()
 	t.Setenv("HTMLGRAPH_CACHE_DIR", cacheDir)
 
-	os.WriteFile(filepath.Join(cacheDir, ".htmlgraph-statusline-cache"),
-		[]byte("test content"), 0o644)
+	hgDir := "/tmp/test-project/.htmlgraph"
+	// Write to the project-scoped path.
+	cachePath := statuslineCachePath(hgDir)
+	os.WriteFile(cachePath, []byte("test content"), 0o644)
 
-	got := ReadStatuslineCache()
+	got := ReadStatuslineCache(hgDir)
 	if got != "test content" {
 		t.Errorf("expected 'test content', got %q", got)
 	}
@@ -202,8 +206,32 @@ func TestReadStatuslineCache_ReadsFile(t *testing.T) {
 func TestReadStatuslineCache_EmptyOnMissing(t *testing.T) {
 	t.Setenv("HTMLGRAPH_CACHE_DIR", t.TempDir())
 
-	got := ReadStatuslineCache()
+	got := ReadStatuslineCache("/tmp/nonexistent/.htmlgraph")
 	if got != "" {
 		t.Errorf("expected empty for missing cache, got %q", got)
+	}
+}
+
+func TestStatuslineCacheProjectIsolation(t *testing.T) {
+	cacheDir := t.TempDir()
+	t.Setenv("HTMLGRAPH_CACHE_DIR", cacheDir)
+
+	dirA := "/tmp/project-a/.htmlgraph"
+	dirB := "/tmp/project-b/.htmlgraph"
+
+	// Write cache for project A.
+	pathA := statuslineCachePath(dirA)
+	os.WriteFile(pathA, []byte("project A item"), 0o644)
+
+	// Project B should not see project A's cache.
+	got := ReadStatuslineCache(dirB)
+	if got != "" {
+		t.Errorf("project B should not see project A cache, got %q", got)
+	}
+
+	// Project A should see its own cache.
+	got = ReadStatuslineCache(dirA)
+	if got != "project A item" {
+		t.Errorf("project A should see its own cache, got %q", got)
 	}
 }

@@ -420,7 +420,7 @@ func TestRunWiSetStatus_BlockedClearsCache(t *testing.T) {
 	if err := runWiSetStatus("feature", featNode.ID, "in-progress"); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	cache := ReadStatuslineCache()
+	cache := ReadStatuslineCache(hgDir)
 	if cache == "" {
 		t.Fatal("cache should be populated after start")
 	}
@@ -429,7 +429,7 @@ func TestRunWiSetStatus_BlockedClearsCache(t *testing.T) {
 	if err := runWiSetStatus("feature", featNode.ID, "blocked"); err != nil {
 		t.Fatalf("blocked: %v", err)
 	}
-	cache = ReadStatuslineCache()
+	cache = ReadStatuslineCache(hgDir)
 	if cache != "" {
 		t.Errorf("cache should be empty after blocked, got %q", cache)
 	}

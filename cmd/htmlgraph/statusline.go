@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -201,20 +203,15 @@ func inferType(id string) string {
 	}
 }
 
-// WriteStatuslineCache writes the active work item summary to
-// ~/.htmlgraph-statusline-cache. This provides a fast, DB-free fallback
-// for subagents and status line scripts that cannot query SQLite directly.
+// WriteStatuslineCache writes the active work item summary to a project-scoped
+// cache file. The filename includes a hash of the htmlgraphDir so different
+// projects never overwrite each other's cache (bug-95dc78ba).
 // Pass empty featureID to clear the cache (on complete).
 func WriteStatuslineCache(htmlgraphDir, featureID string) {
-	cacheDir := os.Getenv("HTMLGRAPH_CACHE_DIR")
-	if cacheDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return
-		}
-		cacheDir = home
+	cachePath := statuslineCachePath(htmlgraphDir)
+	if cachePath == "" {
+		return
 	}
-	cachePath := filepath.Join(cacheDir, ".htmlgraph-statusline-cache")
 
 	if featureID == "" {
 		_ = os.WriteFile(cachePath, []byte(""), 0o644)
@@ -265,9 +262,24 @@ func buildCacheLine(htmlgraphDir, featureID string) string {
 	return fmt.Sprintf("%s %s", iconFor(featureType), truncate(featureTitle, 30))
 }
 
-// ReadStatuslineCache reads the cached status line from disk.
+// ReadStatuslineCache reads the project-scoped cached status line from disk.
 // Returns empty string if the cache file doesn't exist or is empty.
-func ReadStatuslineCache() string {
+// htmlgraphDir is required to scope the lookup to the correct project.
+func ReadStatuslineCache(htmlgraphDir string) string {
+	cachePath := statuslineCachePath(htmlgraphDir)
+	if cachePath == "" {
+		return ""
+	}
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// statuslineCachePath returns the project-scoped cache file path.
+// Format: <cacheDir>/.htmlgraph-statusline-<hash8>
+func statuslineCachePath(htmlgraphDir string) string {
 	cacheDir := os.Getenv("HTMLGRAPH_CACHE_DIR")
 	if cacheDir == "" {
 		home, err := os.UserHomeDir()
@@ -276,9 +288,10 @@ func ReadStatuslineCache() string {
 		}
 		cacheDir = home
 	}
-	data, err := os.ReadFile(filepath.Join(cacheDir, ".htmlgraph-statusline-cache"))
-	if err != nil {
+	if htmlgraphDir == "" {
 		return ""
 	}
-	return strings.TrimSpace(string(data))
+	h := sha256.Sum256([]byte(filepath.Clean(htmlgraphDir)))
+	suffix := hex.EncodeToString(h[:4]) // 8 hex chars
+	return filepath.Join(cacheDir, ".htmlgraph-statusline-"+suffix)
 }
