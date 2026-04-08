@@ -40,7 +40,7 @@ func autoCausedByEdge(p *workitem.Project, bugID, featureID string) {
 
 // autoImplementedInEdge creates bidirectional edges between a work item and
 // a session: implemented_in (item→session in HTML+SQLite) and implements
-// (session→item in SQLite only, since sessions have no HTML files).
+// (session→item in SQLite; sessions also have HTML files in .htmlgraph/sessions/).
 // Idempotent: skips if the forward edge already exists. Non-fatal on error.
 func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string, database *sql.DB) {
 	node, err := col.Get(itemID)
@@ -61,7 +61,7 @@ func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string, d
 	}
 	_, _ = col.AddEdge(itemID, edge) // writes HTML + SQLite via dual-write
 
-	// Reverse edge: session→item (SQLite only — sessions have no HTML files).
+	// Reverse edge: session→item (SQLite + session HTML files in .htmlgraph/sessions/).
 	if database != nil {
 		nodeType := kindFromPrefix(itemID)
 		revID := fmt.Sprintf("%s-%s-%s", sessionID, string(models.RelImplements), itemID)

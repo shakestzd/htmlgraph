@@ -1,0 +1,386 @@
+package hooks
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/shakestzd/htmlgraph/internal/models"
+)
+
+func TestCreateSessionHTML(t *testing.T) {
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+
+	now := time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)
+	s := &models.Session{
+		SessionID:     "sess-html-test-001",
+		AgentAssigned: "opus-coder",
+		Status:        "active",
+		CreatedAt:     now,
+		StartCommit:   "abc1234",
+		IsSubagent:    false,
+	}
+
+	createSessionHTML(projectDir, s)
+
+	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", "sess-html-test-001.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("session HTML file not created: %v", err)
+	}
+	content := string(data)
+
+	// Verify DOCTYPE and structure.
+	if !strings.Contains(content, "<!DOCTYPE html>") {
+		t.Error("missing DOCTYPE")
+	}
+	if !strings.Contains(content, `<html lang="en">`) {
+		t.Error("missing <html lang>")
+	}
+
+	// Verify article attributes.
+	if !strings.Contains(content, `id="sess-html-test-001"`) {
+		t.Error("missing article id")
+	}
+	if !strings.Contains(content, `data-type="session"`) {
+		t.Error("missing data-type")
+	}
+	if !strings.Contains(content, `data-status="active"`) {
+		t.Error("missing data-status")
+	}
+	if !strings.Contains(content, `data-agent="opus-coder"`) {
+		t.Error("missing data-agent")
+	}
+	if !strings.Contains(content, `data-started-at="2026-04-08T12:00:00Z"`) {
+		t.Error("missing data-started-at")
+	}
+	if !strings.Contains(content, `data-event-count="0"`) {
+		t.Error("missing data-event-count")
+	}
+	if !strings.Contains(content, `data-is-subagent="false"`) {
+		t.Error("missing data-is-subagent")
+	}
+	if !strings.Contains(content, `data-start-commit="abc1234"`) {
+		t.Error("missing data-start-commit")
+	}
+
+	// Verify empty activity log structure.
+	if !strings.Contains(content, `<section data-activity-log>`) {
+		t.Error("missing activity log section")
+	}
+	if !strings.Contains(content, `<ol reversed>`) {
+		t.Error("missing ordered list")
+	}
+	if !strings.Contains(content, `</ol>`) {
+		t.Error("missing </ol> close tag")
+	}
+
+	// Verify nav section for edges.
+	if !strings.Contains(content, `<nav data-graph-edges>`) {
+		t.Error("missing nav data-graph-edges")
+	}
+}
+
+func TestCreateSessionHTMLSubagent(t *testing.T) {
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+
+	s := &models.Session{
+		SessionID:     "sess-html-sub-001",
+		AgentAssigned: "sonnet-coder",
+		Status:        "active",
+		CreatedAt:     time.Now().UTC(),
+		StartCommit:   "def5678",
+		IsSubagent:    true,
+	}
+
+	createSessionHTML(projectDir, s)
+
+	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", "sess-html-sub-001.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("session HTML file not created: %v", err)
+	}
+	content := string(data)
+
+	if !strings.Contains(content, `data-is-subagent="true"`) {
+		t.Error("subagent should have data-is-subagent=true")
+	}
+}
+
+func TestAppendEventToSessionHTML(t *testing.T) {
+	projectDir := t.TempDir()
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions")
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatalf("mkdir sessions: %v", err)
+	}
+
+	// Create the initial session HTML file.
+	s := &models.Session{
+		SessionID:     "sess-append-test-001",
+		AgentAssigned: "claude-code",
+		Status:        "active",
+		CreatedAt:     time.Now().UTC(),
+		StartCommit:   "aaa1111",
+		IsSubagent:    false,
+	}
+	createSessionHTML(projectDir, s)
+
+	// Append an event.
+	ts := time.Date(2026, 4, 8, 13, 30, 0, 0, time.UTC)
+	ev := sessionEvent{
+		Timestamp: ts,
+		ToolName:  "Edit",
+		Success:   true,
+		EventID:   "evt-test-001",
+		FeatureID: "feat-aabbccdd",
+		Summary:   "/path/to/file.go (edited)",
+	}
+	appendEventToSessionHTML(projectDir, "sess-append-test-001", ev)
+
+	htmlPath := filepath.Join(sessDir, "sess-append-test-001.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read session HTML: %v", err)
+	}
+	content := string(data)
+
+	// Verify the <li> was inserted.
+	if !strings.Contains(content, `data-tool="Edit"`) {
+		t.Error("missing data-tool attribute")
+	}
+	if !strings.Contains(content, `data-success="true"`) {
+		t.Error("missing data-success attribute")
+	}
+	if !strings.Contains(content, `data-event-id="evt-test-001"`) {
+		t.Error("missing data-event-id attribute")
+	}
+	if !strings.Contains(content, `data-feature="feat-aabbccdd"`) {
+		t.Error("missing data-feature attribute")
+	}
+	if !strings.Contains(content, `/path/to/file.go (edited)`) {
+		t.Error("missing summary text")
+	}
+	if !strings.Contains(content, `data-ts="2026-04-08T13:30:00Z"`) {
+		t.Error("missing data-ts attribute")
+	}
+
+	// Verify the <li> is inside <ol reversed> ... </ol>.
+	olIdx := strings.Index(content, "<ol reversed>")
+	liIdx := strings.Index(content, "<li ")
+	closOlIdx := strings.Index(content, "</ol>")
+	if olIdx == -1 || liIdx == -1 || closOlIdx == -1 {
+		t.Fatal("missing ol/li/close-ol structure")
+	}
+	if liIdx < olIdx || liIdx > closOlIdx {
+		t.Error("<li> should be between <ol reversed> and </ol>")
+	}
+}
+
+func TestAppendMultipleEventsToSessionHTML(t *testing.T) {
+	projectDir := t.TempDir()
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions")
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatalf("mkdir sessions: %v", err)
+	}
+
+	s := &models.Session{
+		SessionID:     "sess-multi-append-001",
+		AgentAssigned: "claude-code",
+		Status:        "active",
+		CreatedAt:     time.Now().UTC(),
+		IsSubagent:    false,
+	}
+	createSessionHTML(projectDir, s)
+
+	// Append two events.
+	appendEventToSessionHTML(projectDir, "sess-multi-append-001", sessionEvent{
+		Timestamp: time.Now().UTC(),
+		ToolName:  "Read",
+		Success:   true,
+		EventID:   "evt-multi-001",
+		Summary:   "first event",
+	})
+	appendEventToSessionHTML(projectDir, "sess-multi-append-001", sessionEvent{
+		Timestamp: time.Now().UTC(),
+		ToolName:  "Write",
+		Success:   true,
+		EventID:   "evt-multi-002",
+		Summary:   "second event",
+	})
+
+	htmlPath := filepath.Join(sessDir, "sess-multi-append-001.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read session HTML: %v", err)
+	}
+	content := string(data)
+
+	// Both events should be present.
+	if !strings.Contains(content, `data-event-id="evt-multi-001"`) {
+		t.Error("first event missing")
+	}
+	if !strings.Contains(content, `data-event-id="evt-multi-002"`) {
+		t.Error("second event missing")
+	}
+
+	// Count <li> elements.
+	if c := strings.Count(content, "<li "); c != 2 {
+		t.Errorf("expected 2 <li> elements, got %d", c)
+	}
+}
+
+func TestFinalizeSessionHTML(t *testing.T) {
+	projectDir := t.TempDir()
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions")
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatalf("mkdir sessions: %v", err)
+	}
+
+	s := &models.Session{
+		SessionID:     "sess-finalize-001",
+		AgentAssigned: "claude-code",
+		Status:        "active",
+		CreatedAt:     time.Now().UTC(),
+		IsSubagent:    false,
+	}
+	createSessionHTML(projectDir, s)
+
+	// Append 3 events so event count is meaningful.
+	for i := 0; i < 3; i++ {
+		appendEventToSessionHTML(projectDir, "sess-finalize-001", sessionEvent{
+			Timestamp: time.Now().UTC(),
+			ToolName:  "Bash",
+			Success:   true,
+			EventID:   "evt-fin-" + string(rune('a'+i)),
+			Summary:   "event",
+		})
+	}
+
+	endedAt := "2026-04-08T15:00:00Z"
+	finalizeSessionHTML(projectDir, "sess-finalize-001", endedAt, "completed", 3)
+
+	htmlPath := filepath.Join(sessDir, "sess-finalize-001.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read session HTML: %v", err)
+	}
+	content := string(data)
+
+	// Verify status changed.
+	if !strings.Contains(content, `data-status="completed"`) {
+		t.Error("data-status should be completed")
+	}
+	if strings.Contains(content, `data-status="active"`) {
+		t.Error("data-status should NOT still be active")
+	}
+
+	// Verify ended-at was added.
+	if !strings.Contains(content, `data-ended-at="2026-04-08T15:00:00Z"`) {
+		t.Error("missing data-ended-at attribute")
+	}
+
+	// Verify event count updated.
+	if !strings.Contains(content, `data-event-count="3"`) {
+		t.Error("data-event-count should be 3")
+	}
+
+	// Verify badge text updated.
+	if !strings.Contains(content, `status-completed`) {
+		t.Error("badge class should show completed")
+	}
+	if !strings.Contains(content, `3 events`) {
+		t.Error("badge text should show 3 events")
+	}
+}
+
+func TestMissingSessionHTMLDoesNotError(t *testing.T) {
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+
+	// Appending to a non-existent session file should not panic or error.
+	appendEventToSessionHTML(projectDir, "nonexistent-session", sessionEvent{
+		Timestamp: time.Now().UTC(),
+		ToolName:  "Read",
+		Success:   true,
+		EventID:   "evt-missing-001",
+		Summary:   "should be silently ignored",
+	})
+
+	// Finalizing a non-existent session file should not panic or error.
+	finalizeSessionHTML(projectDir, "nonexistent-session", "2026-04-08T16:00:00Z", "completed", 5)
+
+	// If we reach here without panicking, the test passes.
+}
+
+func TestCreateSessionHTMLCreatesDirectory(t *testing.T) {
+	projectDir := t.TempDir()
+	// Only create .htmlgraph, NOT .htmlgraph/sessions — createSessionHTML should handle it.
+	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+
+	s := &models.Session{
+		SessionID:     "sess-mkdir-test-001",
+		AgentAssigned: "claude-code",
+		Status:        "active",
+		CreatedAt:     time.Now().UTC(),
+		IsSubagent:    false,
+	}
+	createSessionHTML(projectDir, s)
+
+	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", "sess-mkdir-test-001.html")
+	if _, err := os.Stat(htmlPath); os.IsNotExist(err) {
+		t.Error("createSessionHTML should create the sessions directory automatically")
+	}
+}
+
+func TestAppendEventHTMLEscaping(t *testing.T) {
+	projectDir := t.TempDir()
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions")
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatalf("mkdir sessions: %v", err)
+	}
+
+	s := &models.Session{
+		SessionID:     "sess-escape-test-001",
+		AgentAssigned: "claude-code",
+		Status:        "active",
+		CreatedAt:     time.Now().UTC(),
+		IsSubagent:    false,
+	}
+	createSessionHTML(projectDir, s)
+
+	// Append an event with HTML-special characters in the summary.
+	appendEventToSessionHTML(projectDir, "sess-escape-test-001", sessionEvent{
+		Timestamp: time.Now().UTC(),
+		ToolName:  "Bash",
+		Success:   true,
+		EventID:   "evt-escape-001",
+		Summary:   `echo "hello <world>" && cat file`,
+	})
+
+	htmlPath := filepath.Join(sessDir, "sess-escape-test-001.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read session HTML: %v", err)
+	}
+	content := string(data)
+
+	// The summary should be HTML-escaped.
+	if strings.Contains(content, "<world>") {
+		t.Error("summary should be HTML-escaped, found raw <world>")
+	}
+	if !strings.Contains(content, "&lt;world&gt;") {
+		t.Error("summary should contain HTML-escaped &lt;world&gt;")
+	}
+}

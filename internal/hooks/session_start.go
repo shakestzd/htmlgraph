@@ -163,6 +163,9 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		"session": shortID,
 	}, txStart, "transaction complete")
 
+	// Write canonical session HTML file (non-critical, errors silently logged).
+	createSessionHTML(projectDir, s)
+
 	LogTimed(projectDir, "session-start", map[string]string{
 		"session": shortID,
 	}, handlerStart, "handler complete")

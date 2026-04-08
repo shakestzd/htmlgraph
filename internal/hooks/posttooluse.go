@@ -51,6 +51,16 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	_ = db.UpdateEventFields(database, eventID, status, outputSummary)
 
+	// Append event to session HTML activity log (non-critical, errors silently logged).
+	appendEventToSessionHTML(ctx.ProjectDir, ctx.SessionID, sessionEvent{
+		Timestamp: time.Now().UTC(),
+		ToolName:  event.ToolName,
+		Success:   success,
+		EventID:   eventID,
+		FeatureID: ctx.FeatureID,
+		Summary:   summariseInput(event.ToolName, event.ToolInput),
+	})
+
 	// Record orchestrator direct-tool usage for analytics.
 	// Subagents are excluded — only direct orchestrator use is interesting here.
 	if !ctx.IsSubagent {
