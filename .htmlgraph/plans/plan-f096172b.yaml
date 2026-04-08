@@ -1,11 +1,11 @@
 meta:
     id: plan-f096172b
-    track_id: trk-956d574c
+    track_id: trk-b0377def
     title: Internal Plan Review — Marimo Migration
     description: |
         Eliminate Marimo/Python dependency from plan review by completing the internal Go/HTML/JS implementation in internal/plantmpl/. ~960 lines new code to replace ~1,712 lines embedded Python. Single-binary, offline-first, instant startup. Seamless dashboard integration with unified navigation and visual design.
     created_at: "2026-04-07"
-    status: draft
+    status: finalized
     created_by: claude-opus
     version: 1
 design:
@@ -56,7 +56,7 @@ slices:
         message persistence to plan_feedback table with correct action and value fields.
         Integration: api_plans_test.go — httptest.NewRecorder, POST /api/plans/test-id/chat,
         assert Content-Type: text/event-stream and at least one data: chunk in response body.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-091f4ce3
       num: 2
@@ -85,7 +85,7 @@ slices:
         variations (single-line, multiline, missing fields, malformed input).
         Integration: api_plans_test.go — seed plan_feedback rows with action=amendment, GET
         /api/plans/test-id/amendments, assert correct amendment count and status fields in JSON.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-3a7d1c9f
       num: 3
@@ -112,7 +112,7 @@ slices:
         text/plain and non-empty body when yaml file exists; 404 when yaml missing.
         Manual: open plan page, approve a slice checkbox, confirm graph node turns green without
         page reload; confirm YAML viewer shows highlighted YAML content.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-b82e0fd4
       num: 4
@@ -153,7 +153,7 @@ slices:
         Unit: go build ./... is the primary gate — compiler catches any dangling import of
         internal/notebook. Run go test ./... to confirm no test file imports the deleted package.
         Smoke: htmlgraph plan --help to confirm 'review' absent from subcommand list.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-d4e81a2f
       num: 5
@@ -191,7 +191,7 @@ slices:
         on /api/plans/{id}/events within 1 second.
         Manual: open dashboard, click a plan row, verify detail panel renders with correct
         styling, approve a slice, verify graph node updates and SSE refreshes the list.
-      approved: false
+      approved: true
       comment: ""
 questions:
     - id: q-chat-streaming
