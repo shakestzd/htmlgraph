@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,14 +12,17 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
-// setupTestDB creates an in-memory DB with schema, a session, and an
-// optional feature. Returns the database and a cleanup function.
+// setupTestDB creates a per-test on-disk SQLite DB with schema and a session.
+// Each call gets its own isolated database to prevent UNIQUE constraint
+// violations when tests share the same in-memory connection cache.
 func setupTestDB(t *testing.T) *testDB {
 	t.Helper()
-	database, err := db.Open("file::memory:?cache=shared&_busy_timeout=5000")
+	dbPath := filepath.Join(t.TempDir(), "htmlgraph.db")
+	database, err := db.Open(dbPath)
 	if err != nil {
 		t.Fatalf("db.Open: %v", err)
 	}
+	t.Cleanup(func() { database.Close() })
 	now := time.Now().UTC()
 
 	sess := &models.Session{

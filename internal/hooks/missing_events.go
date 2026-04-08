@@ -3,6 +3,8 @@ package hooks
 import (
 	"database/sql"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -239,6 +241,7 @@ func WorktreeCreate(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 // WorktreeRemove handles the WorktreeRemove Claude Code hook event.
 // Records when a git worktree is removed after work is complete.
+// Auto-completes any in-progress work items associated with the worktree branch.
 // Also injects additionalContext to redirect the agent back to the project root
 // so it can run final checks even though its CWD no longer exists.
 func WorktreeRemove(event *CloudEvent, database *sql.DB) (*HookResult, error) {
@@ -252,20 +255,47 @@ func WorktreeRemove(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		return result, err
 	}
 
+	// Auto-complete in-progress work items for the removed worktree's branch.
+	// The branch name is typically the last path component of the worktree path
+	// (e.g. /path/to/worktrees/trk-abc12345 → "trk-abc12345").
+	branch := extractBranchFromWorktreePath(event.WorktreePath)
+	var completedItems []string
+	if branch != "" {
+		completedItems = autoCompleteByBranch(branch, database)
+		if len(completedItems) > 0 {
+			projectDir := ResolveProjectDir(event.CWD, event.SessionID)
+			debugLog(projectDir, "[worktree-remove] auto-completed %s (branch=%s)", strings.Join(completedItems, ", "), branch)
+		}
+	}
+
 	// Inject guidance so the agent can complete post-worktree steps.
 	// The worktree directory no longer exists — any Bash command using the
 	// old CWD will fail. Tell the agent to switch to the project root.
 	projectRoot := ResolveProjectDir(event.CWD, event.SessionID)
 	if projectRoot != "" {
-		result.AdditionalContext = fmt.Sprintf(
+		msg := fmt.Sprintf(
 			"WORKTREE REMOVED: Your working directory (%s) no longer exists. "+
 				"All subsequent Bash commands must use absolute paths or cd to the project root first. "+
 				"Project root: %s — use this for any remaining steps (marking feature done, final checks, etc.).",
 			event.WorktreePath, projectRoot,
 		)
+		if len(completedItems) > 0 {
+			msg += fmt.Sprintf("\nAuto-completed work items: %s", strings.Join(completedItems, ", "))
+		}
+		result.AdditionalContext = msg
 	}
 
 	return result, nil
+}
+
+// extractBranchFromWorktreePath extracts the branch name from a worktree path.
+// Claude Code typically names worktrees after the branch, so the last path
+// component is the branch name (e.g. "/repo/.claude/worktrees/trk-abc12345").
+func extractBranchFromWorktreePath(worktreePath string) string {
+	if worktreePath == "" {
+		return ""
+	}
+	return filepath.Base(worktreePath)
 }
 
 // PostToolUseFailure handles the PostToolUseFailure Claude Code hook event.

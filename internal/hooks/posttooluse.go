@@ -143,6 +143,22 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 				}
 			}
 		}
+
+		// Auto-complete work items when a branch merge completes.
+		// "git merge trk-xxxxx" or "git merge feat-xxxxx" should close
+		// all in-progress items on that track/feature.
+		if cmd := extractBashCommand(event.ToolInput); looksLikeGitMerge(cmd) {
+			if branch := extractMergeBranch(cmd); branch != "" {
+				if completed := autoCompleteByBranch(branch, database); len(completed) > 0 {
+					notice := fmt.Sprintf("Auto-completed (merge): %s", strings.Join(completed, ", "))
+					if result.AdditionalContext != "" {
+						result.AdditionalContext += "\n" + notice
+					} else {
+						result.AdditionalContext = notice
+					}
+				}
+			}
+		}
 	}
 
 	return result, nil
@@ -237,9 +253,19 @@ func autoCompleteFromCommit(commitMsg string, ctx *toolUseContext, database *sql
 	return completed
 }
 
+// completeIfInProgressFn is the implementation used by completeIfInProgress.
+// It is a package-level variable so tests can inject a stub to avoid shelling
+// out to the CLI binary (which requires a real on-disk DB at a known path).
+var completeIfInProgressFn = completeIfInProgressImpl
+
 // completeIfInProgress checks whether a work item is in-progress and, if so,
 // shells out to the CLI to complete it. Returns true if completion was triggered.
 func completeIfInProgress(id string, database *sql.DB) bool {
+	return completeIfInProgressFn(id, database)
+}
+
+// completeIfInProgressImpl is the real implementation of completeIfInProgress.
+func completeIfInProgressImpl(id string, database *sql.DB) bool {
 	var status string
 	if err := database.QueryRow(`SELECT status FROM features WHERE id = ?`, id).Scan(&status); err != nil {
 		return false
@@ -267,6 +293,97 @@ var gitCommitOutputRe = regexp.MustCompile(`\[[\w/\-]+\s+([0-9a-f]{7,40})\]\s+(.
 // looksLikeGitCommit returns true when the bash command appears to be a git commit.
 func looksLikeGitCommit(cmd string) bool {
 	return strings.Contains(cmd, "git commit") || strings.Contains(cmd, "git-commit")
+}
+
+// looksLikeGitMerge returns true when the bash command appears to be a git merge.
+func looksLikeGitMerge(cmd string) bool {
+	return strings.Contains(cmd, "git merge") || strings.Contains(cmd, "git-merge")
+}
+
+// gitMergeBranchRe matches the branch name in a git merge command.
+// Handles: "git merge trk-abc123", "git merge --no-ff feat-abc123", etc.
+var gitMergeBranchRe = regexp.MustCompile(`git[-\s]merge\s+(?:--\S+\s+)*(\S+)`)
+
+// extractMergeBranch parses a git merge command and returns the branch being merged.
+// Returns "" when the branch cannot be determined.
+func extractMergeBranch(cmd string) string {
+	// Find the last argument after flags (skip option flags starting with -)
+	for _, line := range strings.Split(cmd, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, "git merge") && !strings.Contains(line, "git-merge") {
+			continue
+		}
+		if m := gitMergeBranchRe.FindStringSubmatch(line); len(m) == 2 {
+			branch := m[1]
+			// Filter out common flags that look like arguments
+			if strings.HasPrefix(branch, "-") {
+				return ""
+			}
+			return branch
+		}
+	}
+	return ""
+}
+
+// workItemBranchRe matches a branch name that is itself a work item ID:
+// feat-xxxxxxxx, bug-xxxxxxxx, spk-xxxxxxxx (8 hex chars).
+var workItemBranchRe = regexp.MustCompile(`^((?:feat|bug|spk)-[0-9a-f]{8})$`)
+
+// trackBranchRe matches a branch that is a track ID: trk-xxxxxxxx.
+var trackBranchRe = regexp.MustCompile(`^(trk-[0-9a-f]{8})$`)
+
+// autoCompleteByBranch completes in-progress work items based on a branch name.
+// When the branch is a track ID (trk-xxxxxxxx), all in-progress features/bugs/spikes
+// on that track are completed. When it is a direct work item ID, only that item
+// is completed. Returns the IDs of completed items.
+func autoCompleteByBranch(branch string, database *sql.DB) []string {
+	// Direct work item branch: feat-xxxxxxxx, bug-xxxxxxxx, spk-xxxxxxxx
+	if workItemBranchRe.MatchString(branch) {
+		if completeIfInProgress(branch, database) {
+			return []string{branch}
+		}
+		return nil
+	}
+
+	// Track branch: trk-xxxxxxxx — complete all in-progress items on this track
+	if m := trackBranchRe.FindStringSubmatch(branch); len(m) == 2 {
+		trackID := m[1]
+		return completeInProgressByTrack(trackID, database)
+	}
+
+	return nil
+}
+
+// completeInProgressByTrack queries for all in-progress work items on a track
+// and shells out to complete each one. Returns the IDs of completed items.
+func completeInProgressByTrack(trackID string, database *sql.DB) []string {
+	rows, err := database.Query(
+		`SELECT id FROM features WHERE track_id = ? AND status = 'in-progress'`,
+		trackID,
+	)
+	if err != nil {
+		debugLog("", "[posttooluse] query in-progress for track %s: %v", trackID, err)
+		return nil
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	_ = rows.Err()
+
+	var completed []string
+	for _, id := range ids {
+		if completeIfInProgress(id, database) {
+			completed = append(completed, id)
+		}
+	}
+	return completed
 }
 
 // parseGitCommitOutput extracts the commit hash and message from git's stdout.
