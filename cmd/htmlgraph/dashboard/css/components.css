@@ -758,10 +758,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
 .plan-detail-body {
-  /* Map plan CSS tokens to dashboard tokens */
+  /* Map plan CSS tokens to dashboard design system */
   --bg: var(--bg-primary);
   --bg-card: var(--bg-secondary);
   --bg-input: var(--bg-tertiary);
@@ -772,20 +774,56 @@
   --border: var(--border);
   --accent: var(--accent);
   --accent-dim: var(--accent-dim);
+  --accent-glow: rgba(205, 255, 0, 0.25);
   --radius: var(--radius);
+  --radius-sm: 4px;
   --mono: var(--font-mono);
-  --sans: var(--font-sans);
+  --sans: 'DM Sans', var(--font-sans);
+  --shadow-card: 0 1px 3px rgba(0,0,0,.4), 0 0 0 1px var(--border);
+  --shadow-elevated: 0 4px 24px rgba(0,0,0,.5), 0 0 0 1px var(--border);
+  --transition: 150ms cubic-bezier(.4,0,.2,1);
+  --approved: #22c55e;
+  --revision: #f59e0b;
+  --discuss: #a78bfa;
+  --pending: #6b7280;
+  --blocked: #ef4444;
+  font-family: var(--sans);
+  line-height: 1.6;
 }
+.plan-detail-body h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px; }
+.plan-detail-body h1::first-letter { color: var(--accent); }
+.plan-detail-body h2 { font-size: 1rem; font-weight: 600; }
+.plan-detail-body h3 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
 .plan-detail-body .section-card {
   background: var(--bg-secondary);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: box-shadow var(--transition);
 }
+.plan-detail-body .section-card:hover { box-shadow: var(--shadow-elevated); }
 .plan-detail-body details summary {
   cursor: pointer;
-  padding: 12px 16px;
+  padding: 14px 20px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  font-family: var(--sans);
+  transition: background var(--transition);
 }
-.plan-detail-body .sidebar { display: none; }
+.plan-detail-body details summary:hover { background: var(--bg-hover); }
+.plan-detail-body .plan-sidebar { display: none; }
+.plan-detail-body .plan-content { padding: 0; max-width: none; }
+.plan-detail-body .plan-header { margin-bottom: 28px; padding-bottom: 16px; border-bottom: 1px solid var(--border); position: relative; }
+.plan-detail-body .plan-header::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100px; height: 1px; background: var(--accent); opacity: .4; }
+.plan-detail-body .dep-graph { box-shadow: var(--shadow-card); }
+.plan-detail-body .progress-zone { box-shadow: var(--shadow-card); }
+.plan-detail-body .chat-panel { box-shadow: var(--shadow-card); }
+.plan-detail-body .amendments-panel { box-shadow: var(--shadow-card); }
+.plan-detail-body .badge { font-family: var(--mono); font-size: .63rem; }
+.plan-detail-body .slice-num { background: var(--accent); color: var(--bg-primary); font-size: .7rem; padding: 2px 7px; border-radius: 4px; }
+.plan-detail-body .chat-bubble { border-radius: 12px; }
+.plan-detail-body .chat-bubble[data-role="user"] { border-bottom-right-radius: 4px; }
+.plan-detail-body .chat-bubble[data-role="assistant"] { border-bottom-left-radius: 4px; }
+.plan-detail-body .btn-finalize { transition: all var(--transition); }
+.plan-detail-body .btn-finalize:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); }
