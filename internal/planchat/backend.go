@@ -6,6 +6,7 @@ package planchat
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -155,14 +156,12 @@ func (b *Backend) buildCmd(claudePath, message string) []string {
 		"-p", message,
 		"--output-format", "stream-json",
 		"--verbose",
+		"--include-partial-messages",
 		"--append-system-prompt", b.buildSystemPrompt(),
 	}
 	if b.sessionID != "" {
 		// Resume existing session by UUID.
 		args = append(args, "--resume", b.sessionID)
-	} else if b.firstMsg {
-		// First message: try resuming by plan ID (named session).
-		args = append(args, "--resume", b.PlanID)
 	}
 	return args
 }
@@ -181,7 +180,8 @@ func (b *Backend) sendViaSubprocess(ctx context.Context, claudePath, message str
 	if err != nil {
 		return fmt.Errorf("stdout pipe: %w", err)
 	}
-	cmd.Stderr = nil // discard stderr
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start claude CLI: %w", err)
@@ -214,6 +214,25 @@ func (b *Backend) sendViaSubprocess(ctx context.Context, claudePath, message str
 				}
 			}
 
+		case "stream_event":
+			inner, _ := event["event"].(map[string]any)
+			if inner == nil {
+				continue
+			}
+			if innerType, _ := inner["type"].(string); innerType == "content_block_delta" {
+				delta, _ := inner["delta"].(map[string]any)
+				if deltaType, _ := delta["type"].(string); deltaType == "text_delta" {
+					if text, _ := delta["text"].(string); text != "" {
+						select {
+						case <-ctx.Done():
+							_ = cmd.Process.Kill()
+							return ctx.Err()
+						case chunks <- text:
+						}
+					}
+				}
+			}
+
 		case "assistant":
 			for _, text := range extractTextChunks(event) {
 				select {
@@ -233,11 +252,12 @@ func (b *Backend) sendViaSubprocess(ctx context.Context, claudePath, message str
 done:
 	waitErr := cmd.Wait()
 
-	// If --resume failed (stale session), clear session and retry once.
-	if waitErr != nil && b.sessionID != "" {
-		b.sessionID = ""
-		b.saveSessionID()
-		// Don't retry here — let the caller handle retry logic.
+	if waitErr != nil {
+		if b.sessionID != "" {
+			b.sessionID = ""
+			b.saveSessionID()
+		}
+		return fmt.Errorf("claude CLI exited: %w (stderr: %s)", waitErr, stderrBuf.String())
 	}
 
 	return nil

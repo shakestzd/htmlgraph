@@ -191,6 +191,69 @@ func TestBuildSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestBuildCmd_IncludesPartialMessages(t *testing.T) {
+	database := openTestDB(t)
+	b := New(database, "plan-cmd-test", "ctx", "/tmp")
+
+	args := b.buildCmd("/usr/bin/claude", "hello")
+
+	found := false
+	for _, arg := range args {
+		if arg == "--include-partial-messages" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("buildCmd args missing --include-partial-messages: %v", args)
+	}
+}
+
+func TestExtractStreamEvent_TextDelta(t *testing.T) {
+	// Simulate a stream_event with content_block_delta / text_delta.
+	raw := `{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello..."}}}`
+	var event map[string]any
+	if err := json.Unmarshal([]byte(raw), &event); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	inner, _ := event["event"].(map[string]any)
+	if inner == nil {
+		t.Fatal("inner event is nil")
+	}
+	innerType, _ := inner["type"].(string)
+	if innerType != "content_block_delta" {
+		t.Fatalf("inner type: got %q, want content_block_delta", innerType)
+	}
+	delta, _ := inner["delta"].(map[string]any)
+	deltaType, _ := delta["type"].(string)
+	if deltaType != "text_delta" {
+		t.Fatalf("delta type: got %q, want text_delta", deltaType)
+	}
+	text, _ := delta["text"].(string)
+	if text != "Hello..." {
+		t.Errorf("text: got %q, want Hello...", text)
+	}
+}
+
+func TestExtractStreamEvent_NonTextDelta(t *testing.T) {
+	// stream_event with a non-text delta should yield no text.
+	raw := `{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}`
+	var event map[string]any
+	if err := json.Unmarshal([]byte(raw), &event); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	inner, _ := event["event"].(map[string]any)
+	if inner == nil {
+		t.Fatal("inner event is nil")
+	}
+	// type is content_block_start, not content_block_delta — no text should be extracted.
+	innerType, _ := inner["type"].(string)
+	if innerType == "content_block_delta" {
+		t.Fatal("expected non-delta event type for this test case")
+	}
+}
+
 func TestExtractTextChunks_AssistantEvent(t *testing.T) {
 	event := `{"type":"assistant","message":{"content":[{"type":"text","text":"Hello world"}]}}`
 	var parsed map[string]any
