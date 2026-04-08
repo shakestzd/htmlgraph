@@ -501,18 +501,40 @@ func isCodeHealthCheckedFile(path string) bool {
 	return false
 }
 
-// hasRecentResearch checks if Read/Grep/Glob was used in this session.
-// Agent events are excluded — actual source reading (Read/Grep/Glob) is
-// required, not just delegation to a subagent.
+// hasRecentResearch checks if Read/Grep/Glob was used in this session
+// or its parent session. Also checks if the session has any events at all —
+// if not, the event recording pipeline is likely broken (e.g. DB mismatch
+// in worktrees) and we fail-open rather than blocking valid work.
 func hasRecentResearch(database *sql.DB, sessionID string) bool {
-	var count int
-	database.QueryRow(`
-		SELECT COUNT(*) FROM agent_events
-		WHERE session_id = ? AND tool_name IN ('Read', 'Grep', 'Glob')
-		LIMIT 1`,
-		sessionID,
-	).Scan(&count)
-	return count > 0
+	if database == nil || sessionID == "" {
+		return true // fail-open: can't verify, don't block
+	}
+	// Check this session and its parent (worktree subagents inherit context).
+	sessionIDs := getSessionAndParent(database, sessionID)
+	for _, sid := range sessionIDs {
+		var count int
+		database.QueryRow(`
+			SELECT COUNT(*) FROM agent_events
+			WHERE session_id = ? AND tool_name IN ('Read', 'Grep', 'Glob')
+			LIMIT 1`,
+			sid,
+		).Scan(&count)
+		if count > 0 {
+			return true
+		}
+	}
+	// If the session has zero events total, event recording is broken —
+	// fail-open to avoid blocking valid work.
+	var totalEvents int
+	for _, sid := range sessionIDs {
+		var c int
+		database.QueryRow(`SELECT COUNT(*) FROM agent_events WHERE session_id = ? LIMIT 1`, sid).Scan(&c)
+		totalEvents += c
+	}
+	if totalEvents == 0 {
+		return true // no events recorded at all — recording issue, not laziness
+	}
+	return false
 }
 
 // getSessionAndParent returns the current session ID plus its parent session
