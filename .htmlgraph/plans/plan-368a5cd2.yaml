@@ -1,0 +1,355 @@
+meta:
+    id: plan-368a5cd2
+    track_id: trk-66dcbbf7
+    title: Multi-Project MVP
+    description: |
+        Auto-registering project registry, project listing CLI, and unified read-only dashboard aggregating across all HtmlGraph-enabled projects.
+    created_at: "2026-04-08"
+    status: draft
+    created_by: claude-opus
+    version: 3
+design:
+    problem: |
+        HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask "what work is happening across all my projects right now?" without manually cd-ing into each repo and running `htmlgraph snapshot`.
+
+        The gap is real and the building blocks are already in place. The `sessions` table already stores `project_dir` and `git_remote_url` per row, meaning project identity is tracked at the row level inside each SQLite DB. `internal/workitem/project.go` has `Project.Open()` which opens a project's SQLite DB by directory — the pattern for multi-DB access exists (though it runs migrations so cross-project reads need a lightweight read-only alternative). `~/.local/share/htmlgraph/` is established as a global location (used today for `version-check.json` and `.binary-version`) but holds no project registry. Every CLI invocation in a new project has no memory of the others.
+
+        The deleted Elixir/Phoenix implementation had a full `ProjectRegistry` GenServer and workspace scanner. That code is gone but the problem it solved is not. Power users with 5–20 active repos get zero cross-project visibility: no way to see which projects have in-progress work, which sessions are running, or which bugs are blocked. The dashboard (`htmlgraph serve`) only sees the current project. There is no global entry point.
+
+        The MVP scope is deliberately narrow: passive registry growth via upsert-on-invocation, a `projects list` command, and a `--global` flag on `serve` that aggregates read-only data across all known project DBs. Everything else stays project-local.
+    goals:
+        - '**Auto-registering project registry** — every `htmlgraph` invocation inside a project upserts that project''s metadata (path, name, git remote, last-seen timestamp) into `~/.local/share/htmlgraph/projects.json`, so the registry grows passively without any user action and always reflects recently active projects'
+        - '**`htmlgraph projects list` command** — a new top-level command that reads the registry and prints all known projects with their path, last-active timestamp, and in-progress work item count; usable from any directory, not just inside a project'
+        - '**`htmlgraph serve --global` unified dashboard** — extends the existing embedded dashboard server to aggregate read-only data from all registered project DBs when `--global` is passed, presenting a single view of in-progress work items and recent sessions without breaking the default single-project `htmlgraph serve`'
+    constraints:
+        - No external infrastructure — registry must be a local JSON file at `~/.local/share/htmlgraph/projects.json`; no Postgres, Redis, or cloud sync; consistent with the core project constraint
+        - Read-only cross-project aggregation — the global dashboard and `projects list` must never write to any project's `.htmlgraph/` directory or SQLite DB; all cross-project DB access uses read-only SQLite connections (`?mode=ro` URI) that skip schema migrations; SQLite supports concurrent readers so aggregation is safe, but cross-project writes are explicitly out of scope for this MVP
+        - Zero breakage of existing single-project workflows — `htmlgraph serve` without `--global`, all hook behaviour, and all project-local commands must behave identically; the registry upsert must be a silent side-effect with no latency impact on normal CLI invocations
+        - No build step or framework additions to the dashboard — the SPA is vanilla JS served via `embed.FS`; the global view must use the same constraint, adding only new API endpoints to the existing Go HTTP server and new JS fetch calls, not a bundler or frontend framework
+    approved: false
+    comment: ""
+slices:
+    - id: feat-3c8a1e72
+      num: 1
+      title: Registry package — internal/registry/
+      what: |
+        Create `internal/registry/` with a single file `registry.go`. Define `Entry` struct: `{ProjectDir, Name, GitRemoteURL, LastSeen, ID string}` where `ID` is the first 8 characters of the SHA256 hash of `ProjectDir`, computed once on first upsert and stored in the entry. Define `Registry` struct wrapping the file path and a `[]Entry` slice. Implement `Load(path string) (*Registry, error)` — reads and JSON-decodes the file; returns empty registry (not error) if file does not exist. Implement `(*Registry) Save() error` — JSON-encodes with indentation, writes atomically via a tempfile + `os.Rename()` pattern (write to `<path>.tmp`, then rename) to the registry path, ensuring crash-safe writes. Implement `(*Registry) Upsert(dir, name, remoteURL string)` — finds existing entry by `ProjectDir` (filepath.Clean comparison), updates `LastSeen` / `GitRemoteURL` / `Name` in-place or appends a new entry with a freshly computed `ID`; uses `time.Now().UTC().Format(time.RFC3339)` for `LastSeen`. Implement `(*Registry) List() []Entry` returning a copy of entries. Implement `(*Registry) Prune() []string` — removes entries whose `filepath.Join(entry.ProjectDir, ".htmlgraph")` does not exist via `os.Stat`; returns list of pruned dirs. Expose `DefaultPath() string` helper returning `~/.local/share/htmlgraph/projects.json` (resolved via `os.UserHomeDir`). Add `OpenReadOnly(dbPath string) (*sql.DB, error)` — opens SQLite with `file:<dbPath>?mode=ro&_busy_timeout=5000` URI; does NOT call `ApplyPragmas` or `CreateAllTables`; returns a read-only `*sql.DB` for use by cross-project queries. No external dependencies — stdlib only (database/sql + modernc.org/sqlite already in go.mod).
+      why: |
+        All other slices depend on a well-defined, tested registry abstraction. Isolating it in `internal/registry/` keeps the CLI commands thin and makes the persistence layer independently testable. The atomic write pattern prevents registry corruption on crash. The read-only DB helper prevents schema mutations on foreign project databases.
+      files:
+        - internal/registry/registry.go
+        - internal/registry/registry_test.go
+      deps: []
+      done_when:
+        - '`go build ./internal/registry/...` passes'
+        - '`go test ./internal/registry/...` passes with coverage of Load/Save/Upsert/List/Prune/OpenReadOnly'
+        - 'Upsert is idempotent: calling twice with same dir updates LastSeen, does not duplicate'
+        - Load on missing file returns empty registry, no error
+        - Prune removes entries whose .htmlgraph/ dir is absent and returns their paths
+        - Save uses tempfile+rename — power-loss during write does not corrupt the registry
+        - Each Entry has a stable ID (8-char SHA256 prefix of ProjectDir) set on first upsert and preserved on subsequent upserts
+        - OpenReadOnly returns a *sql.DB that can query but cannot write or run migrations
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestLoad_MissingFile, TestUpsert_NewEntry, TestUpsert_UpdatesExisting,
+              TestSave_RoundTrip, TestSave_Atomic (interrupt mid-write via tmpdir),
+              TestPrune_RemovesStale, TestDefaultPath, TestOpenReadOnly_RejectsWrite,
+              TestEntry_StableID (same dir always yields same ID)
+        Integration: none (pure file I/O + SQLite, tmpdir-based in unit tests)
+      approved: false
+      comment: ""
+    - id: feat-7d4b2f91
+      num: 2
+      title: Auto-registration in PersistentPreRunE
+      what: |
+        In `cmd/htmlgraph/main.go`, extend the existing `rootCmd.PersistentPreRunE` to call `registry.Load(registry.DefaultPath())`, then `reg.Upsert(projectDir, name, gitRemoteURL)`, then `reg.Save()` after the existing `agent.EnsureSession` call. Derive `projectDir` from the already-resolved `filepath.Dir(hgDir)`. Derive `name` as `filepath.Base(projectDir)`. Derive `gitRemoteURL` via `paths.GetGitRemoteURL(projectDir)` — but ONLY when the existing registry entry for `projectDir` has an empty `GitRemoteURL`; if the entry already has a URL populated, skip the `git remote get-url origin` subprocess entirely and pass the cached value to `Upsert`. This ensures the git subprocess runs at most once per project, not on every CLI invocation. Skip the registry upsert (return `nil`) when `findHtmlgraphDir()` returns an error (same graceful-degradation pattern already used for EnsureSession). The entire upsert + save must complete within 10 ms on an SSD for the common case (cached remote URL, no git subprocess); the first-invocation case may take up to 30 ms due to git process startup.
+      why: |
+        Self-maintaining registry without any daemon. Every `htmlgraph` invocation silently keeps the registry fresh, which makes `projects list` reliable without manual maintenance. Caching the remote URL after first write prevents a git subprocess on every CLI call — critical for latency since git process startup is 5–20 ms on macOS.
+      files:
+        - cmd/htmlgraph/main.go
+      deps:
+        - 1
+      done_when:
+        - Running `htmlgraph status` in a project dir creates/updates an entry in `~/.local/share/htmlgraph/projects.json`
+        - LastSeen timestamp advances on each invocation
+        - git remote get-url is called ONLY on first registration (when GitRemoteURL is empty); subsequent invocations use the cached value
+        - Commands excluded from PersistentPreRunE (version, help, init, etc.) do not touch registry
+        - '`go build ./... && go vet ./... && go test ./...` pass'
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestPersistentPreRunE_UpsertsCalled (mock registry via tmpdir),
+              TestPersistentPreRunE_GitSubprocessCalledOnce (assert GetGitRemoteURL not called
+              when entry already has URL)
+        Integration: Run `htmlgraph status` twice in a temp project dir; assert projects.json
+                     contains exactly one entry with updated LastSeen; assert git subprocess
+                     not invoked on second run (mock or count via test hook)
+      approved: false
+      comment: ""
+    - id: feat-c1e5a83d
+      num: 3
+      title: htmlgraph projects subcommand (list + prune)
+      what: |
+        Create `cmd/htmlgraph/projects.go` with a `projectsCmd()` function returning a `*cobra.Command` for `htmlgraph projects`. Add two subcommands: `htmlgraph projects list` — calls `registry.Load(registry.DefaultPath())`, iterates entries, prints a table with columns: NAME, DIR, LAST_SEEN, STATUS (exists/missing), ITEMS. STATUS is "exists" if `filepath.Join(entry.ProjectDir, ".htmlgraph")` is stat-able, "missing" otherwise. ITEMS count is derived by opening the project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, ".htmlgraph", "htmlgraph.db"))` and querying feature + bug + spike counts — skip silently on open error. Do NOT use `workitem.Open(entry.ProjectDir, ...)` here as that runs schema migrations. `htmlgraph projects prune` — calls `reg.Prune()`, prints pruned dirs, calls `reg.Save()`. Register `projectsCmd()` in `main.go` via `rootCmd.AddCommand(projectsCmd())`. Add "projects" to the PersistentPreRunE skip list so the subcommand works without a local `.htmlgraph/` directory.
+      why: |
+        Gives users visibility into all known projects and a manual cleanup path for stale entries — the primary user-facing surface of the registry. Using read-only DB connections for ITEMS counts ensures no schema mutations are applied to foreign project databases.
+      files:
+        - cmd/htmlgraph/projects.go
+        - cmd/htmlgraph/main.go
+      deps:
+        - 1
+      done_when:
+        - '`htmlgraph projects list` prints a table row for each entry in the registry'
+        - '`htmlgraph projects prune` removes entries with missing `.htmlgraph/` and prints them'
+        - Running either command in a directory without `.htmlgraph/` does not error
+        - ITEMS count uses read-only DB connection via `registry.OpenReadOnly` — no migrations run on foreign DBs
+        - DB path is constructed as `filepath.Join(entry.ProjectDir, ".htmlgraph", "htmlgraph.db")` not `entry.ProjectDir` directly
+        - '`go build ./... && go vet ./... && go test ./...` pass'
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestProjectsList_Output, TestProjectsPrune_RemovesAndSaves (tmpdir registry)
+        Integration: Populate registry with two entries (one real, one fake dir);
+                     assert `list` shows both, `prune` removes the fake one;
+                     assert no schema tables created in real project DB after `list` runs
+      approved: false
+      comment: ""
+    - id: feat-9a7e6c04
+      num: 4
+      title: Global dashboard backend — htmlgraph serve --global
+      what: |
+        In `cmd/htmlgraph/serve.go`, add a `--global` bool flag to `serveCmd()`. When `--global` is set, call a new `runGlobalServer(port int)` function instead of `runServer`. `runGlobalServer` loads the registry, iterates entries where status==exists, opens each project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, ".htmlgraph", "htmlgraph.db"))` — never via `workitem.Open` which runs migrations. Collect `[]*sql.DB` mapped by stable project ID (`entry.ID`, the 8-char SHA256 prefix stored in the registry entry). Add new API routes to the mux: `GET /api/projects` — returns `[]ProjectSummary` JSON where each summary contains `{id, name, dir, lastSeen, featureCount, bugCount, spikeCount}` using the stable `entry.ID` as the project ID. `GET /api/mode` — returns `{"mode":"global","projects":[...]}` in global mode; this endpoint is also added to the single-project server returning `{"mode":"single"}`. Extend existing routes with a `?project=<id>` query parameter: `GET /api/sessions?project=<id>` dispatches to `sessionsHandler` for the matched project's `*sql.DB`; `GET /api/features?project=<id>` dispatches to `featuresHandler`; `GET /api/stats?project=<id>` dispatches to `statsHandler`. `GET /api/projects/all/stats` — aggregates stat counts across all projects. When `?project` is absent or the route is hit without global context, fall through to single-project behaviour. Reuse existing `corsMiddleware` and handler functions — pass `*sql.DB` and `htmlgraphDir` as explicit arguments rather than closures where needed. All cross-project DB connections are read-only. Existing `runServer` (single-project) must remain unchanged.
+      why: |
+        The backend aggregation layer enables the global dashboard without duplicating data. All reads are at query time against per-project SQLite files opened read-only via URI mode — no migrations, no schema mutations, no data merging or synchronisation needed. Using query parameters on existing routes aligns with the Q3 recommended answer and avoids a separate route tree.
+      files:
+        - cmd/htmlgraph/serve.go
+      deps:
+        - 1
+      done_when:
+        - '`htmlgraph serve --global` starts without error'
+        - '`GET /api/projects` returns JSON array with one entry per registry project that exists on disk; each entry has a stable `id` (SHA256-derived, not array index)'
+        - '`GET /api/mode` returns `{"mode":"global",...}` in global mode and `{"mode":"single"}` in single-project mode'
+        - '`GET /api/sessions?project=<id>` returns sessions from that project''s DB'
+        - '`GET /api/features?project=<id>` returns features from that project''s DB'
+        - '`GET /api/projects/all/stats` returns aggregated counts across all loaded projects'
+        - All cross-project DB access uses read-only connections — no schema mutations on foreign projects
+        - Single-project `htmlgraph serve` (no flag) behaviour is unchanged; `/api/mode` returns `{"mode":"single"}`
+        - '`go build ./... && go vet ./... && go test ./...` pass'
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestRunGlobalServer_RoutesRegistered, TestProjectIDStable (same dir always same id),
+              TestModeEndpoint_Single, TestModeEndpoint_Global
+        Integration: Start global server against a tmpdir with two project dirs;
+                     assert /api/projects returns two entries with stable IDs;
+                     assert /api/sessions?project=<id> returns data from the correct DB;
+                     assert no new tables created in project DBs after server startup
+      approved: false
+      comment: ""
+    - id: feat-e2f8b17a
+      num: 5
+      title: Global dashboard frontend — project switcher UI
+      what: |
+        Extend `cmd/htmlgraph/dashboard/js/app.js` to detect global mode by calling `GET /api/mode` on startup (not `/api/projects`, which returns an HTML 404 in single-project mode due to the file server fallback). If the response has `mode == "global"` the app enters global mode. In global mode, render a project switcher panel above the existing nav — a `<select>` or pill-list of project names plus an "All Projects" option. Selecting a specific project re-scopes all subsequent API calls using the `?project=<id>` query parameter on existing routes (e.g., `/api/sessions?project=<id>`, `/api/features?project=<id>`). Selecting "All Projects" calls `/api/projects/all/stats` for the stats panel and renders a merged session list from all projects. Add a `buildProjectUrl(projectId, endpoint)` helper in `helpers.js` that returns `/api/${endpoint}?project=${projectId}` when `projectId` is set or `/api/${endpoint}` for the single-project fallback. Single-project mode (when `/api/mode` returns `{"mode":"single"}`) must behave exactly as today — no regressions. No new JS dependencies — vanilla JS only, matching the existing codebase style.
+      why: |
+        The frontend switcher is the user-visible payoff of the global backend. Using `/api/mode` as the detection mechanism avoids the HTML-404 trap from the static file server fallback on `/api/projects`. The `?project=` query parameter pattern aligns with the aligned Slice 4 implementation.
+      files:
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/js/helpers.js
+      deps:
+        - 4
+      done_when:
+        - Opening `htmlgraph serve --global` in a browser shows a project switcher with all registered projects
+        - Switching projects re-fetches sessions and features for the selected project using `?project=<id>` query params
+        - '`All Projects` view shows aggregated stats'
+        - Single-project `htmlgraph serve` shows no switcher and all existing behaviour is preserved
+        - Mode detection uses `GET /api/mode` — not `/api/projects` which returns HTML 404 in single-project mode
+        - No new JS libraries introduced
+      effort: M
+      risk: Low
+      tests: |
+        Unit: none (vanilla JS; verified via manual browser walkthrough)
+        Integration: Start global server with two projects; load dashboard; assert switcher
+                     renders both project names; assert feature list changes on selection;
+                     assert single-project server shows no switcher
+      approved: false
+      comment: ""
+questions:
+    - id: q-registry-format
+      text: Should the project registry use JSON file or SQLite database?
+      description: |
+        The registry stores project metadata (path, git remote, last_seen timestamp) for the multi-project dashboard. JSON files have simpler concurrent write semantics (atomic rename is safer than SQLite locking) but no querying capabilities. SQLite is already the operational index everywhere else and would support future queries like "projects not seen in 30 days". JSON is simpler for MVP scope and reads cleanly into the dashboard API. The tradeoff is long-term queryability vs immediate simplicity.
+      recommended: json-file
+      options:
+        - key: json-file
+          label: 'A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped'
+        - key: sqlite-db
+          label: 'B: SQLite database — queryable, consistent with internal architecture, more overhead'
+      answer: null
+    - id: q-auto-registration-trigger
+      text: 'When should a project auto-register: every CLI invocation, first-use only, or htmlgraph init only?'
+      description: |
+        Auto-registration keeps projects discoverable without manual registration. Every-CLI-invocation (upsert on every command) keeps last_seen fresh but adds I/O to every command and risks stale timestamps if the command fails mid-execution. First-use-only (create-if-not-exists) is cheaper and avoids repeated writes but timestamps become stale quickly. htmlgraph init only removes all ambient registration — users must explicitly opt in, but then manual multi-project setup is required. The choice affects how quickly new projects appear in the global dashboard.
+      recommended: first-use-only
+      options:
+        - key: every-invocation
+          label: 'A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command'
+        - key: first-use-only
+          label: 'B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly'
+        - key: init-only
+          label: 'C: htmlgraph init only — explicit opt-in, manual multi-project setup required'
+      answer: null
+    - id: q-global-api-design
+      text: Should multi-project API routes be separate (e.g., /api/global/sessions) or a query parameter on existing routes?
+      description: |
+        The global dashboard needs to fetch sessions across all projects. Separate routes like /api/global/sessions and /api/global/dashboards are cleaner but require duplicate handler logic (filter by project_id). Query parameters like /api/sessions?project=all extend existing routes with minimal duplication but blend two separate concerns (single-project vs multi-project). Separate routes scale better if multi-project filters become complex later (e.g., project filtering, aggregations). Query params are simpler for MVP scope.
+      recommended: query-parameter
+      options:
+        - key: separate-routes
+          label: 'A: Separate /api/global/* routes — cleaner separation, requires handler duplication'
+        - key: query-parameter
+          label: 'B: Query parameter ?project=all on existing routes — minimal code, blends concerns'
+      answer: query-parameter
+    - id: q-project-identity
+      text: Should project identity be git remote URL or absolute project directory path?
+      description: |
+        When the same repo is cloned to different paths (e.g., ~/main and ~/experiment), should they be treated as one project or two? git_remote_url deduplicates clones across paths — the registry shows one entry for https://github.com/user/repo. project_dir is always unique — each clone is a separate entry. The tradeoff is query simplicity (deduplicated by remote) vs filesystem accuracy (each clone is distinct). Worktrees share the same remote but different paths, so remote URL would group them together even if they should be tracked separately. Directory path is more accurate but requires users to manage duplicates manually.
+      recommended: project-dir
+      options:
+        - key: git-remote-url
+          label: 'A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness'
+        - key: project-dir
+          label: 'B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management'
+      answer: null
+critique:
+    reviewed_at: "2026-04-08"
+    reviewers:
+        - Haiku (design review)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: verified
+          text: sessions table stores project_dir and git_remote_url
+          evidence: internal/db/schema.go migrations
+        - id: A2
+          status: verified
+          text: workitem.Project.Open() exists and opens a project DB
+          evidence: internal/workitem/project.go:57
+        - id: A3
+          status: falsified
+          text: Project.Open() works for read-only multi-DB access
+          evidence: Open() calls ApplyPragmas + CreateAllTables — always mutates
+        - id: A4
+          status: verified
+          text: ~/.local/share/htmlgraph/ is established global location
+          evidence: internal/version/check.go:29, plugin/hooks/bin/bootstrap.sh:27
+        - id: A5
+          status: falsified
+          text: HTMLGRAPH_WORKSPACE is wired in resolve.go
+          evidence: Zero occurrences in resolve.go — only in archived docs
+        - id: A6
+          status: verified
+          text: PersistentPreRunE skip list is a switch-case
+          evidence: cmd/htmlgraph/main.go:42-45
+        - id: A7
+          status: verified
+          text: All dashboard handlers accept *sql.DB explicitly, not closures
+          evidence: cmd/htmlgraph/api.go:108,175,289; api_timeline.go:12
+        - id: A8
+          status: verified
+          text: GetGitRemoteURL exists in paths package
+          evidence: internal/paths/resolve.go:211-221
+        - id: A9
+          status: questionable
+          text: Registry upsert completes within 10ms including git subprocess
+          evidence: git process startup is 5-20ms on macOS — dominates the budget
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Slice Assessment
+              items:
+                - badge: S1
+                  kind: success
+                  text: 'Registry package well-scoped, testable, stdlib-only. Fixed: use tempfile+rename for atomic writes.'
+                - badge: S2
+                  kind: warn
+                  text: 'Auto-registration adds git subprocess to every CLI call. Fixed: cache remote URL after first write.'
+                - badge: S3
+                  kind: warn
+                  text: 'ITEMS counting opens full read-write DB connections. Fixed: use read-only SQLite URI.'
+                - badge: S4
+                  kind: warn
+                  text: 'Project ID as array index is unstable. Fixed: use SHA256 hash of projectDir.'
+                - badge: S5
+                  kind: info
+                  text: 'Frontend detection of global mode via /api/projects 404 returns HTML. Fixed: use /api/mode endpoint.'
+            - heading: Gaps & Missing Considerations
+              items:
+                - badge: Gap
+                  kind: warn
+                  text: No refresh mechanism when registry changes while global dashboard is running
+                - badge: Gap
+                  kind: warn
+                  text: No migration path for existing projects — must invoke CLI once per project to register
+                - badge: Gap
+                  kind: info
+                  text: Git worktrees resolve to main repo root — correct but may surprise users
+            - heading: Alternative Approaches
+              items:
+                - badge: Alt
+                  kind: info
+                  text: SQLite ATTACH for cross-project queries — cleaner than N separate connections. Deferred to post-MVP.
+                - badge: Alt
+                  kind: info
+                  text: Query existing sessions table for project discovery — avoids parallel registry. Deferred.
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: What Exists to Leverage
+              items:
+                - badge: Prior
+                  kind: success
+                  text: version/check.go has JSON read/write pattern for ~/.local/share/htmlgraph/ — model Registry on it
+                - badge: Prior
+                  kind: success
+                  text: All API handlers accept *sql.DB explicitly — zero refactoring needed for global dispatch
+                - badge: Prior
+                  kind: success
+                  text: PersistentPreRunE skip list is the established pattern — extending it for 'projects' is clean
+            - heading: What the Plan Gets Wrong
+              items:
+                - badge: Bug
+                  kind: danger
+                  text: 'workitem.Open expects .htmlgraph/ dir but plan passes project root — fixed: use filepath.Join'
+                - badge: Bug
+                  kind: danger
+                  text: 'Slice 4 implements separate route tree but Q3 recommends query params — fixed: aligned'
+            - heading: Prior Art & Examples
+              items:
+                - badge: Ref
+                  kind: info
+                  text: version-check.json in ~/.local/share/htmlgraph/ — identical load/save pattern for registry
+                - badge: Ref
+                  kind: info
+                  text: corsMiddleware in serve.go — reusable handler wrapper pattern
+    risks:
+        - risk: workitem.Open() runs schema migrations on foreign project DBs
+          severity: High
+          mitigation: Use read-only SQLite URI (?mode=ro) for all cross-project access
+        - risk: GetGitRemoteURL spawns git subprocess on every CLI invocation
+          severity: Medium
+          mitigation: Cache remote URL in registry; skip git call if already populated
+        - risk: os.WriteFile truncates then writes — not crash-safe
+          severity: Medium
+          mitigation: Use tempfile + os.Rename for atomic writes
+        - risk: Array-index project IDs are unstable across server restarts
+          severity: Medium
+          mitigation: Use SHA256 hash of projectDir as deterministic stable ID
+        - risk: N open SQLite connections with 64MB cache each in global mode
+          severity: Medium
+          mitigation: Read-only connections skip cache pragmas; lazy-open on first access
+        - risk: Concurrent CLI invocations may corrupt JSON registry
+          severity: Low
+          mitigation: Atomic rename prevents partial writes; flock for additional safety if needed post-MVP
+    synthesis: |
+        Two critical findings require plan revision: (1) workitem.Open() is NOT read-only — all cross-project DB access must use a lightweight read-only connection, and (2) HTMLGRAPH_WORKSPACE is not wired in Go code. Additionally, the git subprocess latency on auto-registration should be mitigated by caching the remote URL. The plan's implementation approach for Slice 4 conflicted with its own recommended design question answer — aligned to use query parameters. All findings addressed in the revised slices.
