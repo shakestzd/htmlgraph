@@ -367,35 +367,60 @@ func normalizeJSONTags(jsonTags string) string {
 }
 
 // sanitizeFTSQuery converts user input into a safe FTS5 query.
-// It splits on whitespace and joins with implicit AND,
-// stripping FTS5 operators that could cause syntax errors.
+// It strips all FTS5 syntax characters (including hyphens and apostrophes
+// which FTS5 interprets as column filters or phrase boundaries), splits on
+// whitespace, filters out reserved operators, and appends prefix wildcards.
 func sanitizeFTSQuery(input string) string {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return ""
 	}
 
-	// FTS5 special characters that need to be removed from user input.
+	// Replace all characters that have special meaning in FTS5 with spaces.
+	// Hyphens are particularly important: "in-progress" is parsed as
+	// column:query syntax, causing "no such column" errors.
+	// Apostrophes similarly break tokenization.
 	replacer := strings.NewReplacer(
 		"(", " ",
 		")", " ",
 		"*", " ",
 		"\"", " ",
+		"'", " ",
 		":", " ",
 		"^", " ",
 		"{", " ",
 		"}", " ",
+		"-", " ",
+		"+", " ",
+		"~", " ",
+		"[", " ",
+		"]", " ",
+		"/", " ",
+		"\\", " ",
+		"@", " ",
+		"#", " ",
+		"$", " ",
+		"%", " ",
+		"&", " ",
+		"!", " ",
+		"?", " ",
+		",", " ",
+		";", " ",
+		".", " ",
+		"<", " ",
+		">", " ",
+		"|", " ",
+		"=", " ",
 	)
 	cleaned := replacer.Replace(input)
 
-	// Split into words, filter out FTS5 operators.
+	// Split into words, filter out FTS5 reserved operators.
 	ftsOps := map[string]bool{
 		"AND": true, "OR": true, "NOT": true, "NEAR": true,
 	}
 
 	var terms []string
 	for _, word := range strings.Fields(cleaned) {
-		word = strings.TrimSpace(word)
 		if word == "" || ftsOps[strings.ToUpper(word)] {
 			continue
 		}

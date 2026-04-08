@@ -108,14 +108,17 @@ func runSemanticSearch(query string, limit int, jsonOut bool) error {
 		return fmt.Errorf("search: %w", err)
 	}
 
+	if jsonOut {
+		if results == nil {
+			results = []dbpkg.SemanticResult{}
+		}
+		return json.NewEncoder(os.Stdout).Encode(results)
+	}
+
 	if len(results) == 0 {
 		fmt.Println("No matching items found.")
 		fmt.Println("Tip: run 'htmlgraph semantic rebuild' to populate the index.")
 		return nil
-	}
-
-	if jsonOut {
-		return json.NewEncoder(os.Stdout).Encode(results)
 	}
 
 	printSemanticResults(results)
@@ -139,13 +142,16 @@ func runSemanticRelated(featureID string, limit int, jsonOut bool) error {
 		return fmt.Errorf("related: %w", err)
 	}
 
+	if jsonOut {
+		if results == nil {
+			results = []dbpkg.SemanticResult{}
+		}
+		return json.NewEncoder(os.Stdout).Encode(results)
+	}
+
 	if len(results) == 0 {
 		fmt.Printf("No related items found for %s.\n", featureID)
 		return nil
-	}
-
-	if jsonOut {
-		return json.NewEncoder(os.Stdout).Encode(results)
 	}
 
 	fmt.Printf("Features related to %s:\n\n", featureID)
