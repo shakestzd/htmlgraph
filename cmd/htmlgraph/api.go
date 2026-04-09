@@ -112,7 +112,11 @@ func sessionsHandler(database *sql.DB) http.HandlerFunc {
 		rows, err := database.Query(`
 			SELECT s.session_id, s.agent_assigned, s.status, s.created_at,
 			       COALESCE(s.completed_at, ''), s.total_events,
-			       COALESCE(s.active_feature_id, ''), COALESCE(s.model, ''),
+			       COALESCE(
+			           (SELECT w.work_item_id FROM active_work_items w
+			            WHERE w.session_id = s.session_id AND w.agent_id = '__root__'
+			            LIMIT 1),
+			           s.active_feature_id, ''), COALESCE(s.model, ''),
 			       COALESCE(s.title, '') AS title,
 			       COALESCE((SELECT SUBSTR(m.content, 1, 120)
 			                 FROM messages m

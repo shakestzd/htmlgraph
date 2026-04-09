@@ -16,6 +16,8 @@ import (
 )
 
 // detectActiveFeature returns the active feature ID from the session DB, or "".
+// Prefers the per-agent active_work_items table; falls back to the legacy
+// sessions.active_feature_id column for sessions that predate the new table.
 func detectActiveFeature(p *workitem.Project, htmlgraphDir string) string {
 	if p.DB == nil {
 		return ""
@@ -24,7 +26,8 @@ func detectActiveFeature(p *workitem.Project, htmlgraphDir string) string {
 	if sessionID == "" {
 		return ""
 	}
-	return hooks.GetActiveFeatureID(p.DB, sessionID)
+	agentID := dbpkg.NormaliseAgentID(os.Getenv("HTMLGRAPH_AGENT_ID"))
+	return dbpkg.GetActiveWorkItemWithFallback(p.DB, sessionID, agentID)
 }
 
 // autoCausedByEdge creates a caused_by edge from a bug to the active feature.

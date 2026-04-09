@@ -1,11 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
+	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
 // testCreate is a test helper that wraps runWiCreate with the opts struct.
@@ -514,5 +518,256 @@ func TestWarnMissingFields_ErrorMessageGuidance(t *testing.T) {
 	}
 	if !stringContains(msg, "--track") {
 		t.Errorf("error message should mention '--track': %q", msg)
+	}
+}
+
+// testHgDirWithDB creates a temp dir with .htmlgraph subdirs and a seeded
+// session row. Returns tmpDir, hgDir, and the pre-opened DB (caller closes it).
+func testHgDirWithDB(t *testing.T, sessionID string) (tmpDir, hgDir string) {
+	t.Helper()
+	tmpDir = t.TempDir()
+	hgDir = filepath.Join(tmpDir, ".htmlgraph")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		if err := os.MkdirAll(filepath.Join(hgDir, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Open (and migrate) the DB so tables exist, then insert a session row.
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	if err := dbpkg.InsertSession(database, &models.Session{
+		SessionID:     sessionID,
+		AgentAssigned: "claude-code",
+		Status:        "active",
+		CreatedAt:     time.Now(),
+	}); err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	return tmpDir, hgDir
+}
+
+// TestFeatureStart_Idempotent verifies that calling runWiSetStatus twice with
+// the same feature ID does not issue a second UpdateActiveFeature write. We
+// detect this by checking that active_feature_id in the DB remains set after
+// both calls, and that only one claim row exists for the session+feature pair.
+func TestFeatureStart_Idempotent(t *testing.T) {
+	const sessionID = "test-session-idempotent"
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	if err := testCreate("feature", "Idempotent Feature", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 1 {
+		t.Fatalf("expected 1 feature file, got %d", len(featFiles))
+	}
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+	featID := featNode.ID
+
+	// First start — must succeed and set active_feature_id.
+	if err := runWiSetStatus("feature", featID, "in-progress"); err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+
+	// Read active_feature_id after first start.
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db after first start: %v", err)
+	}
+	defer database.Close()
+
+	activeAfterFirst := dbpkg.GetActiveFeatureIDForSession(database, sessionID)
+	if activeAfterFirst != featID {
+		t.Fatalf("after first start: active_feature_id = %q, want %q", activeAfterFirst, featID)
+	}
+
+	// Count claims before second start.
+	var claimsBefore int
+	database.QueryRow(`SELECT COUNT(*) FROM claims WHERE work_item_id = ? AND owner_session_id = ?`,
+		featID, sessionID).Scan(&claimsBefore)
+
+	// Record updated_at before second start. Sleep 2ms so any write would
+	// advance the timestamp.
+	var updatedAtBefore string
+	database.QueryRow(`SELECT updated_at FROM sessions WHERE session_id = ?`, sessionID).
+		Scan(&updatedAtBefore)
+	time.Sleep(2 * time.Millisecond)
+
+	// Second start — must not error.
+	if err := runWiSetStatus("feature", featID, "in-progress"); err != nil {
+		t.Fatalf("second start: %v", err)
+	}
+
+	// updated_at must NOT have advanced (no write was issued).
+	var updatedAtAfter string
+	database.QueryRow(`SELECT updated_at FROM sessions WHERE session_id = ?`, sessionID).
+		Scan(&updatedAtAfter)
+	if updatedAtAfter != updatedAtBefore {
+		t.Errorf("updated_at changed on idempotent re-start: before=%q after=%q", updatedAtBefore, updatedAtAfter)
+	}
+
+	// Claim count must not grow (ClaimItem also guards against duplicates,
+	// but the short-circuit should prevent even reaching it).
+	var claimsAfter int
+	database.QueryRow(`SELECT COUNT(*) FROM claims WHERE work_item_id = ? AND owner_session_id = ?`,
+		featID, sessionID).Scan(&claimsAfter)
+	if claimsAfter != claimsBefore {
+		t.Errorf("claim count changed on idempotent re-start: before=%d after=%d", claimsBefore, claimsAfter)
+	}
+}
+
+// TestFeatureStart_DifferentFeatures verifies that starting two different
+// features in sequence issues both UpdateActiveFeature writes, ending with
+// active_feature_id pointing at the second feature.
+func TestFeatureStart_DifferentFeatures(t *testing.T) {
+	const sessionID = "test-session-two-features"
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	// Create two features.
+	for _, title := range []string{"Feature Alpha", "Feature Beta"} {
+		if err := testCreate("feature", title, trackID, "medium", false, false); err != nil {
+			t.Fatalf("create %q: %v", title, err)
+		}
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 2 {
+		t.Fatalf("expected 2 feature files, got %d", len(featFiles))
+	}
+	nodeA, _ := htmlparse.ParseFile(featFiles[0])
+	nodeB, _ := htmlparse.ParseFile(featFiles[1])
+	idA, idB := nodeA.ID, nodeB.ID
+
+	// Start feature A.
+	if err := runWiSetStatus("feature", idA, "in-progress"); err != nil {
+		t.Fatalf("start A: %v", err)
+	}
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	if got := dbpkg.GetActiveFeatureIDForSession(database, sessionID); got != idA {
+		t.Errorf("after start A: active_feature_id = %q, want %q", got, idA)
+	}
+
+	// Start feature B — must write and update active_feature_id.
+	if err := runWiSetStatus("feature", idB, "in-progress"); err != nil {
+		t.Fatalf("start B: %v", err)
+	}
+	if got := dbpkg.GetActiveFeatureIDForSession(database, sessionID); got != idB {
+		t.Errorf("after start B: active_feature_id = %q, want %q", got, idB)
+	}
+}
+
+// TestRunWiSetStatus_ConcurrentAgents proves that N goroutines with distinct
+// agentIDs can each claim different features on the same session without
+// contention, error, or loss.
+//
+// NOTE: We call wiSetStatusWithAgent (not runWiSetStatus) to avoid env-var races.
+// runWiSetStatus is a thin wrapper that reads env vars then delegates here.
+//
+// NOTE on SQLite concurrency: workitem.Open opens a new DB connection per call.
+// SQLite WAL allows concurrent readers but serializes writers. A semaphore (cap=1)
+// ensures at most one workitem.Open call is in-flight at any time, matching the
+// real-world pattern where each agent runs in a separate OS process. The key
+// invariant being tested is that N distinct (session, agentID) pairs each
+// produce an independent row in active_work_items — not raw write parallelism.
+func TestRunWiSetStatus_ConcurrentAgents(t *testing.T) {
+	const sessionID = "test-session-concurrent"
+	const N = 5
+
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	// Create N features up-front (sequential — avoids concurrent HTML writes).
+	featIDs := make([]string, N)
+	for i := 0; i < N; i++ {
+		title := fmt.Sprintf("Concurrent Feature %d", i)
+		if err := testCreate("feature", title, trackID, "medium", false, false); err != nil {
+			t.Fatalf("create feature %d: %v", i, err)
+		}
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) < N {
+		t.Fatalf("expected %d feature files, got %d", N, len(featFiles))
+	}
+	for i := 0; i < N; i++ {
+		node, err := htmlparse.ParseFile(featFiles[i])
+		if err != nil {
+			t.Fatalf("parse feature %d: %v", i, err)
+		}
+		featIDs[i] = node.ID
+	}
+
+	// Semaphore with capacity 1: serializes the workitem.Open / SQLite write
+	// calls (matching real usage where each agent is a separate OS process).
+	// Goroutines still run concurrently for everything outside the semaphore.
+	sem := make(chan struct{}, 1)
+	errCh := make(chan error, N)
+	for i := 0; i < N; i++ {
+		agentID := fmt.Sprintf("agent-%d", i)
+		featID := featIDs[i]
+		go func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			errCh <- wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID)
+		}()
+	}
+
+	// Collect results — all must succeed.
+	for i := 0; i < N; i++ {
+		if err := <-errCh; err != nil {
+			t.Errorf("goroutine error: %v", err)
+		}
+	}
+
+	// Verify all N rows in active_work_items.
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	items, err := dbpkg.ActiveWorkItemsForSession(database, sessionID)
+	if err != nil {
+		t.Fatalf("ActiveWorkItemsForSession: %v", err)
+	}
+	if len(items) != N {
+		t.Errorf("want %d active_work_items rows, got %d: %v", N, len(items), items)
+	}
+
+	// Each agentID must map to its expected feature.
+	for i := 0; i < N; i++ {
+		agentID := fmt.Sprintf("agent-%d", i)
+		want := featIDs[i]
+		if got := items[agentID]; got != want {
+			t.Errorf("agent-%d: want %s, got %q", i, want, got)
+		}
 	}
 }

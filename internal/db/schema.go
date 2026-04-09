@@ -50,6 +50,20 @@ func Open(dbPath string) (*sql.DB, error) {
 	// Per-agent work attribution: each subagent records its identity on claims.
 	db.Exec(`ALTER TABLE claims ADD COLUMN claimed_by_agent_id TEXT DEFAULT ""`)
 
+	// Per-agent active work item attribution: one slot per (session, agent).
+	// Replaces the single sessions.active_feature_id which caused write contention
+	// when N parallel subagents all claimed different features in the same session.
+	// Sentinel: agent_id = '__root__' when HTMLGRAPH_AGENT_ID is unset (top-level session).
+	db.Exec(`CREATE TABLE IF NOT EXISTS active_work_items (
+		session_id    TEXT NOT NULL,
+		agent_id      TEXT NOT NULL,
+		work_item_id  TEXT NOT NULL,
+		claimed_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (session_id, agent_id)
+	)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_active_work_items_work_item
+		ON active_work_items(work_item_id)`)
+
 	// Drop deprecated tables replaced by claims system.
 	db.Exec(`DROP TABLE IF EXISTS agent_collaboration`)
 	db.Exec(`DROP TABLE IF EXISTS agent_presence`)

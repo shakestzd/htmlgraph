@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/hooks"
 	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
@@ -104,9 +105,12 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 		if _, startErr := collectionFor(p, typeName).Start(node.ID); startErr != nil {
 			return fmt.Errorf("start %s: %w", typeName, startErr)
 		}
-		// Update session's active_feature_id so the status line reflects
-		// the newly-started work item (mirrors runWiSetStatus logic).
+		// Update per-agent attribution so the status line reflects the
+		// newly-started work item (mirrors runWiSetStatus logic).
 		if sessionID != "" && p.DB != nil {
+			agentID := dbpkg.NormaliseAgentID(os.Getenv("HTMLGRAPH_AGENT_ID"))
+			_ = dbpkg.SetActiveWorkItem(p.DB, sessionID, agentID, node.ID)
+			// Legacy dual-write for consumers not yet reading active_work_items.
 			_ = hooks.UpdateActiveFeature(p.DB, sessionID, node.ID)
 		}
 		fmt.Printf("Created and started: %s  %s\n", node.ID, node.Title)

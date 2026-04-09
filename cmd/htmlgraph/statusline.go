@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
-	"github.com/shakestzd/htmlgraph/internal/hooks"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +50,10 @@ func statuslineFromSession(dir, sessionID string) error {
 	}
 	defer database.Close()
 
-	featureID := hooks.GetActiveFeatureID(database, sessionID)
+	// Prefer per-agent attribution (active_work_items), fall back to legacy
+	// sessions.active_feature_id for sessions that predate the new table.
+	agentID := dbpkg.NormaliseAgentID(os.Getenv("HTMLGRAPH_AGENT_ID"))
+	featureID := dbpkg.GetActiveWorkItemWithFallback(database, sessionID, agentID)
 	if featureID == "" {
 		// No active feature for this session — show nothing.
 		// A global fallback would leak another terminal's active feature

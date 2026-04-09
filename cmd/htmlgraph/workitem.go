@@ -150,6 +150,16 @@ func wiCompleteCmd(typeName string) *cobra.Command {
 }
 
 func runWiSetStatus(typeName, id, status string) error {
+	sessionID := hooks.EnvSessionID("")
+	agentID := dbpkg.NormaliseAgentID(os.Getenv("HTMLGRAPH_AGENT_ID"))
+	return wiSetStatusWithAgent(typeName, id, status, sessionID, agentID)
+}
+
+// wiSetStatusWithAgent is the testable core of runWiSetStatus that accepts
+// explicit sessionID and agentID instead of reading them from the environment.
+// This allows concurrent tests to call it with distinct agent identities without
+// env-var races.
+func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error {
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err
@@ -181,32 +191,44 @@ func runWiSetStatus(typeName, id, status string) error {
 		return fmt.Errorf("set %s %s: %w\nRun 'htmlgraph %s list' to see valid IDs", typeName, status, err, typeName)
 	}
 
-	// When starting a work item, update active_feature_id, create a claim
+	// When starting a work item, update per-agent attribution, create a claim
 	// with per-agent attribution, and create an implemented_in edge.
 	if status == "in-progress" {
-		sessionID := hooks.EnvSessionID("")
-		agentID := os.Getenv("HTMLGRAPH_AGENT_ID")
 		if sessionID != "" {
 			if p.DB != nil {
-				_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
-				claim := &models.Claim{
-					ClaimID:          "clm-" + uuid.NewString()[:8],
-					WorkItemID:       id,
-					OwnerSessionID:   sessionID,
-					OwnerAgent:       agentForClaim(),
-					ClaimedByAgentID: agentID,
-					Status:           models.ClaimInProgress,
+				// Short-circuit: skip all writes if this (session, agent) already
+				// claims this work item. Eliminates redundant SQLite writes under
+				// parallel dispatch where N subagents call start on their own feature.
+				currentActive := dbpkg.GetActiveWorkItem(p.DB, sessionID, agentID)
+				if currentActive != id {
+					// New per-agent attribution table (primary write path).
+					_ = dbpkg.SetActiveWorkItem(p.DB, sessionID, agentID, id)
+					// Legacy dual-write to sessions.active_feature_id for readers
+					// that have not yet migrated to the new table. Removed once all
+					// consumers read from active_work_items.
+					_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
+					claim := &models.Claim{
+						ClaimID:          "clm-" + uuid.NewString()[:8],
+						WorkItemID:       id,
+						OwnerSessionID:   sessionID,
+						OwnerAgent:       agentForClaim(),
+						ClaimedByAgentID: agentID,
+						Status:           models.ClaimInProgress,
+					}
+					_ = dbpkg.ClaimItem(p.DB, claim, 30*time.Minute)
 				}
-				_ = dbpkg.ClaimItem(p.DB, claim, 30*time.Minute)
 			}
 			autoImplementedInEdge(col, id, sessionID, p.DB)
 		}
 	}
 
-	// When completing a work item, clear active_feature_id on any session
-	// still pointing at it. Otherwise the guards see a stale pointer and
-	// allow edits after the feature is done.
+	// When completing a work item, clear active_work_items and the legacy
+	// active_feature_id on any session still pointing at it.
 	if status == "done" && p.DB != nil {
+		if sessionID != "" {
+			_ = dbpkg.ClearActiveWorkItem(p.DB, sessionID, agentID)
+		}
+		// Clear legacy column for any session pointing at this item.
 		_, _ = p.DB.Exec(
 			`UPDATE sessions SET active_feature_id = '' WHERE active_feature_id = ?`,
 			id,
