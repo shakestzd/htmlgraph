@@ -1,0 +1,206 @@
+package childproc
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"time"
+)
+
+// buildFakeChild writes a shell script that ignores its args, prints the
+// handshake line, then sleeps. The script is used as the BinPath for a
+// Supervisor so the handshake/lifecycle/reap logic can be exercised
+// without needing a real htmlgraph binary.
+func buildFakeChild(t *testing.T, port int) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake child shell script is POSIX-only")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-htmlgraph")
+	script := "#!/bin/sh\n" +
+		"echo \"htmlgraph-serve-ready port=" + itoa(port) + " pid=$$\"\n" +
+		"exec sleep 30\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := false
+	if n < 0 {
+		neg = true
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
+}
+
+func TestGetOrSpawnHandshake(t *testing.T) {
+	bin := buildFakeChild(t, 12345)
+	sup := NewSupervisor(Options{
+		BinPath:      bin,
+		SpawnTimeout: 2 * time.Second,
+	})
+	defer sup.Shutdown(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	c, err := sup.GetOrSpawn(ctx, "projA", t.TempDir())
+	if err != nil {
+		t.Fatalf("GetOrSpawn: %v", err)
+	}
+	if c.Port != 12345 {
+		t.Errorf("port: got %d, want 12345", c.Port)
+	}
+	if c.PID == 0 {
+		t.Errorf("pid: zero, want positive")
+	}
+	if c.Proxy == nil {
+		t.Errorf("proxy: nil")
+	}
+
+	// Warm lookup: same child.
+	c2, err := sup.GetOrSpawn(ctx, "projA", t.TempDir())
+	if err != nil {
+		t.Fatalf("GetOrSpawn warm: %v", err)
+	}
+	if c2 != c {
+		t.Errorf("warm lookup returned different child")
+	}
+}
+
+func TestGetOrSpawnConcurrent(t *testing.T) {
+	bin := buildFakeChild(t, 12346)
+	sup := NewSupervisor(Options{
+		BinPath:      bin,
+		SpawnTimeout: 2 * time.Second,
+	})
+	defer sup.Shutdown(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Fire N concurrent GetOrSpawn calls for the same projectID. The
+	// sync.Once gate must cause them to share a single spawned child.
+	const N = 10
+	results := make(chan *Child, N)
+	errs := make(chan error, N)
+	for i := 0; i < N; i++ {
+		go func() {
+			c, err := sup.GetOrSpawn(ctx, "herd", "/tmp/herd")
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- c
+		}()
+	}
+
+	var first *Child
+	for i := 0; i < N; i++ {
+		select {
+		case err := <-errs:
+			t.Fatalf("spawn err: %v", err)
+		case c := <-results:
+			if first == nil {
+				first = c
+			} else if c != first {
+				t.Errorf("herd produced different children: %p vs %p", first, c)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for spawn results")
+		}
+	}
+}
+
+func TestInvalidHandshakeFails(t *testing.T) {
+	// Fake binary that prints the wrong line.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad-htmlgraph")
+	bad := "#!/bin/sh\necho \"wrong line format\"\nexec sleep 30\n"
+	if err := os.WriteFile(path, []byte(bad), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sup := NewSupervisor(Options{
+		BinPath:      path,
+		SpawnTimeout: 2 * time.Second,
+	})
+	defer sup.Shutdown(context.Background())
+
+	_, err := sup.GetOrSpawn(context.Background(), "bad", "/tmp/bad")
+	if err == nil {
+		t.Fatal("expected error on invalid handshake")
+	}
+}
+
+func TestHandshakeTimeout(t *testing.T) {
+	// Fake binary that never prints — sleeps forever with no output.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "silent-htmlgraph")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexec sleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sup := NewSupervisor(Options{
+		BinPath:      path,
+		SpawnTimeout: 200 * time.Millisecond,
+	})
+	defer sup.Shutdown(context.Background())
+
+	start := time.Now()
+	_, err := sup.GetOrSpawn(context.Background(), "silent", "/tmp/silent")
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("expected handshake timeout error")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("took too long: %s", elapsed)
+	}
+}
+
+func TestIdleReaperKillsStaleChild(t *testing.T) {
+	bin := buildFakeChild(t, 12347)
+	sup := NewSupervisor(Options{
+		BinPath:      bin,
+		SpawnTimeout: 2 * time.Second,
+		IdleTimeout:  100 * time.Millisecond,
+	})
+	defer sup.Shutdown(context.Background())
+
+	c, err := sup.GetOrSpawn(context.Background(), "idle", "/tmp/idle")
+	if err != nil {
+		t.Fatalf("spawn: %v", err)
+	}
+
+	// Force LastRequest into the past.
+	c.LastRequest.Store(time.Now().Add(-1 * time.Second).Unix())
+
+	sup.reapIdleOnce()
+
+	// Wait for the reaper goroutine to remove the map entry.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(sup.Children()) == 0 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("child was not reaped after idle; children=%d", len(sup.Children()))
+}
