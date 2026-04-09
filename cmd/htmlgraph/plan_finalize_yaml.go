@@ -107,12 +107,23 @@ func runFinalizeYAML(planID string) error {
 	}
 	defer p.Close()
 
-	// Create track from plan title.
-	track, err := p.Tracks.Create(plan.Meta.Title)
-	if err != nil {
-		return fmt.Errorf("create track: %w", err)
+	// Reuse existing track when meta.track_id references a valid track;
+	// otherwise create a new one from the plan title.
+	var track *models.Node
+	if plan.Meta.TrackID != "" {
+		existing, getErr := p.Tracks.Get(plan.Meta.TrackID)
+		if getErr == nil && existing != nil {
+			track = existing
+			fmt.Printf("Using existing track: %s  %s\n", track.ID, track.Title)
+		}
 	}
-	fmt.Printf("Created track: %s  %s\n", track.ID, track.Title)
+	if track == nil {
+		track, err = p.Tracks.Create(plan.Meta.Title)
+		if err != nil {
+			return fmt.Errorf("create track: %w", err)
+		}
+		fmt.Printf("Created track: %s  %s\n", track.ID, track.Title)
+	}
 
 	// Create features for approved slices.
 	numToFeatID := map[int]string{}

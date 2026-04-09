@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -268,6 +269,10 @@ func planStatusHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	}
 }
 
+// validSectionRe matches valid plan feedback section keys.
+// Known sections: design, outline, meta, critique, slice-N, chat, q-* (questions).
+var validSectionRe = regexp.MustCompile(`^(design|outline|meta|critique|chat|slice-\d+|q-[a-z0-9-]+)$`)
+
 // planFeedbackSubmitHandler stores a feedback entry for a plan section.
 // POST /api/plans/{id}/feedback
 func planFeedbackSubmitHandler(database *sql.DB) http.HandlerFunc {
@@ -279,6 +284,18 @@ func planFeedbackSubmitHandler(database *sql.DB) http.HandlerFunc {
 		}
 		if req.Section == "" || req.Action == "" {
 			http.Error(w, "section and action are required", http.StatusBadRequest)
+			return
+		}
+
+		// Normalize underscores to hyphens for slice sections — a common
+		// mistake that used to silently store wrong-format keys that
+		// finalize-yaml couldn't find.
+		if strings.HasPrefix(req.Section, "slice_") {
+			req.Section = "slice-" + strings.TrimPrefix(req.Section, "slice_")
+		}
+
+		if !validSectionRe.MatchString(req.Section) {
+			http.Error(w, fmt.Sprintf("invalid section %q — must match: design, outline, meta, critique, chat, slice-N, or q-<name>", req.Section), http.StatusBadRequest)
 			return
 		}
 
