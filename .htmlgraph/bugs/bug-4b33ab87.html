@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Researcher agent bloated by agent-context skill on simple file reads</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-4b33ab87"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T18:06:54.265308"
+             data-updated="2026-04-09T18:23:55.248136" data-agent-assigned="claude-code" data-track-id="trk-467e565c">
+
+        <header>
+            <h1>Researcher agent bloated by agent-context skill on simple file reads</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-467e565c.html" data-relationship="part_of" data-since="2026-04-09T18:06:54.266775">trk-467e565c</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="8d53982f-66f2-415b-a645-1886eb8ae438.html" data-relationship="implemented_in" data-since="2026-04-09T18:06:56.679198">session 8d53982f-66f2-415b-a645-1886eb8ae438</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-0c0b1728.html" data-relationship="caused_by" data-since="2026-04-09T18:06:54.266177">feat-0c0b1728</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When the orchestrator delegates a trivial file-read task to htmlgraph:researcher, the agent loads the agent-context skill (and any other frontmatter-injected skills) as part of its startup sequence. The skill injection dominates wall-clock time for what should be a <100ms cat operation — observed today with a read of .htmlgraph/plans/plan-368a5cd2.yaml which stalled long enough that the user complained 'what is taking so long'. Inspecting the async output file showed the agent had only just finished ingesting its skill context, not yet begun the read. Two problems: (1) skill injection cost is not proportional to task complexity — a simple read pays the same overhead as a deep research task; (2) orchestrator delegation rules push ALL file reads through researcher, so the overhead is incurred on every Read tool call. Possible mitigations: (a) carve out a lightweight reader agent variant without skill injection for trivial reads, (b) make skill injection lazy/on-demand rather than eager at agent startup, (c) relax orchestrator rules to permit direct Read tool for data files (YAML, JSON, small config) while still delegating source-code reads and edits, (d) cache skill context between agent invocations so only the first read pays the cost.</p>
+        </section>
+    </article>
+</body>
+</html>

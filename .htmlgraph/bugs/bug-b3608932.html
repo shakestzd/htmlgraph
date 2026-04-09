@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>finalize-yaml ignores meta.track_id — always creates a fresh track</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-b3608932"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:46:10.429307"
+             data-updated="2026-04-09T16:58:18.745426" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>finalize-yaml ignores meta.track_id — always creates a fresh track</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-8cf41009.html" data-relationship="part_of" data-since="2026-04-09T16:46:10.430019">trk-8cf41009</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>htmlgraph plan finalize-yaml always creates a new track regardless of whether meta.track_id is set in the YAML. This orphans any pre-existing track the plan was associated with. Behavior should be: if meta.track_id is set and the track exists, reuse it; if not, create a new one. Currently forces users to delete the duplicate track after finalize.</p>
+        </section>
+    </article>
+</body>
+</html>

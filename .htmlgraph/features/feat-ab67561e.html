@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Key active_work_item attribution on (session_id, agent_id)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-ab67561e"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T19:12:35.345335"
+             data-updated="2026-04-09T19:58:28.250182" data-agent-assigned="claude-code" data-track-id="trk-00ee0cd0">
+
+        <header>
+            <h1>Key active_work_item attribution on (session_id, agent_id)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-00ee0cd0.html" data-relationship="part_of" data-since="2026-04-09T19:12:35.346526">trk-00ee0cd0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implements">
+                <h3>Implements:</h3>
+                <ul>
+                    <li><a href="bug-d2d3fb3f.html" data-relationship="implements" data-since="2026-04-09T19:12:54.904705">Parallel agents collide on attribution, worktrees cleaned up on stall</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="8d53982f-66f2-415b-a645-1886eb8ae438.html" data-relationship="implemented_in" data-since="2026-04-09T19:48:00.058814">session 8d53982f-66f2-415b-a645-1886eb8ae438</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Replaces the invalidated feat-30c8bd7a (per-subagent session IDs). Empirical verification on 2026-04-09 confirmed: Claude Code does NOT assign per-subagent session IDs — all subagents in a session share the parent session_id. However agent_events.agent_id IS unique per subagent and is already populated on every tool-use event fired inside a subagent context (verified via parallel probe dispatch with agents a40efaa293112c661, a9f14add32a7b0d30, aedc3c3aff4aefc14 all sharing session=8d53982f but each owning distinct agent_ids).
+
+Fix: move active_work_item attribution from the sessions table (single active_feature_id column, one per session_id) to a new table active_work_items(session_id, agent_id, work_item_id, claimed_at) keyed on (session_id, agent_id). Each subagent claims its own slot — N parallel subagents can each call 'htmlgraph feature start' without racing because they write different (session_id, agent_id) tuples. Top-level session uses agent_id sentinel like '__root__'.
+
+Changes: (1) schema migration adding active_work_items table, (2) cmd/htmlgraph/workitem.go:runWiSetStatus writes (sessionID, agentID, featureID) instead of updating sessions row, (3) update dashboard and statusline queries to read from new table, (4) keep sessions.active_feature_id as deprecated read-only for one release then drop. This is the correctly-scoped version of the diagnosis's option (c) — previously estimated 'days' but much smaller because agent_id already flows through the system. Est. 4-6 hours.</p>
+        </section>
+    </article>
+</body>
+</html>

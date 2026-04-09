@@ -10,15 +10,15 @@
 <body>
     <article id="trk-06a29a51"
              data-type="track"
-             data-status="todo"
+             data-status="done"
              data-priority="high"
              data-created="2026-03-28T21:56:43.418484"
-             data-updated="2026-04-07T05:28:25.015633" data-agent-assigned="claude-code">
+             data-updated="2026-04-09T02:27:12.749956" data-agent-assigned="claude-code">
 
         <header>
             <h1>Project Isolation — Prevent Cross-Project Contamination</h1>
             <div class="metadata">
-                <span class="badge status-todo">Todo</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-high">High Priority</span>
             </div>
         </header>
@@ -38,11 +38,11 @@
         <section data-steps>
             <h3>Implementation Steps</h3>
             <ol>
-                <li data-completed="false" data-step-id="step-trk-06a29a51-0">⏳ ARCHITECTURE: Each project with .htmlgraph/ is an independent namespace. Work items, sessions, and events must never leak between projects.</li>
-                <li data-completed="false" data-step-id="step-trk-06a29a51-1">⏳ ARCHITECTURE: Session-start records the canonical project_dir in both the session DB row and .active-session file. All downstream hooks validate against this.</li>
-                <li data-completed="false" data-step-id="step-trk-06a29a51-2">⏳ ARCHITECTURE: Claude Code transcripts and git repo identity (remote URL or root path) are the ground truth for project identity — not walk-up heuristics.</li>
-                <li data-completed="false" data-step-id="step-trk-06a29a51-3">⏳ ARCHITECTURE: When CWD diverges from session project_dir, hooks warn and refuse to write work items to the wrong project.</li>
-                <li data-completed="false" data-step-id="step-trk-06a29a51-4">⏳ ARCHITECTURE: htmlgraph ingest only imports sessions whose git remote matches the current project.</li>
+                <li data-completed="true" data-step-id="step-trk-06a29a51-0" data-agent="claude-code">✅ ARCHITECTURE: Each project with .htmlgraph/ is an independent namespace. Work items, sessions, and events must never leak between projects.</li>
+                <li data-completed="true" data-step-id="step-trk-06a29a51-1" data-agent="claude-code">✅ ARCHITECTURE: Session-start records the canonical project_dir in both the session DB row and .active-session file. All downstream hooks validate against this.</li>
+                <li data-completed="true" data-step-id="step-trk-06a29a51-2" data-agent="claude-code">✅ ARCHITECTURE: Claude Code transcripts and git repo identity (remote URL or root path) are the ground truth for project identity — not walk-up heuristics.</li>
+                <li data-completed="true" data-step-id="step-trk-06a29a51-3" data-agent="claude-code">✅ ARCHITECTURE: When CWD diverges from session project_dir, hooks warn and refuse to write work items to the wrong project.</li>
+                <li data-completed="true" data-step-id="step-trk-06a29a51-4" data-agent="claude-code">✅ ARCHITECTURE: htmlgraph ingest only imports sessions whose git remote matches the current project.</li>
             </ol>
         </section>
     </article>

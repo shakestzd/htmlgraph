@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Guard accepts completed features as active — feature complete does not clear session active_feature_id</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-dcd5a469"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T14:18:05.157501"
+             data-updated="2026-04-09T14:29:56.66372" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>Guard accepts completed features as active — feature complete does not clear session active_feature_id</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-032e6a56.html" data-relationship="caused_by" data-since="2026-04-09T14:18:05.158825">feat-032e6a56</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-09T14:18:05.16406">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="559faa0b-464a-43ca-95a6-65097d374f34.html" data-relationship="implemented_in" data-since="2026-04-09T14:20:02.592358">session 559faa0b-464a-43ca-95a6-65097d374f34</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When htmlgraph feature complete runs, the feature's status changes to done but the session's active_feature_id column still points to it. The work item guard then checks ctx.FeatureID != '' and allows edits, even though the feature is no longer active. Two fixes needed: (1) feature complete should clear sessions.active_feature_id for sessions where it matches, and (2) the guard should join to features table and verify status = 'in-progress' not just that the column is non-empty.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>htmlgraph projects subcommand (list &#43; prune)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-4f93abb5"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:43:57.67935"
+             data-updated="2026-04-09T19:02:45.594305" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>htmlgraph projects subcommand (list &#43; prune)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="4aa3628f-9cde-43b7-94a6-4e01f892c264.html" data-relationship="implemented_in" data-since="2026-04-09T18:36:29.576702">session 4aa3628f-9cde-43b7-94a6-4e01f892c264</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-377ea97f.html" data-relationship="blocked_by">feat-377ea97f</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-368a5cd2.html" data-relationship="planned_in" data-since="2026-04-09T16:43:57.679554">plan-368a5cd2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Create `cmd/htmlgraph/projects.go` with a `projectsCmd()` function returning a `*cobra.Command` for `htmlgraph projects`. Add two subcommands: `htmlgraph projects list` — calls `registry.Load(registry.DefaultPath())`, iterates entries, prints a table with columns: NAME, DIR, LAST_SEEN, STATUS (exists/missing), ITEMS. STATUS is "exists" if `filepath.Join(entry.ProjectDir, ".htmlgraph")` is stat-able, "missing" otherwise. ITEMS count is derived by opening the project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, ".htmlgraph", "htmlgraph.db"))` and querying feature + bug + spike counts — skip silently on open error. Do NOT use `workitem.Open(entry.ProjectDir, ...)` here as that runs schema migrations. `htmlgraph projects prune` — calls `reg.Prune()`, prints pruned dirs, calls `reg.Save()`. Register `projectsCmd()` in `main.go` via `rootCmd.AddCommand(projectsCmd())`. Add "projects" to the PersistentPreRunE skip list so the subcommand works without a local `.htmlgraph/` directory.</p>
+        </section>
+    </article>
+</body>
+</html>

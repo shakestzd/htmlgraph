@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Plan finalize: status stays DRAFT &#43; no next-step guidance</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-c05709a2"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-08T23:35:58.92643"
+             data-updated="2026-04-08T23:45:08.522085" data-agent-assigned="claude-code" data-track-id="trk-b0377def">
+
+        <header>
+            <h1>Plan finalize: status stays DRAFT &#43; no next-step guidance</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-f5476192.html" data-relationship="caused_by" data-since="2026-04-08T23:35:58.927817">bug-f5476192</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-b0377def.html" data-relationship="part_of" data-since="2026-04-08T23:35:58.928299">trk-b0377def</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="559faa0b-464a-43ca-95a6-65097d374f34.html" data-relationship="implemented_in" data-since="2026-04-08T23:35:59.31418">session 559faa0b-464a-43ca-95a6-65097d374f34</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Two issues: (1) finalizePlanHTML error is silently discarded with _ = so HTML stays draft when the write fails. The plan list reads status from HTML, not SQLite. Fix: surface the error and add a finalized flag to plan_feedback as a fallback. (2) After clicking Finalize, only shows 'Plan finalized successfully' with no guidance on creating track/features. Fix: include dispatch command in the API response and show it in the JS handler.</p>
+        </section>
+    </article>
+</body>
+</html>

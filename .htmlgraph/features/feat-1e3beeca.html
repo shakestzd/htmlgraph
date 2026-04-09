@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Reindex reads .htmlgraph/sessions/ HTML to rebuild agent_events</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-1e3beeca"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-08T19:31:49.400711"
+             data-updated="2026-04-08T21:21:26.06202" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>Reindex reads .htmlgraph/sessions/ HTML to rebuild agent_events</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="9ababed5-1109-4342-a116-d7a34a93389f.html" data-relationship="implemented_in" data-since="2026-04-08T19:36:07.922072">session 9ababed5-1109-4342-a116-d7a34a93389f</a></li>
+                    <li><a href="854754c0-e618-4e9c-9e28-9bb2bab895a7.html" data-relationship="implemented_in" data-since="2026-04-08T20:12:26.490317">session 854754c0-e618-4e9c-9e28-9bb2bab895a7</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-7c84651c.html" data-relationship="blocked_by" data-since="2026-04-08T19:31:59.644562">Ingest pipeline populates agent_events from tool_calls</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-08T19:31:49.402974">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Add reindexSessions() to cmd/htmlgraph/reindex.go. Scan .htmlgraph/sessions/*.html, parse
+elements from the activity-log section, insert into agent_events via upsert. Recovers 303 Python-era historical sessions. Parser must handle the session HTML format (different from node.gohtml template).</p>
+        </section>
+    </article>
+</body>
+</html>

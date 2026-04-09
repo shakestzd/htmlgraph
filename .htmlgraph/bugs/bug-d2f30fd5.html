@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Global dashboard missing SSE &#43; legacy routes — header shows Reconnecting</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-d2f30fd5"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T20:14:45.498812"
+             data-updated="2026-04-09T20:21:00.794096" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>Global dashboard missing SSE &#43; legacy routes — header shows Reconnecting</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-8cf41009.html" data-relationship="part_of" data-since="2026-04-09T20:14:45.499588">trk-8cf41009</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="8d53982f-66f2-415b-a645-1886eb8ae438.html" data-relationship="implemented_in" data-since="2026-04-09T20:14:52.777742">session 8d53982f-66f2-415b-a645-1886eb8ae438</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>htmlgraph serve --global only registers the new multi-project routes (/api/mode, /api/projects, /api/projects/all/stats, dispatchByProject for sessions/features/stats). It does NOT register the routes the existing frontend relies on, so the dashboard header shows 'Reconnecting...' and all header stats display '--' in global mode.
+
+Missing endpoints observed via curl on 2026-04-09:
+- /api/events/stream → 404 (SSE; triggers 'Reconnecting' in event-tree.js:14)
+- /api/events/recent?limit=100 → 404 (header live feed in app.js:71)
+- /api/stats (no ?project) → 400 'project query parameter required' (header aggregate stats)
+- /api/plans, /api/plans/:id/render, /api/plans/:id/delete → likely 404
+- /api/graph → likely 404
+- /api/features/detail, /api/features/related, /api/features/:id/activity → likely 404
+
+Fix: extend runGlobalServer in cmd/htmlgraph/serve_global.go to mount:
+1. /api/events/stream — aggregated SSE stream (fan-in from per-project sources, or a polling fallback)
+2. /api/events/recent — merge events across all project DBs
+3. /api/stats without ?project — fall back to /api/projects/all/stats aggregate
+4. /api/plans, /api/graph, /api/features/* — register under dispatchByProject so they return a clear 400 when ?project is missing OR register an aggregated variant where it makes sense
+
+Originally missed because slice 4 done_when only listed the new routes. This is a gap in the plan, not an implementation bug per se — the plan should have required parity with every route app.js / components/*.js calls.</p>
+        </section>
+    </article>
+</body>
+</html>

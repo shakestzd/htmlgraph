@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Idempotent feature start — short-circuit redundant writes</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-315d7d87"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T18:50:02.371274"
+             data-updated="2026-04-09T18:55:35.669176" data-agent-assigned="claude-code" data-track-id="trk-00ee0cd0">
+
+        <header>
+            <h1>Idempotent feature start — short-circuit redundant writes</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implements">
+                <h3>Implements:</h3>
+                <ul>
+                    <li><a href="bug-d2d3fb3f.html" data-relationship="implements" data-since="2026-04-09T18:50:18.922602">Parallel agents collide on attribution, worktrees cleaned up on stall</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="8d53982f-66f2-415b-a645-1886eb8ae438.html" data-relationship="implemented_in" data-since="2026-04-09T18:51:17.958055">session 8d53982f-66f2-415b-a645-1886eb8ae438</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-00ee0cd0.html" data-relationship="part_of" data-since="2026-04-09T18:50:02.372938">trk-00ee0cd0</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Fix (a) for bug-d2d3fb3f. When 'htmlgraph feature start ' is called, query GetActiveFeatureID(db, sessionID) first and short-circuit if it already equals . Eliminates redundant UpdateActiveFeature + ClaimItem writes that pile up SQLite's single-writer queue under parallel dispatch. Change in cmd/htmlgraph/workitem.go:186 (runWiSetStatus). Also reduce busy_timeout for feature start path from 5000ms to 500ms so contention fast-fails instead of stalling agent timeouts.</p>
+        </section>
+    </article>
+</body>
+</html>

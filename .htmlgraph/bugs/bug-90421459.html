@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>rewrite-yaml strips slice approved fields — approvals out of sync with YAML</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-90421459"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:46:10.406198"
+             data-updated="2026-04-09T16:54:10.849942" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>rewrite-yaml strips slice approved fields — approvals out of sync with YAML</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-8cf41009.html" data-relationship="part_of" data-since="2026-04-09T16:46:10.407259">trk-8cf41009</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>htmlgraph plan rewrite-yaml discards the approved field on slices and design, even when the input YAML has approved: true. This creates confusion: the YAML shows approved: false but the actual approval state lives in SQLite plan_feedback. Either: (1) rewrite-yaml should preserve the approved fields from the input YAML, or (2) the approved field should be removed from the YAML schema entirely since approvals are stored in SQLite.</p>
+        </section>
+    </article>
+</body>
+</html>

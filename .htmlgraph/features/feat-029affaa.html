@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SessionStart/PostToolUse hooks write session HTML files</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-029affaa"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-08T19:31:49.420507"
+             data-updated="2026-04-08T21:21:26.077804" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>SessionStart/PostToolUse hooks write session HTML files</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-08T19:31:49.421956">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-1e3beeca.html" data-relationship="blocked_by" data-since="2026-04-08T19:31:59.660821">Reindex reads .htmlgraph/sessions/ HTML to rebuild agent_events</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="9ababed5-1109-4342-a116-d7a34a93389f.html" data-relationship="implemented_in" data-since="2026-04-08T19:36:45.094273">session 9ababed5-1109-4342-a116-d7a34a93389f</a></li>
+                    <li><a href="854754c0-e618-4e9c-9e28-9bb2bab895a7.html" data-relationship="implemented_in" data-since="2026-04-08T20:13:10.749372">session 854754c0-e618-4e9c-9e28-9bb2bab895a7</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>SessionStart hook creates .htmlgraph/sessions/{session-id}.html with article/section/ol structure matching Python-era format. PostToolUse hook appends
+elements to the activity log (atomic append with flock). SessionEnd hook updates data-ended-at and data-status. Makes sessions fully canonical like features/bugs/tracks — rebuildable via reindex.</p>
+        </section>
+    </article>
+</body>
+</html>

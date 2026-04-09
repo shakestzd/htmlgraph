@@ -1,15 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="htmlgraph-version" content="1.0">
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="htmlgraph-version" content="1.0"/>
 <title>Plan: Internal Plan Review — Marimo Migration</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled=""/>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/go.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
@@ -291,7 +289,7 @@ textarea::placeholder{color:var(--text-muted)}
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
-  &#9728; Light
+  ☀ Light
 </button>
 
 <!-- Related Work -->
@@ -300,7 +298,7 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan YAML source (collapsible) -->
 <details class="yaml-viewer" id="yaml-viewer">
     <summary>View Plan YAML</summary>
-    <pre><code class="language-yaml" id="yaml-content">Loading&#x2026;</code></pre>
+    <pre><code class="language-yaml" id="yaml-content">Loading…</code></pre>
 </details>
 
 <!-- ZONE 1: Dependency Graph -->
@@ -321,7 +319,7 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- ZONE 2: Interactive Sections -->
 
 <!-- Design -->
-<details id="design" class="section-card" open data-phase="design" data-status="pending">
+<details id="design" class="section-card" open="" data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
     <h4>Problem</h4>
@@ -348,7 +346,7 @@ textarea::placeholder{color:var(--text-muted)}
 </ul>
 
     <div class="approval-row">
-      <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
+      <label><input type="checkbox" data-section="design" data-action="approve" checked="checked"/> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
@@ -359,13 +357,13 @@ textarea::placeholder{color:var(--text-muted)}
 
 
 <!-- Slices -->
-<details id="slices" class="section-card" open data-phase="slices" data-status="pending">
+<details id="slices" class="section-card" open="" data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
     <div class="slice-card" data-slice="1" data-slice-name="feat-c47132ea" data-status="pending">
   <div class="slice-header">
     <span class="slice-num">#1</span>
-    <span class="slice-name">SSE chat endpoint &#43; streaming bubble UI</span>
+    <span class="slice-name">SSE chat endpoint + streaming bubble UI</span>
     <span class="badge badge-blocked">L</span>
     <span class="badge badge-revision">Med</span>
     <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
@@ -385,14 +383,14 @@ assert Content-Type: text/event-stream and at least one data: chunk in response 
 </div></div>
   <div class="slice-deps">Dependencies: none</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-1" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
   </div>
 </div>
 <div class="slice-card" data-slice="2" data-slice-name="feat-091f4ce3" data-status="pending">
   <div class="slice-header">
     <span class="slice-num">#2</span>
-    <span class="slice-name">Amendment management UI &#43; Go parser</span>
+    <span class="slice-name">Amendment management UI + Go parser</span>
     <span class="badge badge-revision">M</span>
     <span class="badge badge-pending">Low</span>
     <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
@@ -412,7 +410,7 @@ Integration: api_plans_test.go — seed plan_feedback rows with action=amendment
 </div></div>
   <div class="slice-deps">Dependencies: slices 1</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-2" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
   </div>
 </div>
@@ -439,7 +437,7 @@ page reload; confirm YAML viewer shows highlighted YAML content.
 </div></div>
   <div class="slice-deps">Dependencies: slices 1</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-3" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-3" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
   </div>
 </div>
@@ -452,7 +450,7 @@ page reload; confirm YAML viewer shows highlighted YAML content.
     <span class="badge badge-pending" data-badge-for="slice-4">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Delete internal/notebook/ package (embed.go &#43; files/ directory: plan_notebook.py, plan_ui.py, plan_persistence.py, critique_renderer.py, dagre_widget.py, chat_widget.py, claude_chat.py, amendment_parser.py, sample_plan.yaml). Move prototypes/ contents to prototypes/archive/ with a README noting they were the Marimo prototypes that graduated to production. In cmd/htmlgraph/plan_yaml_extras.go remove planReviewCmd() function, runPlanReview() function, the import of internal/notebook, and the import of os/exec used solely for uvx/marimo launch. Update planCmds() in cmd/htmlgraph/plan_cmds.go to drop AddCommand(planReviewCmd()). Update plugin/skills/plan/SKILL.md step 5 from &#34;htmlgraph plan review &lt;plan-id&gt;&#34; (Marimo) to &#34;htmlgraph serve&#34; and open /plans/{id}.html in browser. Remove uv/marimo install references from docs, README, and SKILL.md wherever they appear.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Delete internal/notebook/ package (embed.go + files/ directory: plan_notebook.py, plan_ui.py, plan_persistence.py, critique_renderer.py, dagre_widget.py, chat_widget.py, claude_chat.py, amendment_parser.py, sample_plan.yaml). Move prototypes/ contents to prototypes/archive/ with a README noting they were the Marimo prototypes that graduated to production. In cmd/htmlgraph/plan_yaml_extras.go remove planReviewCmd() function, runPlanReview() function, the import of internal/notebook, and the import of os/exec used solely for uvx/marimo launch. Update planCmds() in cmd/htmlgraph/plan_cmds.go to drop AddCommand(planReviewCmd()). Update plugin/skills/plan/SKILL.md step 5 from &#34;htmlgraph plan review &lt;plan-id&gt;&#34; (Marimo) to &#34;htmlgraph serve&#34; and open /plans/{id}.html in browser. Remove uv/marimo install references from docs, README, and SKILL.md wherever they appear.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Without this slice the binary still embeds ~1,712 lines of Python, uv is still required on PATH for the dead review command, and SKILL.md still directs agents to launch Marimo. This slice is what makes the migration complete and prevents future maintainers from accidentally re-activating the Marimo path.
 </div></div>
@@ -465,7 +463,7 @@ Smoke: htmlgraph plan --help to confirm &#39;review&#39; absent from subcommand 
 </div></div>
   <div class="slice-deps">Dependencies: slices 1,2,3,5</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-4" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-4" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
   </div>
 </div>
@@ -494,7 +492,7 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
 </div></div>
   <div class="slice-deps">Dependencies: slices 1,2,3</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-5" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-5" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
   </div>
 </div>
@@ -512,68 +510,68 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
       <p>How should the chat widget stream responses?</p>
       
       
-      <label class="recommended"><input type="radio" name="q-chat-streaming" data-question="q-chat-streaming" value="A: SSE — Server-Sent Events (unidirectional stream, simpler, HTTP-native)"> A: SSE — Server-Sent Events (unidirectional stream, simpler, HTTP-native) <span class="rec-tag">recommended</span></label>
+      <label class="recommended"><input type="radio" name="q-chat-streaming" data-question="q-chat-streaming" value="A: SSE — Server-Sent Events (unidirectional stream, simpler, HTTP-native)" checked="checked"/> A: SSE — Server-Sent Events (unidirectional stream, simpler, HTTP-native) <span class="rec-tag">recommended</span></label>
       
-      <label><input type="radio" name="q-chat-streaming" data-question="q-chat-streaming" value="B: WebSocket — Bidirectional socket (supports cancel/interrupt, more complex infrastructure)"> B: WebSocket — Bidirectional socket (supports cancel/interrupt, more complex infrastructure)</label>
+      <label><input type="radio" name="q-chat-streaming" data-question="q-chat-streaming" value="B: WebSocket — Bidirectional socket (supports cancel/interrupt, more complex infrastructure)"/> B: WebSocket — Bidirectional socket (supports cancel/interrupt, more complex infrastructure)</label>
       
-      <textarea data-section="questions" data-question-rationale="q-chat-streaming" placeholder="Rationale for q-chat-streaming..."></textarea>
+      <textarea data-section="questions" data-question-rationale="q-chat-streaming" placeholder="Rationale for q-chat-streaming...">this is live stream from the claude headless session</textarea>
     </div>
     
     <div class="question-block" id="q-chat-scope">
       <p>Should the chat widget display live Claude API responses or pre-recorded history?</p>
       
       
-      <label class="recommended"><input type="radio" name="q-chat-scope" data-question="q-chat-scope" value="A: Live Claude API — Chat widget connects to Claude API in real-time during review (current Marimo model)"> A: Live Claude API — Chat widget connects to Claude API in real-time during review (current Marimo model) <span class="rec-tag">recommended</span></label>
+      <label class="recommended"><input type="radio" name="q-chat-scope" data-question="q-chat-scope" value="A: Live Claude API — Chat widget connects to Claude API in real-time during review (current Marimo model)" checked="checked"/> A: Live Claude API — Chat widget connects to Claude API in real-time during review (current Marimo model) <span class="rec-tag">recommended</span></label>
       
-      <label><input type="radio" name="q-chat-scope" data-question="q-chat-scope" value="B: Pre-recorded history — Conversations recorded in YAML during plan creation, displayed read-only during review (local-first)"> B: Pre-recorded history — Conversations recorded in YAML during plan creation, displayed read-only during review (local-first)</label>
+      <label><input type="radio" name="q-chat-scope" data-question="q-chat-scope" value="B: Pre-recorded history — Conversations recorded in YAML during plan creation, displayed read-only during review (local-first)"/> B: Pre-recorded history — Conversations recorded in YAML during plan creation, displayed read-only during review (local-first)</label>
       
-      <textarea data-section="questions" data-question-rationale="q-chat-scope" placeholder="Rationale for q-chat-scope..."></textarea>
+      <textarea data-section="questions" data-question-rationale="q-chat-scope" placeholder="Rationale for q-chat-scope...">this is live stream from the claude headless session</textarea>
     </div>
     
     <div class="question-block" id="q-migration-strategy">
       <p>Should we remove Marimo immediately or keep it as a fallback during transition?</p>
       
       
-      <label class="recommended"><input type="radio" name="q-migration-strategy" data-question="q-migration-strategy" value="A: Big-bang removal — Replace `htmlgraph plan review` immediately, delete Marimo notebooks once new system ships"> A: Big-bang removal — Replace `htmlgraph plan review` immediately, delete Marimo notebooks once new system ships <span class="rec-tag">recommended</span></label>
+      <label class="recommended"><input type="radio" name="q-migration-strategy" data-question="q-migration-strategy" value="A: Big-bang removal — Replace `htmlgraph plan review` immediately, delete Marimo notebooks once new system ships"/> A: Big-bang removal — Replace `htmlgraph plan review` immediately, delete Marimo notebooks once new system ships <span class="rec-tag">recommended</span></label>
       
-      <label><input type="radio" name="q-migration-strategy" data-question="q-migration-strategy" value="B: Gradual migration — Run both systems in parallel (e.g., `--use-marimo` flag), fade Marimo out over 2-3 releases"> B: Gradual migration — Run both systems in parallel (e.g., `--use-marimo` flag), fade Marimo out over 2-3 releases</label>
+      <label><input type="radio" name="q-migration-strategy" data-question="q-migration-strategy" value="B: Gradual migration — Run both systems in parallel (e.g., `--use-marimo` flag), fade Marimo out over 2-3 releases" checked="checked"/> B: Gradual migration — Run both systems in parallel (e.g., `--use-marimo` flag), fade Marimo out over 2-3 releases</label>
       
-      <textarea data-section="questions" data-question-rationale="q-migration-strategy" placeholder="Rationale for q-migration-strategy..."></textarea>
+      <textarea data-section="questions" data-question-rationale="q-migration-strategy" placeholder="Rationale for q-migration-strategy...">this is live stream from the claude headless session</textarea>
     </div>
     
     <div class="question-block" id="q-planbook-dependency">
       <p>Does removing Marimo from htmlgraph affect the standalone Planbook tool planned in trk-84bcad47?</p>
       
       
-      <label><input type="radio" name="q-planbook-dependency" data-question="q-planbook-dependency" value="A: Htmlgraph-only — Remove Marimo from htmlgraph only; Planbook depends on Marimo separately (allows independent iteration)"> A: Htmlgraph-only — Remove Marimo from htmlgraph only; Planbook depends on Marimo separately (allows independent iteration)</label>
+      <label><input type="radio" name="q-planbook-dependency" data-question="q-planbook-dependency" value="A: Htmlgraph-only — Remove Marimo from htmlgraph only; Planbook depends on Marimo separately (allows independent iteration)" checked="checked"/> A: Htmlgraph-only — Remove Marimo from htmlgraph only; Planbook depends on Marimo separately (allows independent iteration)</label>
       
-      <label><input type="radio" name="q-planbook-dependency" data-question="q-planbook-dependency" value="B: Unified frontend — Both htmlgraph and Planbook use the same internal Go/HTML/JS system (drops Marimo entirely)"> B: Unified frontend — Both htmlgraph and Planbook use the same internal Go/HTML/JS system (drops Marimo entirely)</label>
+      <label><input type="radio" name="q-planbook-dependency" data-question="q-planbook-dependency" value="B: Unified frontend — Both htmlgraph and Planbook use the same internal Go/HTML/JS system (drops Marimo entirely)"/> B: Unified frontend — Both htmlgraph and Planbook use the same internal Go/HTML/JS system (drops Marimo entirely)</label>
       
-      <label class="recommended"><input type="radio" name="q-planbook-dependency" data-question="q-planbook-dependency" value="C: Needs clarification — Planbook scope and requirements not yet defined; defer decision until trk-84bcad47 is detailed"> C: Needs clarification — Planbook scope and requirements not yet defined; defer decision until trk-84bcad47 is detailed <span class="rec-tag">recommended</span></label>
+      <label class="recommended"><input type="radio" name="q-planbook-dependency" data-question="q-planbook-dependency" value="C: Needs clarification — Planbook scope and requirements not yet defined; defer decision until trk-84bcad47 is detailed"/> C: Needs clarification — Planbook scope and requirements not yet defined; defer decision until trk-84bcad47 is detailed <span class="rec-tag">recommended</span></label>
       
-      <textarea data-section="questions" data-question-rationale="q-planbook-dependency" placeholder="Rationale for q-planbook-dependency..."></textarea>
+      <textarea data-section="questions" data-question-rationale="q-planbook-dependency" placeholder="Rationale for q-planbook-dependency...">this is live stream from the claude headless session</textarea>
     </div>
     
     <div class="question-block" id="q-cdn-dependencies">
       <p>Should we vendor JavaScript dependencies or continue relying on CDN for D3/dagre-d3?</p>
       
       
-      <label><input type="radio" name="q-cdn-dependencies" data-question="q-cdn-dependencies" value="A: CDN — Load D3 and dagre-d3 from CDN (lighter binary, requires network)"> A: CDN — Load D3 and dagre-d3 from CDN (lighter binary, requires network)</label>
+      <label><input type="radio" name="q-cdn-dependencies" data-question="q-cdn-dependencies" value="A: CDN — Load D3 and dagre-d3 from CDN (lighter binary, requires network)"/> A: CDN — Load D3 and dagre-d3 from CDN (lighter binary, requires network)</label>
       
-      <label class="recommended"><input type="radio" name="q-cdn-dependencies" data-question="q-cdn-dependencies" value="B: Vendor — Embed JS files in the binary or `plugin/static/`, serve locally (offline-first, larger binary)"> B: Vendor — Embed JS files in the binary or `plugin/static/`, serve locally (offline-first, larger binary) <span class="rec-tag">recommended</span></label>
+      <label class="recommended"><input type="radio" name="q-cdn-dependencies" data-question="q-cdn-dependencies" value="B: Vendor — Embed JS files in the binary or `plugin/static/`, serve locally (offline-first, larger binary)" checked="checked"/> B: Vendor — Embed JS files in the binary or `plugin/static/`, serve locally (offline-first, larger binary) <span class="rec-tag">recommended</span></label>
       
-      <textarea data-section="questions" data-question-rationale="q-cdn-dependencies" placeholder="Rationale for q-cdn-dependencies..."></textarea>
+      <textarea data-section="questions" data-question-rationale="q-cdn-dependencies" placeholder="Rationale for q-cdn-dependencies...">this is live stream from the claude headless session</textarea>
     </div>
     
     <div class="question-block" id="q-dashboard-embedding">
       <p>How should plan review be embedded in the dashboard?</p>
       
       
-      <label class="recommended"><input type="radio" name="q-dashboard-embedding" data-question="q-dashboard-embedding" value="A: HTML fragment — New /render endpoint returns shell-stripped HTML, inject into dashboard panel (consistent with existing patterns, requires CSS reconciliation)"> A: HTML fragment — New /render endpoint returns shell-stripped HTML, inject into dashboard panel (consistent with existing patterns, requires CSS reconciliation) <span class="rec-tag">recommended</span></label>
+      <label class="recommended"><input type="radio" name="q-dashboard-embedding" data-question="q-dashboard-embedding" value="A: HTML fragment — New /render endpoint returns shell-stripped HTML, inject into dashboard panel (consistent with existing patterns, requires CSS reconciliation)"/> A: HTML fragment — New /render endpoint returns shell-stripped HTML, inject into dashboard panel (consistent with existing patterns, requires CSS reconciliation) <span class="rec-tag">recommended</span></label>
       
-      <label><input type="radio" name="q-dashboard-embedding" data-question="q-dashboard-embedding" value="B: Iframe embed — Load plan page in an iframe within the dashboard (simpler, preserves isolation, but nested scroll and SSE complications)"> B: Iframe embed — Load plan page in an iframe within the dashboard (simpler, preserves isolation, but nested scroll and SSE complications)</label>
+      <label><input type="radio" name="q-dashboard-embedding" data-question="q-dashboard-embedding" value="B: Iframe embed — Load plan page in an iframe within the dashboard (simpler, preserves isolation, but nested scroll and SSE complications)"/> B: Iframe embed — Load plan page in an iframe within the dashboard (simpler, preserves isolation, but nested scroll and SSE complications)</label>
       
-      <textarea data-section="questions" data-question-rationale="q-dashboard-embedding" placeholder="Rationale for q-dashboard-embedding..."></textarea>
+      <textarea data-section="questions" data-question-rationale="q-dashboard-embedding" placeholder="Rationale for q-dashboard-embedding...">this is live stream from the claude headless session</textarea>
     </div>
     
     <table class="q-table">
@@ -582,37 +580,37 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
         
         <tr data-recap-for="q-chat-streaming">
           <td>How should the chat widget stream responses?</td>
-          <td class="recap-answer">&mdash;</td>
+          <td class="recap-answer">—</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
         <tr data-recap-for="q-chat-scope">
           <td>Should the chat widget display live Claude API responses or pre-recorded history?</td>
-          <td class="recap-answer">&mdash;</td>
+          <td class="recap-answer">—</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
         <tr data-recap-for="q-migration-strategy">
           <td>Should we remove Marimo immediately or keep it as a fallback during transition?</td>
-          <td class="recap-answer">&mdash;</td>
+          <td class="recap-answer">—</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
         <tr data-recap-for="q-planbook-dependency">
           <td>Does removing Marimo from htmlgraph affect the standalone Planbook tool planned in trk-84bcad47?</td>
-          <td class="recap-answer">&mdash;</td>
+          <td class="recap-answer">—</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
         <tr data-recap-for="q-cdn-dependencies">
           <td>Should we vendor JavaScript dependencies or continue relying on CDN for D3/dagre-d3?</td>
-          <td class="recap-answer">&mdash;</td>
+          <td class="recap-answer">—</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
         <tr data-recap-for="q-dashboard-embedding">
           <td>How should plan review be embedded in the dashboard?</td>
-          <td class="recap-answer">&mdash;</td>
+          <td class="recap-answer">—</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
@@ -651,7 +649,7 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
         <span class="badge badge-approved">verified</span>
         <div>
           <p style="margin:0;font-size:.9rem">Graph node color update on approval is already partially implemented</p>
-          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">plan_page.gohtml:468-476 STATUS_COLORS map &#43; stroke update exist; only fill patch missing</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">plan_page.gohtml:468-476 STATUS_COLORS map + stroke update exist; only fill patch missing</p>
         </div>
       </div>
       
@@ -683,7 +681,7 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
         <span class="badge badge-blocked">falsified</span>
         <div>
           <p style="margin:0;font-size:.9rem">SSE stream can push plan events with minimal wiring</p>
-          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">sseHandler() polls agent_events only; no plan event write path exists; requires new DB writes &#43; SSE query</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">sseHandler() polls agent_events only; no plan event write path exists; requires new DB writes + SSE query</p>
         </div>
       </div>
       
@@ -707,7 +705,7 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
         <span class="badge badge-pending">plausible</span>
         <div>
           <p style="margin:0;font-size:.9rem">Chat widget requires ~600 lines of new JS/Go</p>
-          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Python reference is 422&#43;312=734 lines; Go reimplementation may differ but estimate is rough</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Python reference is 422+312=734 lines; Go reimplementation may differ but estimate is rough</p>
         </div>
       </div>
       
@@ -791,7 +789,7 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
           </tr>
           
           <tr>
-            <td>SSE plan events require new infrastructure (write path &#43; query), not just wiring</td>
+            <td>SSE plan events require new infrastructure (write path + query), not just wiring</td>
             <td><span class="badge badge-blocked">High</span></td>
             <td>Use scoped /api/plans/{id}/events endpoint instead of adding to global stream</td>
           </tr>
@@ -842,7 +840,7 @@ styling, approve a slice, verify graph node updates and SSE refreshes the list.
     <div id="commentsFeed"><p style="font-size:.8rem;color:var(--text-muted);font-style:italic">No comments yet.</p></div>
   </div>
   <div class="finalize-area">
-    <button class="btn-finalize" id="finalizeBtn" disabled>Finalize Plan</button>
+    <button class="btn-finalize" id="finalizeBtn" disabled="">Finalize Plan</button>
     <p style="font-size:.75rem;color:var(--text-muted);margin-top:6px">All sections must be approved before finalizing.</p>
   </div>
 </section>
@@ -1553,6 +1551,7 @@ syncHljsTheme();
     .catch(function(){});
 })();
 </script>
-</div><!-- .plan-content -->
-</body>
-</html>
+<!-- .plan-content -->
+
+
+</body></html>

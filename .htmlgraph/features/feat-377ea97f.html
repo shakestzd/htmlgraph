@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Registry package — internal/registry/</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-377ea97f"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:43:57.677822"
+             data-updated="2026-04-09T19:02:45.553068" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>Registry package — internal/registry/</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-368a5cd2.html" data-relationship="planned_in" data-since="2026-04-09T16:43:57.678105">plan-368a5cd2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="4aa3628f-9cde-43b7-94a6-4e01f892c264.html" data-relationship="implemented_in" data-since="2026-04-09T18:30:02.549916">session 4aa3628f-9cde-43b7-94a6-4e01f892c264</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Create `internal/registry/` with a single file `registry.go`. Define `Entry` struct: `{ProjectDir, Name, GitRemoteURL, LastSeen, ID string}` where `ID` is the first 8 characters of the SHA256 hash of `ProjectDir`, computed once on first upsert and stored in the entry. Define `Registry` struct wrapping the file path and a `[]Entry` slice. Implement `Load(path string) (*Registry, error)` — reads and JSON-decodes the file; returns empty registry (not error) if file does not exist. Implement `(*Registry) Save() error` — JSON-encodes with indentation, writes atomically via a tempfile + `os.Rename()` pattern (write to `.tmp`, then rename) to the registry path, ensuring crash-safe writes. Implement `(*Registry) Upsert(dir, name, remoteURL string)` — finds existing entry by `ProjectDir` (filepath.Clean comparison), updates `LastSeen` / `GitRemoteURL` / `Name` in-place or appends a new entry with a freshly computed `ID`; uses `time.Now().UTC().Format(time.RFC3339)` for `LastSeen`. Implement `(*Registry) List() []Entry` returning a copy of entries. Implement `(*Registry) Prune() []string` — removes entries whose `filepath.Join(entry.ProjectDir, ".htmlgraph")` does not exist via `os.Stat`; returns list of pruned dirs. Expose `DefaultPath() string` helper returning `~/.local/share/htmlgraph/projects.json` (resolved via `os.UserHomeDir`). Add `OpenReadOnly(dbPath string) (*sql.DB, error)` — opens SQLite with `file:?mode=ro&_busy_timeout=5000` URI; does NOT call `ApplyPragmas` or `CreateAllTables`; returns a read-only `*sql.DB` for use by cross-project queries. No external dependencies — stdlib only (database/sql + modernc.org/sqlite already in go.mod).</p>
+        </section>
+    </article>
+</body>
+</html>

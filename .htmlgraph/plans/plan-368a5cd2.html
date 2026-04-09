@@ -1,15 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="htmlgraph-version" content="1.0">
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="htmlgraph-version" content="1.0"/>
 <title>Plan: Multi-Project MVP</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled=""/>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/go.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
@@ -278,7 +276,7 @@ textarea::placeholder{color:var(--text-muted)}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-368a5cd2" data-plan-id="plan-368a5cd2" data-feature-id="trk-66dcbbf7" data-status="draft">
+<article id="plan-368a5cd2" data-plan-id="plan-368a5cd2" data-feature-id="trk-8cf41009" data-status="finalized">
 
 <!-- Plan Header -->
 <header class="plan-header">
@@ -287,11 +285,11 @@ textarea::placeholder{color:var(--text-muted)}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">5 slices · Created 2026-04-08</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">5 slices · Created 2026-04-09</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
-  &#9728; Light
+  ☀ Light
 </button>
 
 <!-- Related Work -->
@@ -300,7 +298,7 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan YAML source (collapsible) -->
 <details class="yaml-viewer" id="yaml-viewer">
     <summary>View Plan YAML</summary>
-    <pre><code class="language-yaml" id="yaml-content">Loading&#x2026;</code></pre>
+    <pre><code class="language-yaml" id="yaml-content">Loading…</code></pre>
 </details>
 
 <!-- ZONE 1: Dependency Graph -->
@@ -321,34 +319,34 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- ZONE 2: Interactive Sections -->
 
 <!-- Design -->
-<details id="design" class="section-card" open data-phase="design" data-status="pending">
+<details id="design" class="section-card" open="" data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
     <h4>Problem</h4>
-<p>HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask &#34;what work is happening across all my projects right now?&#34; without manually cd-ing into each repo and running `htmlgraph snapshot`.
+<div data-markdown="">HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask &#34;what work is happening across all my projects right now?&#34; without manually cd-ing into each repo and running `htmlgraph snapshot`.
 
 The gap is real and the building blocks are already in place. The `sessions` table already stores `project_dir` and `git_remote_url` per row, meaning project identity is tracked at the row level inside each SQLite DB. `internal/workitem/project.go` has `Project.Open()` which opens a project&#39;s SQLite DB by directory — the pattern for multi-DB access exists (though it runs migrations so cross-project reads need a lightweight read-only alternative). `~/.local/share/htmlgraph/` is established as a global location (used today for `version-check.json` and `.binary-version`) but holds no project registry. Every CLI invocation in a new project has no memory of the others.
 
 The deleted Elixir/Phoenix implementation had a full `ProjectRegistry` GenServer and workspace scanner. That code is gone but the problem it solved is not. Power users with 5–20 active repos get zero cross-project visibility: no way to see which projects have in-progress work, which sessions are running, or which bugs are blocked. The dashboard (`htmlgraph serve`) only sees the current project. There is no global entry point.
 
 The MVP scope is deliberately narrow: passive registry growth via upsert-on-invocation, a `projects list` command, and a `--global` flag on `serve` that aggregates read-only data across all known project DBs. Everything else stays project-local.
-</p>
+</div>
 <h4>Goals</h4>
 <ol>
-<li>**Auto-registering project registry** — every `htmlgraph` invocation inside a project upserts that project&#39;s metadata (path, name, git remote, last-seen timestamp) into `~/.local/share/htmlgraph/projects.json`, so the registry grows passively without any user action and always reflects recently active projects</li>
-<li>**`htmlgraph projects list` command** — a new top-level command that reads the registry and prints all known projects with their path, last-active timestamp, and in-progress work item count; usable from any directory, not just inside a project</li>
-<li>**`htmlgraph serve --global` unified dashboard** — extends the existing embedded dashboard server to aggregate read-only data from all registered project DBs when `--global` is passed, presenting a single view of in-progress work items and recent sessions without breaking the default single-project `htmlgraph serve`</li>
+<li data-markdown="">**Auto-registering project registry** — every `htmlgraph` invocation inside a project upserts that project&#39;s metadata (path, name, git remote, last-seen timestamp) into `~/.local/share/htmlgraph/projects.json`, so the registry grows passively without any user action and always reflects recently active projects</li>
+<li data-markdown="">**`htmlgraph projects list` command** — a new top-level command that reads the registry and prints all known projects with their path, last-active timestamp, and in-progress work item count; usable from any directory, not just inside a project</li>
+<li data-markdown="">**`htmlgraph serve --global` unified dashboard** — extends the existing embedded dashboard server to aggregate read-only data from all registered project DBs when `--global` is passed, presenting a single view of in-progress work items and recent sessions without breaking the default single-project `htmlgraph serve`</li>
 </ol>
 <h4>Constraints</h4>
 <ul>
-<li>No external infrastructure — registry must be a local JSON file at `~/.local/share/htmlgraph/projects.json`; no Postgres, Redis, or cloud sync; consistent with the core project constraint</li>
-<li>Read-only cross-project aggregation — the global dashboard and `projects list` must never write to any project&#39;s `.htmlgraph/` directory or SQLite DB; all cross-project DB access uses read-only SQLite connections (`?mode=ro` URI) that skip schema migrations; SQLite supports concurrent readers so aggregation is safe, but cross-project writes are explicitly out of scope for this MVP</li>
-<li>Zero breakage of existing single-project workflows — `htmlgraph serve` without `--global`, all hook behaviour, and all project-local commands must behave identically; the registry upsert must be a silent side-effect with no latency impact on normal CLI invocations</li>
-<li>No build step or framework additions to the dashboard — the SPA is vanilla JS served via `embed.FS`; the global view must use the same constraint, adding only new API endpoints to the existing Go HTTP server and new JS fetch calls, not a bundler or frontend framework</li>
+<li data-markdown="">No external infrastructure — registry must be a local JSON file at `~/.local/share/htmlgraph/projects.json`; no Postgres, Redis, or cloud sync; consistent with the core project constraint</li>
+<li data-markdown="">Read-only cross-project aggregation — the global dashboard and `projects list` must never write to any project&#39;s `.htmlgraph/` directory or SQLite DB; all cross-project DB access uses read-only SQLite connections (`?mode=ro` URI) that skip schema migrations; SQLite supports concurrent readers so aggregation is safe, but cross-project writes are explicitly out of scope for this MVP</li>
+<li data-markdown="">Zero breakage of existing single-project workflows — `htmlgraph serve` without `--global`, all hook behaviour, and all project-local commands must behave identically; the registry upsert must be a silent side-effect with no latency impact on normal CLI invocations</li>
+<li data-markdown="">No build step or framework additions to the dashboard — the SPA is vanilla JS served via `embed.FS`; the global view must use the same constraint, adding only new API endpoints to the existing Go HTTP server and new JS fetch calls, not a bundler or frontend framework</li>
 </ul>
 
     <div class="approval-row">
-      <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
+      <label><input type="checkbox" data-section="design" data-action="approve" checked="checked"/> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
@@ -359,7 +357,7 @@ The MVP scope is deliberately narrow: passive registry growth via upsert-on-invo
 
 
 <!-- Slices -->
-<details id="slices" class="section-card" open data-phase="slices" data-status="pending">
+<details id="slices" class="section-card" open="" data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
     <div class="slice-card" data-slice="1" data-slice-name="feat-3c8a1e72" data-status="pending">
@@ -371,22 +369,22 @@ The MVP scope is deliberately narrow: passive registry growth via upsert-on-invo
     <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Create `internal/registry/` with a single file `registry.go`. Define `Entry` struct: `{ProjectDir, Name, GitRemoteURL, LastSeen, ID string}` where `ID` is the first 8 characters of the SHA256 hash of `ProjectDir`, computed once on first upsert and stored in the entry. Define `Registry` struct wrapping the file path and a `[]Entry` slice. Implement `Load(path string) (*Registry, error)` — reads and JSON-decodes the file; returns empty registry (not error) if file does not exist. Implement `(*Registry) Save() error` — JSON-encodes with indentation, writes atomically via a tempfile &#43; `os.Rename()` pattern (write to `&lt;path&gt;.tmp`, then rename) to the registry path, ensuring crash-safe writes. Implement `(*Registry) Upsert(dir, name, remoteURL string)` — finds existing entry by `ProjectDir` (filepath.Clean comparison), updates `LastSeen` / `GitRemoteURL` / `Name` in-place or appends a new entry with a freshly computed `ID`; uses `time.Now().UTC().Format(time.RFC3339)` for `LastSeen`. Implement `(*Registry) List() []Entry` returning a copy of entries. Implement `(*Registry) Prune() []string` — removes entries whose `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;)` does not exist via `os.Stat`; returns list of pruned dirs. Expose `DefaultPath() string` helper returning `~/.local/share/htmlgraph/projects.json` (resolved via `os.UserHomeDir`). Add `OpenReadOnly(dbPath string) (*sql.DB, error)` — opens SQLite with `file:&lt;dbPath&gt;?mode=ro&amp;_busy_timeout=5000` URI; does NOT call `ApplyPragmas` or `CreateAllTables`; returns a read-only `*sql.DB` for use by cross-project queries. No external dependencies — stdlib only (database/sql &#43; modernc.org/sqlite already in go.mod).
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Create `internal/registry/` with a single file `registry.go`. Define `Entry` struct: `{ProjectDir, Name, GitRemoteURL, LastSeen, ID string}` where `ID` is the first 8 characters of the SHA256 hash of `ProjectDir`, computed once on first upsert and stored in the entry. Define `Registry` struct wrapping the file path and a `[]Entry` slice. Implement `Load(path string) (*Registry, error)` — reads and JSON-decodes the file; returns empty registry (not error) if file does not exist. Implement `(*Registry) Save() error` — JSON-encodes with indentation, writes atomically via a tempfile + `os.Rename()` pattern (write to `&lt;path&gt;.tmp`, then rename) to the registry path, ensuring crash-safe writes. Implement `(*Registry) Upsert(dir, name, remoteURL string)` — finds existing entry by `ProjectDir` (filepath.Clean comparison), updates `LastSeen` / `GitRemoteURL` / `Name` in-place or appends a new entry with a freshly computed `ID`; uses `time.Now().UTC().Format(time.RFC3339)` for `LastSeen`. Implement `(*Registry) List() []Entry` returning a copy of entries. Implement `(*Registry) Prune() []string` — removes entries whose `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;)` does not exist via `os.Stat`; returns list of pruned dirs. Expose `DefaultPath() string` helper returning `~/.local/share/htmlgraph/projects.json` (resolved via `os.UserHomeDir`). Add `OpenReadOnly(dbPath string) (*sql.DB, error)` — opens SQLite with `file:&lt;dbPath&gt;?mode=ro&amp;_busy_timeout=5000` URI; does NOT call `ApplyPragmas` or `CreateAllTables`; returns a read-only `*sql.DB` for use by cross-project queries. No external dependencies — stdlib only (database/sql + modernc.org/sqlite already in go.mod).
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">All other slices depend on a well-defined, tested registry abstraction. Isolating it in `internal/registry/` keeps the CLI commands thin and makes the persistence layer independently testable. The atomic write pattern prevents registry corruption on crash. The read-only DB helper prevents schema mutations on foreign project databases.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/registry/registry.go, internal/registry/registry_test.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`go build ./internal/registry/...` passes</li><li>`go test ./internal/registry/...` passes with coverage of Load/Save/Upsert/List/Prune/OpenReadOnly</li><li>Upsert is idempotent: calling twice with same dir updates LastSeen, does not duplicate</li><li>Load on missing file returns empty registry, no error</li><li>Prune removes entries whose .htmlgraph/ dir is absent and returns their paths</li><li>Save uses tempfile&#43;rename — power-loss during write does not corrupt the registry</li><li>Each Entry has a stable ID (8-char SHA256 prefix of ProjectDir) set on first upsert and preserved on subsequent upserts</li><li>OpenReadOnly returns a *sql.DB that can query but cannot write or run migrations</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`go build ./internal/registry/...` passes</li><li>`go test ./internal/registry/...` passes with coverage of Load/Save/Upsert/List/Prune/OpenReadOnly</li><li>Upsert is idempotent: calling twice with same dir updates LastSeen, does not duplicate</li><li>Load on missing file returns empty registry, no error</li><li>Prune removes entries whose .htmlgraph/ dir is absent and returns their paths</li><li>Save uses tempfile+rename — power-loss during write does not corrupt the registry</li><li>Each Entry has a stable ID (8-char SHA256 prefix of ProjectDir) set on first upsert and preserved on subsequent upserts</li><li>OpenReadOnly returns a *sql.DB that can query but cannot write or run migrations</li><li>Atomic-rename semantics are documented in the package doc comment — write to `&lt;path&gt;.tmp`, fsync, then `os.Rename` — which prevents partial-write corruption but does NOT prevent concurrent writers racing; last-writer-wins is the accepted MVP tradeoff</li><li>flock-based exclusion for concurrent CLI invocations is explicitly out of scope for the MVP and documented as a post-MVP follow-up (matches Risk #6 in the critique)</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestLoad_MissingFile, TestUpsert_NewEntry, TestUpsert_UpdatesExisting,
       TestSave_RoundTrip, TestSave_Atomic (interrupt mid-write via tmpdir),
       TestPrune_RemovesStale, TestDefaultPath, TestOpenReadOnly_RejectsWrite,
       TestEntry_StableID (same dir always yields same ID)
-Integration: none (pure file I/O &#43; SQLite, tmpdir-based in unit tests)
+Integration: none (pure file I/O + SQLite, tmpdir-based in unit tests)
 </div></div>
   <div class="slice-deps">Dependencies: none</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-1" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
   </div>
 </div>
@@ -399,12 +397,12 @@ Integration: none (pure file I/O &#43; SQLite, tmpdir-based in unit tests)
     <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">In `cmd/htmlgraph/main.go`, extend the existing `rootCmd.PersistentPreRunE` to call `registry.Load(registry.DefaultPath())`, then `reg.Upsert(projectDir, name, gitRemoteURL)`, then `reg.Save()` after the existing `agent.EnsureSession` call. Derive `projectDir` from the already-resolved `filepath.Dir(hgDir)`. Derive `name` as `filepath.Base(projectDir)`. Derive `gitRemoteURL` via `paths.GetGitRemoteURL(projectDir)` — but ONLY when the existing registry entry for `projectDir` has an empty `GitRemoteURL`; if the entry already has a URL populated, skip the `git remote get-url origin` subprocess entirely and pass the cached value to `Upsert`. This ensures the git subprocess runs at most once per project, not on every CLI invocation. Skip the registry upsert (return `nil`) when `findHtmlgraphDir()` returns an error (same graceful-degradation pattern already used for EnsureSession). The entire upsert &#43; save must complete within 10 ms on an SSD for the common case (cached remote URL, no git subprocess); the first-invocation case may take up to 30 ms due to git process startup.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">In `cmd/htmlgraph/main.go`, extend the existing `rootCmd.PersistentPreRunE` to call `registry.Load(registry.DefaultPath())`, then `reg.Upsert(projectDir, name, gitRemoteURL)`, then `reg.Save()` after the existing `agent.EnsureSession` call. Derive `projectDir` from the already-resolved `filepath.Dir(hgDir)`. Derive `name` as `filepath.Base(projectDir)`. Derive `gitRemoteURL` via `paths.GetGitRemoteURL(projectDir)` — but ONLY when the existing registry entry for `projectDir` has an empty `GitRemoteURL`; if the entry already has a URL populated, skip the `git remote get-url origin` subprocess entirely and pass the cached value to `Upsert`. This ensures the git subprocess runs at most once per project, not on every CLI invocation. Skip the registry upsert (return `nil`) when `findHtmlgraphDir()` returns an error (same graceful-degradation pattern already used for EnsureSession). The entire upsert + save must complete within 10 ms on an SSD for the common case (cached remote URL, no git subprocess); the first-invocation case may take up to 30 ms due to git process startup.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Self-maintaining registry without any daemon. Every `htmlgraph` invocation silently keeps the registry fresh, which makes `projects list` reliable without manual maintenance. Caching the remote URL after first write prevents a git subprocess on every CLI call — critical for latency since git process startup is 5–20 ms on macOS.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/main.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>Running `htmlgraph status` in a project dir creates/updates an entry in `~/.local/share/htmlgraph/projects.json`</li><li>LastSeen timestamp advances on each invocation</li><li>git remote get-url is called ONLY on first registration (when GitRemoteURL is empty); subsequent invocations use the cached value</li><li>Commands excluded from PersistentPreRunE (version, help, init, etc.) do not touch registry</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>Running `htmlgraph status` in a project dir creates/updates an entry in `~/.local/share/htmlgraph/projects.json`</li><li>LastSeen timestamp advances on each invocation</li><li>git remote get-url is called ONLY on first registration (when GitRemoteURL is empty); subsequent invocations use the cached value</li><li>Commands excluded from PersistentPreRunE (version, help, init, etc.) do not touch registry</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li><li>Cached path (entry.GitRemoteURL already populated): upsert + save completes in under 10 ms on SSD — no git subprocess invoked, verified by benchmark or subprocess count hook</li><li>Cold path (first registration of a project): upsert + save completes in under 30 ms on SSD including `git remote get-url origin` subprocess startup (5–20 ms on macOS per assumption A9)</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestPersistentPreRunE_UpsertsCalled (mock registry via tmpdir),
       TestPersistentPreRunE_GitSubprocessCalledOnce (assert GetGitRemoteURL not called
@@ -415,20 +413,20 @@ Integration: Run `htmlgraph status` twice in a temp project dir; assert projects
 </div></div>
   <div class="slice-deps">Dependencies: slices 1</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-2" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
   </div>
 </div>
 <div class="slice-card" data-slice="3" data-slice-name="feat-c1e5a83d" data-status="pending">
   <div class="slice-header">
     <span class="slice-num">#3</span>
-    <span class="slice-name">htmlgraph projects subcommand (list &#43; prune)</span>
+    <span class="slice-name">htmlgraph projects subcommand (list + prune)</span>
     <span class="badge badge-pending">S</span>
     <span class="badge badge-pending">Low</span>
     <span class="badge badge-pending" data-badge-for="slice-3">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Create `cmd/htmlgraph/projects.go` with a `projectsCmd()` function returning a `*cobra.Command` for `htmlgraph projects`. Add two subcommands: `htmlgraph projects list` — calls `registry.Load(registry.DefaultPath())`, iterates entries, prints a table with columns: NAME, DIR, LAST_SEEN, STATUS (exists/missing), ITEMS. STATUS is &#34;exists&#34; if `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;)` is stat-able, &#34;missing&#34; otherwise. ITEMS count is derived by opening the project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;, &#34;htmlgraph.db&#34;))` and querying feature &#43; bug &#43; spike counts — skip silently on open error. Do NOT use `workitem.Open(entry.ProjectDir, ...)` here as that runs schema migrations. `htmlgraph projects prune` — calls `reg.Prune()`, prints pruned dirs, calls `reg.Save()`. Register `projectsCmd()` in `main.go` via `rootCmd.AddCommand(projectsCmd())`. Add &#34;projects&#34; to the PersistentPreRunE skip list so the subcommand works without a local `.htmlgraph/` directory.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Create `cmd/htmlgraph/projects.go` with a `projectsCmd()` function returning a `*cobra.Command` for `htmlgraph projects`. Add two subcommands: `htmlgraph projects list` — calls `registry.Load(registry.DefaultPath())`, iterates entries, prints a table with columns: NAME, DIR, LAST_SEEN, STATUS (exists/missing), ITEMS. STATUS is &#34;exists&#34; if `filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;)` is stat-able, &#34;missing&#34; otherwise. ITEMS count is derived by opening the project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, &#34;.htmlgraph&#34;, &#34;htmlgraph.db&#34;))` and querying feature + bug + spike counts — skip silently on open error. Do NOT use `workitem.Open(entry.ProjectDir, ...)` here as that runs schema migrations. `htmlgraph projects prune` — calls `reg.Prune()`, prints pruned dirs, calls `reg.Save()`. Register `projectsCmd()` in `main.go` via `rootCmd.AddCommand(projectsCmd())`. Add &#34;projects&#34; to the PersistentPreRunE skip list so the subcommand works without a local `.htmlgraph/` directory.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Gives users visibility into all known projects and a manual cleanup path for stale entries — the primary user-facing surface of the registry. Using read-only DB connections for ITEMS counts ensures no schema mutations are applied to foreign project databases.
 </div></div>
@@ -442,7 +440,7 @@ Integration: Populate registry with two entries (one real, one fake dir);
 </div></div>
   <div class="slice-deps">Dependencies: slices 1</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-3" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-3" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
   </div>
 </div>
@@ -450,7 +448,7 @@ Integration: Populate registry with two entries (one real, one fake dir);
   <div class="slice-header">
     <span class="slice-num">#4</span>
     <span class="slice-name">Global dashboard backend — htmlgraph serve --global</span>
-    <span class="badge badge-revision">M</span>
+    <span class="badge badge-blocked">L</span>
     <span class="badge badge-revision">Med</span>
     <span class="badge badge-pending" data-badge-for="slice-4">Pending</span>
   </div>
@@ -460,7 +458,7 @@ Integration: Populate registry with two entries (one real, one fake dir);
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">The backend aggregation layer enables the global dashboard without duplicating data. All reads are at query time against per-project SQLite files opened read-only via URI mode — no migrations, no schema mutations, no data merging or synchronisation needed. Using query parameters on existing routes aligns with the Q3 recommended answer and avoids a separate route tree.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/serve.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`htmlgraph serve --global` starts without error</li><li>`GET /api/projects` returns JSON array with one entry per registry project that exists on disk; each entry has a stable `id` (SHA256-derived, not array index)</li><li>`GET /api/mode` returns `{&#34;mode&#34;:&#34;global&#34;,...}` in global mode and `{&#34;mode&#34;:&#34;single&#34;}` in single-project mode</li><li>`GET /api/sessions?project=&lt;id&gt;` returns sessions from that project&#39;s DB</li><li>`GET /api/features?project=&lt;id&gt;` returns features from that project&#39;s DB</li><li>`GET /api/projects/all/stats` returns aggregated counts across all loaded projects</li><li>All cross-project DB access uses read-only connections — no schema mutations on foreign projects</li><li>Single-project `htmlgraph serve` (no flag) behaviour is unchanged; `/api/mode` returns `{&#34;mode&#34;:&#34;single&#34;}`</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`htmlgraph serve --global` starts without error</li><li>`GET /api/projects` returns JSON array with one entry per registry project that exists on disk; each entry has a stable `id` (SHA256-derived, not array index)</li><li>`GET /api/mode` returns `{&#34;mode&#34;:&#34;global&#34;,...}` in global mode and `{&#34;mode&#34;:&#34;single&#34;}` in single-project mode</li><li>`GET /api/sessions?project=&lt;id&gt;` returns sessions from that project&#39;s DB</li><li>`GET /api/features?project=&lt;id&gt;` returns features from that project&#39;s DB</li><li>`GET /api/projects/all/stats` returns aggregated counts across all loaded projects</li><li>All cross-project DB access uses read-only connections — no schema mutations on foreign projects</li><li>Single-project `htmlgraph serve` (no flag) behaviour is unchanged; `/api/mode` returns `{&#34;mode&#34;:&#34;single&#34;}`</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` pass</li><li>`GET /api/projects` re-reads `registry.Load(registry.DefaultPath())` on each request so newly-registered projects appear without restarting `htmlgraph serve --global` — the re-read is a single small JSON file load (~1 ms) and the DB connection cache is keyed by stable project ID so existing `*sql.DB` handles are reused across requests (addresses DESIGN CRITIC Gap: &#34;No refresh mechanism when registry changes while global dashboard is running&#34;)</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit: TestRunGlobalServer_RoutesRegistered, TestProjectIDStable (same dir always same id),
       TestModeEndpoint_Single, TestModeEndpoint_Global
@@ -471,7 +469,7 @@ Integration: Start global server against a tmpdir with two project dirs;
 </div></div>
   <div class="slice-deps">Dependencies: slices 1</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-4" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-4" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
   </div>
 </div>
@@ -498,7 +496,7 @@ Integration: Start global server with two projects; load dashboard; assert switc
 </div></div>
   <div class="slice-deps">Dependencies: slices 4</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-5" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-5" data-action="approve" checked="checked"/> Approve slice</label>
     <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
   </div>
 </div>
@@ -516,9 +514,9 @@ Integration: Start global server with two projects; load dashboard; assert switc
       <p>Should the project registry use JSON file or SQLite database?</p>
       
       
-      <label class="recommended"><input type="radio" name="q-registry-format" data-question="q-registry-format" value="A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped"> A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped <span class="rec-tag">recommended</span></label>
+      <label><input type="radio" name="q-registry-format" data-question="q-registry-format" value="A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped" checked=""/> A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped</label>
       
-      <label><input type="radio" name="q-registry-format" data-question="q-registry-format" value="B: SQLite database — queryable, consistent with internal architecture, more overhead"> B: SQLite database — queryable, consistent with internal architecture, more overhead</label>
+      <label><input type="radio" name="q-registry-format" data-question="q-registry-format" value="B: SQLite database — queryable, consistent with internal architecture, more overhead"/> B: SQLite database — queryable, consistent with internal architecture, more overhead</label>
       
       <textarea data-section="questions" data-question-rationale="q-registry-format" placeholder="Rationale for q-registry-format..."></textarea>
     </div>
@@ -527,11 +525,11 @@ Integration: Start global server with two projects; load dashboard; assert switc
       <p>When should a project auto-register: every CLI invocation, first-use only, or htmlgraph init only?</p>
       
       
-      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command"> A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command</label>
+      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command"/> A: Every CLI invocation — keeps last_seen fresh, adds I/O to every command</label>
       
-      <label class="recommended"><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly"> B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly <span class="rec-tag">recommended</span></label>
+      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly" checked=""/> B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly</label>
       
-      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="C: htmlgraph init only — explicit opt-in, manual multi-project setup required"> C: htmlgraph init only — explicit opt-in, manual multi-project setup required</label>
+      <label><input type="radio" name="q-auto-registration-trigger" data-question="q-auto-registration-trigger" value="C: htmlgraph init only — explicit opt-in, manual multi-project setup required"/> C: htmlgraph init only — explicit opt-in, manual multi-project setup required</label>
       
       <textarea data-section="questions" data-question-rationale="q-auto-registration-trigger" placeholder="Rationale for q-auto-registration-trigger..."></textarea>
     </div>
@@ -540,9 +538,9 @@ Integration: Start global server with two projects; load dashboard; assert switc
       <p>Should multi-project API routes be separate (e.g., /api/global/sessions) or a query parameter on existing routes?</p>
       
       
-      <label><input type="radio" name="q-global-api-design" data-question="q-global-api-design" value="A: Separate /api/global/* routes — cleaner separation, requires handler duplication"> A: Separate /api/global/* routes — cleaner separation, requires handler duplication</label>
+      <label><input type="radio" name="q-global-api-design" data-question="q-global-api-design" value="A: Separate /api/global/* routes — cleaner separation, requires handler duplication"/> A: Separate /api/global/* routes — cleaner separation, requires handler duplication</label>
       
-      <label><input type="radio" name="q-global-api-design" data-question="q-global-api-design" value="B: Query parameter ?project=all on existing routes — minimal code, blends concerns" checked> B: Query parameter ?project=all on existing routes — minimal code, blends concerns</label>
+      <label><input type="radio" name="q-global-api-design" data-question="q-global-api-design" value="B: Query parameter ?project=all on existing routes — minimal code, blends concerns" checked=""/> B: Query parameter ?project=all on existing routes — minimal code, blends concerns</label>
       
       <textarea data-section="questions" data-question-rationale="q-global-api-design" placeholder="Rationale for q-global-api-design..."></textarea>
     </div>
@@ -551,9 +549,9 @@ Integration: Start global server with two projects; load dashboard; assert switc
       <p>Should project identity be git remote URL or absolute project directory path?</p>
       
       
-      <label><input type="radio" name="q-project-identity" data-question="q-project-identity" value="A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness"> A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness</label>
+      <label><input type="radio" name="q-project-identity" data-question="q-project-identity" value="A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness"/> A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness</label>
       
-      <label class="recommended"><input type="radio" name="q-project-identity" data-question="q-project-identity" value="B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management"> B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management <span class="rec-tag">recommended</span></label>
+      <label><input type="radio" name="q-project-identity" data-question="q-project-identity" value="B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management" checked=""/> B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management</label>
       
       <textarea data-section="questions" data-question-rationale="q-project-identity" placeholder="Rationale for q-project-identity..."></textarea>
     </div>
@@ -564,14 +562,14 @@ Integration: Start global server with two projects; load dashboard; assert switc
         
         <tr data-recap-for="q-registry-format">
           <td>Should the project registry use JSON file or SQLite database?</td>
-          <td class="recap-answer">&mdash;</td>
-          <td><span class="badge badge-pending">Pending</span></td>
+          <td class="recap-answer">A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped</td>
+          <td><span class="badge badge-approved">Decided</span></td>
         </tr>
         
         <tr data-recap-for="q-auto-registration-trigger">
           <td>When should a project auto-register: every CLI invocation, first-use only, or htmlgraph init only?</td>
-          <td class="recap-answer">&mdash;</td>
-          <td><span class="badge badge-pending">Pending</span></td>
+          <td class="recap-answer">B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly</td>
+          <td><span class="badge badge-approved">Decided</span></td>
         </tr>
         
         <tr data-recap-for="q-global-api-design">
@@ -582,8 +580,8 @@ Integration: Start global server with two projects; load dashboard; assert switc
         
         <tr data-recap-for="q-project-identity">
           <td>Should project identity be git remote URL or absolute project directory path?</td>
-          <td class="recap-answer">&mdash;</td>
-          <td><span class="badge badge-pending">Pending</span></td>
+          <td class="recap-answer">B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management</td>
+          <td><span class="badge badge-approved">Decided</span></td>
         </tr>
         
       </tbody>
@@ -621,7 +619,7 @@ Integration: Start global server with two projects; load dashboard; assert switc
         <span class="badge badge-blocked">falsified</span>
         <div>
           <p style="margin:0;font-size:.9rem">Project.Open() works for read-only multi-DB access</p>
-          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Open() calls ApplyPragmas &#43; CreateAllTables — always mutates</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Open() calls ApplyPragmas + CreateAllTables — always mutates</p>
         </div>
       </div>
       
@@ -758,7 +756,7 @@ Integration: Start global server with two projects; load dashboard; assert switc
           <tr>
             <td>os.WriteFile truncates then writes — not crash-safe</td>
             <td><span class="badge badge-revision">Medium</span></td>
-            <td>Use tempfile &#43; os.Rename for atomic writes</td>
+            <td>Use tempfile + os.Rename for atomic writes</td>
           </tr>
           
           <tr>
@@ -807,7 +805,7 @@ Integration: Start global server with two projects; load dashboard; assert switc
     <div id="commentsFeed"><p style="font-size:.8rem;color:var(--text-muted);font-style:italic">No comments yet.</p></div>
   </div>
   <div class="finalize-area">
-    <button class="btn-finalize" id="finalizeBtn" disabled>Finalize Plan</button>
+    <button class="btn-finalize" id="finalizeBtn" disabled="">Finalize Plan</button>
     <p style="font-size:.75rem;color:var(--text-muted);margin-top:6px">All sections must be approved before finalizing.</p>
   </div>
 </section>
@@ -1023,13 +1021,23 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
       })
       .then(function(r){
         if(r.ok){
-          var art=document.querySelector('article[id]');if(art)art.dataset.status='finalized';
-          btn.textContent='Plan Finalized';
-          btn.style.background='var(--approved)';
-          btn.style.color='#fff';
-          finalizeMsg.textContent='Plan finalized successfully.';
-          finalizeMsg.style.color='var(--approved)';
-          finalizeMsg.style.display='block';
+          r.json().then(function(data){
+            var art=document.querySelector('article[id]');if(art)art.dataset.status='finalized';
+            btn.textContent='Plan Finalized';
+            btn.style.background='var(--approved)';
+            btn.style.color='#fff';
+            if(data&&data.next_steps){
+              var pre=document.createElement('pre');
+              pre.style.cssText='margin-top:12px;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:.78rem;text-align:left;white-space:pre-wrap;word-break:break-all;color:var(--text)';
+              pre.textContent=data.next_steps;
+              finalizeMsg.innerHTML='';
+              finalizeMsg.appendChild(pre);
+            } else {
+              finalizeMsg.textContent='Plan finalized successfully.';
+            }
+            finalizeMsg.style.color='var(--approved)';
+            finalizeMsg.style.display='block';
+          });
         } else {
           return r.json().then(function(data){
             btn.textContent='Finalize Plan';
@@ -1181,6 +1189,55 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 })();
 
 // Chat panel
+// Global markdown renderer — shared by chat bubbles and data-markdown elements
+function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function renderMd(text){
+  var s=escHtml(text);
+  s=s.replace(/```(\w*)\n([\s\S]*?)```/g,function(_,lang,code){
+    return '<pre><code'+(lang?' class="language-'+lang+'"':'')+'>'+code.trim()+'</code></pre>';
+  });
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  s=s.replace(/^### (.+)$/gm,'<h4>$1</h4>');
+  s=s.replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  s=s.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm,function(_,hdr,sep,body){
+    var ths=hdr.split('|').filter(Boolean).map(function(c){return '<th>'+c.trim()+'</th>';}).join('');
+    var rows=body.trim().split('\n').map(function(row){
+      var tds=row.split('|').filter(Boolean).map(function(c){return '<td>'+c.trim()+'</td>';}).join('');
+      return '<tr>'+tds+'</tr>';
+    }).join('');
+    return '<table class="q-table"><thead><tr>'+ths+'</tr></thead><tbody>'+rows+'</tbody></table>';
+  });
+  s=s.replace(/^[*-] (.+)$/gm,'<li>$1</li>');
+  s=s.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
+  s=s.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+  s=s.replace(/\n\n/g,'</p><p>');
+  s=s.replace(/\n/g,'<br>');
+  return '<p>'+s+'</p>';
+}
+// Render inline markdown for elements with data-markdown attribute.
+// For block elements (div/p) replaces innerHTML; for inline (li/span)
+// renders without wrapping <p> tags.
+(function(){
+  document.querySelectorAll('[data-markdown]').forEach(function(el){
+    var raw=el.textContent;
+    if(!raw.trim()) return;
+    var tag=el.tagName.toLowerCase();
+    if(tag==='li'||tag==='span'||tag==='td'){
+      // Inline context — just apply bold/italic/code, no block transforms
+      var s=escHtml(raw);
+      s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+      s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+      s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+      el.innerHTML=s;
+    } else {
+      el.innerHTML=renderMd(raw);
+    }
+    el.removeAttribute('data-markdown');
+  });
+})();
+
 (function(){
   'use strict';
   var chatMessages=document.getElementById('chat-messages');
@@ -1188,45 +1245,6 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
   var chatSend=document.getElementById('chat-send');
   var chatEmpty=document.getElementById('chat-empty');
   if(!chatMessages||!chatInput||!chatSend) return;
-
-  function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-
-  // Lightweight markdown → HTML for chat bubbles
-  function renderMd(text){
-    var s=escHtml(text);
-    // Code blocks (``` ... ```)
-    s=s.replace(/```(\w*)\n([\s\S]*?)```/g,function(_,lang,code){
-      return '<pre><code'+(lang?' class="language-'+lang+'"':'')+'>'+code.trim()+'</code></pre>';
-    });
-    // Inline code
-    s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
-    // Bold
-    s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-    // Italic
-    s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
-    // Headers
-    s=s.replace(/^### (.+)$/gm,'<h4>$1</h4>');
-    s=s.replace(/^## (.+)$/gm,'<h3>$1</h3>');
-    // Tables: header row, separator, data rows
-    s=s.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm,function(_,hdr,sep,body){
-      var ths=hdr.split('|').filter(Boolean).map(function(c){return '<th>'+c.trim()+'</th>';}).join('');
-      var rows=body.trim().split('\n').map(function(row){
-        var tds=row.split('|').filter(Boolean).map(function(c){return '<td>'+c.trim()+'</td>';}).join('');
-        return '<tr>'+tds+'</tr>';
-      }).join('');
-      return '<table class="q-table"><thead><tr>'+ths+'</tr></thead><tbody>'+rows+'</tbody></table>';
-    });
-    // Unordered lists
-    s=s.replace(/^[*-] (.+)$/gm,'<li>$1</li>');
-    s=s.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
-    // Numbered lists
-    s=s.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
-    // Paragraphs (double newline)
-    s=s.replace(/\n\n/g,'</p><p>');
-    // Single newlines within paragraphs
-    s=s.replace(/\n/g,'<br>');
-    return '<p>'+s+'</p>';
-  }
 
   function addBubble(role,content){
     if(!content||!content.trim()) return null; // skip empty messages
@@ -1518,6 +1536,7 @@ syncHljsTheme();
     .catch(function(){});
 })();
 </script>
-</div><!-- .plan-content -->
-</body>
-</html>
+<!-- .plan-content -->
+
+
+</body></html>

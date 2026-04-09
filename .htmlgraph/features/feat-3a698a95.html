@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Project isolation — prevent cross-project contamination (trk-06a29a51)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-3a698a95"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-08T22:36:53.795112"
+             data-updated="2026-04-08T22:52:44.290835" data-agent-assigned="claude-code" data-track-id="trk-99236a6f">
+
+        <header>
+            <h1>Project isolation — prevent cross-project contamination (trk-06a29a51)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implements">
+                <h3>Implements:</h3>
+                <ul>
+                    <li><a href="bug-95dc78ba.html" data-relationship="implements" data-since="2026-04-08T22:37:27.976882">Status line bleeds across projects — shows work items from wrong project</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="ca52272e-2ab2-4b82-a117-aa6e91df6ae2.html" data-relationship="implemented_in" data-since="2026-04-08T22:47:46.641075">session ca52272e-2ab2-4b82-a117-aa6e91df6ae2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-99236a6f.html" data-relationship="part_of" data-since="2026-04-08T22:36:53.795796">trk-99236a6f</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Status line bleeds across projects (bug-95dc78ba). Sessions from other projects end up in the current DB. Ensure hooks only write to the correct project's DB. Tighten ResolveProjectDir to reject ambiguous resolution.</p>
+        </section>
+    </article>
+</body>
+</html>

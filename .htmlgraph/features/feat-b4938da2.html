@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Auto-registration in PersistentPreRunE</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-b4938da2"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:43:57.678659"
+             data-updated="2026-04-09T19:02:45.574189" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>Auto-registration in PersistentPreRunE</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-377ea97f.html" data-relationship="blocked_by">feat-377ea97f</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="4aa3628f-9cde-43b7-94a6-4e01f892c264.html" data-relationship="implemented_in" data-since="2026-04-09T18:35:53.026205">session 4aa3628f-9cde-43b7-94a6-4e01f892c264</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-368a5cd2.html" data-relationship="planned_in" data-since="2026-04-09T16:43:57.679006">plan-368a5cd2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>In `cmd/htmlgraph/main.go`, extend the existing `rootCmd.PersistentPreRunE` to call `registry.Load(registry.DefaultPath())`, then `reg.Upsert(projectDir, name, gitRemoteURL)`, then `reg.Save()` after the existing `agent.EnsureSession` call. Derive `projectDir` from the already-resolved `filepath.Dir(hgDir)`. Derive `name` as `filepath.Base(projectDir)`. Derive `gitRemoteURL` via `paths.GetGitRemoteURL(projectDir)` — but ONLY when the existing registry entry for `projectDir` has an empty `GitRemoteURL`; if the entry already has a URL populated, skip the `git remote get-url origin` subprocess entirely and pass the cached value to `Upsert`. This ensures the git subprocess runs at most once per project, not on every CLI invocation. Skip the registry upsert (return `nil`) when `findHtmlgraphDir()` returns an error (same graceful-degradation pattern already used for EnsureSession). The entire upsert + save must complete within 10 ms on an SSD for the common case (cached remote URL, no git subprocess); the first-invocation case may take up to 30 ms due to git process startup.</p>
+        </section>
+    </article>
+</body>
+</html>

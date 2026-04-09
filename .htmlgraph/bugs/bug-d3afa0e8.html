@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Execute log shows work item IDs instead of titles in badges</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-d3afa0e8"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T18:35:05.741435"
+             data-updated="2026-04-09T18:42:17.527975" data-agent-assigned="claude-code" data-track-id="trk-00ee0cd0">
+
+        <header>
+            <h1>Execute log shows work item IDs instead of titles in badges</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-00ee0cd0.html" data-relationship="part_of" data-since="2026-04-09T18:35:05.743099">trk-00ee0cd0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="8d53982f-66f2-415b-a645-1886eb8ae438.html" data-relationship="implemented_in" data-since="2026-04-09T18:35:08.728508">session 8d53982f-66f2-415b-a645-1886eb8ae438</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Screenshot from /htmlgraph:execute session (2026-04-09) shows the execute log with work item badges rendering IDs like 'TRK-8CF41009' and numeric step IDs ('1', '2', '3') instead of human-readable titles. Expected: 'MULTI-PROJECT MVP' (or a truncated title), and step titles like 'CREATE INTERNAL/REGISTRY/REGISTRY.GO'. Observed: raw IDs. This is a regression — the badges used to show titles. Context: user started /htmlgraph:execute trk-8cf41009 and the dispatcher subagent titles are also showing as 'HTMLGRAPH:SONNET-CODER' which is the agent name, but the numeric step labels '1','2','3','4','5' next to TaskCreate/TaskUpdate entries should show slice titles. Possibly related to the plan finalize-yaml flow creating new feature IDs that weren't re-linked to the log rendering, or the execute dispatcher using step num instead of title when emitting task descriptions.</p>
+        </section>
+    </article>
+</body>
+</html>

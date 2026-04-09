@@ -10,15 +10,15 @@
 <body>
     <article id="feat-3c25d1f1"
              data-type="feature"
-             data-status="todo"
+             data-status="done"
              data-priority="medium"
              data-created="2026-03-28T21:56:43.420432"
-             data-updated="2026-03-28T21:56:43.421664" data-agent-assigned="claude-code" data-track-id="trk-06a29a51">
+             data-updated="2026-04-09T02:25:25.506089" data-agent-assigned="claude-code" data-track-id="trk-06a29a51">
 
         <header>
             <h1>Ingest project filter — only import matching sessions</h1>
             <div class="metadata">
-                <span class="badge status-todo">Todo</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
@@ -35,11 +35,11 @@
         <section data-steps>
             <h3>Implementation Steps</h3>
             <ol>
-                <li data-completed="false" data-step-id="step-feat-3c25d1f1-0">⏳ In htmlgraph ingest, read the current project&#39;s git remote URL</li>
-                <li data-completed="false" data-step-id="step-feat-3c25d1f1-1">⏳ When scanning Claude Code transcripts, skip sessions whose CWD or project_dir doesn&#39;t match the current project</li>
-                <li data-completed="false" data-step-id="step-feat-3c25d1f1-2">⏳ Use git remote URL comparison (not path comparison) so different checkouts of the same repo are treated as same project</li>
-                <li data-completed="false" data-step-id="step-feat-3c25d1f1-3">⏳ Add --all flag to ingest to override the filter and import everything (backward compat)</li>
-                <li data-completed="false" data-step-id="step-feat-3c25d1f1-4">⏳ Write test: ingest with two projects&#39; transcripts -&gt; only imports matching project&#39;s sessions</li>
+                <li data-completed="true" data-step-id="step-feat-3c25d1f1-0" data-agent="claude-code">✅ In htmlgraph ingest, read the current project&#39;s git remote URL</li>
+                <li data-completed="true" data-step-id="step-feat-3c25d1f1-1" data-agent="claude-code">✅ When scanning Claude Code transcripts, skip sessions whose CWD or project_dir doesn&#39;t match the current project</li>
+                <li data-completed="true" data-step-id="step-feat-3c25d1f1-2" data-agent="claude-code">✅ Use git remote URL comparison (not path comparison) so different checkouts of the same repo are treated as same project</li>
+                <li data-completed="true" data-step-id="step-feat-3c25d1f1-3" data-agent="claude-code">✅ Add --all flag to ingest to override the filter and import everything (backward compat)</li>
+                <li data-completed="true" data-step-id="step-feat-3c25d1f1-4" data-agent="claude-code">✅ Write test: ingest with two projects&#39; transcripts -&gt; only imports matching project&#39;s sessions</li>
             </ol>
         </section>
     </article>

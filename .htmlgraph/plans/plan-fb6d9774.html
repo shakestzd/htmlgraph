@@ -1,15 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="htmlgraph-version" content="1.0">
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="htmlgraph-version" content="1.0"/>
 <title>Plan: CLI Reference Auto-Generator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled=""/>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/go.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
@@ -278,7 +276,7 @@ textarea::placeholder{color:var(--text-muted)}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-fb6d9774" data-plan-id="plan-fb6d9774" data-feature-id="" data-status="draft">
+<article id="plan-fb6d9774" data-plan-id="plan-fb6d9774" data-feature-id="" data-status="finalized">
 
 <!-- Plan Header -->
 <header class="plan-header">
@@ -290,7 +288,7 @@ textarea::placeholder{color:var(--text-muted)}
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
-  &#9728; Light
+  ☀ Light
 </button>
 
 <!-- Related Work -->
@@ -299,7 +297,7 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan YAML source (collapsible) -->
 <details class="yaml-viewer" id="yaml-viewer">
     <summary>View Plan YAML</summary>
-    <pre><code class="language-yaml" id="yaml-content">Loading&#x2026;</code></pre>
+    <pre><code class="language-yaml" id="yaml-content">Loading…</code></pre>
 </details>
 
 <!-- ZONE 1: Dependency Graph -->
@@ -315,7 +313,7 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- ZONE 2: Interactive Sections -->
 
 <!-- Design -->
-<details id="design" class="section-card" open data-phase="design" data-status="pending">
+<details id="design" class="section-card" open="" data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
     <!--PLAN_DESIGN_CONTENT-->
@@ -324,7 +322,7 @@ textarea::placeholder{color:var(--text-muted)}
       <!--PLAN_QUESTIONS-->
     </div>
     <div class="approval-row">
-      <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
+      <label><input type="checkbox" data-section="design" data-action="approve" checked="checked"/> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
@@ -334,7 +332,7 @@ textarea::placeholder{color:var(--text-muted)}
 
 
 <!-- Slices -->
-<details id="slices" class="section-card" open data-phase="slices" data-status="pending">
+<details id="slices" class="section-card" open="" data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
     
@@ -373,7 +371,7 @@ textarea::placeholder{color:var(--text-muted)}
     <div id="commentsFeed"><p style="font-size:.8rem;color:var(--text-muted);font-style:italic">No comments yet.</p></div>
   </div>
   <div class="finalize-area">
-    <button class="btn-finalize" id="finalizeBtn" disabled>Finalize Plan</button>
+    <button class="btn-finalize" id="finalizeBtn" disabled="">Finalize Plan</button>
     <p style="font-size:.75rem;color:var(--text-muted);margin-top:6px">All sections must be approved before finalizing.</p>
   </div>
 </section>
@@ -1084,6 +1082,7 @@ syncHljsTheme();
     .catch(function(){});
 })();
 </script>
-</div><!-- .plan-content -->
-</body>
-</html>
+<!-- .plan-content -->
+
+
+</body></html>

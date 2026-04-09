@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Global dashboard backend — htmlgraph serve --global</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-5cd534a9"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:43:57.67989"
+             data-updated="2026-04-09T19:02:45.614136" data-agent-assigned="claude-code" data-track-id="trk-8cf41009">
+
+        <header>
+            <h1>Global dashboard backend — htmlgraph serve --global</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-377ea97f.html" data-relationship="blocked_by">feat-377ea97f</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="4aa3628f-9cde-43b7-94a6-4e01f892c264.html" data-relationship="implemented_in" data-since="2026-04-09T18:37:11.225424">session 4aa3628f-9cde-43b7-94a6-4e01f892c264</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-368a5cd2.html" data-relationship="planned_in" data-since="2026-04-09T16:43:57.680106">plan-368a5cd2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>In `cmd/htmlgraph/serve.go`, add a `--global` bool flag to `serveCmd()`. When `--global` is set, call a new `runGlobalServer(port int)` function instead of `runServer`. `runGlobalServer` loads the registry, iterates entries where status==exists, opens each project DB read-only via `registry.OpenReadOnly(filepath.Join(entry.ProjectDir, ".htmlgraph", "htmlgraph.db"))` — never via `workitem.Open` which runs migrations. Collect `[]*sql.DB` mapped by stable project ID (`entry.ID`, the 8-char SHA256 prefix stored in the registry entry). Add new API routes to the mux: `GET /api/projects` — returns `[]ProjectSummary` JSON where each summary contains `{id, name, dir, lastSeen, featureCount, bugCount, spikeCount}` using the stable `entry.ID` as the project ID. `GET /api/mode` — returns `{"mode":"global","projects":[...]}` in global mode; this endpoint is also added to the single-project server returning `{"mode":"single"}`. Extend existing routes with a `?project=` query parameter: `GET /api/sessions?project=` dispatches to `sessionsHandler` for the matched project's `*sql.DB`; `GET /api/features?project=` dispatches to `featuresHandler`; `GET /api/stats?project=` dispatches to `statsHandler`. `GET /api/projects/all/stats` — aggregates stat counts across all projects. When `?project` is absent or the route is hit without global context, fall through to single-project behaviour. Reuse existing `corsMiddleware` and handler functions — pass `*sql.DB` and `htmlgraphDir` as explicit arguments rather than closures where needed. All cross-project DB connections are read-only. Existing `runServer` (single-project) must remain unchanged.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Work view empty after Back to Board from graph navigation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-93822e81"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-09T16:18:09.43315"
+             data-updated="2026-04-09T16:21:17.199862" data-agent-assigned="claude-code" data-track-id="trk-97f85b3b">
+
+        <header>
+            <h1>Work view empty after Back to Board from graph navigation</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-97f85b3b.html" data-relationship="part_of" data-since="2026-04-09T16:18:09.434962">trk-97f85b3b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="559faa0b-464a-43ca-95a6-65097d374f34.html" data-relationship="implemented_in" data-since="2026-04-09T16:18:38.997752">session 559faa0b-464a-43ca-95a6-65097d374f34</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When clicking a work item from the graph view, navigating to its detail, then clicking Back to Board, the work view shows an empty state (Work 0) instead of the kanban board. Root cause: closeWorkDetail shows the board container but features[] is empty because fetchFeatures was never called (user came from graph, not work view). Fix: closeWorkDetail should call fetchFeatures when features.length === 0.</p>
+        </section>
+    </article>
+</body>
+</html>

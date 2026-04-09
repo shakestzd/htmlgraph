@@ -1,0 +1,1725 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="htmlgraph-version" content="1.0"/>
+<title>Plan: Multi-Project Hardening — per-project process isolation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-dark"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" id="hljs-light" disabled=""/>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/go.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
+<style>
+:root {
+  --bg:#0f0f13; --bg-card:#18181c; --bg-input:#222228; --bg-hover:#2c2c32;
+  --text:#f0f0ed; --text-dim:#d0d0cc; --text-muted:#9898a0; --border:#3a3a42;
+  --accent:#cdff00; --accent-dim:rgba(205,255,0,.1); --accent-glow:rgba(205,255,0,.25);
+  --approved:#22c55e; --revision:#f59e0b; --discuss:#a78bfa; --pending:#6b7280; --blocked:#ef4444;
+  --radius:8px; --radius-sm:5px;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono','Cascadia Code',monospace;
+  --sans:'DM Sans','Inter',system-ui,-apple-system,sans-serif;
+  --shadow-card:0 2px 8px rgba(0,0,0,.5), 0 0 0 1px var(--border);
+  --shadow-elevated:0 8px 32px rgba(0,0,0,.6), 0 0 0 1px var(--border);
+  --transition:150ms cubic-bezier(.4,0,.2,1);
+}
+[data-theme="light"] {
+  --bg:#f4f3ef; --bg-card:#ffffff; --bg-input:#eeeee8; --bg-hover:#e4e4de;
+  --text:#1a1a1e; --text-dim:#4a4a50; --text-muted:#8a8a90; --border:#d4d4cc;
+  --accent:#4a6e00; --accent-dim:rgba(74,110,0,.08); --accent-glow:rgba(74,110,0,.2);
+  --shadow-card:0 1px 3px rgba(0,0,0,.06), 0 0 0 1px var(--border);
+  --shadow-elevated:0 4px 24px rgba(0,0,0,.1), 0 0 0 1px var(--border);
+}
+[data-theme="light"] .badge-approved{background:rgba(34,197,94,.08);color:#16a34a;border-color:rgba(34,197,94,.2)}
+[data-theme="light"] .badge-revision{background:rgba(245,158,11,.08);color:#d97706;border-color:rgba(245,158,11,.2)}
+[data-theme="light"] .badge-discuss{background:rgba(167,139,250,.08);color:#7c3aed;border-color:rgba(167,139,250,.2)}
+[data-theme="light"] .badge-pending{background:rgba(107,114,128,.08);color:#4b5563;border-color:rgba(107,114,128,.2)}
+[data-theme="light"] .badge-blocked{background:rgba(239,68,68,.08);color:#dc2626;border-color:rgba(239,68,68,.2)}
+[data-theme="light"] .btn-finalize{background:#4a6e00;color:#fff}
+[data-theme="light"] .section-card{--shadow-card:0 1px 2px rgba(0,0,0,.04),0 0 0 1px var(--border)}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.6;margin:0;padding:0;display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+
+/* ── Sidebar ── */
+.plan-sidebar{background:var(--bg-card);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;gap:1px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.plan-sidebar .brand{padding:16px 20px 20px;font-weight:700;font-size:1rem;color:var(--accent);text-decoration:none;display:block;border-bottom:1px solid var(--border);margin-bottom:8px;font-family:var(--mono);letter-spacing:-.02em}
+.plan-sidebar a.nav-link{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--text-muted);text-decoration:none;font-size:.82rem;font-weight:500;border-right:2px solid transparent;transition:all var(--transition)}
+.plan-sidebar a.nav-link:hover{color:var(--text);background:var(--bg-hover)}
+.plan-sidebar a.nav-link.active{color:var(--accent);background:var(--accent-dim);border-right-color:var(--accent);font-weight:600}
+
+/* ── Plan layout (content + chat sidebar) ── */
+.plan-layout{display:flex;flex:1;min-width:0;overflow:hidden;height:100vh}
+.plan-content{flex:1;min-width:0;padding:32px 40px 80px;overflow-y:auto;max-width:960px}
+
+/* ── Chat sidebar ── */
+.chat-sidebar{width:360px;min-width:280px;max-width:600px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg-card);overflow:hidden;height:100%}
+.chat-resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background .15s;flex-shrink:0;position:relative}
+.chat-resize-handle:hover,.chat-resize-handle.dragging{background:var(--accent);opacity:.5}
+.chat-resize-handle::after{content:'';position:absolute;top:50%;left:-4px;width:12px;height:32px;transform:translateY(-50%);border-radius:4px}
+
+/* ── Typography ── */
+h1{font-family:var(--sans);font-size:1.65rem;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-.03em;line-height:1.3}
+h1::first-letter{color:var(--accent)}
+h2{font-family:var(--sans);font-size:1.15rem;font-weight:600;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+h4{font-family:var(--sans);font-size:.88rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+p,li{color:var(--text-dim);line-height:1.7;font-size:.95rem}
+ul,ol{padding-left:1.5em;margin:8px 0}
+ul{list-style:disc}
+ol{list-style:decimal}
+li{padding:3px 0}
+li::marker{color:var(--text-muted)}
+code{font-family:var(--mono);font-size:.82em;background:var(--bg-input);padding:2px 6px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+pre{font-family:var(--mono);font-size:.78rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;line-height:1.6;color:var(--text);margin:10px 0}
+a{color:var(--accent);text-decoration:none;transition:opacity var(--transition)}
+a:hover{opacity:.8}
+
+/* ── Plan header ── */
+.plan-header{margin-bottom:36px;padding-bottom:20px;border-bottom:1px solid var(--border);position:relative}
+.plan-header::after{content:'';position:absolute;bottom:-1px;left:0;width:120px;height:1px;background:var(--accent);opacity:.5}
+.plan-header .meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;align-items:center}
+
+/* ── Related Work ── */
+.related-work{margin-bottom:24px;padding:16px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;gap:12px}
+.related-track{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.related-label{font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;min-width:70px}
+.related-link{color:var(--accent);font-weight:600;font-size:.9rem;text-decoration:none}
+.related-link:hover{text-decoration:underline}
+.related-features{display:flex;flex-direction:column;gap:6px}
+.related-feature-list{display:flex;flex-direction:column;gap:4px}
+.related-feature{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);text-decoration:none;transition:border-color var(--transition)}
+.related-feature:hover{border-color:var(--accent)}
+.related-feature-id{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);min-width:110px}
+.related-feature-title{flex:1;font-size:.85rem;color:var(--text-dim)}
+.related-feature .badge{flex-shrink:0}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:4px 12px;border-radius:9999px;border:1px solid transparent;transition:all var(--transition)}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.badge-approved{background:rgba(34,197,94,.1);color:var(--approved);border-color:rgba(34,197,94,.25)}.badge-approved::before{background:var(--approved);box-shadow:0 0 6px var(--approved)}
+.badge-revision{background:rgba(245,158,11,.1);color:var(--revision);border-color:rgba(245,158,11,.25)}.badge-revision::before{background:var(--revision)}
+.badge-discuss{background:rgba(167,139,250,.1);color:var(--discuss);border-color:rgba(167,139,250,.25)}.badge-discuss::before{background:var(--discuss)}
+.badge-pending{background:rgba(107,114,128,.1);color:var(--pending);border-color:rgba(107,114,128,.2)}.badge-pending::before{background:var(--pending)}
+.badge-blocked{background:rgba(239,68,68,.1);color:var(--blocked);border-color:rgba(239,68,68,.25)}.badge-blocked::before{background:var(--blocked)}
+
+/* ── Dependency graph ── */
+.dep-graph{background:var(--bg-card);border-radius:var(--radius);padding:28px;margin-bottom:28px;box-shadow:var(--shadow-card);overflow-x:auto}
+.dep-graph h2{margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.dep-graph svg{display:block;height:auto}
+#dep-graph-svg .node rect{rx:8;ry:8;fill:var(--bg-input);stroke:var(--border);stroke-width:2px}
+#dep-graph-svg .node text{fill:var(--text) !important;font-family:var(--sans);font-size:13px}
+#dep-graph-svg .edgePath path{stroke:var(--text-muted);stroke-dasharray:5 4;fill:none;stroke-width:1.5}
+#dep-graph-svg .edgePath marker path{fill:var(--text-muted)}
+
+/* ── Section cards ── */
+.section-card{background:var(--bg-card);border-radius:var(--radius);margin-bottom:14px;box-shadow:var(--shadow-card);overflow:hidden;transition:box-shadow var(--transition)}
+.section-card:hover{box-shadow:var(--shadow-elevated)}
+.section-card summary{display:flex;align-items:center;gap:12px;padding:16px 24px;cursor:pointer;font-weight:600;font-size:1rem;list-style:none;user-select:none;color:var(--text);font-family:var(--sans);transition:background var(--transition)}
+.section-card summary:hover{background:var(--bg-hover)}
+.section-card summary::-webkit-details-marker{display:none}
+.section-card summary::before{content:'';width:6px;height:6px;border-right:2px solid var(--text-muted);border-bottom:2px solid var(--text-muted);transform:rotate(-45deg);transition:transform .2s ease;flex-shrink:0}
+.section-card[open] summary::before{transform:rotate(45deg)}
+.section-card summary .badge{margin-left:auto}
+.section-body{padding:16px 24px 24px;animation:slideDown .2s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.sub-section{margin-bottom:20px}.sub-section:last-child{margin-bottom:0}
+
+/* ── Approval row ── */
+.approval-row{display:flex;align-items:center;gap:16px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.approval-row label{font-size:.9rem;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:500;white-space:nowrap;transition:color var(--transition)}
+.approval-row label:hover{color:var(--accent)}
+.approval-row input[type="checkbox"]{accent-color:var(--approved);width:18px;height:18px;cursor:pointer;border-radius:4px;flex-shrink:0}
+
+/* ── Textarea ── */
+textarea{width:100%;min-height:52px;resize:vertical;background:var(--bg-input);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:var(--sans);font-size:.84rem;line-height:1.5;transition:border-color var(--transition),box-shadow var(--transition)}
+textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+textarea::placeholder{color:var(--text-muted)}
+
+/* ── Question blocks ── */
+.question-block{margin-bottom:16px;padding:14px 16px;background:var(--bg-input);border-radius:var(--radius);border-left:3px solid var(--discuss)}
+.question-block p{font-size:.88rem;color:var(--text);margin-bottom:8px;font-weight:500}
+.question-block label{display:block;font-size:.84rem;color:var(--text-dim);padding:5px 8px;cursor:pointer;transition:color var(--transition);border-radius:var(--radius-sm)}
+.question-block label:hover{color:var(--text);background:var(--bg-hover)}
+.question-block label.recommended{border-left:2px solid var(--accent);padding-left:10px;background:var(--accent-dim)}
+.question-block input[type="radio"]{accent-color:var(--accent);margin-right:8px;cursor:pointer}
+.rec-tag{font-family:var(--mono);font-size:.65rem;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-left:6px;opacity:.8}
+
+/* ── Slice cards ── */
+.slice-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px;transition:border-color var(--transition)}
+.slice-card:hover{border-color:rgba(205,255,0,.2)}
+.slice-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.slice-num{font-family:var(--mono);font-size:.8rem;color:var(--bg);background:var(--accent);padding:3px 9px;border-radius:4px;font-weight:700;min-width:26px;text-align:center}
+.slice-name{font-weight:600;font-size:1rem;font-family:var(--sans);flex:1}
+.slice-meta{font-size:.85rem;color:var(--text-muted);margin-bottom:8px;font-family:var(--mono)}
+.slice-meta span{margin-right:14px}
+.slice-field{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(51,51,56,.4)}
+.slice-field:last-of-type{border-bottom:none}
+.slice-field-label{font-family:var(--mono);font-size:.75rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.slice-field-value{font-size:.92rem;color:var(--text-dim);line-height:1.7}
+.slice-field-value code{font-size:.82rem;word-break:break-all}
+.slice-tests{white-space:pre-line}
+.slice-done-list{list-style:none;padding-left:0;margin:0}
+.slice-done-list li{font-size:.9rem;color:var(--text-dim);padding:4px 0;padding-left:20px;position:relative}
+.slice-done-list li::before{content:'\2713';position:absolute;left:0;color:var(--approved);font-weight:700}
+.slice-deps{font-size:.85rem;color:var(--text-muted);margin-top:8px;font-family:var(--mono)}
+.slice-card .approval-row{margin-top:16px}
+
+/* ── Progress zone ── */
+.progress-zone{background:var(--bg-card);border-radius:var(--radius);padding:24px;margin-top:28px;box-shadow:var(--shadow-card)}
+.progress-bar-track{height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden;margin:12px 0 20px;position:relative}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--approved));border-radius:3px;transition:width .4s cubic-bezier(.4,0,.2,1);position:relative}
+.progress-bar-fill::after{content:'';position:absolute;right:0;top:-1px;width:8px;height:8px;background:var(--approved);border-radius:50%;box-shadow:0 0 8px var(--approved);opacity:0;transition:opacity .3s}
+.progress-bar-fill[style*="width:100"]::after,.progress-bar-fill[style*="width: 100"]::after{opacity:1}
+.progress-stats{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px}
+.progress-stat{font-size:.82rem;color:var(--text-dim);font-family:var(--sans)}.progress-stat strong{color:var(--text);font-size:1.2rem;margin-right:4px;font-weight:700}
+.comments-summary{border-top:1px solid var(--border);padding-top:16px;margin-top:4px}.comments-summary h3{margin-bottom:10px}
+.comment-entry{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border)}
+.comment-entry:last-child{border-bottom:none}
+.comment-entry .comment-source{font-family:var(--mono);color:var(--accent);font-weight:600;margin-right:8px;font-size:.75rem}
+.finalize-area{margin-top:20px;text-align:center}
+.btn-finalize{background:var(--accent);color:#0a0a0a;border:none;border-radius:var(--radius);padding:12px 36px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:var(--sans);letter-spacing:.01em;transition:all var(--transition);box-shadow:0 0 0 0 var(--accent-glow)}
+.btn-finalize:hover:not(:disabled){filter:brightness(.92);box-shadow:0 0 20px var(--accent-glow)}
+.btn-finalize:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── Critique zone lists (badge-aligned, no bullets) ── */
+#critique ul{list-style:none;padding-left:0;margin:0}
+#critique ul li{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+#critique ul li:last-child{border-bottom:none}
+#critique ul li .badge{flex-shrink:0;margin-top:2px}
+
+/* ── Questions table ── */
+.q-table{width:100%;font-size:.84rem;border-collapse:collapse}
+.q-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text-muted);font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em}
+.q-table td{padding:8px 10px;border-bottom:1px solid var(--border)}
+
+/* ── Chat panel (inside sidebar) ── */
+.chat-panel{display:flex;flex-direction:column;flex:1;overflow:hidden;border-radius:0;box-shadow:none;background:transparent}
+.chat-panel h2{padding:16px 20px 12px;margin-bottom:0;font-size:.95rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.chat-bubble{padding:14px 18px;border-radius:12px;max-width:88%;word-wrap:break-word;font-size:.88rem;line-height:1.65;white-space:normal;animation:bubbleIn .2s ease;overflow:visible}
+@keyframes bubbleIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.chat-bubble[data-role="user"]{background:var(--accent-dim);border:1px solid rgba(205,255,0,.12);margin-left:auto;color:var(--text);border-bottom-right-radius:4px}
+.chat-bubble[data-role="assistant"]{background:var(--bg-input);border:1px solid var(--border);color:var(--text-dim);border-bottom-left-radius:4px}
+.chat-bubble h3,.chat-bubble h4{font-size:.92rem;margin:16px 0 6px;color:var(--text);font-family:var(--sans)}
+.chat-bubble h3:first-child,.chat-bubble h4:first-child,.chat-bubble p:first-child{margin-top:0}
+.chat-bubble p{margin:8px 0;font-size:inherit;color:inherit;line-height:1.65}
+.chat-bubble p:last-child{margin-bottom:0}
+.chat-bubble strong{color:var(--text);font-weight:600}
+.chat-bubble em{font-style:italic}
+.chat-bubble code{font-size:.82em;padding:2px 5px;background:rgba(255,255,255,.06);border-radius:3px}
+.chat-bubble pre{margin:10px 0;padding:12px 14px;font-size:.8rem;border-radius:var(--radius-sm);background:rgba(0,0,0,.2);overflow-x:auto;white-space:pre;line-height:1.5}
+.chat-bubble pre code{background:none;padding:0;font-size:inherit}
+.chat-bubble ul,.chat-bubble ol{margin:8px 0;padding-left:1.4em}
+.chat-bubble li{padding:3px 0;font-size:inherit;line-height:1.6}
+.chat-bubble table{margin:10px 0;font-size:.82rem;border-collapse:collapse;width:100%;display:block;overflow-x:auto}
+.chat-bubble table th{text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);color:var(--text-muted);font-family:var(--mono);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.chat-bubble table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.chat-input-area{display:flex;gap:8px;padding:14px 20px;border-top:1px solid var(--border);background:var(--bg-input);flex-shrink:0}
+#chat-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;resize:none;font-family:var(--sans);font-size:.84rem;line-height:1.5;transition:border-color var(--transition),box-shadow var(--transition)}
+#chat-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+#chat-input::placeholder{color:var(--text-muted)}
+#chat-send{background:var(--accent);color:#0a0a0a;border:none;border-radius:var(--radius);padding:10px 18px;cursor:pointer;font-weight:600;font-family:var(--sans);font-size:.84rem;transition:all var(--transition)}
+#chat-send:hover:not(:disabled){box-shadow:0 0 16px var(--accent-glow)}
+#chat-send:disabled{opacity:.3;cursor:not-allowed}
+.chat-notice{font-size:.82rem;color:var(--text-muted);padding:20px;text-align:center;line-height:1.6}
+
+/* ── Amendments ── */
+.amendments-panel{margin-top:28px;background:var(--bg-card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card)}
+.amendments-panel h3{margin:0 0 14px;font-size:.92rem;color:var(--text);font-family:var(--sans);font-weight:600}
+.amendment-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);transition:background var(--transition)}
+.amendment-item:last-child{border-bottom:none}
+.amendment-item:hover{background:var(--bg-hover);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:var(--radius-sm)}
+.amendment-desc{flex:1;font-size:.84rem;color:var(--text-dim)}
+.amendment-desc .op{color:var(--accent);font-weight:600;font-family:var(--mono);font-size:.78rem}
+.amendment-desc .field{color:var(--text-muted);font-family:var(--mono);font-size:.78rem}
+.amendment-select{background:var(--bg-input);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;font-size:.8rem;font-family:var(--sans);cursor:pointer;transition:border-color var(--transition)}
+.amendment-select:focus{border-color:var(--accent);outline:none}
+.amendments-summary{font-size:.82rem;color:var(--text-muted);margin-top:14px;font-family:var(--mono);padding-top:10px;border-top:1px solid var(--border)}
+
+/* ── YAML viewer ── */
+.yaml-viewer{margin:20px 0}
+.yaml-viewer summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:.84rem;padding:8px 0;font-family:var(--mono);transition:opacity var(--transition)}
+.yaml-viewer summary:hover{opacity:.7}
+.yaml-viewer pre{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:16px;overflow-x:auto;max-height:500px;overflow-y:auto;font-size:.78rem;line-height:1.5;margin-top:8px}
+.yaml-viewer code{font-family:var(--mono);color:var(--text)}
+
+
+/* ── Print ── */
+@media print{body{background:#fff;color:#111;max-width:100%;display:block}.plan-sidebar{display:none}.section-card,.dep-graph,.progress-zone,.slice-card{border-color:#ccc;background:#fafafa;box-shadow:none}details[open] summary~*{display:block}.btn-finalize,.chat-panel,.amendments-panel{display:none}}
+
+/* ── Responsive ── */
+@media(max-width:1024px){.chat-sidebar{width:300px;min-width:240px}}
+@media(max-width:768px){
+  body{grid-template-columns:1fr}
+  .plan-sidebar{display:none}
+  .plan-layout{flex-direction:column;height:auto}
+  .plan-content{padding:20px 16px 40px;max-width:none}
+  .chat-resize-handle{display:none}
+  .chat-sidebar{width:100% !important;min-width:0;max-width:none;border-left:none;border-top:1px solid var(--border);height:400px;flex-shrink:0}
+}
+
+</style>
+</head>
+<body>
+
+<nav class="plan-sidebar">
+  <a href="/" class="brand">HtmlGraph</a>
+  <a href="#design" class="nav-link active" data-spy="design">Design</a>
+  <a href="#slices" class="nav-link" data-spy="slices">Slices</a>
+  <a href="#questions" class="nav-link" data-spy="questions">Decisions</a>
+  <a href="#critique" class="nav-link" data-spy="critique">Critique</a>
+  <a href="#feedback-summary" class="nav-link" data-spy="feedback-summary">Progress</a>
+  <a href="#chat-panel" class="nav-link" data-spy="chat-panel">Chat</a>
+</nav>
+<div class="plan-layout">
+<div class="plan-content">
+<article id="plan-237fb251" data-plan-id="plan-237fb251" data-feature-id="trk-cb36e595" data-status="finalized">
+
+<!-- Plan Header -->
+<header class="plan-header">
+  <h1>Plan: Multi-Project Hardening — per-project process isolation</h1>
+  <p style="color:var(--text-dim)">Re-architect `htmlgraph serve` from shared-process query-param dispatch to per-project child-process reverse-proxy isolation. Drops the `--global` mode flag entirely: `htmlgraph serve` is the only human-facing serve command, always starts the parent with reverse proxy, shows a projects-landing doorway, and spawns per-project children on demand. When invoked from inside a project directory, the server detects the current project and prints a deep-link URL to open it directly. Single-project serve becomes an internal cobra command (hidden from help) used only by the supervisor to spawn children. OS-level process isolation; correct-by-construction hook context; crash isolation; zero SQLite handles in the parent process.</p>
+  <div class="meta">
+    <span class="badge badge-pending">Draft</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">6 slices · Created 2026-04-09</span>
+  </div>
+</header>
+<button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
+  ☀ Light
+</button>
+
+<!-- Related Work -->
+
+
+<!-- Plan YAML source (collapsible) -->
+<details class="yaml-viewer" id="yaml-viewer">
+    <summary>View Plan YAML</summary>
+    <pre><code class="language-yaml" id="yaml-content">Loading…</code></pre>
+</details>
+
+<!-- ZONE 1: Dependency Graph -->
+<section class="dep-graph" data-zone="dependency-graph">
+  <h2>Dependency Graph</h2>
+  <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Extract buildSingleProjectMux factory + hidden _serve-child command + ephemeral port" data-status="pending" data-deps="" data-files="2"></div>
+    <div data-node="2" data-name="internal/childproc package — spawn, handshake, lifecycle, reap" data-status="pending" data-deps="1" data-files="2"></div>
+    <div data-node="3" data-name="Replace runServer body with parent+proxy; drop --global flag; current-project auto-detect" data-status="pending" data-deps="2" data-files="3"></div>
+    <div data-node="4" data-name="Remove dispatchByProject + aggregate handlers + projectCache (true doorway)" data-status="pending" data-deps="3" data-files="2"></div>
+    <div data-node="5" data-name="Frontend — /p/&lt;id&gt;/ base path navigation + helper cleanup" data-status="pending" data-deps="4" data-files="5"></div>
+    <div data-node="6" data-name="Cross-project isolation acceptance test + crash recovery + idle reap integration" data-status="pending" data-deps="5" data-files="2"></div>
+    
+    <!--PLAN_GRAPH_NODES-->
+  </div>
+  <svg id="dep-graph-svg" width="100%"></svg>
+</section>
+
+<!-- ZONE 2: Interactive Sections -->
+
+<!-- Design -->
+<details id="design" class="section-card" open="" data-phase="design" data-status="pending">
+  <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
+  <div class="section-body">
+    <h4>Problem</h4>
+<div data-markdown="">`cmd/htmlgraph/serve_global.go` implements a dual-mode `htmlgraph serve --global` path that holds a `projectCache` of read-only `*sql.DB` handles to every registered project and dispatches project-scoped routes (`/api/plans/*`, `/api/plans/&lt;id&gt;/chat`, `/api/plans/&lt;id&gt;/delete`, `/api/plans/&lt;id&gt;/render`, `/api/graph`, `/api/sessions`, `/api/features/*`, `/api/transcript`, `/api/events/tree`, `/api/events/subagent`) via `dispatchByProject(?project=&lt;id&gt;)`. The handlers then receive a read-only DB opened in the global server&#39;s working directory with the global server&#39;s env. Any write — plan chat streaming, plan finalize, plan delete, feature state transitions, hook-driven mutations — runs with the wrong CWD, wrong `HTMLGRAPH_PROJECT_DIR`, wrong `.htmlgraph/` attribution, and a SQLite handle that was explicitly opened `mode=ro`.
+
+Two concrete consequences surfaced during smoke testing on 2026-04-09:
+1. `POST /api/plans/plan-368a5cd2/chat` returned HTTP 400 because the embedded plan template hardcodes `/api/plans/&lt;id&gt;/chat` with no `?project=` and `dispatchByProject` demands it. The band-aid fix (inject `?project=` into the template) was rejected because it papers over the symptom while leaving the architecture exposed.
+2. A successfully-routed write (hypothetically) against `/api/plans/&lt;id&gt;/finalize?project=A` would: open a read-only DB to project A (SQLite errors on write), but first try to run hooks under the global server&#39;s CWD and env, attributing to the wrong project&#39;s session tables, writing event files to the wrong `.htmlgraph/` directory, and shelling out `claude` subprocesses under the wrong project context. The router has zero enforcement of which project a given write belongs to — the query param is a hint, not a boundary.
+
+The existing implementation also forces every frontend fetch call site to remember to append `?project=`. Today `buildProjectUrl` in `dashboard/js/helpers.js` covers 18+ call sites; the plan template&#39;s hardcoded URLs bypass it entirely. And the `--global` mode flag forces users to know which mode they want before running the command — the same tool has two behaviors depending on a flag that adds no value once the parent-proxy model ships. Both problems go away when the parent-proxy server becomes the default and single-project mode becomes an internal implementation detail.</div>
+<h4>Goals</h4>
+<ol>
+<li data-markdown="">**Process isolation** — each active project runs in its own `htmlgraph serve` child process with its own OS heap, env vars, CWD, SQLite connection pool, and hook context. A memory bug, held-wrong-pointer, or router confusion cannot leak state across projects because the kernel enforces the boundary.</li>
+<li data-markdown="">**Global server holds zero SQLite handles** — the global process never opens any project&#39;s SQLite database, not even read-only. All database access happens inside child processes bound to their own project directory. The landing page reads only from the registry JSON file; per-project data is served by the corresponding child via `/p/&lt;id&gt;/api/*` proxy. This is grep-enforceable: `grep -rn &#39;sql.Open\|sqlx.Open\|dbpkg.Open\|registry.OpenReadOnly&#39; cmd/htmlgraph/serve_global.go` must return zero matches.</li>
+<li data-markdown="">**Single user-facing origin** — the user still sees one dashboard on `http://localhost:8087/`. Drilling into a project navigates to `/p/&lt;project-id&gt;/` which the global server reverse-proxies to the matching child. All per-project views, plans, events, and graphs share the same origin under the `/p/&lt;id&gt;/` prefix.</li>
+<li data-markdown="">**Correct-by-construction hook context** — children are spawned with `--project-dir &lt;path&gt;`, resolved by `internal/paths/resolve.go` as the highest-priority source. All `.htmlgraph/` writes, hook events, and subprocess invocations automatically attribute to the right project with zero per-handler coordination.</li>
+<li data-markdown="">**Zero frontend ceremony** — the plan template, feature detail pages, and any future embedded view receive their project context via a template-injected `window.htmlgraphPlanBase` variable (set by the child&#39;s render path, not the global server). No `?project=` anywhere in user-facing code. `buildProjectUrl` becomes a one-line helper that branches on `window.location.pathname.startsWith(&#39;/p/&#39;)`.</li>
+<li data-markdown="">**Architectural acceptance test** — an integration test creates two temp projects, writes feature X to projectA through `/p/A/api/workitem/create`, and asserts projectB&#39;s SQLite file on disk does NOT contain feature X. Cross-project contamination becomes impossible at the boundary, not merely absent by inspection.</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li data-markdown="">Single binary, single entry point — `htmlgraph serve` spawns children of the same binary via `os.Executable()`. No new CLI tool, no separate release artifact.</li>
+<li data-markdown="">Children bind `127.0.0.1:0` — kernel assigns a free ephemeral port. Parent reads the bound port back via a stdout handshake line before routing any requests. Must not require pre-allocation or config.</li>
+<li data-markdown="">Crash isolation is bidirectional — a panic in child A must not affect child B, and the global server must return 502 (not hang) when a child is dead. The next request to that project respawns.</li>
+<li data-markdown="">Idle reaping required — children older than a configurable idle timeout (default 30 min) are SIGTERMed to prevent process leaks over long dashboard sessions.</li>
+<li data-markdown="">Zombie prevention on parent shutdown — when the global server receives SIGINT/SIGTERM, it must SIGTERM all children, wait up to 5s for graceful exit, then SIGKILL survivors. No orphan processes after `Ctrl+C`.</li>
+<li data-markdown="">All cross-project access in the global layer is read-only. The aggregate handlers (`/api/projects/all/stats`, `/api/events/stream`, `/api/events/recent`) may open foreign project DBs in `?mode=ro` mode for aggregation but MUST NOT call any handler that performs writes. This is the only architectural rule that cannot be relaxed.</li>
+<li data-markdown="">The `--global` flag is dropped entirely. `htmlgraph serve` is the only human-facing serve command and always starts the parent with reverse proxy. Single-project serve lives on as a hidden cobra subcommand (`_serve-child` or similar) used exclusively by the supervisor to spawn children — never typed by humans, excluded from `--help` output.</li>
+<li data-markdown="">`active_work_items(session_id, agent_id)` attribution (feat-ab67561e) composes cleanly — each child has its own `sessions` table and its own writer queue, so there is no cross-project SQLite contention by construction. The attribution fix applies per-project without further changes.</li>
+<li data-markdown="">Supports macOS and Linux. Windows is not a target for this work — process lifecycle differs (`pdeathsig` Linux, `ProcessMonitor` macOS, Job Objects Windows) and Windows support can be filed separately if needed.</li>
+<li data-markdown="">Child must emit the port handshake line as its FIRST stdout output. After the handshake, child stdout and stderr must be redirected to a per-project log file at `.htmlgraph/logs/serve-&lt;port&gt;.log` to prevent the parent&#39;s pipe reader from blocking on subsequent prints.</li>
+<li data-markdown="">`--project-dir` is a persistent flag on the root command, not on the `serve` subcommand. Child spawn arg order is fixed: `[binary, --project-dir, &lt;path&gt;, serve, --port, 0]`. Wrong order causes cobra to reject the flag at runtime.</li>
+<li data-markdown="">SQLite WAL mode must be explicitly enabled on both the parent&#39;s read-only aggregate connections (mode=ro) and the child&#39;s read-write connection. Without WAL on both sides, concurrent readers block writers. Audited and enforced as part of slice 4.</li>
+<li data-markdown="">Only one `htmlgraph serve` process per host. Two global servers would race on ephemeral port allocation and leave orphaned children on crash. Documented limitation; optional future work to enforce via a lockfile at `~/.htmlgraph/global-server.lock`.</li>
+<li data-markdown="">Process isolation is at the kernel boundary, not at the access-control layer. The global server has no auth today and this work does not add any. A user with HTTP access to the global server can reach `/p/&lt;any-registered-project&gt;/` — the architectural guarantee is &#39;no cross-project contamination&#39;, not &#39;project-level access control&#39;.</li>
+<li data-markdown="">On macOS there is no `prctl(PR_SET_PDEATHSIG)` equivalent. Child processes use a 5-second heartbeat goroutine that checks the parent PID and exits if the parent is gone. Linux uses pdeathsig directly. Orphan cleanup on parent SIGKILL is best-effort.</li>
+<li data-markdown="">Cross-project analytics are explicitly out of scope for this MVP. The landing page is a pure doorway: it lists registered projects from `~/.local/share/htmlgraph/projects.json` showing name, path, git remote, and last-seen timestamp. It does NOT show per-project work-item counts, live event streams, or aggregate statistics. These are deferred to a Phase 2 feature (tracked separately) that will design the cross-project analytics story intentionally rather than inheriting it from the MVP.</li>
+<li data-markdown="">The global server holds ZERO SQLite connections — no `aggregateCache`, no `projectCache`, no lazy read-only reads. Every database access in `htmlgraph serve` happens inside a child process bound to a single project&#39;s directory. This invariant is verified by grep in the slice 4 done_when and by an automated test that inspects the global server&#39;s DB handle count via reflection or instrumentation.</li>
+<li data-markdown="">When `htmlgraph serve` is invoked from inside a project directory (CWD has a `.htmlgraph/` dir), the server detects the current project by walking up to find `.htmlgraph/`, computing the project ID via SHA256-hex-8 of the absolute project dir, and checking it against the registry. If the project is registered, the startup banner prints both URLs: the doorway at `http://localhost:&lt;port&gt;/` AND the deep link at `http://localhost:&lt;port&gt;/p/&lt;id&gt;/`. If the project is not yet in the registry, auto-register it first (same path the current `PersistentPreRunE` uses). Detection failure is non-fatal — the server still starts and prints the doorway URL only. This is Option B from the v4 UX discussion: one server process, no mode branching, but the common case of &#39;I&#39;m already in a project&#39; gets a clickable deep link in the startup output.</li>
+</ul>
+
+    <div class="approval-row">
+      <label><input type="checkbox" data-section="design" data-action="approve" checked="checked"/> Approve design</label>
+      <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
+    </div>
+  </div>
+</details>
+
+
+<!-- Structure Outline (hidden when empty) -->
+
+
+<!-- Slices -->
+<details id="slices" class="section-card" open="" data-phase="slices" data-status="pending">
+  <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
+  <div class="section-body">
+    <div class="slice-card" data-slice="1" data-slice-name="feat-a1c5e301" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">Extract buildSingleProjectMux factory + hidden _serve-child command + ephemeral port</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">Refactor `cmd/htmlgraph/serve.go` into three pieces: a factory, a hidden internal command, and a human-facing command that will be fully rewired in slice 3.
+
+**(1) Factory extraction.** Extract `buildSingleProjectMux(db *sql.DB, htmlgraphDir string) *http.ServeMux` as a package-level function — 2-arg signature; `dashboardFS` is a package-level //go:embed var accessed via `dashboardSub()` and does not need to be a parameter (feasibility critic A7). The factory registers every route currently in `runServer` (lines 38-98 per research) but does NOT start the HTTP server or launch background goroutines.
+
+**(2) Hidden `_serve-child` command.** Add a new cobra subcommand under the root command with `Hidden: true` so it does not appear in `htmlgraph --help`. Name it `_serve-child` (or `serve-child` if cobra rejects the leading underscore — check). Accepts `--port &lt;N&gt;` and inherits `--project-dir &lt;path&gt;` from the persistent root flag. Body: opens the project DB via `dbpkg.Open`, builds the mux via the factory, and starts the HTTP server using `net.Listen(&#34;tcp&#34;, &#34;127.0.0.1:&lt;port&gt;&#34;) + (&amp;http.Server{Handler: mux}).Serve(ln)` so the bound `*net.TCPListener` is readable before `Serve` blocks. When `--port 0` is passed, read the assigned port via `ln.Addr().(*net.TCPAddr).Port` and print `htmlgraph-serve-ready port=&lt;N&gt; pid=&lt;PID&gt;\n` to stdout as the FIRST output of the process — no startup logs, no deprecation warnings, nothing before it, or the supervisor&#39;s line scanner corrupts. Immediately after printing the handshake, redirect `os.Stdout` and `os.Stderr` to `&lt;htmlgraphDir&gt;/logs/serve-&lt;port&gt;.log` (mkdir -p the logs dir first).
+
+**(3) Fix `autoIngestOnce` CWD dependency.** Parameterize `autoIngestOnce` (NOT `autoIngestLoop` — feasibility critic A2) at serve.go:246 to accept an explicit `htmlgraphDir`. Replace both `os.Getwd()` calls at lines 249 and 309. Update `autoIngestLoop` signature to pass `htmlgraphDir` through.
+
+**(4) Leave existing `runServer` alone for now** — slice 3 replaces its body entirely with the parent-with-proxy logic. In this slice, `runServer` can still call the factory directly and behave exactly as today&#39;s single-project serve (minus the `--global` branch). This lets slice 1 land independently without breaking `htmlgraph serve`.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Every downstream slice depends on being able to spawn a child as `htmlgraph serve --port 0 --project-dir &lt;path&gt;` and receive the assigned port back. Without the factory extraction and the ephemeral-port refactor, there is no way to run the per-project server logic inside a child process that the parent can reverse-proxy to. `autoIngestLoop` reading `os.Getwd()` is a pre-existing bug that would silently corrupt child attribution; fixing it as part of this slice keeps the blast radius contained to one commit.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/serve.go, cmd/htmlgraph/serve_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`buildSingleProjectMux(db, htmlgraphDir)` is a 2-arg package-level factory returning `*http.ServeMux`</li><li>`_serve-child` (or `serve-child`) cobra subcommand exists with `Hidden: true` — does NOT appear in `htmlgraph --help`</li><li>Running `htmlgraph --project-dir &lt;tmp&gt; _serve-child --port 0` prints `htmlgraph-serve-ready port=&lt;N&gt; pid=&lt;PID&gt;` as the FIRST stdout write</li><li>After the handshake line, child stdout and stderr are redirected to `&lt;htmlgraphDir&gt;/logs/serve-&lt;port&gt;.log`</li><li>Running the hidden child command with a fixed `--port 8081` also works and prints the handshake line (so tests can use deterministic ports)</li><li>`autoIngestOnce` takes an explicit `htmlgraphDir` parameter; both `os.Getwd()` calls at lines 249 and 309 are replaced</li><li>`autoIngestLoop` forwards the parameter to `autoIngestOnce`</li><li>Existing `htmlgraph serve` (no flag) behavior is unchanged — single-project mode still works exactly as today (slice 3 will replace it)</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit:
+  - TestBuildSingleProjectMux_RegistersAllRoutes — construct the mux via the factory with a tmpdir DB, assert every current route in serve.go is registered
+  - TestRunServer_EphemeralPort — start server with --port 0, capture stdout, assert handshake line appears, assert port is reachable via net.Dial
+  - TestRunServer_FixedPort_NoHandshake — start with --port &lt;fixed&gt;, assert no handshake line, assert existing behavior unchanged
+  - TestAutoIngestLoop_HonorsProjectDir — call with an explicit htmlgraphDir, assert ingest targets that dir not os.Getwd()
+Integration:
+  - end-to-end: start server with --port 0 in a tmpdir project, read handshake, curl /api/mode, curl /api/projects, assert responses
+Regression:
+  - existing cmd/htmlgraph tests must still pass unchanged
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve" checked="checked"/> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="2" data-slice-name="feat-b2d6f412" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#2</span>
+    <span class="slice-name">internal/childproc package — spawn, handshake, lifecycle, reap</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">New package `internal/childproc/` with `childproc.go` + `childproc_test.go`. Define `type Child struct { ID string; ProjectDir string; Port int; PID int; cmd *exec.Cmd; LastRequest atomic.Int64; cancel context.CancelFunc; exitC chan struct{}; proxy *httputil.ReverseProxy }`. Define `type Supervisor struct { mu sync.Mutex; children map[string]*Child; spawnGroups map[string]*sync.Once; binPath string; idleTimeout time.Duration; spawnTimeout time.Duration }` with per-project `sync.Once` to handle concurrent cold-spawn requests without herd contention on the main mutex. Implement `NewSupervisor(opts Options) *Supervisor` with `binPath = os.Executable()` by default. Implement `(*Supervisor) GetOrSpawn(ctx context.Context, projectID, projectDir string) (*Child, error)` which spawns via `exec.CommandContext(cancelCtx, s.binPath, &#34;--project-dir&#34;, projectDir, &#34;_serve-child&#34;, &#34;--port&#34;, &#34;0&#34;)`. **The arg order is load-bearing**: `--project-dir` is a persistent flag on the root cobra command (main.go:37) and must appear BEFORE the `serve` subcommand, not after, or cobra rejects it (feasibility critic A8). Capture stdout via `cmd.StdoutPipe()`, call `cmd.Start()`, launch a goroutine that scans stdout with `bufio.Scanner` for exactly one line matching `htmlgraph-serve-ready port=&lt;N&gt; pid=&lt;PID&gt;` with a 5s deadline. After the handshake, the scanner goroutine drains the pipe into `io.Discard` forever so the child doesn&#39;t block — though the child should have already redirected its own stdout to a log file per slice 1&#39;s requirement. Populate `Child.Port` and `Child.proxy` (pre-built `httputil.NewSingleHostReverseProxy` pointed at `http://127.0.0.1:&lt;port&gt;` with `FlushInterval = 100 * time.Millisecond` for SSE), and return. Second goroutine per child calls `cmd.Wait()`, closes `exitC`, removes from the map under the mutex. Implement `Shutdown(ctx)` which SIGTERMs all children in parallel, waits with deadline, SIGKILLs survivors. Implement `RunIdleReaper(ctx)` ticking every 60s. The closest prior-art pattern is `internal/planchat/backend.go:174` (exec.CommandContext + StdoutPipe + Start + scan + Wait) — model the scanner goroutine after it. Use `os.Executable()` not `os.Args[0]` (plan_cmds.go:268 uses os.Args[0] which is wrong for moved binaries / symlinks).</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">The supervisor is the isolation boundary. All OS-level process concerns live in one place: spawning, port handshake parsing, crash detection, idle reaping, zombie prevention on shutdown. Isolating this behind a clean interface lets slice 3&#39;s reverse-proxy layer ignore process-level concerns and lets tests verify lifecycle in isolation. Using `os.Executable()` guarantees version parity between parent and child (no PATH resolution, no split-binary installs) and plays well with `go test` (tests build their own binary and spawn it).</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/childproc/childproc.go, internal/childproc/childproc_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`GetOrSpawn` spawns a child on first call, returns the cached live child on subsequent calls</li><li>Child spawn uses the CORRECT arg order: `[binPath, --project-dir, &lt;path&gt;, _serve-child, --port, 0]` — persistent flag precedes subcommand</li><li>Port handshake parsing times out cleanly after 5s if the child never prints the ready line — returns a clear error, kills the child, removes from map</li><li>After the handshake is parsed, the scanner goroutine drains subsequent pipe output into `io.Discard` to prevent child blocking on pipe writes</li><li>Concurrent `GetOrSpawn` calls for the same project during cold spawn wait on a per-project `sync.Once`, not on the main supervisor mutex — verified by a test that fires 10 goroutines simultaneously</li><li>`exitC` closes and the map entry is removed when the child exits for any reason</li><li>`Shutdown(ctx)` with a 5s deadline cleanly kills all children — SIGTERM first, SIGKILL survivors after 5s</li><li>Idle reaper kills children where `time.Since(LastRequest) &gt; idleTimeout`</li><li>`LastRequest.Store` is atomic and safe to call from any goroutine</li><li>Spawning uses `os.Executable()` not `os.Args[0]`</li><li>Per-child `httputil.ReverseProxy` is constructed once on spawn with `FlushInterval = 100 * time.Millisecond` and cached on the Child struct</li><li>Tests use shared `TestMain` + single `go build` of a stub binary (or the real htmlgraph binary) that mimics the handshake protocol</li><li>`go test ./internal/childproc/...` completes in under 15 seconds</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit:
+  - TestSupervisor_GetOrSpawn_Fresh — spawns, handshake succeeds, returns populated Child
+  - TestSupervisor_GetOrSpawn_Cached — two calls return the same *Child instance
+  - TestSupervisor_HandshakeTimeout — child never prints ready line, spawn returns error within 5s, child is killed
+  - TestSupervisor_ChildExit_RemovesFromMap — kill the spawned child externally, assert map entry is gone after cmd.Wait() completes
+  - TestSupervisor_Shutdown_SIGTERM — shutdown with plenty of deadline, all children exit cleanly via SIGTERM, no SIGKILL fired
+  - TestSupervisor_Shutdown_SIGKILL — spawn a stub that ignores SIGTERM, assert SIGKILL fires after the deadline
+  - TestSupervisor_IdleReaper — set idleTimeout=100ms, spawn child, wait 200ms without calling LastRequest.Store, assert reaper kills it
+Integration:
+  - uses `go test -tags=integration` + a test-only `TestMain` that builds a stub binary mimicking htmlgraph&#39;s handshake protocol
+Regression:
+  - no existing tests touched (new package)
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-2" data-action="approve" checked="checked"/> Approve slice</label>
+    <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="3" data-slice-name="feat-c3e7a523" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#3</span>
+    <span class="slice-name">Replace runServer body with parent+proxy; drop --global flag; current-project auto-detect</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-3">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">This is the slice where `htmlgraph serve` transitions from &#39;single-project server&#39; to &#39;parent with reverse proxy and projects-landing&#39;. Multi-part change:
+
+**(1) Drop the `--global` flag entirely.** Delete the flag definition from the serve cobra command. `htmlgraph serve --global` becomes an unknown-flag error (cobra default). Users who typed `--global` get a clear cobra error and can re-run without the flag.
+
+**(2) Merge `runGlobalServer` body into `runServer`.** `runServer` now always starts the parent process: builds the global mux (landing SPA + `/api/mode` + `/api/projects` + `/p/&lt;id&gt;/*` proxy), instantiates the `childproc.Supervisor` from slice 2, starts the idle reaper goroutine, and calls `http.ListenAndServe(addr, mux)` on the configured `--port` (default 8087). The old single-project behavior is gone from `runServer` — it moved to the hidden `_serve-child` command in slice 1. Delete the now-dead `runGlobalServer` function.
+
+**(3) Proxy handler registration.** Register `mux.Handle(&#34;/p/&#34;, corsMiddleware(http.HandlerFunc(proxyHandler)))` where `proxyHandler` parses `/p/&lt;project-id&gt;/&lt;rest&gt;`, validates the project ID (reject empty, `.`, `..`, `/`, null bytes, non-alphanumeric+underscore+hyphen — returns 400 on validation failure), looks up the project in the registry to get `ProjectDir` (returns 404 if unknown), calls `supervisor.GetOrSpawn(r.Context(), projectID, projectDir)` (returns 502 on spawn failure), strips the `/p/&lt;id&gt;` prefix from `r.URL.Path` via `path.Clean(&#34;/&#34; + rest)` not string manipulation, calls `child.LastRequest.Store(time.Now().Unix())`, and forwards via the pre-built `child.proxy` (already has `FlushInterval = 100 * time.Millisecond` for SSE from slice 2). The proxy&#39;s `ErrorHandler` (set at construction time in slice 2) returns 502 on child unreachable.
+
+**(4) Current-project auto-detection (Option B).** Before starting the HTTP server, call `findHtmlgraphDir()` to check if CWD contains a `.htmlgraph/` directory. If yes, derive the project ID via `SHA256(absPath)[:8]`, auto-register it in the registry if not already present (same `registry.Upsert` call the `PersistentPreRunE` uses), and extend the startup banner to print BOTH URLs: `http://localhost:&lt;port&gt;/` (doorway) and `http://localhost:&lt;port&gt;/p/&lt;id&gt;/` (current project deep link). If CWD has no `.htmlgraph/` or the registration fails, silently print only the doorway URL. The detection code is ~10 lines at the top of `runServer` before the mux is built. Do NOT auto-open the browser — just print the URL for the user to click.
+
+**(5) Graceful shutdown.** Plumb `supervisor.Shutdown(ctx)` through `http.Server.RegisterOnShutdown` so when the parent receives SIGINT/SIGTERM, it cleanly kills all children before exiting.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">The reverse proxy is the one-line contract between the global server&#39;s outer mux and the per-project children. It&#39;s the only layer that needs to understand &#39;how to get a request from the user into a child&#39;; everything else (child lifecycle, frontend routing, aggregate reads) is independent. The `FlushInterval` setting is load-bearing for the SSE event stream (without it, `httputil.ReverseProxy` buffers the response and breaks EventSource). The 502 ErrorHandler is the crash-recovery story: if the child dies mid-request, the user sees an error, refreshes, and the next request spawns a fresh child.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/serve.go, cmd/htmlgraph/serve_test.go, cmd/htmlgraph/serve_global.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`--global` flag is removed from the serve cobra command — `htmlgraph serve --global` returns `unknown flag` error</li><li>`runServer` builds the global parent mux (landing + /api/mode + /api/projects + /p/&lt;id&gt;/* proxy) and always calls it</li><li>`runGlobalServer` function is deleted</li><li>`htmlgraph serve` from any directory starts the parent on port 8087 and serves the projects landing at `/`</li><li>`htmlgraph serve` invoked from inside a registered project directory prints BOTH the doorway URL and the `/p/&lt;id&gt;/` deep link in the startup banner</li><li>`htmlgraph serve` invoked from outside any project directory prints only the doorway URL (no error)</li><li>`GET /p/&lt;valid-id&gt;/api/mode` proxies to the child and returns its response</li><li>`GET /p/&lt;unknown-id&gt;/api/mode` returns 404</li><li>`GET /p/../evil` returns 400 (path traversal rejected before supervisor lookup)</li><li>`GET /p//api/mode` (empty project ID) returns 400</li><li>Child crash mid-request returns 502 via the cached proxy ErrorHandler; next request respawns a fresh child</li><li>`supervisor.Shutdown(ctx)` is called via `http.Server.RegisterOnShutdown` on parent exit</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit:
+  - TestProxyHandler_PathShape — /p/a/b proxies, /p/ 404s, /p 404s
+  - TestProxyHandler_UnknownProject_404 — registry miss returns 404 with body
+  - TestProxyHandler_SpawnFailure_502 — supervisor returns error, handler returns 502
+  - TestProxyHandler_ChildDead_502 — kill child externally, send request, assert 502 via ErrorHandler
+  - TestProxyHandler_PrefixStripped — child receives r.URL.Path without /p/&lt;id&gt; prefix
+Integration:
+  - start global server with a real child (via supervisor spawning a test stub), proxy /p/&lt;id&gt;/api/mode, assert response body comes from the child
+  - SSE streaming: proxy /p/&lt;id&gt;/api/events/stream, read first chunk within 200ms (proves FlushInterval works)
+  - crash recovery: kill child, send next request, assert fresh child spawned (PID differs from first)
+Regression:
+  - existing serve_global tests must still pass
+</div></div>
+  <div class="slice-deps">Dependencies: slices 2</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-3" data-action="approve" checked="checked"/> Approve slice</label>
+    <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="4" data-slice-name="feat-d4f8b634" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#4</span>
+    <span class="slice-name">Remove dispatchByProject + aggregate handlers + projectCache (true doorway)</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-4">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">In `cmd/htmlgraph/serve_global.go`, delete every project-scoped and cross-project-aggregate route. This is the architectural cleanup slice: after it lands, the global server holds zero SQLite handles and serves only the projects landing SPA, the reverse proxy, and a tiny `/api/mode` endpoint.
+
+**Delete entirely** (function + registrations):
+- `dispatchByProject` function
+- `projectCache` type, instance, and all its methods
+- `loadProjectSummaries` (counts-from-DB logic) — replace with a simpler `listRegisteredProjects()` that iterates the registry and returns `{id, name, dir, gitRemoteURL, lastSeen}` for each — no DB opens, no counts
+- `countByType` / any helper that runs COUNT queries against project DBs
+- `aggregateStats` and the `/api/projects/all/stats` route
+- `globalSSEHandler` and the `/api/events/stream` route (stream moves inside each child via proxy)
+- `globalRecentEventsHandler` and the `/api/events/recent` route (same)
+- All project-scoped routes previously dispatched via `dispatchByProject`: `/api/sessions`, `/api/features`, `/api/features/detail`, `/api/features/related`, `/api/features/`, `/api/graph`, `/api/events/tree`, `/api/events/subagent`, `/api/plans`, `/api/plans/`, `/api/transcript`, `/api/sessions/`, `/api/stats`, `/api/events/recent`, `/api/events/stream` — all handled by the child via `/p/&lt;id&gt;/api/*` proxy now
+
+**Keep** (narrowed global API surface):
+- `/api/mode` — returns `{&#34;mode&#34;:&#34;global&#34;}`, no other fields
+- `/api/projects` — returns the registry list WITHOUT counts; fields are exactly `{id, name, dir, gitRemoteURL, lastSeen}`. Add a doc comment on the handler: `// No DB access. Registry JSON only. Counts and per-project data come from the child via /p/&lt;id&gt;/api/*.`
+- `/p/&lt;project-id&gt;/*` — the reverse proxy from slice 3
+- `/` — the landing SPA (embedded dashboard files)
+
+Since the global server no longer opens any SQLite connection, there is NO WAL audit needed on the global side (the original plan&#39;s concern evaporates when the handles evaporate). The child-side WAL pragma is still required for normal single-project operation but that&#39;s unchanged from today&#39;s single-project server — not a new constraint introduced by this slice.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">This is the slice where the security property becomes real. Removing `dispatchByProject` eliminates the router surface where a project-scoped write could land in the wrong project. Renaming and re-scoping `projectCache` to `aggregateCache` makes the invariant (&#39;global-scope access is read-only&#39;) grep-enforceable: every DB handle in the global server is in a variable whose name declares the constraint. Must land after slice 3 (which provides the replacement) and before slice 5 (which removes the `?project=` param from the frontend); if landed out of order, the frontend will 404 on every call between deployments.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/serve_global.go, cmd/htmlgraph/serve_global_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`dispatchByProject` function is deleted — `grep -rn dispatchByProject cmd/ internal/` returns zero matches</li><li>`projectCache` type and instance are deleted — grep returns zero matches</li><li>`loadProjectSummaries`, `countByType`, `aggregateStats`, `globalSSEHandler`, `globalRecentEventsHandler` are all deleted</li><li>`/api/projects/all/stats`, `/api/events/stream`, `/api/events/recent`, `/api/stats` are NOT registered on the global mux</li><li>`/api/projects` returns registry-only data without feature/bug/spike counts — response schema is `[{id, name, dir, gitRemoteURL, lastSeen}]`</li><li>`grep -rn &#39;sql.Open\|dbpkg.Open\|registry.OpenReadOnly&#39; cmd/htmlgraph/serve_global.go` returns zero matches (global server opens zero SQLite connections)</li><li>`grep -rn &#39;?project=&#39; cmd/htmlgraph/` returns zero matches</li><li>Smoke test: `htmlgraph serve`, `curl /api/projects` returns the registry list with no counts, `curl /api/plans` returns 404, `curl /p/&lt;id&gt;/api/plans` proxies to the child</li><li>Unit test `TestGlobalServer_NoSQLiteHandles` — start a global server, inspect the process (via test hook or reflection) and assert no `*sql.DB` instances exist in global scope</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit:
+  - TestAggregateCache_OnlyReadOnly — reflect/scan every *sql.DB opened by aggregateCache, assert the connection string contains mode=ro
+  - TestServeGlobal_NoDispatchByProject — grep the mux for handlers that reference dispatchByProject; none should exist
+  - TestServeGlobal_NoQueryParamRouting — send GET /api/plans?project=anything, assert 404 (the route is deleted entirely, not 400)
+Integration:
+  - start global server (with slice 3 proxy wired), hit /p/&lt;id&gt;/api/sessions, assert child handles it
+  - hit /api/sessions (no /p/ prefix), assert 404
+  - hit /api/projects/all/stats, assert aggregate response unchanged
+Regression:
+  - existing aggregate-read tests must still pass
+</div></div>
+  <div class="slice-deps">Dependencies: slices 3</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-4" data-action="approve" checked="checked"/> Approve slice</label>
+    <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="5" data-slice-name="feat-e5a9c745" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#5</span>
+    <span class="slice-name">Frontend — /p/&lt;id&gt;/ base path navigation + helper cleanup</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending" data-badge-for="slice-5">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">**Critical correction from feasibility critic A5/C5**: the original plan&#39;s claim that `fetch(&#39;/api/plans/&lt;id&gt;/chat&#39;)` &#39;naturally resolves as a relative URL&#39; under `/p/&lt;id&gt;/` is FALSE. All 10 fetch calls in `internal/plantmpl/templates/plan_page.gohtml` use absolute-path URLs (leading slash) that resolve against the origin, ignoring the page path. Affected lines: 515, 543, 596, 616, 661, 871, 898, 1043, 1094, 1117. Endpoints: `/feedback` (×4), `/finalize`, `/chat`, `/yaml`, `/amendments`. Every interactive plan action breaks without an explicit fix.
+
+**Required changes:**
+1. **Plan template variable injection** — in the Go template render path (`cmd/htmlgraph/api_plans.go` or wherever the template is executed), inject a `BasePath` field into the template context. Set it to `/p/&lt;project-id&gt;` when serving under the per-project proxy, empty otherwise. Rename the template to emit `&lt;script&gt;window.htmlgraphPlanBase = {{.BasePath | printf &#34;%q&#34;}};&lt;/script&gt;` in the head.
+2. **Template fetch rewrite** — change all 10 fetch calls from `fetch(&#39;/api/plans/&#39;+planId+&#39;/chat&#39;)` to `fetch((window.htmlgraphPlanBase||&#39;&#39;)+&#39;/api/plans/&#39;+planId+&#39;/chat&#39;)`. Single regex rewrite.
+3. **Plan HTML static file path** — the template is currently served at `/plans/&lt;id&gt;.html` via the FileServer at `serve.go:80` (not through the API router). Under the new architecture this path becomes `/p/&lt;id&gt;/plans/&lt;id&gt;.html` through the child proxy. Slice 1&#39;s factory already registers the route inside `buildSingleProjectMux`, so no new registration is needed — but confirm the file path resolution works from the child&#39;s CWD.
+4. **`dashboard/js/helpers.js:buildProjectUrl` rewrite** — detect project-scoped mode via `window.location.pathname.startsWith(&#39;/p/&#39;)`; if yes, return `/p/&lt;id&gt;/api/&lt;endpoint&gt;`; if no, return `/api/&lt;endpoint&gt;`. Delete the `?project=` append logic entirely. 18 call sites verified (feasibility critic A4). Leave `fetch(&#39;/api/mode&#39;)` at `app.js:1114` alone — it&#39;s intentionally global-scope.
+5. **`dashboard/js/app.js` navigation** — projects-landing card clicks set `window.location.href = &#39;/p/&#39; + project.id + &#39;/&#39;` for full page navigation. Delete `enterProject` and `showProjectsLanding` SPA functions. When loading under `/p/&lt;id&gt;/`, skip landing and run single-project startup.
+6. **Back button** — becomes `&lt;a href=&#34;/&#34;&gt;` in the project context header. No JS state management.
+
+**Landing card simplification (from doorway decision)**: update the projects-landing card renderer in `app.js`&#39;s `renderProjectsLanding()` to show ONLY registry fields — name, path (cleaned or truncated), git remote (cleaned to `owner/repo`), and last-seen relative time. Delete the stat tiles that displayed feature/bug/spike counts. The card body becomes a simple metadata block with a visible &#39;Open →&#39; affordance. CSS for `.project-card .stat-tile` can be deleted as unused.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Removing `?project=` from the frontend is the final closure of the old architecture. Using full page navigation instead of SPA state transitions is the key that unlocks zero-ceremony templates: the browser&#39;s own URL resolution handles the project scope via the page origin/base URL, not JavaScript string manipulation. After this slice, no JavaScript file or Go template has to know whether it&#39;s running in single-project or global mode — the URL path prefix makes the context self-evident. This also makes deep-linking work correctly (`/p/A/plans/plan-123` is a permalink) and makes browser back/forward buttons behave naturally.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/js/helpers.js, cmd/htmlgraph/dashboard/index.html, internal/plantmpl/templates/plan_page.gohtml, cmd/htmlgraph/api_plans.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>Search for `?project=` in `cmd/htmlgraph/dashboard/` returns zero matches</li><li>`buildProjectUrl` is a ~5 line function with no query-param logic</li><li>Clicking a projects-landing card triggers full page navigation to `/p/&lt;id&gt;/`</li><li>`enterProject` and `showProjectsLanding` are deleted from app.js</li><li>Plan template injects `window.htmlgraphPlanBase` at render time</li><li>All 10 fetch calls in plan_page.gohtml are prefixed with `(window.htmlgraphPlanBase||&#39;&#39;)`</li><li>`/plans/&lt;id&gt;.html` is served by the child via the proxy at `/p/&lt;id&gt;/plans/&lt;id&gt;.html`</li><li>Loading `http://localhost:8087/p/&lt;valid-id&gt;/` runs the single-project startup path with `buildProjectUrl(&#39;sessions&#39;) === &#39;/p/&lt;id&gt;/api/sessions&#39;`</li><li>Loading `http://localhost:8087/` serves the projects landing unchanged</li><li>Loading `http://localhost:8080/` (single-project mode) serves the dashboard unchanged with `buildProjectUrl(&#39;sessions&#39;) === &#39;/api/sessions&#39;`</li><li>Plan chat works end-to-end in global mode — visual smoke test, no more &#39;Error: Bad Request&#39;</li><li>Plan finalize works end-to-end</li><li>Plan feedback POST works end-to-end</li><li>Plan amendments POST works end-to-end</li><li>`fetch(&#39;/api/mode&#39;)` in app.js:1114 is unchanged (intentional global-scope call)</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass</li><li>Landing cards show ONLY name, path, git remote, last seen — no feature/bug/spike counts</li><li>`renderProjectsLanding()` does not reference `featureCount`, `bugCount`, `spikeCount` fields</li><li>.stat-tile CSS rules are deleted from `layout.css` (unused)</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">Unit:
+  - JS tests are manual (vanilla JS, no test runner) — verified via browser walkthrough
+  - TestPlanTemplateFetchResolution — static analysis: grep plan_page.gohtml for hardcoded /api/ paths, assert all are relative (no leading scheme/host)
+Integration:
+  - start htmlgraph serve, navigate to /, click a project card, assert URL becomes /p/&lt;id&gt;/, assert sessions/features/plans views all load without 404
+  - plan chat: navigate to /p/&lt;id&gt;/plans/&lt;some-plan&gt;, open plan, type a message, assert POST succeeds and response streams back
+Regression:
+  - start htmlgraph serve (single-project, no --global), assert dashboard behavior is unchanged — all tabs, all plans, all charts
+</div></div>
+  <div class="slice-deps">Dependencies: slices 4</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-5" data-action="approve" checked="checked"/> Approve slice</label>
+    <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="6" data-slice-name="feat-f6b0d856" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#6</span>
+    <span class="slice-name">Cross-project isolation acceptance test + crash recovery + idle reap integration</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-6">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value">New test file `cmd/htmlgraph/serve_global_proxy_test.go` (under `//go:build integration`) with three integration tests and a shared `TestMain`. **`TestMain`** builds the htmlgraph binary once at test startup via `exec.Command(&#34;go&#34;, &#34;build&#34;, &#34;-o&#34;, filepath.Join(tempDir, &#34;htmlgraph&#34;), &#34;./cmd/htmlgraph&#34;)` and stores the path in a package-level variable. All three tests reuse this binary — no second go build. This is REQUIRED (not optional per feasibility critic A10/C8) to keep CI under 60s; a per-test go build would cost 5-15s each. The same `TestMain` pattern applies to `internal/childproc/childproc_integration_test.go`.
+
+**Test A (cross-project contamination proof):** create tmpdir projectA and projectB each with initialized `.htmlgraph/`; register both in a temp `~/.local/share/htmlgraph/projects.json`; start the server with `supervisor.binPath` pointing at the test-built binary; via the proxy, POST `/p/&lt;A-id&gt;/api/workitem/create` to create feature X in projectA; open projectB&#39;s SQLite file DIRECTLY from disk (not via any proxy) via `dbpkg.OpenReadOnly` and assert no `work_items` row for feature X; open projectA&#39;s file and assert feature X IS there. **Test B (crash recovery):** spawn a child via the supervisor; kill the child with `cmd.Process.Signal(syscall.SIGKILL)` from the test; send the next request through the proxy; assert a fresh child is spawned (new PID) and the request succeeds. **Test C (idle reap):** create a supervisor with `idleTimeout = 200ms`; spawn a child; wait 300ms without sending any requests; assert the reaper killed the child and the map entry is gone. Default `go test ./...` (without `-tags=integration`) does NOT run these — CI adds a separate job with `-tags=integration`.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">Slices 1-5 implement the architecture, but only an integration test can prove the cross-project isolation guarantee holds at the OS boundary. Test A is the load-bearing acceptance criterion: if it passes, cross-project contamination is architecturally impossible because we verified by opening the other project&#39;s DB file directly and finding no trace of the write. Test B and C verify the operational guarantees (crashes and idle reaping) that the design documents but could otherwise silently regress. Separating behind a build tag keeps the unit test loop fast while still running these proofs in CI.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/serve_global_proxy_test.go, internal/childproc/childproc_integration_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`TestMain` shared across all integration tests in `cmd/htmlgraph/` — single `go build` per test run</li><li>`go test -tags=integration ./cmd/htmlgraph/... -run TestCrossProjectIsolation` passes</li><li>`go test -tags=integration ./cmd/htmlgraph/... -run TestCrashRecovery` passes</li><li>`go test -tags=integration ./cmd/htmlgraph/... -run TestIdleReap` passes</li><li>The contamination test opens the sibling project&#39;s SQLite file DIRECTLY from disk (bypasses all proxy) to verify isolation</li><li>Default `go test ./...` (without `-tags=integration`) does not run these tests and completes in the same time as before the feature</li><li>Full integration run `-tags=integration` completes in under 60s</li><li>CI adds a separate job that runs `go test -tags=integration ./...` and blocks the merge if any integration test fails</li><li>`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">This slice IS tests — no further test requirements.
+Integration (the three tests described above):
+  - TestCrossProjectIsolation — the load-bearing proof
+  - TestCrashRecovery — SIGKILL a child, next request respawns
+  - TestIdleReap — wait past idleTimeout, assert child is killed
+Regression:
+  - default go test ./... run time must not increase
+</div></div>
+  <div class="slice-deps">Dependencies: slices 5</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-6" data-action="approve" checked="checked"/> Approve slice</label>
+    <textarea data-section="slice-6" data-comment-for="slice-6" placeholder="Comments on slice 6..."></textarea>
+  </div>
+</div>
+
+    <!--PLAN_SLICE_CARDS-->
+  </div>
+</details>
+
+<!-- Design Decisions -->
+<details id="questions" class="section-card" data-phase="questions" data-status="pending">
+  <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
+  <div class="section-body">
+    
+    <div class="question-block" id="q-port-handshake">
+      <p>How does a child announce its bound ephemeral port back to the parent?</p>
+      
+      
+      <label><input type="radio" name="q-port-handshake" data-question="q-port-handshake" value="A: Stdout handshake line — parent scans child stdout for &#39;htmlgraph-serve-ready port=N&#39; with 5s deadline; simple, works everywhere, no filesystem dependency" checked=""/> A: Stdout handshake line — parent scans child stdout for &#39;htmlgraph-serve-ready port=N&#39; with 5s deadline; simple, works everywhere, no filesystem dependency</label>
+      
+      <label><input type="radio" name="q-port-handshake" data-question="q-port-handshake" value="B: Handshake file at .htmlgraph/.serve-port — child writes, parent polls; decouples from pipe plumbing but adds polling and cleanup concerns"/> B: Handshake file at .htmlgraph/.serve-port — child writes, parent polls; decouples from pipe plumbing but adds polling and cleanup concerns</label>
+      
+      <label><input type="radio" name="q-port-handshake" data-question="q-port-handshake" value="C: Parent-allocated pipe via ExtraFiles fd 3 — cleanest IPC but requires Unix fd passing and more code in the child"/> C: Parent-allocated pipe via ExtraFiles fd 3 — cleanest IPC but requires Unix fd passing and more code in the child</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-port-handshake" placeholder="Rationale for q-port-handshake..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-aggregate-reads">
+      <p>How does the global server handle cross-project reads and per-project card metadata?</p>
+      
+      
+      <label><input type="radio" name="q-aggregate-reads" data-question="q-aggregate-reads" value="A: Lazy read-only cache — global server opens mode=ro connections to each project for aggregates and card counts"/> A: Lazy read-only cache — global server opens mode=ro connections to each project for aggregates and card counts</label>
+      
+      <label><input type="radio" name="q-aggregate-reads" data-question="q-aggregate-reads" value="B: Fan-in over HTTP — global server calls each child&#39;s API for aggregates"/> B: Fan-in over HTTP — global server calls each child&#39;s API for aggregates</label>
+      
+      <label><input type="radio" name="q-aggregate-reads" data-question="q-aggregate-reads" value="C: Read event JSONL files directly from disk without SQLite"/> C: Read event JSONL files directly from disk without SQLite</label>
+      
+      <label><input type="radio" name="q-aggregate-reads" data-question="q-aggregate-reads" value="D: True doorway — drop cross-project aggregates AND per-project card counts; global server holds zero SQLite handles; analytics deferred to Phase 2" checked=""/> D: True doorway — drop cross-project aggregates AND per-project card counts; global server holds zero SQLite handles; analytics deferred to Phase 2</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-aggregate-reads" placeholder="Rationale for q-aggregate-reads..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-idle-reap-timeout">
+      <p>What is the default idle-reap timeout for child processes?</p>
+      
+      
+      <label><input type="radio" name="q-idle-reap-timeout" data-question="q-idle-reap-timeout" value="A: 15 minutes — aggressive reclaim, may trigger respawns during normal browsing"/> A: 15 minutes — aggressive reclaim, may trigger respawns during normal browsing</label>
+      
+      <label><input type="radio" name="q-idle-reap-timeout" data-question="q-idle-reap-timeout" value="B: 30 minutes — balanced default; matches active-session feel" checked=""/> B: 30 minutes — balanced default; matches active-session feel</label>
+      
+      <label><input type="radio" name="q-idle-reap-timeout" data-question="q-idle-reap-timeout" value="C: 60 minutes — conservative, minimizes respawns but holds more memory"/> C: 60 minutes — conservative, minimizes respawns but holds more memory</label>
+      
+      <label><input type="radio" name="q-idle-reap-timeout" data-question="q-idle-reap-timeout" value="D: No reaping by default — children live until global server shutdown; operator opts in via flag"/> D: No reaping by default — children live until global server shutdown; operator opts in via flag</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-idle-reap-timeout" placeholder="Rationale for q-idle-reap-timeout..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-legacy-removal">
+      <p>Remove dispatchByProject / query-param routes immediately or keep as deprecated for one release?</p>
+      
+      
+      <label><input type="radio" name="q-legacy-removal" data-question="q-legacy-removal" value="A: Remove dispatchByProject and all query-param routes in slice 4 — clean one-way migration, enforced by grep in the slice 4 done_when" checked=""/> A: Remove dispatchByProject and all query-param routes in slice 4 — clean one-way migration, enforced by grep in the slice 4 done_when</label>
+      
+      <label><input type="radio" name="q-legacy-removal" data-question="q-legacy-removal" value="B: Keep query-param dispatch as deprecated, log a warning, delete in a follow-up feature after the next release"/> B: Keep query-param dispatch as deprecated, log a warning, delete in a follow-up feature after the next release</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-legacy-removal" placeholder="Rationale for q-legacy-removal..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-child-binary">
+      <p>How does the supervisor locate the htmlgraph binary to spawn children?</p>
+      
+      
+      <label><input type="radio" name="q-child-binary" data-question="q-child-binary" value="A: os.Executable() — guarantees version parity, works in tests, no PATH dependency" checked=""/> A: os.Executable() — guarantees version parity, works in tests, no PATH dependency</label>
+      
+      <label><input type="radio" name="q-child-binary" data-question="q-child-binary" value="B: exec.LookPath(&#39;htmlgraph&#39;) — relies on $PATH, may spawn a different version than the parent"/> B: exec.LookPath(&#39;htmlgraph&#39;) — relies on $PATH, may spawn a different version than the parent</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-child-binary" placeholder="Rationale for q-child-binary..."></textarea>
+    </div>
+    
+    <table class="q-table">
+      <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
+      <tbody id="questionsRecap">
+        
+        <tr data-recap-for="q-port-handshake">
+          <td>How does a child announce its bound ephemeral port back to the parent?</td>
+          <td class="recap-answer">A: Stdout handshake line — parent scans child stdout for &#39;htmlgraph-serve-ready port=N&#39; with 5s deadline; simple, works everywhere, no filesystem dependency</td>
+          <td><span class="badge badge-approved">Decided</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-aggregate-reads">
+          <td>How does the global server handle cross-project reads and per-project card metadata?</td>
+          <td class="recap-answer">D: True doorway — drop cross-project aggregates AND per-project card counts; global server holds zero SQLite handles; analytics deferred to Phase 2</td>
+          <td><span class="badge badge-approved">Decided</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-idle-reap-timeout">
+          <td>What is the default idle-reap timeout for child processes?</td>
+          <td class="recap-answer">B: 30 minutes — balanced default; matches active-session feel</td>
+          <td><span class="badge badge-approved">Decided</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-legacy-removal">
+          <td>Remove dispatchByProject / query-param routes immediately or keep as deprecated for one release?</td>
+          <td class="recap-answer">A: Remove dispatchByProject and all query-param routes in slice 4 — clean one-way migration, enforced by grep in the slice 4 done_when</td>
+          <td><span class="badge badge-approved">Decided</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-child-binary">
+          <td>How does the supervisor locate the htmlgraph binary to spawn children?</td>
+          <td class="recap-answer">A: os.Executable() — guarantees version parity, works in tests, no PATH dependency</td>
+          <td><span class="badge badge-approved">Decided</span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </div>
+</details>
+
+
+
+<details id="critique" class="section-card" data-phase="critique" data-status="pending">
+  <summary><span>Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
+  <div class="section-body">
+
+    
+    <div class="sub-section">
+      <h4>Assumption Verification</h4>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">runServer is extractable into a factory</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">serve.go:38-98 — runServer spans the claimed range; factory extraction requires moving route registration out of the server-start path. Entangled with DB open, goroutine launch, and ListenAndServe but separable with care.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-pending">questionable</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">autoIngestLoop is where os.Getwd() needs to be parameterized</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">serve.go:238-243 shows autoIngestLoop only calls autoIngestOnce. The os.Getwd() calls are in autoIngestOnce at lines 249 (projectFilter for DiscoverSessions) and 309 (reading .htmlgraph/.launch-mode). Two call sites, not one. Slice 1 must parameterize autoIngestOnce.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">Approximately 13 project-scoped routes need removal from the global mux</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">serve_global.go has 15 dispatchByProject call sites across 13 distinct mux.Handle registrations. Three of the registrations are combo handlers (/api/stats, /api/events/recent, /api/events/stream) that also serve aggregate reads — these require branch-level surgery, not full registration deletion.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">buildProjectUrl has 18+ call sites across the dashboard JS</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">21 grep hits including the function definition and comments; 18 distinct fetch/EventSource call sites across app.js (~13), transcript-view.js (4), event-tree.js (3). One intentional bare fetch(&#39;/api/mode&#39;) at app.js:1114 for global-scope mode detection is correctly left out.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">The plan template&#39;s fetch(&#39;/api/plans/&lt;id&gt;/chat&#39;) naturally resolves relative to /p/&lt;id&gt;/ because it&#39;s relative</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">plan_page.gohtml has TEN absolute-path fetch calls (leading slash) at lines 515, 543, 596, 616, 661, 871, 898, 1043, 1094, 1117 — all resolve against the origin, not the page path. Under /p/A/plans/plan-123, fetch(&#39;/api/plans/...&#39;) goes to /api/plans/... which will 404 after slice 4. Slice 5 needs a concrete fix for all 10 fetch sites, not just /chat.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-pending">questionable</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">SQLite WAL supports concurrent readers while children are writing</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">True in principle (SQLite WAL allows one writer + many readers), but requires BOTH the parent&#39;s read-only connection AND the child&#39;s read-write connection to have journal_mode=WAL explicitly set. Must audit registry.OpenReadOnly and dbpkg.Open for WAL pragma before relying on concurrent access in slice 4.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">The existing buildSingleProjectMux does not need a dashboardFS parameter</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">dashboard.go:9-16 — dashboardFS is a package-level //go:embed var accessed via dashboardSub(). Calling it from the factory needs no parameter injection. Plan&#39;s proposed 3-arg signature should drop dashboardFS.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">serve subcommand accepts --project-dir flag directly</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">main.go:37-42 — --project-dir is a persistent flag on the root command, not on the serve subcommand. Cobra requires persistent flags before their subcommand. Child spawn args MUST be [bin, &#39;--project-dir&#39;, path, &#39;serve&#39;, &#39;--port&#39;, &#39;0&#39;] NOT [bin, &#39;serve&#39;, &#39;--port&#39;, &#39;0&#39;, &#39;--project-dir&#39;, path]. Slice 2&#39;s current spec will fail to parse at runtime.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">runGlobalServer has no hidden lifecycle dependencies (signals, goroutines, package-level state)</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">serve_global.go:91-98 — runGlobalServer is thin: builds mux, prints banner, calls ListenAndServe. No signal handlers, no background goroutines, no package-level state. The refactor has no gotchas in the global path.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">No existing test spawns the htmlgraph binary or uses TestMain for shared build</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">grep of *_test.go for TestMain and exec.Command(&#39;go&#39; returned zero matches. Current go test ./cmd/htmlgraph/... is ~0.5s cached. Slice 6&#39;s subprocess tests add 15-30s; a shared TestMain+go build is required (not optional) to keep CI under budget.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">Prior art for Supervisor pattern exists in internal/planchat/backend.go</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">internal/planchat/backend.go:174 uses exec.CommandContext + StdoutPipe + Start + scan-stdout-lines + Wait. This is the closest model to the proposed Supervisor&#39;s handshake scanner. claude.go:393 (mentioned in plan) is a weaker model because it uses .Run() (blocking).</p>
+        </div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      
+      <div>
+        <h4>Haiku (design review)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>Slice Assessment</h5>
+<ul>
+  <li><span class="badge badge-success">S1</span> Factory extraction straightforward. Handshake line protocol is simple and testable. Must correct autoIngestOnce target (two os.Getwd sites) and drop dashboardFS from the factory signature.</li>
+  <li><span class="badge badge-warn">S2</span> Child must emit handshake as FIRST stdout output or the parent&#39;s parser corrupts. Redirect child stdout/stderr to per-project log file AFTER handshake. Concurrent requests racing on spawn need per-project condition variable to avoid herd thundering.</li>
+  <li><span class="badge badge-warn">S3</span> Path validation in proxyHandler must reject &#39;..&#39;, empty segments, URL-encoded slashes, and &#39;.&#39; for project ID to prevent traversal. Director must strip /p/&lt;id&gt; prefix via explicit path manipulation, not string replacement.</li>
+  <li><span class="badge badge-danger">S4</span> Combo handlers (/api/stats, /api/events/recent, /api/events/stream) require branch-level surgery, not deletion. Also must audit SQLite WAL settings on both parent and child before assuming concurrent access works. Deploy-order coupling with S5 creates a 404 window unless merged atomically.</li>
+  <li><span class="badge badge-danger">S5</span> The &#39;relative URL naturally resolves&#39; claim is FALSE. Ten absolute-path fetches in plan_page.gohtml all break. Must inject a template variable like window.htmlgraphPlanBase at render time and prefix every fetch. Also must move /plans/&lt;id&gt;.html static file serving into the child (currently at serve.go:80 FileServer).</li>
+  <li><span class="badge badge-success">S6</span> Integration tests well-specified. Cross-project contamination proof via direct SQLite read is the correct acceptance criterion. Must use shared TestMain + single go build to stay under CI budget (not optional).</li>
+</ul>
+<h5>Gaps &amp; Missing Considerations</h5>
+<ul>
+  <li><span class="badge badge-warn">Gap</span> Child stdout/stderr logging after handshake — where do child logs go? If parent&#39;s pipe reader stops reading after handshake, child will eventually block on pipe write. Need per-project log file or /dev/null redirect.</li>
+  <li><span class="badge badge-warn">Gap</span> Dashboard UX during cold-spawn latency (~300-500ms). First click on an idle-reaped project shows blank page briefly. Consider a loading indicator or pre-warm on landing render.</li>
+  <li><span class="badge badge-warn">Gap</span> Herd problem — if N concurrent requests hit an un-spawned project, all N will wait on the supervisor mutex. Per-project condition variable or singleflight pattern keeps spawn serialized without blocking the N requests unnecessarily.</li>
+  <li><span class="badge badge-info">Gap</span> Auth/ACL — no enforcement today. Under new model a user navigating /p/&lt;unknown-id&gt;/ gets 404, /p/&lt;known-id&gt;/ gets full access. Not a regression but should be explicitly acknowledged in design constraints.</li>
+  <li><span class="badge badge-warn">Gap</span> Version skew — two global servers (e.g., old dev binary + new marketplace binary) on the same machine will fight over ephemeral ports and can leave orphaned children. Must document &#39;only one global server per machine&#39; or add a lockfile.</li>
+  <li><span class="badge badge-danger">Gap</span> Plan template path routing — plan HTML files are served at /plans/&lt;id&gt;.html via FileServer (serve.go:80), not via the API router. Under new architecture this path is only accessible via /p/&lt;id&gt;/plans/&lt;id&gt;.html through the child proxy. Slice 5 must account for this.</li>
+</ul>
+<h5>Alternative Approaches</h5>
+<ul>
+  <li><span class="badge badge-info">Alt</span> Worker pool (N fixed processes handling any project on-demand) vs per-project child. Plan correctly chose per-project because hook/env context must be baked at process start. Correct tradeoff.</li>
+  <li><span class="badge badge-info">Alt</span> In-process goroutine pools with DB sharding. Rejected because a panic in project A could crash project B. Plan correctly prioritized crash isolation.</li>
+  <li><span class="badge badge-info">Alt</span> Unix domain sockets instead of TCP. Eliminates port discovery but adds Unix-only complexity. TCP loopback is the right choice for cross-platform scope.</li>
+</ul>
+</div>
+      </div>
+      
+      
+      <div>
+        <h4>Sonnet (feasibility)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>What Exists to Leverage</h5>
+<ul>
+  <li><span class="badge badge-success">Prior</span> internal/planchat/backend.go:174 — exec.CommandContext + StdoutPipe + Start + stdout scanner + Wait. Closest prior art for the Supervisor handshake scanner.</li>
+  <li><span class="badge badge-success">Prior</span> cmd/htmlgraph/claude.go:393 — exec.Command with Dir + Env injection. Model for child env setup (HTMLGRAPH_PROJECT_DIR propagation).</li>
+  <li><span class="badge badge-info">Prior</span> cmd/htmlgraph/plan_cmds.go:268 uses os.Args[0] for self-re-exec. Plan&#39;s choice of os.Executable() is better (handles moved binaries and symlinks correctly).</li>
+  <li><span class="badge badge-success">Prior</span> dashboardFS is a package-level embed.FS accessed via dashboardSub() — no need to pass it through the factory signature.</li>
+</ul>
+<h5>What the Plan Gets Wrong</h5>
+<ul>
+  <li><span class="badge badge-danger">Bug</span> Slice 5 relative-URL claim is FALSE. All 10 fetch calls in plan_page.gohtml use absolute paths. Every interactive action (feedback, finalize, chat, yaml, amendments) breaks without a template variable injection.</li>
+  <li><span class="badge badge-danger">Bug</span> Slice 2 child spawn arg order is wrong. --project-dir is a persistent flag on the root command, not on serve. Must be [bin, --project-dir, path, serve, --port, 0] or cobra rejects it.</li>
+  <li><span class="badge badge-warn">Bug</span> Slice 1 targets autoIngestLoop for os.Getwd fix, but the actual CWD reads are in autoIngestOnce at lines 249 and 309 (two sites, not one).</li>
+  <li><span class="badge badge-warn">Bug</span> Slice 1 proposes dashboardFS as a factory parameter — it&#39;s package-level and already accessible via dashboardSub().</li>
+  <li><span class="badge badge-warn">Bug</span> Slice 4 &#39;delete 13 routes&#39; oversimplifies. 15 dispatchByProject call sites, 3 in combo handlers that need branch surgery (keep aggregate, remove dispatch branch).</li>
+  <li><span class="badge badge-warn">Bug</span> Plan /plans/&lt;id&gt;.html is served via FileServer at serve.go:80, not the API router. Slice 5 must ensure it moves into the child mux, not stays at the global /plans/ path.</li>
+</ul>
+<h5>Prior Art &amp; Examples</h5>
+<ul>
+  <li><span class="badge badge-info">Ref</span> net/http/httputil.ReverseProxy with FlushInterval=100ms is the stdlib pattern for SSE streaming. No third-party deps needed.</li>
+  <li><span class="badge badge-info">Ref</span> No net.Listen prior art in the repo. Ephemeral port binding is entirely new code; slice 1 should include extra test coverage.</li>
+  <li><span class="badge badge-info">Ref</span> containerd / kubelet use similar spawn-track-signal-on-shutdown patterns for child lifecycle. The Supervisor design matches these widely-used models.</li>
+</ul>
+</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Synthesis</h4>
+      <div style="font-size:.85rem;color:var(--text-dim)">Plan was critiqued at v2 and revised at v3 (true doorway decision). At v4, the human dropped the `--global` mode flag entirely: `htmlgraph serve` becomes the only human-facing serve command and always starts the parent with reverse proxy. Single-project serve lives on as a hidden `_serve-child` cobra command invoked exclusively by the supervisor to spawn children. When run from inside a project directory, the parent auto-detects the current project and prints both the doorway URL and a deep link to `/p/&lt;id&gt;/` in the startup banner — Option B from the UX discussion.
+
+This simplifies the user-facing command surface (one command, no mode flag) while preserving the architectural boundary (parent holds zero DB handles, child lifecycle in one place, reverse proxy as the only entry into per-project state). The two falsified assumptions from v2 (A5 absolute-path URLs, A8 persistent-flag arg order) remain fixed in slices 5 and 2. The three mechanical corrections (A2 autoIngestOnce, A3 combo-handler surgery, A7 dashboardFS) remain applied in slice 1 and slice 4.
+
+Slice 4 is now purely architectural cleanup — no aggregate reads, no `projectCache`, no WAL pragma audit, grep-enforceable zero-DB-handles invariant. Slice 5 rewires the plan template fetches via a template-injected `window.htmlgraphPlanBase` variable. Slice 6 proves the boundary with an integration test that writes to projectA and reads projectB&#39;s SQLite directly.
+
+Verdict: BUILDABLE AS WRITTEN at v4. All 5 questions answered. Proceed to finalize and dispatch.</div>
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Risk Assessment</h4>
+      <table class="q-table">
+        <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          
+          <tr>
+            <td>Plan template absolute-URL fetches break under /p/&lt;id&gt;/ routing (10 call sites, all interactive plan actions)</td>
+            <td><span class="badge badge-blocked">High</span></td>
+            <td>Slice 5 injects a window.htmlgraphPlanBase variable at template render time and prefixes all 10 fetch calls. Acceptance test covers plan chat, plan finalize, plan feedback, and plan yaml POST.</td>
+          </tr>
+          
+          <tr>
+            <td>Child spawn arg order wrong — --project-dir before serve subcommand, not after</td>
+            <td><span class="badge badge-blocked">High</span></td>
+            <td>Slice 2 spec corrected. Test spawns a real child with the correct arg order and asserts startup.</td>
+          </tr>
+          
+          <tr>
+            <td>Child stdout corruption before handshake — any startup print before the handshake line breaks the parser</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Child main must guarantee the handshake line is the FIRST stdout write. After the handshake, redirect stdout/stderr to a per-project log file in .htmlgraph/logs/serve-&lt;port&gt;.log. Slice 1 and Slice 2 share this requirement.</td>
+          </tr>
+          
+          <tr>
+            <td>SQLite WAL mode not enabled on parent read-only or child read-write connection, causing blocked writers</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Slice 4 audits both connection opens and adds journal_mode=WAL to the URI if missing. Acceptance test opens a parent RO connection and a child RW connection simultaneously and asserts concurrent reads during writes succeed.</td>
+          </tr>
+          
+          <tr>
+            <td>Deploy-order window between Slice 4 (remove dispatchByProject) and Slice 5 (frontend /p/ navigation) — frontend 404s if landed out of order</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Slices 3, 4, 5 land in a single merge (or slice 4 keeps a deprecation shim until slice 5 ships). CI merge gate blocks slice 4 merge unless slice 5 is in the same PR.</td>
+          </tr>
+          
+          <tr>
+            <td>Herd problem on cold spawn — N concurrent requests all wait on the supervisor mutex during 300-500ms spawn</td>
+            <td><span class="badge badge-pending">Low</span></td>
+            <td>Per-project sync.Once or golang.org/x/sync/singleflight for the spawn; waiting requests wake after spawn completes. Single-user dashboard use case makes this mostly theoretical but the fix is small.</td>
+          </tr>
+          
+          <tr>
+            <td>Path traversal via /p/../evil in proxyHandler</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Slice 3 validates project ID via explicit rules: no &#39;/&#39;, no &#39;..&#39;, no empty, no &#39;.&#39;. Director strips /p/&lt;id&gt; prefix via path.Clean not string manipulation.</td>
+          </tr>
+          
+          <tr>
+            <td>Child orphan on parent crash — if parent is SIGKILLed, children remain running on their ephemeral ports</td>
+            <td><span class="badge badge-pending">Low</span></td>
+            <td>Children check parent liveness via prctl(PR_SET_PDEATHSIG, SIGTERM) on Linux. macOS has no direct equivalent; use a heartbeat goroutine that checks parent PID every 5s and exits if parent is gone. Documented as a known limitation in the design constraints.</td>
+          </tr>
+          
+          <tr>
+            <td>Version skew — two global servers on one machine fight over lockfiles or leave orphaned children</td>
+            <td><span class="badge badge-pending">Low</span></td>
+            <td>Document &#39;single global server per host&#39; as a constraint. Optionally add a lockfile at ~/.htmlgraph/global-server.lock that the parent takes on startup.</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+
+    
+
+  </div>
+</details>
+
+
+
+
+
+<!-- ZONE 3: Feedback Summary -->
+<section id="feedback-summary" class="progress-zone" data-zone="feedback-summary">
+  <h2>Feedback Summary</h2>
+  <div class="progress-stats">
+    <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
+    <div class="progress-stat"><strong id="totalSections">7</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">7</strong> pending</div>
+  </div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="comments-summary">
+    <h3>Decisions &amp; Comments</h3>
+    <div id="commentsFeed"><p style="font-size:.8rem;color:var(--text-muted);font-style:italic">No comments yet.</p></div>
+  </div>
+  <div class="finalize-area">
+    <button class="btn-finalize" id="finalizeBtn" disabled="">Finalize Plan</button>
+    <p style="font-size:.75rem;color:var(--text-muted);margin-top:6px">All sections must be approved before finalizing.</p>
+  </div>
+</section>
+
+</article>
+</div><!-- /.plan-content -->
+
+<!-- Drag handle for resizing chat sidebar -->
+<div class="chat-resize-handle" id="chat-resize-handle"></div>
+
+<!-- Chat sidebar -->
+<aside class="chat-sidebar" id="chat-sidebar">
+  <section id="chat-panel" class="chat-panel" data-zone="chat">
+    <h2>Plan Discussion</h2>
+    <div id="chat-messages" class="chat-messages">
+      <p class="chat-notice" id="chat-empty">Ask about the plan design, slices, risks, or tradeoffs.</p>
+    </div>
+    <div class="chat-input-area">
+      <textarea id="chat-input" placeholder="Ask about the plan..." rows="2"></textarea>
+      <button id="chat-send">Send</button>
+    </div>
+  </section>
+
+  <!-- Amendments Panel -->
+  <div id="amendments-panel" class="amendments-panel" style="display:none">
+    <h3>Amendments</h3>
+    <div id="amendments-list"></div>
+    <div id="amendments-summary" class="amendments-summary"></div>
+  </div>
+</aside>
+</div><!-- /.plan-layout -->
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
+<script>
+// Theme toggle (skip when embedded — dashboard manages its own theme)
+(function(){
+  var themeBtn = document.getElementById('themeToggle');
+  if (!themeBtn) return;
+  var html = document.documentElement;
+
+  var saved = localStorage.getItem('crispi-theme');
+  function syncHljsTheme(theme) {
+    var dark = document.getElementById('hljs-dark');
+    var light = document.getElementById('hljs-light');
+    if (theme === 'light') {
+      dark.disabled = true; light.disabled = false;
+    } else {
+      dark.disabled = false; light.disabled = true;
+    }
+  }
+
+  if (saved) {
+    html.dataset.theme = saved;
+    themeBtn.textContent = saved === 'light' ? '\u263E Dark' : '\u2600 Light';
+    syncHljsTheme(saved);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    html.dataset.theme = 'light';
+    themeBtn.textContent = '\u263E Dark';
+    syncHljsTheme('light');
+  }
+
+  themeBtn.addEventListener('click', function() {
+    var current = html.dataset.theme || 'dark';
+    var next = current === 'dark' ? 'light' : 'dark';
+    html.dataset.theme = next;
+    localStorage.setItem('crispi-theme', next);
+    themeBtn.textContent = next === 'light' ? '\u263E Dark' : '\u2600 Light';
+    syncHljsTheme(next);
+  });
+
+  hljs.highlightAll();
+})();
+
+// Global plan ID — accessible to all script blocks when embedded
+var planId=(function(){var a=document.querySelector('article[id]');return a?a.id:null;})();
+
+(function(){
+  'use strict';
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6"]/*END_PLAN_SECTIONS_JSON*/;
+
+  function setBadge(el,ok){
+    el.className='badge badge-'+(ok?'approved':'pending');
+    el.textContent=ok?'Approved':'Pending';
+  }
+
+  function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+  document.querySelectorAll('input[data-action="approve"]').forEach(function(cb){
+    cb.addEventListener('change',function(){
+      var sec=this.dataset.section;
+      var badge=document.querySelector('[data-badge-for="'+sec+'"]');
+      if(badge) setBadge(badge,this.checked);
+      var details=this.closest('details[data-phase]');
+      if(details) details.dataset.status=this.checked?'approved':'pending';
+      if(sec.startsWith('slice-')){
+        var n=sec.split('-')[1];
+        var node=document.getElementById('node-'+n);
+        if(node) node.dataset.status=this.checked?'approved':'pending';
+        var all=document.querySelectorAll('input[data-section^="slice-"][data-action="approve"]');
+        var allOk=Array.prototype.every.call(all,function(c){return c.checked});
+        var sb=document.querySelector('[data-badge-for="slices"]');
+        if(sb) setBadge(sb,allOk);
+        var sd=document.querySelector('[data-phase="slices"]');
+        if(sd) sd.dataset.status=allOk?'approved':'pending';
+      }
+      updateProgress();
+      if(planId){
+        fetch('/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:sec,action:'approve',value:String(this.checked),question_id:''})
+        });
+      }
+    });
+  });
+
+  document.querySelectorAll('input[type="radio"][data-question]').forEach(function(r){
+    r.addEventListener('change',function(){
+      var row=document.querySelector('[data-recap-for="'+this.dataset.question+'"]');
+      if(row){
+        var c=row.querySelector('.recap-answer');
+        if(c) c.textContent=this.value.charAt(0).toUpperCase()+this.value.slice(1);
+        var badge=row.querySelector('.badge');
+        if(badge) setBadge(badge,true);
+      }
+      var allRows=document.querySelectorAll('[data-recap-for]');
+      var allAnswered=Array.prototype.every.call(allRows,function(r){
+        var b=r.querySelector('.badge');
+        return b&&b.className.indexOf('badge-approved')>=0;
+      });
+      var headerBadge=document.querySelector('[data-badge-for="questions"]');
+      if(headerBadge) setBadge(headerBadge,allAnswered);
+      var details=document.querySelector('[data-phase="questions"]');
+      if(details) details.dataset.status=allAnswered?'approved':'pending';
+      if(planId){
+        fetch('/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:'questions',action:'answer',value:this.value,question_id:this.dataset.question})
+        });
+      }
+    });
+  });
+
+  document.querySelectorAll('input[type="radio"][data-question]:checked').forEach(function(r){
+    var row=document.querySelector('[data-recap-for="'+r.dataset.question+'"]');
+    if(row){
+      var badge=row.querySelector('.badge');
+      if(badge) setBadge(badge,true);
+    }
+  });
+  var allRows=document.querySelectorAll('[data-recap-for]');
+  var allAnswered=Array.prototype.every.call(allRows,function(r){
+    var b=r.querySelector('.badge');
+    return b&&b.className.indexOf('badge-approved')>=0;
+  });
+  var qBadge=document.querySelector('[data-badge-for="questions"]');
+  if(qBadge) setBadge(qBadge,allAnswered);
+  var qDetails=document.querySelector('[data-phase="questions"]');
+  if(qDetails) qDetails.dataset.status=allAnswered?'approved':'pending';
+
+  function updateProgress(){
+    var approved=0;
+    SECTIONS.forEach(function(sec){
+      var cb=document.querySelector('input[data-section="'+sec+'"][data-action="approve"]');
+      if(cb&&cb.checked) approved++;
+    });
+    document.getElementById('approvedCount').textContent=approved;
+    document.getElementById('pendingCount').textContent=SECTIONS.length-approved;
+    document.getElementById('progressFill').style.width=Math.round(approved/SECTIONS.length*100)+'%';
+    document.getElementById('finalizeBtn').disabled=(approved<SECTIONS.length);
+    updateComments();
+  }
+
+  function updateComments(){
+    var feed=document.getElementById('commentsFeed'),html='';
+    SECTIONS.forEach(function(sec){
+      var ta=document.querySelector('textarea[data-section="'+sec+'"]');
+      if(ta&&ta.value.trim()) html+='<div class="comment-entry"><span class="comment-source">'+sec+'</span>'+escHtml(ta.value.trim())+'</div>';
+    });
+    feed.innerHTML=html||'<p style="font-size:.8rem;color:var(--text-muted);font-style:italic">No comments yet.</p>';
+  }
+
+  var timer;
+  document.querySelectorAll('textarea[data-section]').forEach(function(ta){
+    ta.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(updateComments,400)});
+    ta.addEventListener('blur',function(){
+      if(planId&&this.value.trim()){
+        fetch('/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:this.dataset.section,action:'comment',value:this.value.trim(),question_id:''})
+        });
+      }
+    });
+  });
+
+  var finalizeMsg=document.createElement('p');
+  finalizeMsg.style.cssText='font-size:.85rem;margin-top:8px;text-align:center;display:none';
+  var finalizeBtn=document.getElementById('finalizeBtn');
+  if(finalizeBtn){
+    finalizeBtn.parentNode.insertBefore(finalizeMsg,finalizeBtn.nextSibling);
+    finalizeBtn.addEventListener('click',function(){
+      if(!planId){return;}
+      var btn=this;
+      btn.disabled=true;
+      btn.textContent='Finalizing...';
+      finalizeMsg.style.display='none';
+      fetch('/api/plans/'+planId+'/finalize',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'}
+      })
+      .then(function(r){
+        if(r.ok){
+          r.json().then(function(data){
+            var art=document.querySelector('article[id]');if(art)art.dataset.status='finalized';
+            btn.textContent='Plan Finalized';
+            btn.style.background='var(--approved)';
+            btn.style.color='#fff';
+            if(data&&data.next_steps){
+              var pre=document.createElement('pre');
+              pre.style.cssText='margin-top:12px;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:.78rem;text-align:left;white-space:pre-wrap;word-break:break-all;color:var(--text)';
+              pre.textContent=data.next_steps;
+              finalizeMsg.innerHTML='';
+              finalizeMsg.appendChild(pre);
+            } else {
+              finalizeMsg.textContent='Plan finalized successfully.';
+            }
+            finalizeMsg.style.color='var(--approved)';
+            finalizeMsg.style.display='block';
+          });
+        } else {
+          return r.json().then(function(data){
+            btn.textContent='Finalize Plan';
+            btn.disabled=false;
+            finalizeMsg.textContent=data.error||'Not all sections approved.';
+            finalizeMsg.style.color='var(--blocked)';
+            finalizeMsg.style.display='block';
+          });
+        }
+      })
+      .catch(function(){
+        btn.textContent='Finalize Plan';
+        btn.disabled=false;
+        finalizeMsg.textContent='Could not reach server. Is htmlgraph serve running?';
+        finalizeMsg.style.color='var(--revision)';
+        finalizeMsg.style.display='block';
+      });
+    });
+  }
+
+  function loadExistingFeedback(){
+    if(!planId){return;}
+    fetch('/api/plans/'+planId+'/feedback')
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(data){
+        if(!data){return;}
+        if(data.sections){
+          Object.keys(data.sections).forEach(function(sec){
+            var info=data.sections[sec];
+            if(info.approved){
+              var cb=document.querySelector('input[data-section="'+sec+'"][data-action="approve"]');
+              if(cb&&!cb.checked){cb.checked=true;cb.dispatchEvent(new Event('change'));}
+            }
+            if(info.comment){
+              var ta=document.querySelector('textarea[data-section="'+sec+'"]');
+              if(ta) ta.value=info.comment;
+            }
+          });
+        }
+        if(data.questions){
+          Object.keys(data.questions).forEach(function(qid){
+            var val=data.questions[qid];
+            var radio=document.querySelector('input[type="radio"][data-question="'+qid+'"][value="'+val+'"]');
+            if(radio&&!radio.checked){radio.checked=true;radio.dispatchEvent(new Event('change'));}
+          });
+        }
+        updateProgress();
+      })
+      .catch(function(){});
+  }
+
+  loadExistingFeedback();
+
+  document.querySelectorAll('input[data-action="approve"]').forEach(function(cb){
+    cb.addEventListener('change',function(){
+      var sec=this.dataset.section;
+      if(sec.startsWith('slice-')){
+        var n=sec.split('-')[1];
+        var nodeRect=d3.select('#dep-graph-svg .node[id="'+n+'"] rect');
+        if(!nodeRect.empty()){
+          var color=this.checked?'#16a34a':'#6b7280';
+          var cs=getComputedStyle(document.querySelector('.dep-graph')||document.documentElement);
+          nodeRect.style('stroke',color).style('fill',cs.getPropertyValue('--bg-input').trim()||'#222228');
+        }
+      }
+    });
+  });
+})();
+
+// Render dagre-d3 dependency graph
+(function(){
+  'use strict';
+
+  var STATUS_COLORS={pending:'#6b7280',approved:'#16a34a',revision:'#f59e0b',discuss:'#8b5cf6',blocked:'#dc2626'};
+
+  function renderGraph(){
+    var container=document.getElementById('graph-data');
+    if(!container) return;
+
+    var g=new dagreD3.graphlib.Graph().setGraph({rankdir:'TB',marginx:24,marginy:24,ranksep:48,nodesep:32});
+    g.setDefaultEdgeLabel(function(){return{};});
+
+    var nodes=container.querySelectorAll('[data-node]');
+    nodes.forEach(function(el){
+      var id=el.dataset.node;
+      var name=el.dataset.name;
+      var files=el.dataset.files;
+      var status=el.dataset.status||'pending';
+      g.setNode(id,{
+        label: name+'\n'+files+' files',
+        rx: 6,
+        ry: 6,
+        paddingX: 36,
+        paddingY: 16,
+        status: status
+      });
+    });
+
+    nodes.forEach(function(el){
+      var id=el.dataset.node;
+      var deps=el.dataset.deps?el.dataset.deps.split(',').map(function(d){return d.trim();}).filter(Boolean):[];
+      deps.forEach(function(dep){g.setEdge(dep,id);});
+    });
+
+    var svg=d3.select('#dep-graph-svg');
+    var inner=svg.append('g');
+    var render=new dagreD3.render();
+    render(inner,g);
+
+    // Read CSS vars from the plan container so graph respects light/dark theme
+    var cs=getComputedStyle(document.querySelector('.dep-graph')||document.documentElement);
+    var nodeFill=cs.getPropertyValue('--bg-input').trim()||'#222228';
+    var nodeText=cs.getPropertyValue('--text').trim()||'#ededea';
+    var edgeColor=cs.getPropertyValue('--text-muted').trim()||'#707070';
+
+    inner.selectAll('g.node').each(function(id){
+      var nodeData=g.node(id);
+      var status=nodeData?nodeData.status:'pending';
+      var color=STATUS_COLORS[status]||STATUS_COLORS.pending;
+      d3.select(this).select('rect')
+        .style('fill',nodeFill)
+        .style('stroke',color)
+        .style('stroke-width','2px');
+      d3.select(this).select('text').style('fill',nodeText).style('font-size','13px');
+    });
+
+    inner.selectAll('g.edgePath path')
+      .style('stroke',edgeColor)
+      .style('stroke-dasharray','4 3')
+      .style('fill','none');
+    inner.selectAll('g.edgePath marker path')
+      .style('fill','#707070');
+
+    var svgEl=document.getElementById('dep-graph-svg');
+    var graphWidth=g.graph().width;
+    var graphHeight=g.graph().height;
+    var pad=24;
+    inner.attr('transform','translate('+pad+','+pad+')');
+    svgEl.setAttribute('width',graphWidth+pad*2);
+    svgEl.setAttribute('height',graphHeight+pad*2);
+    svgEl.removeAttribute('viewBox');
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',renderGraph);
+  } else {
+    renderGraph();
+  }
+})();
+
+// Chat panel
+// Global markdown renderer — shared by chat bubbles and data-markdown elements
+function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function renderMd(text){
+  var s=escHtml(text);
+  s=s.replace(/```(\w*)\n([\s\S]*?)```/g,function(_,lang,code){
+    return '<pre><code'+(lang?' class="language-'+lang+'"':'')+'>'+code.trim()+'</code></pre>';
+  });
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  s=s.replace(/^### (.+)$/gm,'<h4>$1</h4>');
+  s=s.replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  s=s.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm,function(_,hdr,sep,body){
+    var ths=hdr.split('|').filter(Boolean).map(function(c){return '<th>'+c.trim()+'</th>';}).join('');
+    var rows=body.trim().split('\n').map(function(row){
+      var tds=row.split('|').filter(Boolean).map(function(c){return '<td>'+c.trim()+'</td>';}).join('');
+      return '<tr>'+tds+'</tr>';
+    }).join('');
+    return '<table class="q-table"><thead><tr>'+ths+'</tr></thead><tbody>'+rows+'</tbody></table>';
+  });
+  s=s.replace(/^[*-] (.+)$/gm,'<li>$1</li>');
+  s=s.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
+  s=s.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+  s=s.replace(/\n\n/g,'</p><p>');
+  s=s.replace(/\n/g,'<br>');
+  return '<p>'+s+'</p>';
+}
+// Render inline markdown for elements with data-markdown attribute.
+// For block elements (div/p) replaces innerHTML; for inline (li/span)
+// renders without wrapping <p> tags.
+(function(){
+  document.querySelectorAll('[data-markdown]').forEach(function(el){
+    var raw=el.textContent;
+    if(!raw.trim()) return;
+    var tag=el.tagName.toLowerCase();
+    if(tag==='li'||tag==='span'||tag==='td'){
+      // Inline context — just apply bold/italic/code, no block transforms
+      var s=escHtml(raw);
+      s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+      s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+      s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+      el.innerHTML=s;
+    } else {
+      el.innerHTML=renderMd(raw);
+    }
+    el.removeAttribute('data-markdown');
+  });
+})();
+
+(function(){
+  'use strict';
+  var chatMessages=document.getElementById('chat-messages');
+  var chatInput=document.getElementById('chat-input');
+  var chatSend=document.getElementById('chat-send');
+  var chatEmpty=document.getElementById('chat-empty');
+  if(!chatMessages||!chatInput||!chatSend) return;
+
+  function addBubble(role,content){
+    if(!content||!content.trim()) return null; // skip empty messages
+    if(chatEmpty) chatEmpty.style.display='none';
+    var div=document.createElement('div');
+    div.className='chat-bubble';
+    div.dataset.role=role;
+    if(role==='assistant'){
+      div.innerHTML=renderMd(content);
+    } else {
+      div.textContent=content;
+    }
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+    return div;
+  }
+
+  function setInputEnabled(enabled){
+    chatInput.disabled=!enabled;
+    chatSend.disabled=!enabled;
+    if(enabled) chatInput.focus();
+  }
+
+  // Load previous messages directly into the chat thread.
+  if(planId){
+    fetch('/api/plans/'+planId+'/feedback')
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(data){
+        if(!data||!data.chat_messages||!data.chat_messages.length) return;
+        if(chatEmpty) chatEmpty.style.display='none';
+        data.chat_messages.forEach(function(m){
+          addBubble(m.role,m.content);
+        });
+      })
+      .catch(function(){});
+  }
+
+  function sendMessage(){
+    var text=chatInput.value.trim();
+    if(!text||!planId) return;
+    chatInput.value='';
+    setInputEnabled(false);
+
+    addBubble('user',text);
+    // Create streaming bubble directly (addBubble skips empty content)
+    if(chatEmpty) chatEmpty.style.display='none';
+    var assistantBubble=document.createElement('div');
+    assistantBubble.className='chat-bubble';
+    assistantBubble.dataset.role='assistant';
+    chatMessages.appendChild(assistantBubble);
+    var rawResponse='';
+
+    fetch('/api/plans/'+planId+'/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:text})
+    }).then(function(response){
+      if(response.status===503){
+        assistantBubble.textContent='Chat unavailable \u2014 Claude CLI not found and no API key configured.';
+        assistantBubble.style.color='var(--text-muted)';
+        assistantBubble.style.fontStyle='italic';
+        setInputEnabled(true);
+        return;
+      }
+      if(!response.ok){
+        assistantBubble.textContent='Error: '+response.statusText;
+        setInputEnabled(true);
+        return;
+      }
+      var reader=response.body.getReader();
+      var decoder=new TextDecoder();
+      var buffer='';
+
+      function processStream(){
+        reader.read().then(function(result){
+          if(result.done){
+            // Stream complete — render accumulated text as markdown
+            if(rawResponse) assistantBubble.innerHTML=renderMd(rawResponse);
+            setInputEnabled(true);
+            return;
+          }
+          buffer+=decoder.decode(result.value,{stream:true});
+          var lines=buffer.split('\n');
+          buffer=lines.pop()||'';
+          lines.forEach(function(line){
+            line=line.trim();
+            if(!line.startsWith('data: ')) return;
+            var jsonStr=line.substring(6);
+            try{
+              var evt=JSON.parse(jsonStr);
+              if(evt.type==='chunk'&&evt.text){
+                rawResponse+=evt.text;
+                assistantBubble.textContent=rawResponse; // show raw while streaming
+                chatMessages.scrollTop=chatMessages.scrollHeight;
+              } else if(evt.type==='error'){
+                assistantBubble.textContent+=' [Error: '+evt.error+']';
+              } else if(evt.type==='done'){
+                if(rawResponse) assistantBubble.innerHTML=renderMd(rawResponse);
+                setInputEnabled(true);
+              }
+            }catch(e){}
+          });
+          processStream();
+        }).catch(function(){
+          setInputEnabled(true);
+        });
+      }
+      processStream();
+    }).catch(function(err){
+      assistantBubble.textContent='Network error: '+err.message;
+      setInputEnabled(true);
+    });
+  }
+
+  chatSend.addEventListener('click',sendMessage);
+  chatInput.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+})();
+
+// Scroll-spy (uses plan-content scroll, not window)
+(function(){
+  'use strict';
+  var links=document.querySelectorAll('.plan-sidebar a[data-spy]');
+  if(!links.length) return;
+  var ids=Array.prototype.map.call(links,function(a){return a.dataset.spy;});
+  var scrollContainer=document.querySelector('.plan-content')||window;
+  function update(){
+    var current='';
+    ids.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el&&el.getBoundingClientRect().top<=80) current=id;
+    });
+    links.forEach(function(a){
+      a.classList.toggle('active',a.dataset.spy===current);
+    });
+  }
+  scrollContainer.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('scroll',update,{passive:true});
+  update();
+})();
+
+// Chat sidebar drag-resize
+(function(){
+  var handle=document.getElementById('chat-resize-handle');
+  var sidebar=document.getElementById('chat-sidebar');
+  if(!handle||!sidebar) return;
+  var startX,startW;
+  handle.addEventListener('mousedown',function(e){
+    e.preventDefault();
+    startX=e.clientX;
+    startW=sidebar.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor='col-resize';
+    document.body.style.userSelect='none';
+    function onMove(e){
+      var delta=startX-e.clientX;
+      var newW=Math.max(280,Math.min(600,startW+delta));
+      sidebar.style.width=newW+'px';
+    }
+    function onUp(){
+      handle.classList.remove('dragging');
+      document.body.style.cursor='';
+      document.body.style.userSelect='';
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+    }
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+  });
+})();
+
+
+// Sync highlight.js theme with current dark/light mode
+function syncHljsTheme(){
+  var isLight=document.documentElement.dataset.theme==='light';
+  var dark=document.getElementById('hljs-dark');
+  var light=document.getElementById('hljs-light');
+  if(dark) dark.disabled=isLight;
+  if(light) light.disabled=!isLight;
+}
+syncHljsTheme();
+
+// YAML viewer — lazy-loads plan YAML on first open or re-highlights on reopen
+(function(){
+  var viewer=document.getElementById('yaml-viewer');
+  var codeEl=document.getElementById('yaml-content');
+  if(!viewer||!codeEl)return;
+
+  function loadAndHighlight(){
+    var planEl=document.querySelector('[data-plan-id]');
+    if(!planEl)return;
+    var id=planEl.getAttribute('data-plan-id');
+    fetch('/api/plans/'+id+'/yaml')
+      .then(function(r){if(!r.ok)throw new Error('err');return r.text();})
+      .then(function(t){
+        codeEl.textContent=t;
+        delete codeEl.dataset.highlighted; // allow re-highlighting
+        syncHljsTheme();
+        function tryHighlight(){
+          if(window.hljs&&hljs.getLanguage&&hljs.getLanguage('yaml')){
+            hljs.highlightElement(codeEl);
+          } else {
+            setTimeout(tryHighlight,200);
+          }
+        }
+        tryHighlight();
+      })
+      .catch(function(){codeEl.textContent='YAML not available';});
+  }
+
+  var loaded=false;
+  viewer.addEventListener('toggle',function(){
+    if(!viewer.open||loaded)return;
+    loaded=true;
+    loadAndHighlight();
+  });
+  // If already open (e.g. re-rendered in embedded view), load immediately
+  if(viewer.open){loaded=true;loadAndHighlight();}
+})();
+
+// Amendments panel
+(function(){
+  var panel=document.getElementById('amendments-panel');
+  var list=document.getElementById('amendments-list');
+  var summary=document.getElementById('amendments-summary');
+  if(!panel||!list)return;
+
+  var article=document.querySelector('article[id]');
+  var planId=article?article.id:null;
+  if(!planId)return;
+
+  function escapeHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+  function updateSummary(){
+    var selects=list.querySelectorAll('select');
+    var accepted=0,pending=0;
+    selects.forEach(function(s){
+      if(s.value==='accepted')accepted++;
+      else if(s.value==='pending')pending++;
+    });
+    summary.textContent=selects.length+' amendments — '+accepted+' accepted, '+pending+' pending';
+  }
+
+  fetch('/api/plans/'+planId+'/amendments')
+    .then(function(r){return r.json();})
+    .then(function(amendments){
+      if(!amendments||!amendments.length)return;
+      panel.style.display='';
+      amendments.forEach(function(a,i){
+        var item=document.createElement('div');
+        item.className='amendment-item';
+        var desc=document.createElement('div');
+        desc.className='amendment-desc';
+        desc.innerHTML='<span class="op">'+escapeHtml(a.operation)+'</span> '+
+          '<span class="field">'+escapeHtml(a.field)+'</span> on slice-'+a.slice_num+': '+
+          escapeHtml(a.content);
+        var sel=document.createElement('select');
+        sel.className='amendment-select';
+        ['pending','accepted','rejected'].forEach(function(s){
+          var opt=document.createElement('option');
+          opt.value=s;
+          opt.textContent=s.charAt(0).toUpperCase()+s.slice(1);
+          if(s===a.status)opt.selected=true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change',function(){
+          fetch('/api/plans/'+planId+'/feedback',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              section:'amendment',
+              action:'amendment_status',
+              value:sel.value,
+              question_id:'amend-'+i
+            })
+          });
+          updateSummary();
+        });
+        item.appendChild(desc);
+        item.appendChild(sel);
+        list.appendChild(item);
+      });
+      updateSummary();
+    })
+    .catch(function(){});
+})();
+</script>
+<!-- .plan-content -->
+
+
+</body></html>
