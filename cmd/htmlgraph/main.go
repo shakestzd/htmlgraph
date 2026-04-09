@@ -90,6 +90,7 @@ func main() {
 	rootCmd.AddCommand(agentInitCmd())
 	rootCmd.AddCommand(pluginCmd())
 	rootCmd.AddCommand(purgeSpikesCmd())
+	rootCmd.AddCommand(projectsCmd())
 	rootCmd.AddCommand(traceCmd())
 	rootCmd.AddCommand(graphCmd())
 	rootCmd.AddCommand(queryCmd())
