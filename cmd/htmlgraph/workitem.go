@@ -203,6 +203,16 @@ func runWiSetStatus(typeName, id, status string) error {
 		}
 	}
 
+	// When completing a work item, clear active_feature_id on any session
+	// still pointing at it. Otherwise the guards see a stale pointer and
+	// allow edits after the feature is done.
+	if status == "done" && p.DB != nil {
+		_, _ = p.DB.Exec(
+			`UPDATE sessions SET active_feature_id = '' WHERE active_feature_id = ?`,
+			id,
+		)
+	}
+
 	// Update status line cache for subagent visibility.
 	if status == "in-progress" {
 		WriteStatuslineCache(dir, id)

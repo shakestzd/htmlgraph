@@ -168,15 +168,23 @@ type ToolUseContextRow struct {
 // GetToolUseContext fetches the session and active claim for agentID in a
 // single query, replacing three separate reads on the PreToolUse hot path.
 // Returns nil when the session does not exist.
+//
+// active_feature_id is only returned when the referenced feature is actually
+// in-progress — a stale pointer to a completed feature is treated as empty,
+// so guards correctly block edits without an active work item.
 func GetToolUseContext(db *sql.DB, sessionID, agentID string) (*ToolUseContextRow, error) {
 	row := db.QueryRow(`
 		SELECT s.session_id,
-		       COALESCE(s.active_feature_id, '') AS active_feature_id,
+		       COALESCE(
+		         CASE WHEN f.status = 'in-progress' THEN s.active_feature_id ELSE '' END,
+		         ''
+		       ) AS active_feature_id,
 		       COALESCE(s.parent_session_id, '') AS parent_session_id,
 		       s.is_subagent,
 		       s.created_at,
 		       COALESCE(c.work_item_id, '')       AS claimed_item
 		FROM sessions s
+		LEFT JOIN features f ON f.id = s.active_feature_id
 		LEFT JOIN claims c
 		       ON c.claimed_by_agent_id = ?
 		      AND c.status IN ('proposed','claimed','in_progress','blocked','handoff_pending')

@@ -247,6 +247,7 @@ function renderSessions() {
   sorted.forEach(function(s) {
     var tr = document.createElement('tr');
     tr.className = 'session-row' + (s.status === 'active' ? ' live' : '');
+    tr.setAttribute('data-session-id', s.session_id);
     tr.addEventListener('click', function() { openTranscript(s.session_id); });
 
     // Title cell
@@ -1609,10 +1610,11 @@ function openSessionDetail(sessionId) {
   document.querySelectorAll('.view').forEach(function(v) {
     v.classList.toggle('active', v.id === 'v-sessions');
   });
+  // Open the transcript directly — don't just highlight the list row.
   if (sessions.length === 0) {
-    fetchSessions().then(function() { highlightSession(sessionId); });
+    fetchSessions().then(function() { openTranscript(sessionId); });
   } else {
-    highlightSession(sessionId);
+    openTranscript(sessionId);
   }
 }
 
