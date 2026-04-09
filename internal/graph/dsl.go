@@ -1,0 +1,320 @@
+package graph
+
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+)
+
+// ExecuteDSL parses and executes a DSL query, returning matched nodes.
+//
+// Syntax:
+//
+//	type[field=value] -> rel_type -> type[field=value]
+//
+// Examples:
+//
+//	features -> contains -> features
+//	features[status=todo] -> blocked_by -> features[status=done]
+//	tracks -> contains -> features[status=todo]
+//
+// The first segment must be a type (optionally with filter). Subsequent
+// segments alternate between relationship types and node types.
+func ExecuteDSL(db *sql.DB, input string) ([]NodeResult, error) {
+	tokens, err := tokenize(input)
+	if err != nil {
+		return nil, err
+	}
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("dsl: empty query")
+	}
+
+	first, ok := tokens[0].(nodeSelector)
+	if !ok {
+		return nil, fmt.Errorf("dsl: query must start with a node type, got %q", tokens[0])
+	}
+
+	currentIDs, err := resolveTypeSelector(db, first)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 1; i < len(tokens); i++ {
+		if len(currentIDs) == 0 {
+			break
+		}
+		switch v := tokens[i].(type) {
+		case arrowToken:
+			continue
+		case relToken:
+			currentIDs, err = followEdgesDSL(db, currentIDs, v.relType)
+			if err != nil {
+				return nil, err
+			}
+		case nodeSelector:
+			currentIDs, err = filterBySelectorDSL(db, currentIDs, v)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	q := &QueryBuilder{db: db}
+	return q.resolveNodes(currentIDs)
+}
+
+// Token types for the DSL parser.
+type dslToken interface{ dslToken() }
+
+type nodeSelector struct {
+	nodeType string
+	field    string
+	value    string
+}
+
+type arrowToken struct{}
+type relToken struct{ relType string }
+
+func (nodeSelector) dslToken() {}
+func (arrowToken) dslToken()   {}
+func (relToken) dslToken()     {}
+
+// tokenize splits a DSL string into tokens.
+func tokenize(input string) ([]dslToken, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil, nil
+	}
+
+	// Split on " -> " preserving the arrow as a separator.
+	parts := strings.Split(input, "->")
+	var tokens []dslToken
+
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		if i > 0 {
+			tokens = append(tokens, arrowToken{})
+		}
+
+		// Check if it's a node selector (has brackets or is a known type prefix).
+		if strings.Contains(part, "[") {
+			sel, err := parseNodeSelector(part)
+			if err != nil {
+				return nil, err
+			}
+			tokens = append(tokens, sel)
+		} else if isNodeType(part) {
+			tokens = append(tokens, nodeSelector{nodeType: part})
+		} else {
+			// It's a relationship type.
+			tokens = append(tokens, relToken{relType: part})
+		}
+	}
+	return tokens, nil
+}
+
+// parseNodeSelector parses "type[field=value]" syntax.
+func parseNodeSelector(s string) (nodeSelector, error) {
+	bracketIdx := strings.Index(s, "[")
+	if bracketIdx < 0 {
+		return nodeSelector{nodeType: s}, nil
+	}
+
+	nodeType := strings.TrimSpace(s[:bracketIdx])
+	rest := s[bracketIdx+1:]
+	endBracket := strings.Index(rest, "]")
+	if endBracket < 0 {
+		return nodeSelector{}, fmt.Errorf("dsl: unclosed bracket in %q", s)
+	}
+
+	filter := rest[:endBracket]
+	eqIdx := strings.Index(filter, "=")
+	if eqIdx < 0 {
+		return nodeSelector{}, fmt.Errorf("dsl: expected field=value in brackets, got %q", filter)
+	}
+
+	return nodeSelector{
+		nodeType: nodeType,
+		field:    strings.TrimSpace(filter[:eqIdx]),
+		value:    strings.TrimSpace(filter[eqIdx+1:]),
+	}, nil
+}
+
+// isNodeType checks if a string is a known node type plural.
+var knownNodeTypes = map[string]string{
+	"features": "feature",
+	"feature":  "feature",
+	"bugs":     "bug",
+	"bug":      "bug",
+	"spikes":   "spike",
+	"spike":    "spike",
+	"tracks":   "track",
+	"track":    "track",
+	"plans":    "plan",
+	"plan":     "plan",
+	"specs":    "spec",
+	"spec":     "spec",
+}
+
+func isNodeType(s string) bool {
+	_, ok := knownNodeTypes[strings.ToLower(s)]
+	return ok
+}
+
+func normalizeNodeType(s string) string {
+	if t, ok := knownNodeTypes[strings.ToLower(s)]; ok {
+		return t
+	}
+	return strings.ToLower(s)
+}
+
+// resolveTypeSelector queries for all node IDs matching a type+filter selector.
+func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
+	nodeType := normalizeNodeType(sel.nodeType)
+
+	// Determine which table to query.
+	table := "features"
+	if nodeType == "track" {
+		table = "tracks"
+	}
+
+	var query string
+	var args []any
+
+	if sel.field != "" {
+		col, ok := allowedFilterColumns[sel.field]
+		if !ok {
+			return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+		}
+		if table == "tracks" {
+			query = fmt.Sprintf(`SELECT id FROM tracks WHERE %s = ?`, col)
+		} else {
+			query = fmt.Sprintf(`SELECT id FROM features WHERE type = ? AND %s = ?`, col)
+			args = append(args, nodeType)
+		}
+		args = append(args, sel.value)
+	} else {
+		if table == "tracks" {
+			query = `SELECT id FROM tracks`
+		} else {
+			query = `SELECT id FROM features WHERE type = ?`
+			args = append(args, nodeType)
+		}
+	}
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("dsl resolve type: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// followEdgesDSL is the DSL version of edge traversal.
+func followEdgesDSL(db *sql.DB, sourceIDs []string, relType string) ([]string, error) {
+	if len(sourceIDs) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(sourceIDs))
+	args := make([]any, len(sourceIDs)+1)
+	for i, id := range sourceIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	args[len(sourceIDs)] = relType
+
+	query := fmt.Sprintf(`
+		SELECT DISTINCT to_node_id FROM graph_edges
+		WHERE from_node_id IN (%s) AND relationship_type = ?`,
+		strings.Join(placeholders, ","))
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("dsl follow: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// filterBySelectorDSL filters IDs by a node selector (type + optional field).
+func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	nodeType := normalizeNodeType(sel.nodeType)
+	table := "features"
+	if nodeType == "track" {
+		table = "tracks"
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	inClause := strings.Join(placeholders, ",")
+
+	var query string
+	if sel.field != "" {
+		col, ok := allowedFilterColumns[sel.field]
+		if !ok {
+			return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+		}
+		if table == "tracks" {
+			query = fmt.Sprintf(`SELECT id FROM tracks WHERE id IN (%s) AND %s = ?`, inClause, col)
+		} else {
+			query = fmt.Sprintf(`SELECT id FROM features WHERE id IN (%s) AND type = ? AND %s = ?`,
+				inClause, col)
+			args = append(args, nodeType)
+		}
+		args = append(args, sel.value)
+	} else {
+		if table == "tracks" {
+			query = fmt.Sprintf(`SELECT id FROM tracks WHERE id IN (%s)`, inClause)
+		} else {
+			query = fmt.Sprintf(`SELECT id FROM features WHERE id IN (%s) AND type = ?`, inClause)
+			args = append(args, nodeType)
+		}
+	}
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("dsl filter: %w", err)
+	}
+	defer rows.Close()
+
+	var result []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		result = append(result, id)
+	}
+	return result, rows.Err()
+}
+

@@ -110,6 +110,7 @@ func main() {
 	rootCmd.AddCommand(purgeSpikesCmd())
 	rootCmd.AddCommand(traceCmd())
 	rootCmd.AddCommand(graphCmd())
+	rootCmd.AddCommand(queryCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

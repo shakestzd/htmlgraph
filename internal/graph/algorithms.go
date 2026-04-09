@@ -216,19 +216,6 @@ func AllUniqueIDs(cycles [][]string) []string {
 	return ids
 }
 
-// uniqueFromSlice deduplicates a string slice preserving order.
-func uniqueFromSlice(ss []string) []string {
-	seen := make(map[string]bool, len(ss))
-	var out []string
-	for _, s := range ss {
-		if !seen[s] {
-			seen[s] = true
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 // FormatPath returns a human-readable "a -> b -> c" path string.
 func FormatPath(path []string) string {
 	return strings.Join(path, " -> ")
