@@ -73,6 +73,10 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		// Derive session→feature edges from agent_events.
 		edges = append(edges, loadSessionFeatureEdges(database)...)
 
+		// Derive track-to-track edges from shared sessions: if a session
+		// worked on features from two different tracks, those tracks are related.
+		edges = append(edges, loadTrackCooccurrenceEdges(database)...)
+
 		// Deduplicate edges (explicit DB edges may duplicate implicit ones).
 		edges = deduplicateEdges(edges)
 
@@ -202,6 +206,40 @@ func loadSessionFeatureEdges(database *sql.DB) []graphEdge {
 			Source: fid,
 			Target: sid,
 			Type:   "worked_on",
+		})
+	}
+	return edges
+}
+
+// loadTrackCooccurrenceEdges derives track-to-track relationships from
+// shared sessions: if a single session worked on features belonging to
+// two different tracks, those tracks are related ("co_session").
+func loadTrackCooccurrenceEdges(database *sql.DB) []graphEdge {
+	// Find pairs of tracks that share at least one session via agent_events.
+	rows, err := database.Query(`
+		SELECT DISTINCT t1.track_id, t2.track_id
+		FROM agent_events e1
+		JOIN features t1 ON t1.id = e1.feature_id
+		JOIN agent_events e2 ON e2.session_id = e1.session_id AND e2.feature_id != e1.feature_id
+		JOIN features t2 ON t2.id = e2.feature_id
+		WHERE t1.track_id != '' AND t2.track_id != ''
+		  AND t1.track_id != t2.track_id
+		  AND t1.track_id < t2.track_id
+		LIMIT 200`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var src, tgt string
+		if err := rows.Scan(&src, &tgt); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{
+			Source: src,
+			Target: tgt,
+			Type:   "co_session",
 		})
 	}
 	return edges
