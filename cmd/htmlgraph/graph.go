@@ -32,6 +32,7 @@ Subcommands:
 	cmd.AddCommand(graphOrphansCmd())
 	cmd.AddCommand(graphHubsCmd())
 	cmd.AddCommand(graphBottlenecksCmd())
+	cmd.AddCommand(graphSessionsCmd())
 	return cmd
 }
 
@@ -321,6 +322,52 @@ func runGraphBottlenecks() error {
 		}
 		fmt.Printf("  %-25s  blocks %d items  [%s]  %s\n",
 			b.ID, b.BlockCount, b.Status, title)
+	}
+	return nil
+}
+
+func graphSessionsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "sessions <feature-id>",
+		Short: "Show sessions that worked on a feature",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runGraphSessions(args[0])
+		},
+	}
+}
+
+func runGraphSessions(featureID string) error {
+	dir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer database.Close()
+
+	sessions, err := graph.SessionsForFeature(database, featureID)
+	if err != nil {
+		return err
+	}
+	if len(sessions) == 0 {
+		fmt.Printf("No sessions found for %s.\n", featureID)
+		return nil
+	}
+
+	sep := strings.Repeat("─", 60)
+	fmt.Println(sep)
+	fmt.Printf("  Sessions for %s (%d)\n", featureID, len(sessions))
+	fmt.Println(sep)
+	for _, s := range sessions {
+		created := s.CreatedAt
+		if len(created) > 19 {
+			created = created[:19]
+		}
+		fmt.Printf("  %-20s  [%s]  %s  %s\n",
+			truncate(s.SessionID, 20), s.Status, s.Agent, created)
 	}
 	return nil
 }
