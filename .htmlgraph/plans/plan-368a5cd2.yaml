@@ -1,13 +1,13 @@
 meta:
     id: plan-368a5cd2
-    track_id: trk-66dcbbf7
+    track_id: trk-54f5ed7b
     title: Multi-Project MVP
     description: |
         Auto-registering project registry, project listing CLI, and unified read-only dashboard aggregating across all HtmlGraph-enabled projects.
     created_at: "2026-04-08"
-    status: draft
+    status: finalized
     created_by: claude-opus
-    version: 4
+    version: 5
 design:
     problem: |
         HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask "what work is happening across all my projects right now?" without manually cd-ing into each repo and running `htmlgraph snapshot`.
@@ -57,7 +57,7 @@ slices:
               TestPrune_RemovesStale, TestDefaultPath, TestOpenReadOnly_RejectsWrite,
               TestEntry_StableID (same dir always yields same ID)
         Integration: none (pure file I/O + SQLite, tmpdir-based in unit tests)
-      approved: true
+      approved: false
       comment: ""
     - id: feat-7d4b2f91
       num: 2
@@ -85,7 +85,7 @@ slices:
         Integration: Run `htmlgraph status` twice in a temp project dir; assert projects.json
                      contains exactly one entry with updated LastSeen; assert git subprocess
                      not invoked on second run (mock or count via test hook)
-      approved: true
+      approved: false
       comment: ""
     - id: feat-c1e5a83d
       num: 3
@@ -113,7 +113,7 @@ slices:
         Integration: Populate registry with two entries (one real, one fake dir);
                      assert `list` shows both, `prune` removes the fake one;
                      assert no schema tables created in real project DB after `list` runs
-      approved: true
+      approved: false
       comment: ""
     - id: feat-9a7e6c04
       num: 4
@@ -145,7 +145,7 @@ slices:
                      assert /api/projects returns two entries with stable IDs;
                      assert /api/sessions?project=<id> returns data from the correct DB;
                      assert no new tables created in project DBs after server startup
-      approved: true
+      approved: false
       comment: ""
     - id: feat-e2f8b17a
       num: 5
@@ -173,7 +173,7 @@ slices:
         Integration: Start global server with two projects; load dashboard; assert switcher
                      renders both project names; assert feature list changes on selection;
                      assert single-project server shows no switcher
-      approved: true
+      approved: false
       comment: ""
 questions:
     - id: q-registry-format
