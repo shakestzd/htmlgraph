@@ -49,8 +49,31 @@ func runServer(port int) error {
 	defer database.Close()
 
 	// Auto-ingest transcripts on startup and every 60s.
-	go autoIngestLoop(database)
+	go autoIngestLoop(database, htmlgraphDir)
 
+	mux := buildSingleProjectMux(database, htmlgraphDir)
+
+	addr := fmt.Sprintf("localhost:%d", port)
+	fmt.Printf("HtmlGraph Dashboard:  http://%s/\n", addr)
+	fmt.Printf("API Stats:            http://%s/api/stats\n", addr)
+	fmt.Printf("SSE Stream:           http://%s/api/events/stream\n", addr)
+	fmt.Println("Press Ctrl+C to stop.")
+
+	return http.ListenAndServe(addr, mux)
+}
+
+// buildSingleProjectMux constructs the HTTP routes for a single-project
+// HtmlGraph server. It does NOT start the HTTP server and does NOT launch
+// background goroutines — the caller is responsible for both.
+//
+// This factory is shared by:
+//   - runServer (legacy single-project path; slice 3 repurposes runServer)
+//   - runServeChild (the hidden _serve-child subcommand the parent spawns
+//     for per-project process isolation in multi-project mode)
+//
+// dashboardFS is accessed via the package-level dashboardSub() helper and
+// is intentionally not a parameter.
+func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// /api/mode — lets the dashboard detect single vs global mode on load.
@@ -88,13 +111,7 @@ func runServer(port int) error {
 	// Serve embedded dashboard (index.html, css/, js/, components/)
 	mux.Handle("/", corsMiddleware(http.FileServer(http.FS(dashboardSub()))))
 
-	addr := fmt.Sprintf("localhost:%d", port)
-	fmt.Printf("HtmlGraph Dashboard:  http://%s/\n", addr)
-	fmt.Printf("API Stats:            http://%s/api/stats\n", addr)
-	fmt.Printf("SSE Stream:           http://%s/api/events/stream\n", addr)
-	fmt.Println("Press Ctrl+C to stop.")
-
-	return http.ListenAndServe(addr, mux)
+	return mux
 }
 
 // resolvePluginDir finds the go-plugin directory using a priority-ordered
@@ -235,20 +252,24 @@ func resolveMarketplacePluginDir() string {
 }
 
 // autoIngestLoop runs transcript ingestion immediately, then every 60 seconds.
-func autoIngestLoop(database *sql.DB) {
+// htmlgraphDir is the .htmlgraph/ directory of the project being served;
+// its parent is used as the project-root filter for session discovery. This
+// removes the previous os.Getwd() dependency so the child process spawned
+// by the parent server (slice 2) still scopes ingestion to the correct
+// project regardless of the child's CWD.
+func autoIngestLoop(database *sql.DB, htmlgraphDir string) {
 	for {
-		autoIngestOnce(database)
+		autoIngestOnce(database, htmlgraphDir)
 		time.Sleep(60 * time.Second)
 	}
 }
 
 // autoIngestOnce discovers session files and ingests any that are new.
-func autoIngestOnce(database *sql.DB) {
-	// Filter to current project only — use full CWD path for exact match
-	projectFilter := ""
-	if cwd, err := os.Getwd(); err == nil {
-		projectFilter = cwd
-	}
+func autoIngestOnce(database *sql.DB, htmlgraphDir string) {
+	// Filter to current project only — derive project root from htmlgraphDir
+	// (parent of .htmlgraph/) so the child-process server still scopes
+	// ingestion correctly.
+	projectFilter := filepath.Dir(htmlgraphDir)
 	files, err := ingest.DiscoverSessions(projectFilter)
 	if err != nil {
 		return
@@ -305,12 +326,9 @@ func autoIngestOnce(database *sql.DB) {
 	// "active" if file modified < 5 min ago, "completed" otherwise.
 	// Also tag active sessions with launch_mode from .launch-mode file.
 	launchMode := ""
-	// Find .htmlgraph/.launch-mode relative to CWD
-	if cwd, err := os.Getwd(); err == nil {
-		if data, err := os.ReadFile(filepath.Join(cwd, ".htmlgraph", ".launch-mode")); err == nil {
-			if strings.Contains(string(data), `"yolo`) {
-				launchMode = "yolo"
-			}
+	if data, err := os.ReadFile(filepath.Join(htmlgraphDir, ".launch-mode")); err == nil {
+		if strings.Contains(string(data), `"yolo`) {
+			launchMode = "yolo"
 		}
 	}
 

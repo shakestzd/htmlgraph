@@ -1,0 +1,93 @@
+package main
+
+import (
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/registry"
+	"github.com/spf13/cobra"
+)
+
+// serveChildCmd is the hidden internal subcommand the parent HtmlGraph
+// server spawns for each project in multi-project mode. It is NOT intended
+// for direct invocation — end users run `htmlgraph serve`, which forks this
+// command as a child process per project.
+//
+// The child binds to an ephemeral port (--port 0), prints exactly one
+// handshake line to stdout so the parent supervisor can discover the port,
+// and then redirects stdout/stderr to a per-project log file before the
+// HTTP server begins accepting traffic. This guarantees the supervisor's
+// scanner never sees stray startup logs between the handshake and the
+// supervisor's stdout-drain goroutine attaching.
+func serveChildCmd() *cobra.Command {
+	var port int
+	cmd := &cobra.Command{
+		Use:    "_serve-child",
+		Hidden: true,
+		Short:  "Internal: single-project HTTP server spawned by parent (do not invoke directly)",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runServeChild(port)
+		},
+	}
+	cmd.Flags().IntVar(&port, "port", 0, "TCP port (0 = ephemeral)")
+	return cmd
+}
+
+// runServeChild opens the project DB, builds the single-project mux, binds
+// the listener, prints the handshake, redirects stdio, and serves HTTP.
+func runServeChild(port int) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return fmt.Errorf("locate .htmlgraph: %w", err)
+	}
+
+	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	database, err := dbpkg.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	// database is closed when the process exits; no defer Close — Serve blocks.
+
+	mux := buildSingleProjectMux(database, htmlgraphDir)
+
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
+	}
+	assigned := ln.Addr().(*net.TCPAddr).Port
+
+	// Handshake: MUST be the first output of this process. The parent
+	// supervisor (internal/childproc, slice 2) reads exactly one line
+	// matching `htmlgraph-serve-ready port=<N> pid=<P>` with a 5s deadline.
+	// Any prior stdout write — log line, deprecation warning, anything —
+	// corrupts the scanner. Do not add prints above this line.
+	if _, err := fmt.Printf("htmlgraph-serve-ready port=%d pid=%d\n", assigned, os.Getpid()); err != nil {
+		return fmt.Errorf("write handshake: %w", err)
+	}
+	if err := os.Stdout.Sync(); err != nil {
+		// Non-fatal: the parent has already read the line via its pipe.
+		_ = err
+	}
+
+	// Redirect stdout/stderr to a per-project log file so subsequent logs
+	// (auto-ingest, handler errors, etc.) don't leak through the supervisor's
+	// drain goroutine to the parent's terminal.
+	projectID := registry.ComputeID(filepath.Dir(htmlgraphDir))
+	logsDir := filepath.Join(htmlgraphDir, "logs")
+	_ = os.MkdirAll(logsDir, 0o755)
+	logPath := filepath.Join(logsDir, fmt.Sprintf("serve-%s.log", projectID))
+	if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+		os.Stdout = f
+		os.Stderr = f
+	}
+
+	// Auto-ingest transcripts on startup and every 60s, scoped to this
+	// project via the explicit htmlgraphDir argument (not CWD).
+	go autoIngestLoop(database, htmlgraphDir)
+
+	return (&http.Server{Handler: mux}).Serve(ln)
+}

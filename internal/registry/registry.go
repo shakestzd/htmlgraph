@@ -188,6 +188,13 @@ func OpenReadOnly(dbPath string) (*sql.DB, error) {
 
 // computeID returns the first 8 hex characters of SHA256(dir).
 func computeID(dir string) string {
+	return ComputeID(dir)
+}
+
+// ComputeID returns the first 8 hex characters of SHA256(dir). It is the
+// stable project identifier used by the registry and by the parent server
+// to route per-project reverse-proxy traffic (/p/<id>/...).
+func ComputeID(dir string) string {
 	sum := sha256.Sum256([]byte(dir))
 	return hex.EncodeToString(sum[:])[:8]
 }
