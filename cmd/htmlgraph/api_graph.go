@@ -190,6 +190,9 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 
 	// Sessions that worked on features — only include sessions with
 	// meaningful activity (>5 events) to avoid noise.
+	// Only include sessions that have actual transcript content —
+	// both agent_events (proves attribution) AND messages (proves ingest).
+	// Without the messages check, hook-only sessions surface as empty transcripts.
 	srows, serr := database.Query(`
 		SELECT s.session_id,
 		       COALESCE(s.agent_assigned, 'session'),
@@ -199,6 +202,9 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		    SELECT 1 FROM agent_events e
 		    WHERE e.session_id = s.session_id AND e.feature_id != ''
 		    GROUP BY e.session_id HAVING COUNT(*) > 5
+		)
+		AND EXISTS (
+		    SELECT 1 FROM messages m WHERE m.session_id = s.session_id
 		)
 		LIMIT 200`)
 	if serr == nil {
