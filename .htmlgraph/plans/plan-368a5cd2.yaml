@@ -7,7 +7,7 @@ meta:
     created_at: "2026-04-08"
     status: finalized
     created_by: claude-opus
-    version: 10
+    version: 12
 design:
     problem: |
         HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask "what work is happening across all my projects right now?" without manually cd-ing into each repo and running `htmlgraph snapshot`.
@@ -49,6 +49,8 @@ slices:
         - Save uses tempfile+rename — power-loss during write does not corrupt the registry
         - Each Entry has a stable ID (8-char SHA256 prefix of ProjectDir) set on first upsert and preserved on subsequent upserts
         - OpenReadOnly returns a *sql.DB that can query but cannot write or run migrations
+        - Atomic-rename semantics are documented in the package doc comment — write to `<path>.tmp`, fsync, then `os.Rename` — which prevents partial-write corruption but does NOT prevent concurrent writers racing; last-writer-wins is the accepted MVP tradeoff
+        - 'flock-based exclusion for concurrent CLI invocations is explicitly out of scope for the MVP and documented as a post-MVP follow-up (matches Risk #6 in the critique)'
       effort: S
       risk: Low
       tests: |
@@ -76,6 +78,8 @@ slices:
         - git remote get-url is called ONLY on first registration (when GitRemoteURL is empty); subsequent invocations use the cached value
         - Commands excluded from PersistentPreRunE (version, help, init, etc.) do not touch registry
         - '`go build ./... && go vet ./... && go test ./...` pass'
+        - 'Cached path (entry.GitRemoteURL already populated): upsert + save completes in under 10 ms on SSD — no git subprocess invoked, verified by benchmark or subprocess count hook'
+        - 'Cold path (first registration of a project): upsert + save completes in under 30 ms on SSD including `git remote get-url origin` subprocess startup (5–20 ms on macOS per assumption A9)'
       effort: S
       risk: Low
       tests: |
@@ -136,7 +140,8 @@ slices:
         - All cross-project DB access uses read-only connections — no schema mutations on foreign projects
         - Single-project `htmlgraph serve` (no flag) behaviour is unchanged; `/api/mode` returns `{"mode":"single"}`
         - '`go build ./... && go vet ./... && go test ./...` pass'
-      effort: M
+        - '`GET /api/projects` re-reads `registry.Load(registry.DefaultPath())` on each request so newly-registered projects appear without restarting `htmlgraph serve --global` — the re-read is a single small JSON file load (~1 ms) and the DB connection cache is keyed by stable project ID so existing `*sql.DB` handles are reused across requests (addresses DESIGN CRITIC Gap: "No refresh mechanism when registry changes while global dashboard is running")'
+      effort: L
       risk: Med
       tests: |
         Unit: TestRunGlobalServer_RoutesRegistered, TestProjectIDStable (same dir always same id),
