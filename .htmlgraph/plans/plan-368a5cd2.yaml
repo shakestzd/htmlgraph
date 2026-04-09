@@ -1,5 +1,5 @@
 meta:
-    id: plan-32c7b8fb
+    id: plan-368a5cd2
     track_id: trk-66dcbbf7
     title: Multi-Project MVP
     description: |
@@ -7,7 +7,7 @@ meta:
     created_at: "2026-04-08"
     status: draft
     created_by: claude-opus
-    version: 2
+    version: 4
 design:
     problem: |
         HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask "what work is happening across all my projects right now?" without manually cd-ing into each repo and running `htmlgraph snapshot`.
@@ -26,7 +26,7 @@ design:
         - Read-only cross-project aggregation — the global dashboard and `projects list` must never write to any project's `.htmlgraph/` directory or SQLite DB; all cross-project DB access uses read-only SQLite connections (`?mode=ro` URI) that skip schema migrations; SQLite supports concurrent readers so aggregation is safe, but cross-project writes are explicitly out of scope for this MVP
         - Zero breakage of existing single-project workflows — `htmlgraph serve` without `--global`, all hook behaviour, and all project-local commands must behave identically; the registry upsert must be a silent side-effect with no latency impact on normal CLI invocations
         - No build step or framework additions to the dashboard — the SPA is vanilla JS served via `embed.FS`; the global view must use the same constraint, adding only new API endpoints to the existing Go HTTP server and new JS fetch calls, not a bundler or frontend framework
-    approved: false
+    approved: true
     comment: ""
 slices:
     - id: feat-3c8a1e72
@@ -57,7 +57,7 @@ slices:
               TestPrune_RemovesStale, TestDefaultPath, TestOpenReadOnly_RejectsWrite,
               TestEntry_StableID (same dir always yields same ID)
         Integration: none (pure file I/O + SQLite, tmpdir-based in unit tests)
-      approved: false
+      approved: true
       comment: ""
     - id: feat-7d4b2f91
       num: 2
@@ -85,7 +85,7 @@ slices:
         Integration: Run `htmlgraph status` twice in a temp project dir; assert projects.json
                      contains exactly one entry with updated LastSeen; assert git subprocess
                      not invoked on second run (mock or count via test hook)
-      approved: false
+      approved: true
       comment: ""
     - id: feat-c1e5a83d
       num: 3
@@ -113,7 +113,7 @@ slices:
         Integration: Populate registry with two entries (one real, one fake dir);
                      assert `list` shows both, `prune` removes the fake one;
                      assert no schema tables created in real project DB after `list` runs
-      approved: false
+      approved: true
       comment: ""
     - id: feat-9a7e6c04
       num: 4
@@ -145,7 +145,7 @@ slices:
                      assert /api/projects returns two entries with stable IDs;
                      assert /api/sessions?project=<id> returns data from the correct DB;
                      assert no new tables created in project DBs after server startup
-      approved: false
+      approved: true
       comment: ""
     - id: feat-e2f8b17a
       num: 5
@@ -173,7 +173,7 @@ slices:
         Integration: Start global server with two projects; load dashboard; assert switcher
                      renders both project names; assert feature list changes on selection;
                      assert single-project server shows no switcher
-      approved: false
+      approved: true
       comment: ""
 questions:
     - id: q-registry-format
@@ -186,7 +186,7 @@ questions:
           label: 'A: JSON at ~/.local/share/htmlgraph/projects.json — simpler, atomic writes, MVP-scoped'
         - key: sqlite-db
           label: 'B: SQLite database — queryable, consistent with internal architecture, more overhead'
-      answer: null
+      answer: json-file
     - id: q-auto-registration-trigger
       text: 'When should a project auto-register: every CLI invocation, first-use only, or htmlgraph init only?'
       description: |
@@ -199,7 +199,7 @@ questions:
           label: 'B: First-use-only (create-if-not-exists) — cheaper, but timestamps stale quickly'
         - key: init-only
           label: 'C: htmlgraph init only — explicit opt-in, manual multi-project setup required'
-      answer: null
+      answer: first-use-only
     - id: q-global-api-design
       text: Should multi-project API routes be separate (e.g., /api/global/sessions) or a query parameter on existing routes?
       description: |
@@ -221,7 +221,7 @@ questions:
           label: 'A: git_remote_url — deduplicates clones, simpler queries, loses filesystem distinctness'
         - key: project-dir
           label: 'B: Absolute project_dir — always unique, filesystem-accurate, requires manual dedup management'
-      answer: null
+      answer: project-dir
 critique:
     reviewed_at: "2026-04-08"
     reviewers:
