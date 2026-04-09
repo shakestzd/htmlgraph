@@ -2,15 +2,298 @@ meta:
     id: plan-237fb251
     track_id: trk-cb36e595
     title: Multi-Project Hardening — per-project process isolation
-    description: Re-architect htmlgraph serve --global from shared-process query-param dispatch to per-project child-process reverse-proxy isolation. Closes architectural flaw where project-scoped writes route through global server's read-only cache with wrong CWD/env/hook context.
+    description: Re-architect `htmlgraph serve --global` from shared-process query-param dispatch to per-project child-process reverse-proxy isolation. Closes the architectural flaw where project-scoped writes route through the global server's read-only cache with wrong CWD / env / hook context, enabling accidental cross-project contamination. Each active project runs in its own `htmlgraph serve` child process on a 127.0.0.1 ephemeral port; the global server serves only aggregate reads and reverse-proxies `/p/<project-id>/*` to the matching child. OS-level process isolation; correct-by-construction hook context; crash isolation; composes cleanly with the `(session_id, agent_id)` attribution fix by giving each project its own writer queue.
     created_at: "2026-04-09"
     status: draft
+    created_by: claude-opus
     version: 2
 design:
-    problem: ""
-    goals: []
-    constraints: []
+    problem: |-
+        `cmd/htmlgraph/serve_global.go` holds a `projectCache` of read-only `*sql.DB` handles to every registered project and dispatches project-scoped routes (`/api/plans/*`, `/api/plans/<id>/chat`, `/api/plans/<id>/delete`, `/api/plans/<id>/render`, `/api/graph`, `/api/sessions`, `/api/features/*`, `/api/transcript`, `/api/events/tree`, `/api/events/subagent`) via `dispatchByProject(?project=<id>)`. The handlers then receive a read-only DB opened in the global server's working directory with the global server's env. Any write — plan chat streaming, plan finalize, plan delete, feature state transitions, hook-driven mutations — runs with the wrong CWD, wrong `HTMLGRAPH_PROJECT_DIR`, wrong `.htmlgraph/` attribution, and a SQLite handle that was explicitly opened `mode=ro`.
+
+        Two concrete consequences surfaced during smoke testing on 2026-04-09:
+        1. `POST /api/plans/plan-368a5cd2/chat` returned HTTP 400 because the embedded plan template hardcodes `/api/plans/<id>/chat` with no `?project=` and `dispatchByProject` demands it. The band-aid fix (inject `?project=` into the template) was rejected because it papers over the symptom while leaving the architecture exposed.
+        2. A successfully-routed write (hypothetically) against `/api/plans/<id>/finalize?project=A` would: open a read-only DB to project A (SQLite errors on write), but first try to run hooks under the global server's CWD and env, attributing to the wrong project's session tables, writing event files to the wrong `.htmlgraph/` directory, and shelling out `claude` subprocesses under the wrong project context. The router has zero enforcement of which project a given write belongs to — the query param is a hint, not a boundary.
+
+        The existing implementation also forces every frontend fetch call site to remember to append `?project=`. Today `buildProjectUrl` in `dashboard/js/helpers.js` covers 18+ call sites; the plan template's hardcoded URLs bypass it entirely. Future components that forget the helper will silently break or, worse, cross-route.
+    goals:
+        - '**Process isolation** — each active project runs in its own `htmlgraph serve` child process with its own OS heap, env vars, CWD, SQLite connection pool, and hook context. A memory bug, held-wrong-pointer, or router confusion cannot leak state across projects because the kernel enforces the boundary.'
+        - '**Single user-facing origin** — the user still sees one dashboard on `http://localhost:8087/`. Drilling into a project navigates to `/p/<project-id>/` which the global server reverse-proxies to the matching child. Projects landing, global events stream, aggregate stats all share the same origin.'
+        - '**Correct-by-construction hook context** — children are spawned with `--project-dir <path>`, resolved by `internal/paths/resolve.go` as the highest-priority source. All `.htmlgraph/` writes, hook events, and subprocess invocations automatically attribute to the right project with zero per-handler coordination.'
+        - '**Zero frontend ceremony** — the plan template, feature detail pages, and any future embedded view use relative URLs (`/api/plans/<id>/chat`). Under `/p/<id>/` base path, the browser resolves them correctly and the reverse proxy strips the prefix. `buildProjectUrl` becomes a one-line helper. No `?project=` anywhere in user-facing code.'
+        - '**Architectural acceptance test** — an integration test creates two temp projects, writes feature X to projectA through `/p/A/api/workitem/create`, and asserts projectB''s SQLite file on disk does NOT contain feature X. Cross-project contamination becomes impossible at the boundary, not merely absent by inspection.'
+    constraints:
+        - Single binary, single entry point — `htmlgraph serve --global` spawns children of the same binary via `os.Executable()`. No new CLI tool, no separate release artifact.
+        - Children bind `127.0.0.1:0` — kernel assigns a free ephemeral port. Parent reads the bound port back via a stdout handshake line before routing any requests. Must not require pre-allocation or config.
+        - Crash isolation is bidirectional — a panic in child A must not affect child B, and the global server must return 502 (not hang) when a child is dead. The next request to that project respawns.
+        - Idle reaping required — children older than a configurable idle timeout (default 30 min) are SIGTERMed to prevent process leaks over long dashboard sessions.
+        - Zombie prevention on parent shutdown — when the global server receives SIGINT/SIGTERM, it must SIGTERM all children, wait up to 5s for graceful exit, then SIGKILL survivors. No orphan processes after `Ctrl+C`.
+        - All cross-project access in the global layer is read-only. The aggregate handlers (`/api/projects/all/stats`, `/api/events/stream`, `/api/events/recent`) may open foreign project DBs in `?mode=ro` mode for aggregation but MUST NOT call any handler that performs writes. This is the only architectural rule that cannot be relaxed.
+        - Single-project `htmlgraph serve` (no `--global`) behavior is unchanged. The refactor extracts a mux factory that both paths share; the single-project entry point continues to bind a fixed port and serve directly with no parent.
+        - '`active_work_items(session_id, agent_id)` attribution (feat-ab67561e) composes cleanly — each child has its own `sessions` table and its own writer queue, so there is no cross-project SQLite contention by construction. The attribution fix applies per-project without further changes.'
+        - Supports macOS and Linux. Windows is not a target for this work — process lifecycle differs (`pdeathsig` Linux, `ProcessMonitor` macOS, Job Objects Windows) and Windows support can be filed separately if needed.
     approved: false
     comment: ""
-slices: []
-questions: []
+slices:
+    - id: feat-a1c5e301
+      num: 1
+      title: Extract buildSingleProjectMux factory + ephemeral port support
+      what: 'Refactor `cmd/htmlgraph/serve.go:runServer` into two functions. Extract `buildSingleProjectMux(db *sql.DB, htmlgraphDir string, dashboardFS fs.FS) *http.ServeMux` as a pure factory that registers every route currently in `runServer` (lines 38-98 per research) without calling `http.ListenAndServe`. `runServer` becomes a thin wrapper that calls the factory, then starts the server. Replace `http.ListenAndServe(addr, mux)` with `net.Listen("tcp", listenAddr) + (&http.Server{Handler: mux}).Serve(ln)` so the bound `*net.TCPListener` is accessible before `Serve` blocks. When the `--port` flag is `0`, read the assigned port via `ln.Addr().(*net.TCPAddr).Port` and print a structured handshake line to stdout exactly once before calling `Serve`: `htmlgraph-serve-ready port=<N> pid=<PID>\n`. Extract the `autoIngestLoop` goroutine launch from `runServer` and parameterize it with an explicit `htmlgraphDir` argument (the current implementation reads `os.Getwd()` which breaks when children are spawned with `--project-dir`). Both single-project and global-child invocations use the same factory; only the entry point differs.'
+      why: Every downstream slice depends on being able to spawn a child as `htmlgraph serve --port 0 --project-dir <path>` and receive the assigned port back. Without the factory extraction and the ephemeral-port refactor, there is no way to run the per-project server logic inside a child process that the parent can reverse-proxy to. `autoIngestLoop` reading `os.Getwd()` is a pre-existing bug that would silently corrupt child attribution; fixing it as part of this slice keeps the blast radius contained to one commit.
+      files:
+        - cmd/htmlgraph/serve.go
+        - cmd/htmlgraph/serve_test.go
+      deps: []
+      done_when:
+        - '`buildSingleProjectMux(db, htmlgraphDir, dashboardFS)` is a package-level function that returns a `*http.ServeMux` and is called from both `runServer` and (later) the child-process entry point'
+        - '`runServer` uses `net.Listen` + `http.Server{}.Serve(ln)` instead of `http.ListenAndServe`'
+        - Passing `--port 0` causes the server to bind an ephemeral port and print `htmlgraph-serve-ready port=<N> pid=<PID>` to stdout before serving
+        - Passing a fixed port (e.g. `--port 8080`) behaves exactly as today — no handshake line, same log output, same behavior
+        - '`autoIngestLoop` takes an explicit `htmlgraphDir` parameter and no longer calls `os.Getwd()` for project scoping'
+        - 'Single-project smoke test: running `htmlgraph serve --port 8080` starts, dashboard loads, `curl /api/mode` returns single-mode JSON — unchanged from main'
+        - 'Ephemeral smoke test: running `htmlgraph serve --port 0 --project-dir <tmp>` prints the handshake line, binds an ephemeral port, serves `/api/mode`'
+        - '`go build ./... && go vet ./... && go test ./...` all pass'
+      effort: M
+      risk: Med
+      tests: |
+        Unit:
+          - TestBuildSingleProjectMux_RegistersAllRoutes — construct the mux via the factory with a tmpdir DB, assert every current route in serve.go is registered
+          - TestRunServer_EphemeralPort — start server with --port 0, capture stdout, assert handshake line appears, assert port is reachable via net.Dial
+          - TestRunServer_FixedPort_NoHandshake — start with --port <fixed>, assert no handshake line, assert existing behavior unchanged
+          - TestAutoIngestLoop_HonorsProjectDir — call with an explicit htmlgraphDir, assert ingest targets that dir not os.Getwd()
+        Integration:
+          - end-to-end: start server with --port 0 in a tmpdir project, read handshake, curl /api/mode, curl /api/projects, assert responses
+        Regression:
+          - existing cmd/htmlgraph tests must still pass unchanged
+      approved: false
+      comment: ""
+    - id: feat-b2d6f412
+      num: 2
+      title: internal/childproc package — spawn, handshake, lifecycle, reap
+      what: 'New package `internal/childproc/` with `childproc.go` + `childproc_test.go`. Define `type Child struct { ID string; ProjectDir string; Port int; PID int; cmd *exec.Cmd; LastRequest atomic.Int64; cancel context.CancelFunc; exitC chan struct{} }`. Define `type Supervisor struct { mu sync.Mutex; children map[string]*Child; binPath string; idleTimeout time.Duration; spawnTimeout time.Duration }`. Implement `NewSupervisor(opts Options) *Supervisor` with `binPath = os.Executable()` by default (single-binary pattern). Implement `(*Supervisor) GetOrSpawn(ctx context.Context, projectID, projectDir string) (*Child, error)` which: (1) returns the existing live child if the map has one and its `exitC` is not closed; (2) otherwise acquires the mutex, double-checks, spawns via `exec.CommandContext(cancelCtx, s.binPath, "serve", "--port", "0", "--project-dir", projectDir)`, captures stdout via `cmd.StdoutPipe()`, calls `cmd.Start()`, launches a goroutine that scans stdout for `htmlgraph-serve-ready port=<N> pid=<PID>` with a 5s deadline, populates the `Child` and returns it. Launch a second goroutine per child that calls `cmd.Wait()` and closes `exitC` on process exit, then removes the child from the map under the mutex. Implement `(*Supervisor) Shutdown(ctx context.Context) error` which SIGTERMs all children in parallel, waits for their `exitC` with the context deadline, and SIGKILLs any survivors. Implement `(*Supervisor) RunIdleReaper(ctx context.Context)` as a goroutine launched by the caller, ticking every 60s, killing any child where `time.Since(time.Unix(c.LastRequest.Load(), 0)) > s.idleTimeout`. Callers call `child.LastRequest.Store(time.Now().Unix())` on every proxied request.'
+      why: 'The supervisor is the isolation boundary. All OS-level process concerns live in one place: spawning, port handshake parsing, crash detection, idle reaping, zombie prevention on shutdown. Isolating this behind a clean interface lets slice 3''s reverse-proxy layer ignore process-level concerns and lets tests verify lifecycle in isolation. Using `os.Executable()` guarantees version parity between parent and child (no PATH resolution, no split-binary installs) and plays well with `go test` (tests build their own binary and spawn it).'
+      files:
+        - internal/childproc/childproc.go
+        - internal/childproc/childproc_test.go
+      deps:
+        - 1
+      done_when:
+        - '`GetOrSpawn` spawns a child on first call, returns the cached live child on subsequent calls'
+        - Port handshake parsing times out cleanly if the child never prints the ready line — returns a clear error, kills the child, removes from map
+        - '`exitC` closes and the map entry is removed when the child exits for any reason (clean exit, panic, SIGKILL)'
+        - '`Shutdown(ctx)` with a 5s deadline cleanly kills all children — SIGTERM first, SIGKILL survivors after 5s'
+        - Idle reaper kills children where `time.Since(LastRequest) > idleTimeout`
+        - '`LastRequest.Store` is atomic and safe to call from any goroutine'
+        - Spawning uses `os.Executable()` — no PATH lookup
+        - Tests use `t.TempDir()` for project dirs and a test binary (via `TestMain`) that mimics the real `htmlgraph serve --port 0` handshake protocol
+        - '`go test ./internal/childproc/...` completes in under 10 seconds'
+        - '`go build ./... && go vet ./... && go test ./...` all pass'
+      effort: L
+      risk: Med
+      tests: |
+        Unit:
+          - TestSupervisor_GetOrSpawn_Fresh — spawns, handshake succeeds, returns populated Child
+          - TestSupervisor_GetOrSpawn_Cached — two calls return the same *Child instance
+          - TestSupervisor_HandshakeTimeout — child never prints ready line, spawn returns error within 5s, child is killed
+          - TestSupervisor_ChildExit_RemovesFromMap — kill the spawned child externally, assert map entry is gone after cmd.Wait() completes
+          - TestSupervisor_Shutdown_SIGTERM — shutdown with plenty of deadline, all children exit cleanly via SIGTERM, no SIGKILL fired
+          - TestSupervisor_Shutdown_SIGKILL — spawn a stub that ignores SIGTERM, assert SIGKILL fires after the deadline
+          - TestSupervisor_IdleReaper — set idleTimeout=100ms, spawn child, wait 200ms without calling LastRequest.Store, assert reaper kills it
+        Integration:
+          - uses `go test -tags=integration` + a test-only `TestMain` that builds a stub binary mimicking htmlgraph's handshake protocol
+        Regression:
+          - no existing tests touched (new package)
+      approved: false
+      comment: ""
+    - id: feat-c3e7a523
+      num: 3
+      title: Reverse-proxy /p/<id>/* routing in runGlobalServer
+      what: 'In `cmd/htmlgraph/serve_global.go`, add `mux.Handle("/p/", corsMiddleware(http.HandlerFunc(proxyHandler)))` near the other route registrations. Implement `proxyHandler(w http.ResponseWriter, r *http.Request)` which: (1) parses the request path — expects `/p/<project-id>/<rest>` — returns 404 if the shape is wrong; (2) looks up the project ID in the `projectCache` (or re-reads the registry) to get its `ProjectDir`; returns 404 if unknown; (3) calls `supervisor.GetOrSpawn(r.Context(), projectID, projectDir)` — returns 502 with a clear body if spawn fails; (4) constructs (or retrieves from a per-child cached field) an `httputil.ReverseProxy` pointed at `http://127.0.0.1:<child.Port>` via `NewSingleHostReverseProxy` with a custom `Director` that strips the `/p/<project-id>` prefix from `r.URL.Path` before forwarding; (5) sets `proxy.FlushInterval = 100 * time.Millisecond` for SSE streaming; (6) sets a custom `ErrorHandler` that returns 502 with a clear message when the child is unreachable (e.g., crashed between spawn and request); (7) calls `child.LastRequest.Store(time.Now().Unix())` and forwards. The `Supervisor` instance lives in `runGlobalServer`''s scope, created once at startup. Cache the per-child `ReverseProxy` instance on the `Child` struct (add a `proxy *httputil.ReverseProxy` field) so it''s not recreated per request. Call `supervisor.Shutdown(ctx)` on graceful server shutdown (plumb through an `http.Server.RegisterOnShutdown` hook or a context-cancel path).'
+      why: 'The reverse proxy is the one-line contract between the global server''s outer mux and the per-project children. It''s the only layer that needs to understand ''how to get a request from the user into a child''; everything else (child lifecycle, frontend routing, aggregate reads) is independent. The `FlushInterval` setting is load-bearing for the SSE event stream (without it, `httputil.ReverseProxy` buffers the response and breaks EventSource). The 502 ErrorHandler is the crash-recovery story: if the child dies mid-request, the user sees an error, refreshes, and the next request spawns a fresh child.'
+      files:
+        - cmd/htmlgraph/serve_global.go
+        - cmd/htmlgraph/serve_global_test.go
+      deps:
+        - 2
+      done_when:
+        - '`GET /p/<valid-id>/api/mode` returns the child''s `/api/mode` response (proxied)'
+        - '`GET /p/<unknown-id>/api/mode` returns 404 with a clear body'
+        - '`POST /p/<valid-id>/api/plans/<plan-id>/chat` streams the response back unbuffered (FlushInterval in effect)'
+        - If the child is killed externally mid-request, `proxyHandler` returns 502 via the `ErrorHandler` with a clear body — not a hang, not a 500, not a panic
+        - The next request after a 502 respawns a fresh child (verified by `cmd.Wait()` returning and `GetOrSpawn` creating a new entry)
+        - Per-child `ReverseProxy` instance is cached and reused across requests (not recreated)
+        - '`supervisor.Shutdown(ctx)` is called when the global server shuts down, killing all children before the parent exits'
+        - '`go build ./... && go vet ./... && go test ./...` all pass'
+      effort: M
+      risk: Med
+      tests: |
+        Unit:
+          - TestProxyHandler_PathShape — /p/a/b proxies, /p/ 404s, /p 404s
+          - TestProxyHandler_UnknownProject_404 — registry miss returns 404 with body
+          - TestProxyHandler_SpawnFailure_502 — supervisor returns error, handler returns 502
+          - TestProxyHandler_ChildDead_502 — kill child externally, send request, assert 502 via ErrorHandler
+          - TestProxyHandler_PrefixStripped — child receives r.URL.Path without /p/<id> prefix
+        Integration:
+          - start global server with a real child (via supervisor spawning a test stub), proxy /p/<id>/api/mode, assert response body comes from the child
+          - SSE streaming: proxy /p/<id>/api/events/stream, read first chunk within 200ms (proves FlushInterval works)
+          - crash recovery: kill child, send next request, assert fresh child spawned (PID differs from first)
+        Regression:
+          - existing serve_global tests must still pass
+      approved: false
+      comment: ""
+    - id: feat-d4f8b634
+      num: 4
+      title: Remove dispatchByProject + repoint aggregate reads at lazy RO cache
+      what: 'In `cmd/htmlgraph/serve_global.go`, delete `dispatchByProject` entirely and remove every route currently dispatched through it: `/api/sessions`, `/api/features`, `/api/features/detail`, `/api/features/related`, `/api/features/` (the per-id subpath), `/api/graph`, `/api/events/tree`, `/api/events/subagent`, `/api/plans`, `/api/plans/` (the per-id subpath), `/api/transcript`, `/api/sessions/` (per-id). These routes are now served by the child via `/p/<id>/api/*` proxy. Delete the `dispatchByProject`-branch of the hybrid `/api/stats`, `/api/events/recent`, and `/api/events/stream` handlers — keep only the aggregate branches (`aggregateStats`, `globalRecentEventsHandler`, `globalSSEHandler`). The `projectCache` that holds read-only `*sql.DB` handles is now used ONLY by these aggregate handlers. Rename it to `aggregateCache` to reflect its narrowed purpose and add a package doc comment saying ''this cache is read-only by construction; do not add handlers that write''. Verify `aggregateStats`, `globalRecentEventsHandler`, and `globalSSEHandler` each open DB handles in `?mode=ro` URI mode — if any opens a read-write handle, fix it. This is the architectural cleanup — after this slice, there is no code path in the global server that can write to a foreign project DB.'
+      why: 'This is the slice where the security property becomes real. Removing `dispatchByProject` eliminates the router surface where a project-scoped write could land in the wrong project. Renaming and re-scoping `projectCache` to `aggregateCache` makes the invariant (''global-scope access is read-only'') grep-enforceable: every DB handle in the global server is in a variable whose name declares the constraint. Must land after slice 3 (which provides the replacement) and before slice 5 (which removes the `?project=` param from the frontend); if landed out of order, the frontend will 404 on every call between deployments.'
+      files:
+        - cmd/htmlgraph/serve_global.go
+        - cmd/htmlgraph/serve_global_test.go
+      deps:
+        - 3
+      done_when:
+        - '`dispatchByProject` function is deleted entirely from the codebase — `grep -rn dispatchByProject cmd/ internal/` returns zero matches'
+        - Every previously-dispatched route is removed from `runGlobalServer`'s mux; all project-scoped traffic now flows through `/p/<id>/*` proxy (slice 3)
+        - '`projectCache` is renamed to `aggregateCache` with a doc comment declaring read-only invariant'
+        - Every DB open in `aggregateCache` uses `?mode=ro` URI — verified by grep
+        - Search for query-parameter project dispatch in cmd/htmlgraph/ returns zero matches (all query-param dispatch removed)
+        - 'Global server smoke test: start `htmlgraph serve --global`, `curl /api/projects` works, `curl /api/plans` returns 404 (not 400), `curl /p/<id>/api/plans` proxies to the child and returns the child''s response'
+        - '`go build ./... && go vet ./... && go test ./...` all pass'
+      effort: M
+      risk: High
+      tests: |
+        Unit:
+          - TestAggregateCache_OnlyReadOnly — reflect/scan every *sql.DB opened by aggregateCache, assert the connection string contains mode=ro
+          - TestServeGlobal_NoDispatchByProject — grep the mux for handlers that reference dispatchByProject; none should exist
+          - TestServeGlobal_NoQueryParamRouting — send GET /api/plans?project=anything, assert 404 (the route is deleted entirely, not 400)
+        Integration:
+          - start global server (with slice 3 proxy wired), hit /p/<id>/api/sessions, assert child handles it
+          - hit /api/sessions (no /p/ prefix), assert 404
+          - hit /api/projects/all/stats, assert aggregate response unchanged
+        Regression:
+          - existing aggregate-read tests must still pass
+      approved: false
+      comment: ""
+    - id: feat-e5a9c745
+      num: 5
+      title: Frontend — /p/<id>/ base path navigation + helper cleanup
+      what: 'Update `cmd/htmlgraph/dashboard/js/app.js` and `cmd/htmlgraph/dashboard/js/helpers.js`. In `helpers.js`, rewrite `buildProjectUrl(endpoint, extraQuery)` to: (1) detect project-scoped mode via `window.location.pathname.startsWith(''/p/'')`; (2) if yes, return `/p/<id>/api/<endpoint>` (the browser already resolves relative URLs this way, but make it explicit for call sites that pass absolute paths); (3) if no (single-project mode or global root), return `/api/<endpoint>` as today. Delete the `?project=` append logic entirely. In `app.js`, change the projects-landing cards so clicking navigates via full page load: `window.location.href = ''/p/'' + project.id + ''/''`. Remove the in-page SPA transitions `enterProject()` and `showProjectsLanding()` — they''re replaced by real HTTP navigation. When the page loads under `/p/<id>/`, skip `detectMode()` / projects-landing entirely and run the normal single-project startup path. The back button (added earlier for the SPA drill-in) becomes a regular `<a href=''/''>` link that navigates to the projects landing root. The plan template at `internal/plantmpl/templates/plan_page.gohtml` needs zero changes — its hardcoded `fetch(''/api/plans/'' + planId + ''/chat'')` resolves correctly as a relative URL because the enclosing page is at `/p/<id>/plans/<plan-id>`, so the browser resolves the fetch to `/p/<id>/api/plans/<plan-id>/chat`, which the reverse proxy forwards to the child stripped of the `/p/<id>` prefix.'
+      why: 'Removing `?project=` from the frontend is the final closure of the old architecture. Using full page navigation instead of SPA state transitions is the key that unlocks zero-ceremony templates: the browser''s own URL resolution handles the project scope via the page origin/base URL, not JavaScript string manipulation. After this slice, no JavaScript file or Go template has to know whether it''s running in single-project or global mode — the URL path prefix makes the context self-evident. This also makes deep-linking work correctly (`/p/A/plans/plan-123` is a permalink) and makes browser back/forward buttons behave naturally.'
+      files:
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/js/helpers.js
+        - cmd/htmlgraph/dashboard/index.html
+      deps:
+        - 4
+      done_when:
+        - Search for `?project=` in `cmd/htmlgraph/dashboard/` returns zero matches
+        - '`buildProjectUrl` is a 5-line function with no query-param logic — returns either `/api/<ep>` or `/p/<id>/api/<ep>` based on `window.location.pathname`'
+        - Clicking a projects-landing card triggers `window.location.href = '/p/<id>/'` — full page navigation, not SPA transition
+        - '`enterProject` and `showProjectsLanding` functions are deleted from app.js'
+        - Loading `http://localhost:8087/p/<valid-id>/` serves the dashboard with the project context — single-project startup path runs, `buildProjectUrl('sessions')` returns `/p/<id>/api/sessions`
+        - Loading `http://localhost:8087/` (root) serves the projects landing unchanged
+        - Loading `http://localhost:8080/` (single-project mode, no --global) serves the dashboard unchanged — `buildProjectUrl('sessions')` returns `/api/sessions`
+        - 'Plan chat works end-to-end in global mode — visual smoke test in the user''s browser, no more ''Error: Bad Request'''
+        - '`go build ./... && go vet ./... && go test ./...` all pass'
+      effort: M
+      risk: Med
+      tests: |
+        Unit:
+          - JS tests are manual (vanilla JS, no test runner) — verified via browser walkthrough
+          - TestPlanTemplateFetchResolution — static analysis: grep plan_page.gohtml for hardcoded /api/ paths, assert all are relative (no leading scheme/host)
+        Integration:
+          - start htmlgraph serve --global, navigate to /, click a project card, assert URL becomes /p/<id>/, assert sessions/features/plans views all load without 404
+          - plan chat: navigate to /p/<id>/plans/<some-plan>, open plan, type a message, assert POST succeeds and response streams back
+        Regression:
+          - start htmlgraph serve (single-project, no --global), assert dashboard behavior is unchanged — all tabs, all plans, all charts
+      approved: false
+      comment: ""
+    - id: feat-f6b0d856
+      num: 6
+      title: Cross-project isolation acceptance test + crash recovery + idle reap integration
+      what: New test file `cmd/htmlgraph/serve_global_proxy_test.go` with three integration tests that prove the isolation guarantees hold end-to-end. **Test A (contamination proof):** create two tmpdir projects (projectA, projectB) each with `.htmlgraph/` initialized; register both in a temp registry file; start a global server with `supervisor.binPath` pointing at the test-built `htmlgraph` binary (via `go build -o`); through the proxy, call `POST /p/A/api/workitem/create` to create feature X in projectA; then open projectB's SQLite file DIRECTLY from disk (not via the proxy) and assert there is no `work_items` row for feature X; also open projectA's file and assert feature X IS there. **Test B (crash recovery):** spawn a child via the supervisor; kill the child with SIGKILL from the test; send the next request through the proxy; assert a fresh child is spawned (new PID) and the request succeeds. **Test C (idle reap):** create a supervisor with `idleTimeout = 200ms`; spawn a child; wait 300ms without sending any requests; assert the reaper killed the child and the map entry is gone. The tests use a `//go:build integration` tag so they don't slow the default `go test` run; the CI pipeline adds `-tags=integration` in a separate job.
+      why: 'Slices 1-5 implement the architecture, but only an integration test can prove the cross-project isolation guarantee holds at the OS boundary. Test A is the load-bearing acceptance criterion: if it passes, cross-project contamination is architecturally impossible because we verified by opening the other project''s DB file directly and finding no trace of the write. Test B and C verify the operational guarantees (crashes and idle reaping) that the design documents but could otherwise silently regress. Separating behind a build tag keeps the unit test loop fast while still running these proofs in CI.'
+      files:
+        - cmd/htmlgraph/serve_global_proxy_test.go
+        - internal/childproc/childproc_integration_test.go
+      deps:
+        - 5
+      done_when:
+        - '`go test -tags=integration ./cmd/htmlgraph/... -run TestCrossProjectIsolation` passes'
+        - '`go test -tags=integration ./cmd/htmlgraph/... -run TestCrashRecovery` passes'
+        - '`go test -tags=integration ./cmd/htmlgraph/... -run TestIdleReap` passes'
+        - The contamination test opens the sibling project's SQLite file directly from disk (bypassing the proxy) to verify isolation — it is not satisfied by API-level 'I couldn't find it'
+        - Default `go test ./...` (without `-tags=integration`) does not run these tests and completes in the same time as before
+        - CI adds a separate job that runs `go test -tags=integration ./...` and blocks the merge if any integration test fails
+        - '`go build ./... && go vet ./... && go test ./...` all pass'
+      effort: M
+      risk: Low
+      tests: |
+        This slice IS tests — no further test requirements.
+        Integration (the three tests described above):
+          - TestCrossProjectIsolation — the load-bearing proof
+          - TestCrashRecovery — SIGKILL a child, next request respawns
+          - TestIdleReap — wait past idleTimeout, assert child is killed
+        Regression:
+          - default go test ./... run time must not increase
+      approved: false
+      comment: ""
+questions:
+    - id: q-port-handshake
+      text: How does a child announce its bound ephemeral port back to the parent?
+      description: 'The child binds `127.0.0.1:0` and the kernel assigns a free port. The parent needs that number before it can route any request. Three options: **stdout line** — child prints `htmlgraph-serve-ready port=<N> pid=<PID>` as its first output, parent scans the pipe with a 5s deadline; simple but requires the child to never print anything else before the handshake and requires the parent to keep the pipe plumbed. **Handshake file** — child writes `<project-dir>/.htmlgraph/.serve-port` on ready, parent polls for it; decouples from stdout but adds filesystem dependency and polling latency. **Parent-created pipe** — parent creates an os.Pipe before Start, passes the write end via `cmd.ExtraFiles`, child writes to fd 3; cleanest but requires Unix fd passing which has Windows quirks (not a target here). All three work on macOS/Linux. Stdout is the simplest, plays nicely with `go test` (stdout is captured), and has well-understood failure modes.'
+      recommended: stdout-line
+      options:
+        - key: stdout-line
+          label: 'A: Stdout handshake line — parent scans child stdout for ''htmlgraph-serve-ready port=N'' with 5s deadline; simple, works everywhere, no filesystem dependency'
+        - key: handshake-file
+          label: 'B: Handshake file at .htmlgraph/.serve-port — child writes, parent polls; decouples from pipe plumbing but adds polling and cleanup concerns'
+        - key: fd-pipe
+          label: 'C: Parent-allocated pipe via ExtraFiles fd 3 — cleanest IPC but requires Unix fd passing and more code in the child'
+      answer: null
+    - id: q-aggregate-reads
+      text: How does the global server serve aggregate reads after dispatchByProject is removed?
+      description: Post-slice-4, the global server no longer holds read-write DB handles and no longer dispatches per-project requests. But `/api/projects/all/stats`, `/api/events/stream`, and `/api/events/recent` are global aggregates — they need data from every project. **(a) Lazy RO cache** — keep a small `aggregateCache` of `?mode=ro` handles, opened on first aggregate request per project, reused across requests; concurrent with child writers because SQLite WAL supports multi-reader-single-writer; no contention because the global server is only ever a reader. **(b) Fan-in from children** — the global server forwards aggregate requests to each child and merges the responses; adds HTTP overhead but keeps all DB access in one process per project. **(c) Direct file reads** — parse JSONL event files from `.htmlgraph/events/` without SQLite at all; bypasses WAL entirely but duplicates parsing logic and won't see data that's only in SQLite. Option (a) is the smallest change and has correct concurrency semantics (SQLite WAL is designed for exactly this — the children own the writer, the global reads).
+      recommended: lazy-ro-cache
+      options:
+        - key: lazy-ro-cache
+          label: 'A: Lazy read-only cache in the global server (mode=ro URI), reading alongside the children via SQLite WAL concurrent reader semantics'
+        - key: fan-in-http
+          label: 'B: Fan-in over HTTP — global server calls each child''s per-project API and merges responses'
+        - key: direct-file-reads
+          label: 'C: Read event JSONL files directly from disk without touching SQLite'
+      answer: null
+    - id: q-idle-reap-timeout
+      text: What is the default idle-reap timeout for child processes?
+      description: Children are reaped when no request has hit them for N minutes to prevent process leaks during long dashboard sessions. Too short and users see respawn latency every time they tab back to the dashboard; too long and memory accumulates. Each idle Go process holds ~10-20 MB resident memory, negligible for a dozen projects but non-zero for hundreds. Respawn latency is ~300-500ms (process start + DB open + migration check). 15 min is aggressive and may annoy users who context-switch between projects on the same browser session; 60 min is lax and leaves processes around after lunch. 30 min matches typical 'active session' intuition — if you haven't touched a project in half an hour, its process can probably be reclaimed without annoyance. Should be a flag regardless (`--idle-timeout`) so ops can tune it; the question is just the default.
+      recommended: thirty-minutes
+      options:
+        - key: fifteen-minutes
+          label: 'A: 15 minutes — aggressive reclaim, may trigger respawns during normal browsing'
+        - key: thirty-minutes
+          label: 'B: 30 minutes — balanced default; matches active-session feel'
+        - key: sixty-minutes
+          label: 'C: 60 minutes — conservative, minimizes respawns but holds more memory'
+        - key: disabled-default
+          label: 'D: No reaping by default — children live until global server shutdown; operator opts in via flag'
+      answer: null
+    - id: q-legacy-removal
+      text: Remove dispatchByProject / query-param routes immediately or keep as deprecated for one release?
+      description: The current `?project=<id>` dispatch was merged to main earlier today (2026-04-09). It has no external callers — the dashboard is the only client, and slice 5 removes all references. There are two sensible answers. **Remove immediately** — fewer moving parts, one-way migration, no accidental path that leads back into the unsafe routing, smaller surface area for slice 4's cleanup test. **Keep deprecated for one release** — belt-and-suspenders safety for any dashboard-version-skew situations (e.g., a user's browser has the old JS cached and the server is already on the new backend); adds maintenance burden and a grep target for 'deprecated code to remove later'. Given that dashboard assets ship embedded in the binary (no skew possible by construction), deprecation buys nothing.
+      recommended: remove-immediately
+      options:
+        - key: remove-immediately
+          label: 'A: Remove dispatchByProject and all query-param routes in slice 4 — clean one-way migration, enforced by grep in the slice 4 done_when'
+        - key: deprecate-one-release
+          label: 'B: Keep query-param dispatch as deprecated, log a warning, delete in a follow-up feature after the next release'
+      answer: null
+    - id: q-child-binary
+      text: How does the supervisor locate the htmlgraph binary to spawn children?
+      description: The supervisor needs a path to `htmlgraph` to `exec.Command` with `serve --port 0 --project-dir <path>`. Two options. **`os.Executable()`** — returns the path of the currently-running binary (works on all Unixes, handles symlinks correctly with `filepath.EvalSymlinks`, guarantees the child is byte-identical to the parent, makes `go test` work out of the box because the test binary becomes the 'child'). **PATH lookup** — `exec.LookPath('htmlgraph')` resolves against `$PATH`, requires the user to have `htmlgraph` installed globally, fails if the user's shell PATH differs from the server's env, doesn't guarantee version parity (could spawn an old `htmlgraph` if the user updated the dev binary but not `~/.local/bin`). `os.Executable()` is strictly better for correctness and testability; the only reason to choose LookPath is if we ever wanted to support 'spawn a different version as child' which is a hypothetical we don't need and shouldn't design for (YAGNI).
+      recommended: os-executable
+      options:
+        - key: os-executable
+          label: 'A: os.Executable() — guarantees version parity, works in tests, no PATH dependency'
+        - key: path-lookup
+          label: 'B: exec.LookPath(''htmlgraph'') — relies on $PATH, may spawn a different version than the parent'
+      answer: null
