@@ -133,6 +133,11 @@ func buildGlobalMux() *http.ServeMux {
 		return statsHandler(db, dir)
 	})))
 
+	// Serve the embedded dashboard SPA (same assets as single-project mode).
+	// The frontend calls /api/mode on startup to detect global mode and
+	// render the project switcher.
+	mux.Handle("/", corsMiddleware(http.FileServer(http.FS(dashboardSub()))))
+
 	return mux
 }
 

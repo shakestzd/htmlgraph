@@ -1,5 +1,25 @@
 /* ── Shared helpers ─────────────────────────────────────────── */
 
+// buildProjectUrl constructs an API URL that automatically scopes to the
+// currently selected project when the dashboard is running in global mode.
+// `endpoint` is the path without the `/api/` prefix (e.g. "sessions",
+// "features", "stats"). In single-project mode it returns "/api/<endpoint>"
+// unchanged. In global mode it appends `?project=<id>` using
+// window.htmlgraphProjectId (set by the switcher UI); if that value is
+// empty it falls back to the plain endpoint so callers can still hit
+// aggregate routes like "/api/projects/all/stats".
+function buildProjectUrl(endpoint, extraQuery) {
+  var base = '/api/' + endpoint;
+  var isGlobal = window.htmlgraphMode === 'global';
+  var parts = [];
+  if (isGlobal && window.htmlgraphProjectId) {
+    parts.push('project=' + encodeURIComponent(window.htmlgraphProjectId));
+  }
+  if (extraQuery) parts.push(extraQuery);
+  if (parts.length === 0) return base;
+  return base + '?' + parts.join('&');
+}
+
 function esc(s) {
   if (!s) return '';
   var div = document.createElement('div');

@@ -9,6 +9,12 @@ var currentView = 'activity';
 var seenEventIds = new Set();
 var groupByTrack = localStorage.getItem('htmlgraph-kanban-group-by-track') === 'true';
 
+// Global mode state — populated by detectMode() on init. In single-project
+// mode both values stay unset and buildProjectUrl() returns plain URLs.
+window.htmlgraphMode = 'single';
+window.htmlgraphProjects = [];
+window.htmlgraphProjectId = '';
+
 /* ── Navigation ────────────────────────────────────────────── */
 document.querySelector('.nav').addEventListener('click', function(e) {
   var btn = e.target.closest('.nav-btn');
@@ -26,7 +32,11 @@ document.querySelector('.nav').addEventListener('click', function(e) {
 
 /* ── Data fetching ─────────────────────────────────────────── */
 function fetchStats() {
-  return fetch('/api/stats').then(function(r) {
+  // In global mode with no project selected, show aggregate stats.
+  var url = (window.htmlgraphMode === 'global' && !window.htmlgraphProjectId)
+    ? '/api/projects/all/stats'
+    : buildProjectUrl('stats');
+  return fetch(url).then(function(r) {
     if (!r.ok) return;
     return r.json().then(function(data) {
       stats = data;
@@ -68,7 +78,7 @@ function fetchEvents() {
 }
 
 function fetchSessions() {
-  return fetch('/api/sessions').then(function(r) {
+  return fetch(buildProjectUrl('sessions')).then(function(r) {
     if (!r.ok) return;
     return r.json().then(function(data) {
       sessions = data;
@@ -78,7 +88,7 @@ function fetchSessions() {
 }
 
 function fetchFeatures() {
-  return fetch('/api/features').then(function(r) {
+  return fetch(buildProjectUrl('features')).then(function(r) {
     if (!r.ok) return;
     return r.json().then(function(data) {
       features = data;
@@ -1092,7 +1102,79 @@ document.addEventListener('DOMContentLoaded', function() {
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
 
-Promise.all([fetchStats(), fetchEvents()]);
+/* ── Global mode detection + project switcher ─────────────── */
+
+// detectMode calls /api/mode and, if the server is in global mode, stores
+// the project list on window.htmlgraphProjects and renders the switcher.
+// We use /api/mode (not /api/projects) for detection because the static
+// file server returns HTML 404 for unknown /api/* routes in single-project
+// mode, which would fool a JSON-parse check.
+function detectMode() {
+  return fetch('/api/mode').then(function(r) {
+    if (!r.ok) return;
+    return r.json();
+  }).then(function(data) {
+    if (!data || data.mode !== 'global') return;
+    window.htmlgraphMode = 'global';
+    window.htmlgraphProjects = Array.isArray(data.projects) ? data.projects : [];
+    renderProjectSwitcher();
+  }).catch(function() {});
+}
+
+// renderProjectSwitcher injects a project selector above the side nav when
+// running in global mode. Selecting a project or "All Projects" re-scopes
+// all subsequent API calls via buildProjectUrl() and re-fetches data.
+function renderProjectSwitcher() {
+  if (window.htmlgraphMode !== 'global') return;
+  var nav = document.querySelector('.nav');
+  if (!nav || document.getElementById('project-switcher')) return;
+
+  var wrap = document.createElement('div');
+  wrap.id = 'project-switcher';
+  wrap.style.cssText = 'padding:10px 12px; border-bottom:1px solid var(--border, #2a2a2a); display:flex; flex-direction:column; gap:6px;';
+
+  var label = document.createElement('div');
+  label.textContent = 'Project';
+  label.style.cssText = 'font-size:11px; text-transform:uppercase; opacity:0.6; letter-spacing:0.05em;';
+  wrap.appendChild(label);
+
+  var select = document.createElement('select');
+  select.id = 'project-switcher-select';
+  select.style.cssText = 'width:100%; padding:6px 8px; background:var(--bg, #1a1a1a); color:var(--fg, #eee); border:1px solid var(--border, #2a2a2a); border-radius:4px; font-size:13px;';
+
+  var allOpt = document.createElement('option');
+  allOpt.value = '';
+  allOpt.textContent = 'All Projects';
+  select.appendChild(allOpt);
+
+  window.htmlgraphProjects.forEach(function(p) {
+    var opt = document.createElement('option');
+    opt.value = p.id;
+    var items = (p.featureCount || 0) + 'f ' + (p.bugCount || 0) + 'b ' + (p.spikeCount || 0) + 's';
+    opt.textContent = p.name + '  (' + items + ')';
+    select.appendChild(opt);
+  });
+
+  select.addEventListener('change', function() {
+    window.htmlgraphProjectId = select.value;
+    // Reset cached data so next view switch re-fetches from the selected scope.
+    sessions = [];
+    features = [];
+    fetchStats();
+    if (currentView === 'sessions') fetchSessions();
+    if (currentView === 'work') fetchFeatures();
+  });
+
+  wrap.appendChild(select);
+  nav.parentNode.insertBefore(wrap, nav);
+}
+
+// In global mode, detect first (so the switcher and scoped fetches are
+// ready), then kick off the normal startup. In single-project mode the
+// detectMode call is a no-op that returns before fetchStats runs.
+detectMode().then(function() {
+  Promise.all([fetchStats(), fetchEvents()]);
+});
 setInterval(fetchStats, 30000);
 
 /* ── Plan detail panel ────────────────────────────────────── */
