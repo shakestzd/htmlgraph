@@ -86,17 +86,6 @@ type projectSummary struct {
 	SpikeCount   int    `json:"spikeCount"`
 }
 
-// runGlobalServer starts the multi-project dashboard on the given port.
-// All project DB access is read-only; no foreign DBs are mutated.
-func runGlobalServer(port int) error {
-	mux := buildGlobalMux()
-	addr := fmt.Sprintf("localhost:%d", port)
-	fmt.Printf("HtmlGraph Global Dashboard:  http://%s/\n", addr)
-	fmt.Printf("API Projects:                http://%s/api/projects\n", addr)
-	fmt.Println("Press Ctrl+C to stop.")
-	return http.ListenAndServe(addr, mux)
-}
-
 // buildGlobalMux constructs the http.ServeMux for the global server. Split
 // out so tests can drive it via httptest.NewServer without binding a port.
 func buildGlobalMux() *http.ServeMux {

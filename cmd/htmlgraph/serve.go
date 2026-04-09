@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -18,48 +17,29 @@ import (
 
 func serveCmd() *cobra.Command {
 	var port int
-	var global bool
 
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start HTTP dashboard server with SSE event stream",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			if global {
-				return runGlobalServer(port)
-			}
 			return runServer(port)
 		},
 	}
 	cmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
-	cmd.Flags().BoolVar(&global, "global", false, "aggregate across all registered projects (read-only)")
 	return cmd
 }
 
+// runServer is now the parent-with-reverse-proxy entry point. The old
+// single-project in-process server has moved to the hidden _serve-child
+// subcommand (slice 1); runServer spawns one child per project via the
+// childproc supervisor and forwards /p/<id>/* traffic to it.
+//
+// This function is a thin wrapper around runParentServer defined in
+// serve_parent.go — kept here so the cobra command definition above does
+// not need to import a different package or refer to a free-standing
+// function.
 func runServer(port int) error {
-	htmlgraphDir, err := findHtmlgraphDir()
-	if err != nil {
-		return err
-	}
-
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
-	database, err := dbpkg.Open(dbPath)
-	if err != nil {
-		return fmt.Errorf("opening database: %w", err)
-	}
-	defer database.Close()
-
-	// Auto-ingest transcripts on startup and every 60s.
-	go autoIngestLoop(database, htmlgraphDir)
-
-	mux := buildSingleProjectMux(database, htmlgraphDir)
-
-	addr := fmt.Sprintf("localhost:%d", port)
-	fmt.Printf("HtmlGraph Dashboard:  http://%s/\n", addr)
-	fmt.Printf("API Stats:            http://%s/api/stats\n", addr)
-	fmt.Printf("SSE Stream:           http://%s/api/events/stream\n", addr)
-	fmt.Println("Press Ctrl+C to stop.")
-
-	return http.ListenAndServe(addr, mux)
+	return runParentServer(port)
 }
 
 // buildSingleProjectMux constructs the HTTP routes for a single-project
