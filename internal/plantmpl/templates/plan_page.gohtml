@@ -439,6 +439,22 @@ textarea::placeholder{color:var(--text-muted)}
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
 <script>
+// Plan base path — derived from window.location.pathname so the same
+// rendered HTML works whether the file is served at the legacy
+// /plans/<id>.html path (single-project server) or at /p/<id>/plans/<id>.html
+// (via the parent-doorway reverse proxy). Every fetch() on this page
+// prefixes window.htmlgraphPlanBase, which is '' at the root and
+// '/p/<id>' under the proxy. This is the per-project routing fix for
+// the multi-project hardening re-architecture (plan-237fb251).
+window.htmlgraphPlanBase = (function() {
+  var p = window.location.pathname || '';
+  if (p.indexOf('/p/') !== 0) return '';
+  var segs = p.split('/').filter(function(s) { return s !== ''; });
+  if (segs.length >= 2 && segs[0] === 'p') return '/p/' + segs[1];
+  return '';
+})();
+</script>
+<script>
 // Theme toggle (skip when embedded — dashboard manages its own theme)
 (function(){
   var themeBtn = document.getElementById('themeToggle');
@@ -512,7 +528,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
       }
       updateProgress();
       if(planId){
-        fetch('/api/plans/'+planId+'/feedback',{
+        fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({section:sec,action:'approve',value:String(this.checked),question_id:''})
@@ -540,7 +556,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
       var details=document.querySelector('[data-phase="questions"]');
       if(details) details.dataset.status=allAnswered?'approved':'pending';
       if(planId){
-        fetch('/api/plans/'+planId+'/feedback',{
+        fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({section:'questions',action:'answer',value:this.value,question_id:this.dataset.question})
@@ -593,7 +609,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
     ta.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(updateComments,400)});
     ta.addEventListener('blur',function(){
       if(planId&&this.value.trim()){
-        fetch('/api/plans/'+planId+'/feedback',{
+        fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({section:this.dataset.section,action:'comment',value:this.value.trim(),question_id:''})
@@ -613,7 +629,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
       btn.disabled=true;
       btn.textContent='Finalizing...';
       finalizeMsg.style.display='none';
-      fetch('/api/plans/'+planId+'/finalize',{
+      fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/finalize',{
         method:'POST',
         headers:{'Content-Type':'application/json'}
       })
@@ -658,7 +674,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
   function loadExistingFeedback(){
     if(!planId){return;}
-    fetch('/api/plans/'+planId+'/feedback')
+    fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback')
       .then(function(r){return r.ok?r.json():null;})
       .then(function(data){
         if(!data){return;}
@@ -868,7 +884,7 @@ function renderMd(text){
 
   // Load previous messages directly into the chat thread.
   if(planId){
-    fetch('/api/plans/'+planId+'/feedback')
+    fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback')
       .then(function(r){return r.ok?r.json():null;})
       .then(function(data){
         if(!data||!data.chat_messages||!data.chat_messages.length) return;
@@ -895,7 +911,7 @@ function renderMd(text){
     chatMessages.appendChild(assistantBubble);
     var rawResponse='';
 
-    fetch('/api/plans/'+planId+'/chat',{
+    fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({message:text})
@@ -1040,7 +1056,7 @@ syncHljsTheme();
     var planEl=document.querySelector('[data-plan-id]');
     if(!planEl)return;
     var id=planEl.getAttribute('data-plan-id');
-    fetch('/api/plans/'+id+'/yaml')
+    fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+id+'/yaml')
       .then(function(r){if(!r.ok)throw new Error('err');return r.text();})
       .then(function(t){
         codeEl.textContent=t;
@@ -1091,7 +1107,7 @@ syncHljsTheme();
     summary.textContent=selects.length+' amendments — '+accepted+' accepted, '+pending+' pending';
   }
 
-  fetch('/api/plans/'+planId+'/amendments')
+  fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/amendments')
     .then(function(r){return r.json();})
     .then(function(amendments){
       if(!amendments||!amendments.length)return;
@@ -1114,7 +1130,7 @@ syncHljsTheme();
           sel.appendChild(opt);
         });
         sel.addEventListener('change',function(){
-          fetch('/api/plans/'+planId+'/feedback',{
+          fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({

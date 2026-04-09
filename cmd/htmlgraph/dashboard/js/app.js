@@ -1102,63 +1102,65 @@ document.addEventListener('DOMContentLoaded', function() {
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
 
-/* ── Global mode: projects landing + drill-in hierarchy ──── */
+/* ── Doorway mode: projects landing (root) vs single-project (/p/<id>/) ── */
 
-// detectMode calls /api/mode and, if the server is in global mode, stores
-// the project list on window.htmlgraphProjects and shows the projects
-// landing as the root view. We use /api/mode (not /api/projects) for
-// detection because the static file server returns HTML 404 for unknown
-// /api/* routes in single-project mode, which would fool a JSON-parse
-// check.
+// isDoorwayLanding returns true when the dashboard is loaded at the
+// server root ("/") with no /p/<id>/ prefix. In this mode it shows the
+// projects landing and clicking a card navigates to /p/<id>/ with a full
+// page load — there is no SPA drill-in.
+function isDoorwayLanding() {
+  return window.location.pathname.indexOf('/p/') !== 0;
+}
+
+// detectMode calls /api/mode. When loaded at the doorway (root), it
+// receives {"mode":"global"} and renders the projects landing. When
+// loaded under /p/<id>/, it receives {"mode":"single"} (from the child)
+// and proceeds with the regular single-project startup.
 function detectMode() {
   return fetch('/api/mode').then(function(r) {
-    if (!r.ok) return;
+    if (!r.ok) return null;
     return r.json();
   }).then(function(data) {
-    if (!data || data.mode !== 'global') return;
-    window.htmlgraphMode = 'global';
-    window.htmlgraphProjects = Array.isArray(data.projects) ? data.projects : [];
-    // In global mode, start on the projects landing. The per-project views
-    // (Activity, Sessions, etc.) only activate after a card is clicked.
-    showProjectsLanding();
+    if (!data) return;
+    window.htmlgraphMode = data.mode;
+    if (data.mode === 'global' && isDoorwayLanding()) {
+      return loadAndRenderProjectsLanding();
+    }
   }).catch(function() {});
 }
 
-// showProjectsLanding enters the root view of global mode: hides the side
-// nav, hides all per-project views, and renders the project cards. This
-// is the top of the hierarchy — Projects are a level ABOVE the regular
-// dashboard views.
-function showProjectsLanding() {
-  if (window.htmlgraphMode !== 'global') return;
-  window.htmlgraphProjectId = '';
+// loadAndRenderProjectsLanding fetches /api/projects (registry JSON
+// only — no DB counts) and renders one card per project. Clicking a
+// card navigates the browser to /p/<id>/ with a full page load.
+function loadAndRenderProjectsLanding() {
+  return fetch('/api/projects').then(function(r) {
+    if (!r.ok) return [];
+    return r.json();
+  }).then(function(projects) {
+    if (!Array.isArray(projects)) projects = [];
+    window.htmlgraphProjects = projects;
 
-  // Hide the standard nav — it is scoped to a single project and doesn't
-  // make sense on the landing.
-  var nav = document.querySelector('.nav');
-  if (nav) nav.style.display = 'none';
+    // Hide the per-project side nav — the landing is a level above.
+    var nav = document.querySelector('.nav');
+    if (nav) nav.style.display = 'none';
 
-  // Deactivate every per-project view and activate the projects landing.
-  document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
-  var landing = document.getElementById('v-projects');
-  if (landing) landing.classList.add('active');
+    // Activate the projects landing view.
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+    var landing = document.getElementById('v-projects');
+    if (landing) landing.classList.add('active');
 
-  // Hide the project context header (it only appears when drilled in).
-  var ctx = document.getElementById('project-context');
-  if (ctx) ctx.style.display = 'none';
-
-  renderProjectsLanding();
-
-  // Stats bar shows aggregate across all projects on the landing.
-  fetchStats();
+    renderProjectsLanding(projects);
+  });
 }
 
-// renderProjectsLanding builds one card per registered project. Cards are
-// clickable and call enterProject(id) to drill into that project.
-function renderProjectsLanding() {
+// renderProjectsLanding builds one card per registered project. Cards
+// are simple metadata blocks (name, path, git remote, last seen) with a
+// visible "Open →" affordance. Clicking or pressing Enter navigates to
+// /p/<id>/ with a full page load. No SPA state management.
+function renderProjectsLanding(projects) {
   var grid = document.getElementById('project-grid');
   if (!grid) return;
   grid.innerHTML = '';
-  var projects = window.htmlgraphProjects || [];
   var empty = document.getElementById('projects-empty');
   var count = document.getElementById('projects-count');
   if (count) count.textContent = String(projects.length);
@@ -1169,9 +1171,10 @@ function renderProjectsLanding() {
     card.className = 'project-card';
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
-    card.addEventListener('click', function() { enterProject(p.id); });
+    var navigate = function() { window.location.href = '/p/' + p.id + '/'; };
+    card.addEventListener('click', navigate);
     card.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); enterProject(p.id); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(); }
     });
 
     var header = document.createElement('div');
@@ -1186,12 +1189,6 @@ function renderProjectsLanding() {
     header.appendChild(name);
     header.appendChild(dir);
 
-    var stats = document.createElement('div');
-    stats.className = 'project-card-stats';
-    stats.appendChild(buildStatTile(p.featureCount || 0, 'Features'));
-    stats.appendChild(buildStatTile(p.bugCount || 0, 'Bugs'));
-    stats.appendChild(buildStatTile(p.spikeCount || 0, 'Spikes'));
-
     var meta = document.createElement('div');
     meta.className = 'project-card-meta';
     var last = document.createElement('span');
@@ -1205,106 +1202,31 @@ function renderProjectsLanding() {
       meta.appendChild(remote);
     }
 
+    var open = document.createElement('div');
+    open.className = 'project-card-open';
+    open.textContent = 'Open \u2192';
+
     card.appendChild(header);
-    card.appendChild(stats);
     card.appendChild(meta);
+    card.appendChild(open);
     grid.appendChild(card);
   });
 }
 
-function buildStatTile(num, label) {
-  var t = document.createElement('div');
-  t.className = 'project-card-stat';
-  var n = document.createElement('div');
-  n.className = 'project-card-stat-num';
-  n.textContent = String(num);
-  var l = document.createElement('div');
-  l.className = 'project-card-stat-label';
-  l.textContent = label;
-  t.appendChild(n);
-  t.appendChild(l);
-  return t;
-}
-
-// enterProject drills into a specific project: sets the scope, shows the
-// standard nav with a "← All Projects" back button at the top, and
-// activates the Activity view for that project.
-function enterProject(projectId) {
-  if (window.htmlgraphMode !== 'global') return;
-  window.htmlgraphProjectId = projectId;
-
-  // Reveal the side nav (hidden on the landing).
-  var nav = document.querySelector('.nav');
-  if (nav) nav.style.display = '';
-
-  // Inject or update the project context header at the top of the sidebar
-  // (back button + current project name).
-  ensureProjectContextHeader();
-  var ctx = document.getElementById('project-context');
-  if (ctx) ctx.style.display = '';
-  var nameEl = document.getElementById('project-context-name');
-  if (nameEl) {
-    var match = (window.htmlgraphProjects || []).find(function(p) { return p.id === projectId; });
-    nameEl.textContent = match ? match.name : projectId;
-  }
-
-  // Reset cached view data so the new scope re-fetches.
-  sessions = [];
-  features = [];
-  events = [];
-  seenEventIds = new Set();
-
-  // Deactivate the landing and activate the Activity view inside the
-  // selected project.
-  document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
-  var activity = document.getElementById('v-activity');
-  if (activity) activity.classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.view === 'activity');
-  });
-  currentView = 'activity';
-
-  // Fetch the newly scoped data.
-  Promise.all([fetchStats(), fetchEvents()]);
-}
-
-// ensureProjectContextHeader injects (once) a "← All Projects" button as
-// the first child INSIDE .nav. It must be a child of .nav (not a sibling)
-// because .shell uses CSS grid with named areas — a sibling would land in
-// a leftover grid cell at the bottom of the page instead of above the
-// nav buttons.
-function ensureProjectContextHeader() {
-  if (document.getElementById('project-context')) return;
-  var nav = document.querySelector('.nav');
-  if (!nav) return;
-
-  var ctx = document.createElement('div');
-  ctx.id = 'project-context';
-  ctx.className = 'project-context';
-
-  var back = document.createElement('button');
-  back.className = 'project-back-btn';
-  back.innerHTML = '<span style="font-size:14px;">&larr;</span> All Projects';
-  back.addEventListener('click', function() { showProjectsLanding(); });
-
-  var name = document.createElement('div');
-  name.id = 'project-context-name';
-  name.className = 'project-context-name';
-
-  ctx.appendChild(back);
-  ctx.appendChild(name);
-  nav.insertBefore(ctx, nav.firstChild);
-}
-
-// In global mode, detect first (which triggers showProjectsLanding). In
-// single-project mode, detectMode is a no-op and startup proceeds with
-// the old behaviour.
+// Startup: detect mode, then either render the landing (at root) or run
+// the single-project startup (under /p/<id>/).
 detectMode().then(function() {
-  if (window.htmlgraphMode === 'single') {
-    Promise.all([fetchStats(), fetchEvents()]);
+  if (isDoorwayLanding()) {
+    // Landing already rendered — no per-project fetches. The stats bar
+    // at the top of the page is left empty; slice 6 can wire an
+    // aggregate if desired.
+    return;
   }
+  Promise.all([fetchStats(), fetchEvents()]);
 });
-setInterval(fetchStats, 30000);
+setInterval(function() {
+  if (!isDoorwayLanding()) fetchStats();
+}, 30000);
 
 /* ── Plan detail panel ────────────────────────────────────── */
 

@@ -1,23 +1,30 @@
 /* ── Shared helpers ─────────────────────────────────────────── */
 
-// buildProjectUrl constructs an API URL that automatically scopes to the
-// currently selected project when the dashboard is running in global mode.
-// `endpoint` is the path without the `/api/` prefix (e.g. "sessions",
-// "features", "stats"). In single-project mode it returns "/api/<endpoint>"
-// unchanged. In global mode it appends `?project=<id>` using
-// window.htmlgraphProjectId (set by the switcher UI); if that value is
-// empty it falls back to the plain endpoint so callers can still hit
-// aggregate routes like "/api/projects/all/stats".
+// buildProjectUrl constructs an API URL that scopes to the currently
+// active project via the /p/<id>/ base path.
+//
+// When the dashboard loads under /p/<id>/, every API call must go to
+// /p/<id>/api/<endpoint> so the parent server routes the request to the
+// correct child process via the reverse proxy. When the dashboard loads
+// at root (the global doorway landing page), API calls stay at
+// /api/<endpoint> — which is the tiny doorway API (/api/mode and
+// /api/projects only, no per-project data).
+//
+// The old ?project=<id> query-parameter approach is gone. Per-project
+// data routing is now 100% path-based.
 function buildProjectUrl(endpoint, extraQuery) {
-  var base = '/api/' + endpoint;
-  var isGlobal = window.htmlgraphMode === 'global';
-  var parts = [];
-  if (isGlobal && window.htmlgraphProjectId) {
-    parts.push('project=' + encodeURIComponent(window.htmlgraphProjectId));
+  var prefix = '';
+  if (window.location.pathname.indexOf('/p/') === 0) {
+    // Extract /p/<id> from the path. location.pathname starts with
+    // /p/<id>/ so split on / and take the first two non-empty parts.
+    var segs = window.location.pathname.split('/').filter(function(s) { return s !== ''; });
+    if (segs.length >= 2 && segs[0] === 'p') {
+      prefix = '/p/' + segs[1];
+    }
   }
-  if (extraQuery) parts.push(extraQuery);
-  if (parts.length === 0) return base;
-  return base + '?' + parts.join('&');
+  var base = prefix + '/api/' + endpoint;
+  if (extraQuery) return base + '?' + extraQuery;
+  return base;
 }
 
 function esc(s) {

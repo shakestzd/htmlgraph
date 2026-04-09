@@ -10,6 +10,11 @@ class HgEventTree extends HTMLElement {
   }
 
   connectedCallback() {
+    // At the doorway landing page (root path, no /p/<id>/ prefix) the
+    // server holds no per-project DB handles, so /api/events/* 404s.
+    // Skip the load + SSE subscription entirely — the event tree only
+    // belongs inside a per-project view.
+    if (window.location.pathname.indexOf('/p/') !== 0) return;
     this.load();
     this.evtSource = new EventSource(buildProjectUrl('events/stream'));
     this.evtSource.onmessage = (msg) => this.handleSSE(JSON.parse(msg.data));

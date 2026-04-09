@@ -181,29 +181,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.project-card-stats {
-  display: flex;
-  gap: 16px;
-  margin-top: 4px;
-}
-.project-card-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-.project-card-stat-num {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--accent);
-  line-height: 1;
-}
-.project-card-stat-label {
-  color: var(--text-muted);
-  text-transform: uppercase;
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  margin-top: 2px;
-}
 .project-card-meta {
   padding-top: 10px;
   border-top: 1px solid var(--border);
@@ -211,6 +188,14 @@
   color: var(--text-muted);
   display: flex;
   justify-content: space-between;
+}
+.project-card-open {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: right;
+  letter-spacing: 0.02em;
 }
 
 /* ── Project context header (sidebar top when drilled in) ── */
