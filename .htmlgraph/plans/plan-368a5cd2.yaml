@@ -1,13 +1,13 @@
 meta:
     id: plan-368a5cd2
-    track_id: trk-46e6113a
+    track_id: trk-66dcbbf7
     title: Multi-Project MVP
     description: |
         Auto-registering project registry, project listing CLI, and unified read-only dashboard aggregating across all HtmlGraph-enabled projects.
     created_at: "2026-04-08"
     status: finalized
     created_by: claude-opus
-    version: 7
+    version: 8
 design:
     problem: |
         HtmlGraph is strictly single-project-per-invocation. Every CLI command, hook, and dashboard server binds to one `.htmlgraph/` directory, resolved at startup from the working directory. This makes the tool invisible to itself across project boundaries — there is no way to ask "what work is happening across all my projects right now?" without manually cd-ing into each repo and running `htmlgraph snapshot`.
