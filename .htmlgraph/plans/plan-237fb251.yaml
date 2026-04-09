@@ -4,9 +4,9 @@ meta:
     title: Multi-Project Hardening — per-project process isolation
     description: 'Re-architect `htmlgraph serve` from shared-process query-param dispatch to per-project child-process reverse-proxy isolation. Drops the `--global` mode flag entirely: `htmlgraph serve` is the only human-facing serve command, always starts the parent with reverse proxy, shows a projects-landing doorway, and spawns per-project children on demand. When invoked from inside a project directory, the server detects the current project and prints a deep-link URL to open it directly. Single-project serve becomes an internal cobra command (hidden from help) used only by the supervisor to spawn children. OS-level process isolation; correct-by-construction hook context; crash isolation; zero SQLite handles in the parent process.'
     created_at: "2026-04-09"
-    status: draft
+    status: finalized
     created_by: claude-opus
-    version: 5
+    version: 6
 design:
     problem: |-
         `cmd/htmlgraph/serve_global.go` implements a dual-mode `htmlgraph serve --global` path that holds a `projectCache` of read-only `*sql.DB` handles to every registered project and dispatches project-scoped routes (`/api/plans/*`, `/api/plans/<id>/chat`, `/api/plans/<id>/delete`, `/api/plans/<id>/render`, `/api/graph`, `/api/sessions`, `/api/features/*`, `/api/transcript`, `/api/events/tree`, `/api/events/subagent`) via `dispatchByProject(?project=<id>)`. The handlers then receive a read-only DB opened in the global server's working directory with the global server's env. Any write — plan chat streaming, plan finalize, plan delete, feature state transitions, hook-driven mutations — runs with the wrong CWD, wrong `HTMLGRAPH_PROJECT_DIR`, wrong `.htmlgraph/` attribution, and a SQLite handle that was explicitly opened `mode=ro`.
@@ -85,7 +85,7 @@ slices:
           - end-to-end: start server with --port 0 in a tmpdir project, read handshake, curl /api/mode, curl /api/projects, assert responses
         Regression:
           - existing cmd/htmlgraph tests must still pass unchanged
-      approved: false
+      approved: true
       comment: ""
     - id: feat-b2d6f412
       num: 2
@@ -127,7 +127,7 @@ slices:
           - uses `go test -tags=integration` + a test-only `TestMain` that builds a stub binary mimicking htmlgraph's handshake protocol
         Regression:
           - no existing tests touched (new package)
-      approved: false
+      approved: true
       comment: ""
     - id: feat-c3e7a523
       num: 3
@@ -180,7 +180,7 @@ slices:
           - crash recovery: kill child, send next request, assert fresh child spawned (PID differs from first)
         Regression:
           - existing serve_global tests must still pass
-      approved: false
+      approved: true
       comment: ""
     - id: feat-d4f8b634
       num: 4
@@ -235,7 +235,7 @@ slices:
           - hit /api/projects/all/stats, assert aggregate response unchanged
         Regression:
           - existing aggregate-read tests must still pass
-      approved: false
+      approved: true
       comment: ""
     - id: feat-e5a9c745
       num: 5
@@ -292,7 +292,7 @@ slices:
           - plan chat: navigate to /p/<id>/plans/<some-plan>, open plan, type a message, assert POST succeeds and response streams back
         Regression:
           - start htmlgraph serve (single-project, no --global), assert dashboard behavior is unchanged — all tabs, all plans, all charts
-      approved: false
+      approved: true
       comment: ""
     - id: feat-f6b0d856
       num: 6
@@ -327,7 +327,7 @@ slices:
           - TestIdleReap — wait past idleTimeout, assert child is killed
         Regression:
           - default go test ./... run time must not increase
-      approved: false
+      approved: true
       comment: ""
 questions:
     - id: q-port-handshake
