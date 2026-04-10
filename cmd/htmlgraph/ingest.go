@@ -56,6 +56,7 @@ func runIngest(sessionID, project string, all, force bool) error {
 	if err != nil {
 		return err
 	}
+	printProjectHeaderIfDifferent(htmlgraphDir)
 
 	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
 	if err != nil {

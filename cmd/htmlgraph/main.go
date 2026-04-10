@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/shakestzd/htmlgraph/internal/agent"
 	"github.com/shakestzd/htmlgraph/internal/paths"
@@ -183,6 +184,51 @@ func findHtmlgraphDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(root, ".htmlgraph"), nil
+}
+
+// printProjectHeaderIfDifferent prints a one-line "Project: <path>" header
+// to stdout when the resolved project root differs from the current working
+// directory. Project-level mutation commands (migrate, sweep, ingest) call
+// this before touching data so the user can tell at a glance when env-var
+// resolution (HTMLGRAPH_PROJECT_DIR / CLAUDE_PROJECT_DIR) or worktree
+// detection is pointing them at a different project than the one they're
+// sitting in. No-op when the user is already in the resolved project —
+// keeps normal usage silent.
+func printProjectHeaderIfDifferent(htmlgraphDir string) {
+	projectRoot := filepath.Dir(htmlgraphDir)
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	// Resolve symlinks on both sides so /var/... and /private/var/... compare
+	// equal on macOS and worktrees that traverse symlinked paths don't
+	// trigger a false-positive "outside project" header.
+	resolvedProject := resolveForCompare(projectRoot)
+	resolvedWD := resolveForCompare(wd)
+	if resolvedWD == resolvedProject {
+		return
+	}
+	// Silent when CWD is inside the project (worktrees, subdirs).
+	if rel, relErr := filepath.Rel(resolvedProject, resolvedWD); relErr == nil &&
+		!strings.HasPrefix(rel, "..") && rel != "." {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Project: %s  (CWD: %s — use --project-dir to override)\n",
+		projectRoot, wd)
+}
+
+// resolveForCompare returns the absolute, symlink-resolved, cleaned path for
+// directory comparison. Falls back to the absolute path when symlink
+// resolution fails (e.g. the path does not exist).
+func resolveForCompare(p string) string {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return filepath.Clean(resolved)
+	}
+	return filepath.Clean(abs)
 }
 
 // truncate shortens s to maxLen characters, appending "…" if cut.
