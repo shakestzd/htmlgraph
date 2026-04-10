@@ -6,7 +6,7 @@ meta:
     created_at: "2026-04-10"
     status: draft
     created_by: claude-opus
-    version: 3
+    version: 4
 design:
     problem: |-
         The existing session HTML canonical implementation (feat-029affaa, shipped on trk-97f85b3b) has three gaps that became visible during multi-project hardening smoke-testing on 2026-04-10.
@@ -46,13 +46,13 @@ slices:
       what: |-
         Extend the ingest path so that every ingested transcript produces a complete session HTML file in `.htmlgraph/sessions/<session-id>.html` alongside the existing SQLite writes. This slice has a mandatory **export pre-step** because the reusable symbols live in a different package.
 
-        **(0) Export pre-step (MUST land first).** In `internal/hooks/session_html.go` and `internal/hooks/pretooluse.go`, rename the following symbols to be exported so `cmd/htmlgraph/` can call them:
+        **(0) Export pre-step — COMPLETED before plan finalization (see commit log).** In `internal/hooks/session_html.go` and `internal/hooks/pretooluse.go`, rename the following symbols to be exported so `cmd/htmlgraph/` can call them:
           - `createSessionHTML` → `CreateSessionHTML`
           - `appendEventToSessionHTML` → `AppendEventToSessionHTML`
           - `finalizeSessionHTML` → `FinalizeSessionHTML`
           - `sessionEvent` struct → `SessionEvent`
           - `summariseInput` → `SummariseInput`
-        Update all existing callers in `session_start.go`, `posttooluse.go`, `session_end.go`, and any `_test.go` files that reference the old names. This is a pure rename, zero behavioral change. The existing flock path for live appends is untouched.
+        Update all existing callers in `session_start.go`, `posttooluse.go`, `session_end.go`, and any `_test.go` files that reference the old names. Landed in a pre-finalization commit (pure rename, zero behavioral change, quality gates green across all 19 packages). The existing flock path for live appends is untouched.
 
         **(1) New function `RenderIngestedSessionHTML` in `internal/hooks/session_html.go`.** Signature: `RenderIngestedSessionHTML(htmlgraphDir, sessionID, projectDir string, result *ingest.ParseResult) error`. Because it lives in `internal/hooks`, it can reuse the existing template constants and helpers without cross-package gymnastics. It constructs a `models.Session` from `result` and calls `CreateSessionHTML` to write the initial scaffolded file (header, empty `<ol reversed>`, closing tags). Then for each tool call in `result.ToolCalls`, it constructs a `SessionEvent` and calls `AppendEventToSessionHTML` to insert the `<li>` via the existing flock path. This reuses the entire live-hook write stack verbatim — no template duplication, no divergence risk.
 
@@ -73,6 +73,7 @@ slices:
         - cmd/htmlgraph/ingest_test.go
       deps: []
       done_when:
+        - 'Export pre-step LANDED pre-finalization: CreateSessionHTML, AppendEventToSessionHTML, FinalizeSessionHTML, SessionEvent, SummariseInput all exported and all callers updated'
         - 'The export pre-step is complete: `CreateSessionHTML`, `AppendEventToSessionHTML`, `FinalizeSessionHTML`, `SessionEvent`, and `SummariseInput` are exported and all existing callers updated'
         - '`RenderIngestedSessionHTML` function exists in `internal/hooks/session_html.go` with the signature `(htmlgraphDir, sessionID, projectDir string, result *ingest.ParseResult) error`'
         - '`ingestFileWithAgent` calls `RenderIngestedSessionHTML` after `ensureSession` and logs any error via `debugLog` without aborting the SQLite write'
@@ -106,7 +107,7 @@ slices:
       what: |-
         Add a sweep function that detects `agent_events` rows with `status='started'` where no PostToolUse ever fired, emits a synthetic aborted `<li>` entry to the session HTML file, and transitions the SQLite row to `status='aborted'` with a `reason='swept'` marker. The sweep is lazy — triggered by existing hook events, not by a daemon.
 
-        **(0) Schema migration — MANDATORY pre-step.** Add `db.Exec("ALTER TABLE agent_events ADD COLUMN reason TEXT")` to the idempotent migration block in `internal/db/schema.go:Open()`, following the existing pattern at line 41 (`ALTER TABLE sessions ADD COLUMN title TEXT`). This is a one-line addition but it is not optional — the sweep logic writes to this column and will error at runtime if the column is missing. The migration is idempotent (SQLite's `ALTER TABLE ADD COLUMN` fails harmlessly if the column already exists, and the existing migration pattern wraps the Exec in a swallowed error).
+        **(0) Schema migration — COMPLETED before plan finalization (see commit log).** Add `db.Exec("ALTER TABLE agent_events ADD COLUMN reason TEXT")` to the idempotent migration block in `internal/db/schema.go:Open()`, following the existing pattern at line 41 (`ALTER TABLE sessions ADD COLUMN title TEXT`). Landed in a pre-finalization commit as a one-line addition to the existing idempotent migration block — the sweep logic writes to this column and will error at runtime if the column is missing. The migration is idempotent (SQLite's `ALTER TABLE ADD COLUMN` fails harmlessly if the column already exists, and the existing migration pattern wraps the Exec in a swallowed error).
 
         **(1) Detection query.** New function `FindOrphanedEvents(db *sql.DB, olderThan time.Duration) ([]OrphanEvent, error)` in `internal/db/event_repo.go` (alongside `FindStartedEvent` at line 261). Returns rows where `status='started'` AND `created_at < now - olderThan`. Default threshold: 5 minutes, stored as a constant `internal/hooks/orphanThreshold = 5 * time.Minute`. The query uses the existing `idx_agent_events_session_ts_desc` index — no new index required.
 
@@ -136,6 +137,7 @@ slices:
       deps:
         - 1
       done_when:
+        - 'Schema migration LANDED pre-finalization: ALTER TABLE agent_events ADD COLUMN reason TEXT added to schema.go:Open()'
         - 'Schema migration: `ALTER TABLE agent_events ADD COLUMN reason TEXT` added to `schema.go:Open()` and runs idempotently on existing databases'
         - '`FindOrphanedEvents(db, olderThan)` returns rows with `status=''started''` older than the threshold'
         - '`AppendOrphanedEvent` writes a synthetic `<li data-status="aborted" data-reason="no-post-hook">` to the session HTML file via the existing flock path'
@@ -476,3 +478,5 @@ critique:
         High-severity risk R1 (concurrent flock writers) is covered by slice 4's explicit concurrent-writer test that verifies ALL N events land in the final file, not just 'no crash'. Medium-severity risks R2 (migration enforcement) and R6 (SessionEnd race) are addressed by additions to slices 2 and the FinalizeSessionHTML flock wrap. Low risks are documented in constraints or accepted.
 
         Verdict: BUILDABLE AS WRITTEN at v2. All 5 questions answered pending human review. Scope correctly excludes performance optimization and mid-session header refresh per the user's direction. Ready to open for human review.
+
+        **v3 UPDATE (2026-04-10):** Both load-bearing pre-steps have been resolved in code BEFORE finalization, not deferred to slice execution. Commit landed the 5-symbol export (internal/hooks) and the reason-column ALTER TABLE migration (internal/db/schema.go). All 19 Go packages build, vet, and test clean. Slice 1 step (0) and slice 2 step (0) are now confirmations of a completed state rather than TODO work. This de-risks the plan execution by proving the refactor holds before committing to any slice implementation.
