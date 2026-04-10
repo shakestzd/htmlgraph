@@ -86,6 +86,7 @@ func main() {
 	rootCmd.AddCommand(backfillCmd())
 	rootCmd.AddCommand(reindexCmd())
 	rootCmd.AddCommand(sweepCmd())
+	rootCmd.AddCommand(cleanupCmd())
 	rootCmd.AddCommand(migrateCmd())
 	rootCmd.AddCommand(recommendCmd())
 	rootCmd.AddCommand(ciCmd())
