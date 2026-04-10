@@ -177,7 +177,7 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 // and returns an allow result. Used by the plan mode bypass and the normal
 // flow to avoid duplicating the event recording logic.
 func recordEventAndAllow(event *CloudEvent, ctx *toolUseContext, database *sql.DB) (*HookResult, error) {
-	inputSummary := summariseInput(event.ToolName, event.ToolInput)
+	inputSummary := SummariseInput(event.ToolName, event.ToolInput)
 
 	var toolInputStr string
 	if event.ToolInput != nil {
@@ -364,8 +364,8 @@ var bashFileWritePattern = regexp.MustCompile(
 		`)`,
 )
 
-// summariseInput builds a short human-readable summary of tool input.
-func summariseInput(toolName string, input map[string]any) string {
+// SummariseInput builds a short human-readable summary of tool input.
+func SummariseInput(toolName string, input map[string]any) string {
 	if input == nil {
 		return toolName
 	}

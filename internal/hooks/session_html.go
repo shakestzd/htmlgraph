@@ -14,9 +14,9 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
-// sessionEvent holds the data needed to write a <li> element to a session's
+// SessionEvent holds the data needed to write a <li> element to a session's
 // HTML activity log. Kept minimal — only fields that appear in the HTML output.
-type sessionEvent struct {
+type SessionEvent struct {
 	Timestamp time.Time
 	ToolName  string
 	Success   bool
@@ -25,10 +25,10 @@ type sessionEvent struct {
 	Summary   string
 }
 
-// createSessionHTML writes the initial session HTML file to
+// CreateSessionHTML writes the initial session HTML file to
 // .htmlgraph/sessions/{session-id}.html. It creates the sessions directory if
 // needed. Errors are silently logged via debugLog — HTML is non-critical.
-func createSessionHTML(projectDir string, s *models.Session) {
+func CreateSessionHTML(projectDir string, s *models.Session) {
 	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions")
 	if err := os.MkdirAll(sessDir, 0o755); err != nil {
 		debugLog(projectDir, "[session-html] mkdir sessions: %v", err)
@@ -105,11 +105,11 @@ func createSessionHTML(projectDir string, s *models.Session) {
 	}
 }
 
-// appendEventToSessionHTML appends a <li> element to the session's HTML
+// AppendEventToSessionHTML appends a <li> element to the session's HTML
 // activity log. It opens the file with an exclusive flock, reads, modifies,
 // and rewrites — preventing lost updates from concurrent hook invocations.
 // Errors are silently logged (non-critical path).
-func appendEventToSessionHTML(projectDir, sessionID string, ev sessionEvent) {
+func AppendEventToSessionHTML(projectDir, sessionID string, ev SessionEvent) {
 	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID+".html")
 
 	f, err := os.OpenFile(htmlPath, os.O_RDWR, 0o644)
@@ -187,10 +187,10 @@ var articleEventCountRe = regexp.MustCompile(`data-event-count="[^"]*"`)
 var badgeStatusRe = regexp.MustCompile(`<span class="badge status-[^"]*">[^<]*</span>`)
 var badgeEventsRe = regexp.MustCompile(`<span class="badge">\d+ events?</span>`)
 
-// finalizeSessionHTML updates the session HTML file with completion data:
+// FinalizeSessionHTML updates the session HTML file with completion data:
 // sets data-status, adds data-ended-at, and updates data-event-count.
 // Errors are silently logged.
-func finalizeSessionHTML(projectDir, sessionID, endedAt, status string, eventCount int) {
+func FinalizeSessionHTML(projectDir, sessionID, endedAt, status string, eventCount int) {
 	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID+".html")
 	data, err := os.ReadFile(htmlPath)
 	if err != nil {

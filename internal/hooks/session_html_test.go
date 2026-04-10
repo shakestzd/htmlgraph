@@ -26,7 +26,7 @@ func TestCreateSessionHTML(t *testing.T) {
 		IsSubagent:    false,
 	}
 
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", "sess-html-test-001.html")
 	data, err := os.ReadFile(htmlPath)
@@ -101,7 +101,7 @@ func TestCreateSessionHTMLSubagent(t *testing.T) {
 		IsSubagent:    true,
 	}
 
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", "sess-html-sub-001.html")
 	data, err := os.ReadFile(htmlPath)
@@ -131,11 +131,11 @@ func TestAppendEventToSessionHTML(t *testing.T) {
 		StartCommit:   "aaa1111",
 		IsSubagent:    false,
 	}
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	// Append an event.
 	ts := time.Date(2026, 4, 8, 13, 30, 0, 0, time.UTC)
-	ev := sessionEvent{
+	ev := SessionEvent{
 		Timestamp: ts,
 		ToolName:  "Edit",
 		Success:   true,
@@ -143,7 +143,7 @@ func TestAppendEventToSessionHTML(t *testing.T) {
 		FeatureID: "feat-aabbccdd",
 		Summary:   "/path/to/file.go (edited)",
 	}
-	appendEventToSessionHTML(projectDir, "sess-append-test-001", ev)
+	AppendEventToSessionHTML(projectDir, "sess-append-test-001", ev)
 
 	htmlPath := filepath.Join(sessDir, "sess-append-test-001.html")
 	data, err := os.ReadFile(htmlPath)
@@ -198,17 +198,17 @@ func TestAppendMultipleEventsToSessionHTML(t *testing.T) {
 		CreatedAt:     time.Now().UTC(),
 		IsSubagent:    false,
 	}
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	// Append two events.
-	appendEventToSessionHTML(projectDir, "sess-multi-append-001", sessionEvent{
+	AppendEventToSessionHTML(projectDir, "sess-multi-append-001", SessionEvent{
 		Timestamp: time.Now().UTC(),
 		ToolName:  "Read",
 		Success:   true,
 		EventID:   "evt-multi-001",
 		Summary:   "first event",
 	})
-	appendEventToSessionHTML(projectDir, "sess-multi-append-001", sessionEvent{
+	AppendEventToSessionHTML(projectDir, "sess-multi-append-001", SessionEvent{
 		Timestamp: time.Now().UTC(),
 		ToolName:  "Write",
 		Success:   true,
@@ -251,11 +251,11 @@ func TestFinalizeSessionHTML(t *testing.T) {
 		CreatedAt:     time.Now().UTC(),
 		IsSubagent:    false,
 	}
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	// Append 3 events so event count is meaningful.
 	for i := 0; i < 3; i++ {
-		appendEventToSessionHTML(projectDir, "sess-finalize-001", sessionEvent{
+		AppendEventToSessionHTML(projectDir, "sess-finalize-001", SessionEvent{
 			Timestamp: time.Now().UTC(),
 			ToolName:  "Bash",
 			Success:   true,
@@ -265,7 +265,7 @@ func TestFinalizeSessionHTML(t *testing.T) {
 	}
 
 	endedAt := "2026-04-08T15:00:00Z"
-	finalizeSessionHTML(projectDir, "sess-finalize-001", endedAt, "completed", 3)
+	FinalizeSessionHTML(projectDir, "sess-finalize-001", endedAt, "completed", 3)
 
 	htmlPath := filepath.Join(sessDir, "sess-finalize-001.html")
 	data, err := os.ReadFile(htmlPath)
@@ -308,7 +308,7 @@ func TestMissingSessionHTMLDoesNotError(t *testing.T) {
 	}
 
 	// Appending to a non-existent session file should not panic or error.
-	appendEventToSessionHTML(projectDir, "nonexistent-session", sessionEvent{
+	AppendEventToSessionHTML(projectDir, "nonexistent-session", SessionEvent{
 		Timestamp: time.Now().UTC(),
 		ToolName:  "Read",
 		Success:   true,
@@ -317,14 +317,14 @@ func TestMissingSessionHTMLDoesNotError(t *testing.T) {
 	})
 
 	// Finalizing a non-existent session file should not panic or error.
-	finalizeSessionHTML(projectDir, "nonexistent-session", "2026-04-08T16:00:00Z", "completed", 5)
+	FinalizeSessionHTML(projectDir, "nonexistent-session", "2026-04-08T16:00:00Z", "completed", 5)
 
 	// If we reach here without panicking, the test passes.
 }
 
 func TestCreateSessionHTMLCreatesDirectory(t *testing.T) {
 	projectDir := t.TempDir()
-	// Only create .htmlgraph, NOT .htmlgraph/sessions — createSessionHTML should handle it.
+	// Only create .htmlgraph, NOT .htmlgraph/sessions — CreateSessionHTML should handle it.
 	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
 		t.Fatalf("mkdir .htmlgraph: %v", err)
 	}
@@ -336,11 +336,11 @@ func TestCreateSessionHTMLCreatesDirectory(t *testing.T) {
 		CreatedAt:     time.Now().UTC(),
 		IsSubagent:    false,
 	}
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	htmlPath := filepath.Join(projectDir, ".htmlgraph", "sessions", "sess-mkdir-test-001.html")
 	if _, err := os.Stat(htmlPath); os.IsNotExist(err) {
-		t.Error("createSessionHTML should create the sessions directory automatically")
+		t.Error("CreateSessionHTML should create the sessions directory automatically")
 	}
 }
 
@@ -358,10 +358,10 @@ func TestAppendEventHTMLEscaping(t *testing.T) {
 		CreatedAt:     time.Now().UTC(),
 		IsSubagent:    false,
 	}
-	createSessionHTML(projectDir, s)
+	CreateSessionHTML(projectDir, s)
 
 	// Append an event with HTML-special characters in the summary.
-	appendEventToSessionHTML(projectDir, "sess-escape-test-001", sessionEvent{
+	AppendEventToSessionHTML(projectDir, "sess-escape-test-001", SessionEvent{
 		Timestamp: time.Now().UTC(),
 		ToolName:  "Bash",
 		Success:   true,

@@ -56,22 +56,22 @@ func TestSummariseReadInput(t *testing.T) {
 }
 
 func TestSummariseInputReadDispatch(t *testing.T) {
-	// Verify summariseInput dispatches to summariseReadInput for Read tool.
+	// Verify SummariseInput dispatches to summariseReadInput for Read tool.
 	input := map[string]any{"file_path": "/foo.go", "offset": float64(10), "limit": float64(20)}
-	got := summariseInput("Read", input)
+	got := SummariseInput("Read", input)
 	want := "/foo.go [10:30]"
 	if got != want {
-		t.Errorf("summariseInput(Read) = %q, want %q", got, want)
+		t.Errorf("SummariseInput(Read) = %q, want %q", got, want)
 	}
 }
 
 func TestSummariseInputNonRead(t *testing.T) {
 	// Non-Read tools should use the old path-only logic.
 	input := map[string]any{"file_path": "/foo.go", "offset": float64(10)}
-	got := summariseInput("Write", input)
+	got := SummariseInput("Write", input)
 	want := "/foo.go"
 	if got != want {
-		t.Errorf("summariseInput(Write) = %q, want %q", got, want)
+		t.Errorf("SummariseInput(Write) = %q, want %q", got, want)
 	}
 }
 

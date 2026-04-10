@@ -36,7 +36,7 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 	// Finalize session HTML file (non-critical, errors silently logged).
 	var evtCount int
 	_ = database.QueryRow(`SELECT COUNT(*) FROM agent_events WHERE session_id = ?`, sessionID).Scan(&evtCount)
-	finalizeSessionHTML(projectDir, sessionID, now, "completed", evtCount)
+	FinalizeSessionHTML(projectDir, sessionID, now, "completed", evtCount)
 
 	// Store transcript_path and termination reason if provided.
 	if event.TranscriptPath != "" || event.Reason != "" {
