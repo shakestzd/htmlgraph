@@ -458,6 +458,143 @@ func TestLatestEventByTool(t *testing.T) {
 	}
 }
 
+func TestAgentEvent_PopulatesParentAgentID(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+
+	// Insert parent event (agent a1).
+	evA := &models.AgentEvent{
+		EventID:   "evt-parent-a1",
+		AgentID:   "agent-a1",
+		EventType: models.EventToolCall,
+		Timestamp: now,
+		ToolName:  "Task",
+		SessionID: "sess-test",
+		Status:    "started",
+		Source:    "hook",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := db.InsertEvent(database, evA); err != nil {
+		t.Fatalf("InsertEvent evA: %v", err)
+	}
+
+	// Insert child event referencing parent; ParentAgentID intentionally empty.
+	evB := &models.AgentEvent{
+		EventID:       "evt-child-a2",
+		AgentID:       "agent-a2",
+		EventType:     models.EventToolCall,
+		Timestamp:     now.Add(time.Second),
+		ToolName:      "Bash",
+		SessionID:     "sess-test",
+		ParentEventID: "evt-parent-a1",
+		Status:        "started",
+		Source:        "hook",
+		CreatedAt:     now.Add(time.Second),
+		UpdatedAt:     now.Add(time.Second),
+	}
+	if err := db.InsertEvent(database, evB); err != nil {
+		t.Fatalf("InsertEvent evB: %v", err)
+	}
+
+	got, err := db.GetEvent(database, "evt-child-a2")
+	if err != nil {
+		t.Fatalf("GetEvent: %v", err)
+	}
+	if got.ParentAgentID != "agent-a1" {
+		t.Errorf("parent_agent_id: got %q, want %q", got.ParentAgentID, "agent-a1")
+	}
+}
+
+func TestAgentEvent_NilParentAgentID_NoParent(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+
+	ev := &models.AgentEvent{
+		EventID:   "evt-no-parent",
+		AgentID:   "agent-standalone",
+		EventType: models.EventToolCall,
+		Timestamp: now,
+		ToolName:  "Read",
+		SessionID: "sess-test",
+		// ParentEventID intentionally empty
+		Status:    "started",
+		Source:    "hook",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := db.InsertEvent(database, ev); err != nil {
+		t.Fatalf("InsertEvent: %v", err)
+	}
+
+	got, err := db.GetEvent(database, "evt-no-parent")
+	if err != nil {
+		t.Fatalf("GetEvent: %v", err)
+	}
+	if got.ParentAgentID != "" {
+		t.Errorf("parent_agent_id: got %q, want empty", got.ParentAgentID)
+	}
+}
+
+func TestAgentEvent_UnknownParent_NoError(t *testing.T) {
+	// The FK constraint prevents inserting a completely unknown parent_event_id.
+	// This test verifies the safe-lookup path: when ParentAgentID is already set
+	// by the caller, InsertEvent must not overwrite it with a lookup result.
+	database := setupTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+
+	// Insert a real parent event so FK is satisfied.
+	evParent := &models.AgentEvent{
+		EventID:   "evt-uknp-parent",
+		AgentID:   "agent-parent",
+		EventType: models.EventToolCall,
+		Timestamp: now,
+		ToolName:  "Task",
+		SessionID: "sess-test",
+		Status:    "started",
+		Source:    "hook",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := db.InsertEvent(database, evParent); err != nil {
+		t.Fatalf("InsertEvent parent: %v", err)
+	}
+
+	// Child has ParentAgentID pre-set by caller; lookup must not overwrite it.
+	ev := &models.AgentEvent{
+		EventID:       "evt-uknp-child",
+		AgentID:       "agent-child",
+		EventType:     models.EventToolCall,
+		Timestamp:     now.Add(time.Second),
+		ToolName:      "Bash",
+		SessionID:     "sess-test",
+		ParentEventID: "evt-uknp-parent",
+		ParentAgentID: "caller-supplied-value", // caller pre-set, must be preserved
+		Status:        "started",
+		Source:        "hook",
+		CreatedAt:     now.Add(time.Second),
+		UpdatedAt:     now.Add(time.Second),
+	}
+	if err := db.InsertEvent(database, ev); err != nil {
+		t.Fatalf("InsertEvent child: %v", err)
+	}
+
+	got, err := db.GetEvent(database, "evt-uknp-child")
+	if err != nil {
+		t.Fatalf("GetEvent: %v", err)
+	}
+	// Must preserve the caller-supplied value, not overwrite with lookup result.
+	if got.ParentAgentID != "caller-supplied-value" {
+		t.Errorf("parent_agent_id: got %q, want %q", got.ParentAgentID, "caller-supplied-value")
+	}
+}
+
 func TestCountRecentDuplicates(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()

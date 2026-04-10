@@ -8,8 +8,33 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
+// lookupAgentIDByEvent returns the agent_id of an existing event, or "" if the
+// event does not exist. Used to materialise parent_agent_id at insert time
+// without failing when the parent row hasn't been written yet (race condition).
+func lookupAgentIDByEvent(database *sql.DB, eventID string) string {
+	if eventID == "" {
+		return ""
+	}
+	var agentID string
+	err := database.QueryRow(
+		`SELECT agent_id FROM agent_events WHERE event_id = ?`, eventID,
+	).Scan(&agentID)
+	if err != nil {
+		// parent row not found (race) or other error — leave blank, non-fatal
+		return ""
+	}
+	return agentID
+}
+
 // InsertEvent writes an agent event row.
+// If ParentEventID is set and ParentAgentID is empty, the parent row's agent_id
+// is resolved automatically and stored as parent_agent_id, materialising the
+// agent-to-agent lineage edge in a single hop. Only new rows written after this
+// change will have parent_agent_id populated; no historical backfill is performed.
 func InsertEvent(db *sql.DB, e *models.AgentEvent) error {
+	if e.ParentEventID != "" && e.ParentAgentID == "" {
+		e.ParentAgentID = lookupAgentIDByEvent(db, e.ParentEventID)
+	}
 	_, err := db.Exec(`
 		INSERT INTO agent_events (
 			event_id, agent_id, event_type, timestamp, tool_name,

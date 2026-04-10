@@ -771,3 +771,82 @@ func TestRunWiSetStatus_ConcurrentAgents(t *testing.T) {
 		}
 	}
 }
+
+// TestSubagentCanStartFeatureCreatedByDifferentAgent verifies that feat-ab67561e's
+// per-(session_id, agent_id) attribution removed the old session-ownership restriction.
+// A sub-agent with a distinct agent_id (but sharing the parent's session_id, as
+// Claude Code does per docs) must be able to run feature start on a feature the
+// orchestrator created in the same session without any error.
+//
+// Regression test for bug-50c7eed0: "Execute skill sub-agent attribution guard
+// blocks legitimate claims to features created by orchestrator."
+func TestSubagentCanStartFeatureCreatedByDifferentAgent(t *testing.T) {
+	const sessionID = "test-session-subagent-claim"
+	const orchestratorAgentID = "agent-orchestrator"
+	const subagentAgentID = "agent-subagent-a"
+
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	// Step 1: Create a feature (simulating orchestrator creating work for subagent).
+	// Do NOT start it yet — this is a feature created but not claimed.
+	if err := testCreate("feature", "Subagent Claim Test", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 1 {
+		t.Fatalf("expected 1 feature file, got %d", len(featFiles))
+	}
+	featNode, err := htmlparse.ParseFile(featFiles[0])
+	if err != nil {
+		t.Fatalf("parse feature: %v", err)
+	}
+	featureID := featNode.ID
+
+	// Step 2: Orchestrator claims the feature first (simulating orchestrator
+	// dispatching work and starting it to track attribution).
+	if err := wiSetStatusWithAgent("feature", featureID, "in-progress", sessionID, orchestratorAgentID); err != nil {
+		t.Fatalf("orchestrator start: %v", err)
+	}
+
+	// Step 3: Sub-agent claims the SAME feature with a DIFFERENT agent_id.
+	// This would have been blocked under the old session-ownership model, but
+	// feat-ab67561e changed attribution to per-(session, agent_id), so both
+	// agents can own their own active_work_items rows for the same feature.
+	if err := wiSetStatusWithAgent("feature", featureID, "in-progress", sessionID, subagentAgentID); err != nil {
+		t.Fatalf("subagent start failed: %v — regression of bug-50c7eed0", err)
+	}
+
+	// Step 4: Verify both agents' rows exist in active_work_items and point
+	// to the same feature.
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	orchestratorActive := dbpkg.GetActiveWorkItem(database, sessionID, orchestratorAgentID)
+	if orchestratorActive != featureID {
+		t.Errorf("orchestrator active: got %q want %q", orchestratorActive, featureID)
+	}
+
+	subagentActive := dbpkg.GetActiveWorkItem(database, sessionID, subagentAgentID)
+	if subagentActive != featureID {
+		t.Errorf("subagent active: got %q want %q", subagentActive, featureID)
+	}
+
+	// Step 5: Verify both rows exist in active_work_items table.
+	items, err := dbpkg.ActiveWorkItemsForSession(database, sessionID)
+	if err != nil {
+		t.Fatalf("ActiveWorkItemsForSession: %v", err)
+	}
+	if len(items) != 2 {
+		t.Errorf("want 2 active_work_items rows (one per agent), got %d: %v", len(items), items)
+	}
+}
