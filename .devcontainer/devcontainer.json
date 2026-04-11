@@ -36,7 +36,8 @@
         "terminal.integrated.defaultProfile.linux": "zsh",
         "terminal.integrated.profiles.linux": {
           "zsh": { "path": "/usr/bin/zsh" }
-        }
+        },
+        "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font', 'JetBrains Mono', Menlo, monospace"
       },
       "extensions": [
         "golang.Go",
