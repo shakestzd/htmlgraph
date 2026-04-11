@@ -31,6 +31,16 @@
             "command": "htmlgraph hook user-prompt"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "date -u '+Current time (UTC): %Y-%m-%dT%H:%M:%SZ'",
+            "timeout": 2
+          }
+        ]
       }
     ],
     "PreToolUse": [
