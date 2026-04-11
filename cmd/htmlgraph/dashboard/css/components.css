@@ -1074,3 +1074,26 @@
 .plan-detail-body .comments-summary { border-top: 1px solid var(--border); }
 .plan-detail-body .comment-entry { color: var(--text-dim); border-bottom: 1px solid var(--border); }
 .plan-detail-body .comment-entry .comment-source { color: var(--accent); }
+
+/* ── Graph legend pill ─────────────────────────────────────────
+   Theme-aware pill in the bottom-left of the graph view. Previously
+   had a hardcoded slate-blue background inline on index.html which
+   looked foreign in light mode. Now uses design tokens so it flips
+   with the active theme. Span colors are painted in JS by
+   paintGraphLegend() from getGraphPalette(). */
+#graph-legend {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 11px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
