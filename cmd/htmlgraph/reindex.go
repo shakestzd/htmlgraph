@@ -82,9 +82,11 @@ func runReindex(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// Rebuild agent_events from session HTML activity logs.
+	// Rebuild agent_events from session HTML activity logs. projectDir is
+	// passed through so parseSessionHTML can attribute sessions whose HTML
+	// files predate the data-project-dir attribute (bug-a52d5bf9).
 	sessDir := filepath.Join(htmlgraphDir, "sessions")
-	sessTotal, sessUpserted, sessErrs := reindexSessions(database, sessDir)
+	sessTotal, sessUpserted, sessErrs := reindexSessions(database, sessDir, projectDir)
 	if sessUpserted > 0 || sessErrs > 0 {
 		fmt.Printf("  sessions: %d events upserted, %d errors (of %d session files)\n",
 			sessUpserted, sessErrs, sessTotal)

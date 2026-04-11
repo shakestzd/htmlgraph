@@ -18,14 +18,18 @@ const maxInputSummaryLen = 200
 // reindexSessions scans sessionDir for *.html session files and parses each
 // <li> activity entry into an AgentEvent, upserting via db.UpsertEvent.
 // Returns (totalFiles, totalEventsUpserted, errorFiles).
-func reindexSessions(database *sql.DB, sessionDir string) (int, int, int) {
+//
+// projectDir is the absolute filesystem path of the project that owns
+// sessionDir; it is used as the fallback project_dir attribution when the
+// parsed HTML predates the data-project-dir attribute (bug-a52d5bf9).
+func reindexSessions(database *sql.DB, sessionDir, projectDir string) (int, int, int) {
 	pattern := filepath.Join(sessionDir, "*.html")
 	files, _ := filepath.Glob(pattern)
 
 	var total, upserted, errCount int
 	for _, f := range files {
 		total++
-		n, err := parseSessionHTML(database, f)
+		n, err := parseSessionHTML(database, f, projectDir)
 		if err != nil {
 			errCount++
 			continue
@@ -36,9 +40,16 @@ func reindexSessions(database *sql.DB, sessionDir string) (int, int, int) {
 }
 
 // parseSessionHTML reads a single session HTML file, extracts the article
-// metadata (session ID, agent) and each <li> in the activity log, then
-// upserts an AgentEvent per entry. Returns the number of events upserted.
-func parseSessionHTML(database *sql.DB, path string) (int, error) {
+// metadata (session ID, agent, project_dir) and each <li> in the activity
+// log, then upserts an AgentEvent per entry. Returns the number of events
+// upserted.
+//
+// fallbackProjectDir is used when the HTML file predates the
+// data-project-dir attribute. It should be the filesystem path of the
+// project that owns the sessionDir being walked (typically the parent of
+// .htmlgraph/). This prevents bug-a52d5bf9, where sessions were written
+// without any project_dir and polluted every project's dashboard.
+func parseSessionHTML(database *sql.DB, path, fallbackProjectDir string) (int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, fmt.Errorf("open %s: %w", path, err)
@@ -66,6 +77,15 @@ func parseSessionHTML(database *sql.DB, path string) (int, error) {
 	isSubagent := attrOrDefault(article, "data-is-subagent", "false") == "true"
 	startCommit := attrOrDefault(article, "data-start-commit", "")
 
+	// Prefer the article's data-project-dir (HTML canonical) and fall back
+	// to the directory the reindex walker is pointing at. The fallback
+	// keeps legacy HTML files (from before the attribute was written)
+	// attributable instead of silently polluting with empty project_dir.
+	projectDir := attrOrDefault(article, "data-project-dir", "")
+	if projectDir == "" {
+		projectDir = fallbackProjectDir
+	}
+
 	// Map session HTML statuses to sessions table CHECK constraint values.
 	sessionStatus := "completed"
 	switch statusAttr {
@@ -84,11 +104,21 @@ func parseSessionHTML(database *sql.DB, path string) (int, error) {
 
 	// Ensure a session row exists (FK constraint on agent_events.session_id).
 	_, _ = database.Exec(`
-		INSERT OR IGNORE INTO sessions (session_id, agent_assigned, created_at, status, start_commit, is_subagent)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		INSERT OR IGNORE INTO sessions (session_id, agent_assigned, created_at, status, start_commit, is_subagent, project_dir)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		sessionID, agentID, startedAt.UTC().Format(time.RFC3339),
-		sessionStatus, startCommit, isSubagent,
+		sessionStatus, startCommit, isSubagent, projectDir,
 	)
+
+	// Backfill project_dir on existing rows that predate this fix
+	// (bug-a52d5bf9). Only updates rows where project_dir is empty so we
+	// never clobber a more-specific attribution written elsewhere.
+	if projectDir != "" {
+		_, _ = database.Exec(
+			`UPDATE sessions SET project_dir = ? WHERE session_id = ? AND (project_dir IS NULL OR project_dir = '')`,
+			projectDir, sessionID,
+		)
+	}
 
 	var count int
 

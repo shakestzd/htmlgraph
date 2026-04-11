@@ -98,7 +98,7 @@ func TestReindexSessions_EventIDMapping(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:32:28.000000", events)
 
-	total, upserted, errCount := reindexSessions(database, dir)
+	total, upserted, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -144,7 +144,7 @@ func TestReindexSessions_SuccessStatusMapping(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
-	_, _, errCount := reindexSessions(database, dir)
+	_, _, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -193,7 +193,7 @@ func TestReindexSessions_FeatureIDMapping(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
-	_, _, errCount := reindexSessions(database, dir)
+	_, _, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -235,7 +235,7 @@ func TestReindexSessions_InputSummaryTruncation(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
-	_, _, errCount := reindexSessions(database, dir)
+	_, _, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -273,7 +273,7 @@ func TestReindexSessions_ParentEventID(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
-	_, _, errCount := reindexSessions(database, dir)
+	_, _, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -304,7 +304,7 @@ func TestReindexSessions_IdempotentUpsert(t *testing.T) {
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
 	// First run.
-	_, u1, e1 := reindexSessions(database, dir)
+	_, u1, e1 := reindexSessions(database, dir, "/test/project")
 	if e1 != 0 {
 		t.Errorf("first run errCount: got %d, want 0", e1)
 	}
@@ -313,7 +313,7 @@ func TestReindexSessions_IdempotentUpsert(t *testing.T) {
 	}
 
 	// Second run -- should not error (INSERT OR REPLACE is idempotent).
-	_, _, e2 := reindexSessions(database, dir)
+	_, _, e2 := reindexSessions(database, dir, "/test/project")
 	if e2 != 0 {
 		t.Errorf("second run errCount: got %d, want 0", e2)
 	}
@@ -337,7 +337,7 @@ func TestReindexSessions_MultipleFiles(t *testing.T) {
 		writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 	}
 
-	total, upserted, errCount := reindexSessions(database, dir)
+	total, upserted, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -365,7 +365,7 @@ func TestReindexSessions_SourceIsReindex(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
-	reindexSessions(database, dir)
+	reindexSessions(database, dir, "/test/project")
 
 	got, err := dbpkg.GetEvent(database, "evt-source-1")
 	if err != nil {
@@ -398,7 +398,7 @@ func TestReindexSessions_TimestampParsing(t *testing.T) {
 	}
 	writeSessionHTML(t, dir, sessionID, "claude-code", "2026-03-10T14:00:00.000000", events)
 
-	_, _, errCount := reindexSessions(database, dir)
+	_, _, errCount := reindexSessions(database, dir, "/test/project")
 	if errCount != 0 {
 		t.Errorf("errCount: got %d, want 0", errCount)
 	}
@@ -419,7 +419,7 @@ func TestReindexSessions_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	database := setupSessionTestDB(t)
 
-	total, upserted, errCount := reindexSessions(database, dir)
+	total, upserted, errCount := reindexSessions(database, dir, "/test/project")
 	if total != 0 {
 		t.Errorf("total: got %d, want 0", total)
 	}
@@ -441,7 +441,7 @@ func TestReindexSessions_MalformedHTML(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	total, _, errCount := reindexSessions(database, dir)
+	total, _, errCount := reindexSessions(database, dir, "/test/project")
 	if total != 1 {
 		t.Errorf("total: got %d, want 1", total)
 	}

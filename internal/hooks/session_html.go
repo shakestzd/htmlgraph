@@ -70,6 +70,9 @@ func CreateSessionHTML(projectDir string, s *models.Session) {
              data-agent="`)
 	b.WriteString(html.EscapeString(s.AgentAssigned))
 	b.WriteString(`"
+             data-project-dir="`)
+	b.WriteString(html.EscapeString(projectDir))
+	b.WriteString(`"
              data-started-at="`)
 	b.WriteString(html.EscapeString(startedAt))
 	b.WriteString(`"
