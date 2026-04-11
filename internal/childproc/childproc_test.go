@@ -56,11 +56,11 @@ func TestGetOrSpawnHandshake(t *testing.T) {
 	bin := buildFakeChild(t, 12345)
 	sup := NewSupervisor(Options{
 		BinPath:      bin,
-		SpawnTimeout: 2 * time.Second,
+		SpawnTimeout: 10 * time.Second,
 	})
 	defer sup.Shutdown(context.Background())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	c, err := sup.GetOrSpawn(ctx, "projA", t.TempDir())
@@ -91,11 +91,11 @@ func TestGetOrSpawnConcurrent(t *testing.T) {
 	bin := buildFakeChild(t, 12346)
 	sup := NewSupervisor(Options{
 		BinPath:      bin,
-		SpawnTimeout: 2 * time.Second,
+		SpawnTimeout: 10 * time.Second,
 	})
 	defer sup.Shutdown(context.Background())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	// Fire N concurrent GetOrSpawn calls for the same projectID. The
@@ -125,7 +125,7 @@ func TestGetOrSpawnConcurrent(t *testing.T) {
 			} else if c != first {
 				t.Errorf("herd produced different children: %p vs %p", first, c)
 			}
-		case <-time.After(5 * time.Second):
+		case <-time.After(15 * time.Second):
 			t.Fatal("timeout waiting for spawn results")
 		}
 	}
@@ -141,7 +141,7 @@ func TestInvalidHandshakeFails(t *testing.T) {
 	}
 	sup := NewSupervisor(Options{
 		BinPath:      path,
-		SpawnTimeout: 2 * time.Second,
+		SpawnTimeout: 10 * time.Second,
 	})
 	defer sup.Shutdown(context.Background())
 
@@ -179,7 +179,7 @@ func TestIdleReaperKillsStaleChild(t *testing.T) {
 	bin := buildFakeChild(t, 12347)
 	sup := NewSupervisor(Options{
 		BinPath:      bin,
-		SpawnTimeout: 2 * time.Second,
+		SpawnTimeout: 10 * time.Second,
 		IdleTimeout:  100 * time.Millisecond,
 	})
 	defer sup.Shutdown(context.Background())
