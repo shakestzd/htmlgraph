@@ -37,9 +37,9 @@
         "terminal.integrated.profiles.linux": {
           "zsh": { "path": "/usr/bin/zsh" }
         },
-        "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font",
+        "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font Mono",
         "terminal.integrated.gpuAcceleration": "off",
-        "editor.fontFamily": "JetBrainsMono Nerd Font"
+        "editor.fontFamily": "JetBrains Mono"
       },
       "extensions": [
         "golang.Go",
