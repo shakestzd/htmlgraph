@@ -449,18 +449,17 @@
   border-radius: var(--radius);
   font-size: 12px;
   line-height: 1.6;
-  max-width: 78%;
+  width: 78%;
+  box-sizing: border-box;
   word-break: break-word;
 }
 .msg-user {
   align-self: flex-end;
-  margin-left: 22%;
   border-right: 3px solid #58a6ff;
   background: rgba(88,166,255,0.08);
 }
 .msg-assistant {
   align-self: flex-start;
-  margin-right: 22%;
   border-left: 3px solid var(--accent);
   background: rgba(205,255,0,0.04);
 }
