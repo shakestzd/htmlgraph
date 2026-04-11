@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# Fix ownership of named-volume mount points (Docker creates these as root:root)
+sudo chown -R vscode:vscode /workspaces/htmlgraph/.htmlgraph /workspaces/htmlgraph/.claude 2>/dev/null || true
+
 cd "$(dirname "$0")/.."
 
 export PATH="${HOME}/.local/bin:${PATH}"
