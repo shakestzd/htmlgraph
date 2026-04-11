@@ -4,13 +4,21 @@
 
 Work items, session tracking, custom agents, hooks, slash commands, quality gates, and a real-time dashboard — managed by a single Go binary, stored as HTML files in your repo. No external infrastructure required.
 
+## What this is NOT
+
+- **Not a hosted platform.** Local-first. Your data stays on your machine — no cloud sync, no telemetry.
+- **Not a general-purpose dev tool yet.** Today it's power-user and Claude-Code-centric. Other CLI integrations exist but are less mature.
+- **Not a behavioral agent coordinator.** It observes and attributes what agents do — it does not dispatch, steer, or enforce behavior on agents at runtime.
+
 ## Architecture
 
 | Layer | Role |
 |-------|------|
-| `.htmlgraph/*.html` | Canonical store — single source of truth |
-| SQLite (`.htmlgraph/htmlgraph.db`) | Read index for queries and dashboard |
+| `.htmlgraph/*.html` | Canonical CRUD store — single source of truth |
+| SQLite (`.htmlgraph/htmlgraph.db`) | Rebuildable read cache for fast queries and the dashboard |
 | Go binary (`htmlgraph`) | CLI + hook handler |
+
+HTML is the source of truth; SQLite is derived. If they drift, `htmlgraph reindex` drops the database and rebuilds it from the HTML files. No external infrastructure — no Postgres, no Redis, no cloud sync.
 
 ## Install
 
@@ -53,7 +61,7 @@ htmlgraph serve                         # dashboard at localhost:4000
 
 **Real-time dashboard** — Activity feed, kanban board, session viewer, and work item detail — served locally by `htmlgraph serve`.
 
-**Multi-agent coordination** — Claude Code, Gemini CLI, Codex, and GitHub Copilot all read from and write to the same work items. Orchestration patterns control which agent handles which task.
+**Multi-agent attribution and observation** — Claude Code, Gemini CLI, Codex, and GitHub Copilot all read from and write to the same work items. Every tool call, file edit, and session is attributed to a work item so you can see what each agent actually did.
 
 **Plans & specifications** — CRISPI plans break initiatives into trackable steps. Feature specs define acceptance criteria. Agents execute against the plan and report progress.
 
