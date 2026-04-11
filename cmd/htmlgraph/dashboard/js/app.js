@@ -1409,6 +1409,11 @@ function buildPlanSubnav(container) {
 /* ── Graph View ────────────────────────────────────────────── */
 
 var graphSimulation = null;
+// Observer that watches the root <html> element for data-theme
+// attribute changes so we can repaint existing graph nodes and the
+// legend without tearing down the D3 simulation. Disconnected on
+// every renderGraph call and re-created against the new selection.
+var graphThemeObserver = null;
 
 // GRAPH_LAYOUT centralizes every tunable constant in the graph view so
 // values can be adjusted in one place instead of scattered across
@@ -1439,8 +1444,60 @@ var GRAPH_LAYOUT = {
   // Force-simulation cooldown. Lower starting alpha + faster decay
   // because nodes are pre-seeded near their final positions.
   SIM_INITIAL_ALPHA: 0.3,
-  SIM_ALPHA_DECAY:   0.05
+  SIM_ALPHA_DECAY:   0.05,
+  // Inter-node repulsion. More negative = more spread. Tuned by eye
+  // on a 500+ node graph; -220 gives the dense center room to breathe
+  // without blowing the whole graph outside the viewport.
+  CHARGE_STRENGTH: -220,
+  // Per-type node fill, split by theme. Track and feature are "neon"
+  // (bright, saturated) so the most common node types pop against
+  // the dashboard background. Bug is matte so error nodes don't
+  // dominate the eye, and spike/plan/session stay calm so secondary
+  // categories sit quietly. Light-mode variants are darker+more
+  // saturated to maintain contrast against the cream #f4f3ef body.
+  TYPE_COLOR: {
+    dark: {
+      track:   '#4ade80',  // neon emerald
+      feature: '#60a5fa',  // neon sky blue
+      bug:     '#a65454',  // matte brick
+      spike:   '#b08040',  // muted amber
+      plan:    '#7a6aa8',  // muted plum
+      session: '#4a8a95'   // muted teal
+    },
+    light: {
+      track:   '#15803d',  // deep emerald
+      feature: '#2563eb',  // deep royal blue
+      bug:     '#991b1b',  // deep brick
+      spike:   '#b45309',  // burnt amber
+      plan:    '#6d28d9',  // deep plum
+      session: '#0e7490'   // deep teal
+    }
+  },
+  // Fill opacity for non-session nodes. Sessions stay at their
+  // existing 0.6 — they're secondary. 0.88 takes a little more
+  // edge off the primary nodes without making them look washed out.
+  NODE_FILL_OPACITY: 0.88
 };
+
+// getGraphPalette returns the active-theme color map from
+// GRAPH_LAYOUT.TYPE_COLOR. Reads document.documentElement.dataset.theme
+// each call so the result always reflects the current toggle state.
+function getGraphPalette() {
+  var theme = (document.documentElement.dataset.theme === 'light') ? 'light' : 'dark';
+  return GRAPH_LAYOUT.TYPE_COLOR[theme];
+}
+
+// paintGraphLegend applies the current-theme colors to every legend
+// entry carrying a data-graph-type attribute. Called on initial render
+// and again whenever the theme toggles.
+function paintGraphLegend() {
+  var palette = getGraphPalette();
+  var spans = document.querySelectorAll('[data-graph-type]');
+  for (var i = 0; i < spans.length; i++) {
+    var t = spans[i].getAttribute('data-graph-type');
+    if (palette[t]) spans[i].style.color = palette[t];
+  }
+}
 
 function fetchGraph() {
   fetch(buildProjectUrl('graph'))
@@ -1472,6 +1529,10 @@ function renderGraph(data) {
     graphSimulation.stop();
     graphSimulation = null;
   }
+  if (graphThemeObserver) {
+    graphThemeObserver.disconnect();
+    graphThemeObserver = null;
+  }
 
   var width = container.clientWidth || 800;
   var height = container.clientHeight || 600;
@@ -1488,15 +1549,12 @@ function renderGraph(data) {
     .on('zoom', function(e) { g.attr('transform', e.transform); })
   );
 
-  // Colour by node type.
-  var typeColor = {
-    track:   '#22c55e',
-    feature: '#3b82f6',
-    bug:     '#ef4444',
-    spike:   '#f59e0b',
-    plan:    '#8b5cf6',
-    session: '#06b6d4'
-  };
+  // Colour by node type — theme-aware via getGraphPalette(). The
+  // variable is reassigned inside the MutationObserver below so a
+  // theme toggle repaints existing nodes without rebuilding the
+  // simulation.
+  var typeColor = getGraphPalette();
+  paintGraphLegend();
 
   // Node size combines edges (structural weight) and activity (usage weight).
   // Log scale spreads small nodes more and compresses large ones so hubs
@@ -1562,7 +1620,7 @@ function renderGraph(data) {
         if (d.type === 'part_of') return 0.9;
         return 0.6;
       }))
-    .force('charge', d3.forceManyBody().strength(-80).distanceMax(400))
+    .force('charge', d3.forceManyBody().strength(GRAPH_LAYOUT.CHARGE_STRENGTH).distanceMax(400))
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('x', d3.forceX(width / 2).strength(0.015))
     .force('y', d3.forceY(height / 2).strength(0.015))
@@ -1598,7 +1656,7 @@ function renderGraph(data) {
       return d.type === 'session' ? Math.max(3, nodeRadius(d) * 0.6) : nodeRadius(d);
     })
     .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
-    .attr('fill-opacity', function(d) { return d.type === 'session' ? 0.6 : 1; })
+    .attr('fill-opacity', function(d) { return d.type === 'session' ? 0.6 : GRAPH_LAYOUT.NODE_FILL_OPACITY; })
     .attr('stroke', 'var(--bg-primary)')
     .attr('stroke-width', 1.5)
     .style('cursor', 'pointer')
@@ -1613,6 +1671,20 @@ function renderGraph(data) {
         d.fx = null; d.fy = null;
       })
     );
+
+  // Repaint nodes and legend on theme toggle without tearing down
+  // the simulation. The closure captures `node` and reassigns
+  // `typeColor` to the new palette so subsequent fill reads stay
+  // in sync (used by the drag/hover handlers that reuse typeColor).
+  graphThemeObserver = new MutationObserver(function() {
+    typeColor = getGraphPalette();
+    node.attr('fill', function(d) { return typeColor[d.type] || '#888'; });
+    paintGraphLegend();
+  });
+  graphThemeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme']
+  });
 
   // Tooltip.
   var tooltip = d3.select('#graph-container').append('div')
