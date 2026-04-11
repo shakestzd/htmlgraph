@@ -289,6 +289,92 @@ func TestCheckYoloCommitGuard(t *testing.T) {
 	}
 }
 
+// setupIsolatedProjectDir creates a temp directory with a .htmlgraph
+// subdirectory and pins the resolver chain to it for the duration of
+// the test. Without overriding CLAUDE_PROJECT_DIR and clearing
+// HTMLGRAPH_PROJECT_DIR, paths.ResolveProjectDir would inherit the
+// outer Claude Code session's env vars and resolve to the real
+// htmlgraph repo root instead of the test's tempDir.
+func setupIsolatedProjectDir(t *testing.T) string {
+	t.Helper()
+	projDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", projDir)
+	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
+	// HTMLGRAPH_SESSION_ID must remain non-empty so the resolver's
+	// priority-3 step (CLAUDE_PROJECT_DIR check) actually fires; it
+	// is gated on HTMLGRAPH_SESSION_ID being set as a stale-env guard.
+	if os.Getenv("HTMLGRAPH_SESSION_ID") == "" {
+		t.Setenv("HTMLGRAPH_SESSION_ID", "test-session")
+	}
+	return projDir
+}
+
+// TestCheckYoloCommitGuard_ProjectAwareMessage covers bug-f616c2a8.
+// The error message must name the test command for the project the
+// commit is being attempted in, not a hardcoded "go test or pytest"
+// hybrid that confused users in single-language projects.
+func TestCheckYoloCommitGuard_ProjectAwareMessage(t *testing.T) {
+	cases := []struct {
+		name        string
+		manifest    string
+		manifestSrc string
+		wantSubstr  string
+	}{
+		{"go project", "go.mod", "module example.com/test\n", "go test ./..."},
+		{"python pyproject", "pyproject.toml", "[project]\nname=\"t\"\n", "uv run pytest"},
+		{"python requirements", "requirements.txt", "pytest\n", "uv run pytest"},
+		{"node project", "package.json", `{"name":"t"}`, "npm test"},
+		{"rust project", "Cargo.toml", "[package]\nname=\"t\"\n", "cargo test"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			projDir := setupIsolatedProjectDir(t)
+			if err := os.WriteFile(filepath.Join(projDir, c.manifest), []byte(c.manifestSrc), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": "git commit -m 'x'"},
+				CWD:       projDir,
+			}
+			msg := checkYoloCommitGuard(event, true, false)
+			if msg == "" {
+				t.Fatal("expected commit to be blocked, got empty message")
+			}
+			if !strings.Contains(msg, c.wantSubstr) {
+				t.Errorf("expected message to contain %q, got: %s", c.wantSubstr, msg)
+			}
+			// The pre-fix hardcoded message contained both go AND pytest.
+			// Make sure we don't regress to that hybrid form.
+			if strings.Contains(msg, "go test") && strings.Contains(msg, "uv run pytest") {
+				t.Errorf("message still emits hybrid hardcoded suggestion: %s", msg)
+			}
+		})
+	}
+}
+
+// TestCheckYoloCommitGuard_FallbackForUnknownProjectType verifies that
+// when no manifest file is found, the user still gets actionable
+// guidance instead of an empty or single-language string.
+func TestCheckYoloCommitGuard_FallbackForUnknownProjectType(t *testing.T) {
+	projDir := setupIsolatedProjectDir(t)
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "git commit -m 'x'"},
+		CWD:       projDir,
+	}
+	msg := checkYoloCommitGuard(event, true, false)
+	if msg == "" {
+		t.Fatal("expected commit to be blocked, got empty message")
+	}
+	if !strings.Contains(msg, fallbackTestSuggestion) {
+		t.Errorf("expected fallback suggestion in message, got: %s", msg)
+	}
+}
+
 func TestCheckYoloWorktreeGuard(t *testing.T) {
 	tests := []struct {
 		name    string

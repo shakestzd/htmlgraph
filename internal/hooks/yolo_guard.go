@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
 // mergeInProgressFn is injected for testing. In production, it checks the real
@@ -223,8 +224,21 @@ func countStepsForItem(htmlgraphDir, itemID string) int {
 // gitCommitPattern matches git commit commands in Bash.
 var gitCommitPattern = regexp.MustCompile(`\bgit\s+commit\b`)
 
+// fallbackTestSuggestion is used when the project's language can't be
+// detected from manifest files. It enumerates the supported test
+// commands so the user can pick the relevant one rather than seeing
+// a confidently-wrong single command (bug-f616c2a8).
+const fallbackTestSuggestion = "your project's test suite (go test ./..., uv run pytest, npm test, cargo test, etc.)"
+
 // checkYoloCommitGuard blocks git commit when tests haven't run in
 // the current session. Returns a non-empty reason to block, or "" to allow.
+//
+// The error message names the test command for the detected project
+// type (Go, Python, Node, Rust). Falls back to a generic enumeration
+// when no manifest file is found in the project root or its monorepo
+// subdirectories. Previously emitted "go test ./... or uv run pytest"
+// regardless of project, which was confusing in single-language
+// projects (bug-f616c2a8).
 func checkYoloCommitGuard(event *CloudEvent, yolo, testRan bool) string {
 	if !yolo {
 		return ""
@@ -239,8 +253,11 @@ func checkYoloCommitGuard(event *CloudEvent, yolo, testRan bool) string {
 	if testRan {
 		return ""
 	}
-	return "YOLO mode requires tests to pass before committing. " +
-		"Run: go test ./... or uv run pytest"
+	suggestion := paths.TestCommandFor(paths.DetectProjectType(ResolveProjectDir(event.CWD, event.SessionID)))
+	if suggestion == "" {
+		suggestion = fallbackTestSuggestion
+	}
+	return "YOLO mode requires tests to pass before committing. Run: " + suggestion
 }
 
 // checkYoloBudgetGuard blocks git commit when the staged diff exceeds

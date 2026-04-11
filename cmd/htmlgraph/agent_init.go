@@ -4,8 +4,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/shakestzd/htmlgraph/internal/paths"
@@ -87,67 +85,31 @@ grep -r topic .htmlgraph/
 }
 
 func qualityGatesSection() string {
-	projectType := detectProjectType()
-
-	switch projectType {
-	case "go":
+	switch detectProjectType() {
+	case paths.ProjectTypeGo:
 		return goQualityGates()
-	case "python":
+	case paths.ProjectTypePython:
 		return pythonQualityGates()
-	case "node":
+	case paths.ProjectTypeNode:
 		return nodeQualityGates()
 	default:
 		return genericQualityGates()
 	}
 }
 
-// detectProjectType checks for language markers in the project root
-// and one level of subdirectories (packages/*/, src/*/).
-func detectProjectType() string {
+// detectProjectType resolves the project root from the --project-dir
+// flag (or the standard fallback chain) and delegates to
+// paths.DetectProjectType for the actual marker scan. Kept as a thin
+// wrapper so the cobra-flag dependency stays in cmd/ and the reusable
+// detection lives in internal/paths/ alongside ResolveProjectDir.
+func detectProjectType() paths.ProjectType {
 	root, err := paths.ResolveProjectDir(paths.ProjectDirOptions{
 		ExplicitDir: projectDirFlag,
 	})
 	if err != nil {
-		return "unknown"
+		return paths.ProjectTypeUnknown
 	}
-
-	// Check in priority order — most specific first.
-	markers := []struct {
-		file     string
-		projType string
-	}{
-		{"go.mod", "go"},
-		{"pyproject.toml", "python"},
-		{"requirements.txt", "python"},
-		{"package.json", "node"},
-		{"Cargo.toml", "rust"},
-	}
-
-	// Collect all directories to scan: root + monorepo subdirs.
-	dirs := []string{root}
-	for _, subdir := range []string{"packages", "src"} {
-		entries, err := os.ReadDir(filepath.Join(root, subdir))
-		if err != nil {
-			continue
-		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				dirs = append(dirs, filepath.Join(root, subdir, entry.Name()))
-			}
-		}
-	}
-
-	// Return the highest-priority marker found across all directories.
-	// Markers are ordered by priority so the first match wins.
-	for _, m := range markers {
-		for _, dir := range dirs {
-			if _, err := os.Stat(filepath.Join(dir, m.file)); err == nil {
-				return m.projType
-			}
-		}
-	}
-
-	return "unknown"
+	return paths.DetectProjectType(root)
 }
 
 func goQualityGates() string {
