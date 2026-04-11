@@ -1,0 +1,16 @@
+meta:
+    id: plan-1b621827
+    track_id: trk-97f85b3b
+    title: Logical session splitting via hook source field
+    description: 'Split monolithic Claude Code transcripts into logical user-scoped sessions using the hook CloudEvent.Source field (startup/resume/clear/compact) as ground-truth boundaries. Adds a logical_sessions table layered over the existing sessions table — the transcript session_id stays canonical, logical_sessions tracks sittings within it. Includes live hook attribution, JSONL backfill for historical data, HTML representation that round-trips through reindex, and a dashboard view that groups by logical session by default. Differentiator: no other tool has hook data, so no other tool can split transcripts by Claude Code''s own boundary signal.'
+    created_at: "2026-04-11"
+    status: draft
+    version: 2
+design:
+    problem: ""
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices: []
+questions: []
