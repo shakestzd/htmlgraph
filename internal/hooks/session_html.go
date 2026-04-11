@@ -42,6 +42,20 @@ func CreateSessionHTML(projectDir string, s *models.Session) {
 		return
 	}
 
+	// data-project-dir is the canonical attribution for the session and
+	// must reflect the TRANSCRIPT'S source project, not the destination
+	// repo that the HTML is being written into. RenderIngestedSessionHTML
+	// sets s.ProjectDir to the decoded source path before calling here,
+	// so prefer that over the function argument when set. The function
+	// argument is only used as a fallback for the live hook path where
+	// projectDir IS the source project. (bug found in roborev review of
+	// d2731bec — without this guard, ingested sessions would canonicalize
+	// the wrong project_dir and reindex would propagate it forward.)
+	canonicalProjectDir := s.ProjectDir
+	if canonicalProjectDir == "" {
+		canonicalProjectDir = projectDir
+	}
+
 	isSubagent := "false"
 	if s.IsSubagent {
 		isSubagent = "true"
@@ -71,7 +85,7 @@ func CreateSessionHTML(projectDir string, s *models.Session) {
 	b.WriteString(html.EscapeString(s.AgentAssigned))
 	b.WriteString(`"
              data-project-dir="`)
-	b.WriteString(html.EscapeString(projectDir))
+	b.WriteString(html.EscapeString(canonicalProjectDir))
 	b.WriteString(`"
              data-started-at="`)
 	b.WriteString(html.EscapeString(startedAt))

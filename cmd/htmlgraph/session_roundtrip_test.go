@@ -84,7 +84,7 @@ func TestSessionRoundTrip_IngestThenReindex(t *testing.T) {
 		t.Fatalf("delete events: %v", err)
 	}
 
-	total, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"))
+	total, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"), filepath.Dir(htmlgraphDir))
 	if errFiles != 0 {
 		t.Fatalf("reindex errors: %d", errFiles)
 	}
@@ -154,7 +154,7 @@ func TestSessionRoundTrip_OrphanSweepReindexesAsAborted(t *testing.T) {
 	if _, err := database.Exec(`DELETE FROM agent_events`); err != nil {
 		t.Fatalf("delete events: %v", err)
 	}
-	_, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"))
+	_, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"), filepath.Dir(htmlgraphDir))
 	if errFiles != 0 {
 		t.Fatalf("reindex errors: %d", errFiles)
 	}
@@ -220,7 +220,7 @@ func TestSessionRoundTrip_MigrationBackfill(t *testing.T) {
 	if _, err := database.Exec(`DELETE FROM agent_events`); err != nil {
 		t.Fatalf("delete events: %v", err)
 	}
-	_, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"))
+	_, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"), filepath.Dir(htmlgraphDir))
 	if errFiles != 0 {
 		t.Fatalf("reindex errors: %d", errFiles)
 	}
@@ -386,7 +386,7 @@ func TestSessionRoundTrip_ConcurrentWriters(t *testing.T) {
 	if _, err := database.Exec(`DELETE FROM agent_events`); err != nil {
 		t.Fatalf("delete events: %v", err)
 	}
-	_, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"))
+	_, upserted, errFiles := reindexSessions(database, filepath.Join(htmlgraphDir, "sessions"), filepath.Dir(htmlgraphDir))
 	if errFiles != 0 {
 		t.Fatalf("reindex errors: %d", errFiles)
 	}

@@ -1511,7 +1511,11 @@ function renderGraph(data) {
     var h = GRAPH_LAYOUT.FNV_OFFSET_BASIS;
     for (var i = 0; i < s.length; i++) {
       h ^= s.charCodeAt(i);
-      h = (h * GRAPH_LAYOUT.FNV_PRIME) >>> 0;
+      // Math.imul performs true 32-bit integer multiplication; plain
+      // `h * FNV_PRIME` would overflow a 64-bit float past 2^53 and
+      // silently corrupt the hash distribution, causing avoidable
+      // clustering in the seeded layout (roborev finding on f0b9d8aa).
+      h = Math.imul(h, GRAPH_LAYOUT.FNV_PRIME) >>> 0;
     }
     return h;
   }
