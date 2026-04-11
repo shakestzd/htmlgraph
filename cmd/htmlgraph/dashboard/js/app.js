@@ -1396,6 +1396,38 @@ function buildPlanSubnav(container) {
 
 var graphSimulation = null;
 
+// GRAPH_LAYOUT centralizes every tunable constant in the graph view so
+// values can be adjusted in one place instead of scattered across
+// renderGraph. FNV_* drives the per-node deterministic position seeding;
+// TYPE_BAND_Y is the vertical fraction of the viewport each node type
+// anchors to (tracks near the top, sessions near the bottom); SIM_*
+// governs the force-layout cooldown.
+var GRAPH_LAYOUT = {
+  // FNV-1a hash constants for deterministic (x, y) seeding.
+  FNV_OFFSET_BASIS: 2166136261,
+  FNV_PRIME: 16777619,
+  // Hash bit ranges used to spread nodes within a band.
+  HASH_X_MODULUS: 1000,          // low bits drive x position
+  HASH_Y_MODULUS: 200,           // next 8 bits drive y jitter
+  HASH_Y_SHIFT: 10,              // bit shift before the y modulus
+  BAND_Y_JITTER_FRACTION: 0.15,  // fraction of viewport height a node can drift within its band
+  // Vertical anchors per node type, expressed as a fraction of viewport
+  // height. Chosen to match the eventual force-layout clusters so the
+  // relaxation pass has almost no work to do.
+  TYPE_BAND_Y: {
+    track:   0.20,
+    plan:    0.30,
+    feature: 0.50,
+    bug:     0.55,
+    spike:   0.60,
+    session: 0.80
+  },
+  // Force-simulation cooldown. Lower starting alpha + faster decay
+  // because nodes are pre-seeded near their final positions.
+  SIM_INITIAL_ALPHA: 0.3,
+  SIM_ALPHA_DECAY:   0.05
+};
+
 function fetchGraph() {
   fetch(buildProjectUrl('graph'))
     .then(function(r) { return r.json(); })
@@ -1474,47 +1506,34 @@ function renderGraph(data) {
   // random (x, y) and the simulation bounces everything into place — visible
   // as a jarring "explosion and settle" on every load. With seeded positions,
   // the simulation relaxes from a near-final layout, producing a small shiver.
-  //
-  // Layout strategy: use a simple FNV-1a hash of the node ID to bucket nodes
-  // across the viewport. Nodes of the same type cluster by bucketing them
-  // into type-specific vertical bands (tracks at top, features in the middle,
-  // sessions at the bottom) — this matches the force-layout's eventual shape
-  // so the relaxation pass has very little work to do.
-  function hashString(s) {
-    var h = 2166136261;
+  // All tunables live in GRAPH_LAYOUT at the top of the Graph View section.
+  function hashNodeId(s) {
+    var h = GRAPH_LAYOUT.FNV_OFFSET_BASIS;
     for (var i = 0; i < s.length; i++) {
       h ^= s.charCodeAt(i);
-      h = (h * 16777619) >>> 0;
+      h = (h * GRAPH_LAYOUT.FNV_PRIME) >>> 0;
     }
     return h;
   }
-  var typeBand = {
-    track:   0.20,
-    feature: 0.50,
-    bug:     0.55,
-    spike:   0.60,
-    plan:    0.30,
-    session: 0.80
-  };
+  var DEFAULT_BAND_Y = 0.5;
   nodes.forEach(function(n) {
-    var h = hashString(n.id);
-    var bandY = (typeBand[n.type] !== undefined ? typeBand[n.type] : 0.5) * height;
-    // Spread within the band using hash bits for x and a small y jitter.
-    n.x = ((h % 1000) / 1000) * width;
-    n.y = bandY + ((((h >>> 10) % 200) / 200) - 0.5) * (height * 0.15);
+    var h = hashNodeId(n.id);
+    var bandFraction = GRAPH_LAYOUT.TYPE_BAND_Y[n.type];
+    if (bandFraction === undefined) bandFraction = DEFAULT_BAND_Y;
+    var bandY = bandFraction * height;
+    var jitterRange = height * GRAPH_LAYOUT.BAND_Y_JITTER_FRACTION;
+    n.x = ((h % GRAPH_LAYOUT.HASH_X_MODULUS) / GRAPH_LAYOUT.HASH_X_MODULUS) * width;
+    n.y = bandY + ((((h >>> GRAPH_LAYOUT.HASH_Y_SHIFT) % GRAPH_LAYOUT.HASH_Y_MODULUS) / GRAPH_LAYOUT.HASH_Y_MODULUS) - 0.5) * jitterRange;
   });
 
   // Balanced forces: clusters visible but not overlapping.
   // Link strength varies by type: structural edges pull tighter than activity.
-  //
-  // alpha(0.3) starts the simulation at lower heat than the default (1.0) —
-  // because nodes are already seeded near their final positions, we don't
-  // need the full cooldown. alphaDecay(0.05) makes the settle finish in
-  // about half the time. Combined, the initial layout appears within ~500ms
-  // instead of the ~2s bounce-and-settle the default produces.
+  // SIM_INITIAL_ALPHA and SIM_ALPHA_DECAY are lowered from the D3 defaults
+  // (1.0 and 0.0228 respectively) because nodes are pre-seeded near their
+  // final positions — the simulation only needs a short relaxation pass.
   graphSimulation = d3.forceSimulation(nodes)
-    .alpha(0.3)
-    .alphaDecay(0.05)
+    .alpha(GRAPH_LAYOUT.SIM_INITIAL_ALPHA)
+    .alphaDecay(GRAPH_LAYOUT.SIM_ALPHA_DECAY)
     .force('link', d3.forceLink(edges).id(function(d) { return d.id; })
       .distance(function(d) {
         return d.type === 'worked_on' ? 70 : 45;
