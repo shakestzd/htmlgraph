@@ -1449,29 +1449,21 @@ var GRAPH_LAYOUT = {
   // on a 500+ node graph; -220 gives the dense center room to breathe
   // without blowing the whole graph outside the viewport.
   CHARGE_STRENGTH: -220,
-  // Per-type node fill, split by theme. Track and feature are "neon"
-  // (bright, saturated) so the most common node types pop against
-  // the dashboard background. Bug is matte so error nodes don't
-  // dominate the eye, and spike/plan/session stay calm so secondary
-  // categories sit quietly. Light-mode variants are darker+more
-  // saturated to maintain contrast against the cream #f4f3ef body.
-  TYPE_COLOR: {
-    dark: {
-      track:   '#4ade80',  // neon emerald
-      feature: '#60a5fa',  // neon sky blue
-      bug:     '#a65454',  // matte brick
-      spike:   '#b08040',  // muted amber
-      plan:    '#7a6aa8',  // muted plum
-      session: '#4a8a95'   // muted teal
-    },
-    light: {
-      track:   '#15803d',  // deep emerald
-      feature: '#2563eb',  // deep royal blue
-      bug:     '#991b1b',  // deep brick
-      spike:   '#b45309',  // burnt amber
-      plan:    '#6d28d9',  // deep plum
-      session: '#0e7490'   // deep teal
-    }
+  // Per-type fill, keyed to design-system tokens so the graph inherits
+  // the active theme automatically. Resolved live via
+  // getComputedStyle(document.documentElement) at every getGraphPalette()
+  // call — CSS `var(...)` cannot be assigned directly to a d3 `fill`
+  // attribute, and the computed value flips when the user toggles theme.
+  // Track is the brand accent; feature/plan are the grayscale tier
+  // (plan is differentiated with a dashed stroke in the node render);
+  // bug/spike/session reuse semantic status/priority tokens.
+  TYPE_TOKEN: {
+    track:   '--accent',
+    feature: '--text-secondary',
+    plan:    '--text-muted',
+    bug:     '--status-blocked',
+    spike:   '--priority-high',
+    session: '--status-ip'
   },
   // Fill opacity for non-session nodes. Sessions stay at their
   // existing 0.6 — they're secondary. 0.88 takes a little more
@@ -1479,12 +1471,45 @@ var GRAPH_LAYOUT = {
   NODE_FILL_OPACITY: 0.88
 };
 
-// getGraphPalette returns the active-theme color map from
-// GRAPH_LAYOUT.TYPE_COLOR. Reads document.documentElement.dataset.theme
-// each call so the result always reflects the current toggle state.
+// getGraphPalette resolves GRAPH_LAYOUT.TYPE_TOKEN into a flat map of
+// concrete color strings using the live computed values of the root
+// element. Called on every render and on every data-theme mutation so
+// the result always reflects the active theme.
 function getGraphPalette() {
-  var theme = (document.documentElement.dataset.theme === 'light') ? 'light' : 'dark';
-  return GRAPH_LAYOUT.TYPE_COLOR[theme];
+  var cs = getComputedStyle(document.documentElement);
+  var out = {};
+  var tokens = GRAPH_LAYOUT.TYPE_TOKEN;
+  for (var key in tokens) {
+    if (Object.prototype.hasOwnProperty.call(tokens, key)) {
+      out[key] = cs.getPropertyValue(tokens[key]).trim() || '#888';
+    }
+  }
+  return out;
+}
+
+// colorToRGB parses any CSS color string getComputedStyle might return
+// (rgb, rgba, hex) into a numeric [r,g,b] triple. Named colors and hsl
+// are not expected on our tokens but fall through to a neutral gray so
+// YIQ still produces a reasonable pick.
+function colorToRGB(c) {
+  if (!c) return [128, 128, 128];
+  if (c[0] === '#') {
+    if (c.length === 4) c = '#' + c[1]+c[1] + c[2]+c[2] + c[3]+c[3];
+    return [parseInt(c.slice(1,3), 16), parseInt(c.slice(3,5), 16), parseInt(c.slice(5,7), 16)];
+  }
+  var m = c.match(/\d+(\.\d+)?/g);
+  if (!m || m.length < 3) return [128, 128, 128];
+  return [parseFloat(m[0]) | 0, parseFloat(m[1]) | 0, parseFloat(m[2]) | 0];
+}
+
+// pickLabelColor picks a near-black or near-white ink for a given node
+// fill using YIQ luminance, so labels stay legible on every palette
+// entry regardless of active theme. The paint-order stroke layered on
+// top of the label adds a second line of defense for edge-case fills.
+function pickLabelColor(fill) {
+  var rgb = colorToRGB(fill);
+  var yiq = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000;
+  return yiq >= 140 ? '#0a0a0a' : '#f0f0f0';
 }
 
 // paintGraphLegend applies the current-theme colors to every legend
@@ -1569,6 +1594,18 @@ function renderGraph(data) {
     return Math.max(4, Math.min(28, r));
   }
 
+  // visualRadius is the ACTUAL rendered radius of the circle, after any
+  // type-specific scaling. This is the value to use for hit testing,
+  // text wrapping, and label fit decisions so a single source of truth
+  // governs "how big is this node on screen." Previously the code used
+  // nodeRadius() directly for labels while the circle renderer scaled
+  // session nodes to 60% — the labels thought they had more room than
+  // the circle actually provided and spilled onto the background.
+  function visualRadius(d) {
+    if (d.type === 'session') return Math.max(3, nodeRadius(d) * 0.6);
+    return nodeRadius(d);
+  }
+
   // Make a shallow copy so D3 can mutate positions without polluting our cache.
   var nodes = data.nodes.map(function(n) { return Object.assign({}, n); });
   var edges = data.edges.map(function(e) { return Object.assign({}, e); });
@@ -1624,7 +1661,7 @@ function renderGraph(data) {
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('x', d3.forceX(width / 2).strength(0.015))
     .force('y', d3.forceY(height / 2).strength(0.015))
-    .force('collision', d3.forceCollide().radius(function(d) { return nodeRadius(d) + 3; }));
+    .force('collision', d3.forceCollide().radius(function(d) { return visualRadius(d) + 3; }));
 
   // Edge color by relationship type for visual variety.
   var edgeColor = {
@@ -1648,17 +1685,20 @@ function renderGraph(data) {
       return d.type === 'worked_on' ? 0.7 : 1.2;
     });
 
-  // Node circles.
+  // Node circles. Radius flows through visualRadius so the on-screen
+  // size matches the value used by label wrapping and the collision
+  // force below — one source of truth for "how big is this node."
   var node = g.append('g').selectAll('circle')
     .data(nodes).enter().append('circle')
-    .attr('r', function(d) {
-      // Sessions are secondary — render smaller.
-      return d.type === 'session' ? Math.max(3, nodeRadius(d) * 0.6) : nodeRadius(d);
-    })
+    .attr('r', visualRadius)
     .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
     .attr('fill-opacity', function(d) { return d.type === 'session' ? 0.6 : GRAPH_LAYOUT.NODE_FILL_OPACITY; })
     .attr('stroke', 'var(--bg-primary)')
     .attr('stroke-width', 1.5)
+    // Plans share the grayscale tier with features. The dashed outline
+    // signals "blueprint, not built yet" so the two tiers stay distinct
+    // even when their fill tokens resolve to similar neutrals.
+    .attr('stroke-dasharray', function(d) { return d.type === 'plan' ? '4,2' : null; })
     .style('cursor', 'pointer')
     .call(d3.drag()
       .on('start', function(e, d) {
@@ -1672,13 +1712,19 @@ function renderGraph(data) {
       })
     );
 
-  // Repaint nodes and legend on theme toggle without tearing down
-  // the simulation. The closure captures `node` and reassigns
-  // `typeColor` to the new palette so subsequent fill reads stay
-  // in sync (used by the drag/hover handlers that reuse typeColor).
+  // Repaint nodes, labels, and legend on theme toggle without tearing
+  // down the simulation. The closure captures `node` / the label
+  // selections and reassigns `typeColor` so subsequent fill reads stay
+  // in sync (used by drag/hover handlers that reuse typeColor).
   graphThemeObserver = new MutationObserver(function() {
     typeColor = getGraphPalette();
     node.attr('fill', function(d) { return typeColor[d.type] || '#888'; });
+    if (typeof trackLabels !== 'undefined') {
+      trackLabels.attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); });
+    }
+    if (typeof hubLabels !== 'undefined') {
+      hubLabels.attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); });
+    }
     paintGraphLegend();
   });
   graphThemeObserver.observe(document.documentElement, {
@@ -1863,6 +1909,11 @@ function renderGraph(data) {
   }
 
   // Labels inside track nodes using SVG text + tspan (no foreignObject).
+  // Fill is contrast-aware via pickLabelColor so labels stay legible
+  // regardless of which palette token the node resolved to. No
+  // paint-order stroke — labels wrap inside the node radius, never
+  // cross onto the background, and a dark halo would visibly thicken
+  // and blur the small font sizes that fit inside sub-20px nodes.
   var trackLabelNodes = nodes.filter(function(d) { return d.type === 'track'; });
   var trackLabelGroup = g.append('g');
   var trackLabels = trackLabelGroup.selectAll('text.track-label')
@@ -1871,18 +1922,22 @@ function renderGraph(data) {
     .attr('class', 'track-label')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'central')
-    .attr('fill', '#fff')
+    .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
     .attr('font-weight', 'bold')
     .attr('pointer-events', 'none');
 
   trackLabels.each(function(d) {
-    wrapTextInCircle(d3.select(this), d.title, nodeRadius(d));
+    wrapTextInCircle(d3.select(this), d.title, visualRadius(d));
   });
 
-  // Hub node labels — fit inside the circle when node is large enough,
-  // using the same chord-width wrapping as track labels.
+  // Hub node labels — fit inside the circle when node is large enough.
+  // Uses visualRadius (not nodeRadius) so the "is this big enough to
+  // label?" test matches the ACTUAL on-screen size, which for session
+  // nodes is 60% of nodeRadius. Without this, session labels thought
+  // they had 67% more space than the circle actually provided and
+  // spilled onto the background.
   var hubNodes = nodes.filter(function(d) {
-    return d.type !== 'track' && (d.edges || 0) >= 3 && nodeRadius(d) >= 10;
+    return d.type !== 'track' && (d.edges || 0) >= 3 && visualRadius(d) >= 10;
   });
 
   var hubLabels = g.append('g').selectAll('text.hub-label')
@@ -1891,12 +1946,12 @@ function renderGraph(data) {
     .attr('class', 'hub-label')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'central')
-    .attr('fill', '#fff')
+    .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
     .attr('font-weight', '600')
     .attr('pointer-events', 'none');
 
   hubLabels.each(function(d) {
-    wrapTextInCircle(d3.select(this), d.title, nodeRadius(d));
+    wrapTextInCircle(d3.select(this), d.title, visualRadius(d));
   });
 
   graphSimulation.on('tick', function() {

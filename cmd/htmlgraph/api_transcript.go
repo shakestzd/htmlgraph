@@ -89,11 +89,18 @@ func transcriptHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 		// Look up linked plan for this session (from plan chat).
 		planID, planTitle := lookupSessionPlan(database, htmlgraphDir, sessionID)
 
+		// Collect distinct work item IDs attributed to this session so the
+		// transcript stats row can render them as clickable badges next to
+		// the Plan badge. Only includes items that actually appeared in
+		// agent_events — empty strings filtered, order stable by id.
+		featureIDs := lookupSessionFeatureIDs(database, sessionID)
+
 		resp := map[string]any{
 			"session_id":    sessionID,
 			"message_count": len(messages),
 			"tool_count":    len(toolCalls),
 			"messages":      result,
+			"feature_ids":   featureIDs,
 		}
 		if planID != "" {
 			resp["plan_id"] = planID
@@ -101,6 +108,30 @@ func transcriptHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 		}
 		respondJSON(w, resp)
 	}
+}
+
+// lookupSessionFeatureIDs returns distinct feature_id values recorded for
+// the given session in agent_events. Used by the transcript view to render
+// session-level work item badges. Returns an empty slice (not nil) so the
+// JSON response always serialises as an array for consistent frontend
+// handling.
+func lookupSessionFeatureIDs(database *sql.DB, sessionID string) []string {
+	ids := []string{}
+	rows, err := database.Query(`
+		SELECT DISTINCT feature_id FROM agent_events
+		WHERE session_id = ? AND COALESCE(feature_id, '') != ''
+		ORDER BY feature_id`, sessionID)
+	if err != nil {
+		return ids
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil && id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // lookupSessionPlan queries plan_feedback for a session→plan link and returns

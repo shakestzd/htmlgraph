@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"net/http"
+	"strings"
 )
 
 // graphNode represents a work item node in the graph response.
@@ -193,10 +194,22 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 	// Only include sessions that have actual transcript content —
 	// both agent_events (proves attribution) AND messages (proves ingest).
 	// Without the messages check, hook-only sessions surface as empty transcripts.
+	//
+	// The SELECT pulls enough for a useful node label: the sessions.title
+	// column (set by the background titler for human sessions), the first
+	// user message (as a fallback title source), the created_at timestamp
+	// (for a last-resort "Apr 11 06:57" label), and the agent type. A
+	// graph-local pickSessionLabel helper then picks the best of the three.
 	srows, serr := database.Query(`
 		SELECT s.session_id,
 		       COALESCE(s.agent_assigned, 'session'),
-		       COALESCE(s.status, 'completed')
+		       COALESCE(s.status, 'completed'),
+		       COALESCE(s.title, '') AS title,
+		       COALESCE((SELECT SUBSTR(m.content, 1, 160)
+		                 FROM messages m
+		                 WHERE m.session_id = s.session_id AND m.role = 'user'
+		                 ORDER BY m.ordinal LIMIT 1), '') AS first_msg,
+		       COALESCE(s.created_at, '') AS created_at
 		FROM sessions s
 		WHERE EXISTS (
 		    SELECT 1 FROM agent_events e
@@ -211,18 +224,156 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		defer srows.Close()
 		for srows.Next() {
 			var n graphNode
-			var agent string
-			if err := srows.Scan(&n.ID, &agent, &n.Status); err != nil {
+			var agent, title, firstMsg, createdAt string
+			if err := srows.Scan(&n.ID, &agent, &n.Status, &title, &firstMsg, &createdAt); err != nil {
 				continue
 			}
 			n.Type = "session"
-			n.Title = agent + " · " + n.ID[:8]
+			n.Title = pickSessionLabel(n.ID, title, firstMsg, createdAt)
 			nodes = append(nodes, n)
 			trackIDs = append(trackIDs, "")
 		}
 	}
 
 	return nodes, trackIDs, nil
+}
+
+// pickSessionLabel returns the best human-readable label for a session node
+// in the graph. Priority:
+//
+//  1. sessions.title — set by the background titler for human sessions.
+//     Rejected when empty, when it starts with the "[htmlgraph-titler]"
+//     sentinel (placeholder not yet replaced with a real summary), or when
+//     it's an obviously-empty placeholder like "--" or "-".
+//  2. First user message — truncated to ~56 chars with a trailing ellipsis.
+//     Rejected when empty or when it starts with the titler sentinel.
+//  3. Time prefix — "MM-DD HH:MM · <short id>" built from created_at.
+//  4. Last resort — "session · <short id>".
+//
+// The function is deliberately display-only; it never touches the database.
+func pickSessionLabel(sessionID, title, firstMsg, createdAt string) string {
+	const sentinel = "[htmlgraph-titler]"
+	short := sessionID
+	if len(short) > 8 {
+		short = short[:8]
+	}
+
+	if cleanTitle := sanitizeSessionTitle(title, sentinel); cleanTitle != "" {
+		return truncateForNodeLabel(cleanTitle)
+	}
+
+	if cleanMsg := sanitizeFirstMessage(firstMsg, sentinel); cleanMsg != "" {
+		return truncateForNodeLabel(cleanMsg)
+	}
+
+	if createdAt != "" {
+		// created_at is stored as RFC3339 or "YYYY-MM-DD HH:MM:SS". Both
+		// forms start with "YYYY-MM-DD" and contain "HH:MM" at a fixed
+		// offset, so a substring slice is enough for a cheap, readable
+		// fallback without the time package overhead.
+		if len(createdAt) >= 16 {
+			datePart := createdAt[5:10]  // "MM-DD"
+			timePart := createdAt[11:16] // "HH:MM"
+			return datePart + " " + timePart + " · " + short
+		}
+	}
+
+	return "session · " + short
+}
+
+// sanitizeFirstMessage turns a raw first user message into a single-line
+// label suitable for a graph node. The heavy lift is unwrapping Claude
+// Code slash-command invocations like
+//
+//	<command-message>htmlgraph:execute</command-message>
+//	<command-name>/htmlgraph:execute</command-name>
+//	<command-args>trk-d8aef97a</command-args>
+//
+// into the clean form "/htmlgraph:execute trk-d8aef97a" which reads as a
+// proper session description instead of a lump of XML. Falls back to a
+// whitespace-collapsed version of the original message for non-command
+// sessions.
+func sanitizeFirstMessage(msg, sentinel string) string {
+	m := strings.TrimSpace(msg)
+	if m == "" || strings.HasPrefix(m, sentinel) {
+		return ""
+	}
+
+	// Slash-command invocations from Claude Code arrive wrapped in
+	// <command-name> + <command-args> blocks. Pull the pieces out and
+	// stitch them into a clean command line.
+	if strings.Contains(m, "<command-name>") {
+		name := extractTagContent(m, "command-name")
+		args := extractTagContent(m, "command-args")
+		var label string
+		switch {
+		case name != "" && args != "":
+			label = name + " " + args
+		case name != "":
+			label = name
+		default:
+			label = extractTagContent(m, "command-message")
+		}
+		label = strings.Join(strings.Fields(label), " ")
+		if label != "" {
+			return label
+		}
+	}
+
+	return strings.Join(strings.Fields(m), " ")
+}
+
+// extractTagContent returns the text between <tag> and </tag> in s, or ""
+// when the tag is missing. Matches the first occurrence only.
+func extractTagContent(s, tag string) string {
+	open := "<" + tag + ">"
+	close := "</" + tag + ">"
+	start := strings.Index(s, open)
+	if start < 0 {
+		return ""
+	}
+	start += len(open)
+	end := strings.Index(s[start:], close)
+	if end < 0 {
+		return ""
+	}
+	return strings.TrimSpace(s[start : start+end])
+}
+
+// sanitizeSessionTitle strips obviously-empty placeholders that still pass
+// a plain emptiness check — namely the titler sentinel prefix and dash-only
+// strings written by older ingestion paths — and returns "" in those cases
+// so pickSessionLabel can fall through to the next source.
+func sanitizeSessionTitle(title, sentinel string) string {
+	t := strings.TrimSpace(title)
+	if t == "" {
+		return ""
+	}
+	if strings.HasPrefix(t, sentinel) {
+		return ""
+	}
+	// Reject titles that are just dashes / underscores — legacy placeholder.
+	if strings.Trim(t, "-_ ") == "" {
+		return ""
+	}
+	return t
+}
+
+// truncateForNodeLabel clips a label to a length that still fits inside
+// graph node circles when rendered by wrapTextInCircle. Soft cut at word
+// boundaries when possible, hard cut otherwise.
+func truncateForNodeLabel(s string) string {
+	const maxLen = 56
+	if len(s) <= maxLen {
+		return s
+	}
+	// Prefer cutting at the last space before maxLen so we don't chop a
+	// word in half. Fall back to a hard cut when there's no whitespace.
+	cut := maxLen
+	if idx := strings.LastIndex(s[:maxLen], " "); idx > 20 {
+		cut = idx
+	}
+	return strings.TrimRight(s[:cut], " ,.;:") + "…"
 }
 
 // loadSessionFeatureEdges derives edges from agent_events — sessions that
