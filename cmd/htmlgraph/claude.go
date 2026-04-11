@@ -92,13 +92,13 @@ func removeMarketplaceHtmlgraph() {
 	for _, scope := range []string{"htmlgraph@htmlgraph", "htmlgraph@local-marketplace"} {
 		if out, err := exec.Command("claude", "plugin", "uninstall", scope).CombinedOutput(); err != nil {
 			msg := strings.ToLower(strings.TrimSpace(string(out)))
-			if !strings.Contains(msg, "not found") && !strings.Contains(msg, "not installed") {
+			if !strings.Contains(msg, "not found") && !strings.Contains(msg, "not installed") && !strings.Contains(msg, "already uninstalled") {
 				fmt.Fprintf(os.Stdout, "warning: plugin uninstall %s: %v (%s)\n", scope, err, strings.TrimSpace(string(out)))
 			}
 		}
 		if out, err := exec.Command("claude", "plugin", "disable", scope).CombinedOutput(); err != nil {
 			msg := strings.ToLower(strings.TrimSpace(string(out)))
-			if !strings.Contains(msg, "not found") && !strings.Contains(msg, "not installed") {
+			if !strings.Contains(msg, "not found") && !strings.Contains(msg, "not installed") && !strings.Contains(msg, "already disabled") {
 				fmt.Fprintf(os.Stdout, "warning: plugin disable %s: %v (%s)\n", scope, err, strings.TrimSpace(string(out)))
 			}
 		}
