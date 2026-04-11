@@ -1899,9 +1899,10 @@ function renderGraph(data) {
 
   // Labels inside track nodes using SVG text + tspan (no foreignObject).
   // Fill is contrast-aware via pickLabelColor so labels stay legible
-  // regardless of which palette token the node resolved to. The
-  // paint-order stroke adds a background-colored halo around each glyph
-  // so edge-case fills (accent at full brightness) never lose readability.
+  // regardless of which palette token the node resolved to. No
+  // paint-order stroke — labels wrap inside the node radius, never
+  // cross onto the background, and a dark halo would visibly thicken
+  // and blur the small font sizes that fit inside sub-20px nodes.
   var trackLabelNodes = nodes.filter(function(d) { return d.type === 'track'; });
   var trackLabelGroup = g.append('g');
   var trackLabels = trackLabelGroup.selectAll('text.track-label')
@@ -1912,11 +1913,7 @@ function renderGraph(data) {
     .attr('dominant-baseline', 'central')
     .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
     .attr('font-weight', 'bold')
-    .attr('pointer-events', 'none')
-    .style('paint-order', 'stroke')
-    .style('stroke', 'var(--bg-primary)')
-    .style('stroke-width', '2px')
-    .style('stroke-linejoin', 'round');
+    .attr('pointer-events', 'none');
 
   trackLabels.each(function(d) {
     wrapTextInCircle(d3.select(this), d.title, nodeRadius(d));
@@ -1936,11 +1933,7 @@ function renderGraph(data) {
     .attr('dominant-baseline', 'central')
     .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
     .attr('font-weight', '600')
-    .attr('pointer-events', 'none')
-    .style('paint-order', 'stroke')
-    .style('stroke', 'var(--bg-primary)')
-    .style('stroke-width', '2px')
-    .style('stroke-linejoin', 'round');
+    .attr('pointer-events', 'none');
 
   hubLabels.each(function(d) {
     wrapTextInCircle(d3.select(this), d.title, nodeRadius(d));
