@@ -9,6 +9,15 @@ import (
 	"time"
 )
 
+// Shared test timing budget. SpawnTimeout is generous enough to absorb
+// fork+exec+shell-startup jitter under full-suite parallel load (happy
+// path still resolves in ~200ms); testCtxTimeout must exceed it with
+// margin so the context isn't the limiting factor.
+const (
+	testSpawnTimeout = 10 * time.Second
+	testCtxTimeout   = 15 * time.Second
+)
+
 // buildFakeChild writes a shell script that ignores its args, prints the
 // handshake line, then sleeps. The script is used as the BinPath for a
 // Supervisor so the handshake/lifecycle/reap logic can be exercised
@@ -56,11 +65,11 @@ func TestGetOrSpawnHandshake(t *testing.T) {
 	bin := buildFakeChild(t, 12345)
 	sup := NewSupervisor(Options{
 		BinPath:      bin,
-		SpawnTimeout: 10 * time.Second,
+		SpawnTimeout: testSpawnTimeout,
 	})
 	defer sup.Shutdown(context.Background())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testCtxTimeout)
 	defer cancel()
 
 	c, err := sup.GetOrSpawn(ctx, "projA", t.TempDir())
@@ -91,11 +100,11 @@ func TestGetOrSpawnConcurrent(t *testing.T) {
 	bin := buildFakeChild(t, 12346)
 	sup := NewSupervisor(Options{
 		BinPath:      bin,
-		SpawnTimeout: 10 * time.Second,
+		SpawnTimeout: testSpawnTimeout,
 	})
 	defer sup.Shutdown(context.Background())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testCtxTimeout)
 	defer cancel()
 
 	// Fire N concurrent GetOrSpawn calls for the same projectID. The
@@ -125,7 +134,7 @@ func TestGetOrSpawnConcurrent(t *testing.T) {
 			} else if c != first {
 				t.Errorf("herd produced different children: %p vs %p", first, c)
 			}
-		case <-time.After(15 * time.Second):
+		case <-time.After(testCtxTimeout):
 			t.Fatal("timeout waiting for spawn results")
 		}
 	}
@@ -141,7 +150,7 @@ func TestInvalidHandshakeFails(t *testing.T) {
 	}
 	sup := NewSupervisor(Options{
 		BinPath:      path,
-		SpawnTimeout: 10 * time.Second,
+		SpawnTimeout: testSpawnTimeout,
 	})
 	defer sup.Shutdown(context.Background())
 
@@ -179,7 +188,7 @@ func TestIdleReaperKillsStaleChild(t *testing.T) {
 	bin := buildFakeChild(t, 12347)
 	sup := NewSupervisor(Options{
 		BinPath:      bin,
-		SpawnTimeout: 10 * time.Second,
+		SpawnTimeout: testSpawnTimeout,
 		IdleTimeout:  100 * time.Millisecond,
 	})
 	defer sup.Shutdown(context.Background())

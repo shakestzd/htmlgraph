@@ -154,9 +154,9 @@ func newTestRegistry(t *testing.T, projectDirs ...string) {
 func mkProxyServer(t *testing.T, idleTimeout time.Duration) (*httptest.Server, *childproc.Supervisor) {
 	t.Helper()
 	sup := childproc.NewSupervisor(childproc.Options{
-		BinPath:      testBinPath,
-		SpawnTimeout: 5 * time.Second,
-		IdleTimeout:  idleTimeout,
+		BinPath:     testBinPath,
+		IdleTimeout: idleTimeout,
+		// SpawnTimeout unset — falls back to childproc.DefaultSpawnTimeout.
 	})
 	mux := buildParentMux(sup)
 	srv := httptest.NewServer(mux)
