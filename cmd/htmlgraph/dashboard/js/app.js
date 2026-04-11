@@ -1253,6 +1253,20 @@ setInterval(function() {
   if (!isDoorwayLanding()) fetchStats();
 }, 30000);
 
+// Auto-refresh the sessions list while it is the active view so an
+// in-progress session's message count and LIVE badge stay current
+// without manual reloads (bug-af5d048b). Cadence is 15s — half the
+// stats interval, fast enough to feel live but well above the
+// autoIngest sweep window so we don't waste cycles between sweeps.
+// Gated on currentView so we only fetch when the user is looking,
+// avoiding background work for the activity/work/graph/plans views.
+var SESSIONS_REFRESH_MS = 15000;
+setInterval(function() {
+  if (currentView === 'sessions' && !isDoorwayLanding()) {
+    fetchSessions();
+  }
+}, SESSIONS_REFRESH_MS);
+
 /* ── Plan detail panel ────────────────────────────────────── */
 
 // navigateToPlan switches to the plans view and opens the given plan.
