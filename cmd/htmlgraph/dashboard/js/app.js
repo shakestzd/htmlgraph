@@ -1269,6 +1269,27 @@ setInterval(function() {
 
 /* ── Plan detail panel ────────────────────────────────────── */
 
+// navigateToWorkDetail switches the dashboard to the Work view and opens
+// the given work item's detail panel. Called from cross-view badge
+// clicks (transcript stats, session list) so the behaviour matches
+// clicking a work-item node in the graph view. Without this helper,
+// callers would have to duplicate the nav-btn / .view class toggling
+// and still end up with the detail panel rendered inside a hidden tab
+// (roborev finding on job 886).
+function navigateToWorkDetail(id) {
+  if (!id) return;
+  currentView = 'work';
+  document.querySelectorAll('.nav-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.view === 'work');
+  });
+  document.querySelectorAll('.view').forEach(function(v) {
+    v.classList.toggle('active', v.id === 'v-work');
+  });
+  if (typeof openWorkDetail === 'function') {
+    openWorkDetail(id);
+  }
+}
+
 // navigateToPlan switches to the plans view and opens the given plan.
 // Called from cross-view badge clicks (e.g. session list, transcript view).
 function navigateToPlan(planId, title) {
@@ -1752,8 +1773,21 @@ function renderGraph(data) {
 
   node.on('mouseover', function(e, d) {
     var rect = container.getBoundingClientRect();
+    // Tooltip content is built with DOM text nodes instead of .html(...)
+    // because d.title can originate from a user prompt (session nodes
+    // now use sessions.title or the first user message as their label)
+    // and passing that through innerHTML would let a crafted prompt
+    // inject <script> into the dashboard (roborev finding on job 886).
+    var tipEl = tooltip.node();
+    tipEl.textContent = '';
+    var titleEl = document.createElement('strong');
+    titleEl.textContent = d.title || '';
+    tipEl.appendChild(titleEl);
+    tipEl.appendChild(document.createElement('br'));
+    var meta = (d.type || '') + ' · ' + (d.status || '') +
+               ' · ' + (d.edges || 0) + ' edge' + (d.edges !== 1 ? 's' : '');
+    tipEl.appendChild(document.createTextNode(meta));
     tooltip.style('opacity', 1)
-      .html('<strong>' + d.title + '</strong><br>' + d.type + ' &middot; ' + d.status + ' &middot; ' + (d.edges || 0) + ' edge' + (d.edges !== 1 ? 's' : ''))
       .style('left', (e.clientX - rect.left + 12) + 'px')
       .style('top', (e.clientY - rect.top - 10) + 'px');
     // Highlight connected nodes.
@@ -1800,15 +1834,10 @@ function renderGraph(data) {
       }
       return;
     }
-    // Tracks/features/bugs/spikes open in the work detail panel.
-    currentView = 'work';
-    document.querySelectorAll('.nav-btn').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.view === 'work');
-    });
-    document.querySelectorAll('.view').forEach(function(v) {
-      v.classList.toggle('active', v.id === 'v-work');
-    });
-    openWorkDetail(d.id);
+    // Tracks/features/bugs/spikes open in the work detail panel via
+    // the shared navigateToWorkDetail helper (same path used by the
+    // transcript stats work-item badges).
+    navigateToWorkDetail(d.id);
   });
 
   // Wrap text inside a circle using real SVG measurement via getComputedTextLength.
