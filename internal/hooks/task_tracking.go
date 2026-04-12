@@ -30,11 +30,14 @@ func selfBinary() string {
 // addTaskStep shells out to the htmlgraph CLI to add a step to the active
 // feature. This avoids importing the workitem package (architectural constraint:
 // hooks must not import workitem to prevent spike creation policy violations).
-func addTaskStep(database *sql.DB, sessionID, featureID, taskID, subject string) {
+func addTaskStep(database *sql.DB, sessionID, featureID, taskID, subject, teammateName string) {
 	if subject == "" {
 		subject = "Task " + taskID
 	}
 	stepDesc := subject + " [task:" + taskID + "]"
+	if teammateName != "" {
+		stepDesc = "[" + teammateName + "] " + stepDesc
+	}
 	typeName := inferTypeName(featureID)
 
 	// htmlgraph <type> add-step <id> "<description>"
@@ -45,7 +48,7 @@ func addTaskStep(database *sql.DB, sessionID, featureID, taskID, subject string)
 // completeTaskStep marks a step as done by updating the step counters in SQLite.
 // Full HTML step completion requires the workitem package, so we only update the
 // database counters here. The HTML will be reconciled on next reindex.
-func completeTaskStep(database *sql.DB, sessionID, featureID, taskID string) {
+func completeTaskStep(database *sql.DB, sessionID, featureID, taskID, teammateName string) {
 	if database == nil {
 		return
 	}
