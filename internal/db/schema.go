@@ -96,6 +96,11 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("migrate agent_events check constraint: %w", err)
 	}
 
+	// Agent Teams: teammate identity on events.
+	// Must run AFTER copy-and-swap migration to avoid column loss.
+	db.Exec(`ALTER TABLE agent_events ADD COLUMN teammate_name TEXT`)
+	db.Exec(`ALTER TABLE agent_events ADD COLUMN team_name TEXT`)
+
 	return db, nil
 }
 
@@ -110,7 +115,7 @@ func CreateAllTables(db *sql.DB) error {
 			event_type TEXT NOT NULL CHECK(
 				event_type IN ('tool_call','tool_result','error','delegation',
 				               'completion','start','end','check_point','task_delegation',
-				               'teammate_idle','task_completed',
+				               'teammate_idle','task_created','task_completed',
 				               'claim.proposed','claim.claimed','claim.heartbeat','claim.blocked',
 				               'claim.completed','claim.abandoned','claim.expired','claim.handoff')
 			),
@@ -480,7 +485,7 @@ const agentEventsCheckConstraintDDL = `CREATE TABLE agent_events (
 			event_type TEXT NOT NULL CHECK(
 				event_type IN ('tool_call','tool_result','error','delegation',
 				               'completion','start','end','check_point','task_delegation',
-				               'teammate_idle','task_completed',
+				               'teammate_idle','task_created','task_completed',
 				               'claim.proposed','claim.claimed','claim.heartbeat','claim.blocked',
 				               'claim.completed','claim.abandoned','claim.expired','claim.handoff')
 			),

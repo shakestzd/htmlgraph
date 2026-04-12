@@ -139,6 +139,7 @@ const (
 	EventCheckPoint     EventType = "check_point"
 	EventTaskDelegation EventType = "task_delegation"
 	EventTeammateIdle   EventType = "teammate_idle"
+	EventTaskCreated    EventType = "task_created"
 	EventTaskCompleted  EventType = "task_completed"
 )
 

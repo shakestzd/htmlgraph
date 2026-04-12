@@ -83,7 +83,14 @@ func PostCompact(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 // TeammateIdle handles the TeammateIdle Claude Code hook event.
 // Records a teammate_idle event when a teammate agent goes idle.
 func TeammateIdle(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	return recordSimpleEvent(models.EventTeammateIdle, "TeammateIdle", "Teammate agent went idle", "recorded", event, database)
+	summary := "Teammate agent went idle"
+	if event.TeammateName != "" {
+		summary = fmt.Sprintf("Teammate %s went idle", event.TeammateName)
+	}
+	if event.IdleReason != "" {
+		summary += fmt.Sprintf(" (reason: %s)", event.IdleReason)
+	}
+	return recordSimpleEvent(models.EventTeammateIdle, "TeammateIdle", summary, "recorded", event, database)
 }
 
 // TaskCreated handles the TaskCreated Claude Code hook event.
@@ -97,8 +104,14 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	featureID := cachedGetActiveFeatureID(database, sessionID)
-	subject, _ := event.TaskData["subject"].(string)
-	description, _ := event.TaskData["description"].(string)
+	subject := event.TaskSubject
+	if subject == "" {
+		subject, _ = event.TaskData["subject"].(string)
+	}
+	description := event.TaskDescription
+	if description == "" {
+		description, _ = event.TaskData["description"].(string)
+	}
 	taskID := event.TaskID
 
 	summary := "Task created"
@@ -112,7 +125,7 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	ev := &models.AgentEvent{
 		EventID:      uuid.New().String(),
 		AgentID:      resolveEventAgentID(event),
-		EventType:    models.EventCheckPoint,
+		EventType:    models.EventTaskCreated,
 		Timestamp:    now,
 		ToolName:     "TaskCreate",
 		InputSummary: summary,
@@ -152,7 +165,10 @@ func TaskCompleted(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	featureID := cachedGetActiveFeatureID(database, sessionID)
 	taskID := event.TaskID
-	subject, _ := event.TaskData["subject"].(string)
+	subject := event.TaskSubject
+	if subject == "" {
+		subject, _ = event.TaskData["subject"].(string)
+	}
 
 	summary := "Task completed"
 	if subject != "" {

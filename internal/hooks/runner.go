@@ -58,6 +58,13 @@ type CloudEvent struct {
 	// TaskCreated / TaskCompleted
 	TaskID   string         `json:"task_id"`
 	TaskData map[string]any `json:"task"`
+
+	// Agent Teams — teammate metadata (experimental, gracefully empty when not in a team)
+	TeammateName    string `json:"teammate_name"`
+	TeamName        string `json:"team_name"`
+	IdleReason      string `json:"idle_reason"`
+	TaskSubject     string `json:"task_subject"`
+	TaskDescription string `json:"task_description"`
 }
 
 // HookResult is the JSON written to stdout to control Claude Code behaviour.
