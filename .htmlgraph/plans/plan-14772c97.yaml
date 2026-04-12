@@ -5,9 +5,9 @@ meta:
     description: |
         Wire HtmlGraph to Claude Code's experimental agent-teams feature. The hook declarations and Go handlers already exist, but they drop teammate metadata on the floor, the orchestrator skill has zero guidance on when to use teams, and there is no quality-gate teeth on the team lifecycle hooks. This plan closes those concrete gaps without speculative scope.
     created_at: "2026-04-11"
-    status: draft
+    status: finalized
     created_by: claude-opus-4-6
-    version: 4
+    version: 5
 design:
     problem: |
         Claude Code v2.1.32+ ships an experimental agent-teams feature (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1) where independent Claude instances self-claim work from a shared task list and message each other directly. The HtmlGraph plugin has already declared TeammateIdle, TaskCreated, and TaskCompleted hooks in plugin/hooks/hooks.json and wired Go handlers in internal/hooks/missing_events.go — but those handlers silently discard the teammate_name, team_name, idle_reason, task_subject, and task_description fields that Claude Code emits in the JSON payload, because the CloudEvent struct in internal/hooks/runner.go (lines 21-61) has no place to put them. As a result: multiple teammates working on one feature look identical in the HtmlGraph step log, the TaskCreated handler records using EventCheckPoint as a fallback (because internal/models/enums.go has no EventTaskCreated constant), and the 871-line orchestrator-directives skill never tells the lead agent that agent teams exist as a delegation option. The hooks observe but cannot enforce — exit-code-2 blocking is documented and supported by Claude Code, but no handler uses it. Notably, internal/hooks/yolo_guard.go already implements the exact blocking pattern we need (detect project, run gate, exit 2 on failure) but only fires for a different event.
@@ -59,7 +59,7 @@ slices:
         Unit: TestTeammateIdle_RecordsTeammateName — fake event with teammate_name="implementer" → assert recorded event details contain "implementer" and idle_reason.
         Unit: TestSchema_TeammateColumnsIdempotent — run migration twice on the same DB → second run is a no-op, columns exist.
         Regression: existing missing_events_test.go tests (the file exists per git status) still pass with TaskData fallback path preserved.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-aatm0002
       num: 2
@@ -84,7 +84,7 @@ slices:
         Unit: TestTaskCreated_UsesCorrectEventType — call handler with sample event, query DB, assert event_type='task_created'.
         Unit: TestEventCheckPoint_StillUsedByLegitimateCallers — assert grep for EventCheckPoint still finds 7 callers (regression guard against accidental cleanup).
         Regression: any existing test filtering on EventCheckPoint for non-task events still passes.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-aatm0003
       num: 3
@@ -112,7 +112,7 @@ slices:
         Unit: TestAddTaskStep_WithTeammate — call with teammateName="reviewer" → assert shell-out received `[reviewer] <subject>`.
         Unit: TestAddTaskStep_NoTeammate — call with empty teammateName → assert legacy format preserved.
         Integration: end-to-end TaskCreated event with teammate_name="implementer" populates a feat- step text with the prefix; snapshot output contains it.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-aatm0004
       num: 4
@@ -146,7 +146,7 @@ slices:
         Unit: TestTaskCompleted_FlagOn_BlocksOnFailure — config flag true + failing gate, asserts exit code 2 and stderr contains gate name + recovery command.
         Unit: TestTaskCompleted_FlagOn_PassesOnSuccess — config flag true + passing gate, asserts exit 0 and step recorded.
         Regression: existing missing_events_test.go for TaskCompleted continues to pass when no config file exists.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-aatm0005
       num: 5
@@ -172,7 +172,7 @@ slices:
         Unit: none (documentation).
         Integration: manual smoke — invoke /htmlgraph:orchestrator-directives-skill, verify the new section renders.
         Regression: existing 871 lines untouched; only an append.
-      approved: false
+      approved: true
       comment: ""
     - id: feat-aatm0006
       num: 6
@@ -198,7 +198,7 @@ slices:
       tests: |
         Unit: none (documentation).
         Manual: render markdown in dashboard / GitHub preview, verify links resolve.
-      approved: false
+      approved: true
       comment: ""
 questions:
     - id: q-env-flag-default
