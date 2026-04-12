@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "date -u '+Current time (UTC): %Y-%m-%dT%H:%M:%SZ'",
+            "command": "date '+Current time: %Y-%m-%dT%H:%M:%S%z (%Z)'",
             "timeout": 2
           }
         ]

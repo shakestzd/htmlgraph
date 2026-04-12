@@ -1,5 +1,8 @@
 {
   "name": "htmlgraph-dev",
+  "containerEnv": {
+    "TZ": "America/New_York"
+  },
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
