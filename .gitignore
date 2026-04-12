@@ -136,3 +136,5 @@ plugin/hooks/bin/htmlgraph
 # Notebook files copied at build time from prototypes/ (do not commit)
 internal/notebook/files/
 dist/
+_build/tailwind-*
+chrome/*.zip
