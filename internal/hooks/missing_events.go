@@ -199,20 +199,23 @@ func TaskCompleted(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		debugLog(projectDir, "[error] handler=TaskCompleted session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 
-	// Opt-in quality gate: run build/test before allowing task completion.
-	projectDir := ResolveProjectDir(event.CWD, event.SessionID)
-	blockOnFailure := readTaskCompletionConfig(projectDir)
-	gate := runTaskCompletionGate(projectDir)
-	if !gate.Passed {
-		// Record the failure as an event regardless of blocking mode.
-		recordSimpleEvent(models.EventCheckPoint, "TaskCompletionGate",
-			fmt.Sprintf("Quality gate failed: %s", gate.GateName), "failed", event, database)
+	// quality gate only runs when a feature is actively claimed
+	if featureID != "" {
+		// Opt-in quality gate: run build/test before allowing task completion.
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
+		blockOnFailure := readTaskCompletionConfig(projectDir)
+		gate := runTaskCompletionGate(projectDir)
+		if !gate.Passed {
+			// Record the failure as an event regardless of blocking mode.
+			recordSimpleEvent(models.EventQualityGate, "TaskCompletionGate",
+				fmt.Sprintf("Quality gate failed: %s", gate.GateName), "failed", event, database)
 
-		if blockOnFailure {
-			msg := fmt.Sprintf("Quality gate %q failed. "+
-				"To complete this task manually after fixing: htmlgraph feature complete %s",
-				gate.GateName, featureID)
-			return nil, &BlockExit2Error{Message: msg}
+			if blockOnFailure {
+				msg := fmt.Sprintf("Quality gate %q failed. "+
+					"To complete this task manually after fixing: htmlgraph feature complete %s",
+					gate.GateName, featureID)
+				return nil, &BlockExit2Error{Message: msg}
+			}
 		}
 	}
 

@@ -88,6 +88,19 @@ func TestTaskCompleted_FlagOff_NeverBlocks(t *testing.T) {
 func TestTaskCompleted_FlagOn_BlocksOnFailure(t *testing.T) {
 	td, sessionID := setupMissingEventsDB(t)
 
+	// Insert a feature and set it as the active feature for the session so the
+	// quality gate guard (featureID != "") is satisfied.
+	td.addTrack("trk-gate-test", "Gate test track")
+	td.addFeature("feat-gate-test", "feature", "Gate test feature", "in-progress")
+	if _, err := td.DB.Exec(
+		`UPDATE sessions SET active_feature_id = ? WHERE session_id = ?`,
+		"feat-gate-test", sessionID,
+	); err != nil {
+		t.Fatalf("set active_feature_id: %v", err)
+	}
+	// Reset the package-level cache so the updated active_feature_id is read.
+	featureIDCache = featureIDCacheEntry{}
+
 	// Create project dir with go.mod AND config with blocking enabled.
 	projectDir := t.TempDir()
 	cfgDir := filepath.Join(projectDir, ".htmlgraph")
@@ -119,4 +132,6 @@ func TestTaskCompleted_FlagOn_BlocksOnFailure(t *testing.T) {
 	if result != nil {
 		t.Errorf("expected nil result when blocking, got %+v", result)
 	}
+	// Reset cache so subsequent tests are not affected.
+	featureIDCache = featureIDCacheEntry{}
 }

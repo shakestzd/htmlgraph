@@ -578,6 +578,42 @@ func TestTaskCreated_FallsBackToTaskData(t *testing.T) {
 
 // --- TaskCreated (EventTaskCreated constant) ---
 
+// TestTaskCompleted_EmptyFeatureID_SkipsQualityGate verifies that when no
+// feature is actively claimed (featureID == ""), the quality gate block is
+// skipped entirely — no quality_gate event is recorded and no BlockExit2Error
+// is returned.
+func TestTaskCompleted_EmptyFeatureID_SkipsQualityGate(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+	// No active_work_items row inserted → cachedGetActiveFeatureID returns "".
+
+	event := &CloudEvent{
+		SessionID: sessionID,
+		CWD:       t.TempDir(),
+		TaskID:    "task-nofeature",
+		TaskData:  map[string]any{"subject": "No feature task"},
+	}
+
+	result, err := TaskCompleted(event, td.DB)
+	if err != nil {
+		t.Fatalf("TaskCompleted returned unexpected error: %v", err)
+	}
+	if result == nil || !result.Continue {
+		t.Error("expected Continue=true when featureID is empty")
+	}
+
+	// No quality_gate event should be recorded.
+	var count int
+	if err := td.DB.QueryRow(
+		`SELECT COUNT(*) FROM agent_events WHERE session_id = ? AND event_type = 'quality_gate'`,
+		sessionID,
+	).Scan(&count); err != nil {
+		t.Fatalf("query agent_events: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 quality_gate events when featureID is empty, got %d", count)
+	}
+}
+
 // TestTaskCreated_UsesEventTaskCreated verifies that TaskCreated records with
 // event_type='task_created' instead of 'check_point'.
 func TestTaskCreated_UsesEventTaskCreated(t *testing.T) {

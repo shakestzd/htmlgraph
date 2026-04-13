@@ -908,7 +908,7 @@ Claude Code will create teammates, assign them work from a shared task list, and
 ### Caveats
 
 - **`skills:` and `mcpServers:` frontmatter are NOT applied to teammates** — do not rely on skill injection or MCP servers in agent definitions used as teammates. Teammates run with base capabilities only.
-- **No session resume** — if a teammate is blocked (e.g., by an exit-code-2 quality gate), the user cannot `/resume` it. The teammate is stranded. Always provide manual recovery instructions in stderr.
+- **No session resume** — teammates exit via the `exit-code-2` block-and-return contract; Claude Code's `/resume` is not currently wired through this path. If a teammate is blocked (e.g., by a quality gate), the teammate is stranded. Always provide manual recovery instructions in stderr.
 - **One team per session** — you cannot spawn multiple teams in a single Claude Code session.
 - **No nested teams** — a teammate cannot create its own team.
 - **`/htmlgraph:execute` is unchanged** — the parallel dispatch skill continues to use subagents with worktree isolation. This plan does not convert it to use teams.
