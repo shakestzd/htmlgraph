@@ -99,6 +99,7 @@ func main() {
 	rootCmd.AddCommand(traceCmd())
 	rootCmd.AddCommand(graphCmd())
 	rootCmd.AddCommand(queryCmd())
+	rootCmd.AddCommand(upgradeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -128,7 +129,7 @@ func versionCmd() *cobra.Command {
 func persistentPreRunE(cmd *cobra.Command, _ []string) error {
 	// Skip commands that must work without .htmlgraph/.
 	switch cmd.Name() {
-	case "version", "help", "init", "build", "install-hooks", "setup", "setup-cli", "projects":
+	case "version", "help", "init", "build", "install-hooks", "setup", "setup-cli", "projects", "upgrade", "update":
 		return nil
 	}
 	// Skip hook subtree — hooks manage their own session lifecycle.

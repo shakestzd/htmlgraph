@@ -108,7 +108,7 @@ Commands for data import, export, and index maintenance.
 
 ## Development & Operations
 
-Commands for autonomous development, building, serving, and agent configuration.
+Commands for autonomous development, building, serving, agent configuration, and maintenance.
 
 | Command | Usage | Description |
 |---------|-------|-------------|
@@ -117,6 +117,7 @@ Commands for autonomous development, building, serving, and agent configuration.
 | `serve` | `htmlgraph serve` | Start local dashboard server at `localhost:4000` |
 | `agent-init` | `htmlgraph agent-init` | Output shared agent context (safety, attribution, quality gates) |
 | `statusline` | `htmlgraph statusline` | OMP/Starship prompt integration |
+| `upgrade` / `update` | `htmlgraph upgrade [--check] [--version 0.54.9]` | Self-update CLI from GitHub releases |
 
 ---
 

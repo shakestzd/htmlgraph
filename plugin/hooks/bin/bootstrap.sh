@@ -44,7 +44,26 @@ resolve_version() {
     fi
 
     if [ ! -f "${plugin_json}" ]; then
-        echo ""
+        # Third fallback: explicit env var (for CI / pinning).
+        if [ -n "${HTMLGRAPH_VERSION:-}" ]; then
+            echo "${HTMLGRAPH_VERSION}"
+            return
+        fi
+
+        # Fourth fallback: query GitHub releases API for the latest tag.
+        # Wrapped in a 5-second timeout; silently ignored if unavailable.
+        _api_url="https://api.github.com/repos/shakestzd/htmlgraph/releases/latest"
+        _tag=""
+        if command -v curl >/dev/null 2>&1; then
+            _tag="$(curl -fsSL --max-time 5 "${_api_url}" 2>/dev/null \
+                | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' \
+                | head -1 || true)"
+        elif command -v wget >/dev/null 2>&1; then
+            _tag="$(wget -q -T 5 -O - "${_api_url}" 2>/dev/null \
+                | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' \
+                | head -1 || true)"
+        fi
+        echo "${_tag:-}"
         return
     fi
 

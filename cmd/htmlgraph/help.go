@@ -33,6 +33,7 @@ const compactCLIRef = `htmlgraph CLI commands:
   backfill [feature-files|tool-calls-feature] — Rebuild derived tables
   reindex — Sync HTML work items to SQLite index
   yolo --feature <id> [--track <id>] — Autonomous dev mode
+  upgrade [--check] [--version X.Y.Z] — Self-update CLI from GitHub releases (alias: update)
   build — Build Go binary (dev workflow)
   serve — Start local dashboard server
   agent-init — Output shared agent context (safety, attribution, quality gates)

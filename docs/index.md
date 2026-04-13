@@ -168,6 +168,14 @@ git clone https://github.com/shakestzd/htmlgraph.git
 cd htmlgraph && go build -o htmlgraph ./cmd/htmlgraph/
 ```
 
+### Upgrading
+
+```bash
+htmlgraph upgrade            # latest release
+htmlgraph upgrade --check    # check without installing
+htmlgraph update             # alias for upgrade
+```
+
 </section>
 
 <!-- ======================================== -->

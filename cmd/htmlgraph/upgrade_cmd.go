@@ -1,0 +1,294 @@
+package main
+
+import (
+	"archive/tar"
+	"compress/gzip"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+)
+
+const (
+	githubReleaseAPI = "https://api.github.com/repos/shakestzd/htmlgraph/releases/latest"
+	downloadBaseURL  = "https://github.com/shakestzd/htmlgraph/releases/download"
+)
+
+func upgradeCmd() *cobra.Command {
+	var checkOnly bool
+	var pinVersion string
+
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Aliases: []string{"update"},
+		Short:   "Upgrade htmlgraph to the latest (or specified) version",
+		Long:    "Download and install the latest htmlgraph release from GitHub. Use --check to preview without installing.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runUpgrade(cmd.OutOrStdout(), checkOnly, pinVersion)
+		},
+	}
+	cmd.Flags().BoolVar(&checkOnly, "check", false, "Show current vs latest version without installing")
+	cmd.Flags().StringVar(&pinVersion, "version", "", "Install a specific version (e.g. 0.54.9)")
+	return cmd
+}
+
+func runUpgrade(out io.Writer, checkOnly bool, pinVersion string) error {
+	currentVer := strings.TrimPrefix(version, "v")
+
+	// Determine target version.
+	targetVer, err := resolveTargetVersion(pinVersion)
+	if err != nil {
+		return fmt.Errorf("resolving target version: %w", err)
+	}
+
+	if checkOnly {
+		fmt.Fprintf(out, "current: %s\n", currentVer)
+		fmt.Fprintf(out, "latest:  %s\n", targetVer)
+		if targetVer == currentVer {
+			fmt.Fprintln(out, "status:  up to date")
+		} else {
+			fmt.Fprintln(out, "status:  update available")
+		}
+		return nil
+	}
+
+	// Determine platform.
+	goos, goarch := runtime.GOOS, runtime.GOARCH
+	platformOS, platformArch, err := mapPlatform(goos, goarch)
+	if err != nil {
+		return err
+	}
+
+	archive := fmt.Sprintf("htmlgraph-%s-%s.tar.gz", platformOS, platformArch)
+	url := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, targetVer, archive)
+
+	fmt.Fprintf(out, "Downloading htmlgraph v%s for %s/%s...\n", targetVer, platformOS, platformArch)
+
+	// Download to temp dir.
+	tmpDir, err := os.MkdirTemp("", "htmlgraph-upgrade-*")
+	if err != nil {
+		return fmt.Errorf("creating temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tarballPath := filepath.Join(tmpDir, "htmlgraph.tar.gz")
+	if err := downloadFile(url, tarballPath); err != nil {
+		return fmt.Errorf("downloading release: %w", err)
+	}
+
+	// Extract binary from tarball.
+	binaryName := fmt.Sprintf("htmlgraph-%s-%s", platformOS, platformArch)
+	extractedPath := filepath.Join(tmpDir, binaryName)
+	if err := extractBinary(tarballPath, binaryName, extractedPath); err != nil {
+		// Try plain "htmlgraph" as fallback name.
+		extractedPath = filepath.Join(tmpDir, "htmlgraph")
+		if err2 := extractBinary(tarballPath, "htmlgraph", extractedPath); err2 != nil {
+			return fmt.Errorf("extracting binary: %w (also tried 'htmlgraph': %v)", err, err2)
+		}
+	}
+
+	// Determine install destination.
+	currentBin, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving current binary path: %w", err)
+	}
+	currentBin, err = filepath.EvalSymlinks(currentBin)
+	if err != nil {
+		return fmt.Errorf("resolving symlinks for current binary: %w", err)
+	}
+
+	// Check if destination is writable.
+	installDir := filepath.Dir(currentBin)
+	if err := checkWritable(installDir); err != nil {
+		return fmt.Errorf("install directory %s is not writable: %w\nTry: sudo htmlgraph upgrade, or reinstall to ~/.local/bin", installDir, err)
+	}
+
+	fmt.Fprintf(out, "Installing to %s...\n", currentBin)
+
+	// Atomic replace: try os.Rename; fall back to copy on cross-device.
+	if err := atomicReplace(extractedPath, currentBin); err != nil {
+		return fmt.Errorf("replacing binary: %w", err)
+	}
+
+	// Update ~/.local/share/htmlgraph/.binary-version so bootstrap fast-path works.
+	updateVersionFile(targetVer)
+
+	// Self-test: run the newly installed binary's version subcommand.
+	fmt.Fprintln(out, "Verifying installed binary...")
+	if err := verifySelfVersion(currentBin, targetVer); err != nil {
+		fmt.Fprintf(out, "warning: version verification failed: %v\n", err)
+		fmt.Fprintln(out, "The binary was installed but may not report the expected version.")
+	} else {
+		fmt.Fprintf(out, "htmlgraph v%s installed successfully.\n", targetVer)
+	}
+	return nil
+}
+
+// resolveTargetVersion returns the pinned version if provided, otherwise
+// fetches the latest tag from the GitHub releases API.
+func resolveTargetVersion(pinVersion string) (string, error) {
+	if pinVersion != "" {
+		return strings.TrimPrefix(pinVersion, "v"), nil
+	}
+	return fetchUpgradeVersion()
+}
+
+// fetchUpgradeVersion queries the GitHub releases API and returns the latest tag.
+func fetchUpgradeVersion() (string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(githubReleaseAPI)
+	if err != nil {
+		return "", fmt.Errorf("querying GitHub API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("parsing GitHub API response: %w", err)
+	}
+	if payload.TagName == "" {
+		return "", fmt.Errorf("GitHub API returned empty tag_name")
+	}
+	return strings.TrimPrefix(payload.TagName, "v"), nil
+}
+
+// mapPlatform converts GOOS/GOARCH to the archive naming used by goreleaser.
+func mapPlatform(goos, goarch string) (string, string, error) {
+	var os, arch string
+	switch goos {
+	case "darwin":
+		os = "darwin"
+	case "linux":
+		os = "linux"
+	default:
+		return "", "", fmt.Errorf("unsupported OS: %s", goos)
+	}
+	switch goarch {
+	case "amd64":
+		arch = "amd64"
+	case "arm64":
+		arch = "arm64"
+	default:
+		return "", "", fmt.Errorf("unsupported architecture: %s", goarch)
+	}
+	return os, arch, nil
+}
+
+// downloadFile fetches url and writes it to dest.
+func downloadFile(url, dest string) error {
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+	}
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+// extractBinary extracts a single named file from a .tar.gz archive.
+func extractBinary(tarball, binaryName, dest string) error {
+	f, err := os.Open(tarball)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("reading gzip: %w", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("reading tar: %w", err)
+		}
+		if filepath.Base(hdr.Name) == binaryName {
+			out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+			if err != nil {
+				return err
+			}
+			if _, err = io.Copy(out, tr); err != nil {
+				out.Close()
+				return err
+			}
+			return out.Close()
+		}
+	}
+	return fmt.Errorf("binary %q not found in archive", binaryName)
+}
+
+// atomicReplace replaces dest with src. Tries os.Rename first (atomic on same
+// filesystem), falls back to copy + chmod + remove on cross-device.
+func atomicReplace(src, dest string) error {
+	if err := os.Rename(src, dest); err == nil {
+		return nil
+	}
+	// Cross-device fallback.
+	if err := copyBinary(src, dest); err != nil {
+		return err
+	}
+	return os.Remove(src)
+}
+
+// checkWritable verifies the directory is writable by attempting to create a
+// temp file inside it.
+func checkWritable(dir string) error {
+	tmp, err := os.CreateTemp(dir, ".htmlgraph-write-test-*")
+	if err != nil {
+		return err
+	}
+	tmp.Close()
+	return os.Remove(tmp.Name())
+}
+
+// updateVersionFile writes the installed version to ~/.local/share/htmlgraph/.binary-version.
+func updateVersionFile(ver string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	versionFile := filepath.Join(home, ".local", "share", "htmlgraph", ".binary-version")
+	_ = os.MkdirAll(filepath.Dir(versionFile), 0o755)
+	_ = os.WriteFile(versionFile, []byte(ver), 0o644)
+}
+
+// verifySelfVersion runs `<binary> version` and checks the output contains targetVer.
+func verifySelfVersion(binary, targetVer string) error {
+	out, err := exec.Command(binary, "version").Output()
+	if err != nil {
+		return fmt.Errorf("running version command: %w", err)
+	}
+	if !strings.Contains(string(out), targetVer) {
+		return fmt.Errorf("expected version %s in output, got: %s", targetVer, strings.TrimSpace(string(out)))
+	}
+	return nil
+}

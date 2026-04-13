@@ -33,6 +33,14 @@ cd htmlgraph && go build -o htmlgraph ./cmd/htmlgraph/
 
 For subsequent rebuilds after the binary is on your PATH, use `htmlgraph build` instead.
 
+### Upgrading
+
+```bash
+htmlgraph upgrade            # latest release
+htmlgraph upgrade --check    # check without installing
+htmlgraph update             # alias for upgrade
+```
+
 ## Quick Start
 
 ```bash

@@ -85,6 +85,7 @@ Use `/htmlgraph:orchestrator-directives-skill` for delegation patterns and model
 | Deploy | `./scripts/deploy-all.sh VERSION --no-confirm` |
 | Dashboard | `htmlgraph serve` |
 | Status | `htmlgraph status` |
+| Self-update | `htmlgraph upgrade` |
 
 ---
 
