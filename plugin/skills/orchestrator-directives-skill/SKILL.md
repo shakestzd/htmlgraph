@@ -869,3 +869,86 @@ Only execute: Task(), AskUserQuestion(), TodoWrite(), SDK operations
 **Everything else → Delegate to appropriate spawner**
 
 **When in doubt → DELEGATE**
+
+---
+
+## Agent Teams vs Subagents
+
+Claude Code v2.1.32+ ships an experimental **agent teams** feature where independent Claude instances self-claim work from a shared task list and message each other directly. This section helps you decide when to use teams vs traditional subagent delegation.
+
+### Decision Criteria
+
+| Dimension | Agent Teams | Subagents |
+|-----------|-------------|-----------|
+| **Ownership** | Parallel — each teammate claims tasks independently | Sequential — orchestrator dispatches one-at-a-time |
+| **Communication** | Teammates message each other directly | Subagents report back to orchestrator only |
+| **Best for** | Competing-hypothesis debugging, multi-lens review, feature ownership splitting | Sequential task chains, research→implement, isolated single-task work |
+| **HtmlGraph tracking** | Automatic — TeammateIdle/TaskCreated/TaskCompleted hooks fire per teammate | Manual — orchestrator attributes via `htmlgraph feature start/complete` |
+| **Context isolation** | Each teammate has its own context window | Subagents inherit orchestrator's context model |
+| **Cost model** | N teammates × full session cost | Orchestrator + N smaller subagent calls |
+
+### Opt-In Requirements
+
+Agent teams require explicit opt-in:
+
+1. **Environment variable:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+2. **Minimum version:** Claude Code **2.1.32** or later
+3. The HtmlGraph plugin works with or without teams enabled — hooks gracefully no-op when no team is active
+
+### How to Spawn a Team
+
+There is no SDK API for teams. Spawn via natural language:
+
+```
+Create an agent team to <describe the work and how to divide it>
+```
+
+Claude Code will create teammates, assign them work from a shared task list, and let them coordinate directly.
+
+### Caveats
+
+- **`skills:` and `mcpServers:` frontmatter are NOT applied to teammates** — do not rely on skill injection or MCP servers in agent definitions used as teammates. Teammates run with base capabilities only.
+- **No session resume** — teammates exit via the `exit-code-2` block-and-return contract; Claude Code's `/resume` is not currently wired through this path. If a teammate is blocked (e.g., by a quality gate), the teammate is stranded. Always provide manual recovery instructions in stderr.
+- **One team per session** — you cannot spawn multiple teams in a single Claude Code session.
+- **No nested teams** — a teammate cannot create its own team.
+- **`/htmlgraph:execute` is unchanged** — the parallel dispatch skill continues to use subagents with worktree isolation. This plan does not convert it to use teams.
+
+### Example Prompts
+
+**1. Multi-lens PR review:**
+```
+Create an agent team: one teammate reviews for correctness,
+one for performance, one for security. Each writes findings
+to a shared review.md under their section heading.
+```
+
+**2. Competing-hypothesis debugging:**
+```
+Create an agent team to debug the flaky test in internal/hooks/.
+One teammate investigates timing issues, one investigates state
+pollution, one investigates resource contention. First to find
+root cause messages the others.
+```
+
+**3. Feature ownership splitting:**
+```
+Create an agent team for track trk-XXXX. Each teammate claims
+one unblocked feature and works it to completion. Use
+htmlgraph feature start/complete for attribution.
+```
+
+### What HtmlGraph Captures
+
+When agent teams are active, HtmlGraph automatically records:
+
+- **Teammate identity** — every TeammateIdle, TaskCreated, and TaskCompleted event includes `teammate_name` and `team_name`
+- **Step attribution** — feature steps are prefixed with `[teammate-name]` so `htmlgraph snapshot` shows who did what
+- **Optional quality gate** — TaskCompleted can run build/test gates before allowing task completion. Opt-in via `.htmlgraph/config.json`:
+
+```json
+{
+  "block_task_completion_on_quality_failure": true
+}
+```
+
+> **WARNING:** Enabling the quality gate can strand teammates. Blocked teammates cannot be `/resume`d. When blocking occurs, stderr includes a manual recovery command: `htmlgraph feature complete <feature-id>`.

@@ -162,3 +162,13 @@ htmlgraph help --compact   # reprint this list at any time
 | `ingest` | Ingest JSONL transcripts |
 | `reindex` | Sync HTML to SQLite |
 | `yolo --feature <id>` | Autonomous dev mode |
+
+---
+
+## Agent Teams (experimental)
+
+When Claude Code's agent teams feature is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, requires v2.1.32+), HtmlGraph automatically captures teammate identity on every `TeammateIdle`, `TaskCreated`, and `TaskCompleted` hook — feature steps are prefixed with `[teammate-name]` for attribution in `htmlgraph snapshot`. The plugin hooks gracefully no-op when no team is active.
+
+**Optional quality gate:** set `block_task_completion_on_quality_failure: true` in `.htmlgraph/config.json` to block task completion (exit code 2) when build/test fails. Default off. Warning: blocked teammates cannot be `/resume`d — stderr includes the manual recovery command (`htmlgraph feature complete <id>`).
+
+For delegation decision criteria (teams vs subagents, example prompts, caveats), see `/htmlgraph:orchestrator-directives-skill`.

@@ -83,7 +83,14 @@ func PostCompact(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 // TeammateIdle handles the TeammateIdle Claude Code hook event.
 // Records a teammate_idle event when a teammate agent goes idle.
 func TeammateIdle(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	return recordSimpleEvent(models.EventTeammateIdle, "TeammateIdle", "Teammate agent went idle", "recorded", event, database)
+	summary := "Teammate agent went idle"
+	if event.TeammateName != "" {
+		summary = fmt.Sprintf("Teammate %s went idle", event.TeammateName)
+	}
+	if event.IdleReason != "" {
+		summary += fmt.Sprintf(" (reason: %s)", event.IdleReason)
+	}
+	return recordSimpleEvent(models.EventTeammateIdle, "TeammateIdle", summary, "recorded", event, database)
 }
 
 // TaskCreated handles the TaskCreated Claude Code hook event.
@@ -97,8 +104,14 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	}
 
 	featureID := cachedGetActiveFeatureID(database, sessionID)
-	subject, _ := event.TaskData["subject"].(string)
-	description, _ := event.TaskData["description"].(string)
+	subject := event.TaskSubject
+	if subject == "" {
+		subject, _ = event.TaskData["subject"].(string)
+	}
+	description := event.TaskDescription
+	if description == "" {
+		description, _ = event.TaskData["description"].(string)
+	}
 	taskID := event.TaskID
 
 	summary := "Task created"
@@ -112,7 +125,7 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	ev := &models.AgentEvent{
 		EventID:      uuid.New().String(),
 		AgentID:      resolveEventAgentID(event),
-		EventType:    models.EventCheckPoint,
+		EventType:    models.EventTaskCreated,
 		Timestamp:    now,
 		ToolName:     "TaskCreate",
 		InputSummary: summary,
@@ -133,7 +146,7 @@ func TaskCreated(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	// Mirror as a step on the active feature so the task survives session end.
 	if featureID != "" && taskID != "" {
-		addTaskStep(database, sessionID, featureID, taskID, subject)
+		addTaskStep(database, sessionID, featureID, taskID, subject, event.TeammateName)
 	}
 
 
@@ -152,7 +165,10 @@ func TaskCompleted(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	featureID := cachedGetActiveFeatureID(database, sessionID)
 	taskID := event.TaskID
-	subject, _ := event.TaskData["subject"].(string)
+	subject := event.TaskSubject
+	if subject == "" {
+		subject, _ = event.TaskData["subject"].(string)
+	}
 
 	summary := "Task completed"
 	if subject != "" {
@@ -183,9 +199,29 @@ func TaskCompleted(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		debugLog(projectDir, "[error] handler=TaskCompleted session=%s: insert event: %v", sessionID[:minSessionLen(sessionID)], err)
 	}
 
+	// quality gate only runs when a feature is actively claimed
+	if featureID != "" {
+		// Opt-in quality gate: run build/test before allowing task completion.
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
+		blockOnFailure := readTaskCompletionConfig(projectDir)
+		gate := runTaskCompletionGate(projectDir)
+		if !gate.Passed {
+			// Record the failure as an event regardless of blocking mode.
+			recordSimpleEvent(models.EventQualityGate, "TaskCompletionGate",
+				fmt.Sprintf("Quality gate failed: %s", gate.GateName), "failed", event, database)
+
+			if blockOnFailure {
+				msg := fmt.Sprintf("Quality gate %q failed. "+
+					"To complete this task manually after fixing: htmlgraph feature complete %s",
+					gate.GateName, featureID)
+				return nil, &BlockExit2Error{Message: msg}
+			}
+		}
+	}
+
 	// Mark the step as completed on the feature HTML.
 	if featureID != "" && taskID != "" {
-		completeTaskStep(database, sessionID, featureID, taskID)
+		completeTaskStep(database, sessionID, featureID, taskID, event.TeammateName)
 	}
 
 	return &HookResult{Continue: true}, nil

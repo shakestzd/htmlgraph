@@ -447,6 +447,202 @@ func TestTaskCompleted_NoSubject_FallsBackToTaskID(t *testing.T) {
 	}
 }
 
+// --- TeammateIdle (Agent Teams) ---
+
+// TestTeammateIdle_RecordsTeammateName verifies that when a teammate name and
+// idle reason are present, the summary includes both.
+func TestTeammateIdle_RecordsTeammateName(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+
+	event := &CloudEvent{
+		SessionID:    sessionID,
+		CWD:          t.TempDir(),
+		TeammateName: "implementer",
+		IdleReason:   "waiting",
+	}
+
+	result, err := TeammateIdle(event, td.DB)
+	if err != nil {
+		t.Fatalf("TeammateIdle: %v", err)
+	}
+	if result == nil || !result.Continue {
+		t.Error("expected Continue=true")
+	}
+
+	var inputSummary string
+	if err := td.DB.QueryRow(
+		`SELECT input_summary FROM agent_events WHERE session_id = ? AND tool_name = 'TeammateIdle'`,
+		sessionID,
+	).Scan(&inputSummary); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	expected := "Teammate implementer went idle (reason: waiting)"
+	if inputSummary != expected {
+		t.Errorf("input_summary = %q, want %q", inputSummary, expected)
+	}
+}
+
+// TestTeammateIdle_NoTeammate_GenericSummary verifies legacy behavior when
+// no teammate fields are present.
+func TestTeammateIdle_NoTeammate_GenericSummary(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+
+	event := &CloudEvent{SessionID: sessionID, CWD: t.TempDir()}
+
+	result, err := TeammateIdle(event, td.DB)
+	if err != nil {
+		t.Fatalf("TeammateIdle: %v", err)
+	}
+	if result == nil || !result.Continue {
+		t.Error("expected Continue=true")
+	}
+
+	var inputSummary string
+	if err := td.DB.QueryRow(
+		`SELECT input_summary FROM agent_events WHERE session_id = ? AND tool_name = 'TeammateIdle'`,
+		sessionID,
+	).Scan(&inputSummary); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if inputSummary != "Teammate agent went idle" {
+		t.Errorf("input_summary = %q, want %q", inputSummary, "Teammate agent went idle")
+	}
+}
+
+// --- TaskCreated (Agent Teams typed fields) ---
+
+// TestTaskCreated_PrefersTypedSubject verifies that TaskSubject takes priority
+// over TaskData["subject"] when both are present.
+func TestTaskCreated_PrefersTypedSubject(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+
+	event := &CloudEvent{
+		SessionID:   sessionID,
+		CWD:         t.TempDir(),
+		TaskID:      "task-typed",
+		TaskSubject: "Build widget",
+		TaskData:    map[string]any{"subject": "Old subject"},
+	}
+
+	result, err := TaskCreated(event, td.DB)
+	if err != nil {
+		t.Fatalf("TaskCreated: %v", err)
+	}
+	if result == nil || !result.Continue {
+		t.Error("expected Continue=true")
+	}
+
+	var inputSummary string
+	if err := td.DB.QueryRow(
+		`SELECT input_summary FROM agent_events WHERE session_id = ? AND tool_name = 'TaskCreate'`,
+		sessionID,
+	).Scan(&inputSummary); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if inputSummary != "Task created: Build widget" {
+		t.Errorf("input_summary = %q, want %q", inputSummary, "Task created: Build widget")
+	}
+}
+
+// TestTaskCreated_FallsBackToTaskData verifies that when TaskSubject is empty,
+// the handler falls back to TaskData["subject"].
+func TestTaskCreated_FallsBackToTaskData(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+
+	event := &CloudEvent{
+		SessionID: sessionID,
+		CWD:       t.TempDir(),
+		TaskID:    "task-fallback",
+		TaskData:  map[string]any{"subject": "Fallback subject"},
+	}
+
+	result, err := TaskCreated(event, td.DB)
+	if err != nil {
+		t.Fatalf("TaskCreated: %v", err)
+	}
+	if result == nil || !result.Continue {
+		t.Error("expected Continue=true")
+	}
+
+	var inputSummary string
+	if err := td.DB.QueryRow(
+		`SELECT input_summary FROM agent_events WHERE session_id = ? AND tool_name = 'TaskCreate'`,
+		sessionID,
+	).Scan(&inputSummary); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if inputSummary != "Task created: Fallback subject" {
+		t.Errorf("input_summary = %q, want %q", inputSummary, "Task created: Fallback subject")
+	}
+}
+
+// --- TaskCreated (EventTaskCreated constant) ---
+
+// TestTaskCompleted_EmptyFeatureID_SkipsQualityGate verifies that when no
+// feature is actively claimed (featureID == ""), the quality gate block is
+// skipped entirely — no quality_gate event is recorded and no BlockExit2Error
+// is returned.
+func TestTaskCompleted_EmptyFeatureID_SkipsQualityGate(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+	// No active_work_items row inserted → cachedGetActiveFeatureID returns "".
+
+	event := &CloudEvent{
+		SessionID: sessionID,
+		CWD:       t.TempDir(),
+		TaskID:    "task-nofeature",
+		TaskData:  map[string]any{"subject": "No feature task"},
+	}
+
+	result, err := TaskCompleted(event, td.DB)
+	if err != nil {
+		t.Fatalf("TaskCompleted returned unexpected error: %v", err)
+	}
+	if result == nil || !result.Continue {
+		t.Error("expected Continue=true when featureID is empty")
+	}
+
+	// No quality_gate event should be recorded.
+	var count int
+	if err := td.DB.QueryRow(
+		`SELECT COUNT(*) FROM agent_events WHERE session_id = ? AND event_type = 'quality_gate'`,
+		sessionID,
+	).Scan(&count); err != nil {
+		t.Fatalf("query agent_events: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 quality_gate events when featureID is empty, got %d", count)
+	}
+}
+
+// TestTaskCreated_UsesEventTaskCreated verifies that TaskCreated records with
+// event_type='task_created' instead of 'check_point'.
+func TestTaskCreated_UsesEventTaskCreated(t *testing.T) {
+	td, sessionID := setupMissingEventsDB(t)
+
+	event := &CloudEvent{
+		SessionID: sessionID,
+		CWD:       t.TempDir(),
+		TaskID:    "task-type-check",
+		TaskData:  map[string]any{"subject": "Type check"},
+	}
+
+	_, err := TaskCreated(event, td.DB)
+	if err != nil {
+		t.Fatalf("TaskCreated: %v", err)
+	}
+
+	var eventType string
+	if err := td.DB.QueryRow(
+		`SELECT event_type FROM agent_events WHERE session_id = ? AND tool_name = 'TaskCreate'`,
+		sessionID,
+	).Scan(&eventType); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if eventType != "task_created" {
+		t.Errorf("event_type = %q, want %q", eventType, "task_created")
+	}
+}
+
 // --- SessionResume ---
 
 // TestSessionResume_ReactivatesCompletedSession verifies that SessionResume

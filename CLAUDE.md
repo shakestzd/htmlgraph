@@ -89,6 +89,30 @@ Use `/htmlgraph:orchestrator-directives-skill` for delegation patterns and model
 
 ---
 
+## Monitoring Claude Code Upstream
+
+Claude Code is our only integration surface. Plugins, hooks, skills, slash commands, and observability (logging, events, sessions) are how HtmlGraph influences behavior — if upstream changes those contracts, our plugin either breaks silently or misses new capabilities.
+
+**Periodically review the Claude Code docs for changes to:**
+
+- **Plugin system** — manifest format, `plugin.json` schema, marketplace structure
+- **Hooks** — event names, payload shapes, exit-code semantics, new hook types
+- **Skills** — frontmatter fields, activation triggers, invocation patterns
+- **Agent teams** — still experimental as of last review; watch for graduation out of `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (v2.1.32+), API stability, nested-team support
+- **Observability** — session metadata, telemetry, cost/token reporting, transcript format
+
+**Upstream sources to monitor:**
+
+- https://code.claude.com/docs/en/plugins
+- https://code.claude.com/docs/en/hooks
+- https://code.claude.com/docs/en/skills
+- https://code.claude.com/docs/en/agent-teams
+- Claude Code release notes / changelog
+
+When upstream contracts change, the fix lands in `plugin/hooks/hooks.json`, `internal/hooks/`, `plugin/skills/`, or `cmd/htmlgraph/prompts/system-prompt.md` — not in AGENTS.md or CLAUDE.md (which are user-facing project docs, not plugin surfaces).
+
+---
+
 ## Dogfooding
 
 This project uses HtmlGraph to develop itself. `.htmlgraph/` contains real work items — not demos.

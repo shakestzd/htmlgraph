@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -173,6 +174,13 @@ func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 
 	result, err := handler(event)
 	if err != nil {
+		// ErrBlockExit2 signals that the hook should exit with code 2 (block).
+		// Write the message to stderr here — the handler does NOT write it.
+		var blockErr *hooks.BlockExit2Error
+		if errors.As(err, &blockErr) {
+			fmt.Fprintln(os.Stderr, blockErr.Message)
+			os.Exit(2)
+		}
 		hooks.LogError("runHook", event.SessionID, fmt.Sprintf("handler error: %v", err))
 		return hooks.Allow()
 	}
