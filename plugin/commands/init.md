@@ -55,11 +55,13 @@ Created `.htmlgraph/` directory with:
 - `tracks/` - Multi-feature tracks
 - `spikes/` - Research and investigation
 - `bugs/` - Bug tracking
-- `patterns/` - Workflow patterns
-- `insights/` - Session insights
-- `metrics/` - Aggregated metrics
-- `todos/` - Persistent tasks
-- `task-delegations/` - Subagent work tracking
+- `htmlgraph.db` - SQLite read index for queries and dashboard
+- `refs.json` - Project metadata references
+- `styles.css` - Default stylesheet for HtmlGraph HTML nodes
+
+Note:
+- Additional paths such as plans, events, and launch/session markers may appear later as other HtmlGraph commands and hooks run.
+- Current `htmlgraph init` does not create legacy analytics directories like `insights/`, `metrics/`, or `cigs/`.
 
 ### Next Steps
 1. Plan new work: `/htmlgraph:plan "Feature title"`

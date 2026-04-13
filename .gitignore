@@ -59,42 +59,48 @@ dashboard-*.png
 # Codex output
 CODEX.md
 
-# HtmlGraph analytics index (rebuildable cache)
-.htmlgraph/index.sqlite
-.htmlgraph/index.sqlite-wal
-.htmlgraph/index.sqlite-shm
+# HtmlGraph policy
+# Track canonical declarative project state under .htmlgraph/:
+# - work-item HTML/YAML content
+# - project config/metadata
+# - archive HTML when intentionally retained as part of repo history
+#
+# Ignore only derived storage/index artifacts and runtime telemetry.
 
-# SQLite database — derived cache, rebuilt by `htmlgraph reindex`.
-# Never track in git: binary merges corrupt the file.
-.htmlgraph/htmlgraph.db
-.htmlgraph/htmlgraph.db-shm
-.htmlgraph/htmlgraph.db-wal
+# HtmlGraph derived database/index/cache artifacts
+.htmlgraph/*.db*
+.htmlgraph/*.sqlite*
+.htmlgraph/archive-index/
+*.bloom
 
-# HtmlGraph session tracking artifacts (regenerable observability data)
-.htmlgraph/sessions/*.jsonl
-.htmlgraph/events/*.jsonl
-.htmlgraph/parent-activity.json
-.htmlgraph/logs/errors/
-
-# HtmlGraph runtime logs (contain sensitive paths/prompts)
-.htmlgraph/hook-debug.jsonl
-.htmlgraph/errors.jsonl
-.htmlgraph/.error-spikes.json
+# HtmlGraph runtime/session telemetry
+.htmlgraph/events/
+.htmlgraph/sessions/
 .htmlgraph/logs/
+.htmlgraph/**/*.jsonl
+.htmlgraph/**/*.log
+.htmlgraph/.active-session
+.htmlgraph/.launch-mode
+.htmlgraph/.session-warning-state.json
+.htmlgraph/parent-activity.json
+.htmlgraph/.error-spikes.json
+.htmlgraph/active-auto-spikes.json
+.htmlgraph/drift-queue.json
 
-# HtmlGraph backup and test files
-.htmlgraph/index.sqlite.backup
-.htmlgraph/*.backup
-.htmlgraph/test_*.db
-.htmlgraph/database.db
-.htmlgraph/.htmlgraph/  # Prevent nested structure corruption
+# HtmlGraph obsolete/generated analytics artifacts from older builds
+.htmlgraph/cigs/
+.htmlgraph/insights/
+.htmlgraph/metrics/
+.htmlgraph/orchestrator-mode.json
 
-# Keep these (source of truth):
-# - .htmlgraph/features/
-# - .htmlgraph/bugs/
-# - .htmlgraph/chores/
-# - .htmlgraph/spikes/
-# - .htmlgraph/agents.json
+# HtmlGraph invalid nested state
+.htmlgraph/.htmlgraph/
+
+# HtmlGraph tracked canonical content should override broad global ignores
+!.htmlgraph/**/*.html
+!.htmlgraph/**/*.yaml
+!.htmlgraph/**/*.yml
+!.htmlgraph/**/*.css
 
 .env
 
