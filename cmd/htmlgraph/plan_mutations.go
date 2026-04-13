@@ -155,14 +155,16 @@ func runPlanSetSlice(planID, sliceNum, tests, deps, files string) error {
 			if spanStart >= 0 && spanEnd >= 0 {
 				absStart := sliceIdx + metaIdx + spanStart + len("<span>")
 				absEnd := sliceIdx + metaIdx + spanEnd
-				fileHTML := "Files: "
+				var fileSB strings.Builder
+				fileSB.WriteString("Files: ")
 				for i, f := range strings.Split(files, ",") {
 					f = strings.TrimSpace(f)
 					if i > 0 {
-						fileHTML += ", "
+						fileSB.WriteString(", ")
 					}
-					fileHTML += "<code>" + html.EscapeString(f) + "</code>"
+					fileSB.WriteString("<code>" + html.EscapeString(f) + "</code>")
 				}
+				fileHTML := fileSB.String()
 				content = content[:absStart] + fileHTML + content[absEnd:]
 			}
 		}
@@ -244,10 +246,10 @@ func runPlanAddQuestion(planID, question, description, optionsRaw string) error 
 
 	// Build question block HTML.
 	var qHTML strings.Builder
-	qHTML.WriteString(fmt.Sprintf(`      <div class="question-block" data-question="%s" data-status="pending">`+"\n", html.EscapeString(qID)))
-	qHTML.WriteString(fmt.Sprintf("        <p><strong>%s</strong></p>\n", html.EscapeString(question)))
+	fmt.Fprintf(&qHTML, `      <div class="question-block" data-question="%s" data-status="pending">`+"\n", html.EscapeString(qID))
+	fmt.Fprintf(&qHTML, "        <p><strong>%s</strong></p>\n", html.EscapeString(question))
 	if description != "" {
-		qHTML.WriteString(fmt.Sprintf(`        <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:8px">%s</p>`+"\n", html.EscapeString(description)))
+		fmt.Fprintf(&qHTML, `        <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:8px">%s</p>`+"\n", html.EscapeString(description))
 	}
 	for i, opt := range opts {
 		checked := ""
@@ -258,8 +260,8 @@ func runPlanAddQuestion(planID, question, description, optionsRaw string) error 
 		if opt.Explanation != "" {
 			label += fmt.Sprintf(` <span style="color:var(--text-muted);font-size:.85rem">&mdash; %s</span>`, html.EscapeString(opt.Explanation))
 		}
-		qHTML.WriteString(fmt.Sprintf(`        <label><input type="radio" name="%s" value="%s"%s data-question="%s"> %s</label>`+"\n",
-			html.EscapeString(radioName), html.EscapeString(opt.Value), checked, html.EscapeString(qID), label))
+		fmt.Fprintf(&qHTML, `        <label><input type="radio" name="%s" value="%s"%s data-question="%s"> %s</label>`+"\n",
+			html.EscapeString(radioName), html.EscapeString(opt.Value), checked, html.EscapeString(qID), label)
 	}
 	qHTML.WriteString("      </div>\n")
 
@@ -286,9 +288,7 @@ func runPlanAddQuestion(planID, question, description, optionsRaw string) error 
 	// Insert recap row (idempotent — skip if already exists for this question).
 	recapAttr := fmt.Sprintf(`data-recap-for="%s"`, html.EscapeString(qID))
 	if !strings.Contains(content, recapAttr) {
-		if strings.Contains(content, "<!--PLAN_QUESTIONS_RECAP-->") {
-			content = strings.Replace(content, "<!--PLAN_QUESTIONS_RECAP-->", recapHTML+"\n        <!--PLAN_QUESTIONS_RECAP-->", 1)
-		}
+		content = strings.Replace(content, "<!--PLAN_QUESTIONS_RECAP-->", recapHTML+"\n        <!--PLAN_QUESTIONS_RECAP-->", 1)
 	}
 
 	if err := os.WriteFile(planPath, []byte(content), 0o644); err != nil {

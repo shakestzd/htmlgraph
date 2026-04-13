@@ -38,6 +38,26 @@ Task(
 
 ---
 
+## Batching htmlgraph CLI Calls (IMPERATIVE)
+
+Each Bash tool call spends one agent turn from the user's quota. **Chain htmlgraph bookkeeping commands with `&&` into a single Bash invocation whenever possible.** htmlgraph exists to reduce agent overhead — do not add it back by issuing one Bash call per `htmlgraph link add`.
+
+**Do this (1 tool call):**
+```bash
+htmlgraph bug create "A" --track trk-xxx --description "..." && \
+htmlgraph bug create "B" --track trk-xxx --description "..." && \
+htmlgraph link add feat-aaa feat-bbb --rel blocks && \
+htmlgraph link add feat-ccc feat-ddd --rel relates_to
+```
+
+**Never 4 separate Bash calls for the same thing.**
+
+**When NOT to chain:** only when a downstream command must parse the ID printed by an earlier command. Chain the creators into one call, then chain the dependents into a second call. Two calls, not eight.
+
+Applies to `feature/bug/spike/track/plan create|start|complete|add-step`, `link add|remove`, `feature edit`, and any other htmlgraph bookkeeping.
+
+---
+
 ## CRITICAL: Cost-First Delegation (IMPERATIVE)
 
 **Claude Code is EXPENSIVE. You MUST delegate to FREE/CHEAP AIs first.**

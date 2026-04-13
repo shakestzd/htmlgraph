@@ -107,6 +107,8 @@ htmlgraph feature create "Test Feature" --track <trk-id> && htmlgraph feature li
 htmlgraph feature show invalid-id   # must return non-zero exit
 ```
 
+**Batch htmlgraph bookkeeping.** Each Bash tool call costs one turn from the user's quota. Chain `htmlgraph` commands with `&&` — `htmlgraph bug create ... && htmlgraph bug start <id> && htmlgraph link add ...` is one call, not three.
+
 ## Continuous Testing Workflow (TDD)
 
 1. Write failing test (red)

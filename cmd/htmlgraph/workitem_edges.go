@@ -18,7 +18,7 @@ import (
 // detectActiveFeature returns the active feature ID from the session DB, or "".
 // Prefers the per-agent active_work_items table; falls back to the legacy
 // sessions.active_feature_id column for sessions that predate the new table.
-func detectActiveFeature(p *workitem.Project, htmlgraphDir string) string {
+func detectActiveFeature(p *workitem.Project, _ string) string {
 	if p.DB == nil {
 		return ""
 	}

@@ -15,7 +15,7 @@ import (
 )
 
 func yoloCmd() *cobra.Command {
-	var dev, initMode, continueMode, noWorktree bool
+	var dev, initMode, continueMode, noWorktree, tmux bool
 	var permMode, trackID, featureID string
 
 	cmd := &cobra.Command{
@@ -34,6 +34,15 @@ Each session is auto-named with a timestamp for easy identification.
 Requires --track or --feature to identify the work item for attribution.
 Without either flag, launches in planning mode to help you create one first.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Tmux wrap must happen before any side-effecting work.
+			// When --tmux is set and we are not already inside tmux, this
+			// replaces the current process with: tmux new-session -A -s htmlgraph-yolo -- <argv without --tmux>
+			// and never returns. If tmux is missing, an error is returned.
+			// If we are already inside tmux (TMUX env set), this is a no-op.
+			_ = tmux // flag is consumed via os.Args inspection in maybeTmuxWrap
+			if err := maybeTmuxWrap(); err != nil {
+				return err
+			}
 			switch {
 			case dev:
 				return launchYoloDev(trackID, featureID, noWorktree, args)
@@ -51,6 +60,7 @@ Without either flag, launches in planning mode to help you create one first.`,
 	cmd.Flags().BoolVar(&initMode, "init", false, "Initialize .htmlgraph/ then launch in YOLO mode")
 	cmd.Flags().BoolVar(&continueMode, "continue", false, "Resume last YOLO session")
 	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation (run in project root)")
+	cmd.Flags().BoolVar(&tmux, "tmux", false, "Wrap yolo in a tmux session named 'htmlgraph-yolo' (survives disconnects; reattaches on re-run)")
 	cmd.Flags().StringVar(&permMode, "permission-mode", "bypassPermissions",
 		"Permission mode (bypassPermissions, acceptEdits)")
 	cmd.Flags().StringVar(&trackID, "track", "", "Track ID to work on (e.g., trk-3719d8f3)")
@@ -309,7 +319,7 @@ func resolveTrackForFeature(featureID, projectRoot string) string {
 }
 
 // buildWorkItemPromptPrefix returns the work item header to prepend to the yolo prompt.
-func buildWorkItemPromptPrefix(id, kind string) string {
+func buildWorkItemPromptPrefix(id, _ string) string {
 	return strings.Join([]string{
 		"## Active Work Item",
 		fmt.Sprintf("You are working on: %s", id),

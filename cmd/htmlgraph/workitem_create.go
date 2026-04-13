@@ -22,7 +22,7 @@ type wiCreateOpts struct {
 	causedBy    string // explicit caused_by feature ID for bugs
 }
 
-func wiCreateCmd(typeName, dirName string) *cobra.Command {
+func wiCreateCmd(typeName, _ string) *cobra.Command {
 	var opts wiCreateOpts
 
 	cmd := &cobra.Command{

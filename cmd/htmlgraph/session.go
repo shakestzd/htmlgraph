@@ -224,7 +224,7 @@ func runSessionShow(sessionID string) error {
 
 	s, err := dbpkg.GetSession(db, sessionID)
 	if err != nil {
-		return fmt.Errorf("session not found: %w", err)
+		return fmt.Errorf("session %q not found: %w\nRun 'htmlgraph session list' to see known sessions.", sessionID, err)
 	}
 
 	sep := strings.Repeat("─", 60)

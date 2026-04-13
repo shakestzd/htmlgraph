@@ -32,6 +32,14 @@ When your task is done and quality gates pass:
 - `htmlgraph feature complete <id>` not `Edit(".htmlgraph/features/...")`
 - `htmlgraph bug create "title"` not `Write(".htmlgraph/bugs/...")`
 
+**BATCH htmlgraph CLI calls.** Each Bash tool call spends one turn from the user's quota. Chain commands with `&&` into a single invocation whenever possible. Do this (1 call):
+```bash
+htmlgraph bug create "A" --track trk-xxx && \
+htmlgraph bug create "B" --track trk-xxx && \
+htmlgraph link add feat-aaa bug-new --rel caused_by
+```
+Never 3 separate Bash calls for the same thing. Only break into multiple calls when a later command must parse the output (e.g., a returned ID) of an earlier one.
+
 ### Plan YAML Updates
 
 Plan YAML files (`.htmlgraph/plans/*.yaml`) are validated assets — never write them directly.

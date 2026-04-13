@@ -216,16 +216,17 @@ func analyzePythonFile(path string, result *healthResult) error {
 func countBraces(line string) int {
 	n, inStr := 0, false
 	for _, ch := range line {
-		if ch == '"' {
+		switch ch {
+		case '"':
 			inStr = !inStr
-		}
-		if inStr {
-			continue
-		}
-		if ch == '{' {
-			n++
-		} else if ch == '}' {
-			n--
+		case '{':
+			if !inStr {
+				n++
+			}
+		case '}':
+			if !inStr {
+				n--
+			}
 		}
 	}
 	return n
@@ -233,13 +234,15 @@ func countBraces(line string) int {
 
 func countIndent(line string) int {
 	n := 0
+OuterLoop:
 	for _, ch := range line {
-		if ch == ' ' {
+		switch ch {
+		case ' ':
 			n++
-		} else if ch == '\t' {
+		case '\t':
 			n += 4
-		} else {
-			break
+		default:
+			break OuterLoop
 		}
 	}
 	return n

@@ -167,3 +167,4 @@ All three modes enforce:
 - **Evidence-based decisions** — no guessing
 - **Research first** — documentation and testing before implementation
 - **Minimal changes** — fix the root cause, not symptoms
+- **Batch htmlgraph CLI calls** — chain `htmlgraph` bookkeeping commands with `&&` in a single Bash invocation; each Bash tool call costs a turn from the user's quota

@@ -40,11 +40,6 @@ func isPluginInstalledAt(path string) bool {
 	return true
 }
 
-// installedPluginVersion returns the version string of the installed plugin,
-// or empty string if not installed.
-func installedPluginVersion() string {
-	return installedPluginVersionAt(installedPluginsJSONPath())
-}
 
 // installedPluginVersionAt is the testable core.
 func installedPluginVersionAt(path string) string {

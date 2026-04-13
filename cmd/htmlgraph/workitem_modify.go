@@ -113,7 +113,7 @@ func runWiMove(typeName, id, targetTrackID string) error {
 	col := collectionFor(p, typeName)
 	node, err := col.Get(id)
 	if err != nil {
-		return fmt.Errorf("%s not found: %w", id, err)
+		return fmt.Errorf("%s %s not found: %w\nRun 'htmlgraph %s list' to see valid IDs.", typeName, id, err, typeName)
 	}
 
 	// Validate target track exists.

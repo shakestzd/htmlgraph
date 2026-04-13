@@ -108,6 +108,33 @@ Never commit with unresolved type errors, lint warnings, or test failures.
 3. For Go: use `go build`, `go test`, `go vet`
 4. Research first, implement second
 5. Fix all errors before committing
+6. **Batch htmlgraph CLI calls with `&&` — each Bash tool call spends a turn from the user's quota**
+
+## Batching htmlgraph CLI Calls (IMPERATIVE)
+
+Each Bash tool call consumes one agent turn, which counts against the user's message quota. **Chain htmlgraph CLI commands with `&&` in a single Bash invocation whenever possible.** htmlgraph is supposed to *reduce* agent overhead — do not turn bookkeeping into a tax on the user.
+
+**Do this (1 call):**
+```bash
+htmlgraph bug create "Title A" --track trk-xxx --description "..." && \
+htmlgraph bug create "Title B" --track trk-xxx --description "..." && \
+htmlgraph bug create "Title C" --track trk-xxx --description "..." && \
+htmlgraph link add feat-aaa bug-new --rel caused_by && \
+htmlgraph link add feat-bbb feat-ccc --rel blocks
+```
+
+**Never this (5 separate tool calls):**
+```bash
+htmlgraph bug create "Title A" ...   # turn 1
+htmlgraph bug create "Title B" ...   # turn 2
+htmlgraph bug create "Title C" ...   # turn 3
+htmlgraph link add ...               # turn 4
+htmlgraph link add ...               # turn 5
+```
+
+**When NOT to chain:** only when a later command needs to parse the output of an earlier one (e.g., needs the returned `bug-xxx` ID). In that case, chain all the *creating* commands into one call, capture the IDs from the output, then chain all the *dependent* commands into a second call. Two calls, not eight.
+
+Applies to all htmlgraph bookkeeping: `feature/bug/spike/track/plan create|start|complete|add-step`, `link add|remove`, `feature edit`, etc.
 
 ## Orchestration Rules
 

@@ -22,6 +22,8 @@ import (
 //go:embed templates/plan-template.html
 var planTemplateFS embed.FS
 
+var _ = planTemplateFS // referenced via go:embed; keep until plan template code is wired up
+
 // planCmdWithExtras builds the standard workitem commands for plans,
 // then replaces the generic create with the CRISPI-aware version and
 // adds plan-specific subcommands.
@@ -167,7 +169,7 @@ func runPlanGenerateFromWorkItem(htmlgraphDir, sourceID string) (string, error) 
 	}
 	nodePath := resolveNodePath(htmlgraphDir, resolved)
 	if nodePath == "" {
-		return "", fmt.Errorf("work item %q not found", resolved)
+		return "", fmt.Errorf("work item %q not found\nRun 'htmlgraph wip' to see active items or 'htmlgraph find <query>' to search.", resolved)
 	}
 
 	// Check whether a plan already exists for this source ID.

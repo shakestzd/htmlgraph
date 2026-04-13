@@ -30,7 +30,7 @@ func trackPRCmd() *cobra.Command {
 func buildPRBody(trackID string, groups []featureGroup, diffStat string) string {
 	var sb strings.Builder
 	sb.WriteString("## Summary\n\n")
-	sb.WriteString(fmt.Sprintf("Track: `%s`\n\n", trackID))
+	fmt.Fprintf(&sb, "Track: `%s`\n\n", trackID)
 
 	// Feature breakdown
 	sb.WriteString("### Features\n\n")
@@ -41,12 +41,12 @@ func buildPRBody(trackID string, groups []featureGroup, diffStat string) string 
 		if label == "" {
 			label = "(unattributed)"
 		}
-		sb.WriteString(fmt.Sprintf("- **%s** (%d commits)\n", label, len(g.Commits)))
+		fmt.Fprintf(&sb, "- **%s** (%d commits)\n", label, len(g.Commits))
 	}
 
 	// Diff stats
-	sb.WriteString(fmt.Sprintf("\n### Stats\n\n"))
-	sb.WriteString(fmt.Sprintf("- %d commits across %d features\n", totalCommits, len(groups)))
+	sb.WriteString("\n### Stats\n\n")
+	fmt.Fprintf(&sb, "- %d commits across %d features\n", totalCommits, len(groups))
 	if diffStat != "" {
 		sb.WriteString("\n```\n")
 		sb.WriteString(diffStat)

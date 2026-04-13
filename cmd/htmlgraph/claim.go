@@ -136,7 +136,7 @@ func runClaimShow(claimID string) error {
 	fmt.Printf("Heartbeat: %s\n", claim.LastHeartbeatAt.Local().Format("2006-01-02T15:04:05Z07:00"))
 
 	// Print write scope if non-empty
-	if claim.WriteScope != nil && len(claim.WriteScope) > 0 {
+	if len(claim.WriteScope) > 0 {
 		var scope []string
 		if err := json.Unmarshal(claim.WriteScope, &scope); err == nil && len(scope) > 0 {
 			fmt.Printf("Scope:    %v\n", scope)

@@ -59,7 +59,7 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 		if _, err := os.Stat(filepath.Join(opts.ExplicitDir, ".htmlgraph")); err == nil {
 			return opts.ExplicitDir, nil
 		}
-		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found", opts.ExplicitDir)
+		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found. cd into a repo with .htmlgraph/ or set $CLAUDE_PROJECT_DIR", opts.ExplicitDir)
 	}
 
 	// 2. HTMLGRAPH_PROJECT_DIR env var — written by yolo mode (subagent override);
@@ -137,7 +137,7 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 	if wd, err := os.Getwd(); err == nil {
 		return wd, nil
 	}
-	return "", errors.New("no .htmlgraph directory found\nRun 'htmlgraph init' to initialize this directory, or cd into an existing htmlgraph project.")
+	return "", errors.New("no .htmlgraph directory found. cd into a repo with .htmlgraph/ or run `htmlgraph status` to confirm your project dir")
 }
 
 // walkUpForHtmlgraph traverses parent directories looking for .htmlgraph/.

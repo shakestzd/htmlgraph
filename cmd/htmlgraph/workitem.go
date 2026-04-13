@@ -39,7 +39,7 @@ func workitemCmd(typeName, dirName string) *cobra.Command {
 	return cmd
 }
 
-func wiListCmd(typeName, dirName string) *cobra.Command {
+func wiListCmd(_ string, dirName string) *cobra.Command {
 	var statusFilter string
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -188,7 +188,7 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 		node, err = col.Complete(id)
 	}
 	if err != nil {
-		return fmt.Errorf("set %s %s: %w\nRun 'htmlgraph %s list' to see valid IDs", typeName, status, err, typeName)
+		return fmt.Errorf("cannot set %s %s to %s: %w\nRun 'htmlgraph wip' to see active items or 'htmlgraph %s list' to see valid IDs.", typeName, id, status, err, typeName)
 	}
 
 	// When starting a work item, update per-agent attribution, create a claim

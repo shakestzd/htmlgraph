@@ -50,6 +50,14 @@ Dev mode uninstalls the marketplace plugin, clears cache, and launches with `cla
 
 **Why full removal is required:** Disabling a marketplace plugin only affects hooks. Agent definitions and skill content continue loading from `~/.claude/plugins/marketplaces/`, silently shadowing dev source changes.
 
+## Yolo Mode in Codespaces
+
+Codespaces clients disconnect on idle, browser refresh, or network blips — killing long yolo runs. Wrap yolo in tmux:
+
+    htmlgraph yolo --dev --tmux
+
+First run creates a tmux session named `htmlgraph-yolo`. On disconnect, detach instead of dying. Re-run the same command to reattach to the surviving session. Manually detach with `Ctrl-b d`; kill the session with `tmux kill-session -t htmlgraph-yolo`.
+
 ---
 
 ## Plugin Source — Single Source of Truth

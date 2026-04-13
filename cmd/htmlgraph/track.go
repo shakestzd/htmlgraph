@@ -36,20 +36,6 @@ func trackCmdWithExtras() *cobra.Command {
 	return cmd
 }
 
-// loadFeatureCounts returns a map of track ID → feature count.
-func loadFeatureCounts(htmlgraphDir string) map[string]int {
-	counts := make(map[string]int)
-	nodes, err := graph.LoadDir(filepath.Join(htmlgraphDir, "features"))
-	if err != nil {
-		return counts
-	}
-	for _, n := range nodes {
-		if n.TrackID != "" {
-			counts[n.TrackID]++
-		}
-	}
-	return counts
-}
 
 // trackShowCmd shows a single track by ID.
 func trackShowCmd() *cobra.Command {
@@ -430,11 +416,14 @@ func printItemEdges(n *models.Node) {
 
 // printDeepItem prints a single linked item with steps and edges.
 func printDeepItem(n *models.Node) {
-	marker := "  "
-	if n.Status == models.StatusInProgress {
+	var marker string
+	switch n.Status {
+	case models.StatusInProgress:
 		marker = "* "
-	} else if n.Status == models.StatusDone {
+	case models.StatusDone:
 		marker = "✓ "
+	default:
+		marker = "  "
 	}
 	fmt.Printf("  %s%-20s  %-11s  %s\n", marker, n.ID, n.Status, truncate(n.Title, 38))
 	if len(n.Steps) > 0 {

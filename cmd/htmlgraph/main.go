@@ -102,7 +102,13 @@ func main() {
 	rootCmd.AddCommand(upgradeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		msg := err.Error()
+		// Cobra's "unknown command" error doesn't tell the agent what to do
+		// next when no close-match suggestion exists. Append a recovery hint.
+		if strings.HasPrefix(msg, "unknown command") && !strings.Contains(msg, "Did you mean") {
+			msg += "\nRun 'htmlgraph help --compact' to see all commands."
+		}
+		fmt.Fprintln(os.Stderr, msg)
 		os.Exit(1)
 	}
 }
