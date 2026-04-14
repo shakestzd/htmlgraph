@@ -293,15 +293,17 @@ func processRipgrepMatch(msg rgMessage, scores map[string]*relevantResult) error
 	return nil
 }
 
+// htmlTagPattern matches an HTML tag — compiled once and reused on the
+// per-ripgrep-line hot path inside isMarkupOnlyLine.
+var htmlTagPattern = regexp.MustCompile(`<[^>]+>`)
+
 // isMarkupOnlyLine returns true for lines that consist entirely of HTML tags/attributes
 // with no visible text content — these are low-signal ripgrep hits.
 func isMarkupOnlyLine(line string) bool {
-	// If the trimmed line starts with "<" and has no text between tags, skip it.
 	if !strings.HasPrefix(line, "<") {
 		return false
 	}
-	// Remove all tag content and check if anything meaningful remains.
-	stripped := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(line, "")
+	stripped := htmlTagPattern.ReplaceAllString(line, "")
 	return strings.TrimSpace(stripped) == ""
 }
 

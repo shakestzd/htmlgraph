@@ -397,14 +397,20 @@ func TestAddSliceYAML_NoPrintsFakeFeatureID(t *testing.T) {
 		t.Fatalf("add-slice-yaml: %v", err)
 	}
 
-	// Load and verify the slice has ID but NOT a feature_id.
+	// Load and verify the slice has a slice- prefixed ID and NO feature_id yet.
 	loaded, _ := planyaml.Load(planPath)
 	if len(loaded.Slices) != 1 {
 		t.Fatalf("expected 1 slice, got %d", len(loaded.Slices))
 	}
-	if loaded.Slices[0].FeatureID != "" {
-		t.Errorf("slice should have empty feature_id before finalize, got %q", loaded.Slices[0].FeatureID)
+	got := loaded.Slices[0]
+	if got.FeatureID != "" {
+		t.Errorf("slice should have empty feature_id before finalize, got %q", got.FeatureID)
 	}
-	// The slice ID should be a stable identifier (not a fake feat-ID in the printed output).
-	// The test here just confirms the YAML slice doesn't have a feature_id set.
+	// The whole point of bug-32f787d1: slice IDs must not pretend to be features.
+	if strings.HasPrefix(got.ID, "feat-") {
+		t.Errorf("slice ID must not look like a feature ID, got %q", got.ID)
+	}
+	if !strings.HasPrefix(got.ID, "slic") {
+		t.Errorf("slice ID should be slic-prefixed (workitem.GenerateID convention), got %q", got.ID)
+	}
 }

@@ -28,9 +28,17 @@ type planAmendment struct {
 func planFinalizeYAMLCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "finalize-yaml <plan-id>",
-		Short: "Create track and features from approved YAML plan slices",
-		Long: `Read a YAML plan + SQLite feedback, create a track and features for
-approved slices, wire dependency edges. Updates YAML status to finalized.
+		Short: "Create track and features from approved YAML plan slices (dashboard flow)",
+		Long: `Read a YAML plan + SQLite plan_feedback approvals, create a track and
+features for approved slices, wire dependency edges. Updates YAML status to
+finalized.
+
+This is the dashboard-review workflow: only slices with explicit approve
+actions in plan_feedback get promoted, and the track is created from scratch
+when one does not yet exist.
+
+For the simpler hierarchy-only flow that requires an existing track and
+promotes every slice unconditionally, use 'plan finalize' instead.
 
 Example:
   htmlgraph plan finalize-yaml plan-a1b2c3d4`,
