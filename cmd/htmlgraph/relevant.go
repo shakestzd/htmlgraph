@@ -162,20 +162,35 @@ func runRelevantSearch(hgDir, query string, qType queryType) ([]relevantResult, 
 	scores := make(map[string]*relevantResult)
 
 	// Step 1: ripgrep search over HTML files.
-	rgQuery := query
-	if qType == queryTypeSHA {
-		// Search for the SHA as a literal string in the HTML files.
-		rgQuery = query
-	} else if qType == queryTypeFile {
-		// For file-path queries, use the base name and path components as keywords.
-		rgQuery = filepath.Base(query)
+	//
+	// For keyword queries we tokenize on whitespace and call searchWithRipgrep
+	// once per token, accumulating scores in the same map. A literal
+	// multi-token phrase like "lineage review" matches nothing even when each
+	// token individually matches several items, so we score tokens
+	// independently. Items that match multiple tokens naturally rise to the
+	// top via repeated weightFileMention additions.
+	rgTokens := []string{query}
+	switch qType {
+	case queryTypeSHA:
+		// SHAs are single tokens by definition.
+		rgTokens = []string{query}
+	case queryTypeFile:
+		// File-path queries use the base name as the search token.
+		rgTokens = []string{filepath.Base(query)}
+	case queryTypeKeyword:
+		rgTokens = tokenizeQuery(query)
 	}
 
-	if err := searchWithRipgrep(hgDir, rgQuery, scores); err != nil {
-		if isCommandNotFound(err) {
-			return nil, fmt.Errorf("ripgrep (rg) not found in PATH — install it: https://github.com/BurntSushi/ripgrep")
+	for _, tok := range rgTokens {
+		if tok == "" {
+			continue
 		}
-		// Other errors are non-fatal: rg may have hit a transient issue. Continue with git-only attribution.
+		if err := searchWithRipgrep(hgDir, tok, scores); err != nil {
+			if isCommandNotFound(err) {
+				return nil, fmt.Errorf("ripgrep (rg) not found in PATH — install it: https://github.com/BurntSushi/ripgrep")
+			}
+			// Other errors are non-fatal: rg may have hit a transient issue. Continue with git-only attribution.
+		}
 	}
 
 	// Step 2: git log attribution (commit trailer + file history).
@@ -206,6 +221,28 @@ func runRelevantSearch(hgDir, query string, qType queryType) ([]relevantResult, 
 		out = append(out, *r)
 	}
 	return out, nil
+}
+
+// tokenizeQuery splits a free-form keyword query into whitespace-separated
+// tokens, drops duplicates, and skips tokens shorter than 2 characters (which
+// would otherwise generate noise from stop-word-length matches). Preserves
+// original casing — ripgrep runs case-insensitive.
+func tokenizeQuery(query string) []string {
+	fields := strings.Fields(query)
+	seen := make(map[string]bool, len(fields))
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if len(f) < 2 {
+			continue
+		}
+		key := strings.ToLower(f)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, f)
+	}
+	return out
 }
 
 // searchWithRipgrep runs rg --json over .htmlgraph/*.html for the given query

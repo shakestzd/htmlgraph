@@ -138,6 +138,54 @@ func TestRunRelevantKeyword_ReturnsMatch(t *testing.T) {
 	}
 }
 
+// TestRunRelevantKeyword_MultiWordTokenized is the regression for bug-72b52aa4:
+// multi-word queries used to be passed to ripgrep as a literal phrase, so
+// "retrieval sha" matched nothing even though each word individually appears
+// in the fixture. Tokenizing the query per whitespace and scoring each token
+// independently now surfaces the match.
+func TestRunRelevantKeyword_MultiWordTokenized(t *testing.T) {
+	hgDir := makeRelevantFixture(t)
+
+	results, err := runRelevantSearch(hgDir, "retrieval sha", queryTypeKeyword)
+	if err != nil {
+		t.Fatalf("runRelevantSearch: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected multi-word 'retrieval sha' to match via per-token scoring, got 0")
+	}
+	// The fixture contains both tokens, so the item should accumulate scores
+	// from both — higher than a single-token match.
+	if results[0].Score < 2*weightFileMention {
+		t.Errorf("expected score >= 2*weightFileMention for two-token match, got %v", results[0].Score)
+	}
+}
+
+func TestTokenizeQuery(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"lineage review", []string{"lineage", "review"}},
+		{"  retrieval   sha  ", []string{"retrieval", "sha"}},
+		{"PR 38 lineage review", []string{"PR", "38", "lineage", "review"}},
+		{"a lineage a review", []string{"lineage", "review"}}, // "a" < 2 chars dropped
+		{"lineage LINEAGE Lineage", []string{"lineage"}},      // case-insensitive dedup
+		{"", nil},
+	}
+	for _, tc := range cases {
+		got := tokenizeQuery(tc.in)
+		if len(got) != len(tc.want) {
+			t.Errorf("tokenizeQuery(%q) = %v, want %v", tc.in, got, tc.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("tokenizeQuery(%q)[%d] = %q, want %q", tc.in, i, got[i], tc.want[i])
+			}
+		}
+	}
+}
+
 // --- File-path search ---
 
 func TestRunRelevantFilePath_ReturnsMatchingItems(t *testing.T) {
