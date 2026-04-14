@@ -267,7 +267,7 @@ func TestTraceFileJSONStableTrackOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TraceFile: %v", err)
 	}
-	out := traceFileJSON{Query: "shared/sort.go"}
+	out := traceFileJSON{}
 	trackSet := make(map[string]bool)
 	for _, r := range results {
 		if r.TrackID != "" {

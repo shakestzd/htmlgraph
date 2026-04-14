@@ -194,12 +194,13 @@ func runRelevantSearch(hgDir, query string, qType queryType) ([]relevantResult, 
 	}
 
 	// Step 2: git log attribution (commit trailer + file history).
-	if qType == queryTypeFile {
+	switch qType {
+	case queryTypeFile:
 		if err := searchViaGitFileHistory(projectDir, hgDir, query, scores); err != nil {
 			// Non-fatal: git may not be available or file may be untracked.
 			_ = err
 		}
-	} else if qType == queryTypeSHA {
+	case queryTypeSHA:
 		if err := searchViaGitSHA(projectDir, hgDir, query, scores); err != nil {
 			_ = err
 		}

@@ -171,12 +171,12 @@ func parseQuestionOptions(s string) []planyaml.QuestionOption {
 	var opts []planyaml.QuestionOption
 	for _, part := range strings.Split(s, ",") {
 		part = strings.TrimSpace(part)
-		idx := strings.Index(part, ":")
-		if idx < 0 {
+		key, label, found := strings.Cut(part, ":")
+		if !found {
 			continue
 		}
 		opts = append(opts, planyaml.QuestionOption{
-			Key: strings.TrimSpace(part[:idx]), Label: strings.TrimSpace(part[idx+1:]),
+			Key: strings.TrimSpace(key), Label: strings.TrimSpace(label),
 		})
 	}
 	return opts
