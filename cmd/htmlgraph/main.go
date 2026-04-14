@@ -136,6 +136,10 @@ func buildRoot() *cobra.Command {
 	history.GroupID = "query"
 	root.AddCommand(history)
 
+	lineage := newLineageCmd()
+	lineage.GroupID = "query"
+	root.AddCommand(lineage)
+
 	// quality group
 	check := checkCmd()
 	check.GroupID = "quality"
