@@ -58,13 +58,21 @@ func runHistory(id string, jsonOut bool) error {
 		return err
 	}
 
-	// Resolve the git toplevel from the directory that OWNS the discovered
-	// .htmlgraph/ checkout — not from process cwd. Using cwd would target a
-	// nested repo/submodule if the command were run inside one. `git -C <dir>`
-	// pins resolution to the checkout that actually owns the work-item files.
-	repoRoot, err := gitToplevel(filepath.Dir(hgDir))
+	// Resolve the right git toplevel for `git log`.
+	//
+	// Two failure modes to avoid:
+	//   - nested submodule: cwd is inside a different repository than the
+	//     discovered .htmlgraph, and using cwd would log the submodule.
+	//   - linked worktree: .htmlgraph lives in the main checkout but cwd is an
+	//     active linked worktree; using the .htmlgraph owner would log the
+	//     main checkout's HEAD and miss branch-local history.
+	//
+	// Strategy: prefer cwd's worktree if it belongs to the SAME repository as
+	// the .htmlgraph owner (same git-common-dir), otherwise fall back to the
+	// .htmlgraph owner. git-common-dir is shared by every linked worktree of
+	// a repo and differs for submodules, so it is the correct discriminator.
+	repoRoot, err := resolveHistoryRoot(filepath.Dir(hgDir))
 	if err != nil {
-		// Fallback: assume hgDir's parent is the toplevel (flat repo case).
 		repoRoot = filepath.Dir(hgDir)
 	}
 
@@ -128,14 +136,44 @@ func subDirAndExt(id string) (string, string) {
 
 // gitToplevel returns the absolute path to the worktree that owns `dir` by
 // invoking `git -C <dir> rev-parse --show-toplevel`. Pinning to `dir` makes
-// the lookup independent of process cwd so a nested submodule or the user's
-// shell location can't redirect `git log` to the wrong repository.
+// the lookup independent of process cwd.
 func gitToplevel(dir string) (string, error) {
 	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return "", fmt.Errorf("git -C %s rev-parse --show-toplevel: %w", dir, err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// gitCommonDir returns the absolute path to the repository's shared git dir
+// (the main checkout's .git for linked worktrees). Two directories belong to
+// the same repository iff their git-common-dir values are equal after
+// resolving symlinks / relative paths.
+func gitCommonDir(dir string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
+	if err != nil {
+		return "", fmt.Errorf("git -C %s rev-parse --git-common-dir: %w", dir, err)
+	}
+	return filepath.Clean(strings.TrimSpace(string(out))), nil
+}
+
+// resolveHistoryRoot picks the correct git toplevel for `history <id>`.
+//
+// If the process cwd and the supplied .htmlgraph owner directory share a
+// git-common-dir, they belong to the same repository — cwd may be a linked
+// worktree on a different branch, and its toplevel is the right one for
+// branch-local history. Otherwise cwd is inside a different repository
+// (typically a nested submodule) and we fall back to the .htmlgraph owner
+// so history never escapes the HtmlGraph checkout.
+func resolveHistoryRoot(hgOwner string) (string, error) {
+	ownerCommon, ownerErr := gitCommonDir(hgOwner)
+	cwdCommon, cwdErr := gitCommonDir(".")
+	if ownerErr == nil && cwdErr == nil && ownerCommon == cwdCommon {
+		if top, err := gitToplevel("."); err == nil {
+			return top, nil
+		}
+	}
+	return gitToplevel(hgOwner)
 }
 
 // runHistoryLog shells out to git log with --follow to handle renames and
