@@ -171,11 +171,11 @@ func runRelevantSearch(hgDir, query string, qType queryType) ([]relevantResult, 
 		rgQuery = filepath.Base(query)
 	}
 
-	if err := searchWithRipgrep(hgDir, rgQuery, scores); err != nil && !isCommandNotFound(err) {
-		// If rg is missing, return a clear error.
+	if err := searchWithRipgrep(hgDir, rgQuery, scores); err != nil {
 		if isCommandNotFound(err) {
 			return nil, fmt.Errorf("ripgrep (rg) not found in PATH — install it: https://github.com/BurntSushi/ripgrep")
 		}
+		// Other errors are non-fatal: rg may have hit a transient issue. Continue with git-only attribution.
 	}
 
 	// Step 2: git log attribution (commit trailer + file history).
@@ -349,22 +349,26 @@ func attrOrEmpty(sel *goquery.Selection, name string) string {
 
 // searchViaGitFileHistory uses git log --follow to find commits touching the
 // given file, then parses htmlgraph-item trailers to attribute work items.
+//
+// Uses ASCII record separator (\x1e) between commits and unit separator (\x00)
+// between fields so that multi-line commit bodies (where htmlgraph-item trailers
+// usually live) parse correctly.
 func searchViaGitFileHistory(projectDir, hgDir, filePath string, scores map[string]*relevantResult) error {
 	out, err := exec.Command(
 		"git", "-C", projectDir,
-		"log", "--follow", "--format=%H\t%aI\t%s\t%b",
+		"log", "--follow", "--format=%x1e%H%x00%aI%x00%s%x00%b",
 		"--", filePath,
 	).Output()
 	if err != nil {
 		return nil
 	}
 
-	for _, block := range strings.Split(string(out), "\n") {
+	for _, block := range strings.Split(string(out), "\x1e") {
 		block = strings.TrimSpace(block)
 		if block == "" {
 			continue
 		}
-		parts := strings.SplitN(block, "\t", 4)
+		parts := strings.SplitN(block, "\x00", 4)
 		if len(parts) < 4 {
 			continue
 		}
@@ -394,21 +398,23 @@ func searchViaGitFileHistory(projectDir, hgDir, filePath string, scores map[stri
 
 // searchViaGitSHA looks up a specific commit SHA and extracts htmlgraph-item
 // trailers to attribute work items, then augments with ripgrep of item IDs.
+//
+// Uses \x00 field separators so that multi-line commit bodies parse correctly.
 func searchViaGitSHA(projectDir, hgDir, sha string, scores map[string]*relevantResult) error {
 	out, err := exec.Command(
 		"git", "-C", projectDir,
-		"log", "-1", "--format=%H\t%aI\t%s\t%B",
+		"log", "-1", "--format=%H%x00%aI%x00%s%x00%B",
 		sha,
 	).Output()
 	if err != nil {
 		return nil
 	}
 
-	block := strings.TrimSpace(string(out))
+	block := strings.TrimRight(string(out), "\n")
 	if block == "" {
 		return nil
 	}
-	parts := strings.SplitN(block, "\t", 4)
+	parts := strings.SplitN(block, "\x00", 4)
 	if len(parts) < 4 {
 		return nil
 	}

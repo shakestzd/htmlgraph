@@ -90,19 +90,21 @@ func executeMigrateOrphans(p *workitem.Project, apply bool) error {
 	return nil
 }
 
-// isOrphanFeature returns true when the feature has no part_of edge pointing
-// to a plan-* ID. Features with an explicit standalone_reason are also excluded
-// (they've already been handled).
+// isOrphanFeature returns true when the feature has no edge linking it to a
+// plan. Both part_of → plan-* and planned_in → plan-* count as plan linkage —
+// plan finalize and feature create --plan write planned_in, while older
+// scaffolding may have used part_of. Features with an explicit
+// standalone_reason are also excluded (they've already been handled).
 func isOrphanFeature(feat *models.Node) bool {
-	// Already explicitly marked standalone — not an orphan.
 	if v, ok := feat.Properties["standalone_reason"]; ok && v != "" {
 		return false
 	}
 
-	partOfEdges := feat.Edges[string(models.RelPartOf)]
-	for _, edge := range partOfEdges {
-		if strings.HasPrefix(edge.TargetID, "plan-") {
-			return false
+	for _, rel := range []models.RelationshipType{models.RelPartOf, models.RelPlannedIn} {
+		for _, edge := range feat.Edges[string(rel)] {
+			if strings.HasPrefix(edge.TargetID, "plan-") {
+				return false
+			}
 		}
 	}
 	return true
