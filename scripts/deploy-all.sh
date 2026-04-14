@@ -189,7 +189,14 @@ else
         ok "Tagged v$VERSION"
     fi
 
-    git push origin main --tags
+    # Push main branch and only the specific new tag. Pushing --tags broadcasts
+    # every local tag and fails the whole script when historical tags already
+    # exist on the remote (bug-b0264f1b). Push the exact new ref by name.
+    if ! $DOCS_ONLY && [[ -n "$VERSION" ]]; then
+        git push origin main "v$VERSION"
+    else
+        git push origin main
+    fi
     ok "Pushed to origin/main"
 fi
 
@@ -239,7 +246,9 @@ else
     #    No plugin reinstall needed — the marketplace clone update (above)
     #    is sufficient. Reinstalling interferes with dev mode (--plugin-dir).
     if [[ -f "$PROJECT_ROOT/plugin/build.sh" ]]; then
-        sh "$PROJECT_ROOT/plugin/build.sh" 2>&1 | tail -1
+        # Invoke with bash explicitly: build.sh uses `set -o pipefail` which is
+        # a bashism and fails under POSIX sh / dash (bug-364cebb7).
+        bash "$PROJECT_ROOT/plugin/build.sh" 2>&1 | tail -1
         ok "CLI binary rebuilt"
     else
         warn "build.sh not found — skipping CLI rebuild"
