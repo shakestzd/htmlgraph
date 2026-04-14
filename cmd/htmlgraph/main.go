@@ -128,6 +128,10 @@ func buildRoot() *cobra.Command {
 	recommend.GroupID = "query"
 	root.AddCommand(recommend)
 
+	relevant := relevantCmd()
+	relevant.GroupID = "query"
+	root.AddCommand(relevant)
+
 	// quality group
 	check := checkCmd()
 	check.GroupID = "quality"
