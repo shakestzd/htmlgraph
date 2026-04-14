@@ -58,10 +58,11 @@ func runHistory(id string, jsonOut bool) error {
 		return err
 	}
 
-	// Resolve the git toplevel from the current working directory so `git log`
-	// runs against the active worktree's HEAD, not the main checkout. In linked
-	// worktrees, filepath.Dir(hgDir) would resolve back to the main repo.
-	repoRoot, err := gitToplevel()
+	// Resolve the git toplevel from the directory that OWNS the discovered
+	// .htmlgraph/ checkout — not from process cwd. Using cwd would target a
+	// nested repo/submodule if the command were run inside one. `git -C <dir>`
+	// pins resolution to the checkout that actually owns the work-item files.
+	repoRoot, err := gitToplevel(filepath.Dir(hgDir))
 	if err != nil {
 		// Fallback: assume hgDir's parent is the toplevel (flat repo case).
 		repoRoot = filepath.Dir(hgDir)
@@ -125,13 +126,14 @@ func subDirAndExt(id string) (string, string) {
 	}
 }
 
-// gitToplevel returns the absolute path to the active worktree's root by
-// invoking `git rev-parse --show-toplevel`. This correctly distinguishes linked
-// worktrees from the main checkout.
-func gitToplevel() (string, error) {
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+// gitToplevel returns the absolute path to the worktree that owns `dir` by
+// invoking `git -C <dir> rev-parse --show-toplevel`. Pinning to `dir` makes
+// the lookup independent of process cwd so a nested submodule or the user's
+// shell location can't redirect `git log` to the wrong repository.
+func gitToplevel(dir string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
 	if err != nil {
-		return "", fmt.Errorf("git rev-parse --show-toplevel: %w", err)
+		return "", fmt.Errorf("git -C %s rev-parse --show-toplevel: %w", dir, err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }

@@ -172,3 +172,33 @@ func TestRenderAgentTree_ShortPath(t *testing.T) {
 		t.Errorf("output should contain single-path-agent, got:\n%s", output)
 	}
 }
+
+// TestRenderAgentTree_MissingParent covers the orphan promotion regression:
+// a row whose derived parent session is absent from bySession must be
+// promoted to a root instead of silently dropped. Partial lineage data
+// should degrade gracefully.
+func TestRenderAgentTree_MissingParent(t *testing.T) {
+	db := setupLineageTestDB(t)
+
+	rootSession := "root-orphan-0001"
+	orphanSession := "chld-orphan-ghost"
+	// Seed an orphan whose path claims parent "ghost-parent" — but "ghost-parent"
+	// is NOT inserted. Without the fix this row disappears; with the fix it
+	// renders as a root.
+	insertTrace(t, db, "trace-orphan", rootSession, orphanSession, "orphan-agent", 2,
+		[]string{rootSession, "ghost-parent", orphanSession}, "feat-orphan")
+	// Also seed the actual root so GetLineageByRoot has something to return.
+	insertTrace(t, db, "trace-orphan-root", rootSession, rootSession, "root-agent", 0,
+		[]string{rootSession}, "feat-root")
+
+	output, err := RenderAgentTree(db, rootSession)
+	if err != nil {
+		t.Fatalf("RenderAgentTree missing parent: %v", err)
+	}
+	if !strings.Contains(output, "orphan-agent") {
+		t.Errorf("orphan row should still render (as a root), got:\n%s", output)
+	}
+	if !strings.Contains(output, "root-agent") {
+		t.Errorf("actual root should render, got:\n%s", output)
+	}
+}

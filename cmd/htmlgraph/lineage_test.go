@@ -278,6 +278,87 @@ func TestLineageFileDispatch(t *testing.T) {
 	}
 }
 
+// TestLineageCommitRejectsUnsupportedFlags guards the contract that --timeline
+// and --depth are not honored for commit inputs (since TraceCommit is a flat
+// attribution query, not a graph walk).
+func TestLineageCommitRejectsUnsupportedFlags(t *testing.T) {
+	db := setupLineageDB(t)
+	if _, err := db.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp) VALUES (?, ?, ?, ?, ?)`,
+		"abcdef0123", "sess-rej", "feat-rej", "rejection test", time.Now().UTC().Format(time.RFC3339),
+	); err != nil {
+		t.Fatalf("seed commit: %v", err)
+	}
+
+	var buf bytes.Buffer
+	err := runLineage(&buf, db, "abcdef0123", lineageOpts{depth: 5, timelineSet: true})
+	if err == nil {
+		t.Error("expected --timeline on commit input to return an error")
+	}
+
+	buf.Reset()
+	err = runLineage(&buf, db, "abcdef0123", lineageOpts{depth: 10, depthSet: true})
+	if err == nil {
+		t.Error("expected --depth on commit input to return an error")
+	}
+}
+
+// TestLineageSessionJSONIncludesAgentTree covers the regression where session
+// --json dropped the agent spawn tree that the text output displayed.
+func TestLineageSessionJSONIncludesAgentTree(t *testing.T) {
+	db := setupLineageDB(t)
+	rootSession := "sess-jsontree"
+	childSession := "sess-jsontree-child"
+	if err := dbpkg.InsertLineageTrace(db, &models.LineageTrace{
+		TraceID: "lt-jt-root", RootSessionID: rootSession, SessionID: rootSession,
+		AgentName: "orchestrator-jt", Depth: 0, Path: []string{rootSession},
+		FeatureID: "feat-jt", StartedAt: time.Now().UTC(), Status: "active",
+	}); err != nil {
+		t.Fatalf("seed root trace: %v", err)
+	}
+	if err := dbpkg.InsertLineageTrace(db, &models.LineageTrace{
+		TraceID: "lt-jt-child", RootSessionID: rootSession, SessionID: childSession,
+		AgentName: "sub-jt", Depth: 1, Path: []string{rootSession, childSession},
+		FeatureID: "feat-jt", StartedAt: time.Now().UTC(), Status: "active",
+	}); err != nil {
+		t.Fatalf("seed child trace: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := runLineage(&buf, db, rootSession, lineageOpts{depth: 5, jsonOut: true}); err != nil {
+		t.Fatalf("runLineage session --json: %v", err)
+	}
+	var got lineageJSON
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, buf.String())
+	}
+	if got.AgentTree == "" {
+		t.Error("session --json should include agent_tree, got empty")
+	}
+	if !strings.Contains(got.AgentTree, "orchestrator-jt") {
+		t.Errorf("agent_tree should include the orchestrator, got:\n%s", got.AgentTree)
+	}
+}
+
+// TestLineageTimelineEmptyTimestampsLast guards the timeline ordering
+// regression: nodes without a timestamp used to sort BEFORE dated nodes
+// because "" < any real timestamp string.
+func TestLineageTimelineEmptyTimestampsLast(t *testing.T) {
+	nodes := []lineageNode{
+		{ID: "late", Timestamp: "2026-04-14T10:00:00Z"},
+		{ID: "no-ts", Timestamp: ""},
+		{ID: "early", Timestamp: "2026-01-01T00:00:00Z"},
+		{ID: "no-ts-2", Timestamp: ""},
+	}
+	sortLineageTimeline(nodes)
+	want := []string{"early", "late", "no-ts", "no-ts-2"}
+	for i, n := range nodes {
+		if n.ID != want[i] {
+			t.Errorf("position %d: got %q, want %q (full order: %v)", i, n.ID, want[i], nodes)
+		}
+	}
+}
+
 // TestLineageRegressionTraceUnchanged is a compile-time guarantee that the
 // existing trace command surface is untouched. If trace.go's exported helpers
 // disappear, this test fails to compile.

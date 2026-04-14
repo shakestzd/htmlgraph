@@ -93,10 +93,18 @@ func detectLineageKind(arg string) lineageKind {
 }
 
 // lineageOpts is the flag bundle for `htmlgraph lineage`.
+//
+// depthSet and timelineSet record whether the user explicitly passed the
+// corresponding flag on the command line. The commit and file routes reject
+// those flags instead of silently ignoring them, so we can't rely on raw
+// values — depth defaults to 5 and timeline defaults to false, both of which
+// could collide with a deliberate user input.
 type lineageOpts struct {
-	depth    int
-	jsonOut  bool
-	timeline bool
+	depth       int
+	jsonOut     bool
+	timeline    bool
+	depthSet    bool
+	timelineSet bool
 }
 
 // lineageNode is one hop in a forward or backward chain. It is the wire format
@@ -118,16 +126,20 @@ type lineageNode struct {
 //	  "root":     "<id>",
 //	  "kind":     "feature|bug|...",
 //	  "forward":  [{id,type,title,edge_type,depth,timestamp?}, ...],
-//	  "backward": [{id,type,title,edge_type,depth,timestamp?}, ...]
+//	  "backward": [{id,type,title,edge_type,depth,timestamp?}, ...],
+//	  "agent_tree": "<indented text>"   // only for session roots
 //	}
 //
 // Forward edges follow `from_node_id = root` outward; backward edges follow
-// `to_node_id = root` inward. Each list is depth-ordered (BFS).
+// `to_node_id = root` inward. Each list is depth-ordered (BFS). For session
+// roots the agent spawn tree is included as preformatted text so the --json
+// output carries the same information as the human-readable view.
 type lineageJSON struct {
-	Root     string        `json:"root"`
-	Kind     string        `json:"kind"`
-	Forward  []lineageNode `json:"forward"`
-	Backward []lineageNode `json:"backward"`
+	Root      string        `json:"root"`
+	Kind      string        `json:"kind"`
+	Forward   []lineageNode `json:"forward"`
+	Backward  []lineageNode `json:"backward"`
+	AgentTree string        `json:"agent_tree,omitempty"`
 }
 
 // allLineageRels lists all 10 relationship types we traverse. We do NOT subset:
@@ -167,7 +179,7 @@ Examples:
   htmlgraph lineage sess-abc123 --json
   htmlgraph lineage feat-48b3783c --timeline`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := findHtmlgraphDir()
 			if err != nil {
 				return err
@@ -177,6 +189,8 @@ Examples:
 				return err
 			}
 			defer db.Close()
+			opts.depthSet = cmd.Flags().Changed("depth")
+			opts.timelineSet = cmd.Flags().Changed("timeline")
 			return runLineage(os.Stdout, db, args[0], opts)
 		},
 	}
@@ -221,22 +235,27 @@ func runLineage(w io.Writer, db *sql.DB, arg string, opts lineageOpts) error {
 		annotateTimestamps(db, backward)
 	}
 
+	// Session roots carry an agent spawn tree as a secondary view. Render it
+	// once so both the JSON and text outputs can include it.
+	var agentTree string
+	if kind == kindSession {
+		if tree, treeErr := RenderAgentTree(db, arg); treeErr == nil {
+			agentTree = tree
+		}
+	}
+
 	if opts.jsonOut {
-		return renderLineageJSON(w, arg, kind, forward, backward)
+		return renderLineageJSON(w, arg, kind, forward, backward, agentTree)
 	}
 
 	if err := renderLineageTree(w, db, arg, kind, forward, backward, opts.timeline); err != nil {
 		return err
 	}
 
-	// For session inputs, additionally render the agent spawn tree.
-	if kind == kindSession {
-		tree, treeErr := RenderAgentTree(db, arg)
-		if treeErr == nil && strings.TrimSpace(tree) != "" {
-			fmt.Fprintln(w)
-			fmt.Fprintln(w, "Agent spawn chain:")
-			fmt.Fprint(w, tree)
-		}
+	if strings.TrimSpace(agentTree) != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Agent spawn chain:")
+		fmt.Fprint(w, agentTree)
 	}
 	return nil
 }
@@ -346,6 +365,25 @@ func bfsWalk(db *sql.DB, root string, rels []string, maxDepth int, forward bool)
 	return result, nil
 }
 
+// sortLineageTimeline sorts nodes in place by ascending Timestamp, pushing
+// nodes without a timestamp to the END so "oldest first" rendering is honest
+// even when only part of the walk has temporal data.
+func sortLineageTimeline(nodes []lineageNode) {
+	sort.SliceStable(nodes, func(i, j int) bool {
+		ai, bj := nodes[i].Timestamp, nodes[j].Timestamp
+		if ai == "" && bj == "" {
+			return false
+		}
+		if ai == "" {
+			return false
+		}
+		if bj == "" {
+			return true
+		}
+		return ai < bj
+	})
+}
+
 // annotateTimestamps fills in lineageNode.Timestamp by joining git_commits
 // (commit_hash) and agent_events (session_id). Best-effort: missing rows
 // silently leave Timestamp empty so timeline rendering still includes them.
@@ -370,13 +408,14 @@ func annotateTimestamps(db *sql.DB, nodes []lineageNode) {
 	}
 }
 
-// renderLineageJSON emits the stable {root, kind, forward, backward} schema.
-func renderLineageJSON(w io.Writer, root string, kind lineageKind, forward, backward []lineageNode) error {
+// renderLineageJSON emits the stable {root, kind, forward, backward, agent_tree?} schema.
+func renderLineageJSON(w io.Writer, root string, kind lineageKind, forward, backward []lineageNode, agentTree string) error {
 	out := lineageJSON{
-		Root:     root,
-		Kind:     kind.String(),
-		Forward:  forward,
-		Backward: backward,
+		Root:      root,
+		Kind:      kind.String(),
+		Forward:   forward,
+		Backward:  backward,
+		AgentTree: agentTree,
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
@@ -405,9 +444,7 @@ func renderLineageTree(
 		all := make([]lineageNode, 0, len(forward)+len(backward))
 		all = append(all, backward...)
 		all = append(all, forward...)
-		sort.SliceStable(all, func(i, j int) bool {
-			return all[i].Timestamp < all[j].Timestamp
-		})
+		sortLineageTimeline(all)
 		fmt.Fprintln(w, "\n  Timeline (oldest first):")
 		if len(all) == 0 {
 			fmt.Fprintln(w, "    (no related nodes)")
@@ -442,6 +479,9 @@ func renderLineageTree(
 // primitive and renders the result. Commits are not graph_edges nodes, so a
 // bidirectional bfsWalk would return empty — this is the correct surface.
 func runLineageCommit(w io.Writer, db *sql.DB, sha string, opts lineageOpts) error {
+	if opts.timelineSet || opts.depthSet {
+		return fmt.Errorf("--timeline and --depth are not supported for commit inputs; use `htmlgraph lineage <work-item-id>` for graph traversal")
+	}
 	commits, err := dbpkg.TraceCommit(db, sha)
 	if err != nil {
 		return fmt.Errorf("trace commit: %w", err)
@@ -486,6 +526,9 @@ func runLineageCommit(w io.Writer, db *sql.DB, sha string, opts lineageOpts) err
 // and renders the result. Same rationale as runLineageCommit: files are not
 // graph_edges nodes.
 func runLineageFile(w io.Writer, db *sql.DB, filePath string, opts lineageOpts) error {
+	if opts.timelineSet || opts.depthSet {
+		return fmt.Errorf("--timeline and --depth are not supported for file inputs; use `htmlgraph lineage <work-item-id>` for graph traversal")
+	}
 	results, err := dbpkg.TraceFile(db, filePath)
 	if err != nil {
 		return fmt.Errorf("trace file: %w", err)

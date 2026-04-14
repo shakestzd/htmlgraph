@@ -31,8 +31,10 @@ func RenderAgentTree(db *sql.DB, rootSessionID string) (string, error) {
 	}
 
 	// Build parent→children adjacency list.
-	// A row is a root when len(path) < 2 (cannot derive a parent).
-	// Otherwise parent = path[len(path)-2].
+	// A row is a root when len(path) < 2 (cannot derive a parent) OR when its
+	// derived parent session is missing from bySession — that happens for
+	// partial or inconsistent lineage data and promoting the orphan to a root
+	// keeps it visible instead of dropping it silently.
 	children := make(map[string][]string) // parentSessionID -> []childSessionID
 	var roots []string
 
@@ -40,10 +42,14 @@ func RenderAgentTree(db *sql.DB, rootSessionID string) (string, error) {
 		t := &traces[i]
 		if len(t.Path) < 2 {
 			roots = append(roots, t.SessionID)
-		} else {
-			parent := t.Path[len(t.Path)-2]
-			children[parent] = append(children[parent], t.SessionID)
+			continue
 		}
+		parent := t.Path[len(t.Path)-2]
+		if _, ok := bySession[parent]; !ok {
+			roots = append(roots, t.SessionID)
+			continue
+		}
+		children[parent] = append(children[parent], t.SessionID)
 	}
 
 	sep := strings.Repeat("─", 60)
