@@ -519,6 +519,28 @@ func TestWarnMissingFields_ErrorMessageGuidance(t *testing.T) {
 	if !stringContains(msg, "--track") {
 		t.Errorf("error message should mention '--track': %q", msg)
 	}
+	// Retrieval-first framing: relevant command must appear before track list.
+	if !stringContains(msg, "htmlgraph relevant") {
+		t.Errorf("error message should mention 'htmlgraph relevant' for retrieval-first discovery: %q", msg)
+	}
+	if !stringContains(msg, "last resort") {
+		t.Errorf("error message should frame track creation as 'last resort': %q", msg)
+	}
+}
+
+func TestWarnMissingFields_BugErrorMessageRetrievalFirst(t *testing.T) {
+	opts := &wiCreateOpts{description: "some description"}
+	err := warnMissingFields("bug", opts)
+	if err == nil {
+		t.Fatal("expected error for bug without --track, got nil")
+	}
+	msg := err.Error()
+	if !stringContains(msg, "htmlgraph relevant") {
+		t.Errorf("bug error message should mention 'htmlgraph relevant': %q", msg)
+	}
+	if !stringContains(msg, "last resort") {
+		t.Errorf("bug error message should frame track creation as 'last resort': %q", msg)
+	}
 }
 
 // testHgDirWithDB creates a temp dir with .htmlgraph subdirs and a seeded

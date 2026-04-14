@@ -111,7 +111,7 @@ func warnMissingFields(typeName string, o *wiCreateOpts) error {
 	// Features and bugs require a track to link to an initiative.
 	// Features with an explicit standalone_reason are exempt from the track requirement.
 	if o.trackID == "" && (typeName == "feature" || typeName == "bug") && !(typeName == "feature" && o.standaloneReason != "") {
-		msg := fmt.Sprintf("%s requires --track <trk-id> to link to an initiative.\nRun 'htmlgraph track list' to see existing tracks.\nTo create a new track: htmlgraph track create \"Track Title\"", typeName)
+		msg := fmt.Sprintf("%s requires --track <trk-id> to link to an initiative.\n\nFind the right existing track before creating a new one:\n  1. htmlgraph relevant \"<topic from your work>\"   — searches by content\n  2. htmlgraph track list                          — enumerate all tracks\n\nOnly if no existing track fits, create one as a last resort:\n  htmlgraph track create \"Track Title\"", typeName)
 
 		// For bugs with --files, try to suggest the track via file ownership.
 		if typeName == "bug" && o.files != "" {

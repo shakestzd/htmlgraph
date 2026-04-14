@@ -55,12 +55,21 @@ type LaunchOpts struct {
 }
 
 func claudeCmd() *cobra.Command {
-	var dev, init_, continue_, auto bool
+	var dev, init_, continue_, auto, tmux bool
 
 	cmd := &cobra.Command{
 		Use:   "claude",
 		Short: "Launch Claude Code with HtmlGraph",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Tmux wrap must happen before any side-effecting work.
+			// When --tmux is set and we are not already inside tmux, this
+			// replaces the current process with: tmux new-session -A -s htmlgraph-dev -- <argv without --tmux>
+			// and never returns. If tmux is missing, an error is returned.
+			// If we are already inside tmux (TMUX env set), this is a no-op.
+			_ = tmux // flag is consumed via os.Args inspection in maybeTmuxWrap
+			if err := maybeTmuxWrap("htmlgraph-dev"); err != nil {
+				return err
+			}
 			switch {
 			case dev:
 				return launchClaudeDev(args, auto)
@@ -79,6 +88,7 @@ func claudeCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&auto, "auto", false, "Launch with auto mode enabled (autonomous operation)")
 	cmd.Flags().BoolVar(&init_, "init", false, "Launch with marketplace plugin installation")
 	cmd.Flags().BoolVar(&continue_, "continue", false, "Resume last session with marketplace plugin")
+	cmd.Flags().BoolVar(&tmux, "tmux", false, "Wrap in a tmux session named 'htmlgraph-dev' (survives disconnects; reattaches on re-run)")
 	cmd.AddCommand(yoloCmd())
 	return cmd
 }

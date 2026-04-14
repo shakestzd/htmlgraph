@@ -370,7 +370,21 @@
       "Bash(/home/vscode/.claude/omp-claude-wrapper.sh)",
       "Bash(npx playwright:*)",
       "mcp__plugin_playwright_playwright__browser_evaluate",
-      "Bash(./plugin/hooks/bin/htmlgraph plan:*)"
+      "Bash(./plugin/hooks/bin/htmlgraph plan:*)",
+      "Bash(staticcheck ./cmd/htmlgraph/)",
+      "Bash(gh issue:*)",
+      "Bash(ps -o pid,cmd -p 35351 81138)",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "Bash(ldd /workspaces/htmlgraph/plugin/hooks/bin/htmlgraph)",
+      "Bash(readelf -d /workspaces/htmlgraph/plugin/hooks/bin/htmlgraph)",
+      "Bash(/home/vscode/.local/bin/htmlgraph version:*)",
+      "Bash(gh repo:*)",
+      "Bash(set -e)",
+      "Bash(sed -n '35,45p' cmd/htmlgraph/plan_cmds.go)",
+      "Bash(sed -n '140,150p' cmd/htmlgraph/plan_generate_test.go)",
+      "Bash(command -v shellcheck)",
+      "Bash(disown)",
+      "Bash(gh pr:*)"
     ]
   },
   "statusLine": {

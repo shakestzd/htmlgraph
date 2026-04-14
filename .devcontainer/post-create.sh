@@ -15,6 +15,9 @@ cd "$(dirname "$0")/.."
 
 export PATH="${HOME}/.local/bin:${PATH}"
 
+echo "==> Installing tmux..."
+sudo apt-get update && sudo apt-get install -y tmux
+
 echo "==> Installing AI agent CLIs..."
 npm install -g --no-fund --no-audit \
     @anthropic-ai/claude-code \
@@ -42,6 +45,50 @@ echo "==> Installing Oh My Posh..."
 if ! command -v oh-my-posh >/dev/null 2>&1; then
   curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$HOME/.local/bin"
 fi
+
+echo "==> Ensuring \$HOME/.local/bin is on PATH in shell rc files..."
+for _rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  if [ -f "$_rc" ] && ! grep -q '.local/bin' "$_rc"; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$_rc"
+  fi
+done
+
+echo "==> Installing HtmlGraph + Oh My Posh Claude Code wrapper..."
+mkdir -p "$HOME/.claude"
+if [ ! -f "$HOME/.claude/omp-claude-wrapper.sh" ]; then
+  cat > "$HOME/.claude/omp-claude-wrapper.sh" << 'EOF'
+#!/bin/bash
+# HtmlGraph + Oh My Posh wrapper for Claude Code status line
+
+_dir="$(pwd)"
+while [ "$_dir" != "/" ]; do
+    [ -d "$_dir/.htmlgraph" ] && break
+    _dir=$(dirname "$_dir")
+done
+if [ "$_dir" = "/" ]; then
+    echo ""
+    exit 0
+fi
+
+INPUT=$(cat)
+SESS_ID=$(echo "$INPUT" | python3 -c "import sys, json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+ACTIVE_WORK=$(htmlgraph statusline --session "$SESS_ID" 2>/dev/null)
+export HTMLGRAPH_ACTIVE="$ACTIVE_WORK"
+
+OMP_BIN="${HTMLGRAPH_OMP_BIN:-$(which oh-my-posh 2>/dev/null)}"
+OMP_CONFIG="${HTMLGRAPH_OMP_CONFIG:-$HOME/.claude.omp.json}"
+
+if [ -n "$OMP_BIN" ] && [ -f "$OMP_CONFIG" ]; then
+    echo "$INPUT" | "$OMP_BIN" claude --config "$OMP_CONFIG"
+else
+    echo "$ACTIVE_WORK"
+fi
+EOF
+fi
+chmod +x "$HOME/.claude/omp-claude-wrapper.sh"
+
+echo "==> Installing Claude Code Oh My Posh theme..."
+[ -f "$HOME/.claude.omp.json" ] || cp "$(dirname "$0")/claude.omp.json" "$HOME/.claude.omp.json"
 
 echo "==> Installing oh-my-zsh..."
 if [ ! -d "$HOME/.oh-my-zsh" ]; then

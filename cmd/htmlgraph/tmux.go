@@ -8,8 +8,6 @@ import (
 	"syscall"
 )
 
-const tmuxSessionName = "htmlgraph-yolo"
-
 // tmuxWrapAction describes what maybeTmuxWrap should do.
 type tmuxWrapAction int
 
@@ -53,9 +51,13 @@ func stripTmuxFlag(args []string) []string {
 }
 
 // maybeTmuxWrap checks whether the current process should be re-executed inside
-// a tmux session. It must be called early in the yolo command Run function —
+// a tmux session. It must be called early in a command's Run function —
 // before any side-effecting work — because if it decides to exec, the current
 // process is replaced entirely and nothing after the call runs.
+//
+// sessionName is the tmux session name to attach to or create (e.g. "htmlgraph-yolo"
+// or "htmlgraph-dev"). Different commands pass different names so their sessions
+// are independent and can survive in parallel.
 //
 // When --tmux is not set, or we are already inside tmux, the function is a no-op
 // and returns nil so the caller can continue normally.
@@ -64,7 +66,7 @@ func stripTmuxFlag(args []string) []string {
 //
 // When re-exec is needed, this function does not return (on Unix) — it replaces
 // the process via syscall.Exec.
-func maybeTmuxWrap() error {
+func maybeTmuxWrap(sessionName string) error {
 	// Determine whether --tmux flag was present via os.Args inspection.
 	tmuxFlag := false
 	for _, a := range os.Args {
@@ -96,7 +98,7 @@ func maybeTmuxWrap() error {
 		childArgv := stripTmuxFlag(os.Args)
 
 		// tmux new-session -A -s <name> -- <argv>
-		tmuxArgv := []string{tmuxPath, "new-session", "-A", "-s", tmuxSessionName, "--"}
+		tmuxArgv := []string{tmuxPath, "new-session", "-A", "-s", sessionName, "--"}
 		tmuxArgv = append(tmuxArgv, childArgv...)
 
 		// Replace the current process with tmux. On Unix this never returns.

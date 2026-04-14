@@ -40,7 +40,7 @@ Without either flag, launches in planning mode to help you create one first.`,
 			// and never returns. If tmux is missing, an error is returned.
 			// If we are already inside tmux (TMUX env set), this is a no-op.
 			_ = tmux // flag is consumed via os.Args inspection in maybeTmuxWrap
-			if err := maybeTmuxWrap(); err != nil {
+			if err := maybeTmuxWrap("htmlgraph-yolo"); err != nil {
 				return err
 			}
 			switch {

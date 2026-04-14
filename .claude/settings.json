@@ -11,7 +11,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/Users/shakes/.claude/omp-claude-wrapper.sh",
+    "command": "/home/vscode/.claude/omp-claude-wrapper.sh",
     "padding": 0
   },
   "plansDirectory": ".htmlgraph/plans/",
