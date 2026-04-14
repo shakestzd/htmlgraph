@@ -10,7 +10,7 @@ meta:
     version: 1
 design:
     problem: |
-        HtmlGraph has the richest work-graph data layer of any local-first dev tool — nine typed edges in `graph_edges`, `agent_lineage_trace` with full orchestrator→subagent spawn chains, `git_commits` attribution, and `feature_files` ownership — but the surface is thin. `trace <sha>` walks commit→session→feature→track but only in one direction. `graph` subcommands expose primitives (`reach`, `path`, `sessions`) but never narrate a causal chain. `agent_lineage_trace` has no CLI at all. A user with a bug cannot ask "what chain of prompts, plans, sessions, and commits produced this?" in one command, even though every fact needed is in SQLite. Meanwhile the README leads with "observability" — a supporting capability — while the most differentiated subsystem is unmentioned. The result is orphaned value: built, working, invisible.
+        HtmlGraph has the richest work-graph data layer of any local-first dev tool — ten typed edges in `graph_edges` (`blocks`, `blocked_by`, `relates_to`, `implements`, `caused_by`, `spawned_from`, `implemented_in`, `part_of`, `contains`, `planned_in`), `agent_lineage_trace` with full orchestrator→subagent spawn chains, `git_commits` attribution, and `feature_files` ownership — but the surface is thin. Crucially, `planned_in` is the edge that links a plan to its implementing features, so any lineage traversal that ignores it would miss the most compelling plan→feature→commit→bug demo. `trace <sha>` walks commit→session→feature→track but only in one direction. `graph` subcommands expose primitives (`reach`, `path`, `sessions`) but never narrate a causal chain. `agent_lineage_trace` has no CLI at all. A user with a bug cannot ask "what chain of prompts, plans, sessions, and commits produced this?" in one command, even though every fact needed is in SQLite. Meanwhile the README leads with "observability" — a supporting capability — while the most differentiated subsystem is unmentioned. The result is orphaned value: built, working, invisible.
     goals:
         - '**Unified lineage command** — `htmlgraph lineage <any-id>` walks both directions across all edge types and produces a human-readable causal chain in one call'
         - '**Surgical surface additions** — `trace <feature-id>` (reverse direction), `history <id>` (git log wrapper), agent spawn tree rendering, without building a new command family'
@@ -23,6 +23,9 @@ design:
         - Cross-project lineage is out of scope — `projects.json` registry exists but cross-project traversal is a separate concern.
         - No shared rendering package exists today — inline `fmt.Printf` + `strings.Repeat('─', 60)` is the convention. Do not introduce a rendering package as part of this plan; match existing style.
         - The plan must ship code and docs repositioning together — the pitch without the command is a broken promise, the command without the pitch is orphaned again.
+        - '`DBReachable` in `internal/graph/algorithms.go:101` is forward-only — `loadAdjacencyList` builds a one-way map. Bidirectional lineage walks must add a reverse-query helper (pattern exists at `internal/hooks/user_prompt.go:238`: inline `SELECT from_node_id FROM graph_edges WHERE to_node_id = ?`). No new `internal/graph` primitive — keep the reverse walk inline in `lineage.go` to avoid expanding the algorithms package.'
+        - 'Terminology: ''causal chain'' here means graph traversal across typed edges, not deterministic event ordering. For a true chronological view, use the `--timeline` flag which sorts the same traversal results by `timestamp` from joined `git_commits` / `agent_events`. The two are complementary views of the same walk.'
+        - 'Ambiguity handling: when a file touches multiple features or a feature has multiple ancestor plans, `lineage` returns ALL chains (not just one), marked as branches in the tree. Users get a complete picture, not a heuristic pick.'
     approved: false
     comment: ""
 slices:
@@ -30,7 +33,7 @@ slices:
       num: 1
       title: 'Reverse `trace` direction: feature → commits → sessions → files'
       what: |
-        Extend `cmd/htmlgraph/trace.go` to detect when the argument is a work-item ID (`feat-`, `bug-`, `spk-` prefix) and route to a new `runTraceFeature` function. This function calls `db.GetCommitsByFeature`, joins each commit to its session, calls `db.ListFilesForFeature` (or equivalent using `feature_files`), and prints a text report in the existing separator style. Reuses `FormatNodeLabel` + `ResolveToMap` for ID→title display. Add `--json` flag while touching the file.
+        Extend `cmd/htmlgraph/trace.go` to detect when the argument is a work-item ID (`feat-`, `bug-`, `spk-` prefix) and route to a new `runTraceFeature` function. This function calls `db.GetCommitsByFeature` (`internal/db/lineage_repo.go:192`), joins each commit to its session, calls `db.ListFilesByFeature` (`internal/db/feature_files_repo.go:43` — note: plan originally named this incorrectly as `ListFilesForFeature`), and prints a text report in the existing separator style. Reuses `FormatNodeLabel` + `ResolveToMap` for ID→title display. Add `--json` flag while touching the file.
       why: |
         Closes the asymmetry in `trace`. Right now `trace <sha>` walks up from a commit, but the inverse — "what commits, sessions, and files did this feature produce?" — requires three separate commands. This is the cheapest, most surgical win on the list and the template for what `lineage <id>` will do on a larger scale.
       files:
@@ -66,6 +69,7 @@ slices:
         - 'Works for all work-item prefixes: `feat-`, `bug-`, `spk-`, `plan-`, `trk-`'
         - '`--json` emits a structured array of commits'
         - Returns a clear error if the file does not exist (never existed or was archived)
+        - If the work item was archived (moved to `.htmlgraph/archives/`), history falls back to that path and follows the rename via `git log --follow`
       effort: S
       risk: Low
       tests: |
@@ -88,8 +92,9 @@ slices:
       done_when:
         - New `RenderAgentTree(db, rootSessionID) (string, error)` function produces an indented tree from `agent_lineage_trace` rows
         - Parent/child edges are reconstructed correctly from the `path[]` JSON column (parent = `path[len-2]`)
+        - Guards against `len(path) < 2` — root rows with single-element or empty path must not panic (depth=0 nodes are rendered as roots with no parent)
         - 'Each node shows: agent name, session ID (short), depth, feature_id'
-        - Function has unit test with at least a 3-level tree
+        - Function has unit test with at least a 3-level tree plus a root-only edge case
       effort: S
       risk: Low
       tests: |
@@ -102,7 +107,7 @@ slices:
       num: 4
       title: '`lineage <any-id>` — headline unified causal chain command'
       what: |
-        New top-level command `cmd/htmlgraph/lineage.go`. Takes any ID type (feature, bug, session, commit SHA, file path) and produces a causal chain report. Detects type by prefix or pattern, then dispatches:
+        New top-level command `cmd/htmlgraph/lineage.go`. Takes any ID type (feature, bug, spike, plan, session, commit SHA, file path) and produces a causal chain report. Detects type by prefix or pattern, then dispatches. Bidirectional traversal is implemented inline: forward via the existing `DBReachable` (`internal/graph/algorithms.go:101`), backward via a new `reverseNeighbors(db, id, edgeTypes)` helper in `lineage.go` that runs `SELECT from_node_id FROM graph_edges WHERE to_node_id = ? AND relationship_type IN (...)` (pattern from `internal/hooks/user_prompt.go:238`). No new primitive in `internal/graph`.
       why: |
         This is the headline. Every other slice is a primitive that this command composes. A user with a production bug should be able to run `htmlgraph lineage bug-xxxx` and see a single narrated answer: the chain of prompts, plans, features, sessions, sub-agents, and commits that produced it. Without this command, the lineage data layer remains orphaned value.
       files:
@@ -113,7 +118,10 @@ slices:
         - 2
         - 3
       done_when:
-        - '`htmlgraph lineage feat-xxxxxxxx` walks edges both directions and prints a causal chain'
+        - '`htmlgraph lineage feat-xxxxxxxx` walks edges both directions (forward via DBReachable, backward via inline reverseNeighbors helper) and prints a causal chain'
+        - '`htmlgraph lineage plan-xxxxxxxx` follows `planned_in` edges to implementing features and renders the full plan→feature→commit chain'
+        - Traversal includes all ten edge types from `internal/models/enums.go:27`, not a subset
+        - When an ID has multiple ancestors or descendants (branching lineage), ALL chains are rendered as branches in the tree — not a heuristic pick of one
         - '`htmlgraph lineage <session-id>` renders agent spawn tree + commits + features'
         - '`htmlgraph lineage <sha>` walks up from commit to feature AND down from feature to other commits/files'
         - '`htmlgraph lineage path/to/file.go` shows features touching the file + each feature''s chain'
@@ -222,3 +230,130 @@ questions:
         - key: follow-up
           label: 'Follow-up PR: ship slices 1-4, update docs in a separate PR. Faster release. Risk: docs slip and value stays orphaned.'
       answer: null
+critique:
+    reviewed_at: "2026-04-14"
+    reviewers:
+        - Haiku (design review)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: falsified
+          text: Nine typed edges in graph_edges
+          evidence: Actual count is ten in internal/models/enums.go:27 — planned_in was missing. Plan updated.
+        - id: A2
+          status: falsified
+          text: db.ListFilesForFeature is the file listing function
+          evidence: Actual name is db.ListFilesByFeature at internal/db/feature_files_repo.go:43. Plan updated.
+        - id: A3
+          status: falsified
+          text: DBReachable walks edges in both directions
+          evidence: internal/graph/algorithms.go:101 + loadAdjacencyList:141 build a one-way forward map. Backward walk must be inline reverse query. Slice 4 updated to reflect this.
+        - id: A4
+          status: questionable
+          text: Causal chain and graph traversal are the same problem
+          evidence: Design critic flagged that narration (why) vs reachability (what) are different UX problems. Constraint added clarifying that this plan treats them as complementary views of the same walk.
+        - id: A5
+          status: plausible
+          text: path[len-2] parent derivation is safe for all agent_lineage_trace rows
+          evidence: Structurally correct but panics on len(path) < 2. Slice 3 gained explicit guard requirement.
+        - id: A6
+          status: verified
+          text: No cmd/htmlgraph/lineage.go namespace collision
+          evidence: Grep confirms neither lineage.go nor lineage_tree.go exist.
+        - id: A7
+          status: verified
+          text: help --compact auto-regenerates from cobra tree
+          evidence: cmd/htmlgraph/help.go:19 walks root.Commands() at runtime.
+        - id: A8
+          status: verified
+          text: FormatNodeLabel and ResolveToMap are reusable primitives
+          evidence: internal/graph/algorithms.go:180,192 — both exported, signatures match plan usage.
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Slice Assessment
+              items:
+                - badge: S1
+                  kind: success
+                  text: Well-scoped, surgical, closes an obvious asymmetry. Template for slice 4.
+                - badge: S2
+                  kind: warn
+                  text: Over-scoped relative to purpose. history is just git log wrapping — could be a --history flag on trace or lineage. Flagged for q-command-shape discussion; kept as slice for now to preserve composability.
+                - badge: S3
+                  kind: warn
+                  text: Valuable but could be a --agents flag on slice 4. Kept as separate primitive because agent_lineage_trace has no CLI today and the rendering logic is reusable.
+                - badge: S4
+                  kind: info
+                  text: Core of the plan, scope sharpened after feasibility review. Output format (q-lineage-output-format) MUST be answered before implementation or rework is guaranteed.
+                - badge: S5
+                  kind: warn
+                  text: Design critic argues this is a release gate, not a slice. Kept as slice to force tracking — without it as a deliverable, docs slip and value stays orphaned. q-repositioning-coupling asks whether to ship together.
+            - heading: Gaps & Missing Considerations
+              items:
+                - badge: Gap
+                  kind: warn
+                  text: Causal chain vs graph traversal ambiguity — addressed in design.constraints with explicit clarification that this plan treats them as complementary views.
+                - badge: Gap
+                  kind: warn
+                  text: 'Ambiguity in multi-parent/multi-child cases — addressed in design.constraints and slice 4 done_when: all chains rendered as branches, not heuristic pick.'
+                - badge: Gap
+                  kind: info
+                  text: Performance on deep chains not addressed. Mitigated by default --depth 5. No caching in scope for this plan.
+            - heading: Alternative Approaches
+              items:
+                - badge: Alt
+                  kind: info
+                  text: Timeline as primary, tree as flag — flipped mental model. Deferred to q-lineage-output-format for human decision.
+                - badge: Alt
+                  kind: info
+                  text: Drop slice 4, invest in making primitives compose via shell. Cleaner mental model but kills the single-command headline demo.
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: What Exists to Leverage
+              items:
+                - badge: Reuse
+                  kind: success
+                  text: db.GetCommitsByFeature (lineage_repo.go:192), db.ListFilesByFeature (feature_files_repo.go:43), db.TraceFile (feature_files_repo.go:154), db.GetLineageByRoot (lineage_repo.go:51), graph.FormatNodeLabel + ResolveToMap (algorithms.go:180,192), db.TraceCommit (lineage_repo.go:233).
+                - badge: Pattern
+                  kind: success
+                  text: Inline reverse-edge SQL pattern at internal/hooks/user_prompt.go:238 — use this for backward walk in slice 4, do not add a new internal/graph primitive.
+            - heading: What the Plan Gets Wrong
+              items:
+                - badge: Fix
+                  kind: danger
+                  text: Edge count was nine, actually ten — planned_in was missing. Critical for plan→feature demo. Fixed in design.problem and slice 4 dispatch.
+                - badge: Fix
+                  kind: danger
+                  text: ListFilesForFeature is actually ListFilesByFeature. Fixed in slice 1 what.
+                - badge: Fix
+                  kind: danger
+                  text: DBReachable is forward-only. Slice 4 updated with inline reverse-query helper.
+            - heading: Prior Art & Examples
+              items:
+                - badge: Prior
+                  kind: info
+                  text: cmd/htmlgraph/trace.go — separator output style and SHA prefix routing to mirror.
+                - badge: Prior
+                  kind: info
+                  text: cmd/htmlgraph/graph.go — cobra group registration and --json flag pattern.
+                - badge: Prior
+                  kind: info
+                  text: git log --graph (tree), git log --oneline --reverse (timeline), git blame (attribution) — mental models to draw from for output design.
+    risks:
+        - risk: Output format not pre-decided — slice 4 rebuild if q-lineage-output-format answer lands post-implementation
+          severity: High
+          mitigation: Question MUST be answered during human review before slice 4 is dispatched. execute must block on it.
+        - risk: Bidirectional traversal requires inline reverse-query helper not in internal/graph package
+          severity: Medium
+          mitigation: Pattern exists at user_prompt.go:238. Add helper function in lineage.go (~20 lines). Done_when covers verification.
+        - risk: path[len-2] panic on root rows with short path
+          severity: Medium
+          mitigation: Slice 3 done_when now requires explicit length guard + root-only unit test.
+        - risk: Ten edge types are a lot to traverse — output tree may be overwhelming without filtering
+          severity: Medium
+          mitigation: --depth 5 default limits breadth. Consider --relations flag in slice 4 if noise becomes a problem during implementation; not a blocker.
+        - risk: Slice 5 (repositioning) couples release to docs being right — if README examples drift from actual command output, release is blocked
+          severity: Medium
+          mitigation: 'Covered by q-repositioning-coupling. Recommendation: ship together with minimal README examples that are smoke-tested, defer prose polish to follow-up.'
+    synthesis: |
+        Plan is feasible and well-scoped after critique. Three falsified assumptions (edge count, function name, DBReachable direction) were mechanical bugs in the draft — all fixed in this revision without changing the plan's shape. The design critic's sharpest point — that "causal chain" is different from "graph traversal" — is a real UX concern but resolvable via the tree+timeline flag combination; clarified in design.constraints. The highest remaining risk is q-lineage-output-format being answered post-hoc; this must be a hard gate before slice 4 is dispatched. Slices 2, 3, and 5 were challenged as potentially reducible to flags or not-a-slice, but kept intact because each has a clear tracking reason (slice 2: discoverability of git-native temporal lineage, slice 3: first CLI surface for agent spawn data, slice 5: forcing function for doc alignment). The human reviewer may disagree with any of these and the corresponding questions are set up to capture that. Action items before dispatch: (1) answer q-lineage-output-format explicitly, (2) confirm q-command-shape decision to keep all five slices, (3) confirm q-repositioning-coupling ships-together choice.
