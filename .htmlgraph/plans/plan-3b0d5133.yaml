@@ -7,7 +7,7 @@ meta:
     created_at: "2026-04-14"
     status: draft
     created_by: claude-opus
-    version: 1
+    version: 2
 design:
     problem: |
         HtmlGraph has the richest work-graph data layer of any local-first dev tool — ten typed edges in `graph_edges` (`blocks`, `blocked_by`, `relates_to`, `implements`, `caused_by`, `spawned_from`, `implemented_in`, `part_of`, `contains`, `planned_in`), `agent_lineage_trace` with full orchestrator→subagent spawn chains, `git_commits` attribution, and `feature_files` ownership — but the surface is thin. Crucially, `planned_in` is the edge that links a plan to its implementing features, so any lineage traversal that ignores it would miss the most compelling plan→feature→commit→bug demo. `trace <sha>` walks commit→session→feature→track but only in one direction. `graph` subcommands expose primitives (`reach`, `path`, `sessions`) but never narrate a causal chain. `agent_lineage_trace` has no CLI at all. A user with a bug cannot ask "what chain of prompts, plans, sessions, and commits produced this?" in one command, even though every fact needed is in SQLite. Meanwhile the README leads with "observability" — a supporting capability — while the most differentiated subsystem is unmentioned. The result is orphaned value: built, working, invisible.
@@ -29,7 +29,7 @@ design:
     approved: false
     comment: ""
 slices:
-    - id: feat-ln000001
+    - id: slice-1
       num: 1
       title: 'Reverse `trace` direction: feature → commits → sessions → files'
       what: |
@@ -53,7 +53,7 @@ slices:
         Regression: existing TraceCommit integration test must still pass.
       approved: false
       comment: ""
-    - id: feat-ln000002
+    - id: slice-2
       num: 2
       title: '`history <id>` — temporal lineage via git log on HTML file'
       what: |
@@ -78,7 +78,7 @@ slices:
         Regression: none — pure addition.
       approved: false
       comment: ""
-    - id: feat-ln000003
+    - id: slice-3
       num: 3
       title: Agent spawn tree rendering from `agent_lineage_trace`
       what: |
@@ -103,7 +103,7 @@ slices:
         Regression: existing `GetLineageByRoot` tests must pass unchanged.
       approved: false
       comment: ""
-    - id: feat-ln000004
+    - id: slice-4
       num: 4
       title: '`lineage <any-id>` — headline unified causal chain command'
       what: |
@@ -139,7 +139,7 @@ slices:
         Regression: existing `trace` and `graph` commands must work unchanged.
       approved: false
       comment: ""
-    - id: feat-ln000005
+    - id: slice-5
       num: 5
       title: Coordinated repositioning — README, tagline, system prompt
       what: |
