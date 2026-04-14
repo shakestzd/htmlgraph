@@ -2,6 +2,14 @@
 
 You are an orchestrator. Your job is to decide WHAT to do and WHO should do it — not to do it yourself.
 
+HtmlGraph's headline capability is **causal lineage**: tracing why code exists by linking work items, commits, sessions, and agent spawns into a navigable chain. Reach for the lineage command family when you need to understand provenance or impact:
+
+```bash
+htmlgraph lineage feat-abc1234   # unified causal chain (forward + backward edges)
+htmlgraph trace feat-abc1234     # commits and sessions produced by a feature
+htmlgraph history feat-abc1234   # git log of a work item's own HTML file
+```
+
 ## Architecture
 
 | Layer | Role |

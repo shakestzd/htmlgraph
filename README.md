@@ -1,8 +1,8 @@
 # HtmlGraph
 
-**Local-first observability and coordination platform for AI-assisted development.**
+**Causal lineage and observability for AI-assisted development.**
 
-Work items, session tracking, custom agents, hooks, slash commands, quality gates, and a real-time dashboard — managed by a single Go binary, stored as HTML files in your repo. No external infrastructure required.
+Answer "why does this code exist?" in one command. HtmlGraph traces causal chains across work items, commits, sessions, and agent spawns — then stores everything as HTML files in your repo. No external infrastructure required.
 
 ## What this is NOT
 
@@ -58,6 +58,19 @@ htmlgraph serve                         # dashboard at localhost:4000
 
 ## What It Does
 
+**Causal lineage** — Trace the full causal chain for any work item, commit, session, or file. Three commands cover the common queries:
+
+```bash
+# Unified causal chain: forward edges (what this caused) + backward edges (what caused this)
+htmlgraph lineage feat-abc1234
+
+# Reverse direction: given a feature ID, list every commit and session it produced
+htmlgraph trace feat-abc1234
+
+# Temporal lineage: git log for a work item's HTML file — every edit, in order
+htmlgraph history feat-abc1234
+```
+
 **Work item tracking** — Features, bugs, spikes, and tracks as HTML files in `.htmlgraph/`. Every change is a git diff. Every item has a lifecycle: create, start, complete.
 
 **Session observability** — Hooks capture every tool call, every prompt, and attribute them to the active work item. See exactly what happened in any session via the dashboard.
@@ -72,7 +85,7 @@ htmlgraph serve                         # dashboard at localhost:4000
 
 **Real-time dashboard** — Activity feed, kanban board, session viewer, and work item detail — served locally by `htmlgraph serve`.
 
-**Multi-agent attribution and observation** — Claude Code, Gemini CLI, Codex, and GitHub Copilot all read from and write to the same work items. Every tool call, file edit, and session is attributed to a work item so you can see what each agent actually did.
+**Multi-agent attribution and observation** — Claude Code, Gemini CLI, Codex, and GitHub Copilot all read from and write to the same work items via the CLI. Every tool call, file edit, and session is attributed to a work item so you can see what each agent actually did. (Session transcript ingestion currently supports Claude Code JSONL format.)
 
 **Plans & specifications** — CRISPI plans break initiatives into trackable steps. Feature specs define acceptance criteria. Agents execute against the plan and report progress.
 
@@ -85,6 +98,13 @@ htmlgraph serve                         # dashboard at localhost:4000
 | Spike | `spk-` | Time-boxed investigations |
 | Track | `trk-` | Initiatives grouping related work |
 | Plan | `plan-` | CRISPI implementation plans |
+
+## Roadmap
+
+The lineage command family covers work items, commits, sessions, and files within a single repo. Two natural follow-ups are explicitly out of scope for now:
+
+- **Spec-as-node** — treating feature specs as first-class lineage nodes so acceptance criteria appear in the causal chain alongside the code that satisfies them.
+- **Cross-project lineage** — tracing chains across multiple repos registered in `~/.local/share/htmlgraph/projects.json`. Today each project's lineage is self-contained.
 
 ## CLI Reference
 
