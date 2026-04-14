@@ -20,60 +20,6 @@ type finalizeResult struct {
 	ExecuteCmd       string // CLI command to start working on the track
 }
 
-// planFinalizeCmd creates a cobra command for plan finalize.
-func planFinalizeCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "finalize <plan-id>",
-		Short: "Generate a work item graph from a plan",
-		Long: `Read a plan's steps (slices) and generate the work item graph:
-a track, features per slice, and edges for dependencies.
-
-Idempotent: re-running on an already-finalized plan is a no-op.
-
-Example:
-  htmlgraph plan finalize plan-a1b2c3d4`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			htmlgraphDir, err := findHtmlgraphDir()
-			if err != nil {
-				return err
-			}
-			p, err := workitem.Open(htmlgraphDir, "claude-code")
-			if err != nil {
-				return fmt.Errorf("open project: %w", err)
-			}
-			defer p.Close()
-
-			result, err := executePlanFinalize(p, htmlgraphDir, args[0])
-			if err != nil {
-				return err
-			}
-
-			if result.AlreadyFinalized {
-				fmt.Printf("Plan %s is already finalized", args[0])
-				if result.TrackID != "" {
-					fmt.Printf(" (track: %s)", result.TrackID)
-				}
-				fmt.Println()
-				if result.ExecuteCmd != "" {
-					fmt.Printf("\nExecute:\n  %s\n", result.ExecuteCmd)
-				}
-				return nil
-			}
-
-			fmt.Printf("Created track: %s\n", result.TrackID)
-			fmt.Printf("Created %d features\n", len(result.FeatureIDs))
-			for _, fid := range result.FeatureIDs {
-				fmt.Printf("  %s\n", fid)
-			}
-			if result.ExecuteCmd != "" {
-				fmt.Printf("\nExecute:\n  %s\n", result.ExecuteCmd)
-			}
-			return nil
-		},
-	}
-}
-
 // executePlanFinalize reads a plan's steps, creates a track and features,
 // wires edges, and marks the plan as finalized. Idempotent.
 func executePlanFinalize(p *workitem.Project, htmlgraphDir, planID string) (*finalizeResult, error) {
@@ -263,4 +209,181 @@ func findTrackForPlan(p *workitem.Project, planID string) string {
 		}
 	}
 	return ""
+}
+
+// ---- New YAML-first finalize (plan finalize v2) --------------------------------
+
+// planFinalizeFromYAMLCmd creates a cobra command for the new plan finalize.
+// This replaces the old finalize which created a new track. The new design:
+//  1. Validates: plan has a track, problem statement, and ≥1 slice.
+//  2. Creates real features for each slice, linked to plan + track.
+//  3. Writes the promoted feature_id back to each YAML slice.
+//  4. Marks plan status "finalized" and re-renders HTML.
+func planFinalizeFromYAMLCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "finalize <plan-id>",
+		Short: "Promote plan slices to real features and lock the plan",
+		Long: `Validate and finalize a YAML plan: promote each slice to a real feature
+linked to both the plan and its track. Writes feature IDs back to YAML.
+After finalize the plan is locked — use 'plan reopen' to unlock.
+
+Requires:
+  - plan has a track (set meta.track_id in YAML)
+  - plan has a non-empty problem statement
+  - plan has at least one slice
+
+Example:
+  htmlgraph plan finalize plan-a1b2c3d4`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			htmlgraphDir, err := findHtmlgraphDir()
+			if err != nil {
+				return err
+			}
+			p, err := workitem.Open(htmlgraphDir, agentForClaim())
+			if err != nil {
+				return fmt.Errorf("open project: %w", err)
+			}
+			defer p.Close()
+
+			result, err := executePlanFinalizeFromYAML(p, htmlgraphDir, args[0])
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("%d features created, plan locked\n", len(result.FeatureIDs))
+			fmt.Printf("Track: %s\n", result.TrackID)
+			for _, fid := range result.FeatureIDs {
+				fmt.Printf("  %s\n", fid)
+			}
+			if result.ExecuteCmd != "" {
+				fmt.Printf("\nNext: %s\n", result.ExecuteCmd)
+			}
+			return nil
+		},
+	}
+}
+
+// executePlanFinalizeFromYAML implements the new plan finalize logic.
+// It validates the YAML plan, creates features for each slice linked to plan
+// and track, writes feature_id back to YAML, and marks the plan finalized.
+func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID string) (*finalizeResult, error) {
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		return nil, fmt.Errorf("load plan YAML: %w", err)
+	}
+
+	// Guard: already finalized → must use plan reopen first.
+	if plan.Meta.Status == "finalized" {
+		return nil, fmt.Errorf("plan %s is locked (status: finalized) — use 'plan reopen %s' to unlock", planID, planID)
+	}
+
+	// Validate: must have a track.
+	if plan.Meta.TrackID == "" {
+		return nil, fmt.Errorf("plan must be on a track — set meta.track_id in YAML or use 'plan attach-track %s <trk-id>'", planID)
+	}
+
+	// Validate: must have a problem statement.
+	if strings.TrimSpace(plan.Design.Problem) == "" {
+		return nil, fmt.Errorf("plan must have a non-empty problem statement — set design.problem in YAML")
+	}
+
+	// Validate: must have at least one slice.
+	if len(plan.Slices) == 0 {
+		return nil, fmt.Errorf("plan must have at least one slice — add slices with 'plan add-slice-yaml %s <title>'", planID)
+	}
+
+	trackID := plan.Meta.TrackID
+
+	// Create features for each slice.
+	numToFeatureID := make(map[int]string, len(plan.Slices))
+	var featureIDs []string
+
+	for i, s := range plan.Slices {
+		content := buildSliceFeatureContent(s)
+		feat, err := p.Features.Create(s.Title,
+			workitem.FeatWithTrack(trackID),
+			workitem.FeatWithContent(content),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create feature for slice %d (%q): %w", s.Num, s.Title, err)
+		}
+
+		numToFeatureID[s.Num] = feat.ID
+		featureIDs = append(featureIDs, feat.ID)
+
+		// Write feature_id back to YAML slice immediately.
+		plan.Slices[i].FeatureID = feat.ID
+
+		// Wire part_of (feature→track) and contains (track→feature).
+		wireTrackEdges(p, feat.ID, trackID, feat.Title) //nolint:errcheck
+
+		// Link feature → plan via planned_in edge.
+		p.Features.AddEdge(feat.ID, models.Edge{ //nolint:errcheck
+			TargetID:     planID,
+			Relationship: models.RelPlannedIn,
+			Title:        planID,
+			Since:        time.Now().UTC(),
+		})
+	}
+
+	// Wire blocked_by edges from slice deps.
+	for _, s := range plan.Slices {
+		for _, depNum := range s.Deps {
+			depFeatID, ok := numToFeatureID[depNum]
+			if !ok {
+				continue
+			}
+			p.Features.AddEdge(numToFeatureID[s.Num], models.Edge{ //nolint:errcheck
+				TargetID:     depFeatID,
+				Relationship: "blocked_by",
+				Since:        time.Now().UTC(),
+			})
+		}
+	}
+
+	// Link plan → track via implemented_in.
+	p.Plans.AddEdge(planID, models.Edge{ //nolint:errcheck
+		TargetID:     trackID,
+		Relationship: models.RelImplementedIn,
+		Title:        trackID,
+		Since:        time.Now().UTC(),
+	})
+
+	// Lock the plan: set status to finalized in YAML.
+	plan.Meta.Status = "finalized"
+	if err := planyaml.Save(planPath, plan); err != nil {
+		return nil, fmt.Errorf("save plan YAML: %w", err)
+	}
+
+	// Re-render the plan HTML so it reflects finalized state.
+	_ = renderPlanToFile(htmlgraphDir, planID)
+
+	return &finalizeResult{
+		TrackID:    trackID,
+		FeatureIDs: featureIDs,
+		ExecuteCmd: buildExecuteCmd(trackID),
+	}, nil
+}
+
+// buildSliceFeatureContent constructs a feature description from a YAML slice's
+// what/why/done-when fields.
+func buildSliceFeatureContent(s planyaml.PlanSlice) string {
+	if s.What == "" {
+		return s.Why
+	}
+	var sb strings.Builder
+	sb.WriteString(s.What)
+	if s.Why != "" {
+		sb.WriteString("\n\n## Why\n")
+		sb.WriteString(s.Why)
+	}
+	if len(s.DoneWhen) > 0 {
+		sb.WriteString("\n\n## Done When\n")
+		for _, d := range s.DoneWhen {
+			sb.WriteString("- " + d + "\n")
+		}
+	}
+	return sb.String()
 }

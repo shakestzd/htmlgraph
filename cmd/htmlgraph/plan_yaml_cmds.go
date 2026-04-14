@@ -186,7 +186,7 @@ func runPlanAddSliceYAML(htmlgraphDir, planID, title, what, why, files, doneWhen
 	}
 
 	slice := planyaml.PlanSlice{
-		ID:       workitem.GenerateID("feat", title),
+		ID:       workitem.GenerateID("slice", title),
 		Num:      len(plan.Slices) + 1,
 		Title:    title,
 		What:     what,
@@ -207,6 +207,6 @@ func runPlanAddSliceYAML(htmlgraphDir, planID, title, what, why, files, doneWhen
 
 	commitPlanChange(planPath, fmt.Sprintf("plan(%s): add slice %d — %s", planID, slice.Num, title))
 
-	fmt.Printf("Slice %d added: %s\n", slice.Num, slice.ID)
+	fmt.Printf("Slice %d added\n", slice.Num)
 	return nil
 }
