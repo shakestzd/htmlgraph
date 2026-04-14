@@ -109,7 +109,8 @@ func autoTrackEdges(p *workitem.Project, itemID, typeName, trackID, itemTitle st
 // and specs are exempt from the track requirement.
 func warnMissingFields(typeName string, o *wiCreateOpts) error {
 	// Features and bugs require a track to link to an initiative.
-	if o.trackID == "" && (typeName == "feature" || typeName == "bug") {
+	// Features with an explicit standalone_reason are exempt from the track requirement.
+	if o.trackID == "" && (typeName == "feature" || typeName == "bug") && !(typeName == "feature" && o.standaloneReason != "") {
 		msg := fmt.Sprintf("%s requires --track <trk-id> to link to an initiative.\nRun 'htmlgraph track list' to see existing tracks.\nTo create a new track: htmlgraph track create \"Track Title\"", typeName)
 
 		// For bugs with --files, try to suggest the track via file ownership.
@@ -124,7 +125,9 @@ func warnMissingFields(typeName string, o *wiCreateOpts) error {
 
 	switch typeName {
 	case "bug", "feature":
-		if o.description == "" {
+		// Standalone features (no plan, no track) only need --standalone reason, not --description.
+		isStandaloneFeature := typeName == "feature" && o.standaloneReason != ""
+		if o.description == "" && !isStandaloneFeature {
 			return fmt.Errorf("%s requires --description (captures context for future sessions)\nExample: htmlgraph %s create \"title\" --description \"root cause and context\"", typeName, typeName)
 		}
 	case "spec":

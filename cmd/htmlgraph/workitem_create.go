@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/hooks"
@@ -12,14 +13,16 @@ import (
 )
 
 type wiCreateOpts struct {
-	trackID     string
-	priority    string
-	description string
-	files       string
-	steps       string // comma-separated implementation steps
-	start       bool
-	noLink      bool
-	causedBy    string // explicit caused_by feature ID for bugs
+	trackID          string
+	planID           string // feature: link to a plan (alternative to --track)
+	standaloneReason string // feature: explicit standalone reason (e.g. "pre-plan hotfix")
+	priority         string
+	description      string
+	files            string
+	steps            string // comma-separated implementation steps
+	start            bool
+	noLink           bool
+	causedBy         string // explicit caused_by feature ID for bugs
 }
 
 func wiCreateCmd(typeName, _ string) *cobra.Command {
@@ -43,6 +46,10 @@ func wiCreateCmd(typeName, _ string) *cobra.Command {
 	if typeName == "bug" {
 		cmd.Flags().StringVar(&opts.causedBy, "caused-by", "", "feature ID that caused this bug")
 	}
+	if typeName == "feature" {
+		cmd.Flags().StringVar(&opts.planID, "plan", "", "plan ID to link this feature to (e.g. plan-abc12345)")
+		cmd.Flags().StringVar(&opts.standaloneReason, "standalone", "", "reason this feature exists without a plan (e.g. 'hotfix')")
+	}
 	return cmd
 }
 
@@ -57,8 +64,27 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 	}
 	defer p.Close()
 
+	// Enforce plan hierarchy for features first: require --plan OR --standalone.
+	// Features with an explicit --track but no --plan are also accepted (e.g.
+	// created by automated finalize), so only reject truly bare feature creates.
+	if typeName == "feature" && o.planID == "" && o.standaloneReason == "" && o.trackID == "" {
+		return fmt.Errorf("feature must have a parent plan OR --standalone <reason>.\nRun 'htmlgraph relevant <topic>' to find existing context first.")
+	}
+
 	if err := warnMissingFields(typeName, o); err != nil {
 		return err
+	}
+
+	// When --plan is given, resolve the plan to get its track ID so the feature
+	// is linked to both plan and track.
+	if typeName == "feature" && o.planID != "" && o.trackID == "" {
+		planNode, planErr := p.Plans.Get(o.planID)
+		if planErr != nil {
+			return fmt.Errorf("plan %s not found: %w", o.planID, planErr)
+		}
+		if planNode.TrackID != "" {
+			o.trackID = planNode.TrackID
+		}
 	}
 
 	node, err := createNode(p, typeName, title, o)
@@ -82,6 +108,25 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 		}
 		if saveErr := edit.Save(); saveErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to save metadata: %v\n", saveErr)
+		}
+	}
+
+	// Wire feature → plan (planned_in edge) and record standalone_reason.
+	if typeName == "feature" {
+		if o.planID != "" {
+			p.Features.AddEdge(node.ID, models.Edge{ //nolint:errcheck
+				TargetID:     o.planID,
+				Relationship: models.RelPlannedIn,
+				Title:        o.planID,
+				Since:        time.Now().UTC(),
+			})
+		}
+		if o.standaloneReason != "" {
+			edit := p.Features.Edit(node.ID)
+			edit = edit.SetProperty("standalone_reason", o.standaloneReason)
+			if saveErr := edit.Save(); saveErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to save standalone_reason: %v\n", saveErr)
+			}
 		}
 	}
 

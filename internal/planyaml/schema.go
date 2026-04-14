@@ -37,19 +37,20 @@ type PlanDesign struct {
 // PlanSlice is a vertical delivery slice with metadata for effort,
 // risk, dependencies, and human approval.
 type PlanSlice struct {
-	ID       string   `yaml:"id"`
-	Num      int      `yaml:"num"`
-	Title    string   `yaml:"title"`
-	What     string   `yaml:"what"`
-	Why      string   `yaml:"why"`
-	Files    []string `yaml:"files"`
-	Deps     []int    `yaml:"deps"`
-	DoneWhen []string `yaml:"done_when"`
-	Effort   string   `yaml:"effort"` // S | M | L
-	Risk     string   `yaml:"risk"`   // Low | Med | High
-	Tests    string   `yaml:"tests"`
-	Approved bool     `yaml:"approved"`
-	Comment  string   `yaml:"comment"`
+	ID        string   `yaml:"id"`
+	FeatureID string   `yaml:"feature_id,omitempty"` // populated after plan finalize
+	Num       int      `yaml:"num"`
+	Title     string   `yaml:"title"`
+	What      string   `yaml:"what"`
+	Why       string   `yaml:"why"`
+	Files     []string `yaml:"files"`
+	Deps      []int    `yaml:"deps"`
+	DoneWhen  []string `yaml:"done_when"`
+	Effort    string   `yaml:"effort"` // S | M | L
+	Risk      string   `yaml:"risk"`   // Low | Med | High
+	Tests     string   `yaml:"tests"`
+	Approved  bool     `yaml:"approved"`
+	Comment   string   `yaml:"comment"`
 }
 
 // PlanQuestion is an open design question with options and an optional answer.

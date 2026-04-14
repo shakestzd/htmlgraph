@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 )
 
@@ -147,4 +148,263 @@ func TestPlanFinalize_EmptyPlan(t *testing.T) {
 	if len(result.FeatureIDs) != 0 {
 		t.Errorf("features = %d, want 0", len(result.FeatureIDs))
 	}
+}
+
+// ---- New YAML-based finalize (plan finalize v2) tests -------------------------
+
+// setupYAMLFinalizeProject creates a temp dir with a YAML plan that has a track,
+// problem statement, and the requested number of slices. Returns the plan ID.
+func setupYAMLFinalizeProject(t *testing.T, p *workitem.Project, dir string, numSlices int) (string, string) {
+	t.Helper()
+
+	// Create a track first.
+	track, err := p.Tracks.Create("Test Track")
+	if err != nil {
+		t.Fatalf("create track: %v", err)
+	}
+
+	planID := workitem.GenerateID("plan", "YAML Test Plan")
+	plan := planyaml.NewPlan(planID, "YAML Test Plan", "test plan")
+	plan.Meta.TrackID = track.ID
+	plan.Design.Problem = "We need to solve this problem"
+
+	for i := 1; i <= numSlices; i++ {
+		plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+			ID:    workitem.GenerateID("slice", "slice"),
+			Num:   i,
+			Title: "Slice " + strings.Repeat("I", i),
+			What:  "do something",
+			Why:   "because reasons",
+		})
+	}
+
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save plan YAML: %v", err)
+	}
+
+	// Also create the HTML workitem for the plan.
+	if _, err := p.Plans.Create("YAML Test Plan",
+		workitem.PlanWithTrack(track.ID),
+	); err != nil {
+		t.Logf("create plan node warning: %v", err)
+	}
+
+	return planID, track.ID
+}
+
+func TestPlanFinalizeFromYAML_HappyPath(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+	planID, trackID := setupYAMLFinalizeProject(t, p, dir, 2)
+
+	result, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	if result.TrackID != trackID {
+		t.Errorf("trackID = %q, want %q", result.TrackID, trackID)
+	}
+	if len(result.FeatureIDs) != 2 {
+		t.Errorf("features = %d, want 2", len(result.FeatureIDs))
+	}
+	for _, fid := range result.FeatureIDs {
+		if !strings.HasPrefix(fid, "feat-") {
+			t.Errorf("feature ID %q missing feat- prefix", fid)
+		}
+	}
+
+	// Verify features were created and linked.
+	for _, fid := range result.FeatureIDs {
+		feat, err := p.Features.Get(fid)
+		if err != nil {
+			t.Fatalf("get feature %s: %v", fid, err)
+		}
+		if feat.TrackID != trackID {
+			t.Errorf("feature %s track = %q, want %q", fid, feat.TrackID, trackID)
+		}
+		// Should have planned_in edge to plan.
+		plannedIn := feat.Edges[string("planned_in")]
+		found := false
+		for _, e := range plannedIn {
+			if e.TargetID == planID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("feature %s missing planned_in → %s edge", fid, planID)
+		}
+	}
+}
+
+func TestPlanFinalizeFromYAML_FeatureIDWrittenBack(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+	planID, _ := setupYAMLFinalizeProject(t, p, dir, 2)
+
+	_, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	// Load YAML and verify feature_ids were written back.
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("load plan: %v", err)
+	}
+	for i, s := range plan.Slices {
+		if s.FeatureID == "" {
+			t.Errorf("slice[%d] (num=%d) has no feature_id after finalize", i, s.Num)
+		}
+		if !strings.HasPrefix(s.FeatureID, "feat-") {
+			t.Errorf("slice[%d] feature_id = %q, missing feat- prefix", i, s.FeatureID)
+		}
+	}
+	if plan.Meta.Status != "finalized" {
+		t.Errorf("plan status = %q, want finalized", plan.Meta.Status)
+	}
+}
+
+func TestPlanFinalizeFromYAML_NoTrack(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+
+	// Create plan YAML without track.
+	planID := workitem.GenerateID("plan", "no-track plan")
+	plan := planyaml.NewPlan(planID, "no-track plan", "")
+	plan.Design.Problem = "a problem"
+	plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+		Num: 1, Title: "slice one", What: "do it",
+	})
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	_, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err == nil {
+		t.Fatal("expected error for plan without track")
+	}
+	if !strings.Contains(err.Error(), "track") {
+		t.Errorf("error should mention 'track', got: %v", err)
+	}
+}
+
+func TestPlanFinalizeFromYAML_NoProblemStatement(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+
+	track, _ := p.Tracks.Create("T")
+	planID := workitem.GenerateID("plan", "no-problem plan")
+	plan := planyaml.NewPlan(planID, "no-problem plan", "")
+	plan.Meta.TrackID = track.ID
+	// Leave Design.Problem empty.
+	plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+		Num: 1, Title: "slice one", What: "do it",
+	})
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	_, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err == nil {
+		t.Fatal("expected error for plan without problem statement")
+	}
+	if !strings.Contains(err.Error(), "problem") {
+		t.Errorf("error should mention 'problem', got: %v", err)
+	}
+}
+
+func TestPlanFinalizeFromYAML_NoSlices(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+
+	track, _ := p.Tracks.Create("T")
+	planID := workitem.GenerateID("plan", "no-slices plan")
+	plan := planyaml.NewPlan(planID, "no-slices plan", "")
+	plan.Meta.TrackID = track.ID
+	plan.Design.Problem = "a real problem"
+	// Leave Slices empty.
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	_, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err == nil {
+		t.Fatal("expected error for plan without slices")
+	}
+	if !strings.Contains(err.Error(), "slice") {
+		t.Errorf("error should mention 'slice', got: %v", err)
+	}
+}
+
+func TestPlanFinalizeFromYAML_AlreadyFinalized(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+	planID, _ := setupYAMLFinalizeProject(t, p, dir, 1)
+
+	// First finalize.
+	if _, err := executePlanFinalizeFromYAML(p, dir, planID); err != nil {
+		t.Fatalf("first finalize: %v", err)
+	}
+
+	// Second finalize should return locked error.
+	_, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err == nil {
+		t.Fatal("expected error on double-finalize")
+	}
+	if !strings.Contains(err.Error(), "locked") && !strings.Contains(err.Error(), "reopen") {
+		t.Errorf("error should mention 'locked' or 'reopen', got: %v", err)
+	}
+}
+
+func TestPlanFinalizeFromYAML_Reopen(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+	planID, _ := setupYAMLFinalizeProject(t, p, dir, 1)
+
+	// Finalize then reopen.
+	if _, err := executePlanFinalizeFromYAML(p, dir, planID); err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	if err := executePlanReopen(dir, planID); err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+
+	// After reopen, status should be todo/draft (not finalized).
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("load plan: %v", err)
+	}
+	if plan.Meta.Status == "finalized" {
+		t.Error("plan should not be finalized after reopen")
+	}
+}
+
+func TestAddSliceYAML_NoPrintsFakeFeatureID(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)
+
+	planID := workitem.GenerateID("plan", "test")
+	plan := planyaml.NewPlan(planID, "test", "")
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// runPlanAddSliceYAML should return without error.
+	err := runPlanAddSliceYAML(dir, planID, "My Slice", "impl detail", "", "", "", "", "S", "Low", "")
+	if err != nil {
+		t.Fatalf("add-slice-yaml: %v", err)
+	}
+
+	// Load and verify the slice has ID but NOT a feature_id.
+	loaded, _ := planyaml.Load(planPath)
+	if len(loaded.Slices) != 1 {
+		t.Fatalf("expected 1 slice, got %d", len(loaded.Slices))
+	}
+	if loaded.Slices[0].FeatureID != "" {
+		t.Errorf("slice should have empty feature_id before finalize, got %q", loaded.Slices[0].FeatureID)
+	}
+	// The slice ID should be a stable identifier (not a fake feat-ID in the printed output).
+	// The test here just confirms the YAML slice doesn't have a feature_id set.
 }
