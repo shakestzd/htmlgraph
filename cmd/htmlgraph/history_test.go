@@ -171,6 +171,113 @@ func TestHistoryRunsGitLog(t *testing.T) {
 	}
 }
 
+// TestResolveHistoryRoot_LinkedWorktreePrefersCwd guards the regression the
+// second roborev round flagged: when .htmlgraph lives in the main checkout
+// but the user runs `history` from a linked worktree, resolveHistoryRoot
+// must return the LINKED worktree's toplevel so `git log` sees branch-local
+// history — NOT the main checkout's HEAD.
+//
+// Submodule fallback is exercised by running from a completely separate
+// repository: git-common-dir differs, and the helper must fall back to the
+// .htmlgraph owner rather than log the unrelated repo.
+func TestResolveHistoryRoot_LinkedWorktreePrefersCwd(t *testing.T) {
+	// Main checkout with one commit and a .htmlgraph file.
+	mainRoot, _ := seedRepo(t)
+
+	// Absolute main-root (resolving symlinks so comparisons below are stable
+	// across macOS /tmp -> /private/tmp redirects).
+	mainAbs, err := filepath.EvalSymlinks(mainRoot)
+	if err != nil {
+		t.Fatalf("eval main symlinks: %v", err)
+	}
+
+	// git worktree add <worktree> -b branch-linked
+	wtParent := t.TempDir()
+	wtDir := filepath.Join(wtParent, "linked-worktree")
+	runGit := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Tester",
+			"GIT_AUTHOR_EMAIL=tester@example.com",
+			"GIT_COMMITTER_NAME=Tester",
+			"GIT_COMMITTER_EMAIL=tester@example.com",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v (in %s): %v\n%s", args, dir, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	runGit(mainRoot, "worktree", "add", wtDir, "-b", "branch-linked")
+
+	wtAbs, err := filepath.EvalSymlinks(wtDir)
+	if err != nil {
+		t.Fatalf("eval worktree symlinks: %v", err)
+	}
+
+	origCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+
+	chdir := func(t *testing.T, dir string) {
+		t.Helper()
+		if err := os.Chdir(dir); err != nil {
+			t.Fatalf("chdir %s: %v", dir, err)
+		}
+	}
+
+	t.Run("cwd=linked-worktree => returns worktree toplevel", func(t *testing.T) {
+		chdir(t, wtDir)
+		got, err := resolveHistoryRoot(mainRoot)
+		if err != nil {
+			t.Fatalf("resolveHistoryRoot: %v", err)
+		}
+		gotAbs, _ := filepath.EvalSymlinks(got)
+		if gotAbs != wtAbs {
+			t.Errorf("linked worktree case: resolveHistoryRoot = %q, want %q", gotAbs, wtAbs)
+		}
+	})
+
+	t.Run("cwd=main-checkout => returns main toplevel", func(t *testing.T) {
+		chdir(t, mainRoot)
+		got, err := resolveHistoryRoot(mainRoot)
+		if err != nil {
+			t.Fatalf("resolveHistoryRoot: %v", err)
+		}
+		gotAbs, _ := filepath.EvalSymlinks(got)
+		if gotAbs != mainAbs {
+			t.Errorf("main checkout case: resolveHistoryRoot = %q, want %q", gotAbs, mainAbs)
+		}
+	})
+
+	t.Run("cwd=unrelated-repo => falls back to .htmlgraph owner", func(t *testing.T) {
+		// Build a completely separate git repo so git-common-dir differs.
+		otherRoot := t.TempDir()
+		runGit(otherRoot, "init", "-b", "main")
+		runGit(otherRoot, "config", "user.email", "tester@example.com")
+		runGit(otherRoot, "config", "user.name", "Tester")
+		if err := os.WriteFile(filepath.Join(otherRoot, "unrelated.txt"), []byte("hi"), 0644); err != nil {
+			t.Fatalf("write unrelated: %v", err)
+		}
+		runGit(otherRoot, "add", ".")
+		runGit(otherRoot, "commit", "-m", "unrelated commit")
+
+		chdir(t, otherRoot)
+		got, err := resolveHistoryRoot(mainRoot)
+		if err != nil {
+			t.Fatalf("resolveHistoryRoot: %v", err)
+		}
+		gotAbs, _ := filepath.EvalSymlinks(got)
+		if gotAbs != mainAbs {
+			t.Errorf("submodule-fallback case: resolveHistoryRoot = %q, want %q (should NOT escape to unrelated repo)", gotAbs, mainAbs)
+		}
+	})
+}
+
 // TestHistoryJSONOutput verifies that --json flag produces a parseable array
 // of HistoryEntry objects.
 func TestHistoryJSONOutput(t *testing.T) {
