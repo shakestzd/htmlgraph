@@ -3,10 +3,23 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// requireRipgrep skips the caller when `rg` is not on PATH. runRelevantSearch
+// shells out to ripgrep for keyword queries, so CI runners without rg must
+// skip these tests instead of hard-failing. Keeps the quality gate green on
+// minimal environments (containers, fresh VMs) while still catching real
+// regressions when rg is present.
+func requireRipgrep(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("ripgrep (rg) not found in PATH — skipping test that requires it")
+	}
+}
 
 // sampleFeatureHTML is a minimal valid HtmlGraph feature HTML fixture.
 const sampleFeatureHTML = `<!DOCTYPE html>
@@ -112,6 +125,7 @@ func TestDetectQueryType_ExistingFile(t *testing.T) {
 // --- Keyword ripgrep search ---
 
 func TestRunRelevantKeyword_ReturnsMatch(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	results, err := runRelevantSearch(hgDir, "retrieval", queryTypeKeyword)
@@ -144,6 +158,7 @@ func TestRunRelevantKeyword_ReturnsMatch(t *testing.T) {
 // in the fixture. Tokenizing the query per whitespace and scoring each token
 // independently now surfaces the match.
 func TestRunRelevantKeyword_MultiWordTokenized(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	results, err := runRelevantSearch(hgDir, "retrieval sha", queryTypeKeyword)
@@ -189,6 +204,7 @@ func TestTokenizeQuery(t *testing.T) {
 // --- File-path search ---
 
 func TestRunRelevantFilePath_ReturnsMatchingItems(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	// The fixture content mentions "ripgrep and git log" — use the HTML file itself as path.
@@ -233,6 +249,7 @@ func TestRelevantResult_JSONShape(t *testing.T) {
 // --- No results ---
 
 func TestRunRelevantKeyword_NoMatch(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	results, err := runRelevantSearch(hgDir, "zzz_nomatch_xyz_unlikely", queryTypeKeyword)
