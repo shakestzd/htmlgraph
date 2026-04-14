@@ -5,9 +5,9 @@ meta:
     description: |
         Close the lineage surface gap and reposition lineage as HtmlGraph's headline pitch. Data layer is already rich (typed edges, agent_lineage_trace spawn chains, git_commits attribution, feature_files ownership). This plan is primarily a surface, narrative, and documentation effort — a single `lineage <id>` command plus surgical extensions to existing commands, shipped together with coordinated repositioning of README, root tagline, and system prompt.
     created_at: "2026-04-14"
-    status: draft
+    status: finalized
     created_by: claude-opus
-    version: 2
+    version: 3
 design:
     problem: |
         HtmlGraph has the richest work-graph data layer of any local-first dev tool — ten typed edges in `graph_edges` (`blocks`, `blocked_by`, `relates_to`, `implements`, `caused_by`, `spawned_from`, `implemented_in`, `part_of`, `contains`, `planned_in`), `agent_lineage_trace` with full orchestrator→subagent spawn chains, `git_commits` attribution, and `feature_files` ownership — but the surface is thin. Crucially, `planned_in` is the edge that links a plan to its implementing features, so any lineage traversal that ignores it would miss the most compelling plan→feature→commit→bug demo. `trace <sha>` walks commit→session→feature→track but only in one direction. `graph` subcommands expose primitives (`reach`, `path`, `sessions`) but never narrate a causal chain. `agent_lineage_trace` has no CLI at all. A user with a bug cannot ask "what chain of prompts, plans, sessions, and commits produced this?" in one command, even though every fact needed is in SQLite. Meanwhile the README leads with "observability" — a supporting capability — while the most differentiated subsystem is unmentioned. The result is orphaned value: built, working, invisible.
@@ -30,6 +30,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-046e2e03
       num: 1
       title: 'Reverse `trace` direction: feature → commits → sessions → files'
       what: |
@@ -54,6 +55,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-2
+      feature_id: feat-2a43f5f8
       num: 2
       title: '`history <id>` — temporal lineage via git log on HTML file'
       what: |
@@ -79,6 +81,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-3
+      feature_id: feat-5f5d7c40
       num: 3
       title: Agent spawn tree rendering from `agent_lineage_trace`
       what: |
@@ -104,6 +107,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-4
+      feature_id: feat-48b3783c
       num: 4
       title: '`lineage <any-id>` — headline unified causal chain command'
       what: |
@@ -140,6 +144,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-5
+      feature_id: feat-3418e582
       num: 5
       title: Coordinated repositioning — README, tagline, system prompt
       what: |
