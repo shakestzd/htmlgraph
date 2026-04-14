@@ -503,6 +503,110 @@ func TestPlanFinalizeFromYAML_ReopenRefinalize_UpdatesMutatedSlice(t *testing.T)
 	// review: errors.Is(getErr, os.ErrNotExist) in plan_finalize.go.
 }
 
+// TestPlanFinalizeFromYAML_ReopenRefinalize_StaleForeignFeatureID is the
+// regression test for roborev job 29 / bug-9d64d90c finding 2.
+// It verifies that a stale or hand-edited feature_id pointing at an unrelated
+// feature does NOT corrupt that unrelated feature — instead a replacement is
+// created and the YAML is updated to reference the new feature.
+func TestPlanFinalizeFromYAML_ReopenRefinalize_StaleForeignFeatureID(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+
+	// Create a track that the plan will target.
+	track, err := p.Tracks.Create("Plan Track")
+	if err != nil {
+		t.Fatalf("create track: %v", err)
+	}
+
+	// Create an unrelated feature on the same track — NOT through plan finalize,
+	// so it has no planned_in edge to our plan.
+	unrelated, err := p.Features.Create("Unrelated Feature",
+		workitem.FeatWithTrack(track.ID),
+		workitem.FeatWithContent("original content — must not be changed"),
+	)
+	if err != nil {
+		t.Fatalf("create unrelated feature: %v", err)
+	}
+	originalTitle := unrelated.Title
+	originalContent := unrelated.Content
+
+	// Build a plan YAML where the slice's feature_id points at the unrelated feature.
+	planID := workitem.GenerateID("plan", "Stale FeatureID Test")
+	plan := planyaml.NewPlan(planID, "Stale FeatureID Test", "test plan")
+	plan.Meta.TrackID = track.ID
+	plan.Design.Problem = "Testing stale FeatureID protection"
+	plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+		ID:        workitem.GenerateID("slice", "slice-one"),
+		Num:       1,
+		Title:     "Slice One",
+		What:      "do something important",
+		FeatureID: unrelated.ID, // stale/foreign — no planned_in edge
+	})
+
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save plan YAML: %v", err)
+	}
+
+	// Run plan finalize — must NOT corrupt the unrelated feature.
+	result, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("finalize with stale FeatureID: %v", err)
+	}
+
+	// 1. The unrelated feature's title and content must be UNCHANGED.
+	reloaded, err := p.Features.Get(unrelated.ID)
+	if err != nil {
+		t.Fatalf("reload unrelated feature: %v", err)
+	}
+	if reloaded.Title != originalTitle {
+		t.Errorf("unrelated feature Title changed: got %q, want %q", reloaded.Title, originalTitle)
+	}
+	if reloaded.Content != originalContent {
+		t.Errorf("unrelated feature Content changed: got %q, want %q", reloaded.Content, originalContent)
+	}
+
+	// 2. The result must have exactly one feature, and it must NOT be the unrelated one.
+	if len(result.FeatureIDs) != 1 {
+		t.Fatalf("expected 1 feature in result, got %d", len(result.FeatureIDs))
+	}
+	newFeatID := result.FeatureIDs[0]
+	if newFeatID == unrelated.ID {
+		t.Errorf("result feature ID is the unrelated feature — stale FeatureID was not replaced")
+	}
+
+	// 3. The YAML slice must reference the new feature, not the stale one.
+	updated, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("load updated plan YAML: %v", err)
+	}
+	if len(updated.Slices) != 1 {
+		t.Fatalf("expected 1 slice in YAML, got %d", len(updated.Slices))
+	}
+	yamlFeatID := updated.Slices[0].FeatureID
+	if yamlFeatID == unrelated.ID {
+		t.Errorf("YAML slice still references the unrelated feature — stale FeatureID was not updated")
+	}
+	if yamlFeatID != newFeatID {
+		t.Errorf("YAML slice feature_id = %q, want %q (the new replacement feature)", yamlFeatID, newFeatID)
+	}
+
+	// 4. The new feature must have a planned_in edge to this plan.
+	newFeat, err := p.Features.Get(newFeatID)
+	if err != nil {
+		t.Fatalf("get new replacement feature %s: %v", newFeatID, err)
+	}
+	hasProvenance := false
+	for _, e := range newFeat.Edges["planned_in"] {
+		if e.TargetID == planID {
+			hasProvenance = true
+			break
+		}
+	}
+	if !hasProvenance {
+		t.Errorf("replacement feature %s has no planned_in → %s edge", newFeatID, planID)
+	}
+}
+
 func TestAddSliceYAML_NoPrintsFakeFeatureID(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)
