@@ -380,6 +380,64 @@ func TestPlanFinalizeFromYAML_Reopen(t *testing.T) {
 	}
 }
 
+// TestPlanFinalizeFromYAML_ReopenRefinalizeIdempotent verifies that
+// reopen + re-finalize does not duplicate features: the same FeatureIDs
+// must be referenced after re-finalize as after the initial finalize.
+func TestPlanFinalizeFromYAML_ReopenRefinalizeIdempotent(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+	planID, _ := setupYAMLFinalizeProject(t, p, dir, 2)
+
+	// First finalize: captures original feature IDs.
+	result1, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("first finalize: %v", err)
+	}
+	if len(result1.FeatureIDs) != 2 {
+		t.Fatalf("first finalize: expected 2 features, got %d", len(result1.FeatureIDs))
+	}
+
+	// Reopen: unlocks the plan.
+	if err := executePlanReopen(dir, planID); err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+
+	// Re-finalize: must reuse existing FeatureIDs, not create new ones.
+	result2, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("re-finalize: %v", err)
+	}
+
+	// Same number of features.
+	if len(result2.FeatureIDs) != len(result1.FeatureIDs) {
+		t.Errorf("re-finalize feature count = %d, want %d", len(result2.FeatureIDs), len(result1.FeatureIDs))
+	}
+
+	// Same IDs (order preserved).
+	for i, id := range result1.FeatureIDs {
+		if i >= len(result2.FeatureIDs) {
+			break
+		}
+		if result2.FeatureIDs[i] != id {
+			t.Errorf("slice %d: re-finalize feature ID = %q, want %q (duplicate created)", i+1, result2.FeatureIDs[i], id)
+		}
+	}
+
+	// YAML still references the original IDs.
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("load plan after re-finalize: %v", err)
+	}
+	for i, s := range plan.Slices {
+		if i >= len(result1.FeatureIDs) {
+			break
+		}
+		if s.FeatureID != result1.FeatureIDs[i] {
+			t.Errorf("slice[%d] YAML feature_id = %q, want %q after re-finalize", i, s.FeatureID, result1.FeatureIDs[i])
+		}
+	}
+}
+
 func TestAddSliceYAML_NoPrintsFakeFeatureID(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)

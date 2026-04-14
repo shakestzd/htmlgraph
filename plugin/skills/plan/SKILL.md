@@ -524,7 +524,7 @@ This command:
 4. Emits edges: `planned_in` (feature→plan), `part_of`/`contains` (feature↔track), `implemented_in` (plan→track)
 5. Sets plan status to `finalized` and locks it (subsequent calls error with "plan is locked … use 'plan reopen'")
 
-If finalize errors with "plan is locked", the plan was previously finalized. Run `htmlgraph plan reopen <plan-id>` first, revise Step 7a, then re-finalize. Note: reopen + re-finalize can create duplicate features if FeatureID was already written to the YAML.
+If finalize errors with "plan is locked", the plan was previously finalized. Run `htmlgraph plan reopen <plan-id>` first, revise Step 7a, then re-finalize. The finalize command is idempotent: slices whose `feature_id` is already set and whose feature exists will be reused rather than duplicated; only new or orphaned slices create new features.
 
 If finalize errors on missing track, description, or slices, the error message is actionable — fix the YAML and re-run.
 

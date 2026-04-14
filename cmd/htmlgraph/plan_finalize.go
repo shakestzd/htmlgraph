@@ -303,11 +303,25 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 
 	trackID := plan.Meta.TrackID
 
-	// Create features for each slice.
+	// Create features for each slice (idempotent: reuse existing FeatureIDs).
 	numToFeatureID := make(map[int]string, len(plan.Slices))
 	var featureIDs []string
 
 	for i, s := range plan.Slices {
+		// Idempotency check: if the slice already has a FeatureID and the
+		// feature exists in the DB, reuse it instead of creating a duplicate.
+		if s.FeatureID != "" {
+			if existing, err := p.Features.Get(s.FeatureID); err == nil {
+				fmt.Printf("%s  Slice %d — %s (reused existing)\n", existing.ID, s.Num, s.Title)
+				numToFeatureID[s.Num] = existing.ID
+				featureIDs = append(featureIDs, existing.ID)
+				continue
+			}
+			// FeatureID set but feature not found (orphan): create a new feature
+			// and overwrite the stale ID, matching the codebase's pattern of
+			// tolerating missing refs rather than hard-erroring on them.
+		}
+
 		content := buildSliceFeatureContent(s)
 		feat, err := p.Features.Create(s.Title,
 			workitem.FeatWithTrack(trackID),
@@ -317,6 +331,7 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 			return nil, fmt.Errorf("create feature for slice %d (%q): %w", s.Num, s.Title, err)
 		}
 
+		fmt.Printf("%s  Slice %d — %s (created)\n", feat.ID, s.Num, s.Title)
 		numToFeatureID[s.Num] = feat.ID
 		featureIDs = append(featureIDs, feat.ID)
 

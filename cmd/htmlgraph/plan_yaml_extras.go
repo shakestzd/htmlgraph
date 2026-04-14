@@ -283,20 +283,14 @@ func runValidateYAML(planID string) error {
 	return nil
 }
 
-// planReviewCmd prints a deprecation notice directing users to the dashboard.
+// planReviewCmd is a deprecated command directing users to the dashboard.
 func planReviewCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "review <plan-id>",
-		Short: "Open a plan for review (use the dashboard instead)",
-		Long: `Plan review is now available in the dashboard.
-
-Start the dashboard and open the Plans section to review, approve slices,
-answer questions, and finalize a plan.`,
-		Args: cobra.ExactArgs(1),
+		Use:        "review <plan-id>",
+		Short:      "Open a plan for review (use the dashboard instead)",
+		Deprecated: "use 'htmlgraph serve' and open http://localhost:8080/#plans instead",
+		Args:       cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, _ []string) error {
-			fmt.Fprintf(os.Stdout, "Plan review is now available in the dashboard:\n")
-			fmt.Fprintf(os.Stdout, "  htmlgraph serve\n")
-			fmt.Fprintf(os.Stdout, "  Open http://localhost:8080/#plans and click the plan.\n")
 			return nil
 		},
 	}
