@@ -4,7 +4,7 @@ meta:
     description: 'Reduce 83ms/tool-call hook overhead (measured spk-2bf8ae01) AND make HtmlGraph durable across Claude Code, Codex CLI, Gemini CLI, Copilot CLI. Strategy: defense-in-depth — transcript-tail ingestion becomes the durable source of truth; hooks become an optional fast-path for the latency-sensitive minority of events. Research basis: Claude Code docs (hooks, plugins, skills), upstream issues #39391 (process-spawn 35ms, HTTP daemon =112x speedup), #34692 (hooks skip subagent tool calls), #40506 (no hooks in -p headless mode), #43584 (no heartbeat for stuck tools), #42702 (plugin stdin contention), #46376 (plugin PostToolUse exit2 context dropped), #33458 (plugin SessionEnd not fired on macOS). Cross-agent matrix verified: Codex v0.114 partial hooks (shell-only, no ApplyPatch), Gemini CLI full hooks w/ OTEL, Copilot CLI Feb-2026 GA (sync, 10-15s timeouts). Gemini JSONL ingest already shipped (internal/ingest/gemini_parser.go) — blueprint for other agents.'
     created_at: "2026-04-14"
     status: draft
-    version: 11
+    version: 12
 design:
     problem: ""
     goals: []
@@ -197,6 +197,26 @@ slices:
         - watch mode picks up new events from each
       effort: L
       risk: Med
+      tests: ""
+      approved: false
+      comment: ""
+    - id: feat-cd27e209
+      num: 10
+      title: 'Phase 9: Upstream bug mitigation layer'
+      what: 'Explicit labeled workarounds for open upstream issues documented with KNOWN_UPSTREAM_BUG comments so we can delete them when fixes land. #34692 subagent hook skip — transcript-tail closes this plus add reconciliation at SubagentStop diffing observed vs hooked. #40506 headless mode — detect claude -p via env fall back to post-run ingest. #42702 stdin contention — verify runHookNamed reads stdin once at top and passes buffer. #46376 PostToolUse exit2 dropped — never rely on exit2 for context injection move to UserPromptSubmit. #33458 macOS SessionEnd silent fail — detect EOF on session JSONL as fallback.'
+      why: These bugs are OPEN with no fix timeline. Documenting mitigations in code keeps the workarounds visible for removal and prevents future regressions as new contributors rediscover the issues.
+      files:
+        - internal/hooks/runner.go
+        - internal/hooks/subagent.go
+        - internal/ingest/watch.go
+        - plugin/hooks/hooks.json
+      deps:
+        - 5
+      done_when:
+        - each mitigation has KNOWN_UPSTREAM_BUG comment with issue number
+        - tests cover each workaround path
+      effort: M
+      risk: Low
       tests: ""
       approved: false
       comment: ""
