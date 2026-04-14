@@ -26,82 +26,8 @@ var projectDirFlag string
 var getGitRemoteURLFn = paths.GetGitRemoteURL
 
 func main() {
-	rootCmd := &cobra.Command{
-		Use:           "htmlgraph",
-		Short:         "Local-first observability for AI-assisted development",
-		Long:          "HtmlGraph — local-first observability and coordination platform for AI-assisted development.",
-		SilenceErrors: true,
-		SilenceUsage:  true,
-	}
-
-	// --project-dir overrides all other project-root detection strategies.
-	rootCmd.PersistentFlags().StringVar(
-		&projectDirFlag,
-		"project-dir",
-		"",
-		"explicit project root containing .htmlgraph/ (overrides CLAUDE_PROJECT_DIR and CWD walk-up)",
-	)
-
-	// Lazy session registration + passive project registration: every CLI
-	// command self-heals attribution chains and upserts the current project
-	// into the cross-project registry.
-	rootCmd.PersistentPreRunE = persistentPreRunE
-
-	rootCmd.AddCommand(versionCmd())
-	rootCmd.AddCommand(statusCmd())
-	rootCmd.AddCommand(statuslineCmd())
-	rootCmd.AddCommand(serveCmd())
-	rootCmd.AddCommand(serveChildCmd())
-	rootCmd.AddCommand(featureCmdWithExtras())
-	rootCmd.AddCommand(workitemCmd("spike", "spikes"))
-	rootCmd.AddCommand(workitemCmd("bug", "bugs"))
-	rootCmd.AddCommand(snapshotCmd())
-	rootCmd.AddCommand(hookCmd())
-	rootCmd.AddCommand(claudeCmd())
-	rootCmd.AddCommand(yoloCmd())
-	rootCmd.AddCommand(initCmd())
-	rootCmd.AddCommand(trackCmdWithExtras())
-	rootCmd.AddCommand(sessionCmd())
-	rootCmd.AddCommand(wipCmd())
-	rootCmd.AddCommand(analyticsCmd())
-	rootCmd.AddCommand(orchestratorCmd())
-	rootCmd.AddCommand(installHooksCmd())
-	rootCmd.AddCommand(buildCmd())
-	rootCmd.AddCommand(setupCLICmd())
-	rootCmd.AddCommand(setupCmd())
-	rootCmd.AddCommand(devCmd())
-	rootCmd.AddCommand(reportCmd())
-	rootCmd.AddCommand(findCmd())
-	rootCmd.AddCommand(checkCmd())
-	rootCmd.AddCommand(healthCmd())
-	rootCmd.AddCommand(budgetCmd())
-	rootCmd.AddCommand(specCmd())
-	rootCmd.AddCommand(reviewCmd())
-	rootCmd.AddCommand(complianceCmd())
-	rootCmd.AddCommand(tddCmd())
-	rootCmd.AddCommand(ingestCmd())
-	rootCmd.AddCommand(linkCmd())
-	rootCmd.AddCommand(batchCmd())
-	rootCmd.AddCommand(planCmdWithExtras())
-	rootCmd.AddCommand(backfillCmd())
-	rootCmd.AddCommand(reindexCmd())
-	rootCmd.AddCommand(sweepCmd())
-	rootCmd.AddCommand(cleanupCmd())
-	rootCmd.AddCommand(migrateCmd())
-	rootCmd.AddCommand(recommendCmd())
-	rootCmd.AddCommand(ciCmd())
-	rootCmd.AddCommand(helpCmd())
-	rootCmd.AddCommand(claimCmd())
-	rootCmd.AddCommand(agentInitCmd())
-	rootCmd.AddCommand(pluginCmd())
-	rootCmd.AddCommand(purgeSpikesCmd())
-	rootCmd.AddCommand(projectsCmd())
-	rootCmd.AddCommand(traceCmd())
-	rootCmd.AddCommand(graphCmd())
-	rootCmd.AddCommand(queryCmd())
-	rootCmd.AddCommand(upgradeCmd())
-
-	if err := rootCmd.Execute(); err != nil {
+	root := buildRoot()
+	if err := root.Execute(); err != nil {
 		msg := err.Error()
 		// Cobra's "unknown command" error doesn't tell the agent what to do
 		// next when no close-match suggestion exists. Append a recovery hint.
@@ -111,6 +37,197 @@ func main() {
 		fmt.Fprintln(os.Stderr, msg)
 		os.Exit(1)
 	}
+}
+
+// buildRoot constructs and returns a fully-registered root cobra command,
+// but does NOT call Execute(). It is the single source of truth for all
+// command registration — both main() and tests use this function so the
+// command tree cannot drift.
+func buildRoot() *cobra.Command {
+	root := &cobra.Command{
+		Use:           "htmlgraph",
+		Short:         "Local-first observability for AI-assisted development",
+		Long:          "HtmlGraph — local-first observability and coordination platform for AI-assisted development.",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+
+	// --project-dir overrides all other project-root detection strategies.
+	root.PersistentFlags().StringVar(
+		&projectDirFlag,
+		"project-dir",
+		"",
+		"explicit project root containing .htmlgraph/ (overrides CLAUDE_PROJECT_DIR and CWD walk-up)",
+	)
+
+	// Lazy session registration + passive project registration: every CLI
+	// command self-heals attribution chains and upserts the current project
+	// into the cross-project registry.
+	root.PersistentPreRunE = persistentPreRunE
+
+	// Register cobra groups. Registration order determines display order in
+	// renderCompactHelp. Commands assigned to a group ID appear in their group;
+	// ungrouped commands are treated as internal plumbing and omitted.
+	root.AddGroup(&cobra.Group{ID: "workitems", Title: "Work Items"})
+	root.AddGroup(&cobra.Group{ID: "query", Title: "Query & Status"})
+	root.AddGroup(&cobra.Group{ID: "quality", Title: "Quality"})
+	root.AddGroup(&cobra.Group{ID: "data", Title: "Data"})
+	root.AddGroup(&cobra.Group{ID: "dev", Title: "Dev"})
+
+	// workitems group
+	feature := featureCmdWithExtras()
+	feature.GroupID = "workitems"
+	root.AddCommand(feature)
+
+	spike := workitemCmd("spike", "spikes")
+	spike.GroupID = "workitems"
+	root.AddCommand(spike)
+
+	bug := workitemCmd("bug", "bugs")
+	bug.GroupID = "workitems"
+	root.AddCommand(bug)
+
+	track := trackCmdWithExtras()
+	track.GroupID = "workitems"
+	root.AddCommand(track)
+
+	plan := planCmdWithExtras()
+	plan.GroupID = "workitems"
+	root.AddCommand(plan)
+
+	// query group
+	find := findCmd()
+	find.GroupID = "query"
+	root.AddCommand(find)
+
+	wip := wipCmd()
+	wip.GroupID = "query"
+	root.AddCommand(wip)
+
+	status := statusCmd()
+	status.GroupID = "query"
+	root.AddCommand(status)
+
+	snapshot := snapshotCmd()
+	snapshot.GroupID = "query"
+	root.AddCommand(snapshot)
+
+	link := linkCmd()
+	link.GroupID = "query"
+	root.AddCommand(link)
+
+	session := sessionCmd()
+	session.GroupID = "query"
+	root.AddCommand(session)
+
+	analytics := analyticsCmd()
+	analytics.GroupID = "query"
+	root.AddCommand(analytics)
+
+	recommend := recommendCmd()
+	recommend.GroupID = "query"
+	root.AddCommand(recommend)
+
+	// quality group
+	check := checkCmd()
+	check.GroupID = "quality"
+	root.AddCommand(check)
+
+	health := healthCmd()
+	health.GroupID = "quality"
+	root.AddCommand(health)
+
+	spec := specCmd()
+	spec.GroupID = "quality"
+	root.AddCommand(spec)
+
+	tdd := tddCmd()
+	tdd.GroupID = "quality"
+	root.AddCommand(tdd)
+
+	review := reviewCmd()
+	review.GroupID = "quality"
+	root.AddCommand(review)
+
+	compliance := complianceCmd()
+	compliance.GroupID = "quality"
+	root.AddCommand(compliance)
+
+	// data group
+	batch := batchCmd()
+	batch.GroupID = "data"
+	root.AddCommand(batch)
+
+	ingest := ingestCmd()
+	ingest.GroupID = "data"
+	root.AddCommand(ingest)
+
+	backfill := backfillCmd()
+	backfill.GroupID = "data"
+	root.AddCommand(backfill)
+
+	sweep := sweepCmd()
+	sweep.GroupID = "data"
+	root.AddCommand(sweep)
+
+	reindex := reindexCmd()
+	reindex.GroupID = "data"
+	root.AddCommand(reindex)
+
+	migrate := migrateCmd()
+	migrate.GroupID = "data"
+	root.AddCommand(migrate)
+
+	cleanup := cleanupCmd()
+	cleanup.GroupID = "data"
+	root.AddCommand(cleanup)
+
+	// dev group
+	yolo := yoloCmd()
+	yolo.GroupID = "dev"
+	root.AddCommand(yolo)
+
+	upgrade := upgradeCmd()
+	upgrade.GroupID = "dev"
+	root.AddCommand(upgrade)
+
+	build := buildCmd()
+	build.GroupID = "dev"
+	root.AddCommand(build)
+
+	serve := serveCmd()
+	serve.GroupID = "dev"
+	root.AddCommand(serve)
+
+	agentInit := agentInitCmd()
+	agentInit.GroupID = "dev"
+	root.AddCommand(agentInit)
+
+	// ungrouped (internal plumbing — omitted from compact help)
+	root.AddCommand(versionCmd())
+	root.AddCommand(statuslineCmd())
+	root.AddCommand(serveChildCmd())
+	root.AddCommand(hookCmd())
+	root.AddCommand(claudeCmd())
+	root.AddCommand(orchestratorCmd())
+	root.AddCommand(installHooksCmd())
+	root.AddCommand(reportCmd())
+	root.AddCommand(budgetCmd())
+	root.AddCommand(ciCmd())
+	root.AddCommand(helpCmd())
+	root.AddCommand(claimCmd())
+	root.AddCommand(purgeSpikesCmd())
+	root.AddCommand(traceCmd())
+	root.AddCommand(graphCmd())
+	root.AddCommand(queryCmd())
+	root.AddCommand(devCmd())
+	root.AddCommand(pluginCmd())
+	root.AddCommand(projectsCmd())
+	root.AddCommand(initCmd())
+	root.AddCommand(setupCmd())
+	root.AddCommand(setupCLICmd())
+
+	return root
 }
 
 func versionCmd() *cobra.Command {
