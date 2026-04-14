@@ -58,8 +58,14 @@ func runHistory(id string, jsonOut bool) error {
 		return err
 	}
 
-	// Git operations run from the project root (parent of .htmlgraph/).
-	repoRoot := filepath.Dir(hgDir)
+	// Resolve the git toplevel from the current working directory so `git log`
+	// runs against the active worktree's HEAD, not the main checkout. In linked
+	// worktrees, filepath.Dir(hgDir) would resolve back to the main repo.
+	repoRoot, err := gitToplevel()
+	if err != nil {
+		// Fallback: assume hgDir's parent is the toplevel (flat repo case).
+		repoRoot = filepath.Dir(hgDir)
+	}
 
 	entries, err := runHistoryLog(repoRoot, path)
 	if err != nil {
@@ -117,6 +123,17 @@ func subDirAndExt(id string) (string, string) {
 	default:
 		return "", ""
 	}
+}
+
+// gitToplevel returns the absolute path to the active worktree's root by
+// invoking `git rev-parse --show-toplevel`. This correctly distinguishes linked
+// worktrees from the main checkout.
+func gitToplevel() (string, error) {
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse --show-toplevel: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // runHistoryLog shells out to git log with --follow to handle renames and

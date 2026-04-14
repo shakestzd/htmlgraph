@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/graph"
 	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/spf13/cobra"
@@ -61,6 +62,12 @@ var lineageHexRe = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 // detectLineageKind inspects a CLI argument and returns its routing kind.
 // Order matters: ID prefixes win over file path heuristics so an exotic file
 // named "feat-x" is still parsed as a work item by intent.
+//
+// Note: session-ID routing is prefix-only (no length/hex constraint) because
+// upstream generators emit multiple schemes — real sessions are `sess-<hex8>`
+// but tests and ingest tooling also produce `sess-root-0001`, `sess-orch-abc`,
+// etc. Commit-ID routing uses the stricter hex regex because SHAs have a
+// fixed alphabet and any accidental collision there would be a bug.
 func detectLineageKind(arg string) lineageKind {
 	switch {
 	case strings.HasPrefix(arg, "feat-"):
@@ -181,11 +188,24 @@ Examples:
 
 // runLineage is the testable entry point. It dispatches based on
 // detectLineageKind, walks the graph in both directions, and renders.
+//
+// Commit SHAs and file paths short-circuit to the existing attribution
+// primitives (TraceCommit / TraceFile) because graph_edges does not store
+// commit or file nodes — a bfsWalk rooted at a commit or file would always
+// return empty. Work-item, plan, track, and session kinds go through the
+// bidirectional graph walker.
 func runLineage(w io.Writer, db *sql.DB, arg string, opts lineageOpts) error {
 	if opts.depth <= 0 {
 		opts.depth = 5
 	}
 	kind := detectLineageKind(arg)
+
+	switch kind {
+	case kindCommit:
+		return runLineageCommit(w, db, arg, opts)
+	case kindFile:
+		return runLineageFile(w, db, arg, opts)
+	}
 
 	forward, err := forwardWalk(db, arg, allLineageRels, opts.depth)
 	if err != nil {
@@ -302,6 +322,10 @@ func bfsWalk(db *sql.DB, root string, rels []string, maxDepth int, forward bool)
 			result = append(result, node)
 			queue = append(queue, queueEntry{id: nid, depth: cur.depth + 1})
 		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("iterate neighbors of %s: %w", cur.id, err)
+		}
 		rows.Close()
 	}
 
@@ -410,6 +434,90 @@ func renderLineageTree(
 	}
 	if len(forward) == 0 && len(backward) == 0 {
 		fmt.Fprintln(w, "\n  (no related nodes — try `htmlgraph trace` for file/commit attribution)")
+	}
+	return nil
+}
+
+// runLineageCommit dispatches a commit SHA to the existing TraceCommit
+// primitive and renders the result. Commits are not graph_edges nodes, so a
+// bidirectional bfsWalk would return empty — this is the correct surface.
+func runLineageCommit(w io.Writer, db *sql.DB, sha string, opts lineageOpts) error {
+	commits, err := dbpkg.TraceCommit(db, sha)
+	if err != nil {
+		return fmt.Errorf("trace commit: %w", err)
+	}
+	if opts.jsonOut {
+		out := struct {
+			Root    string               `json:"root"`
+			Kind    string               `json:"kind"`
+			Commits []dbpkg.TraceResult  `json:"commits"`
+		}{Root: sha, Kind: kindCommit.String(), Commits: commits}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(out)
+	}
+	sep := strings.Repeat("─", 60)
+	fmt.Fprintln(w, sep)
+	fmt.Fprintf(w, "  Lineage: %s  [commit]\n", truncate(sha, 10))
+	fmt.Fprintln(w, sep)
+	if len(commits) == 0 {
+		fmt.Fprintln(w, "  (no matching commit — run 'htmlgraph ingest commits')")
+		return nil
+	}
+	for _, c := range commits {
+		fmt.Fprintf(w, "  Commit    %s\n", truncate(c.CommitHash, 10))
+		if c.Message != "" {
+			fmt.Fprintf(w, "  Message   %s\n", truncate(c.Message, 55))
+		}
+		if c.SessionID != "" {
+			fmt.Fprintf(w, "  Session   %s\n", c.SessionID)
+		}
+		if c.FeatureID != "" {
+			fmt.Fprintf(w, "  Feature   %s\n", c.FeatureID)
+		}
+		if c.TrackID != "" {
+			fmt.Fprintf(w, "  Track     %s\n", c.TrackID)
+		}
+	}
+	return nil
+}
+
+// runLineageFile dispatches a file path to the existing TraceFile primitive
+// and renders the result. Same rationale as runLineageCommit: files are not
+// graph_edges nodes.
+func runLineageFile(w io.Writer, db *sql.DB, filePath string, opts lineageOpts) error {
+	results, err := dbpkg.TraceFile(db, filePath)
+	if err != nil {
+		return fmt.Errorf("trace file: %w", err)
+	}
+	if opts.jsonOut {
+		out := struct {
+			Root     string                   `json:"root"`
+			Kind     string                   `json:"kind"`
+			Features []dbpkg.FileTraceResult  `json:"features"`
+		}{Root: filePath, Kind: kindFile.String(), Features: results}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(out)
+	}
+	sep := strings.Repeat("─", 60)
+	fmt.Fprintln(w, sep)
+	fmt.Fprintf(w, "  Lineage: %s  [file]\n", filePath)
+	fmt.Fprintln(w, sep)
+	if len(results) == 0 {
+		fmt.Fprintln(w, "  (no features touch this file — run 'htmlgraph reindex')")
+		return nil
+	}
+	fmt.Fprintf(w, "\n  Features (%d):\n", len(results))
+	for _, r := range results {
+		status := r.Status
+		if status == "" {
+			status = "unknown"
+		}
+		fmt.Fprintf(w, "    %s  [%s]  %s\n", r.FeatureID, status, truncate(r.Title, 40))
+		if r.TrackID != "" {
+			fmt.Fprintf(w, "      Track: %s\n", r.TrackID)
+		}
 	}
 	return nil
 }

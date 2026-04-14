@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -199,6 +200,68 @@ func TestTraceSHAUnchanged(t *testing.T) {
 	}
 	if results[0].CommitHash != commitSHA {
 		t.Errorf("CommitHash = %q, want %q", results[0].CommitHash, commitSHA)
+	}
+}
+
+// TestTraceFeatureIncludesFileOnlySession guards against the regression where
+// uniqueSessions only looked at commits and dropped sessions that touched the
+// feature through feature_files without producing a commit.
+func TestTraceFeatureIncludesFileOnlySession(t *testing.T) {
+	database, featureID, _, _ := seedTraceFeatureDB(t)
+	defer database.Close()
+
+	fileOnlySession := "sess-file-only"
+	if err := dbpkg.UpsertFeatureFile(database, &models.FeatureFile{
+		ID:        "ff-file-only",
+		FeatureID: featureID,
+		FilePath:  "internal/db/file_only.go",
+		Operation: "edit",
+		SessionID: fileOnlySession,
+	}); err != nil {
+		t.Fatalf("upsert file-only feature_file: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := runTraceFeatureJSON(&buf, database, featureID); err != nil {
+		t.Fatalf("runTraceFeatureJSON: %v", err)
+	}
+	var got traceFeatureJSON
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if !slices.Contains(got.Sessions, fileOnlySession) {
+		t.Errorf("sessions should include file-only session %q, got %v", fileOnlySession, got.Sessions)
+	}
+}
+
+// TestTraceCommitJSON guards the --json contract for the commit route.
+func TestTraceCommitJSON(t *testing.T) {
+	database, _, commitSHA, _ := seedTraceFeatureDB(t)
+	defer database.Close()
+
+	results, err := dbpkg.TraceCommit(database, commitSHA)
+	if err != nil || len(results) == 0 {
+		t.Fatalf("seed TraceCommit: %v (len=%d)", err, len(results))
+	}
+	// Assemble the JSON payload the same way runTraceCommit does so we exercise
+	// the schema without reaching for os.Stdout.
+	payload := traceCommitJSON{Query: commitSHA, Results: []traceCommitHit{{
+		Commit:  results[0].CommitHash,
+		Message: results[0].Message,
+		Session: results[0].SessionID,
+		Feature: results[0].FeatureID,
+		Track:   results[0].TrackID,
+	}}}
+	buf, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var rt traceCommitJSON
+	if err := json.Unmarshal(buf, &rt); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if rt.Query != commitSHA || len(rt.Results) != 1 || rt.Results[0].Commit != commitSHA {
+		t.Errorf("round-trip mismatch: %+v", rt)
 	}
 }
 

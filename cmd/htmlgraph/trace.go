@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,11 @@ Examples:
 // commitSHARe matches valid commit SHA hashes (7-40 hex characters).
 var commitSHARe = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 
-// workItemIDRe matches feature/bug/spike IDs: feat-, bug-, or spk- followed by 8 hex chars.
+// workItemIDRe matches feature/bug/spike IDs: feat-, bug-, or spk- followed
+// by exactly 8 hex chars. The 8-hex suffix is produced by the ID generators
+// in internal/models (see GenerateFeatureID / GenerateBugID / GenerateSpikeID).
+// If that generation scheme ever changes, update this regex in lockstep or
+// work-item IDs will silently fall through to the file-path branch.
 var workItemIDRe = regexp.MustCompile(`^(feat|bug|spk)-[0-9a-f]{8}$`)
 
 // looksLikeFilePath returns true when the argument looks like a file path
@@ -75,12 +80,26 @@ func runTrace(arg string, jsonOut bool) error {
 		return runTraceFeature(os.Stdout, database, arg)
 	}
 	if looksLikeFilePath(arg) {
-		return runTraceFile(arg)
+		return runTraceFile(arg, jsonOut)
 	}
-	return runTraceCommit(arg)
+	return runTraceCommit(arg, jsonOut)
 }
 
-func runTraceCommit(sha string) error {
+// traceCommitJSON is the structured output schema for commit tracing.
+type traceCommitJSON struct {
+	Query   string            `json:"query"`
+	Results []traceCommitHit  `json:"results"`
+}
+
+type traceCommitHit struct {
+	Commit   string `json:"commit"`
+	Message  string `json:"message,omitempty"`
+	Session  string `json:"session,omitempty"`
+	Feature  string `json:"feature,omitempty"`
+	Track    string `json:"track,omitempty"`
+}
+
+func runTraceCommit(sha string, jsonOut bool) error {
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err
@@ -98,6 +117,22 @@ func runTraceCommit(sha string) error {
 	}
 	if len(commits) == 0 {
 		return fmt.Errorf("commit %s not found in git_commits table\nRun 'htmlgraph ingest commits' to import git history", sha)
+	}
+
+	if jsonOut {
+		out := traceCommitJSON{Query: sha, Results: make([]traceCommitHit, 0, len(commits))}
+		for _, c := range commits {
+			out.Results = append(out.Results, traceCommitHit{
+				Commit:  c.CommitHash,
+				Message: c.Message,
+				Session: c.SessionID,
+				Feature: c.FeatureID,
+				Track:   c.TrackID,
+			})
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(out)
 	}
 
 	sep := strings.Repeat("─", 60)
@@ -124,7 +159,24 @@ func runTraceCommit(sha string) error {
 	return nil
 }
 
-func runTraceFile(filePath string) error {
+// traceFileJSON is the structured output schema for file tracing.
+type traceFileJSON struct {
+	Query    string         `json:"query"`
+	Features []traceFileHit `json:"features"`
+	Tracks   []string       `json:"tracks,omitempty"`
+	Owner    string         `json:"owner,omitempty"`
+}
+
+type traceFileHit struct {
+	FeatureID string `json:"feature_id"`
+	Title     string `json:"title,omitempty"`
+	Status    string `json:"status,omitempty"`
+	TrackID   string `json:"track_id,omitempty"`
+	Operation string `json:"operation,omitempty"`
+	LastSeen  string `json:"last_seen,omitempty"`
+}
+
+func runTraceFile(filePath string, jsonOut bool) error {
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err
@@ -139,6 +191,33 @@ func runTraceFile(filePath string) error {
 	results, err := dbpkg.TraceFile(database, filePath)
 	if err != nil {
 		return err
+	}
+
+	if jsonOut {
+		out := traceFileJSON{Query: filePath, Features: make([]traceFileHit, 0, len(results))}
+		trackSet := make(map[string]bool)
+		for _, r := range results {
+			out.Features = append(out.Features, traceFileHit{
+				FeatureID: r.FeatureID,
+				Title:     r.Title,
+				Status:    r.Status,
+				TrackID:   r.TrackID,
+				Operation: r.Operation,
+				LastSeen:  r.LastSeen,
+			})
+			if r.TrackID != "" {
+				trackSet[r.TrackID] = true
+			}
+		}
+		for t := range trackSet {
+			out.Tracks = append(out.Tracks, t)
+		}
+		if owner := dbpkg.ResolveFileOwner(database, filePath); owner != nil {
+			out.Owner = owner.FeatureID
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(out)
 	}
 
 	sep := strings.Repeat("─", 60)
@@ -200,6 +279,27 @@ type traceFeatureJSON struct {
 	Files    []string `json:"files"`
 }
 
+// uniqueSessions returns the union of session IDs drawn from both git_commits
+// and feature_files, preserving insertion order and dropping empties. Sessions
+// that touched a feature through files without producing a commit are included.
+func uniqueSessions(commits []models.GitCommit, files []models.FeatureFile) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, c := range commits {
+		if c.SessionID != "" && !seen[c.SessionID] {
+			seen[c.SessionID] = true
+			out = append(out, c.SessionID)
+		}
+	}
+	for _, f := range files {
+		if f.SessionID != "" && !seen[f.SessionID] {
+			seen[f.SessionID] = true
+			out = append(out, f.SessionID)
+		}
+	}
+	return out
+}
+
 // runTraceFeature writes a human-readable text tree for a feature's forward trace.
 func runTraceFeature(w io.Writer, database *sql.DB, featureID string) error {
 	commits, err := dbpkg.GetCommitsByFeature(database, featureID)
@@ -212,15 +312,7 @@ func runTraceFeature(w io.Writer, database *sql.DB, featureID string) error {
 		return fmt.Errorf("list files: %w", err)
 	}
 
-	// Collect unique sessions from commits.
-	sessionSeen := make(map[string]bool)
-	var sessions []string
-	for _, c := range commits {
-		if c.SessionID != "" && !sessionSeen[c.SessionID] {
-			sessionSeen[c.SessionID] = true
-			sessions = append(sessions, c.SessionID)
-		}
-	}
+	sessions := uniqueSessions(commits, files)
 
 	sep := strings.Repeat("─", 60)
 	fmt.Fprintln(w, sep)
@@ -264,15 +356,7 @@ func runTraceFeatureJSON(w io.Writer, database *sql.DB, featureID string) error 
 		return fmt.Errorf("list files: %w", err)
 	}
 
-	// Collect unique sessions.
-	sessionSeen := make(map[string]bool)
-	var sessions []string
-	for _, c := range commits {
-		if c.SessionID != "" && !sessionSeen[c.SessionID] {
-			sessionSeen[c.SessionID] = true
-			sessions = append(sessions, c.SessionID)
-		}
-	}
+	sessions := uniqueSessions(commits, files)
 
 	commitHashes := make([]string, 0, len(commits))
 	for _, c := range commits {

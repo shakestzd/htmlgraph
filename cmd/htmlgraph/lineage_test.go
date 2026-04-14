@@ -219,6 +219,65 @@ func TestLineageAgentTreeForSession(t *testing.T) {
 	}
 }
 
+// TestLineageCommitDispatch verifies that a commit SHA routes through the
+// TraceCommit primitive instead of returning an empty graph walk. This is the
+// regression for roborev HIGH finding #1 (lineage.go kindCommit).
+func TestLineageCommitDispatch(t *testing.T) {
+	db := setupLineageDB(t)
+
+	sha := "deadbeef12345678"
+	if _, err := db.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp) VALUES (?, ?, ?, ?, ?)`,
+		sha, "sess-lineage-cmt", "feat-cmtdispatch", "lineage commit dispatch", time.Now().UTC().Format(time.RFC3339),
+	); err != nil {
+		t.Fatalf("seed git_commits: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := runLineage(&buf, db, sha, lineageOpts{depth: 5}); err != nil {
+		t.Fatalf("runLineage commit: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "[commit]") {
+		t.Errorf("commit lineage output should label kind [commit]\n%s", out)
+	}
+	if !strings.Contains(out, "sess-lineage-cmt") {
+		t.Errorf("commit lineage should surface the attributed session\n%s", out)
+	}
+}
+
+// TestLineageFileDispatch verifies file paths route through TraceFile instead
+// of the graph walker (which would return empty for a file path).
+func TestLineageFileDispatch(t *testing.T) {
+	db := setupLineageDB(t)
+
+	featureID := "feat-filedisp1"
+	filePath := "internal/db/lineage_file_dispatch.go"
+	if _, err := db.Exec(
+		`INSERT INTO features (id, type, title, status) VALUES (?, ?, ?, ?)`,
+		featureID, "feature", "File dispatch test", "in-progress",
+	); err != nil {
+		t.Fatalf("seed feature: %v", err)
+	}
+	if err := dbpkg.UpsertFeatureFile(db, &models.FeatureFile{
+		ID: "ff-filedisp", FeatureID: featureID, FilePath: filePath, Operation: "edit",
+	}); err != nil {
+		t.Fatalf("seed feature_file: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := runLineage(&buf, db, filePath, lineageOpts{depth: 5}); err != nil {
+		t.Fatalf("runLineage file: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "[file]") {
+		t.Errorf("file lineage output should label kind [file]\n%s", out)
+	}
+	if !strings.Contains(out, featureID) {
+		t.Errorf("file lineage should surface attributed feature %q\n%s", featureID, out)
+	}
+}
+
 // TestLineageRegressionTraceUnchanged is a compile-time guarantee that the
 // existing trace command surface is untouched. If trace.go's exported helpers
 // disappear, this test fails to compile.
