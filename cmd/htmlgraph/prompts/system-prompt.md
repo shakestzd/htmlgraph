@@ -16,9 +16,12 @@ Activate the work item you're working on BEFORE any tool calls:
 ```bash
 htmlgraph feature start feat-xxx  # or: htmlgraph bug start bug-xxx / htmlgraph spike start spk-xxx
 ```
-If no item matches, create one:
+If no item matches, **first run `htmlgraph relevant <topic>`** to find existing context. If still nothing, create one:
 ```bash
-htmlgraph feature create "title" --track <trk-id> --description "what you're implementing"
+# Preferred — links the feature to its plan and the plan's track:
+htmlgraph feature create "title" --plan <plan-id> --description "what you're implementing"
+# Last resort (hotfix or pre-plan work):
+htmlgraph feature create "title" --standalone "<reason>" --description "what you're implementing"
 htmlgraph feature start <new-id>
 ```
 The CIGS guidance (injected per-turn) lists open work items — pick from those.

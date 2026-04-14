@@ -71,12 +71,9 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 		return fmt.Errorf("feature must have a parent plan OR --standalone <reason>.\nRun 'htmlgraph relevant <topic>' to find existing context first.")
 	}
 
-	if err := warnMissingFields(typeName, o); err != nil {
-		return err
-	}
-
 	// When --plan is given, resolve the plan to get its track ID so the feature
-	// is linked to both plan and track.
+	// is linked to both plan and track. This must run BEFORE warnMissingFields,
+	// otherwise validation rejects --plan-only feature creates for missing --track.
 	if typeName == "feature" && o.planID != "" && o.trackID == "" {
 		planNode, planErr := p.Plans.Get(o.planID)
 		if planErr != nil {
@@ -85,6 +82,10 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 		if planNode.TrackID != "" {
 			o.trackID = planNode.TrackID
 		}
+	}
+
+	if err := warnMissingFields(typeName, o); err != nil {
+		return err
 	}
 
 	node, err := createNode(p, typeName, title, o)

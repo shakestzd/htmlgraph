@@ -222,10 +222,17 @@ func findTrackForPlan(p *workitem.Project, planID string) string {
 func planFinalizeFromYAMLCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "finalize <plan-id>",
-		Short: "Promote plan slices to real features and lock the plan",
+		Short: "Promote plan slices to real features and lock the plan (hierarchy flow)",
 		Long: `Validate and finalize a YAML plan: promote each slice to a real feature
 linked to both the plan and its track. Writes feature IDs back to YAML.
 After finalize the plan is locked — use 'plan reopen' to unlock.
+
+This is the hierarchy-only flow: the plan must already have a track, and
+every slice in the YAML is promoted unconditionally. It does NOT consult
+SQLite plan_feedback for per-slice approvals.
+
+For the dashboard-review workflow that creates a track and only promotes
+slices with explicit approve actions, use 'plan finalize-yaml' instead.
 
 Requires:
   - plan has a track (set meta.track_id in YAML)
@@ -316,16 +323,22 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 		// Write feature_id back to YAML slice immediately.
 		plan.Slices[i].FeatureID = feat.ID
 
-		// Wire part_of (feature→track) and contains (track→feature).
-		wireTrackEdges(p, feat.ID, trackID, feat.Title) //nolint:errcheck
+		// Wire part_of (feature→track) and contains (track→feature). A failure
+		// here means a stale meta.track_id — fail the finalize rather than
+		// locking the plan with inconsistent hierarchy edges.
+		if err := wireTrackEdges(p, feat.ID, trackID, feat.Title); err != nil {
+			return nil, fmt.Errorf("wire track edges for slice %d (%s → %s): %w", s.Num, feat.ID, trackID, err)
+		}
 
 		// Link feature → plan via planned_in edge.
-		p.Features.AddEdge(feat.ID, models.Edge{ //nolint:errcheck
+		if _, err := p.Features.AddEdge(feat.ID, models.Edge{
 			TargetID:     planID,
 			Relationship: models.RelPlannedIn,
 			Title:        planID,
 			Since:        time.Now().UTC(),
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("link feature %s to plan %s: %w", feat.ID, planID, err)
+		}
 	}
 
 	// Wire blocked_by edges from slice deps.

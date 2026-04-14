@@ -6,7 +6,10 @@ Permission prompts are disabled. You must self-enforce quality at every step.
 ## Mandatory Workflow for Each Feature
 
 ### Step 0 — Work Item (BEFORE anything else)
-1. Create: `htmlgraph feature create "title" --track <trk-id> --description "what you're building"`
+0. **Discover first:** `htmlgraph relevant <topic-or-file>` — surface existing features so you don't create an orphan
+1. Create one of:
+   - `htmlgraph feature create "title" --plan <plan-id> --description "what you're building"` (preferred — links to plan + its track)
+   - `htmlgraph feature create "title" --standalone "<reason>"` (last resort: hotfix or pre-plan work)
 2. Start: Record the active feature for attribution
 3. Isolate: Use a git worktree for each feature — never edit main directly
 

@@ -48,9 +48,12 @@ htmlgraph find --status in-progress
 htmlgraph feature start feat-XXXX  # or: htmlgraph bug start bug-XXXX
 ` + "```" + `
 
-If no work item exists for this task, create one first:
+If no work item exists for this task, first run ` + "`htmlgraph relevant <topic>`" + ` to find existing context. If still nothing, create one:
 ` + "```bash" + `
-htmlgraph feature create "Short description of what you're implementing" --track <trk-id> --description "optional detail"
+# Preferred — links the feature to its plan and the plan's track:
+htmlgraph feature create "Short description" --plan <plan-id> --description "optional detail"
+# Last resort (hotfix or pre-plan work):
+htmlgraph feature create "Short description" --standalone "<reason>" --description "optional detail"
 ` + "```" + `
 `
 }
