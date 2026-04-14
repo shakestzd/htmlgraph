@@ -67,7 +67,7 @@ func runUpgrade(out io.Writer, checkOnly bool, pinVersion string) error {
 		return err
 	}
 
-	archive := fmt.Sprintf("htmlgraph-%s-%s.tar.gz", platformOS, platformArch)
+	archive := archiveName(targetVer, platformOS, platformArch)
 	url := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, targetVer, archive)
 
 	fmt.Fprintf(out, "Downloading htmlgraph v%s for %s/%s...\n", targetVer, platformOS, platformArch)
@@ -85,14 +85,10 @@ func runUpgrade(out io.Writer, checkOnly bool, pinVersion string) error {
 	}
 
 	// Extract binary from tarball.
-	binaryName := fmt.Sprintf("htmlgraph-%s-%s", platformOS, platformArch)
+	binaryName := "htmlgraph"
 	extractedPath := filepath.Join(tmpDir, binaryName)
 	if err := extractBinary(tarballPath, binaryName, extractedPath); err != nil {
-		// Try plain "htmlgraph" as fallback name.
-		extractedPath = filepath.Join(tmpDir, "htmlgraph")
-		if err2 := extractBinary(tarballPath, "htmlgraph", extractedPath); err2 != nil {
-			return fmt.Errorf("extracting binary: %w (also tried 'htmlgraph': %v)", err, err2)
-		}
+		return fmt.Errorf("extracting binary: %w", err)
 	}
 
 	// Determine install destination.
@@ -279,6 +275,12 @@ func updateVersionFile(ver string) {
 	versionFile := filepath.Join(home, ".local", "share", "htmlgraph", ".binary-version")
 	_ = os.MkdirAll(filepath.Dir(versionFile), 0o755)
 	_ = os.WriteFile(versionFile, []byte(ver), 0o644)
+}
+
+// archiveName constructs the archive filename matching goreleaser's name_template:
+// "htmlgraph_{{.Version}}_{{.Os}}_{{.Arch}}"
+func archiveName(version, os, arch string) string {
+	return fmt.Sprintf("htmlgraph_%s_%s_%s.tar.gz", version, os, arch)
 }
 
 // verifySelfVersion runs `<binary> version` and checks the output contains targetVer.

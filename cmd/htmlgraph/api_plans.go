@@ -290,8 +290,8 @@ func planFeedbackSubmitHandler(database *sql.DB) http.HandlerFunc {
 		// Normalize underscores to hyphens for slice sections — a common
 		// mistake that used to silently store wrong-format keys that
 		// finalize-yaml couldn't find.
-		if strings.HasPrefix(req.Section, "slice_") {
-			req.Section = "slice-" + strings.TrimPrefix(req.Section, "slice_")
+		if rest, ok := strings.CutPrefix(req.Section, "slice_"); ok {
+			req.Section = "slice-" + rest
 		}
 
 		if !validSectionRe.MatchString(req.Section) {
@@ -980,25 +980,6 @@ func parsePlanHTMLStatus(planPath string) (string, error) {
 		status = "draft"
 	}
 	return status, nil
-}
-
-// updatePlanHTMLStatus rewrites the plan HTML file with data-status set to
-// the new value on the top-level <article> element.
-func updatePlanHTMLStatus(planPath, newStatus string) error {
-	data, err := os.ReadFile(planPath)
-	if err != nil {
-		return err
-	}
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(data)))
-	if err != nil {
-		return err
-	}
-	doc.Find("article[id]").First().SetAttr("data-status", newStatus)
-	html, err := doc.Html()
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(planPath, []byte(html), 0o644)
 }
 
 // finalizePlanHTML writes a snapshot of the finalized plan with all feedback

@@ -76,7 +76,9 @@ func runReindex(cmd *cobra.Command, _ []string) error {
 			errCount += e
 		}
 
+		collectSessionIDs(database, validIDs)
 		purged, edgesPurged := purgeStaleEntries(database, validIDs)
+		reindexEdges(database, htmlgraphDir, validIDs)
 		fmt.Printf("Reindexed: %d upserted, %d errors (of %d HTML files)\n",
 			upserted, errCount, total)
 		if purged > 0 || edgesPurged > 0 {

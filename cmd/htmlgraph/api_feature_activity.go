@@ -165,10 +165,3 @@ func featureActivityRouter(database *sql.DB, htmlgraphDir string) http.HandlerFu
 	}
 }
 
-// nullStringVal is a helper that scans a sql.NullString into a plain string.
-func nullStringVal(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
-	}
-	return ""
-}

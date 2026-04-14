@@ -82,9 +82,7 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	mux.Handle("/api/timeline", corsMiddleware(timelineHandler(database)))
 	mux.Handle("/api/transcript", corsMiddleware(transcriptHandler(database, htmlgraphDir)))
 	mux.Handle("/api/sessions/", corsMiddleware(sessionIngestHandler(database)))
-	mux.Handle("/api/features/detail", corsMiddleware(featureDetailHandler(htmlgraphDir)))
-	mux.Handle("/api/features/related", corsMiddleware(relatedFeaturesHandler(database)))
-	mux.Handle("/api/features/", corsMiddleware(featureActivityHandler(database)))
+	mux.Handle("/api/features/", corsMiddleware(featureActivityRouter(database, htmlgraphDir)))
 	mux.Handle("/api/graph", corsMiddleware(graphAPIHandler(database)))
 
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
@@ -179,7 +177,7 @@ func resolveProjectPluginDir() string {
 
 	// Walk up at most 5 levels looking for the project root.
 	dir := cwd
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		// Check if this directory has both .htmlgraph/ and plugin/
 		pluginDir := filepath.Join(dir, "plugin")
 		if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err == nil {

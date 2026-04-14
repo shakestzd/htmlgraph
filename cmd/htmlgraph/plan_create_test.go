@@ -118,3 +118,35 @@ func TestRunPlanAddSlice(t *testing.T) {
 		t.Error("plan HTML missing slice card data-slice=2")
 	}
 }
+
+func TestUpdatePlanStatus(t *testing.T) {
+	dir := t.TempDir()
+	plansDir := filepath.Join(dir, "plans")
+	if err := os.MkdirAll(plansDir, 0o755); err != nil {
+		t.Fatalf("mkdir plans: %v", err)
+	}
+
+	// Write a minimal plan HTML fixture with data-status="draft" on the root article.
+	planID := "plan-test123"
+	planPath := filepath.Join(plansDir, planID+".html")
+	fixture := `<html><body><article id="plan-test123" data-type="plan" data-status="draft">test plan</article></body></html>`
+	if err := os.WriteFile(planPath, []byte(fixture), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	if err := updatePlanStatus(dir, planID, "done"); err != nil {
+		t.Fatalf("updatePlanStatus: %v", err)
+	}
+
+	data, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatalf("read plan after update: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, `data-status="done"`) {
+		t.Errorf("expected data-status=\"done\" in updated file, got:\n%s", content)
+	}
+	if strings.Contains(content, `data-status="draft"`) {
+		t.Errorf("old data-status=\"draft\" still present after update")
+	}
+}

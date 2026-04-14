@@ -187,24 +187,6 @@ func iconFor(typeName string) string {
 	}
 }
 
-func inferType(id string) string {
-	if len(id) < 4 {
-		return "feature"
-	}
-	switch id[:4] {
-	case "bug-":
-		return "bug"
-	case "feat":
-		return "feature"
-	case "spk-", "spik":
-		return "spike"
-	case "trk-":
-		return "track"
-	default:
-		return "feature"
-	}
-}
-
 // WriteStatuslineCache writes the active work item summary to a project-scoped
 // cache file. The filename includes a hash of the htmlgraphDir so different
 // projects never overwrite each other's cache (bug-95dc78ba).
