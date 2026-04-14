@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
@@ -212,6 +213,8 @@ func runTraceFile(filePath string, jsonOut bool) error {
 		for t := range trackSet {
 			out.Tracks = append(out.Tracks, t)
 		}
+		// Deterministic order so the JSON payload is snapshot-stable across runs.
+		sort.Strings(out.Tracks)
 		if owner := dbpkg.ResolveFileOwner(database, filePath); owner != nil {
 			out.Owner = owner.FeatureID
 		}

@@ -115,6 +115,11 @@ type lineageNode struct {
 	Title    string `json:"title,omitempty"`
 	EdgeType string `json:"edge_type"`
 	Depth    int    `json:"depth"`
+	// Parent is the node ID that this hop was discovered from during BFS. For
+	// the pivot's direct neighbours it equals the pivot. Used by the tree
+	// renderer to build a real adjacency structure so branched walks don't
+	// visually attach grandchildren to the wrong parent.
+	Parent string `json:"parent,omitempty"`
 	// timestamp is populated for --timeline rendering by joining git_commits /
 	// agent_events. Empty when no temporal data is available.
 	Timestamp string `json:"timestamp,omitempty"`
@@ -337,6 +342,7 @@ func bfsWalk(db *sql.DB, root string, rels []string, maxDepth int, forward bool)
 				Type:     ntype,
 				EdgeType: rel,
 				Depth:    cur.depth + 1,
+				Parent:   cur.id,
 			}
 			result = append(result, node)
 			queue = append(queue, queueEntry{id: nid, depth: cur.depth + 1})
@@ -462,12 +468,12 @@ func renderLineageTree(
 
 	if len(backward) > 0 {
 		fmt.Fprintf(w, "\n  Ancestors (%d):\n", len(backward))
-		printLineageBranches(w, backward)
+		printLineageBranches(w, root, backward)
 	}
 	fmt.Fprintf(w, "\n  Pivot: %s\n", rootLabel)
 	if len(forward) > 0 {
 		fmt.Fprintf(w, "\n  Descendants (%d):\n", len(forward))
-		printLineageBranches(w, forward)
+		printLineageBranches(w, root, forward)
 	}
 	if len(forward) == 0 && len(backward) == 0 {
 		fmt.Fprintln(w, "\n  (no related nodes — try `htmlgraph trace` for file/commit attribution)")
@@ -565,16 +571,57 @@ func runLineageFile(w io.Writer, db *sql.DB, filePath string, opts lineageOpts) 
 	return nil
 }
 
-// printLineageBranches indents nodes by depth so branching chains are visually
-// distinct. Each line: "<indent>[<edge_type>] <id> (<title>)".
-func printLineageBranches(w io.Writer, nodes []lineageNode) {
+// printLineageBranches renders nodes as a real tree by walking the parent
+// adjacency built from each node's Parent field. Prior versions indented by
+// `Depth` alone, which was wrong for branched walks: BFS order like
+// [A,C,B,D] (where B is under A and D is under C) would print B immediately
+// after C at indent 2, visually attaching B to C instead of A. Building a
+// children-of-parent map and recursing from the pivot preserves true
+// parentage no matter how BFS interleaves siblings.
+func printLineageBranches(w io.Writer, pivot string, nodes []lineageNode) {
+	byParent := make(map[string][]int, len(nodes))
+	for i, n := range nodes {
+		byParent[n.Parent] = append(byParent[n.Parent], i)
+	}
+	var dfs func(parent string, indentLevel int)
+	dfs = func(parent string, indentLevel int) {
+		for _, idx := range byParent[parent] {
+			n := nodes[idx]
+			indent := strings.Repeat("  ", indentLevel)
+			label := n.ID
+			if n.Title != "" {
+				label = fmt.Sprintf("%s (%s)", n.ID, truncate(n.Title, 40))
+			}
+			fmt.Fprintf(w, "  %s[%s] %s\n", indent, n.EdgeType, label)
+			dfs(n.ID, indentLevel+1)
+		}
+	}
+	// Render every node reachable from the pivot first, then any orphans that
+	// landed in the walk with a missing parent entry — they become additional
+	// roots rather than being dropped silently.
+	dfs(pivot, 1)
+	seen := map[string]bool{pivot: true}
+	var collectSeen func(parent string)
+	collectSeen = func(parent string) {
+		for _, idx := range byParent[parent] {
+			seen[nodes[idx].ID] = true
+			collectSeen(nodes[idx].ID)
+		}
+	}
+	collectSeen(pivot)
 	for _, n := range nodes {
-		indent := strings.Repeat("  ", n.Depth)
+		if seen[n.ID] {
+			continue
+		}
+		// Orphan — its Parent wasn't reachable from the pivot. Render as a
+		// new root so partial walks degrade gracefully.
 		label := n.ID
 		if n.Title != "" {
 			label = fmt.Sprintf("%s (%s)", n.ID, truncate(n.Title, 40))
 		}
-		fmt.Fprintf(w, "  %s[%s] %s\n", indent, n.EdgeType, label)
+		fmt.Fprintf(w, "  [%s] %s  (orphan)\n", n.EdgeType, label)
+		seen[n.ID] = true
+		collectSeen(n.ID)
 	}
 }
 

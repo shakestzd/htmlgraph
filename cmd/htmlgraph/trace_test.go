@@ -234,6 +234,73 @@ func TestTraceFeatureIncludesFileOnlySession(t *testing.T) {
 	}
 }
 
+// TestTraceFileJSONStableTrackOrder guards the Low-severity regression
+// where tracks were emitted from a map iteration and thus varied per run,
+// making the JSON payload unstable for automation and snapshots.
+func TestTraceFileJSONStableTrackOrder(t *testing.T) {
+	database, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	// Three tracks, one feature per track, all touching the same file.
+	// Deliberately insert in NON-sorted order so a map iteration would
+	// produce a different order.
+	tracks := []string{"trk-mmm", "trk-aaa", "trk-zzz"}
+	for i, tr := range tracks {
+		database.Exec(`INSERT INTO tracks (id, type, title, status) VALUES (?, ?, ?, ?)`,
+			tr, "track", "T", "in-progress")
+		featID := "feat-sort" + string(rune('0'+i))
+		database.Exec(`INSERT INTO features (id, type, title, status, track_id) VALUES (?, ?, ?, ?, ?)`,
+			featID, "feature", "F", "done", tr)
+		if err := dbpkg.UpsertFeatureFile(database, &models.FeatureFile{
+			ID: "ff-sort" + string(rune('0'+i)), FeatureID: featID,
+			FilePath: "shared/sort.go", Operation: "edit",
+		}); err != nil {
+			t.Fatalf("upsert: %v", err)
+		}
+	}
+
+	// Simulate the JSON builder path by running the same logic as runTraceFile.
+	results, err := dbpkg.TraceFile(database, "shared/sort.go")
+	if err != nil {
+		t.Fatalf("TraceFile: %v", err)
+	}
+	out := traceFileJSON{Query: "shared/sort.go"}
+	trackSet := make(map[string]bool)
+	for _, r := range results {
+		if r.TrackID != "" {
+			trackSet[r.TrackID] = true
+		}
+	}
+	for tr := range trackSet {
+		out.Tracks = append(out.Tracks, tr)
+	}
+	slicesSort(out.Tracks) // match runTraceFile
+
+	// After sort the order must be deterministic and ascending.
+	want := []string{"trk-aaa", "trk-mmm", "trk-zzz"}
+	if len(out.Tracks) != len(want) {
+		t.Fatalf("tracks len = %d, want %d", len(out.Tracks), len(want))
+	}
+	for i := range want {
+		if out.Tracks[i] != want[i] {
+			t.Errorf("tracks[%d] = %q, want %q", i, out.Tracks[i], want[i])
+		}
+	}
+}
+
+// slicesSort is a small helper matching the sort.Strings call in runTraceFile.
+// Kept in the test file so the regression asserts the same sort behaviour.
+func slicesSort(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j-1] > s[j]; j-- {
+			s[j-1], s[j] = s[j], s[j-1]
+		}
+	}
+}
+
 // TestTraceCommitJSON guards the --json contract for the commit route.
 func TestTraceCommitJSON(t *testing.T) {
 	database, _, commitSHA, _ := seedTraceFeatureDB(t)

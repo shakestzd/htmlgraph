@@ -145,16 +145,23 @@ func gitToplevel(dir string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// gitCommonDir returns the absolute path to the repository's shared git dir
-// (the main checkout's .git for linked worktrees). Two directories belong to
-// the same repository iff their git-common-dir values are equal after
-// resolving symlinks / relative paths.
+// gitCommonDir returns the canonical absolute path to the repository's
+// shared git dir (the main checkout's .git for linked worktrees). Two
+// directories belong to the same repository iff their git-common-dir values
+// are equal after symlink resolution — raw strings are not enough because a
+// worktree and the .htmlgraph owner can reach the same repo via different
+// symlinked paths (e.g. /tmp vs /private/tmp on macOS, or a dev container
+// mount shadowing the host path).
 func gitCommonDir(dir string) (string, error) {
 	out, err := exec.Command("git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
 	if err != nil {
 		return "", fmt.Errorf("git -C %s rev-parse --git-common-dir: %w", dir, err)
 	}
-	return filepath.Clean(strings.TrimSpace(string(out))), nil
+	raw := filepath.Clean(strings.TrimSpace(string(out)))
+	if resolved, evalErr := filepath.EvalSymlinks(raw); evalErr == nil {
+		return resolved, nil
+	}
+	return raw, nil
 }
 
 // resolveHistoryRoot picks the correct git toplevel for `history <id>`.

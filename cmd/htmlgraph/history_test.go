@@ -278,6 +278,64 @@ func TestResolveHistoryRoot_LinkedWorktreePrefersCwd(t *testing.T) {
 	})
 }
 
+// TestResolveHistoryRoot_SymlinkedPaths guards the regression where
+// resolveHistoryRoot compared raw git-common-dir strings without symlink
+// resolution. If cwd and the .htmlgraph owner reach the same repo through
+// different symlinked paths (macOS /tmp vs /private/tmp, or a container
+// mount shadowing the host path), the equality check fails and history
+// incorrectly falls back to the .htmlgraph owner.
+//
+// Setup: create a repo at a real path, then reference it through a symlink.
+// Expectation: gitCommonDir yields the same canonical path for both so the
+// linked-worktree case still takes the cwd-preferred branch.
+func TestResolveHistoryRoot_SymlinkedPaths(t *testing.T) {
+	mainRoot, _ := seedRepo(t)
+	mainAbs, err := filepath.EvalSymlinks(mainRoot)
+	if err != nil {
+		t.Fatalf("eval main: %v", err)
+	}
+
+	// Symlink the repo under a sibling path so the two access paths differ.
+	linkParent := t.TempDir()
+	linkPath := filepath.Join(linkParent, "via-symlink")
+	if err := os.Symlink(mainRoot, linkPath); err != nil {
+		t.Skipf("symlink not supported on this platform: %v", err)
+	}
+
+	// gitCommonDir must canonicalize — both paths refer to the same repo.
+	direct, err := gitCommonDir(mainRoot)
+	if err != nil {
+		t.Fatalf("gitCommonDir direct: %v", err)
+	}
+	viaLink, err := gitCommonDir(linkPath)
+	if err != nil {
+		t.Fatalf("gitCommonDir via link: %v", err)
+	}
+	if direct != viaLink {
+		t.Errorf("git-common-dir should canonicalize to the same path:\n  direct: %s\n  link:   %s", direct, viaLink)
+	}
+
+	// End-to-end: cwd = link path, owner = real path (or vice versa). The
+	// linked-worktree branch must fire even though the two strings differ.
+	origCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	if err := os.Chdir(linkPath); err != nil {
+		t.Fatalf("chdir link: %v", err)
+	}
+
+	got, err := resolveHistoryRoot(mainRoot)
+	if err != nil {
+		t.Fatalf("resolveHistoryRoot: %v", err)
+	}
+	gotAbs, _ := filepath.EvalSymlinks(got)
+	if gotAbs != mainAbs {
+		t.Errorf("symlinked cwd should resolve to main repo:\n  got:  %s\n  want: %s", gotAbs, mainAbs)
+	}
+}
+
 // TestHistoryJSONOutput verifies that --json flag produces a parseable array
 // of HistoryEntry objects.
 func TestHistoryJSONOutput(t *testing.T) {

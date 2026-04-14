@@ -359,6 +359,52 @@ func TestLineageTimelineEmptyTimestampsLast(t *testing.T) {
 	}
 }
 
+// TestLineageTreeRendersRealParentage is the regression for the depth-only
+// tree bug: with BFS, sibling branches can interleave so a grandchild may
+// appear immediately after a cousin at the same indent. Without real parent
+// tracking, the grandchild visually attaches to the wrong parent. This test
+// seeds a branched walk where the BFS order and depth-based indent would
+// collide, then asserts the rendered output keeps each child under its true
+// parent.
+func TestLineageTreeRendersRealParentage(t *testing.T) {
+	db := setupLineageDB(t)
+
+	// Graph:
+	//   pivot -> A (edge: implements)
+	//   pivot -> C (edge: implements)
+	//   A     -> B (edge: implements)   // B's true parent is A
+	//   C     -> D (edge: implements)   // D's true parent is C
+	//
+	// BFS forward from pivot visits: [A, C, B, D].
+	// With depth-only rendering, B would print at indent 2 right after C at
+	// indent 1 and visually attach to C — the wrong parent.
+	seedEdge(t, db, "e1", "feat-pivot", "feature", "feat-aaaa", "feature", "implements")
+	seedEdge(t, db, "e2", "feat-pivot", "feature", "feat-cccc", "feature", "implements")
+	seedEdge(t, db, "e3", "feat-aaaa", "feature", "feat-bbbb", "feature", "implements")
+	seedEdge(t, db, "e4", "feat-cccc", "feature", "feat-dddd", "feature", "implements")
+
+	var buf bytes.Buffer
+	if err := runLineage(&buf, db, "feat-pivot", lineageOpts{depth: 5}); err != nil {
+		t.Fatalf("runLineage: %v", err)
+	}
+	out := buf.String()
+
+	// Split into descendant lines: must preserve "A -> B" and "C -> D" locality.
+	// Precise check: B must appear after A but BEFORE C (since DFS descends A
+	// fully before visiting sibling C). Likewise D appears after C.
+	idxA := strings.Index(out, "feat-aaaa")
+	idxB := strings.Index(out, "feat-bbbb")
+	idxC := strings.Index(out, "feat-cccc")
+	idxD := strings.Index(out, "feat-dddd")
+	if idxA < 0 || idxB < 0 || idxC < 0 || idxD < 0 {
+		t.Fatalf("expected all four descendants in output, got:\n%s", out)
+	}
+	if !(idxA < idxB && idxB < idxC && idxC < idxD) {
+		t.Errorf("descendants out of DFS order (A<B<C<D). A=%d B=%d C=%d D=%d\n%s",
+			idxA, idxB, idxC, idxD, out)
+	}
+}
+
 // TestLineageRegressionTraceUnchanged is a compile-time guarantee that the
 // existing trace command surface is untouched. If trace.go's exported helpers
 // disappear, this test fails to compile.
