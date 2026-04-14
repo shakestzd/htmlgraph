@@ -1,7 +1,11 @@
 package main
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -11,25 +15,37 @@ import (
 )
 
 func traceCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "trace <commit-sha | file-path>",
-		Short: "Trace a commit or file back to its work items",
-		Long: `Takes a commit SHA or file path and returns attribution:
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "trace <commit-sha | file-path | feat-id | bug-id | spk-id>",
+		Short: "Trace a commit, file, or feature to its related work items",
+		Long: `Takes a commit SHA, file path, or work item ID and returns attribution:
 
   trace <commit-sha>  — session, feature, and track for a commit
   trace <file-path>   — all features that touched the file, with tracks
+  trace <feat-id>     — commits, sessions, and files for a feature (forward)
+  trace <bug-id>      — commits, sessions, and files for a bug (forward)
+  trace <spk-id>      — commits, sessions, and files for a spike (forward)
 
 Examples:
   htmlgraph trace abc1234
-  htmlgraph trace internal/db/schema.go`,
+  htmlgraph trace internal/db/schema.go
+  htmlgraph trace feat-046e2e03
+  htmlgraph trace feat-046e2e03 --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runTrace(args[0])
+			return runTrace(args[0], jsonOut)
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON output")
+	return cmd
 }
+
 // commitSHARe matches valid commit SHA hashes (7-40 hex characters).
 var commitSHARe = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
+
+// workItemIDRe matches feature/bug/spike IDs: feat-, bug-, or spk- followed by 8 hex chars.
+var workItemIDRe = regexp.MustCompile(`^(feat|bug|spk)-[0-9a-f]{8}$`)
 
 // looksLikeFilePath returns true when the argument looks like a file path
 // rather than a commit SHA. File paths contain "/" or "." (except lone hex).
@@ -37,7 +53,27 @@ func looksLikeFilePath(s string) bool {
 	return !commitSHARe.MatchString(s)
 }
 
-func runTrace(arg string) error {
+// looksLikeWorkItemID returns true when the argument is a work item ID prefix.
+func looksLikeWorkItemID(s string) bool {
+	return workItemIDRe.MatchString(s)
+}
+
+func runTrace(arg string, jsonOut bool) error {
+	if looksLikeWorkItemID(arg) {
+		dir, err := findHtmlgraphDir()
+		if err != nil {
+			return err
+		}
+		database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+		if err != nil {
+			return fmt.Errorf("open database: %w", err)
+		}
+		defer database.Close()
+		if jsonOut {
+			return runTraceFeatureJSON(os.Stdout, database, arg)
+		}
+		return runTraceFeature(os.Stdout, database, arg)
+	}
 	if looksLikeFilePath(arg) {
 		return runTraceFile(arg)
 	}
@@ -154,4 +190,108 @@ func runTraceFile(filePath string) error {
 	}
 
 	return nil
+}
+
+// traceFeatureJSON is the structured JSON output schema for feature trace.
+type traceFeatureJSON struct {
+	Feature  string   `json:"feature"`
+	Commits  []string `json:"commits"`
+	Sessions []string `json:"sessions"`
+	Files    []string `json:"files"`
+}
+
+// runTraceFeature writes a human-readable text tree for a feature's forward trace.
+func runTraceFeature(w io.Writer, database *sql.DB, featureID string) error {
+	commits, err := dbpkg.GetCommitsByFeature(database, featureID)
+	if err != nil {
+		return fmt.Errorf("get commits: %w", err)
+	}
+
+	files, err := dbpkg.ListFilesByFeature(database, featureID)
+	if err != nil {
+		return fmt.Errorf("list files: %w", err)
+	}
+
+	// Collect unique sessions from commits.
+	sessionSeen := make(map[string]bool)
+	var sessions []string
+	for _, c := range commits {
+		if c.SessionID != "" && !sessionSeen[c.SessionID] {
+			sessionSeen[c.SessionID] = true
+			sessions = append(sessions, c.SessionID)
+		}
+	}
+
+	sep := strings.Repeat("─", 60)
+	fmt.Fprintln(w, sep)
+	fmt.Fprintf(w, "  Trace: %s\n", featureID)
+	fmt.Fprintln(w, sep)
+
+	fmt.Fprintf(w, "\n  Commits (%d):\n", len(commits))
+	for _, c := range commits {
+		fmt.Fprintf(w, "    %s", truncate(c.CommitHash, 10))
+		if c.Message != "" {
+			fmt.Fprintf(w, "  %s", truncate(c.Message, 48))
+		}
+		fmt.Fprintln(w)
+		if c.SessionID != "" {
+			fmt.Fprintf(w, "      Session: %s\n", c.SessionID)
+		}
+	}
+
+	fmt.Fprintf(w, "\n  Sessions (%d):\n", len(sessions))
+	for _, sid := range sessions {
+		fmt.Fprintf(w, "    %s\n", sid)
+	}
+
+	fmt.Fprintf(w, "\n  Files (%d):\n", len(files))
+	for _, f := range files {
+		fmt.Fprintf(w, "    %s  [%s]\n", f.FilePath, f.Operation)
+	}
+
+	return nil
+}
+
+// runTraceFeatureJSON writes structured JSON for a feature's forward trace.
+func runTraceFeatureJSON(w io.Writer, database *sql.DB, featureID string) error {
+	commits, err := dbpkg.GetCommitsByFeature(database, featureID)
+	if err != nil {
+		return fmt.Errorf("get commits: %w", err)
+	}
+
+	files, err := dbpkg.ListFilesByFeature(database, featureID)
+	if err != nil {
+		return fmt.Errorf("list files: %w", err)
+	}
+
+	// Collect unique sessions.
+	sessionSeen := make(map[string]bool)
+	var sessions []string
+	for _, c := range commits {
+		if c.SessionID != "" && !sessionSeen[c.SessionID] {
+			sessionSeen[c.SessionID] = true
+			sessions = append(sessions, c.SessionID)
+		}
+	}
+
+	commitHashes := make([]string, 0, len(commits))
+	for _, c := range commits {
+		commitHashes = append(commitHashes, c.CommitHash)
+	}
+
+	filePaths := make([]string, 0, len(files))
+	for _, f := range files {
+		filePaths = append(filePaths, f.FilePath)
+	}
+
+	out := traceFeatureJSON{
+		Feature:  featureID,
+		Commits:  commitHashes,
+		Sessions: sessions,
+		Files:    filePaths,
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
 }
