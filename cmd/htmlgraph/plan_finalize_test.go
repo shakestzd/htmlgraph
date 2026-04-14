@@ -438,6 +438,71 @@ func TestPlanFinalizeFromYAML_ReopenRefinalizeIdempotent(t *testing.T) {
 	}
 }
 
+// TestPlanFinalizeFromYAML_ReopenRefinalize_UpdatesMutatedSlice verifies that
+// when a slice's title or content is mutated between finalize and re-finalize,
+// the stored feature is updated in-place (same ID, new metadata).
+func TestPlanFinalizeFromYAML_ReopenRefinalize_UpdatesMutatedSlice(t *testing.T) {
+	p, dir := setupFinalizeProject(t)
+	planID, _ := setupYAMLFinalizeProject(t, p, dir, 2)
+
+	// First finalize: captures original feature IDs.
+	result1, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("first finalize: %v", err)
+	}
+	if len(result1.FeatureIDs) != 2 {
+		t.Fatalf("first finalize: expected 2 features, got %d", len(result1.FeatureIDs))
+	}
+
+	// Reopen: unlocks the plan.
+	if err := executePlanReopen(dir, planID); err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+
+	// Mutate slice 1's title and what (which feeds into Content) in the YAML.
+	planPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("load plan before mutation: %v", err)
+	}
+	plan.Slices[0].Title = "Mutated Title"
+	plan.Slices[0].What = "completely different implementation"
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save mutated plan: %v", err)
+	}
+
+	// Re-finalize with mutated slice.
+	result2, err := executePlanFinalizeFromYAML(p, dir, planID)
+	if err != nil {
+		t.Fatalf("re-finalize: %v", err)
+	}
+
+	// Same feature IDs — no duplicates created.
+	if len(result2.FeatureIDs) != len(result1.FeatureIDs) {
+		t.Errorf("re-finalize feature count = %d, want %d", len(result2.FeatureIDs), len(result1.FeatureIDs))
+	}
+	if result2.FeatureIDs[0] != result1.FeatureIDs[0] {
+		t.Errorf("slice 1: re-finalize feature ID = %q, want %q (duplicate created)", result2.FeatureIDs[0], result1.FeatureIDs[0])
+	}
+
+	// The stored feature now reflects the updated title and content.
+	stored, err := p.Features.Get(result1.FeatureIDs[0])
+	if err != nil {
+		t.Fatalf("get feature after mutation: %v", err)
+	}
+	if stored.Title != "Mutated Title" {
+		t.Errorf("stored feature Title = %q, want %q", stored.Title, "Mutated Title")
+	}
+	if !strings.Contains(stored.Content, "completely different implementation") {
+		t.Errorf("stored feature Content should contain mutated What field, got: %q", stored.Content)
+	}
+
+	// Finding 2 note: we don't have an easy way to inject a non-ErrNotExist
+	// Get error in this test harness (it would require corrupting the HTML file
+	// to trigger a parse error). The discrimination logic is verified by code
+	// review: errors.Is(getErr, os.ErrNotExist) in plan_finalize.go.
+}
+
 func TestAddSliceYAML_NoPrintsFakeFeatureID(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)

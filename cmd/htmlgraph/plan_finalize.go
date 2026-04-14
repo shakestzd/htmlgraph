@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -308,18 +310,59 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 	var featureIDs []string
 
 	for i, s := range plan.Slices {
-		// Idempotency check: if the slice already has a FeatureID and the
-		// feature exists in the DB, reuse it instead of creating a duplicate.
+		// Idempotency check: if the slice already has a FeatureID, try to
+		// reuse the stored feature rather than creating a duplicate.
 		if s.FeatureID != "" {
-			if existing, err := p.Features.Get(s.FeatureID); err == nil {
-				fmt.Printf("%s  Slice %d — %s (reused existing)\n", existing.ID, s.Num, s.Title)
+			existing, getErr := p.Features.Get(s.FeatureID)
+			if getErr == nil {
+				// Feature found — reconcile mutable fields so the stored
+				// feature stays in sync with the current YAML slice data.
+				wantContent := buildSliceFeatureContent(s)
+
+				// Track changes are not silently migrated: the old part_of
+				// edges would need to be rewired, which risks corruption.
+				// Surface the inconsistency instead so the operator can
+				// delete the orphaned feature and re-run.
+				if existing.TrackID != trackID {
+					return nil, fmt.Errorf(
+						"re-finalize: slice %d feature %s belongs to track %s but plan now targets track %s — "+
+							"delete the feature manually and re-run to create a fresh one",
+						s.Num, existing.ID, existing.TrackID, trackID)
+				}
+
+				titleChanged := existing.Title != s.Title
+				contentChanged := existing.Content != wantContent
+
+				if titleChanged || contentChanged {
+					// At least one mutable field diverged — persist the update.
+					eb := p.Features.Edit(existing.ID)
+					if titleChanged {
+						eb = eb.SetTitle(s.Title)
+					}
+					if contentChanged {
+						eb = eb.SetDescription(wantContent)
+					}
+					if err := eb.Save(); err != nil {
+						return nil, fmt.Errorf("update feature %s for slice %d: %w", existing.ID, s.Num, err)
+					}
+					fmt.Printf("%s  Slice %d — %s (reused existing, updated title/content)\n", existing.ID, s.Num, s.Title)
+				} else {
+					fmt.Printf("%s  Slice %d — %s (reused existing, unchanged)\n", existing.ID, s.Num, s.Title)
+				}
+
 				numToFeatureID[s.Num] = existing.ID
 				featureIDs = append(featureIDs, existing.ID)
 				continue
 			}
-			// FeatureID set but feature not found (orphan): create a new feature
-			// and overwrite the stale ID, matching the codebase's pattern of
-			// tolerating missing refs rather than hard-erroring on them.
+
+			// Discriminate: is this a genuine "file not found", or a real
+			// storage/parse error that should abort the finalize?
+			if !errors.Is(getErr, os.ErrNotExist) {
+				return nil, fmt.Errorf("read feature %s for slice %d: %w", s.FeatureID, s.Num, getErr)
+			}
+
+			// True orphan (file missing): warn and fall through to recreate.
+			fmt.Printf("warning: feature %s for slice %d not found on disk — recreating\n", s.FeatureID, s.Num)
 		}
 
 		content := buildSliceFeatureContent(s)
