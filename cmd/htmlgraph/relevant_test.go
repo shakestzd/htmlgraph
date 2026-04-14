@@ -3,10 +3,23 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// requireRipgrep skips the caller when `rg` is not on PATH. runRelevantSearch
+// shells out to ripgrep for keyword queries, so CI runners without rg must
+// skip these tests instead of hard-failing. Keeps the quality gate green on
+// minimal environments (containers, fresh VMs) while still catching real
+// regressions when rg is present.
+func requireRipgrep(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("ripgrep (rg) not found in PATH — skipping test that requires it")
+	}
+}
 
 // sampleFeatureHTML is a minimal valid HtmlGraph feature HTML fixture.
 const sampleFeatureHTML = `<!DOCTYPE html>
@@ -112,6 +125,7 @@ func TestDetectQueryType_ExistingFile(t *testing.T) {
 // --- Keyword ripgrep search ---
 
 func TestRunRelevantKeyword_ReturnsMatch(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	results, err := runRelevantSearch(hgDir, "retrieval", queryTypeKeyword)
@@ -138,9 +152,59 @@ func TestRunRelevantKeyword_ReturnsMatch(t *testing.T) {
 	}
 }
 
+// TestRunRelevantKeyword_MultiWordTokenized is the regression for bug-72b52aa4:
+// multi-word queries used to be passed to ripgrep as a literal phrase, so
+// "retrieval sha" matched nothing even though each word individually appears
+// in the fixture. Tokenizing the query per whitespace and scoring each token
+// independently now surfaces the match.
+func TestRunRelevantKeyword_MultiWordTokenized(t *testing.T) {
+	requireRipgrep(t)
+	hgDir := makeRelevantFixture(t)
+
+	results, err := runRelevantSearch(hgDir, "retrieval sha", queryTypeKeyword)
+	if err != nil {
+		t.Fatalf("runRelevantSearch: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected multi-word 'retrieval sha' to match via per-token scoring, got 0")
+	}
+	// The fixture contains both tokens, so the item should accumulate scores
+	// from both — higher than a single-token match.
+	if results[0].Score < 2*weightFileMention {
+		t.Errorf("expected score >= 2*weightFileMention for two-token match, got %v", results[0].Score)
+	}
+}
+
+func TestTokenizeQuery(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"lineage review", []string{"lineage", "review"}},
+		{"  retrieval   sha  ", []string{"retrieval", "sha"}},
+		{"PR 38 lineage review", []string{"PR", "38", "lineage", "review"}},
+		{"a lineage a review", []string{"lineage", "review"}}, // "a" < 2 chars dropped
+		{"lineage LINEAGE Lineage", []string{"lineage"}},      // case-insensitive dedup
+		{"", nil},
+	}
+	for _, tc := range cases {
+		got := tokenizeQuery(tc.in)
+		if len(got) != len(tc.want) {
+			t.Errorf("tokenizeQuery(%q) = %v, want %v", tc.in, got, tc.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("tokenizeQuery(%q)[%d] = %q, want %q", tc.in, i, got[i], tc.want[i])
+			}
+		}
+	}
+}
+
 // --- File-path search ---
 
 func TestRunRelevantFilePath_ReturnsMatchingItems(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	// The fixture content mentions "ripgrep and git log" — use the HTML file itself as path.
@@ -185,6 +249,7 @@ func TestRelevantResult_JSONShape(t *testing.T) {
 // --- No results ---
 
 func TestRunRelevantKeyword_NoMatch(t *testing.T) {
+	requireRipgrep(t)
 	hgDir := makeRelevantFixture(t)
 
 	results, err := runRelevantSearch(hgDir, "zzz_nomatch_xyz_unlikely", queryTypeKeyword)

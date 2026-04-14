@@ -46,8 +46,8 @@ func main() {
 func buildRoot() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "htmlgraph",
-		Short:         "Local-first observability for AI-assisted development",
-		Long:          "HtmlGraph — local-first observability and coordination platform for AI-assisted development.",
+		Short:         "Causal lineage and observability for AI-assisted development",
+		Long:          "HtmlGraph — trace causal lineage across work items, commits, sessions, and agent spawns. Local-first observability and coordination for AI-assisted development.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -131,6 +131,14 @@ func buildRoot() *cobra.Command {
 	relevant := relevantCmd()
 	relevant.GroupID = "query"
 	root.AddCommand(relevant)
+
+	history := newHistoryCmd()
+	history.GroupID = "query"
+	root.AddCommand(history)
+
+	lineage := newLineageCmd()
+	lineage.GroupID = "query"
+	root.AddCommand(lineage)
 
 	// quality group
 	check := checkCmd()

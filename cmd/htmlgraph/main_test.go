@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/shakestzd/htmlgraph/internal/registry"
@@ -154,6 +155,19 @@ func TestPersistentPreRunE_CachesGitRemote(t *testing.T) {
 		if e.ProjectDir == projectDir && e.GitRemoteURL != "https://github.com/cached/repo" {
 			t.Errorf("GitRemoteURL changed: got %q, want %q", e.GitRemoteURL, "https://github.com/cached/repo")
 		}
+	}
+}
+
+// TestRootCommandDescription asserts that the root cobra command's Short and
+// Long descriptions both contain "lineage" (case-insensitive), enforcing that
+// the headline positioning introduced in feat-3418e582 stays in place.
+func TestRootCommandDescription(t *testing.T) {
+	root := buildRoot()
+	if !strings.Contains(strings.ToLower(root.Short), "lineage") {
+		t.Errorf("root.Short does not contain 'lineage': %q", root.Short)
+	}
+	if !strings.Contains(strings.ToLower(root.Long), "lineage") {
+		t.Errorf("root.Long does not contain 'lineage': %q", root.Long)
 	}
 }
 

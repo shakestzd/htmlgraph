@@ -43,13 +43,7 @@ If the user's request mentions a specific plan ID (e.g. "dispatch plan-a1b2c3d4"
 htmlgraph plan show <plan-id> | grep -i status
 ```
 
-**If status is `finalized`:** skip Steps 1-6 entirely and go straight to Step 7. The approvals and question answers are already persisted in `plan_feedback`. Invoke:
-
-```bash
-htmlgraph plan finalize-yaml <plan-id>
-```
-
-This is idempotent — it reads approvals and answers from SQLite, creates any missing features, embeds design decisions, and prints the dispatch summary. Then hand off to `/htmlgraph:execute <plan-id>` or the `htmlgraph yolo` command from the output.
+**If status is `finalized`:** skip Steps 1-6 entirely and go straight to Step 7. The approvals and question answers are already persisted in `plan_feedback`. The plan has already been locked (read-only) — no further revisions are possible without reopening. Hand off directly to `/htmlgraph:execute <plan-id>` or the `htmlgraph yolo` command from the plan details view.
 
 **Do NOT re-run research, critique, or human review on a finalized plan.** If the plan needs revision, ask the user explicitly before reopening.
 
@@ -130,7 +124,7 @@ Agent(description="Restructure slices", subagent_type="htmlgraph:sonnet-coder",
       - Each slice = one end-to-end deliverable, not a horizontal layer
       - Populate ALL mandatory fields: what, why, files, done_when, tests, effort, risk
       - Set real dependency order in deps
-      - Use feat-<8hex> IDs
+      - Use slice-N IDs (e.g. slice-1, slice-2) — real feat- IDs are issued at finalize (Step 7b)
       - Collapse structural sections into slice metadata (testing → done_when, files → files)
       
       Write ONLY the slices section as YAML to /tmp/slices-section.yaml")
@@ -190,7 +184,7 @@ design:
   comment: ""
 
 slices:
-  - id: feat-<hex8>         # existing feature ID or generated
+  - id: slice-1             # slice-N until finalize; real feat- IDs issued at Step 7b
     num: 1
     title: "<slice title>"
     what: >
@@ -505,64 +499,36 @@ Read the plan YAML and the feedback from Step 6. Produce a **revised version** o
 - **Rejected slices**: Remove or mark as excluded
 - **Critique insights**: If critique raised risks or assumptions that were discussed, note mitigations in affected slices
 
-Update the YAML file directly — `planyaml.Save()` auto-increments the version. Commit:
+The revised YAML's `slice.what` field becomes the feature description at finalize time (via `buildSliceFeatureContent`). If you need richer per-feature content — e.g., incorporating chat discussion specific to that slice — write it into `slice.what` during revision. Do not rely on finalize to synthesize it.
+
+Update the YAML via:
 
 ```bash
-# The revised plan is saved as a new version (e.g., v3 → v4)
-# Git history preserves the full trail: draft → critique → revised → finalized
+htmlgraph plan rewrite-yaml <plan-id> --file /tmp/revised.yaml
 ```
 
-### 7b. Create Features
+This validates the revised structure and auto-commits with version history.
 
-Create features from the **revised plan**. Choose the approach based on how much enrichment was needed:
+### 7b. Finalize via the Canonical Command
 
-**Batch path** — when the revised plan already has rich descriptions (minimal chat/amendment context):
+Call the single, atomic finalize command:
 
 ```bash
-htmlgraph batch apply --file spec.yaml
+htmlgraph plan finalize <plan-id>
 ```
 
-Where `spec.yaml` contains:
+This command:
+1. Reads approvals and answers from SQLite `plan_feedback` table
+2. Loops over approved slices and creates features using the slice's Title and What (or Why fallback) as content
+3. Writes each created `FeatureID` back into the slice YAML
+4. Emits edges: `planned_in` (feature→plan), `part_of`/`contains` (feature↔track), `implemented_in` (plan→track)
+5. Sets plan status to `finalized` and locks it (subsequent calls error with "plan is locked … use 'plan reopen'")
 
-```yaml
-track:
-  title: "Track title"
-features:
-  - title: "Slice 1 title"
-    priority: medium
-  - title: "Slice 2 title"
-    priority: high
-    blocked_by: ["Slice 1 title"]
-```
+If finalize errors with "plan is locked", the plan was previously finalized. Run `htmlgraph plan reopen <plan-id>` first, revise Step 7a, then re-finalize. Note: reopen + re-finalize can create duplicate features if FeatureID was already written to the YAML.
 
-**Individual path** — when you need to write enriched descriptions per feature:
+If finalize errors on missing track, description, or slices, the error message is actionable — fix the YAML and re-run.
 
-```bash
-htmlgraph feature create "<slice title>" --track <track-id> --description "<enriched description>"
-```
-
-The enriched description should synthesize:
-- The slice's `what` and `why` from the revised plan
-- Relevant design decisions (answered questions)
-- Context from chat discussion that affects this specific slice
-- Any amendments that modified this slice
-
-### 7c. Wire Structure
-
-After features are created, wire them to the plan:
-
-```bash
-htmlgraph plan wire <plan-id> --track <track-id>
-```
-
-This handles all structural wiring:
-- `planned_in` edges (feature → plan)
-- `part_of` / `contains` edges (feature ↔ track)
-- `blocked_by` edges (from slice dependencies)
-- `implemented_in` edge (plan → track)
-- Sets plan status to `finalized`
-
-### Announce Finalized Plan
+### 7c. Announce the Finalized Plan
 
 ```
 Plan finalized. Track: <track-id>
@@ -607,3 +573,4 @@ Default to sonnet unless the task is trivially simple (haiku) or requires deep r
 - **Finalize is explicit** — human clicks the button, not the agent
 - **TDD is mandatory** — every dispatched task includes tests before implementation
 - **Only approved slices** become features on dispatch
+- **Finalize is atomic** — `htmlgraph plan finalize` handles feature creation, edge wiring, and status transition in one command. Agents do not call `feature create` or `plan wire` directly during finalization.
