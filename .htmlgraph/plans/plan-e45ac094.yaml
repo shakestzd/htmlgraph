@@ -4,7 +4,7 @@ meta:
     description: 'Reduce 83ms/tool-call hook overhead (measured spk-2bf8ae01) AND make HtmlGraph durable across Claude Code, Codex CLI, Gemini CLI, Copilot CLI. Strategy: defense-in-depth — transcript-tail ingestion becomes the durable source of truth; hooks become an optional fast-path for the latency-sensitive minority of events. Research basis: Claude Code docs (hooks, plugins, skills), upstream issues #39391 (process-spawn 35ms, HTTP daemon =112x speedup), #34692 (hooks skip subagent tool calls), #40506 (no hooks in -p headless mode), #43584 (no heartbeat for stuck tools), #42702 (plugin stdin contention), #46376 (plugin PostToolUse exit2 context dropped), #33458 (plugin SessionEnd not fired on macOS). Cross-agent matrix verified: Codex v0.114 partial hooks (shell-only, no ApplyPatch), Gemini CLI full hooks w/ OTEL, Copilot CLI Feb-2026 GA (sync, 10-15s timeouts). Gemini JSONL ingest already shipped (internal/ingest/gemini_parser.go) — blueprint for other agents.'
     created_at: "2026-04-14"
     status: draft
-    version: 4
+    version: 5
 design:
     problem: ""
     goals: []
@@ -48,6 +48,25 @@ slices:
         - existing DB auto-migrates on first open
       effort: M
       risk: Med
+      tests: ""
+      approved: false
+      comment: ""
+    - id: feat-3f189b47
+      num: 3
+      title: 'Phase 2: Async-mode observability events'
+      what: 'Flip plugin/hooks/hooks.json entries to ''async: true'' for events where HtmlGraph only observes and never injects additionalContext. Candidates: PostToolUse SubagentStart SubagentStop SessionEnd TaskCreated TaskCompleted TeammateIdle PostCompact WorktreeCreate WorktreeRemove ConfigChange InstructionsLoaded. Keep blocking: PreToolUse UserPromptSubmit SessionStart PermissionRequest PostToolUseFailure.'
+      why: Claude Code docs confirm async is fire-and-forget — zero blocking cost. This is a Claude-Code-specific win with no downside for other agents (they just ignore the flag).
+      files:
+        - plugin/hooks/hooks.json
+        - internal/hooks/runner.go
+      deps:
+        - 1
+      done_when:
+        - PostToolUse blocking time drops to 0 in trace
+        - async hooks still write events to SQLite
+        - additionalContext paths verified unaffected
+      effort: S
+      risk: Low
       tests: ""
       approved: false
       comment: ""
