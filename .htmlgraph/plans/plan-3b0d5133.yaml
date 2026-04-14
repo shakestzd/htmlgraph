@@ -1,0 +1,224 @@
+meta:
+    id: plan-3b0d5133
+    track_id: trk-0677c709
+    title: Lineage as headline capability — narrate causal chains
+    description: |
+        Close the lineage surface gap and reposition lineage as HtmlGraph's headline pitch. Data layer is already rich (typed edges, agent_lineage_trace spawn chains, git_commits attribution, feature_files ownership). This plan is primarily a surface, narrative, and documentation effort — a single `lineage <id>` command plus surgical extensions to existing commands, shipped together with coordinated repositioning of README, root tagline, and system prompt.
+    created_at: "2026-04-14"
+    status: draft
+    created_by: claude-opus
+    version: 1
+design:
+    problem: |
+        HtmlGraph has the richest work-graph data layer of any local-first dev tool — nine typed edges in `graph_edges`, `agent_lineage_trace` with full orchestrator→subagent spawn chains, `git_commits` attribution, and `feature_files` ownership — but the surface is thin. `trace <sha>` walks commit→session→feature→track but only in one direction. `graph` subcommands expose primitives (`reach`, `path`, `sessions`) but never narrate a causal chain. `agent_lineage_trace` has no CLI at all. A user with a bug cannot ask "what chain of prompts, plans, sessions, and commits produced this?" in one command, even though every fact needed is in SQLite. Meanwhile the README leads with "observability" — a supporting capability — while the most differentiated subsystem is unmentioned. The result is orphaned value: built, working, invisible.
+    goals:
+        - '**Unified lineage command** — `htmlgraph lineage <any-id>` walks both directions across all edge types and produces a human-readable causal chain in one call'
+        - '**Surgical surface additions** — `trace <feature-id>` (reverse direction), `history <id>` (git log wrapper), agent spawn tree rendering, without building a new command family'
+        - '**Coordinated repositioning** — README tagline, `cmd/htmlgraph/main.go:49`, and `system-prompt.md` updated in the same release so the pitch matches the capability'
+        - '**Reuse over rebuild** — every new command calls existing repo functions (`GetLineageByRoot`, `DBReachable`, `TraceFile`, `GetCommitsByFeature`, `FormatNodeLabel`) rather than reimplementing traversal'
+        - '**JSON parity** — every lineage command supports `--json` so agents can pipe output into other tools'
+    constraints:
+        - Data layer is frozen for this plan — no new ingestion, no new hooks, no new schemas. Surface only.
+        - Spec-as-node promotion is out of scope — it is a 3-5 day schema+template+parser+migration change that needs its own plan. Note as follow-up.
+        - Cross-project lineage is out of scope — `projects.json` registry exists but cross-project traversal is a separate concern.
+        - No shared rendering package exists today — inline `fmt.Printf` + `strings.Repeat('─', 60)` is the convention. Do not introduce a rendering package as part of this plan; match existing style.
+        - The plan must ship code and docs repositioning together — the pitch without the command is a broken promise, the command without the pitch is orphaned again.
+    approved: false
+    comment: ""
+slices:
+    - id: feat-ln000001
+      num: 1
+      title: 'Reverse `trace` direction: feature → commits → sessions → files'
+      what: |
+        Extend `cmd/htmlgraph/trace.go` to detect when the argument is a work-item ID (`feat-`, `bug-`, `spk-` prefix) and route to a new `runTraceFeature` function. This function calls `db.GetCommitsByFeature`, joins each commit to its session, calls `db.ListFilesForFeature` (or equivalent using `feature_files`), and prints a text report in the existing separator style. Reuses `FormatNodeLabel` + `ResolveToMap` for ID→title display. Add `--json` flag while touching the file.
+      why: |
+        Closes the asymmetry in `trace`. Right now `trace <sha>` walks up from a commit, but the inverse — "what commits, sessions, and files did this feature produce?" — requires three separate commands. This is the cheapest, most surgical win on the list and the template for what `lineage <id>` will do on a larger scale.
+      files:
+        - cmd/htmlgraph/trace.go
+        - internal/db/git_commits_repo.go
+      deps: []
+      done_when:
+        - '`htmlgraph trace feat-xxxxxxxx` prints commits, sessions, and touched files for that feature in one call'
+        - '`htmlgraph trace feat-xxxxxxxx --json` emits structured JSON matching the text layout'
+        - '`htmlgraph trace <sha>` behavior is unchanged — prefix regex routes correctly'
+        - Unit test in `cmd/htmlgraph/trace_test.go` covers both routing branches
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestTraceFeature routes `feat-` prefix to feature handler, verifies output contains commit hashes and file paths for a seeded feature.
+        Unit: TestTraceCommitUnchanged confirms SHA routing still works after refactor.
+        Regression: existing TraceCommit integration test must still pass.
+      approved: false
+      comment: ""
+    - id: feat-ln000002
+      num: 2
+      title: '`history <id>` — temporal lineage via git log on HTML file'
+      what: |
+        New command `cmd/htmlgraph/history.go`. Takes a work-item ID, resolves it to the HTML file path (`.htmlgraph/features/<id>.html`, with fallbacks for bugs/spikes/plans), shells out to `git log --follow --pretty=format` on that file, and prints the mutation history — timestamp, author, commit message, and summary of change. `--json` flag outputs a structured array. Uses existing cobra group registration.
+      why: |
+        Temporal lineage is already free via git — every HTML file is checked in — but there is zero CLI surface. A user who wants to know "when did this feature change status" or "who edited this acceptance criterion" has to know to run `git log -- .htmlgraph/features/feat-xxx.html`. This wraps that into a discoverable command and makes the git-native aspect of HtmlGraph a feature, not an implementation detail.
+      files:
+        - cmd/htmlgraph/history.go
+        - cmd/htmlgraph/main.go
+      deps: []
+      done_when:
+        - '`htmlgraph history feat-xxxxxxxx` prints timestamp, author, message for each commit touching the file'
+        - 'Works for all work-item prefixes: `feat-`, `bug-`, `spk-`, `plan-`, `trk-`'
+        - '`--json` emits a structured array of commits'
+        - Returns a clear error if the file does not exist (never existed or was archived)
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestHistoryResolvesFilePath covers all five ID prefixes.
+        Integration: TestHistoryRunsGitLog creates a temp git repo with an HTML file, commits twice, runs history, verifies output contains both commits.
+        Regression: none — pure addition.
+      approved: false
+      comment: ""
+    - id: feat-ln000003
+      num: 3
+      title: Agent spawn tree rendering from `agent_lineage_trace`
+      what: |
+        Surface the existing `agent_lineage_trace` SQLite data via CLI. New function in `internal/db/lineage_repo.go` (or a new `lineage_render.go` package under `cmd/htmlgraph/`) that takes a root session ID, calls `GetLineageByRoot`, and reconstructs the parent→child tree by walking the `path[]` JSON column. Renders as an indented text tree using the existing separator convention. This is a primitive that slice 4 (`lineage` command) will call; the standalone surface is through `lineage <session-id>` with `--agents` flag.
+      why: |
+        `agent_lineage_trace` is the most architecturally differentiated thing HtmlGraph captures — full orchestrator→subagent spawn chains with depth and feature attribution. Today it has zero CLI surface. `graph sessions <feature-id>` prints a flat list. Without this, the "multi-agent attribution" pitch claim is not demonstrable from the command line.
+      files:
+        - internal/db/lineage_repo.go
+        - cmd/htmlgraph/lineage_tree.go
+      deps: []
+      done_when:
+        - New `RenderAgentTree(db, rootSessionID) (string, error)` function produces an indented tree from `agent_lineage_trace` rows
+        - Parent/child edges are reconstructed correctly from the `path[]` JSON column (parent = `path[len-2]`)
+        - 'Each node shows: agent name, session ID (short), depth, feature_id'
+        - Function has unit test with at least a 3-level tree
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestRenderAgentTree seeds `agent_lineage_trace` with a root + 2 children + 1 grandchild, verifies rendered output is correctly indented and ordered depth-first.
+        Unit: TestRenderAgentTreeSingleNode handles root-only case.
+        Regression: existing `GetLineageByRoot` tests must pass unchanged.
+      approved: false
+      comment: ""
+    - id: feat-ln000004
+      num: 4
+      title: '`lineage <any-id>` — headline unified causal chain command'
+      what: |
+        New top-level command `cmd/htmlgraph/lineage.go`. Takes any ID type (feature, bug, session, commit SHA, file path) and produces a causal chain report. Detects type by prefix or pattern, then dispatches:
+      why: |
+        This is the headline. Every other slice is a primitive that this command composes. A user with a production bug should be able to run `htmlgraph lineage bug-xxxx` and see a single narrated answer: the chain of prompts, plans, features, sessions, sub-agents, and commits that produced it. Without this command, the lineage data layer remains orphaned value.
+      files:
+        - cmd/htmlgraph/lineage.go
+        - cmd/htmlgraph/lineage_test.go
+      deps:
+        - 1
+        - 2
+        - 3
+      done_when:
+        - '`htmlgraph lineage feat-xxxxxxxx` walks edges both directions and prints a causal chain'
+        - '`htmlgraph lineage <session-id>` renders agent spawn tree + commits + features'
+        - '`htmlgraph lineage <sha>` walks up from commit to feature AND down from feature to other commits/files'
+        - '`htmlgraph lineage path/to/file.go` shows features touching the file + each feature''s chain'
+        - '`--json` flag emits structured output with a stable schema'
+        - '`--depth N` limits traversal; default 5; integration test with a 10-deep chain verifies truncation'
+        - '`--timeline` flag sorts events chronologically instead of by graph topology'
+        - Command is registered in the default cobra group with helpful `Long` description
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestLineageRouting covers all five input types (feature, bug, session, sha, file path) and verifies each dispatches to the correct primitive.
+        Unit: TestLineageDepthLimit seeds a 10-deep chain, runs with --depth=3, verifies output stops at depth 3.
+        Integration: TestLineageEndToEnd uses a seeded DB with a realistic scenario (plan → feature → session → commit → bug) and verifies the output narrates the full chain.
+        Integration: TestLineageJSONSchema parses --json output and validates required fields are present.
+        Regression: existing `trace` and `graph` commands must work unchanged.
+      approved: false
+      comment: ""
+    - id: feat-ln000005
+      num: 5
+      title: Coordinated repositioning — README, tagline, system prompt
+      what: |
+        Update documentation surfaces so lineage is the headline, not a footnote. Specifically:
+      why: |
+        Shipping `lineage <id>` without the repositioning puts the headline back in the footnotes. Shipping the repositioning without the command is a broken promise. They must land in the same release. This slice exists to force the coordination — without it as a tracked deliverable, it slips.
+      files:
+        - README.md
+        - cmd/htmlgraph/main.go
+        - cmd/htmlgraph/prompts/system-prompt.md
+      deps:
+        - 4
+      done_when:
+        - README tagline, `main.go` root command strings, and system prompt all say the same thing about lineage
+        - README has a Lineage section in 'What It Does' with at least three example commands
+        - Codex/Copilot attribution claim is narrowed to reflect what `ingest` actually supports today
+        - Roadmap section notes spec-as-node and cross-project as follow-up
+        - '`help --compact` output is spot-checked — it regenerates from cobra tree so will auto-update'
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestRootCommandDescription verifies `main.go` Short/Long contain the word "lineage".
+        Manual: README diff reviewed for consistency with main.go.
+        Regression: `help --compact` still renders without errors.
+      approved: false
+      comment: ""
+questions:
+    - id: q-lineage-output-format
+      text: What is the default output format for `lineage <id>`?
+      description: |
+        The headline command has four plausible renderings: (a) indented text tree — matches graph command conventions, easy to scan, natural for hierarchical data; (b) timeline — chronological list, easy to follow causation but loses graph structure; (c) narrative prose — "a user prompted X, which spawned session Y, which edited file Z, which was later referenced in bug W" — best pitch demo but hardest to generate deterministically; (d) JSON primary — agent-friendly, but the pitch demands a human-readable default. The codebase has no prose generator today. A tree matches existing conventions and the `lineage` mental model ("causal chain" is a tree with multiple roots when you walk both directions). Timeline can be a `--timeline` flag on top of the tree. JSON is a `--json` flag regardless.
+      recommended: tree
+      options:
+        - key: tree
+          label: 'Tree (recommended): indented text tree with `--timeline` and `--json` flags. Matches existing graph command conventions, cheap to build, reuses `FormatNodeLabel`.'
+        - key: timeline
+          label: 'Timeline: chronological event list as default, `--tree` flag for hierarchical view. Better for demonstrating causation in a demo but loses graph topology.'
+        - key: narrative
+          label: 'Narrative prose: generated sentences describing the chain. Highest pitch impact, but requires a prose generator we don''t have and is harder to unit-test.'
+        - key: json-first
+          label: 'JSON primary: structured output by default, `--text` for human view. Agent-first but weakens the headline demo.'
+      answer: null
+    - id: q-spec-as-node-scope
+      text: Is spec-as-node schema promotion in scope for this plan?
+      description: |
+        Today `compliance` embeds spec text inside the feature HTML and parses it with `strings.Index` on `<section class=\"spec\">`. Promoting the spec to its own graph node would enable lineage traversal to walk spec→implementation explicitly. But the blast radius is 3-5 days: new HTML template, `htmlparse` extension, new `has_spec` edge type, migration for existing feature files, and `compliance` refactor. This plan is scoped to surface and narrative work. Including spec-as-node would double the effort and risk. Recommendation: explicitly out of scope, tracked as a separate plan noted in README Roadmap.
+      recommended: out
+      options:
+        - key: out
+          label: 'Out of scope (recommended): note as follow-up in README Roadmap. Keep this plan surgical. Spec still appears in lineage via the feature it''s embedded in — just not as its own node.'
+        - key: in-minimal
+          label: 'In scope, minimal: add `has_spec` edge at compliance-scoring time without migration. Existing features get spec edges lazily as they''re re-scored.'
+        - key: in-full
+          label: 'In scope, full: template change, parser extension, migration, edge type. Doubles plan effort and risk but delivers the full graph model.'
+      answer: null
+    - id: q-cross-project-scope
+      text: Is cross-project lineage in scope for this plan?
+      description: |
+        HtmlGraph has a `projects.json` registry at `~/.local/share/htmlgraph/projects.json` and `check cross-project` detects session contamination. But there is no cross-project graph traversal — you can't ask "what work in project B depends on work from project A." The multi-project hardening track (`trk-8cf41009`) is already active and likely the right home for this. Recommendation: out of scope, note as follow-up, let the multi-project track own it.
+      recommended: out
+      options:
+        - key: out
+          label: 'Out of scope (recommended): let trk-8cf41009 (Multi-Project MVP) own cross-project lineage. Note in Roadmap.'
+        - key: in
+          label: 'In scope: add cross-project walker to `lineage <id>`. Adds a slice and couples this plan to the multi-project track''s schema decisions.'
+      answer: null
+    - id: q-command-shape
+      text: One unified `lineage` command or several focused commands?
+      description: |
+        Two designs: (a) single `lineage <any-id>` that auto-detects ID type and dispatches to the right walker, with flags for shape (`--tree`, `--timeline`, `--json`, `--depth`, `--agents`) — one command, one mental model, discoverable via autocomplete; (b) several focused commands: extend `trace` (done in slice 1), add `history` (slice 2), add `graph subtree` or `graph agents`, skip the unified command entirely — composable but fragmented, and the headline claim becomes "we have six commands" instead of "we have one command". The plan as drafted does both: slices 1-3 are surgical primitives, slice 4 is the unified headline. Question is whether slice 4 is actually needed or whether slices 1-3 are sufficient.
+      recommended: both
+      options:
+        - key: both
+          label: 'Both (recommended): surgical primitives (slices 1-3) for composability AND unified `lineage <id>` (slice 4) as the headline. Slightly more code but the pitch needs the single-command demo.'
+        - key: primitives-only
+          label: 'Primitives only: ship slices 1, 2, 3 and stop. Drop slice 4. Simpler, but the pitch becomes ''we have six commands'' and the headline demo is a shell pipeline.'
+        - key: unified-only
+          label: 'Unified only: ship slice 4 as one big command, skip slices 1-3. Cleanest surface but no composability and `trace <feature-id>` remains missing.'
+      answer: null
+    - id: q-repositioning-coupling
+      text: Does the documentation repositioning (slice 5) ship with the code or as a follow-up?
+      description: |
+        Slice 5 updates README, `main.go` tagline, and `system-prompt.md` so lineage becomes the headline. Shipping it with slices 1-4 means one coordinated release: the pitch matches the capability immediately. But it also means the release is blocked on the docs being ready. The alternative is a follow-up PR — ship the code first, update the pitch when the command is battle-tested. Risk of the follow-up: it slips, and the command sits as orphaned value exactly like the current state. Recommendation: ship together. Documentation is part of the feature.
+      recommended: together
+      options:
+        - key: together
+          label: 'Ship together (recommended): slice 5 is a blocker on release. Forces pitch-capability alignment. Risk: docs slow the release.'
+        - key: follow-up
+          label: 'Follow-up PR: ship slices 1-4, update docs in a separate PR. Faster release. Risk: docs slip and value stays orphaned.'
+      answer: null
