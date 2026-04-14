@@ -87,7 +87,7 @@ func hookSubcmd(
 		Use:   use,
 		Short: short,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
+			return runHookNamed(use, func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
 				projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 				if !hooks.IsHtmlGraphProject(projectDir) {
 					return fallback, nil
@@ -114,7 +114,11 @@ func hookSubcmdWithProject(
 		Use:   use,
 		Short: short,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
+			// session-start gets a fresh trace file before anything else.
+			if use == "session-start" {
+				hooks.TruncateTraceFile()
+			}
+			return runHookNamed(use, func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
 				projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 				if !hooks.IsHtmlGraphProject(projectDir) {
 					return fallback, nil
@@ -142,7 +146,7 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 			if len(args) == 1 {
 				toolName = args[0]
 			}
-			return runHook(func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
+			return runHookNamed("track-event", func(event *hooks.CloudEvent) (*hooks.HookResult, error) {
 				projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
 				if !hooks.IsHtmlGraphProject(projectDir) {
 					return fallback, nil
@@ -158,24 +162,20 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 	}
 }
 
-// runHook is the common wrapper: read stdin, call the handler, write stdout.
-// On any error it logs to debug.log and falls back to writing an empty JSON
-// object so Claude is never blocked by a hook failure.
-// Timing is recorded via LogTimed so slow hooks are visible in debug.log.
-func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
+// runHookNamed is like runHook but also records a trace entry for diagnostics.
+func runHookNamed(subcommand string, handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 	start := time.Now()
 
-	event, err := hooks.ReadInput()
+	event, rawPayload, err := hooks.ReadInputRaw()
 	if err != nil {
 		hooks.LogError("runHook", "", fmt.Sprintf("read input: %v", err))
-		// Always return a valid decision so Claude Code doesn't show "hook error"
 		return hooks.Allow()
 	}
 
+	hooks.TraceInvocation(subcommand, rawPayload, event)
+
 	result, err := handler(event)
 	if err != nil {
-		// ErrBlockExit2 signals that the hook should exit with code 2 (block).
-		// Write the message to stderr here — the handler does NOT write it.
 		var blockErr *hooks.BlockExit2Error
 		if errors.As(err, &blockErr) {
 			fmt.Fprintln(os.Stderr, blockErr.Message)
@@ -189,13 +189,8 @@ func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 		return hooks.Allow()
 	}
 
-	// Log timing for every hook invocation — helps identify slow handlers.
-	// Use the cobra subcommand name (os.Args[2]) as the event label when available.
 	projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
-	hookName := ""
-	if len(os.Args) >= 3 {
-		hookName = os.Args[2]
-	}
+	hookName := subcommand
 	hooks.LogTimed(projectDir, "runHook", map[string]string{
 		"hook":    hookName,
 		"session": event.SessionID[:hooks.MinSessionLen(event.SessionID)],
@@ -203,3 +198,4 @@ func runHook(handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 
 	return hooks.WriteResult(result)
 }
+

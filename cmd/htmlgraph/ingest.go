@@ -258,6 +258,13 @@ func storeParseResult(database *sql.DB, sessionID, agentID string, result *inges
 		if activeFeatureID != "" {
 			tc.FeatureID = activeFeatureID
 		}
+		// bug-cb4918d8: when this transcript belongs to a subagent (agentID
+		// non-empty), stamp subagent_session_id so the column stops being
+		// latent dead storage. Distinct from session_id, which is the shared
+		// orchestrator UUID for all Task-dispatched subagents.
+		if agentID != "" {
+			tc.SubagentSessionID = agentID
+		}
 		if err := dbpkg.InsertToolCall(database, &tc); err != nil {
 			fmt.Fprintf(os.Stderr, "    warn: tool %s: %v\n", tc.ToolName, err)
 			continue

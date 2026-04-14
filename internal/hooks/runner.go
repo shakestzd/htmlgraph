@@ -79,18 +79,26 @@ type HookResult struct {
 
 // ReadInput reads and parses a CloudEvent from stdin.
 func ReadInput() (*CloudEvent, error) {
+	ev, _, err := ReadInputRaw()
+	return ev, err
+}
+
+// ReadInputRaw reads stdin and returns both the raw bytes and the parsed
+// CloudEvent. Use this when you need to preserve the original payload
+// (e.g., for tracing or forwarding).
+func ReadInputRaw() (*CloudEvent, []byte, error) {
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		return nil, fmt.Errorf("reading stdin: %w", err)
+		return nil, nil, fmt.Errorf("reading stdin: %w", err)
 	}
 	if len(data) == 0 {
-		return &CloudEvent{}, nil
+		return &CloudEvent{}, data, nil
 	}
 	var ev CloudEvent
 	if err := json.Unmarshal(data, &ev); err != nil {
-		return nil, fmt.Errorf("parsing CloudEvent: %w", err)
+		return nil, data, fmt.Errorf("parsing CloudEvent: %w", err)
 	}
-	return &ev, nil
+	return &ev, data, nil
 }
 
 // WriteResult encodes result as JSON to stdout.

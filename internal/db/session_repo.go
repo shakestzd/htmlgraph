@@ -173,6 +173,16 @@ type ToolUseContextRow struct {
 // in-progress — a stale pointer to a completed feature is treated as empty,
 // so guards correctly block edits without an active work item.
 func GetToolUseContext(db *sql.DB, sessionID, agentID string) (*ToolUseContextRow, error) {
+	// Claim lookup uses two paths, tried in order:
+	//   1. claimed_by_agent_id = agentID  — the direct per-agent claim
+	//   2. owner_session_id   = sessionID — fallback for subagent tool calls,
+	//      which share the orchestrator's session_id but carry a distinct
+	//      agent_id that never had its own claim row (bug-cb4918d8). The
+	//      orchestrator's claim is keyed on owner_session_id, so this resolves
+	//      the parent's claim for any subagent running under it.
+	// Both paths are expressed as correlated subqueries so the outer row
+	// remains a single sessions row (LIMIT 1 stays exact) and the primary
+	// agent-id match wins over the session-id fallback via COALESCE ordering.
 	row := db.QueryRow(`
 		SELECT s.session_id,
 		       COALESCE(
@@ -182,15 +192,23 @@ func GetToolUseContext(db *sql.DB, sessionID, agentID string) (*ToolUseContextRo
 		       COALESCE(s.parent_session_id, '') AS parent_session_id,
 		       s.is_subagent,
 		       s.created_at,
-		       COALESCE(c.work_item_id, '')       AS claimed_item
+		       COALESCE(
+		         (SELECT c.work_item_id FROM claims c
+		           WHERE c.claimed_by_agent_id = ?
+		             AND c.status IN ('proposed','claimed','in_progress','blocked','handoff_pending')
+		           LIMIT 1),
+		         (SELECT c.work_item_id FROM claims c
+		           WHERE c.owner_session_id = ?
+		             AND c.status IN ('proposed','claimed','in_progress','blocked','handoff_pending')
+		           ORDER BY c.leased_at DESC
+		           LIMIT 1),
+		         ''
+		       ) AS claimed_item
 		FROM sessions s
 		LEFT JOIN features f ON f.id = s.active_feature_id
-		LEFT JOIN claims c
-		       ON c.claimed_by_agent_id = ?
-		      AND c.status IN ('proposed','claimed','in_progress','blocked','handoff_pending')
 		WHERE s.session_id = ?
 		LIMIT 1`,
-		agentID, sessionID,
+		agentID, sessionID, sessionID,
 	)
 
 	r := &ToolUseContextRow{}

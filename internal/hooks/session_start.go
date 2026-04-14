@@ -134,7 +134,11 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		CreatedAt:       now,
 		StartCommit:     startCommit,
 		IsSubagent:      isSubagentEvent(event) || isSubagent(),
-		Model:           os.Getenv("CLAUDE_MODEL"),
+		Model: os.Getenv("CLAUDE_MODEL"),
+		// TODO(bug-cb4918d8): remove after lineage wiring verified end-to-end.
+		// These env vars are NEVER set in subagent hook contexts (confirmed via
+		// /tmp/htmlgraph-hook-trace.jsonl); lineage now flows through the
+		// subagent-start hook writing sessions+agent_lineage_trace directly.
 		ParentSessionID: os.Getenv("HTMLGRAPH_PARENT_SESSION"),
 		ParentEventID:   os.Getenv("HTMLGRAPH_PARENT_EVENT"),
 		GitRemoteURL:    paths.GetGitRemoteURL(projectDir),

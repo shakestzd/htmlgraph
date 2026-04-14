@@ -184,6 +184,9 @@ func resolveEventAgentType(event *CloudEvent) string {
 //  3. For subagents: task_delegation row matching our agent_id (Method 0.5)
 //  4. Most recent UserQuery in this session (orchestrator default)
 func resolveParentEventID(database *sql.DB, sessionID, agentID string, isSubagent bool) string {
+	// TODO(bug-cb4918d8): remove HTMLGRAPH_PARENT_EVENT read after lineage
+	// wiring verified end-to-end — this env var is never set in subagent
+	// hook contexts; the subagent-hint file and DB fallback carry the load.
 	parentEventID := os.Getenv("HTMLGRAPH_PARENT_EVENT")
 
 	if parentEventID == "" && sessionID != "" {

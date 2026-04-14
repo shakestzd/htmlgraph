@@ -28,6 +28,16 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		agentType = "general-purpose"
 	}
 
+	// Populate the lineage write path: insert a synthetic sessions row keyed
+	// by the subagent's agent_id (guaranteed distinct per subagent, empirically
+	// verified via /tmp/htmlgraph-hook-trace.jsonl) and a matching
+	// agent_lineage_trace row so downstream queries can walk the subagent tree.
+	// bug-cb4918d8: Claude Code delivers the SAME session_id to orchestrator
+	// and subagent hook events, so agent_id is the only discriminator.
+	if event.AgentID != "" {
+		insertSubagentLineage(database, sessionID, event.AgentID, agentType, featureID, projectDir)
+	}
+
 	// Link delegation to the most recent UserQuery in this session.
 	parentEventID, _ := db.LatestEventByTool(database, sessionID, "UserQuery")
 
@@ -101,5 +111,79 @@ func SubagentStop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		paths.CleanupSubagentHint(sessionID, event.AgentID)
 	}
 
+	// Close the lineage trace row opened by SubagentStart. Keyed on
+	// trace_id = event.AgentID (see insertSubagentLineage).
+	// bug-cb4918d8: wire the subagent-stop completion path.
+	if event.AgentID != "" {
+		closeSubagentLineage(database, event.AgentID, ResolveProjectDir(event.CWD, event.SessionID), sessionID)
+	}
+
 	return &HookResult{Continue: true}, nil
+}
+
+// insertSubagentLineage writes the two lineage rows the dashboard / lineage
+// queries need on every subagent dispatch:
+//
+//  1. sessions row keyed by agentID (synthetic PK) with parent_session_id set
+//     to the orchestrator's session UUID. This is how "is_subagent=1 with
+//     populated parent_session_id" finally becomes true for live data.
+//  2. agent_lineage_trace row with trace_id = agentID, root_session_id =
+//     parent session UUID, session_id = agentID (the synthetic row above),
+//     agent_name = agentType. Depth defaults to 1 — top-level subagents only;
+//     we don't chase nested lineage here (correctness-when-simple).
+//
+// Both writes are idempotent (INSERT OR IGNORE) so redelivered start events
+// don't fail the hook. Errors are logged but never block the hook.
+func insertSubagentLineage(database *sql.DB, parentSessionID, agentID, agentType, featureID, projectDir string) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	metadata := fmt.Sprintf(`{"agent_type":%q,"created_via":"subagent-start-hook"}`, agentType)
+
+	if _, err := database.Exec(`
+		INSERT OR IGNORE INTO sessions
+			(session_id, agent_assigned, parent_session_id, created_at,
+			 status, is_subagent, metadata)
+		VALUES (?, ?, ?, ?, 'active', 1, ?)`,
+		agentID, agentType, parentSessionID, now, metadata,
+	); err != nil {
+		debugLog(projectDir, "[error] handler=subagent-start session=%s: insert subagent session row: %v",
+			parentSessionID[:minSessionLen(parentSessionID)], err)
+		return
+	}
+
+	trace := &models.LineageTrace{
+		TraceID:       agentID,
+		RootSessionID: parentSessionID,
+		SessionID:     agentID,
+		AgentName:     agentType,
+		Depth:         1,
+		Path:          []string{agentType},
+		FeatureID:     featureID,
+		StartedAt:     time.Now().UTC(),
+		Status:        "active",
+	}
+	if err := db.InsertLineageTrace(database, trace); err != nil {
+		// Duplicate-PK on re-delivered events is expected; only warn.
+		debugLog(projectDir, "[warn] handler=subagent-start session=%s: insert lineage trace: %v",
+			parentSessionID[:minSessionLen(parentSessionID)], err)
+	}
+}
+
+// closeSubagentLineage marks the lineage row completed. Missing rows (e.g.
+// hook started firing mid-session) log a warn and return — never fail.
+func closeSubagentLineage(database *sql.DB, agentID, projectDir, sessionID string) {
+	res, err := database.Exec(`
+		UPDATE agent_lineage_trace
+		   SET completed_at = ?, status = 'completed'
+		 WHERE trace_id = ? AND completed_at IS NULL`,
+		time.Now().UTC().Format(time.RFC3339), agentID,
+	)
+	if err != nil {
+		debugLog(projectDir, "[warn] handler=subagent-stop session=%s: close lineage trace: %v",
+			sessionID[:minSessionLen(sessionID)], err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		debugLog(projectDir, "[warn] handler=subagent-stop session=%s: no open lineage trace for agent_id=%s",
+			sessionID[:minSessionLen(sessionID)], agentID)
+	}
 }
