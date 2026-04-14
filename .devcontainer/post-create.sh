@@ -15,8 +15,8 @@ cd "$(dirname "$0")/.."
 
 export PATH="${HOME}/.local/bin:${PATH}"
 
-echo "==> Installing tmux..."
-sudo apt-get update && sudo apt-get install -y tmux
+echo "==> Installing tmux and ripgrep..."
+sudo apt-get update && sudo apt-get install -y tmux ripgrep
 
 echo "==> Installing AI agent CLIs..."
 npm install -g --no-fund --no-audit \
