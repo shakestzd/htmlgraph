@@ -42,8 +42,11 @@ Example:
 			if err != nil {
 				return err
 			}
-			planPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
-			fmt.Println(planPath)
+			yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+			htmlPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
+			fmt.Printf("Edit here:  %s\n", yamlPath)
+			fmt.Printf("Then:       htmlgraph plan finalize %s\n", planID)
+			fmt.Println(htmlPath)
 			return nil
 		},
 	}
