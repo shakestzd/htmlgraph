@@ -191,6 +191,9 @@ func createNode(p *workitem.Project, typeName, title string, o *wiCreateOpts) (*
 		if o.trackID != "" {
 			opts = append(opts, workitem.SpikeWithTrack(o.trackID))
 		}
+		if o.description != "" {
+			opts = append(opts, workitem.SpikeWithContent(o.description))
+		}
 		return p.Spikes.Create(title, opts...)
 	case "track":
 		opts := []workitem.TrackOption{workitem.TrackWithPriority(o.priority)}

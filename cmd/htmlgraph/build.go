@@ -24,9 +24,9 @@ func buildCmd() *cobra.Command {
 
 			var c *exec.Cmd
 			if dist {
-				c = exec.Command("sh", buildScript, "--dist")
+				c = exec.Command("bash", buildScript, "--dist")
 			} else {
-				c = exec.Command("sh", buildScript)
+				c = exec.Command("bash", buildScript)
 			}
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr

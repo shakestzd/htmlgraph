@@ -58,20 +58,16 @@ if [ "${DIST_MODE}" = true ]; then
     echo "  Installed:   ${INSTALL_DIR}/htmlgraph (v${VERSION})"
 else
     echo "Building htmlgraph (dev mode, version: ${VERSION})..."
-    go build -ldflags "-s -w -X main.version=${VERSION}" \
-        -o "${BIN_DIR}/htmlgraph" ./cmd/htmlgraph/
-    chmod +x "${BIN_DIR}/htmlgraph"
-    echo "Built: plugin/hooks/bin/htmlgraph"
 
-    # Install to ~/.local/bin so the binary is on PATH.
-    # Always copy (not symlink) so other projects on this machine get a
-    # stable, intentionally-built binary rather than a live pointer into
-    # the dev tree.
+    # Build directly to ~/.local/bin/htmlgraph — no intermediate artifact.
+    # The plugin-has-its-own-binary architecture was removed in commit 5ae76555c;
+    # hooks.json now uses bare 'htmlgraph' via PATH lookup.
     INSTALL_DIR="${HOME}/.local/bin"
     META_DIR="${HOME}/.local/share/htmlgraph"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
     rm -f "${INSTALL_DIR}/htmlgraph"  # Fresh inode avoids macOS signature cache
-    cp "${BIN_DIR}/htmlgraph" "${INSTALL_DIR}/htmlgraph"
+    go build -ldflags "-s -w -X main.version=${VERSION}" \
+        -o "${INSTALL_DIR}/htmlgraph" ./cmd/htmlgraph/
     chmod +x "${INSTALL_DIR}/htmlgraph"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
     echo "Installed: ${INSTALL_DIR}/htmlgraph (v${VERSION})"

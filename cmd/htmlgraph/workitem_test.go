@@ -448,6 +448,149 @@ func TestRunWiSetStatus_BlockedClearsCache(t *testing.T) {
 	}
 }
 
+// TestCreateWithDescription_AllKinds verifies that --description is persisted for
+// every work item type. The spike case was previously a silent data-loss bug.
+func TestCreateWithDescription_AllKinds(t *testing.T) {
+	cases := []struct {
+		kind    string
+		subDir  string
+		prefix  string
+		trackOK bool // whether a --track is needed at all
+	}{
+		{"feature", "features", "feat-", true},
+		{"bug", "bugs", "bug-", true},
+		{"spike", "spikes", "spk-", false},
+		{"track", "tracks", "trk-", false},
+		{"plan", "plans", "plan-", true},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.kind, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			hgDir := filepath.Join(tmpDir, ".htmlgraph")
+			for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+				if err := os.MkdirAll(filepath.Join(hgDir, sub), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			projectDirFlag = tmpDir
+			defer func() { projectDirFlag = "" }()
+
+			trackID := ""
+			if tc.trackOK {
+				trackID = testSetupTrack(t, hgDir)
+			}
+
+			opts := &wiCreateOpts{
+				trackID:          trackID,
+				priority:         "medium",
+				description:      "persisted description body",
+				start:            false,
+				noLink:           true,
+				standaloneReason: func() string {
+					if tc.kind == "feature" && trackID == "" {
+						return "test-standalone"
+					}
+					return ""
+				}(),
+			}
+			if err := runWiCreate(tc.kind, "Test "+tc.kind, opts); err != nil {
+				t.Fatalf("runWiCreate: %v", err)
+			}
+
+			files, _ := filepath.Glob(filepath.Join(hgDir, tc.subDir, tc.prefix+"*.html"))
+			if len(files) == 0 {
+				t.Fatalf("no %s file created", tc.kind)
+			}
+			node, err := htmlparse.ParseFile(files[len(files)-1])
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if !stringContains(node.Content, "persisted description body") {
+				t.Errorf("%s: want content %q, got %q", tc.kind, "persisted description body", node.Content)
+			}
+		})
+	}
+}
+
+// TestSetDescription_AllKinds verifies that the set-description command works for
+// every work item type. Before Fix 1 only feature worked; the rest were unregistered.
+func TestSetDescription_AllKinds(t *testing.T) {
+	cases := []struct {
+		kind       string
+		subDir     string
+		prefix     string
+		needsTrack bool
+	}{
+		{"feature", "features", "feat-", true},
+		{"bug", "bugs", "bug-", true},
+		{"spike", "spikes", "spk-", false},
+		{"track", "tracks", "trk-", false},
+		{"plan", "plans", "plan-", true},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.kind, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			hgDir := filepath.Join(tmpDir, ".htmlgraph")
+			for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+				if err := os.MkdirAll(filepath.Join(hgDir, sub), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			projectDirFlag = tmpDir
+			defer func() { projectDirFlag = "" }()
+
+			trackID := ""
+			if tc.needsTrack {
+				trackID = testSetupTrack(t, hgDir)
+			}
+
+			opts := &wiCreateOpts{
+				trackID:     trackID,
+				priority:    "medium",
+				description: "initial description",
+				start:       false,
+				noLink:      true,
+				standaloneReason: func() string {
+					if tc.kind == "feature" && trackID == "" {
+						return "test-standalone"
+					}
+					return ""
+				}(),
+			}
+			if err := runWiCreate(tc.kind, "SetDesc "+tc.kind, opts); err != nil {
+				t.Fatalf("runWiCreate: %v", err)
+			}
+
+			files, _ := filepath.Glob(filepath.Join(hgDir, tc.subDir, tc.prefix+"*.html"))
+			if len(files) == 0 {
+				t.Fatalf("no %s file created", tc.kind)
+			}
+			node, err := htmlparse.ParseFile(files[len(files)-1])
+			if err != nil {
+				t.Fatalf("parse before set-description: %v", err)
+			}
+
+			// Call the generalized runSetDescription with the kind.
+			if err := runSetDescription(tc.kind, node.ID, "updated description text", "", "", ""); err != nil {
+				t.Fatalf("runSetDescription(%s): %v", tc.kind, err)
+			}
+
+			// Re-read and assert the description changed.
+			node, err = htmlparse.ParseFile(files[len(files)-1])
+			if err != nil {
+				t.Fatalf("parse after set-description: %v", err)
+			}
+			if !stringContains(node.Content, "updated description text") {
+				t.Errorf("%s: want content %q, got %q", tc.kind, "updated description text", node.Content)
+			}
+		})
+	}
+}
+
 // stringContains is a helper to check if a string contains a substring
 func stringContains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {

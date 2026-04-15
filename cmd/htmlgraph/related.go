@@ -13,11 +13,10 @@ import (
 )
 
 // featureCmdWithExtras builds the standard workitem commands for features,
-// then adds the feature-specific "related" and "set-description" subcommands.
+// then adds the feature-specific "related" subcommand.
 func featureCmdWithExtras() *cobra.Command {
 	cmd := workitemCmd("feature", "features")
 	cmd.AddCommand(relatedCmd())
-	cmd.AddCommand(setDescriptionCmd())
 	return cmd
 }
 
@@ -77,15 +76,16 @@ func runRelated(featureID string) error {
 	return nil
 }
 
-// setDescriptionCmd returns a cobra.Command that sets a feature's description with optional structured sections.
-func setDescriptionCmd() *cobra.Command {
+// setDescriptionCmd returns a cobra.Command that sets any work item's description
+// with optional structured sections. kind identifies the work item type (e.g. "feature").
+func setDescriptionCmd(kind string) *cobra.Command {
 	var acceptance, testStrategy, expectedBehavior string
 	cmd := &cobra.Command{
 		Use:   "set-description <id> <text>",
-		Short: "Set or update a feature's description with optional structured sections",
+		Short: "Set or update a " + kind + "'s description with optional structured sections",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runSetDescription(args[0], args[1], acceptance, testStrategy, expectedBehavior)
+			return runSetDescription(kind, args[0], args[1], acceptance, testStrategy, expectedBehavior)
 		},
 	}
 	cmd.Flags().StringVar(&acceptance, "acceptance", "", "Acceptance criteria")
@@ -94,7 +94,7 @@ func setDescriptionCmd() *cobra.Command {
 	return cmd
 }
 
-func runSetDescription(id, text, acceptance, testStrategy, expectedBehavior string) error {
+func runSetDescription(kind, id, text, acceptance, testStrategy, expectedBehavior string) error {
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err
@@ -110,7 +110,8 @@ func runSetDescription(id, text, acceptance, testStrategy, expectedBehavior stri
 	defer p.Close()
 
 	content := buildDescription(text, acceptance, testStrategy, expectedBehavior)
-	if err := p.Features.Edit(id).SetDescription(content).Save(); err != nil {
+	col := collectionFor(p, kind)
+	if err := col.Edit(id).SetDescription(content).Save(); err != nil {
 		return fmt.Errorf("set description: %w", err)
 	}
 	fmt.Printf("Updated description for %s\n", id)

@@ -33,6 +33,7 @@ func workitemCmd(typeName, dirName string) *cobra.Command {
 	cmd.AddCommand(wiDeleteCmd(typeName))
 	cmd.AddCommand(wiAddStepCmd(typeName))
 	cmd.AddCommand(wiUpdateCmd(typeName))
+	cmd.AddCommand(setDescriptionCmd(typeName))
 	if typeName != "track" {
 		cmd.AddCommand(wiMoveCmd(typeName))
 	}

@@ -58,6 +58,11 @@ func SpikeWithTimebox(tb string) SpikeOption {
 	return func(c *spikeConfig) { c.timebox = tb }
 }
 
+// SpikeWithContent sets the description body.
+func SpikeWithContent(content string) SpikeOption {
+	return func(c *spikeConfig) { c.content = content }
+}
+
 // SpikeCollection provides CRUD operations for spikes.
 type SpikeCollection struct {
 	*Collection
