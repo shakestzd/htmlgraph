@@ -191,20 +191,49 @@ func iconFor(typeName string) string {
 // cache file. The filename includes a hash of the htmlgraphDir so different
 // projects never overwrite each other's cache (bug-95dc78ba).
 // Pass empty featureID to clear the cache (on complete).
+//
+// Writes are atomic (write-to-temp + rename) so parallel agents calling
+// feature start cannot produce a torn cache file (bug-d2d3fb3f).
 func WriteStatuslineCache(htmlgraphDir, featureID string) {
 	cachePath := statuslineCachePath(htmlgraphDir)
 	if cachePath == "" {
 		return
 	}
 
-	if featureID == "" {
-		_ = os.WriteFile(cachePath, []byte(""), 0o644)
+	var payload []byte
+	if featureID != "" {
+		payload = []byte(buildCacheLine(htmlgraphDir, featureID))
+	}
+	atomicWriteFile(cachePath, payload, 0o644)
+}
+
+// atomicWriteFile writes data to path via a temp file in the same directory
+// followed by os.Rename. Errors are silently dropped — callers treat cache
+// writes as best-effort.
+func atomicWriteFile(path string, data []byte, mode os.FileMode) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
-
-	// Build the status line: resolve feature title and track context.
-	line := buildCacheLine(htmlgraphDir, featureID)
-	_ = os.WriteFile(cachePath, []byte(line), 0o644)
+	base := filepath.Base(path)
+	tmp, err := os.CreateTemp(dir, base+".tmp-*")
+	if err != nil {
+		return
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		_ = os.Remove(tmpPath)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return
+	}
+	_ = os.Chmod(tmpPath, mode)
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+	}
 }
 
 // buildCacheLine produces the display string for a work item, including

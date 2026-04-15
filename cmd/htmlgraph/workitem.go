@@ -204,10 +204,16 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 				if currentActive != id {
 					// New per-agent attribution table (primary write path).
 					_ = dbpkg.SetActiveWorkItem(p.DB, sessionID, agentID, id)
-					// Legacy dual-write to sessions.active_feature_id for readers
-					// that have not yet migrated to the new table. Removed once all
-					// consumers read from active_work_items.
-					_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
+					// Legacy dual-write to sessions.active_feature_id is single-row
+					// shared state. When N parallel subagents each claim a different
+					// work item in the same session, they race on this one column
+					// and corrupt each other's attribution (bug-d2d3fb3f). Gate the
+					// write to the root agent only: root stays authoritative for
+					// consumers still reading the legacy column; subagents rely on
+					// per-agent claims + active_work_items for their own attribution.
+					if agentID == dbpkg.AgentRootSentinel {
+						_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
+					}
 					claim := &models.Claim{
 						ClaimID:          "clm-" + uuid.NewString()[:8],
 						WorkItemID:       id,

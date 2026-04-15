@@ -30,6 +30,10 @@ type ActiveSessionData struct {
 
 // WriteActiveSession writes session context to .htmlgraph/.active-session so
 // worktree subagent hooks can read session ID even when CLAUDE_ENV_FILE is unset.
+//
+// Writes are atomic (write-to-temp + rename) so concurrent readers never see
+// a torn/empty file, and concurrent writers cannot corrupt each other
+// (bug-d2d3fb3f: parallel agents stomped .active-session).
 func WriteActiveSession(sessionID, projectDir string) {
 	if projectDir == "" {
 		return
@@ -47,8 +51,26 @@ func WriteActiveSession(sessionID, projectDir string) {
 	if err != nil {
 		return
 	}
-	path := filepath.Join(projectDir, ".htmlgraph", ".active-session")
-	_ = os.WriteFile(path, b, 0o644)
+	dir := filepath.Join(projectDir, ".htmlgraph")
+	target := filepath.Join(dir, ".active-session")
+	tmp, err := os.CreateTemp(dir, ".active-session.tmp-*")
+	if err != nil {
+		return
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(b); err != nil {
+		tmp.Close()
+		_ = os.Remove(tmpPath)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return
+	}
+	_ = os.Chmod(tmpPath, 0o644)
+	if err := os.Rename(tmpPath, target); err != nil {
+		_ = os.Remove(tmpPath)
+	}
 }
 
 // ReadActiveSession reads session context from .htmlgraph/.active-session.

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/hooks"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
@@ -1013,5 +1014,90 @@ func TestSubagentCanStartFeatureCreatedByDifferentAgent(t *testing.T) {
 	}
 	if len(items) != 2 {
 		t.Errorf("want 2 active_work_items rows (one per agent), got %d: %v", len(items), items)
+	}
+}
+
+// TestRunWiSetStatus_SubagentsDoNotStompLegacyColumn is the bug-d2d3fb3f
+// regression test. When N subagents with distinct agent_ids claim different
+// features on the same session, they must not race each other writing to
+// sessions.active_feature_id — that single-row shared state caused silent
+// attribution loss and stalls under parallel dispatch.
+//
+// Invariant: subagent feature starts leave sessions.active_feature_id
+// untouched; only the root agent (AgentRootSentinel) writes it. All agents'
+// per-agent claims still land correctly in active_work_items.
+func TestRunWiSetStatus_SubagentsDoNotStompLegacyColumn(t *testing.T) {
+	const sessionID = "test-session-no-stomp"
+	const N = 4
+
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	featIDs := make([]string, N)
+	for i := 0; i < N; i++ {
+		title := fmt.Sprintf("No-Stomp Feature %d", i)
+		if err := testCreate("feature", title, trackID, "medium", false, false); err != nil {
+			t.Fatalf("create feature %d: %v", i, err)
+		}
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) < N {
+		t.Fatalf("expected %d feature files, got %d", N, len(featFiles))
+	}
+	for i := 0; i < N; i++ {
+		node, err := htmlparse.ParseFile(featFiles[i])
+		if err != nil {
+			t.Fatalf("parse feature %d: %v", i, err)
+		}
+		featIDs[i] = node.ID
+	}
+
+	// Each subagent gets a distinct agent_id (not AgentRootSentinel).
+	// Serialize workitem.Open calls via a cap-1 semaphore (matches the
+	// one-process-per-agent reality); the point of this test is schema
+	// and dual-write behavior, not raw SQLite write parallelism.
+	sem := make(chan struct{}, 1)
+	errCh := make(chan error, N)
+	for i := 0; i < N; i++ {
+		agentID := fmt.Sprintf("subagent-%d", i)
+		featID := featIDs[i]
+		go func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			errCh <- wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID)
+		}()
+	}
+	for i := 0; i < N; i++ {
+		if err := <-errCh; err != nil {
+			t.Errorf("subagent %d error: %v", i, err)
+		}
+	}
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	// Every subagent's claim must be in active_work_items.
+	items, err := dbpkg.ActiveWorkItemsForSession(database, sessionID)
+	if err != nil {
+		t.Fatalf("ActiveWorkItemsForSession: %v", err)
+	}
+	if len(items) != N {
+		t.Errorf("want %d active_work_items rows, got %d: %v", N, len(items), items)
+	}
+
+	// Invariant: sessions.active_feature_id must NOT be written by subagents.
+	// Without the fix, it reflects whichever subagent wrote last (flaky); with
+	// the fix it stays empty because no root agent touched it.
+	legacy := hooks.GetActiveFeatureID(database, sessionID)
+	if legacy != "" {
+		t.Errorf("sessions.active_feature_id must be empty when only subagents claim features; got %q", legacy)
 	}
 }
