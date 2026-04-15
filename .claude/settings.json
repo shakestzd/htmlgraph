@@ -1,12 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Write(packages/go/**)",
-      "Edit(packages/go/**)",
+      "Write(//workspaces/htmlgraph/**)",
+      "Edit(//workspaces/htmlgraph/**)",
+      "NotebookEdit(//workspaces/htmlgraph/**)",
       "Bash(cd packages/go*)",
       "Bash(go build:*)",
       "Bash(go test:*)",
       "Bash(go vet:*)"
+    ],
+    "deny": [
+      "Write(//workspaces/htmlgraph/.htmlgraph/**)",
+      "Edit(//workspaces/htmlgraph/.htmlgraph/**)"
     ]
   },
   "statusLine": {
