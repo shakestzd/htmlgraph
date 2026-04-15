@@ -30,6 +30,9 @@ type LaunchOpts struct {
 	PluginDir string
 	// Resume adds --resume to claude args (for --continue mode).
 	Resume bool
+	// ResumeID, if non-empty, passes --resume <id> to claude to resume a specific session.
+	// Takes precedence over Resume.
+	ResumeID string
 	// InjectSystemPrompt, when true, appends the embedded system prompt via
 	// --append-system-prompt. Ignored when SystemPromptFile is set.
 	InjectSystemPrompt bool
@@ -56,6 +59,7 @@ type LaunchOpts struct {
 
 func claudeCmd() *cobra.Command {
 	var dev, init_, continue_, auto, tmux bool
+	var resumeID string
 
 	cmd := &cobra.Command{
 		Use:   "claude",
@@ -72,15 +76,15 @@ func claudeCmd() *cobra.Command {
 			}
 			switch {
 			case dev:
-				return launchClaudeDev(args, auto)
+				return launchClaudeDev(args, auto, resumeID)
 			case auto:
-				return launchClaudeAuto(args)
+				return launchClaudeAuto(args, resumeID)
 			case init_:
-				return launchClaudeInit(args)
+				return launchClaudeInit(args, resumeID)
 			case continue_:
 				return launchClaudeContinue(args)
 			default:
-				return launchClaudeDefault(args)
+				return launchClaudeDefault(args, resumeID)
 			}
 		},
 	}
@@ -89,6 +93,7 @@ func claudeCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&init_, "init", false, "Launch with marketplace plugin installation")
 	cmd.Flags().BoolVar(&continue_, "continue", false, "Resume last session with marketplace plugin")
 	cmd.Flags().BoolVar(&tmux, "tmux", false, "Wrap in a tmux session named 'htmlgraph-dev' (survives disconnects; reattaches on re-run)")
+	cmd.Flags().StringVar(&resumeID, "resume", "", "Resume a specific Claude Code session by ID")
 	cmd.AddCommand(yoloCmd())
 	return cmd
 }
@@ -127,7 +132,7 @@ func removeMarketplaceHtmlgraph() {
 	fmt.Println("Marketplace htmlgraph removed (uninstalled, disabled, cache wiped).")
 }
 
-func launchClaudeDev(extraArgs []string, auto bool) error {
+func launchClaudeDev(extraArgs []string, auto bool, resumeID string) error {
 	// Dev mode resolves the plugin from local source, NOT the marketplace.
 	// resolveProjectPluginDir walks up from CWD to find plugin/.claude-plugin/plugin.json.
 	pluginDir := resolveProjectPluginDir()
@@ -166,6 +171,7 @@ func launchClaudeDev(extraArgs []string, auto bool) error {
 	return launchClaude(LaunchOpts{
 		Mode:               "go",
 		PluginDir:          pluginDir,
+		ResumeID:           resumeID,
 		InjectSystemPrompt: true,
 		EnableAutoMode:     auto,
 		PermissionMode:     autoPermissionMode(auto),
@@ -186,7 +192,7 @@ func autoPermissionMode(enabled bool) string {
 // launchClaudeAuto launches Claude Code with auto mode enabled for autonomous operation.
 // It uses the marketplace plugin (like normal mode) but adds --enable-auto-mode and
 // --permission-mode auto so Claude starts in autonomous operation immediately.
-func launchClaudeAuto(extraArgs []string) error {
+func launchClaudeAuto(extraArgs []string, resumeID string) error {
 	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
@@ -194,6 +200,7 @@ func launchClaudeAuto(extraArgs []string) error {
 	fmt.Println("  Actions will be approved by the background classifier, not prompted.")
 	return launchClaude(LaunchOpts{
 		Mode:               "auto",
+		ResumeID:           resumeID,
 		InjectSystemPrompt: true,
 		EnableAutoMode:     true,
 		PermissionMode:     "auto",
@@ -308,7 +315,7 @@ func cleanupStaleDev(projectRoot string) {
 	restoreFromSymlink(backup.InstallPath, backup.BackupPath, backup.PluginKey, backup.WasEnabled, backupStateFile)
 }
 
-func launchClaudeInit(extraArgs []string) error {
+func launchClaudeInit(extraArgs []string, resumeID string) error {
 	// --init always uses CWD — never walk up to a parent with .htmlgraph/.
 	// The user explicitly wants to work in THIS directory, which may not
 	// have .htmlgraph/ yet. Walk-up would anchor to the wrong project.
@@ -318,6 +325,7 @@ func launchClaudeInit(extraArgs []string) error {
 	fmt.Println("Launching Claude Code with marketplace plugin (init mode)...")
 	return launchClaude(LaunchOpts{
 		Mode:               "init",
+		ResumeID:           resumeID,
 		InjectSystemPrompt: true,
 		ExtraArgs:          extraArgs,
 		ProjectRoot:        projectRoot,
@@ -337,13 +345,14 @@ func launchClaudeContinue(extraArgs []string) error {
 	})
 }
 
-func launchClaudeDefault(extraArgs []string) error {
+func launchClaudeDefault(extraArgs []string, resumeID string) error {
 	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
 	fmt.Println("Launching Claude Code (default mode)...")
 	return launchClaude(LaunchOpts{
 		Mode:               "default",
+		ResumeID:           resumeID,
 		InjectSystemPrompt: true,
 		ExtraArgs:          extraArgs,
 		ProjectRoot:        projectRoot,
@@ -392,7 +401,9 @@ func launchClaude(opts LaunchOpts) error {
 	}
 
 	var claudeArgs []string
-	if opts.Resume {
+	if opts.ResumeID != "" {
+		claudeArgs = append(claudeArgs, "--resume", opts.ResumeID)
+	} else if opts.Resume {
 		claudeArgs = append(claudeArgs, "--resume")
 	}
 	if opts.PluginDir != "" {

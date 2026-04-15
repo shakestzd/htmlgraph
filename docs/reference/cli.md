@@ -112,7 +112,8 @@ Commands for autonomous development, building, serving, agent configuration, and
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `yolo` | `htmlgraph yolo --feature <id> [--track <id>]` | Autonomous dev mode with engineering guardrails |
+| `claude` | `htmlgraph claude [--dev] [--continue\|--resume <session-id>]` | Launch Claude Code with HtmlGraph plugin; `--resume <id>` resumes a specific prior session |
+| `yolo` | `htmlgraph yolo --feature <id> [--track <id>] [--resume <session-id>]` | Autonomous dev mode with engineering guardrails |
 | `build` | `htmlgraph build` | Build Go binary (dev workflow) |
 | `serve` | `htmlgraph serve` | Start local dashboard server at `localhost:4000` |
 | `agent-init` | `htmlgraph agent-init` | Output shared agent context (safety, attribution, quality gates) |

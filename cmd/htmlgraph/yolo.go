@@ -16,7 +16,7 @@ import (
 
 func yoloCmd() *cobra.Command {
 	var dev, initMode, continueMode, noWorktree, tmux bool
-	var permMode, trackID, featureID string
+	var permMode, trackID, featureID, resumeID string
 
 	cmd := &cobra.Command{
 		Use:   "yolo",
@@ -45,13 +45,13 @@ Without either flag, launches in planning mode to help you create one first.`,
 			}
 			switch {
 			case dev:
-				return launchYoloDev(trackID, featureID, noWorktree, args)
+				return launchYoloDev(trackID, featureID, noWorktree, resumeID, args)
 			case initMode:
-				return launchYoloInit(trackID, featureID, args)
+				return launchYoloInit(trackID, featureID, resumeID, args)
 			case continueMode:
 				return launchYoloContinue(args)
 			default:
-				return launchYoloDefault(permMode, trackID, featureID, noWorktree, args)
+				return launchYoloDefault(permMode, trackID, featureID, noWorktree, resumeID, args)
 			}
 		},
 	}
@@ -65,6 +65,7 @@ Without either flag, launches in planning mode to help you create one first.`,
 		"Permission mode (bypassPermissions, acceptEdits)")
 	cmd.Flags().StringVar(&trackID, "track", "", "Track ID to work on (e.g., trk-3719d8f3)")
 	cmd.Flags().StringVar(&featureID, "feature", "", "Feature ID to work on (e.g., feat-15c458aa)")
+	cmd.Flags().StringVar(&resumeID, "resume", "", "Resume a specific Claude Code session by ID")
 	return cmd
 }
 
@@ -355,7 +356,7 @@ func launchYoloPlanningMode(projectRoot string, extraArgs []string) error {
 	})
 }
 
-func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, extraArgs []string) error {
+func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, resumeID string, extraArgs []string) error {
 	projectRoot := ""
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
 		projectRoot = filepath.Dir(htmlgraphDir)
@@ -429,6 +430,7 @@ func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, ext
 
 	return launchClaude(LaunchOpts{
 		Mode:             "yolo",
+		ResumeID:         resumeID,
 		SystemPromptFile: tmpFile.Name(),
 		PermissionMode:   permMode,
 		Name:             sessionName,
@@ -438,7 +440,7 @@ func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, ext
 	})
 }
 
-func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []string) error {
+func launchYoloDev(trackID, featureID string, noWorktree bool, resumeID string, extraArgs []string) error {
 	// Dev mode resolves the plugin from local source, NOT the marketplace.
 	pluginDir := resolveProjectPluginDir()
 	if pluginDir == "" {
@@ -526,6 +528,7 @@ func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []strin
 	return launchClaude(LaunchOpts{
 		Mode:             "yolo-dev",
 		PluginDir:        pluginDir,
+		ResumeID:         resumeID,
 		SystemPromptFile: tmpFile.Name(),
 		PermissionMode:   "bypassPermissions",
 		Name:             sessionName,
@@ -535,13 +538,13 @@ func launchYoloDev(trackID, featureID string, noWorktree bool, extraArgs []strin
 	})
 }
 
-func launchYoloInit(trackID, featureID string, extraArgs []string) error {
+func launchYoloInit(trackID, featureID string, resumeID string, extraArgs []string) error {
 	// Initialize .htmlgraph/ first.
 	if err := runInit(nil, nil); err != nil {
 		return fmt.Errorf("init failed: %w", err)
 	}
 	fmt.Println()
-	return launchYoloDefault("bypassPermissions", trackID, featureID, false, extraArgs)
+	return launchYoloDefault("bypassPermissions", trackID, featureID, false, resumeID, extraArgs)
 }
 
 func launchYoloContinue(extraArgs []string) error {

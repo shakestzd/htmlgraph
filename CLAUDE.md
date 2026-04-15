@@ -50,6 +50,19 @@ Dev mode uninstalls the marketplace plugin, clears cache, and launches with `cla
 
 **Why full removal is required:** Disabling a marketplace plugin only affects hooks. Agent definitions and skill content continue loading from `~/.claude/plugins/marketplaces/`, silently shadowing dev source changes.
 
+## Resuming a Specific Session
+
+`htmlgraph claude`, `htmlgraph yolo`, and `htmlgraph dev` all accept `--resume <session-id>` to resume a specific prior Claude Code session. On exit, Claude Code prints a line like `claude --resume d846b50d-…`; pass that ID through the htmlgraph launcher to get the HtmlGraph plugin, system prompt, and (in `--dev`) local `--plugin-dir` applied to the resumed session:
+
+```bash
+htmlgraph claude --resume d846b50d-9ce4-45c1-8ad2-0f84da537efd
+htmlgraph claude --dev --resume <session-id>
+htmlgraph yolo --dev --resume <session-id>
+htmlgraph dev --resume <session-id>
+```
+
+`--resume <id>` differs from `--continue` (which resumes the most recent session). If both are passed, `--resume <id>` wins.
+
 ## Dev Mode in Codespaces
 
 Codespaces clients disconnect on idle, browser refresh, or network blips — killing long dev sessions. Wrap dev in tmux:
