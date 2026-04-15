@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"database/sql"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/models"
+	"time"
 )
 
 func init() {
@@ -598,6 +601,190 @@ func TestBranchForFilePath(t *testing.T) {
 	got = branchForFilePath(mainFile, "fallback")
 	if got != "main" {
 		t.Errorf("expected %q for main repo file, got %q", "main", got)
+	}
+}
+
+// setupTempGitRepo creates an isolated git repo in a temp dir with an initial
+// commit. Returns the repo dir. The test's working directory is changed to the
+// repo dir so git commands inside the test operate on the right repo.
+func setupTempGitRepo(t *testing.T) string {
+	t.Helper()
+	repoDir := t.TempDir()
+	mustGitIn := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoDir
+		cmd.Env = cleanEnv()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	mustGitIn("init", "-b", "main")
+	mustGitIn("config", "user.email", "test@example.com")
+	mustGitIn("config", "user.name", "Test")
+	// Initial commit so staging works.
+	readme := filepath.Join(repoDir, "README.md")
+	os.WriteFile(readme, []byte("hello"), 0o644)
+	mustGitIn("add", "README.md")
+	mustGitIn("commit", "-m", "init")
+	// Change cwd so git commands in the tested function operate on this repo.
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { os.Chdir(origDir) })
+	return repoDir
+}
+
+// insertAgentEvent is a test helper that inserts a minimal agent_events row.
+func insertAgentEvent(t *testing.T, database *sql.DB, eventID, sessionID, toolName, toolInput, inputSummary, status string) {
+	t.Helper()
+	now := time.Now().UTC()
+	e := &models.AgentEvent{
+		EventID:      eventID,
+		AgentID:      "agent-test",
+		EventType:    "tool_call",
+		Timestamp:    now,
+		ToolName:     toolName,
+		ToolInput:    toolInput,
+		InputSummary: inputSummary,
+		SessionID:    sessionID,
+		Status:       status,
+		Source:       "test",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := db.InsertEvent(database, e); err != nil {
+		t.Fatalf("InsertEvent(%s): %v", eventID, err)
+	}
+}
+
+// TestVisualValidation_SkipsWhenNoUIFilesStaged verifies that a commit with
+// only .go files staged passes immediately without requiring a screenshot
+// (fix 1: staged-diff precheck).
+func TestVisualValidation_SkipsWhenNoUIFilesStaged(t *testing.T) {
+	repoDir := setupTempGitRepo(t)
+
+	// Stage a Go file only.
+	goFile := filepath.Join(repoDir, "main.go")
+	os.WriteFile(goFile, []byte("package main\n"), 0o644)
+	cmd := exec.Command("git", "add", "main.go")
+	cmd.Dir = repoDir
+	cmd.Env = cleanEnv()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+
+	// The guard should pass even with no screenshot recorded in DB.
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "git commit -m 'backend only'"},
+	}
+	result := checkYoloUIValidationGuard(event, true, nil, "sess-go-only")
+	if result != "" {
+		t.Errorf("expected allow for backend-only commit, got: %s", result)
+	}
+}
+
+// TestVisualValidation_FiresWhenUIFilesStaged verifies that staging a .html
+// file with no screenshot recorded triggers the block (session-state path).
+func TestVisualValidation_FiresWhenUIFilesStaged(t *testing.T) {
+	repoDir := setupTempGitRepo(t)
+
+	// Stage an HTML file.
+	htmlFile := filepath.Join(repoDir, "index.html")
+	os.WriteFile(htmlFile, []byte("<html></html>"), 0o644)
+	cmd := exec.Command("git", "add", "index.html")
+	cmd.Dir = repoDir
+	cmd.Env = cleanEnv()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+
+	tdb := setupTestDB(t)
+	defer tdb.DB.Close()
+
+	// Record a UI file edit in session state so uiFileCount > 0.
+	insertAgentEvent(t, tdb.DB, "evt-edit-html", "test-sess", "Edit",
+		`{"file_path":"index.html"}`, "index.html", "completed")
+
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "git commit -m 'ui change'"},
+	}
+	result := checkYoloUIValidationGuard(event, true, tdb.DB, "test-sess")
+	if result == "" {
+		t.Error("expected block when HTML file staged but no screenshot recorded")
+	}
+}
+
+// TestVisualValidation_AcceptsChromeMcpScreenshot verifies that a Chrome MCP
+// screenshot (tool_name=mcp__claude-in-chrome__computer, action=screenshot)
+// satisfies the gate (fix 3: screenshot detection).
+func TestVisualValidation_AcceptsChromeMcpScreenshot(t *testing.T) {
+	repoDir := setupTempGitRepo(t)
+
+	// Stage an HTML file.
+	htmlFile := filepath.Join(repoDir, "index.html")
+	os.WriteFile(htmlFile, []byte("<html></html>"), 0o644)
+	cmd := exec.Command("git", "add", "index.html")
+	cmd.Dir = repoDir
+	cmd.Env = cleanEnv()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+
+	tdb := setupTestDB(t)
+	defer tdb.DB.Close()
+
+	// Record a UI file edit so uiFileCount > 0.
+	insertAgentEvent(t, tdb.DB, "evt-edit-html2", "test-sess", "Edit",
+		`{"file_path":"index.html"}`, "index.html", "completed")
+
+	// Record a Chrome MCP screenshot tool call.
+	insertAgentEvent(t, tdb.DB, "evt-screenshot", "test-sess",
+		"mcp__claude-in-chrome__computer",
+		`{"action":"screenshot"}`, "", "completed")
+
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "git commit -m 'ui with screenshot'"},
+	}
+	result := checkYoloUIValidationGuard(event, true, tdb.DB, "test-sess")
+	if result != "" {
+		t.Errorf("expected allow after Chrome MCP screenshot, got: %s", result)
+	}
+}
+
+// TestVisualValidation_IgnoresNonGitCommitBash verifies that a non-git-commit
+// Bash command (e.g. gh issue create) is ignored regardless of staged files
+// or screenshot state (fix 2: Bash scope).
+func TestVisualValidation_IgnoresNonGitCommitBash(t *testing.T) {
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "gh issue create --title 'foo'"},
+	}
+	// nil DB is safe here — the function must return before touching it.
+	result := checkYoloUIValidationGuard(event, true, nil, "sess-gh")
+	if result != "" {
+		t.Errorf("expected allow for non-git-commit bash, got: %s", result)
+	}
+}
+
+// TestVisualValidation_GitCommitTreeNotGated verifies that "git commit-tree"
+// (a git plumbing sub-command, not the porcelain "git commit") is not gated
+// by the visual-validation guard (fix C: anchor Bash command matching).
+func TestVisualValidation_GitCommitTreeNotGated(t *testing.T) {
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "git commit-tree HEAD~1"},
+	}
+	// nil DB is safe — the function must return before touching it.
+	result := checkYoloUIValidationGuard(event, true, nil, "sess-plumbing")
+	if result != "" {
+		t.Errorf("expected allow for git commit-tree, got: %s", result)
 	}
 }
 

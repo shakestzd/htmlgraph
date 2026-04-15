@@ -221,8 +221,13 @@ func countStepsForItem(htmlgraphDir, itemID string) int {
 	return 0
 }
 
-// gitCommitPattern matches git commit commands in Bash.
-var gitCommitPattern = regexp.MustCompile(`\bgit\s+commit\b`)
+// gitCommitPattern matches "git commit" as a standalone command.
+// It is anchored to the start of the string (modulo leading whitespace) and
+// requires that after "commit" comes whitespace, end-of-string, or a flag
+// prefix (-- or -X where X is not a lowercase letter). This excludes git
+// plumbing sub-commands like "git commit-tree" and "git commit-graph" where
+// the dash is part of the sub-command name rather than a flag separator.
+var gitCommitPattern = regexp.MustCompile(`^\s*git\s+commit(\s|$|--|-[^a-z])`)
 
 // fallbackTestSuggestion is used when the project's language can't be
 // detected from manifest files. It enumerates the supported test
@@ -593,15 +598,70 @@ func hasRecentTestRun(database *sql.DB, sessionID string) bool {
 	return false
 }
 
-// checkYoloUIValidationGuard blocks git commit when UI files were modified in
-// the session but no screenshot or visual validation was performed.
+// uiFileExtensions are the file extensions considered UI files for the purpose
+// of visual validation gating. A commit that only stages backend files skips
+// the screenshot requirement entirely.
+var uiFileExtensions = []string{".html", ".css", ".tsx", ".jsx", ".vue", ".svelte", ".js", ".ts"}
+
+// hasStagedUIFiles runs git diff --cached --name-only and checks whether any
+// staged file has a UI extension or lives under a UI directory (templates/,
+// dashboard/). Returns false on any error so the gate degrades to allow.
+func hasStagedUIFiles() bool {
+	out, err := exec.Command("git", "diff", "--cached", "--name-only").Output()
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		// Skip data files — .htmlgraph/ HTML files are work items, not UI.
+		if strings.Contains(lower, ".htmlgraph/") {
+			continue
+		}
+		// UI directories.
+		if strings.Contains(lower, "templates/") || strings.Contains(lower, "dashboard/") {
+			return true
+		}
+		// UI file extensions.
+		for _, ext := range uiFileExtensions {
+			if strings.HasSuffix(lower, ext) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkYoloUIValidationGuard blocks git commit when UI files are staged and no
+// screenshot or visual validation was performed in the session.
 // Returns a non-empty reason to block, or "" to allow.
+//
+// Fix: three structural problems were repaired (bug-a10ae96a / GH#36):
+//  1. Staged-diff precheck — fires only when UI files are actually staged;
+//     backend-only commits pass immediately without screenshot requirement.
+//  2. Bash scope — gitCommitPattern is now anchored to `^\s*git\s+commit`
+//     with a suffix guard that rejects "commit-tree" and "commit-graph"
+//     (plumbing sub-commands). "gh issue create" and similar never matched.
+//  3. Screenshot detection — the old LIKE '%screenshot%' pattern never matched
+//     the only available Chrome MCP tool (mcp__claude-in-chrome__computer).
+//     Now also checks tool_name = 'mcp__claude-in-chrome__computer' with
+//     "action":"screenshot" in the tool_input JSON column. Existing
+//     take_screenshot patterns are retained for other MCP server flavours.
 func checkYoloUIValidationGuard(event *CloudEvent, yolo bool, database *sql.DB, sessionID string) string {
 	if !yolo || event.ToolName != "Bash" {
 		return ""
 	}
 	cmd, _ := event.ToolInput["command"].(string)
 	if !gitCommitPattern.MatchString(cmd) {
+		return ""
+	}
+
+	// Fix 1: precheck the actual staged diff before touching session state.
+	// If no UI files are staged, the gate is a no-op — backend-only commits
+	// pass immediately without needing a screenshot.
+	if !hasStagedUIFiles() {
 		return ""
 	}
 
@@ -621,17 +681,28 @@ func checkYoloUIValidationGuard(event *CloudEvent, yolo bool, database *sql.DB, 
 	).Scan(&uiFileCount)
 
 	if uiFileCount == 0 {
-		return "" // no UI files touched
+		return "" // no UI files touched in this session
 	}
 
-	// Check for screenshot / UI validation in session (+ parent).
+	// Fix 3: check for screenshot / UI validation in session (+ parent).
+	// Supported screenshot tool names:
+	//   - mcp__claude-in-chrome__computer  (Chrome MCP, action=screenshot)
+	//   - take_screenshot                  (other MCP server flavours)
+	//   - *screenshot*                     (catch-all for future servers)
 	for _, sid := range getSessionAndParent(database, sessionID) {
 		var validationCount int
 		database.QueryRow(`
 			SELECT COUNT(*) FROM agent_events
 			WHERE session_id = ?
-			  AND (tool_name LIKE '%screenshot%'
-			    OR tool_name LIKE '%take_screenshot%')`,
+			  AND (
+			    -- Chrome MCP: tool_name is mcp__claude-in-chrome__computer,
+			    -- action discriminator lives in the tool_input JSON column.
+			    (tool_name = 'mcp__claude-in-chrome__computer'
+			      AND tool_input LIKE '%"action":"screenshot"%')
+			    -- Other MCP servers that expose a dedicated screenshot tool.
+			    OR tool_name LIKE '%take_screenshot%'
+			    OR tool_name LIKE '%screenshot%'
+			  )`,
 			sid,
 		).Scan(&validationCount)
 		if validationCount > 0 {

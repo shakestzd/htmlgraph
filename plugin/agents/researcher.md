@@ -12,10 +12,7 @@ tools:
   - Skill
   - WebSearch
   - WebFetch
-  - mcp__plugin_htmlgraph_chrome-devtools__navigate_page
-  - mcp__plugin_htmlgraph_chrome-devtools__take_screenshot
-  - mcp__plugin_htmlgraph_chrome-devtools__take_snapshot
-  - mcp__plugin_htmlgraph_chrome-devtools__evaluate_script
+  - mcp__claude-in-chrome__computer
 maxTurns: 40
 skills:
   - agent-context
@@ -131,9 +128,9 @@ claude --debug <command>   # Verbose output
 ### Workflow
 
 1. **Determine target URL** — use provided URL, or auto-detect by probing common development ports
-2. **Navigate** to root page via chrome-devtools MCP
+2. **Navigate** to root page: `mcp__claude-in-chrome__computer` with `action=navigate` and the target URL
 3. **Discover pages** — find navigation links and menu items
-4. **Screenshot** each page (viewport + full-page if scrollable); save to `ui-review/`
+4. **Screenshot** each page: `mcp__claude-in-chrome__computer` with `action=screenshot`; save to `ui-review/`
 5. **Analyze** for layout, readability, data correctness, visual hierarchy, responsiveness
 6. **Report** with severity ratings
 
