@@ -18,13 +18,16 @@ func planShowCmd() *cobra.Command {
 		Short: "Show plan details (warns on YAML/HTML drift)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			planID := args[0]
+			rawID := args[0]
 			if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
-				yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
-				htmlPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
-				checkPlanDrift(yamlPath, htmlPath, os.Stderr)
+				resolved, err := resolveID(htmlgraphDir, rawID)
+				if err == nil && strings.HasPrefix(resolved, "plan-") {
+					yamlPath := filepath.Join(htmlgraphDir, "plans", resolved+".yaml")
+					htmlPath := filepath.Join(htmlgraphDir, "plans", resolved+".html")
+					checkPlanDrift(yamlPath, htmlPath, os.Stderr)
+				}
 			}
-			return runWiShow(planID)
+			return runWiShow(rawID)
 		},
 	}
 }

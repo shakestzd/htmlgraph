@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shakestzd/htmlgraph/internal/workitem"
 )
 
 const driftTestYAML = `meta:
@@ -126,6 +128,52 @@ func TestCheckPlanDrift_NoDrift(t *testing.T) {
 
 	if buf.Len() != 0 {
 		t.Errorf("expected no warnings, got:\n%s", buf.String())
+	}
+}
+
+// TestPlanShow_PartialIDResolves verifies that a partial plan ID is resolved
+// to its canonical form before building YAML/HTML paths, so drift-check runs
+// against the real files (regression for roborev-50: partial IDs silently
+// skipped the drift check).
+func TestPlanShow_PartialIDResolves(t *testing.T) {
+	dir := t.TempDir()
+	plansDir := filepath.Join(dir, "plans")
+	if err := os.MkdirAll(plansDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Also create sibling subdirs so resolveID's walker is happy.
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "specs"} {
+		_ = os.MkdirAll(filepath.Join(dir, sub), 0o755)
+	}
+
+	yamlBody := strings.ReplaceAll(driftTestYAML, "plan-drifttest", "plan-abcd1234")
+	htmlBody := `<html><head><title>Plan: Original Title</title></head><body>
+<article id="plan-abcd1234" data-status="draft">
+<div data-slice="1"></div><div data-slice="2"></div>
+</article></body></html>`
+	if err := os.WriteFile(filepath.Join(plansDir, "plan-abcd1234.yaml"), []byte(yamlBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(plansDir, "plan-abcd1234.html"), []byte(htmlBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := workitem.ResolvePartialID(dir, "plan-abcd")
+	if err != nil {
+		t.Fatalf("ResolvePartialID: %v", err)
+	}
+	if resolved != "plan-abcd1234" {
+		t.Fatalf("resolved = %q, want plan-abcd1234", resolved)
+	}
+
+	var buf bytes.Buffer
+	checkPlanDrift(
+		filepath.Join(plansDir, resolved+".yaml"),
+		filepath.Join(plansDir, resolved+".html"),
+		&buf,
+	)
+	if !strings.Contains(buf.String(), `status: yaml="finalized" html="draft"`) {
+		t.Errorf("expected drift warning after partial-ID resolve, got:\n%s", buf.String())
 	}
 }
 
