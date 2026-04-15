@@ -1,0 +1,66 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/spf13/cobra"
+)
+
+// featureReopenCmd creates a cobra command for feature reopen.
+func featureReopenCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reopen <feature-id>",
+		Short: "Reopen a completed feature, setting it back to in-progress",
+		Long: `Reopen a completed feature by setting its status back to 'in-progress'.
+This is a non-destructive operation — all history is preserved.
+
+Errors if the feature is not currently done.
+
+Example:
+  htmlgraph feature reopen feat-a1b2c3d4`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := executeFeatureReopen(args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("Feature %s reopened (status: in-progress).\n", args[0])
+			return nil
+		},
+	}
+}
+
+// executeFeatureReopen sets a done feature back to in-progress.
+func executeFeatureReopen(featureID string) error {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return err
+	}
+
+	featureID, err = resolveID(htmlgraphDir, featureID)
+	if err != nil {
+		return err
+	}
+
+	p, err := workitem.Open(htmlgraphDir, "claude-code")
+	if err != nil {
+		return fmt.Errorf("open project: %w", err)
+	}
+	defer p.Close()
+
+	node, err := p.Features.Get(featureID)
+	if err != nil {
+		return fmt.Errorf("get feature %s: %w", featureID, err)
+	}
+
+	if node.Status != models.StatusDone {
+		return fmt.Errorf("feature %s is not done (status: %q) — nothing to reopen", featureID, node.Status)
+	}
+
+	if _, err := p.Features.Start(featureID); err != nil {
+		return fmt.Errorf("reopen feature %s: %w", featureID, err)
+	}
+
+	return nil
+}

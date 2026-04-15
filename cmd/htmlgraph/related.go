@@ -16,6 +16,7 @@ import (
 // then adds the feature-specific "related" subcommand.
 func featureCmdWithExtras() *cobra.Command {
 	cmd := workitemCmd("feature", "features")
+	cmd.AddCommand(featureReopenCmd())
 	cmd.AddCommand(relatedCmd())
 	return cmd
 }
