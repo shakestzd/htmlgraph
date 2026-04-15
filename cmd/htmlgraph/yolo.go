@@ -49,7 +49,7 @@ Without either flag, launches in planning mode to help you create one first.`,
 			case initMode:
 				return launchYoloInit(trackID, featureID, resumeID, args)
 			case continueMode:
-				return launchYoloContinue(args)
+				return launchYoloContinue(args, resumeID)
 			default:
 				return launchYoloDefault(permMode, trackID, featureID, noWorktree, resumeID, args)
 			}
@@ -547,7 +547,7 @@ func launchYoloInit(trackID, featureID string, resumeID string, extraArgs []stri
 	return launchYoloDefault("bypassPermissions", trackID, featureID, false, resumeID, extraArgs)
 }
 
-func launchYoloContinue(extraArgs []string) error {
+func launchYoloContinue(extraArgs []string, resumeID string) error {
 	projectRoot := ""
 	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
 		projectRoot = filepath.Dir(htmlgraphDir)
@@ -559,6 +559,7 @@ func launchYoloContinue(extraArgs []string) error {
 	return launchClaude(LaunchOpts{
 		Mode:           "yolo-continue",
 		Resume:         true,
+		ResumeID:       resumeID,
 		PermissionMode: "bypassPermissions",
 		ExtraArgs:      extraArgs,
 		ProjectRoot:    projectRoot,

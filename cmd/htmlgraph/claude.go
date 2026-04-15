@@ -82,7 +82,7 @@ func claudeCmd() *cobra.Command {
 			case init_:
 				return launchClaudeInit(args, resumeID)
 			case continue_:
-				return launchClaudeContinue(args)
+				return launchClaudeContinue(args, resumeID)
 			default:
 				return launchClaudeDefault(args, resumeID)
 			}
@@ -332,7 +332,7 @@ func launchClaudeInit(extraArgs []string, resumeID string) error {
 	})
 }
 
-func launchClaudeContinue(extraArgs []string) error {
+func launchClaudeContinue(extraArgs []string, resumeID string) error {
 	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
@@ -340,6 +340,7 @@ func launchClaudeContinue(extraArgs []string) error {
 	return launchClaude(LaunchOpts{
 		Mode:        "continue",
 		Resume:      true,
+		ResumeID:    resumeID,
 		ExtraArgs:   extraArgs,
 		ProjectRoot: projectRoot,
 	})
