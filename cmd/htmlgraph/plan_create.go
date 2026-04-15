@@ -463,27 +463,25 @@ func findPlanFile(htmlgraphDir, planID string) string {
 	return ""
 }
 
-// updatePlanStatus updates the data-status attribute in a plan's HTML file.
+// updatePlanStatus sets meta.status in a plan's YAML source of truth.
+// It does NOT touch the HTML file and does NOT commit — callers are
+// responsible for re-rendering and committing via commitPlanChange.
 func updatePlanStatus(htmlgraphDir, planID, newStatus string) error {
-	planPath := findPlanFile(htmlgraphDir, planID)
-	if planPath == "" {
+	htmlPath := findPlanFile(htmlgraphDir, planID)
+	if htmlPath == "" {
 		return fmt.Errorf("plan file not found: %s\nRun 'htmlgraph plan list' to see valid plan IDs", planID)
 	}
-	data, err := os.ReadFile(planPath)
+	yamlPath := strings.TrimSuffix(htmlPath, ".html") + ".yaml"
+
+	plan, err := planyaml.Load(yamlPath)
 	if err != nil {
-		return err
-	}
-	content := string(data)
-
-	// Replace the status in data-status="..."
-	for _, old := range []string{"todo", "draft", "in-progress", "done", "finalized"} {
-		old := fmt.Sprintf(`data-status="%s"`, old)
-		new := fmt.Sprintf(`data-status="%s"`, newStatus)
-		if strings.Contains(content, old) {
-			content = strings.Replace(content, old, new, 1)
-			break
-		}
+		return fmt.Errorf("load plan YAML: %w", err)
 	}
 
-	return os.WriteFile(planPath, []byte(content), 0o644)
+	plan.Meta.Status = newStatus
+
+	if err := planyaml.Save(yamlPath, plan); err != nil {
+		return fmt.Errorf("save plan YAML: %w", err)
+	}
+	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 	"github.com/shakestzd/htmlgraph/internal/plantmpl"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
@@ -339,12 +340,12 @@ func checkPlanFinalized(htmlgraphDir, planID string) (bool, error) {
 		}
 	}
 
-	planPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
-	status, err := parsePlanHTMLStatus(planPath)
+	yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(yamlPath)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("load plan YAML: %w", err)
 	}
-	return status == "finalized", nil
+	return plan.Meta.Status == "finalized", nil
 }
 
 // fetchPlanStatusFromAPI calls GET /api/plans/{id}/status and returns the status.

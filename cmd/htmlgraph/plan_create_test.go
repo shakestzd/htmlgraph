@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 )
 
 func TestRunPlanCreateFromTopic(t *testing.T) {
@@ -126,27 +128,39 @@ func TestUpdatePlanStatus(t *testing.T) {
 		t.Fatalf("mkdir plans: %v", err)
 	}
 
-	// Write a minimal plan HTML fixture with data-status="draft" on the root article.
+	// Write minimal plan fixtures. updatePlanStatus now reads/writes YAML;
+	// both HTML and YAML files must exist because findPlanFile looks for HTML.
 	planID := "plan-test123"
-	planPath := filepath.Join(plansDir, planID+".html")
-	fixture := `<html><body><article id="plan-test123" data-type="plan" data-status="draft">test plan</article></body></html>`
-	if err := os.WriteFile(planPath, []byte(fixture), 0o644); err != nil {
-		t.Fatalf("write fixture: %v", err)
+	htmlPath := filepath.Join(plansDir, planID+".html")
+	htmlFixture := `<html><body><article id="plan-test123" data-type="plan" data-status="draft">test plan</article></body></html>`
+	if err := os.WriteFile(htmlPath, []byte(htmlFixture), 0o644); err != nil {
+		t.Fatalf("write html fixture: %v", err)
+	}
+	yamlFixture := "meta:\n  id: plan-test123\n  title: Test Plan\n  status: draft\n  version: 1\n"
+	yamlPath := filepath.Join(plansDir, planID+".yaml")
+	if err := os.WriteFile(yamlPath, []byte(yamlFixture), 0o644); err != nil {
+		t.Fatalf("write yaml fixture: %v", err)
 	}
 
 	if err := updatePlanStatus(dir, planID, "done"); err != nil {
 		t.Fatalf("updatePlanStatus: %v", err)
 	}
 
-	data, err := os.ReadFile(planPath)
+	// Assert YAML meta.status was updated (YAML is now the source of truth).
+	plan, err := planyaml.Load(yamlPath)
 	if err != nil {
-		t.Fatalf("read plan after update: %v", err)
+		t.Fatalf("load plan YAML after update: %v", err)
 	}
-	content := string(data)
-	if !strings.Contains(content, `data-status="done"`) {
-		t.Errorf("expected data-status=\"done\" in updated file, got:\n%s", content)
+	if plan.Meta.Status != "done" {
+		t.Errorf("expected YAML meta.status=\"done\", got %q", plan.Meta.Status)
 	}
-	if strings.Contains(content, `data-status="draft"`) {
-		t.Errorf("old data-status=\"draft\" still present after update")
+
+	// Assert HTML was NOT modified by updatePlanStatus (caller owns re-render).
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read plan HTML after update: %v", err)
+	}
+	if strings.Contains(string(data), `data-status="done"`) {
+		t.Errorf("updatePlanStatus must not modify HTML; HTML re-render is caller's responsibility")
 	}
 }

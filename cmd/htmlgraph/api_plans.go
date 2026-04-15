@@ -18,6 +18,7 @@ import (
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/planamend"
 	"github.com/shakestzd/htmlgraph/internal/planchat"
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 	"github.com/shakestzd/htmlgraph/internal/plantmpl"
 )
 
@@ -97,11 +98,22 @@ func parsePlanListItem(planPath, planID string, database *sql.DB) (planListItem,
 	}
 
 	article := doc.Find("article[id]").First()
-	status, _ := article.Attr("data-status")
+	featureID, _ := article.Attr("data-feature-id")
+
+	// Read status from YAML source of truth; fall back to HTML attribute for
+	// backward compatibility (missing YAML, broken envs, existing tests).
+	status := ""
+	yamlPath := strings.TrimSuffix(planPath, ".html") + ".yaml"
+	if yamlPlan, yamlErr := planyaml.Load(yamlPath); yamlErr == nil {
+		status = yamlPlan.Meta.Status
+	}
+	if status == "" {
+		// Fallback: parse HTML attribute (legacy — YAML is the canonical source).
+		status, _ = article.Attr("data-status")
+	}
 	if status == "" {
 		status = "draft"
 	}
-	featureID, _ := article.Attr("data-feature-id")
 
 	title := strings.TrimSpace(doc.Find("h1").First().Text())
 	if title == "" {
@@ -355,6 +367,12 @@ func planFinalizeHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc
 			if err := finalizePlanHTML(planPath, database, planID); err != nil {
 				log.Printf("warning: finalizePlanHTML failed for %s: %v", planID, err)
 			}
+		}
+
+		// Keep YAML meta.status in sync with HTML finalization so YAML remains
+		// the source of truth for status reads (parsePlanHTMLStatus, plan wait, etc.).
+		if yamlErr := updatePlanStatus(htmlgraphDir, planID, "finalized"); yamlErr != nil {
+			log.Printf("warning: updatePlanStatus(finalized) failed for %s: %v", planID, yamlErr)
 		}
 
 		feedback, err := dbpkg.GetPlanFeedback(database, planID)
@@ -962,20 +980,16 @@ func resolvePlanPath(htmlgraphDir, planID string) (string, error) {
 	return p, nil
 }
 
-// parsePlanHTMLStatus reads the plan HTML file and returns the value of
-// data-status on the top-level <article> element.
+// parsePlanHTMLStatus reads the plan's YAML source of truth and returns
+// meta.status. The planPath argument is the HTML path; YAML is derived via
+// TrimSuffix so callers do not need to change their invocations.
 func parsePlanHTMLStatus(planPath string) (string, error) {
-	f, err := os.Open(planPath)
+	yamlPath := strings.TrimSuffix(planPath, ".html") + ".yaml"
+	plan, err := planyaml.Load(yamlPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("load plan YAML for status: %w", err)
 	}
-	defer f.Close()
-
-	doc, err := goquery.NewDocumentFromReader(f)
-	if err != nil {
-		return "", err
-	}
-	status, _ := doc.Find("article[id]").First().Attr("data-status")
+	status := plan.Meta.Status
 	if status == "" {
 		status = "draft"
 	}

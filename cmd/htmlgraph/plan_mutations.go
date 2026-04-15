@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -39,11 +40,10 @@ func runPlanSetStatus(planID, status string) error {
 		return err
 	}
 
-	// NOTE: autocommit intentionally omitted — updatePlanStatus currently mutates
-	// HTML directly without updating the YAML source of truth (see bug-b7f90534).
-	// Committing here via commitPlanChange would re-render HTML from the stale YAML
-	// and stage it, losing the status change just written. The deeper fix belongs
-	// in that bug, not this one.
+	yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	if err := commitPlanChange(yamlPath, fmt.Sprintf("plan set-status %s %s", planID, status)); err != nil {
+		return fmt.Errorf("autocommit set-status: %w", err)
+	}
 
 	fmt.Printf("plan %s: status → %s\n", planID, status)
 	return nil

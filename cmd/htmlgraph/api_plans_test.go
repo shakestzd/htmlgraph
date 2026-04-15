@@ -35,7 +35,7 @@ func setupPlanTestDB(t *testing.T) (*sql.DB, string) {
 }
 
 // writeTempPlanHTML creates a temporary .htmlgraph/plans directory with a
-// minimal plan HTML file. Returns the htmlgraphDir.
+// minimal plan HTML file and a matching YAML file. Returns the htmlgraphDir.
 func writeTempPlanHTML(t *testing.T, planID string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -47,9 +47,16 @@ func writeTempPlanHTML(t *testing.T, planID string) string {
 		`<article id="` + planID + `" data-type="plan" data-status="draft">` +
 		`<header><h1>Test Plan</h1></header>` +
 		`</article></body></html>`
-	path := filepath.Join(plansDir, planID+".html")
-	if err := os.WriteFile(path, []byte(html), 0o644); err != nil {
+	htmlPath := filepath.Join(plansDir, planID+".html")
+	if err := os.WriteFile(htmlPath, []byte(html), 0o644); err != nil {
 		t.Fatalf("write plan html: %v", err)
+	}
+	// Write a matching YAML file so parsePlanHTMLStatus (which now reads YAML)
+	// can find the status. meta.status defaults to "draft" to match the HTML.
+	yamlContent := "meta:\n  id: " + planID + "\n  title: Test Plan\n  status: draft\n  version: 1\n"
+	yamlPath := filepath.Join(plansDir, planID+".yaml")
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o644); err != nil {
+		t.Fatalf("write plan yaml: %v", err)
 	}
 	return dir
 }
