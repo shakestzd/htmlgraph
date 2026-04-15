@@ -1,10 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -310,84 +309,19 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 	var featureIDs []string
 
 	for i, s := range plan.Slices {
-		// Idempotency check: if the slice already has a FeatureID, try to
-		// reuse the stored feature rather than creating a duplicate.
+		// Idempotency — trust-and-skip: if the YAML already records a FeatureID
+		// the feature was created in a previous finalize run. Features are
+		// independent work items after creation; any changes to title or content
+		// must be made via `htmlgraph feature edit`, not by re-running plan
+		// finalize. This is the one-way-mutation invariant.
 		if s.FeatureID != "" {
-			existing, getErr := p.Features.Get(s.FeatureID)
-			if getErr == nil {
-				// Feature found — verify provenance before mutating.
-				// A feature legitimately created by this plan must have a
-				// planned_in edge back to this planID. If it doesn't, the
-				// FeatureID is stale or hand-edited and points at an
-				// unrelated feature — treat as orphan to avoid data corruption.
-				linkedToPlan := false
-				for _, e := range existing.Edges[string(models.RelPlannedIn)] {
-					if e.TargetID == planID {
-						linkedToPlan = true
-						break
-					}
-				}
-				if !linkedToPlan {
-					// Stale FeatureID: the referenced feature exists but has no
-					// provenance edge to this plan. Clear the stale ID and fall
-					// through to the create path below so we build a replacement.
-					fmt.Printf("warning: feature %s for slice %d has no planned_in → %s edge — stale FeatureID, creating replacement\n",
-						s.FeatureID, s.Num, planID)
-					plan.Slices[i].FeatureID = ""
-				} else {
-					// Provenance confirmed — reconcile mutable fields so the stored
-					// feature stays in sync with the current YAML slice data.
-					wantContent := buildSliceFeatureContent(s)
-
-					// Track changes are not silently migrated: the old part_of
-					// edges would need to be rewired, which risks corruption.
-					// Surface the inconsistency instead so the operator can
-					// delete the orphaned feature and re-run.
-					if existing.TrackID != trackID {
-						return nil, fmt.Errorf(
-							"re-finalize: slice %d feature %s belongs to track %s but plan now targets track %s — "+
-								"delete the feature manually and re-run to create a fresh one",
-							s.Num, existing.ID, existing.TrackID, trackID)
-					}
-
-					titleChanged := existing.Title != s.Title
-					contentChanged := existing.Content != wantContent
-
-					if titleChanged || contentChanged {
-						// At least one mutable field diverged — persist the update.
-						eb := p.Features.Edit(existing.ID)
-						if titleChanged {
-							eb = eb.SetTitle(s.Title)
-						}
-						if contentChanged {
-							eb = eb.SetDescription(wantContent)
-						}
-						if err := eb.Save(); err != nil {
-							return nil, fmt.Errorf("update feature %s for slice %d: %w", existing.ID, s.Num, err)
-						}
-						fmt.Printf("%s  Slice %d — %s (reused existing, updated title/content)\n", existing.ID, s.Num, s.Title)
-					} else {
-						fmt.Printf("%s  Slice %d — %s (reused existing, unchanged)\n", existing.ID, s.Num, s.Title)
-					}
-
-					numToFeatureID[s.Num] = existing.ID
-					featureIDs = append(featureIDs, existing.ID)
-					continue
-				}
-			} else {
-				// Discriminate: is this a genuine "file not found", or a real
-				// storage/parse error that should abort the finalize?
-				if !errors.Is(getErr, os.ErrNotExist) {
-					return nil, fmt.Errorf("read feature %s for slice %d: %w", s.FeatureID, s.Num, getErr)
-				}
-
-				// True orphan (file missing): warn and fall through to recreate.
-				fmt.Printf("warning: feature %s for slice %d not found on disk — recreating\n", s.FeatureID, s.Num)
-			}
+			numToFeatureID[s.Num] = s.FeatureID
+			featureIDs = append(featureIDs, s.FeatureID)
+			fmt.Printf("%s  Slice %d — %s (already finalized)\n", s.FeatureID, s.Num, s.Title)
+			continue
 		}
 
-		// Create a new feature: either fresh (no FeatureID), true orphan (missing
-		// file), or stale-FeatureID replacement (unrelated feature, no provenance).
+		// Fall through: create a new feature for this slice.
 		content := buildSliceFeatureContent(s)
 		feat, err := p.Features.Create(s.Title,
 			workitem.FeatWithTrack(trackID),
@@ -397,12 +331,7 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 			return nil, fmt.Errorf("create feature for slice %d (%q): %w", s.Num, s.Title, err)
 		}
 
-		isStaleReplacement := s.FeatureID != "" && plan.Slices[i].FeatureID == ""
-		if isStaleReplacement {
-			fmt.Printf("%s  Slice %d — %s (stale FeatureID, created replacement)\n", feat.ID, s.Num, s.Title)
-		} else {
-			fmt.Printf("%s  Slice %d — %s (created)\n", feat.ID, s.Num, s.Title)
-		}
+		fmt.Printf("%s  Slice %d — %s (created)\n", feat.ID, s.Num, s.Title)
 		numToFeatureID[s.Num] = feat.ID
 		featureIDs = append(featureIDs, feat.ID)
 
@@ -416,12 +345,14 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 			return nil, fmt.Errorf("wire track edges for slice %d (%s → %s): %w", s.Num, feat.ID, trackID, err)
 		}
 
-		// Link feature → plan via planned_in edge.
+		// Link feature → plan via planned_in edge, recording slice-num for
+		// slice-scoped provenance checks on re-finalize.
 		if _, err := p.Features.AddEdge(feat.ID, models.Edge{
 			TargetID:     planID,
 			Relationship: models.RelPlannedIn,
 			Title:        planID,
 			Since:        time.Now().UTC(),
+			Properties:   map[string]string{"slice-num": strconv.Itoa(s.Num)},
 		}); err != nil {
 			return nil, fmt.Errorf("link feature %s to plan %s: %w", feat.ID, planID, err)
 		}

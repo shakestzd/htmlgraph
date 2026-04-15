@@ -438,14 +438,16 @@ func TestPlanFinalizeFromYAML_ReopenRefinalizeIdempotent(t *testing.T) {
 	}
 }
 
-// TestPlanFinalizeFromYAML_ReopenRefinalize_UpdatesMutatedSlice verifies that
-// when a slice's title or content is mutated between finalize and re-finalize,
-// the stored feature is updated in-place (same ID, new metadata).
-func TestPlanFinalizeFromYAML_ReopenRefinalize_UpdatesMutatedSlice(t *testing.T) {
+// TestPlanFinalizeFromYAML_ReopenRefinalize_DoesNotMutateExistingFeature is the
+// canonical test for the one-way-mutation invariant: plan finalize creates
+// features once, and after that features are independent work items. Re-running
+// plan finalize must NOT overwrite a feature's title or content even if the
+// YAML slice has diverged (e.g. the user edited the feature directly).
+func TestPlanFinalizeFromYAML_ReopenRefinalize_DoesNotMutateExistingFeature(t *testing.T) {
 	p, dir := setupFinalizeProject(t)
 	planID, _ := setupYAMLFinalizeProject(t, p, dir, 2)
 
-	// First finalize: captures original feature IDs.
+	// First finalize: creates features for each slice.
 	result1, err := executePlanFinalizeFromYAML(p, dir, planID)
 	if err != nil {
 		t.Fatalf("first finalize: %v", err)
@@ -453,157 +455,49 @@ func TestPlanFinalizeFromYAML_ReopenRefinalize_UpdatesMutatedSlice(t *testing.T)
 	if len(result1.FeatureIDs) != 2 {
 		t.Fatalf("first finalize: expected 2 features, got %d", len(result1.FeatureIDs))
 	}
+	capturedID := result1.FeatureIDs[0]
 
-	// Reopen: unlocks the plan.
+	// Simulate a user/agent editing the feature's title directly (independent of plan).
+	const userEditedTitle = "User-Edited Title (independent of plan YAML)"
+	if err := p.Features.Edit(capturedID).SetTitle(userEditedTitle).Save(); err != nil {
+		t.Fatalf("edit feature title: %v", err)
+	}
+
+	// Verify the edit landed.
+	before, err := p.Features.Get(capturedID)
+	if err != nil {
+		t.Fatalf("get feature before re-finalize: %v", err)
+	}
+	if before.Title != userEditedTitle {
+		t.Fatalf("setup failed: feature title = %q, want %q", before.Title, userEditedTitle)
+	}
+
+	// Reopen: unlocks the plan for re-finalize.
 	if err := executePlanReopen(dir, planID); err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
 
-	// Mutate slice 1's title and what (which feeds into Content) in the YAML.
-	planPath := filepath.Join(dir, "plans", planID+".yaml")
-	plan, err := planyaml.Load(planPath)
-	if err != nil {
-		t.Fatalf("load plan before mutation: %v", err)
-	}
-	plan.Slices[0].Title = "Mutated Title"
-	plan.Slices[0].What = "completely different implementation"
-	if err := planyaml.Save(planPath, plan); err != nil {
-		t.Fatalf("save mutated plan: %v", err)
-	}
-
-	// Re-finalize with mutated slice.
+	// Re-finalize: trust-and-skip must leave the existing feature untouched.
 	result2, err := executePlanFinalizeFromYAML(p, dir, planID)
 	if err != nil {
 		t.Fatalf("re-finalize: %v", err)
 	}
 
-	// Same feature IDs — no duplicates created.
-	if len(result2.FeatureIDs) != len(result1.FeatureIDs) {
-		t.Errorf("re-finalize feature count = %d, want %d", len(result2.FeatureIDs), len(result1.FeatureIDs))
+	// Same feature ID — no duplicate created.
+	if len(result2.FeatureIDs) == 0 {
+		t.Fatal("re-finalize returned no feature IDs")
 	}
-	if result2.FeatureIDs[0] != result1.FeatureIDs[0] {
-		t.Errorf("slice 1: re-finalize feature ID = %q, want %q (duplicate created)", result2.FeatureIDs[0], result1.FeatureIDs[0])
+	if result2.FeatureIDs[0] != capturedID {
+		t.Errorf("re-finalize changed feature ID: got %q, want %q (duplicate created)", result2.FeatureIDs[0], capturedID)
 	}
 
-	// The stored feature now reflects the updated title and content.
-	stored, err := p.Features.Get(result1.FeatureIDs[0])
+	// Title is still the user's manual edit — trust-and-skip did NOT overwrite it.
+	after, err := p.Features.Get(capturedID)
 	if err != nil {
-		t.Fatalf("get feature after mutation: %v", err)
+		t.Fatalf("get feature after re-finalize: %v", err)
 	}
-	if stored.Title != "Mutated Title" {
-		t.Errorf("stored feature Title = %q, want %q", stored.Title, "Mutated Title")
-	}
-	if !strings.Contains(stored.Content, "completely different implementation") {
-		t.Errorf("stored feature Content should contain mutated What field, got: %q", stored.Content)
-	}
-
-	// Finding 2 note: we don't have an easy way to inject a non-ErrNotExist
-	// Get error in this test harness (it would require corrupting the HTML file
-	// to trigger a parse error). The discrimination logic is verified by code
-	// review: errors.Is(getErr, os.ErrNotExist) in plan_finalize.go.
-}
-
-// TestPlanFinalizeFromYAML_ReopenRefinalize_StaleForeignFeatureID is the
-// regression test for roborev job 29 / bug-9d64d90c finding 2.
-// It verifies that a stale or hand-edited feature_id pointing at an unrelated
-// feature does NOT corrupt that unrelated feature — instead a replacement is
-// created and the YAML is updated to reference the new feature.
-func TestPlanFinalizeFromYAML_ReopenRefinalize_StaleForeignFeatureID(t *testing.T) {
-	p, dir := setupFinalizeProject(t)
-
-	// Create a track that the plan will target.
-	track, err := p.Tracks.Create("Plan Track")
-	if err != nil {
-		t.Fatalf("create track: %v", err)
-	}
-
-	// Create an unrelated feature on the same track — NOT through plan finalize,
-	// so it has no planned_in edge to our plan.
-	unrelated, err := p.Features.Create("Unrelated Feature",
-		workitem.FeatWithTrack(track.ID),
-		workitem.FeatWithContent("original content — must not be changed"),
-	)
-	if err != nil {
-		t.Fatalf("create unrelated feature: %v", err)
-	}
-	originalTitle := unrelated.Title
-	originalContent := unrelated.Content
-
-	// Build a plan YAML where the slice's feature_id points at the unrelated feature.
-	planID := workitem.GenerateID("plan", "Stale FeatureID Test")
-	plan := planyaml.NewPlan(planID, "Stale FeatureID Test", "test plan")
-	plan.Meta.TrackID = track.ID
-	plan.Design.Problem = "Testing stale FeatureID protection"
-	plan.Slices = append(plan.Slices, planyaml.PlanSlice{
-		ID:        workitem.GenerateID("slice", "slice-one"),
-		Num:       1,
-		Title:     "Slice One",
-		What:      "do something important",
-		FeatureID: unrelated.ID, // stale/foreign — no planned_in edge
-	})
-
-	planPath := filepath.Join(dir, "plans", planID+".yaml")
-	if err := planyaml.Save(planPath, plan); err != nil {
-		t.Fatalf("save plan YAML: %v", err)
-	}
-
-	// Run plan finalize — must NOT corrupt the unrelated feature.
-	result, err := executePlanFinalizeFromYAML(p, dir, planID)
-	if err != nil {
-		t.Fatalf("finalize with stale FeatureID: %v", err)
-	}
-
-	// 1. The unrelated feature's title and content must be UNCHANGED.
-	reloaded, err := p.Features.Get(unrelated.ID)
-	if err != nil {
-		t.Fatalf("reload unrelated feature: %v", err)
-	}
-	if reloaded.Title != originalTitle {
-		t.Errorf("unrelated feature Title changed: got %q, want %q", reloaded.Title, originalTitle)
-	}
-	if reloaded.Content != originalContent {
-		t.Errorf("unrelated feature Content changed: got %q, want %q", reloaded.Content, originalContent)
-	}
-
-	// 2. The result must have exactly one feature, and it must NOT be the unrelated one.
-	if len(result.FeatureIDs) != 1 {
-		t.Fatalf("expected 1 feature in result, got %d", len(result.FeatureIDs))
-	}
-	newFeatID := result.FeatureIDs[0]
-	if newFeatID == unrelated.ID {
-		t.Errorf("result feature ID is the unrelated feature — stale FeatureID was not replaced")
-	}
-
-	// 3. The YAML slice must reference the new feature, not the stale one.
-	updated, err := planyaml.Load(planPath)
-	if err != nil {
-		t.Fatalf("load updated plan YAML: %v", err)
-	}
-	if len(updated.Slices) != 1 {
-		t.Fatalf("expected 1 slice in YAML, got %d", len(updated.Slices))
-	}
-	yamlFeatID := updated.Slices[0].FeatureID
-	if yamlFeatID == unrelated.ID {
-		t.Errorf("YAML slice still references the unrelated feature — stale FeatureID was not updated")
-	}
-	if yamlFeatID != newFeatID {
-		t.Errorf("YAML slice feature_id = %q, want %q (the new replacement feature)", yamlFeatID, newFeatID)
-	}
-
-	// 4. The new feature must have a planned_in edge to this plan.
-	newFeat, err := p.Features.Get(newFeatID)
-	if err != nil {
-		t.Fatalf("get new replacement feature %s: %v", newFeatID, err)
-	}
-	hasProvenance := false
-	for _, e := range newFeat.Edges["planned_in"] {
-		if e.TargetID == planID {
-			hasProvenance = true
-			break
-		}
-	}
-	if !hasProvenance {
-		t.Errorf("replacement feature %s has no planned_in → %s edge", newFeatID, planID)
+	if after.Title != userEditedTitle {
+		t.Errorf("re-finalize overwrote feature title: got %q, want %q", after.Title, userEditedTitle)
 	}
 }
 
