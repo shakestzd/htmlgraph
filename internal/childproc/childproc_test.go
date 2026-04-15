@@ -110,11 +110,12 @@ func TestGetOrSpawnConcurrent(t *testing.T) {
 	// Fire N concurrent GetOrSpawn calls for the same projectID. The
 	// sync.Once gate must cause them to share a single spawned child.
 	const N = 10
+	herdDir := t.TempDir()
 	results := make(chan *Child, N)
 	errs := make(chan error, N)
 	for i := 0; i < N; i++ {
 		go func() {
-			c, err := sup.GetOrSpawn(ctx, "herd", "/tmp/herd")
+			c, err := sup.GetOrSpawn(ctx, "herd", herdDir)
 			if err != nil {
 				errs <- err
 				return
@@ -154,7 +155,7 @@ func TestInvalidHandshakeFails(t *testing.T) {
 	})
 	defer sup.Shutdown(context.Background())
 
-	_, err := sup.GetOrSpawn(context.Background(), "bad", "/tmp/bad")
+	_, err := sup.GetOrSpawn(context.Background(), "bad", t.TempDir())
 	if err == nil {
 		t.Fatal("expected error on invalid handshake")
 	}
@@ -174,7 +175,7 @@ func TestHandshakeTimeout(t *testing.T) {
 	defer sup.Shutdown(context.Background())
 
 	start := time.Now()
-	_, err := sup.GetOrSpawn(context.Background(), "silent", "/tmp/silent")
+	_, err := sup.GetOrSpawn(context.Background(), "silent", t.TempDir())
 	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatal("expected handshake timeout error")
@@ -193,7 +194,7 @@ func TestIdleReaperKillsStaleChild(t *testing.T) {
 	})
 	defer sup.Shutdown(context.Background())
 
-	c, err := sup.GetOrSpawn(context.Background(), "idle", "/tmp/idle")
+	c, err := sup.GetOrSpawn(context.Background(), "idle", t.TempDir())
 	if err != nil {
 		t.Fatalf("spawn: %v", err)
 	}
@@ -203,8 +204,10 @@ func TestIdleReaperKillsStaleChild(t *testing.T) {
 
 	sup.reapIdleOnce()
 
-	// Wait for the reaper goroutine to remove the map entry.
-	deadline := time.Now().Add(3 * time.Second)
+	// Wait for the reaper goroutine (cmd.Wait) to remove the map entry.
+	// Under CPU contention or -race the goroutine scheduler may delay the
+	// Wait return; 10s is generous enough even under parallel worktree load.
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if len(sup.Children()) == 0 {
 			return
