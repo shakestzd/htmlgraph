@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,8 +22,15 @@ import (
 // returns nil — this makes it test-compatible without requiring every plan
 // test to set up a git repo.
 //
-// Pre-commit hooks run. --no-verify is deliberately NOT used; if a hook
-// aborts the commit, the mutation fails loudly.
+// Pre-commit hooks run. --no-verify is deliberately NOT used. If a hook
+// rejects the commit, the function logs a non-fatal warning and returns nil
+// — the mutation is already persisted to disk; the caller reports success and
+// the user is directed to commit manually (Fix 1 of bug-365a84d9). Only
+// staging and filesystem errors are fatal.
+//
+// HTML is always re-rendered from YAML before staging, so callers that only
+// write YAML (add-slice-yaml, add-question-yaml, set-design-yaml, etc.) never
+// commit stale HTML (Fix 2 of bug-365a84d9).
 func commitPlanChange(planPath, message string) error {
 	htmlPath := strings.TrimSuffix(planPath, ".yaml") + ".html"
 
@@ -37,27 +43,25 @@ func commitPlanChange(planPath, message string) error {
 		return nil
 	}
 
+	// Re-render HTML from YAML before staging so commits always contain a fresh
+	// view — even when the caller only mutated the YAML (Fix 2, bug-365a84d9).
+	// Derive htmlgraphDir and planID from the path: .../plans/<planID>.yaml
+	planID := strings.TrimSuffix(filepath.Base(planPath), ".yaml")
+	htmlgraphDir := filepath.Dir(filepath.Dir(planPath)) // .../plans/.. → htmlgraph dir
+	if err := renderPlanToFileQuiet(htmlgraphDir, planID); err != nil {
+		return fmt.Errorf("autocommit: re-render HTML: %w", err)
+	}
+
 	// Stage both files. Explicit paths only — never `git add -A` or `git add .`.
 	// Use git -C to anchor to the plan dir so relative paths resolve correctly.
-	addArgs := []string{"-C", planDir, "add", "--", filepath.Base(planPath)}
-	if _, err := os.Stat(htmlPath); err == nil {
-		addArgs = append(addArgs, filepath.Base(htmlPath))
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("autocommit: stat HTML %s: %w", htmlPath, err)
-	}
+	// After re-render, HTML is guaranteed to exist, so stage both unconditionally.
+	addArgs := []string{"-C", planDir, "add", "--", filepath.Base(planPath), filepath.Base(htmlPath)}
 	if out, err := exec.Command("git", addArgs...).CombinedOutput(); err != nil {
 		return fmt.Errorf("autocommit: git add failed: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 
-	// Build the commit path spec — always include YAML; include HTML only if it
-	// exists on disk (it may not exist yet on first create-yaml).
-	commitPaths := []string{filepath.Base(planPath)}
-	if _, err := os.Stat(htmlPath); err == nil {
-		commitPaths = append(commitPaths, filepath.Base(htmlPath))
-	}
-
 	// Commit. No --no-verify. Pre-commit hooks run.
-	commitArgs := append([]string{"-C", planDir, "commit", "-m", message, "--"}, commitPaths...)
+	commitArgs := []string{"-C", planDir, "commit", "-m", message, "--", filepath.Base(planPath), filepath.Base(htmlPath)}
 	commitOut, err := exec.Command("git", commitArgs...).CombinedOutput()
 	if err != nil {
 		// Check if the failure was "nothing to commit" (the mutation was a no-op
@@ -66,7 +70,13 @@ func commitPlanChange(planPath, message string) error {
 		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
 			return nil
 		}
-		return fmt.Errorf("autocommit: git commit failed: %s: %w", strings.TrimSpace(outStr), err)
+		// Any other commit failure (pre-commit hook rejection, locked index, etc.)
+		// is non-fatal. The mutation is already persisted to disk; the user just
+		// needs to commit manually. Log a warning and return nil so the calling
+		// command reports success instead of rolling back on a git concern
+		// (Fix 1 of bug-365a84d9). Only staging/filesystem errors above are fatal.
+		fmt.Fprintf(os.Stderr, "autocommit warning: git commit failed (mutation persisted to disk — please commit manually): %s\n", strings.TrimSpace(outStr))
+		return nil
 	}
 	return nil
 }

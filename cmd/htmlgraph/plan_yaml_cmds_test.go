@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 )
 
 // initGitRepo creates a git repo in dir and configures a test user identity.
@@ -133,22 +135,34 @@ func TestAutocommitPlan_NoOpCommit(t *testing.T) {
 	dir := t.TempDir()
 	initGitRepo(t, dir)
 
-	yamlPath, _ := writePlanFiles(t, dir, "plan-noop9876")
-
-	// Commit both files manually so the tree is clean.
-	if out, err := exec.Command("git", "-C", dir, "add", ".").CombinedOutput(); err != nil {
-		t.Fatalf("git add: %v\n%s", err, out)
-	}
-	if out, err := exec.Command("git", "-C", dir, "commit", "-m", "initial").CombinedOutput(); err != nil {
-		t.Fatalf("git commit initial: %v\n%s", err, out)
+	plansDir := filepath.Join(dir, "plans")
+	if err := os.MkdirAll(plansDir, 0o755); err != nil {
+		t.Fatalf("mkdir plans: %v", err)
 	}
 
-	// Count commits before.
+	planID := "plan-noop9876"
+	planPath := filepath.Join(plansDir, planID+".yaml")
+
+	// Create a proper YAML and render HTML via commitPlanChange so the first
+	// commit captures the canonical rendered content. A second call with
+	// identical YAML+HTML must produce no new commit (no-op).
+	plan := planyaml.NewPlan(planID, "No-op Test", "idempotency check")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save yaml: %v", err)
+	}
+
+	// First call — creates the initial commit (re-renders HTML internally).
+	if err := commitPlanChange(planPath, "plan(plan-noop9876): initial"); err != nil {
+		t.Fatalf("first commitPlanChange: %v", err)
+	}
+
+	// Count commits before the second call.
 	beforeOut, _ := exec.Command("git", "-C", dir, "rev-list", "--count", "HEAD").CombinedOutput()
 	before := strings.TrimSpace(string(beforeOut))
 
-	if err := commitPlanChange(yamlPath, "should be no-op"); err != nil {
-		t.Fatalf("commitPlanChange: %v", err)
+	// Second call with no YAML change — should produce no new commit.
+	if err := commitPlanChange(planPath, "should be no-op"); err != nil {
+		t.Fatalf("second commitPlanChange: %v", err)
 	}
 
 	// Count commits after — should be unchanged.
@@ -157,5 +171,152 @@ func TestAutocommitPlan_NoOpCommit(t *testing.T) {
 
 	if before != after {
 		t.Errorf("expected no new commit (count %s → %s)", before, after)
+	}
+}
+
+func TestAutocommitPlan_StaleHtmlRegeneratedBeforeCommit(t *testing.T) {
+	dir := t.TempDir()
+	initGitRepo(t, dir)
+
+	plansDir := filepath.Join(dir, "plans")
+	if err := os.MkdirAll(plansDir, 0o755); err != nil {
+		t.Fatalf("mkdir plans: %v", err)
+	}
+
+	planID := "plan-regen5678"
+	planPath := filepath.Join(plansDir, planID+".yaml")
+	htmlPath := filepath.Join(plansDir, planID+".html")
+
+	// Create a YAML plan with initial title and render HTML once.
+	plan := planyaml.NewPlan(planID, "Old Title", "initial description")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save initial yaml: %v", err)
+	}
+	if err := renderPlanToFileQuiet(dir, planID); err != nil {
+		t.Fatalf("initial render: %v", err)
+	}
+
+	// Confirm initial HTML contains "Old Title".
+	initialHTML, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read initial html: %v", err)
+	}
+	if !strings.Contains(string(initialHTML), "Old Title") {
+		t.Fatalf("initial html should contain 'Old Title', got:\n%s", string(initialHTML))
+	}
+
+	// Mutate the YAML to change the title — do NOT manually re-render HTML.
+	plan.Meta.Title = "New Title"
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save mutated yaml: %v", err)
+	}
+
+	// Call commitPlanChange — it should re-render HTML internally then commit.
+	if err := commitPlanChange(planPath, "plan(plan-regen5678): stale html test"); err != nil {
+		t.Fatalf("commitPlanChange: %v", err)
+	}
+
+	// Verify a commit was created.
+	log := gitLog(t, dir)
+	if !strings.Contains(log, "plan(plan-regen5678): stale html test") {
+		t.Errorf("expected commit in log, got:\n%s", log)
+	}
+
+	// Inspect the committed HTML — it must contain "New Title", not "Old Title".
+	showOut, err := exec.Command("git", "-C", dir, "show", "HEAD:plans/"+planID+".html").CombinedOutput()
+	if err != nil {
+		t.Fatalf("git show html: %v\n%s", err, showOut)
+	}
+	committedHTML := string(showOut)
+	if !strings.Contains(committedHTML, "New Title") {
+		t.Errorf("committed HTML should contain 'New Title' (re-render happened), got:\n%s", committedHTML)
+	}
+	if strings.Contains(committedHTML, "Old Title") {
+		t.Errorf("committed HTML should NOT contain 'Old Title' (stale), got:\n%s", committedHTML)
+	}
+
+	// Also verify committed YAML has the new title.
+	showYAML, err := exec.Command("git", "-C", dir, "show", "HEAD:plans/"+planID+".yaml").CombinedOutput()
+	if err != nil {
+		t.Fatalf("git show yaml: %v\n%s", err, showYAML)
+	}
+	if !strings.Contains(string(showYAML), "New Title") {
+		t.Errorf("committed YAML should contain 'New Title', got:\n%s", string(showYAML))
+	}
+}
+
+func TestAutocommitPlan_CommitHookFailureIsNonFatal(t *testing.T) {
+	dir := t.TempDir()
+	initGitRepo(t, dir)
+
+	plansDir := filepath.Join(dir, "plans")
+	if err := os.MkdirAll(plansDir, 0o755); err != nil {
+		t.Fatalf("mkdir plans: %v", err)
+	}
+
+	planID := "plan-hook1234"
+	planPath := filepath.Join(plansDir, planID+".yaml")
+
+	// Create a valid YAML plan.
+	plan := planyaml.NewPlan(planID, "Hook Test Plan", "pre-commit hook rejection test")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save yaml: %v", err)
+	}
+
+	// Install a pre-commit hook that always rejects.
+	hooksDir := filepath.Join(dir, ".git", "hooks")
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
+		t.Fatalf("mkdir hooks: %v", err)
+	}
+	hookScript := "#!/bin/sh\nexit 1\n"
+	hookPath := filepath.Join(hooksDir, "pre-commit")
+	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
+		t.Fatalf("write pre-commit hook: %v", err)
+	}
+
+	// Capture stderr to verify the warning is printed.
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stderr = w
+
+	commitErr := commitPlanChange(planPath, "plan(plan-hook1234): should be non-fatal")
+
+	// Restore stderr before reading — w must be closed first so Read doesn't block.
+	w.Close()
+	os.Stderr = origStderr
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	r.Close()
+	stderrOutput := string(buf[:n])
+
+	// Assert non-fatal: commitPlanChange must return nil.
+	if commitErr != nil {
+		t.Fatalf("expected nil error when pre-commit hook rejects, got: %v", commitErr)
+	}
+
+	// Assert warning was emitted to stderr.
+	if !strings.Contains(stderrOutput, "autocommit warning") && !strings.Contains(stderrOutput, "please commit manually") {
+		t.Errorf("expected warning on stderr, got: %q", stderrOutput)
+	}
+
+	// Assert plan files are still on disk (not rolled back).
+	if _, err := os.Stat(planPath); err != nil {
+		t.Errorf("plan yaml should still exist on disk: %v", err)
+	}
+
+	// Assert no commit was created (hook rejected it).
+	countOut, err := exec.Command("git", "-C", dir, "rev-list", "--count", "HEAD").CombinedOutput()
+	if err != nil {
+		// rev-list fails when there are no commits — that's expected: no commit means the hook worked.
+		// This is the success case.
+		return
+	}
+	count := strings.TrimSpace(string(countOut))
+	if count != "0" {
+		t.Errorf("expected 0 commits (hook rejected), got %s", count)
 	}
 }

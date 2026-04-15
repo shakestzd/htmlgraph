@@ -384,6 +384,30 @@ func runPlanRender(planID string) error {
 	return renderPlanToFile(htmlgraphDir, planID)
 }
 
+// renderPlanToFileQuiet regenerates plan HTML from the YAML source without
+// printing to stdout. Used by commitPlanChange to re-render before staging so
+// the committed HTML is always in sync with the YAML (Fix 2 of bug-365a84d9).
+func renderPlanToFileQuiet(htmlgraphDir, planID string) error {
+	page := plantmpl.BuildFromTopic(planID, "", "", time.Now().UTC().Format("2006-01-02"))
+	enrichPageFromYAML(htmlgraphDir, planID, page)
+
+	if page.Title == "" {
+		page.Title = planID
+	}
+
+	outPath := filepath.Join(htmlgraphDir, "plans", planID+".html")
+	f, err := os.Create(outPath)
+	if err != nil {
+		return fmt.Errorf("create HTML file: %w", err)
+	}
+	defer f.Close()
+
+	if err := page.Render(f); err != nil {
+		return fmt.Errorf("render plan: %w", err)
+	}
+	return nil
+}
+
 // renderPlanToFile regenerates plan HTML from the YAML source using the
 // dashboard template. Called by the CLI command and tests.
 func renderPlanToFile(htmlgraphDir, planID string) error {
