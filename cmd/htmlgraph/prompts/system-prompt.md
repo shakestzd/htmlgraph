@@ -203,6 +203,12 @@ htmlgraph help --compact   # reprint this list at any time
 
 ---
 
+## Plans
+
+**Plan format:** `plan-*.yaml` is the authoritative source of truth. `plan-*.html` is regenerated on every mutation via `commitPlanChange`. Never edit `plan-*.html` directly — your changes will be overwritten on the next mutation.
+
+---
+
 ## Agent Teams (experimental)
 
 When Claude Code's agent teams feature is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, requires v2.1.32+), HtmlGraph automatically captures teammate identity on every `TeammateIdle`, `TaskCreated`, and `TaskCompleted` hook — feature steps are prefixed with `[teammate-name]` for attribution in `htmlgraph snapshot`. The plugin hooks gracefully no-op when no team is active.
