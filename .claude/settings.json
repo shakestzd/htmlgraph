@@ -11,7 +11,8 @@
     ],
     "deny": [
       "Write(//workspaces/htmlgraph/.htmlgraph/**)",
-      "Edit(//workspaces/htmlgraph/.htmlgraph/**)"
+      "Edit(//workspaces/htmlgraph/.htmlgraph/**)",
+      "NotebookEdit(//workspaces/htmlgraph/.htmlgraph/**)"
     ]
   },
   "statusLine": {
