@@ -390,6 +390,11 @@ func executePlanFinalizeFromYAML(p *workitem.Project, htmlgraphDir, planID strin
 	// Re-render the plan HTML so it reflects finalized state.
 	_ = renderPlanToFile(htmlgraphDir, planID)
 
+	commitMsg := fmt.Sprintf("plan(%s): finalize — %d features created on %s", planID, len(featureIDs), trackID)
+	if err := commitPlanChange(planPath, commitMsg); err != nil {
+		return nil, fmt.Errorf("autocommit finalize: %w", err)
+	}
+
 	return &finalizeResult{
 		TrackID:    trackID,
 		FeatureIDs: featureIDs,

@@ -66,7 +66,9 @@ func handleExitPlanMode(event *hooks.CloudEvent, database *sql.DB, projectDir st
 		return &hooks.HookResult{Continue: true}, nil
 	}
 
-	commitPlanChange(yamlPath, fmt.Sprintf("plan(%s): auto-convert from plan mode — %s", planID, title))
+	if err := commitPlanChange(yamlPath, fmt.Sprintf("plan(%s): auto-convert from plan mode — %s", planID, title)); err != nil {
+		hooks.LogError("exit-plan-mode", event.SessionID, fmt.Sprintf("autocommit: %v", err))
+	}
 
 	suggestion := fmt.Sprintf(
 		"Plan mode output converted to CRISPI YAML: %s\nRun: htmlgraph plan review %s",

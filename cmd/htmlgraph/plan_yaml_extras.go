@@ -158,7 +158,9 @@ func runAddQuestionYAML(planID, text, description, recommended, optionsStr strin
 	if len(truncated) > 50 {
 		truncated = truncated[:50]
 	}
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): add question — %s", planID, truncated))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): add question — %s", planID, truncated)); err != nil {
+		return fmt.Errorf("autocommit add-question: %w", err)
+	}
 
 	fmt.Printf("Added question: %s (%d options)\n", qid, len(opts))
 	return nil
@@ -243,8 +245,10 @@ func runSetCritiqueYAML(planID, dataStr string) error {
 		return fmt.Errorf("save plan: %w", err)
 	}
 
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): set critique — %d assumptions, %d risks",
-		planID, len(critique.Assumptions), len(critique.Risks)))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): set critique — %d assumptions, %d risks",
+		planID, len(critique.Assumptions), len(critique.Risks))); err != nil {
+		return fmt.Errorf("autocommit set-critique: %w", err)
+	}
 
 	fmt.Printf("Critique set for %s: %d assumptions, %d risks\n",
 		planID, len(critique.Assumptions), len(critique.Risks))
@@ -344,7 +348,9 @@ func runSetDesignYAML(planID, problem, goals, constraints string) error {
 		return fmt.Errorf("save plan: %w", err)
 	}
 
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): update design", planID))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): update design", planID)); err != nil {
+		return fmt.Errorf("autocommit set-design: %w", err)
+	}
 
 	fmt.Printf("Design updated for %s: problem=%v goals=%d constraints=%d\n",
 		planID, problem != "", len(plan.Design.Goals), len(plan.Design.Constraints))
@@ -446,8 +452,10 @@ func runRewriteYAML(planID, filePath string) error {
 		return fmt.Errorf("save plan: %w", err)
 	}
 
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): rewrite — %d slices, %d questions",
-		planID, len(newPlan.Slices), len(newPlan.Questions)))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): rewrite — %d slices, %d questions",
+		planID, len(newPlan.Slices), len(newPlan.Questions))); err != nil {
+		return fmt.Errorf("autocommit rewrite: %w", err)
+	}
 
 	if amendmentsApplied > 0 {
 		fmt.Printf("Amendments applied: %d\n", amendmentsApplied)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -37,6 +38,11 @@ func runPlanSetStatus(planID, status string) error {
 
 	if err := updatePlanStatus(htmlgraphDir, planID, status); err != nil {
 		return err
+	}
+
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): set-status %s", planID, status)); err != nil {
+		return fmt.Errorf("autocommit set-status: %w", err)
 	}
 
 	fmt.Printf("plan %s: status → %s\n", planID, status)

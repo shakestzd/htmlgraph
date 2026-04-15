@@ -56,5 +56,10 @@ func executePlanReopen(htmlgraphDir, planID string) error {
 	// Re-render HTML to reflect new status.
 	_ = renderPlanToFile(htmlgraphDir, planID)
 
+	commitMsg := fmt.Sprintf("plan(%s): reopen", planID)
+	if err := commitPlanChange(planPath, commitMsg); err != nil {
+		return fmt.Errorf("autocommit reopen: %w", err)
+	}
+
 	return nil
 }

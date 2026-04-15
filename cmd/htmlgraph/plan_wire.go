@@ -174,7 +174,9 @@ func wirePlan(htmlgraphDir, planID, trackID string) error {
 		return fmt.Errorf("save plan: %w", err)
 	}
 
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): wire — %d features linked", planID, linkedCount))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): wire — %d features linked", planID, linkedCount)); err != nil {
+		return fmt.Errorf("autocommit wire: %w", err)
+	}
 
 	// Print summary.
 	fmt.Printf("Wired plan %s to track %s\n", planID, trackID)

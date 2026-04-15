@@ -252,7 +252,9 @@ func finalizeYAML(htmlgraphDir, planID string) error {
 		return fmt.Errorf("save plan: %w", err)
 	}
 
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): finalize — %d slices approved", planID, len(numToFeat)))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): finalize — %d slices approved", planID, len(numToFeat))); err != nil {
+		return fmt.Errorf("autocommit finalize-yaml: %w", err)
+	}
 
 	// Build feat IDs list in slice order for summary.
 	var featIDs []string

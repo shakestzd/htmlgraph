@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,18 +14,67 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// commitPlanChange stages and commits a plan YAML file change.
-// Best-effort — failures are logged but do not fail the calling command.
-func commitPlanChange(planPath, message string) {
-	dir := filepath.Dir(planPath)
-	add := exec.Command("git", "add", planPath)
-	add.Dir = dir
-	if err := add.Run(); err != nil {
-		return
+// commitPlanChange stages and commits the plan YAML and HTML together as an
+// atomic mutation record. The plan YAML is the source of truth; the HTML is
+// a rendered view derived from it. Both must be committed atomically so git
+// history becomes the full audit trail of plan state changes (bug-9ec0cf31).
+//
+// If the project is not inside a git repo, the function logs a skip and
+// returns nil — this makes it test-compatible without requiring every plan
+// test to set up a git repo.
+//
+// Pre-commit hooks run. --no-verify is deliberately NOT used; if a hook
+// aborts the commit, the mutation fails loudly.
+func commitPlanChange(planPath, message string) error {
+	htmlPath := strings.TrimSuffix(planPath, ".yaml") + ".html"
+
+	// Detect git repo. Uses the plan file's directory as the cwd.
+	planDir := filepath.Dir(planPath)
+	if !isGitRepo(planDir) {
+		// Not in a git repo — silent skip. This is normal in tests and in
+		// non-git projects. Log to stderr for diagnosability.
+		fmt.Fprintf(os.Stderr, "autocommit skipped: %s is not inside a git repository\n", planDir)
+		return nil
 	}
-	commit := exec.Command("git", "commit", "-m", message, "--no-verify")
-	commit.Dir = dir
-	commit.Run()
+
+	// Stage both files. Explicit paths only — never `git add -A` or `git add .`.
+	// Use git -C to anchor to the plan dir so relative paths resolve correctly.
+	addArgs := []string{"-C", planDir, "add", "--", filepath.Base(planPath)}
+	if _, err := os.Stat(htmlPath); err == nil {
+		addArgs = append(addArgs, filepath.Base(htmlPath))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("autocommit: stat HTML %s: %w", htmlPath, err)
+	}
+	if out, err := exec.Command("git", addArgs...).CombinedOutput(); err != nil {
+		return fmt.Errorf("autocommit: git add failed: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+
+	// Build the commit path spec — always include YAML; include HTML only if it
+	// exists on disk (it may not exist yet on first create-yaml).
+	commitPaths := []string{filepath.Base(planPath)}
+	if _, err := os.Stat(htmlPath); err == nil {
+		commitPaths = append(commitPaths, filepath.Base(htmlPath))
+	}
+
+	// Commit. No --no-verify. Pre-commit hooks run.
+	commitArgs := append([]string{"-C", planDir, "commit", "-m", message, "--"}, commitPaths...)
+	commitOut, err := exec.Command("git", commitArgs...).CombinedOutput()
+	if err != nil {
+		// Check if the failure was "nothing to commit" (the mutation was a no-op
+		// — e.g., re-finalize with unchanged YAML). That's not an error.
+		outStr := string(commitOut)
+		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
+			return nil
+		}
+		return fmt.Errorf("autocommit: git commit failed: %s: %w", strings.TrimSpace(outStr), err)
+	}
+	return nil
+}
+
+// isGitRepo returns true if the given directory is inside a git repository.
+func isGitRepo(dir string) bool {
+	err := exec.Command("git", "-C", dir, "rev-parse", "--git-dir").Run()
+	return err == nil
 }
 
 // planCreateYAMLCmd creates a YAML plan file with empty design, slices,
@@ -78,7 +128,9 @@ func runPlanCreateYAML(title, description, trackID string) error {
 		return fmt.Errorf("save plan YAML: %w", err)
 	}
 
-	commitPlanChange(outPath, fmt.Sprintf("plan(%s): create — %s", planID, title))
+	if err := commitPlanChange(outPath, fmt.Sprintf("plan(%s): create — %s", planID, title)); err != nil {
+		return fmt.Errorf("autocommit create: %w", err)
+	}
 
 	fmt.Println(outPath)
 	return nil
@@ -205,7 +257,9 @@ func runPlanAddSliceYAML(htmlgraphDir, planID, title, what, why, files, doneWhen
 		return fmt.Errorf("save plan %q: %w", planID, err)
 	}
 
-	commitPlanChange(planPath, fmt.Sprintf("plan(%s): add slice %d — %s", planID, slice.Num, title))
+	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): add slice %d — %s", planID, slice.Num, title)); err != nil {
+		return fmt.Errorf("autocommit add-slice: %w", err)
+	}
 
 	fmt.Printf("Slice %d added\n", slice.Num)
 	return nil
