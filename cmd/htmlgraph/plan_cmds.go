@@ -32,6 +32,9 @@ func planCmdWithExtras() *cobra.Command {
 	cmd := workitemCmd("plan", "plans")
 	// Replace the generic create with CRISPI plan create.
 	removeSubcommand(cmd, "create")
+	// Replace the generic show with a plan-aware version that warns on YAML/HTML drift.
+	removeSubcommand(cmd, "show")
+	cmd.AddCommand(planShowCmd())
 	cmd.AddCommand(planCreateFromTopicCmd())
 	cmd.AddCommand(planGenerateCmd())
 	cmd.AddCommand(planOpenCmd())
