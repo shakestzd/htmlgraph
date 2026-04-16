@@ -130,6 +130,15 @@ func shortenGitRemote(raw string) string {
 	}
 	s := raw
 
+	// Guard: handle local-path and file:// remotes (don't leak filesystem paths).
+	if remainder, ok := strings.CutPrefix(s, "file://"); ok {
+		return filepath.Base(strings.TrimSuffix(remainder, ".git"))
+	}
+	if strings.HasPrefix(s, "/") || (len(s) > 1 && s[1] == ':') {
+		// Unix absolute path or Windows absolute path (e.g. C:/...).
+		return filepath.Base(strings.TrimSuffix(s, ".git"))
+	}
+
 	// Strip ssh://git@ prefix.
 	s = strings.TrimPrefix(s, "ssh://git@")
 

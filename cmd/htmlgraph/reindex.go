@@ -79,6 +79,7 @@ func runReindex(cmd *cobra.Command, _ []string) error {
 		collectSessionIDs(database, validIDs)
 		purged, edgesPurged := purgeStaleEntries(database, validIDs)
 		reindexEdges(database, htmlgraphDir, validIDs)
+		fixImplementedInEdges(database)
 		fmt.Printf("Reindexed: %d upserted, %d errors (of %d HTML files)\n",
 			upserted, errCount, total)
 		if purged > 0 || edgesPurged > 0 {
@@ -479,3 +480,44 @@ func inferNodeTypeFromID(id string) string {
 		return "unknown"
 	}
 }
+
+// fixImplementedInEdges corrects implemented_in edges that have to_node_type='unknown'.
+// Session IDs are UUIDs (not prefixed), so inferNodeTypeFromID returns 'unknown' by
+// default. This function updates all implemented_in edges with unknown target types
+// by re-inferring the correct type from the target ID.
+func fixImplementedInEdges(database *sql.DB) {
+	// Fetch all implemented_in edges with unknown target type.
+	rows, err := database.Query(`
+		SELECT id, to_node_id FROM graph_edges
+		WHERE relationship_type = 'implemented_in' AND to_node_type = 'unknown'
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	var toFix []struct {
+		id       string
+		toNodeID string
+	}
+	for rows.Next() {
+		var edge struct {
+			id       string
+			toNodeID string
+		}
+		if err := rows.Scan(&edge.id, &edge.toNodeID); err != nil {
+			continue
+		}
+		toFix = append(toFix, edge)
+	}
+
+	// Update each edge with the correct inferred type.
+	for _, edge := range toFix {
+		correctType := inferNodeTypeFromID(edge.toNodeID)
+		_, _ = database.Exec(
+			`UPDATE graph_edges SET to_node_type = ? WHERE id = ?`,
+			correctType, edge.id,
+		)
+	}
+}
+

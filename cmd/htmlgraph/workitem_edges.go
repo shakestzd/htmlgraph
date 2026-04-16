@@ -66,10 +66,9 @@ func autoImplementedInEdge(col *workitem.Collection, itemID, sessionID string, d
 
 	// Reverse edge: session→item (SQLite + session HTML files in .htmlgraph/sessions/).
 	if database != nil {
-		nodeType := kindFromPrefix(itemID)
 		revID := fmt.Sprintf("%s-%s-%s", sessionID, string(models.RelImplements), itemID)
 		_ = dbpkg.InsertEdge(database, revID, sessionID, "session", itemID,
-			nodeType, string(models.RelImplements), nil)
+			inferNodeTypeFromID(itemID), string(models.RelImplements), nil)
 	}
 }
 
