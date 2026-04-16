@@ -2177,24 +2177,19 @@ function renderGraph(data) {
     .attr('fill', 'var(--text-primary)')
     .text(function(d) { return truncateForNodeLabel(d.title || d.id, 36); });
 
-  // Feature labels use a lighter weight and a bit smaller font so the
-  // track titles (which are the higher-level containers) read as
-  // primary. Only features with enough edge activity get labeled; the
-  // long tail of low-activity features stays anonymous to avoid a
-  // wall of text.
-  var featureLabelNodes = nodes.filter(function(d) {
-    return d.type === 'feature' && (d.edges || 0) >= 2;
-  });
+  // Feature labels are intentionally disabled. With 250+ features in a
+  // typical view, labeling even 10% of them (edges >= 2) produces
+  // overlapping walls of text (verified: user feedback after previous
+  // pass). Feature titles stay reachable via:
+  //   1. Hover tooltip (see the mouseover handler above).
+  //   2. Provenance panel (click the node).
+  //   3. Focus lens — clicking the node also brings its title into
+  //      the panel header which stays pinned until dismissed.
+  // Track labels stay on because 42 tracks is a manageable amount of
+  // static text and tracks are the top-level organizing principle.
   var hubLabels = g.append('g').attr('pointer-events', 'none').selectAll('text.hub-label')
-    .data(featureLabelNodes)
-    .enter().append('text')
-    .attr('class', 'hub-label')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'hanging')
-    .attr('font-size', '10px')
-    .attr('font-weight', '400')
-    .attr('fill', 'var(--text-secondary)')
-    .text(function(d) { return truncateForNodeLabel(d.title || d.id, 30); });
+    .data([])
+    .enter().append('text');
 
   // truncateForNodeLabel — short helper; wraps a title at word boundary
   // if it exceeds max chars. Kept local to renderGraph so the existing
