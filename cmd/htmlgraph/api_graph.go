@@ -182,10 +182,24 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		}
 
 		// Filter orphans unless ?all=true.
+		//
+		// Two thresholds by type to match visual weight:
+		//   - Work-item nodes (feature/bug/spike/plan/track) need >=1 edge.
+		//   - High-cardinality provenance types (commit/file/session/agent)
+		//     need >=2 edges — degree-1 nodes are decorative leaves that
+		//     add clutter without contributing to any causal chain beyond
+		//     their one anchor.
 		if !includeAll {
+			highCardinality := map[string]bool{
+				"commit": true, "file": true, "session": true, "agent": true,
+			}
 			filtered := make([]graphNode, 0, len(nodes))
 			for _, n := range nodes {
-				if n.Edges > 0 {
+				threshold := 1
+				if highCardinality[n.Type] {
+					threshold = 2
+				}
+				if n.Edges >= threshold {
 					filtered = append(filtered, n)
 				}
 			}

@@ -1551,8 +1551,15 @@ function paintGraphLegend() {
   }
 }
 
-// Active type filter state — null means "show all".
-var graphActiveTypes = null;
+// Active type filter state — array means "show only these types",
+// null means "show all". Default opens to the work-item skeleton only
+// (track / plan / feature / bug / spike). Provenance layers (agent /
+// session / commit / file) are one toolbar click away but start
+// hidden so the graph doesn't open as a hairball. Research basis:
+// Cambridge Intelligence "don't visualize everything in your
+// underlying knowledge graph" — derive a workflow-focused subset.
+var GRAPH_DEFAULT_TYPES = ['track', 'plan', 'feature', 'bug', 'spike'];
+var graphActiveTypes = GRAPH_DEFAULT_TYPES.slice();
 
 // Race-proofing: track the current fetch so stale responses from a rapid
 // sequence of toggles don't overwrite newer graph state. Each call bumps the
@@ -1562,6 +1569,10 @@ var graphFetchToken = 0;
 var graphFetchController = null;
 
 function fetchGraph(types) {
+  // If caller didn't pass an explicit filter, fall back to the module
+  // state (graphActiveTypes). That way the initial page load and the
+  // post-Reset fetch both pick up the current filter.
+  if (types === undefined) types = graphActiveTypes;
   var url = buildProjectUrl('graph');
   if (types && types.length > 0) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'types=' + types.join(',');
 
@@ -1647,7 +1658,12 @@ function renderGraph(data) {
   var resetBtn = document.createElement('button');
   resetBtn.className = 'graph-filter-btn';
   resetBtn.textContent = 'Reset';
-  resetBtn.onclick = function() { graphActiveTypes = null; fetchGraph(); };
+  // Reset returns to the workflow default, not "show everything".
+  // A user who actually wants everything can hit every toolbar button.
+  resetBtn.onclick = function() {
+    graphActiveTypes = GRAPH_DEFAULT_TYPES.slice();
+    fetchGraph();
+  };
   toolbar.appendChild(resetBtn);
   container.insertBefore(toolbar, container.firstChild);
 
@@ -1783,17 +1799,21 @@ function renderGraph(data) {
     ran_as:        '#f59e0b'
   };
 
-  // Edge lines — structural edges bolder, activity edges subtle.
+  // Edge lines — structural edges carry the skeleton at full weight;
+  // provenance edges (session/agent/commit/file relationships) fall
+  // back to a faint layer so they're visible but don't form the
+  // hairball. Cambridge Intelligence calls this "layer separation":
+  // the workflow edges dominate; detail edges live in context.
+  var STRUCTURAL_EDGE_TYPES = {
+    part_of: 1, blocked_by: 1, caused_by: 1, implements: 1,
+    contains: 1, co_session: 1
+  };
+  function isStructuralEdge(d) { return !!STRUCTURAL_EDGE_TYPES[d.type]; }
   var link = g.append('g').selectAll('line')
     .data(edges).enter().append('line')
     .attr('stroke', function(d) { return edgeColor[d.type] || '#6b7280'; })
-    .attr('stroke-opacity', function(d) {
-      if (d.type === 'worked_on' || d.type === 'committed_for' || d.type === 'touched_by') return 0.25;
-      return 0.6;
-    })
-    .attr('stroke-width', function(d) {
-      return d.type === 'worked_on' ? 0.7 : 1.2;
-    })
+    .attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.55 : 0.10; })
+    .attr('stroke-width', function(d) { return isStructuralEdge(d) ? 1.4 : 0.5; })
     .attr('stroke-dasharray', function(d) {
       return d.type === 'spawned' ? '6,3' : null;
     });
@@ -1914,9 +1934,58 @@ function renderGraph(data) {
     node.attr('opacity', 1);
     link.attr('stroke-opacity', 0.5);
   }).on('click', function(e, d) {
-    // All node types open the provenance panel for causal-chain drill-down.
+    // Click does two things:
+    //   1. Open the provenance panel (causal-chain drill-down)
+    //   2. Focus the graph on this node's 1-hop neighborhood — fade
+    //      everything else to 0.08. This is the "lens" pattern from
+    //      classic focus+context research: keep the context visible
+    //      but suppress it so the subject stands out.
+    e.stopPropagation();
     openProvenancePanel(d.id);
+    focusOnNode(d.id);
   });
+
+  // Background click clears the focus lens (but doesn't touch the
+  // provenance panel — that has its own × button). Attached to the SVG
+  // root so any click that doesn't land on a node bubbles up here.
+  svg.on('click', function(e) {
+    // Only fire when the click target IS the svg/g layer (bubbled),
+    // not when a node handled it (we stopPropagation above).
+    if (e.target === svg.node() || e.target.tagName === 'g') {
+      clearFocus();
+    }
+  });
+
+  // Build an adjacency map once per render. Nodes in the same 1-hop
+  // neighborhood stay at full opacity under focus; all others fade.
+  // Include the focused node itself so it doesn't dim itself.
+  var adjacency = {};
+  edges.forEach(function(edge) {
+    var s = edge.source.id || edge.source;
+    var t = edge.target.id || edge.target;
+    (adjacency[s] = adjacency[s] || {})[t] = 1;
+    (adjacency[t] = adjacency[t] || {})[s] = 1;
+  });
+
+  var focusedNodeId = null;
+  function focusOnNode(id) {
+    focusedNodeId = id;
+    var neighbors = adjacency[id] || {};
+    neighbors[id] = 1;
+    icons.attr('opacity', function(d) { return neighbors[d.id] ? 0.95 : 0.08; });
+    link.attr('stroke-opacity', function(d) {
+      var s = d.source.id || d.source;
+      var t = d.target.id || d.target;
+      if (s === id || t === id) return 0.9;          // incident edges full weight
+      return isStructuralEdge(d) ? 0.05 : 0.02;      // everything else fades hard
+    });
+  }
+  function clearFocus() {
+    if (focusedNodeId === null) return;
+    focusedNodeId = null;
+    icons.attr('opacity', 0.95);
+    link.attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.55 : 0.10; });
+  }
 
   // Wrap text inside a circle using real SVG measurement via getComputedTextLength.
   // Uses binary iteration: tries to fit text, shrinks font if needed, hides if too small.
