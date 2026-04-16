@@ -7,7 +7,7 @@ meta:
     created_at: "2026-04-16"
     status: draft
     created_by: claude-opus
-    version: 3
+    version: 4
 design:
     problem: |
         The htmlgraph-titler subsystem runs `claude -p --model haiku` against the first 3 user messages of every newly-ingested session, plus a catch-up pass that titles up to 5 NULL-title sessions per ingest cycle (cmd/htmlgraph/titler.go:16-79, cmd/htmlgraph/serve.go:337-357). Each invocation costs a Claude API message against the user's quota. The titler also pollutes the activity feed with its own internal `[htmlgraph-titler]` prompts (recently filtered, but the underlying waste remains). Meanwhile, Claude Code already writes an `ai-title` JSONL event for every session — this is the title `claude --resume` displays — and our parser silently discards it (internal/ingest/parser.go:106 handles `custom-title` but not `ai-title`). The sessions panel itself (cmd/htmlgraph/dashboard/js/app.js:240-318) renders titles in a flat table where every row click navigates away to a full transcript view; users cannot peek at a session's recent messages without committing to that navigation.
@@ -21,6 +21,7 @@ design:
         - '`claude --resume` uses the `ai-title` event as the canonical title, so it is the right source of truth'
         - Defense-in-depth filters in api.go (NOT LIKE '[htmlgraph-titler]%') must stay — historical DB rows from before this change may still contain titler-generated content
         - The redesigned sessions panel must reuse the activity feed's disclosure CSS/JS pattern, not a new one (consistency + less code)
+        - Backfill (slice 3) must not block dashboard startup; it runs in background with bounded concurrency and is resumable across restarts.
     approved: false
     comment: ""
 slices:
@@ -28,7 +29,7 @@ slices:
       num: 1
       title: Ingest Claude Code's `ai-title` event into sessions.title
       what: |
-        Extend internal/ingest/parser.go:106 to handle `case "ai-title"` — `result.Title = gjson.Get(line, "aiTitle").String()` — alongside the existing `custom-title` case. Update cmd/htmlgraph/ingest.go ensureSession (lines 349-375) so that when result.Title is non-empty, it issues `UPDATE sessions SET title = ? WHERE session_id = ? AND (title IS NULL OR title <> ?)`. The conditional WHERE prevents redundant writes when the title hasn't changed. Idempotent on re-ingest.
+        Extend internal/ingest/parser.go:106 to handle `case "ai-title"` — `result.Title = gjson.Get(line, "aiTitle").String()` — alongside the existing `custom-title` case. Add a title UPDATE in `cmd/htmlgraph/ingest.go` after `storeParseResult` returns, mirroring the model UPDATE pattern at ingest.go:337-338. Use `UPDATE sessions SET title = ? WHERE session_id = ? AND (title IS NULL OR title = '' OR title = '--' OR title <> ?)`. The conditional WHERE prevents redundant writes and avoids overwriting a freshly-set title with the same value. The UPDATE must NOT be placed inside `ensureSession`, which returns early at line 362 for existing sessions and would never fire.
       why: |
         Goal: Zero Claude API spend on titles. This slice unlocks Claude Code's free, native `ai-title` as the title source. Without this, slice 2 (deletion of the titler) would leave sessions title-less.
       files:
@@ -39,7 +40,7 @@ slices:
       done_when:
         - 'Parser unit test: a JSONL fixture containing an `ai-title` event populates result.Title with aiTitle''s string value'
         - 'Integration: ingesting a real `~/.claude/projects/*/session.jsonl` containing `ai-title` results in `sessions.title` matching `aiTitle` in the DB'
-        - Re-ingesting the same JSONL with an updated `ai-title` value updates `sessions.title` to the new value (idempotent + convergent)
+        - Title UPDATE fires correctly for both new sessions (first ingest) AND existing sessions (re-ingest after upgrade) — verified by ingesting the same JSONL twice into a fresh DB and an existing DB
         - Re-ingesting a JSONL with no change to `ai-title` issues no UPDATE (verified via SQL trace or row-affected count)
       effort: S
       risk: Low
@@ -47,10 +48,10 @@ slices:
         Unit (parser_test.go): Add `TestParse_AITitle` — parse a single-line JSONL containing
           `{"type":"ai-title","aiTitle":"Test title","sessionId":"abc"}` and assert
           result.Title == "Test title".
-        Integration (ingest_test.go or new): Seed a sessions row with NULL title, run ensureSession
-          with result.Title = "X", assert DB row title == "X". Re-run with same value, assert no
-          change. Re-run with "Y", assert DB row title == "Y".
-        Regression: Existing TestParse_CustomTitle still passes (we add a case, don't replace one).
+        Integration (ingest_test.go or new): Seed a sessions row with NULL title, run the title
+          UPDATE after storeParseResult with result.Title = "X", assert DB row title == "X".
+          Re-run with same value, assert no change. Re-run with "Y", assert DB row title == "Y".
+        Regression: Existing TestParse_FiltersMetaAndSystem (parser_test.go:94) still passes (we add a case, don't replace one).
       approved: false
       comment: ""
     - id: slice-2
@@ -85,7 +86,7 @@ slices:
       num: 3
       title: Backfill historical sessions on first launch after upgrade
       what: |
-        Sessions ingested before this change have either (a) titler-generated titles, (b) NULL titles, or (c) the `"--"` failure sentinel. After upgrade, run a one-time backfill: enumerate all sessions in the DB, re-locate their JSONL on disk, re-parse for the latest `ai-title`, and UPDATE sessions.title where the JSONL's ai-title differs from the stored title. Gate this behind a one-time marker (e.g. a row in a `migrations` table or a sentinel file at `.htmlgraph/migrations/ai-title-backfill.done`) so it runs once per project per upgrade.
+        Sessions ingested before this change have either (a) titler-generated titles, (b) NULL titles, or (c) the `"--"` failure sentinel. After upgrade, run a one-time backfill: enumerate all sessions in the DB, re-locate their JSONL on disk, re-parse for the latest `ai-title`, and UPDATE sessions.title where the JSONL's ai-title differs from the stored title. Gate this behind a one-time marker (e.g. a row in a `migrations` table or a sentinel file at `.htmlgraph/migrations/ai-title-backfill.done`) so it runs once per project per upgrade. Backfill must be implemented as a background goroutine with a worker pool (suggested: 4 concurrent workers) and rate-limited file I/O. Must NOT block dashboard startup. Backfill state (sessions remaining) should be queryable via a status endpoint or surfaced in the dashboard. Backfill must be resumable — if interrupted, restart from the last unprocessed session. Use `ingest.ParseFile` (parser.go:45) to re-read JSONLs. Wrap the ParseFile call in an os.Stat check; skip sessions with missing JSONL files and log them.
       why: |
         Without backfill, the existing 100s of sessions in users' DBs keep their stale titler titles forever. The new ai-title path only fires on subsequent ingests of *changed* JSONLs. Backfill brings the existing corpus to the new state in one pass.
       files:
@@ -99,6 +100,9 @@ slices:
         - The backfill is gated by a one-time marker — running serve twice does not run backfill twice
         - Sessions whose JSONL is missing or has no `ai-title` event are left untouched (no overwrite to NULL)
         - Backfill runs in the background and does not block startup or ingest
+        - Backfill of a 10k-session DB completes within 5 minutes on average hardware (verified by benchmark)
+        - Backfill is resumable — killing the process mid-backfill and restarting picks up where it left off
+        - Sessions with missing JSONL files are logged to stderr and left with their existing title (no NULL overwrite)
       effort: M
       risk: Med
       tests: |
@@ -113,11 +117,13 @@ slices:
       num: 4
       title: 'Sessions API: return last-N messages preview field'
       what: |
-        Extend the sessions API response in cmd/htmlgraph/api.go to include a `preview_messages` field on each session: an array of the last N messages (default N=2: latest user prompt + latest assistant reply, each truncated to ~200 chars). Implementation choice (per design Q4): either (a) include in /api/sessions response, or (b) lazy-load via /api/sessions/{id}/preview when a row is expanded. The lazy-load endpoint is recommended to keep the initial sessions list payload small.
+        Add a new `/preview` sub-path under the existing `/api/sessions/` catch-all by extending `cmd/htmlgraph/api_ingest.go` `extractSessionID` to also accept `/preview` suffix, and extending `sessionIngestHandler` (cmd/htmlgraph/serve.go:83) to dispatch: `/ingest` → existing handler, `/preview` → new previewHandler. The `/api/sessions/` catch-all is registered at serve.go:83 and `extractSessionID` at api_ingest.go:64-66 currently only accepts the `/ingest` suffix — the dispatch extension is required before a new `/preview` route can coexist. The new handler returns `{messages: [{role, content_truncated}], ...}` for the last N messages from the events table for that session_id, filtered to user/assistant turns only (exclude tool_use, system). Default N=2.
       why: |
         Goal: Faster session triage. The expandable sessions panel (slice 5) needs a data source for the inline preview. Lazy-loading per expansion avoids inflating the initial payload for sessions lists with hundreds of entries.
       files:
         - cmd/htmlgraph/api.go
+        - cmd/htmlgraph/api_ingest.go
+        - cmd/htmlgraph/serve.go
       deps:
         - 1
       done_when:
@@ -125,20 +131,21 @@ slices:
         - Endpoint returns 200 + empty messages array (not 404) for a session with no events yet
         - Endpoint excludes htmlgraph-internal events (toolUse for hooks, system messages) — only user/assistant turns
         - Response time < 50ms for sessions with up to 1000 events (verified by query plan + benchmark)
+        - GET /api/sessions/{id}/ingest still routes to the existing ingest handler (no regression)
       effort: M
       risk: Low
       tests: |
         Unit: SQL query test — given a sessions table with mixed event types, the preview query
           returns only the last N user/assistant turns.
         Integration: HTTP test — POST to ingest a fixture JSONL, GET preview, assert correct messages.
-        Regression: Existing /api/sessions response shape unchanged.
+        Regression: Existing /api/sessions response shape unchanged. Existing /ingest routing unaffected.
       approved: false
       comment: ""
     - id: slice-5
       num: 5
       title: 'Sessions panel: inline disclosure with message preview'
       what: |
-        Restructure renderSessions() in cmd/htmlgraph/dashboard/js/app.js:240-318 to render each session row with a chevron disclosure widget, mirroring the activity feed's pattern. Per design Q2, reuse the event-tree.js pattern (web component, localStorage-persisted expand state, `data-toggle` attribute, `expand-icon` chevron) — the recommendation is the persistent pattern since users browsing sessions benefit from preserved state across reloads. Per design Q5, chevron expands inline; row click still navigates to the full transcript view (preserves muscle memory). Expanded body fetches from the new /api/sessions/{id}/preview endpoint and renders the latest messages with the existing message-rendering CSS classes from the activity feed.
+        Restructure renderSessions() in cmd/htmlgraph/dashboard/js/app.js:240-318 to render each session row with a chevron disclosure widget, mirroring the activity feed's pattern. Per design Q2, reuse the event-tree.js pattern (web component, localStorage-persisted expand state, `data-toggle` attribute, `expand-icon` chevron) — the recommendation is the persistent pattern since users browsing sessions benefit from preserved state across reloads. Per design Q5, chevron expands inline; row click still navigates to the full transcript view (preserves muscle memory). Expanded body fetches from the new /api/sessions/{id}/preview endpoint and renders the latest messages with the existing message-rendering CSS classes from the activity feed. The `event-tree.js` toggle logic (lines 285-370) is embedded in a private render method and is not importable as-is. Slice 5 either: (a) duplicates the ~30 lines of toggle/localStorage code in app.js using the same `data-toggle` / `expand-icon` / localStorage-key conventions, OR (b) is preceded by an extraction sub-task that pulls the toggle logic into a shared `dashboard/js/disclosure.js` helper. Default to (a) — duplication is acceptable given the small size. Use the localStorage key `hg-sessions-expanded-{projectId}` to prevent cross-project state collision.
       why: |
         Goal: Faster session triage. Users currently must click into a session to see its content. Inline preview lets them browse a list of sessions and assess at a glance which one to dive into.
       files:
@@ -154,6 +161,7 @@ slices:
         - Expanded preview shows latest 2 messages (user + assistant) with role labels and truncated content
         - Clicking elsewhere on the row still navigates to the full transcript view
         - 'Visual consistency: chevron icon, indentation, depth styling match the activity feed exactly'
+        - The localStorage key includes a project-id prefix so multiple HtmlGraph projects do not share expand state
       effort: L
       risk: Med
       tests: |
@@ -225,3 +233,149 @@ questions:
         - key: chevron-toggles-row-inert
           label: 'C: Chevron expands inline; row click does nothing — only the explicit link navigates'
       answer: null
+    - id: q-disclosure-extract
+      text: Should we extract a shared disclosure helper before slice 5, or duplicate the toggle logic?
+      description: |
+        The event-tree.js disclosure pattern is embedded in a private HTML-string render method and not exported. Slice 5 must reuse the visual pattern. Option A: extract a shared `dashboard/js/disclosure.js` helper as a precursor sub-task — cleaner, prevents future divergence, but adds scope. Option B: duplicate the ~30 lines in app.js — faster to ship, accepts some short-term duplication that may need to be refactored later.
+      recommended: duplicate
+      options:
+        - key: extract-helper
+          label: 'A: Extract shared `disclosure.js` helper before slice 5 — DRY, prevents future divergence, adds ~half-day of scope'
+        - key: duplicate
+          label: 'B: Duplicate ~30 lines in app.js — faster to ship, refactor later if a third disclosure use-case appears (recommended)'
+      answer: null
+critique:
+    reviewed_at: "2026-04-16"
+    reviewers:
+        - Haiku (design review)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: verified
+          text: custom-title parser case at parser.go:107 confirms parallel infrastructure exists for ai-title
+          evidence: internal/ingest/parser.go:107 — custom-title case uses identical gjson.Get pattern
+        - id: A2
+          status: falsified
+          text: Title UPDATE can be placed inside ensureSession
+          evidence: 'cmd/htmlgraph/ingest.go:362 — ensureSession returns early for existing sessions; UPDATE inside it never fires on re-ingest. Correct location: after storeParseResult, mirroring model UPDATE at ingest.go:337-338'
+        - id: A3
+          status: falsified
+          text: A new /api/sessions/{id}/preview route can be registered directly
+          evidence: cmd/htmlgraph/serve.go:83 — /api/sessions/ is a catch-all to sessionIngestHandler; cmd/htmlgraph/api_ingest.go:64-66 — extractSessionID only accepts /ingest suffix. New /preview path requires dispatch extension
+        - id: A4
+          status: questionable
+          text: TestParse_CustomTitle covers the custom-title parser case
+          evidence: internal/ingest/parser_test.go:94 — actual test is TestParse_FiltersMetaAndSystem, not TestParse_CustomTitle
+        - id: A5
+          status: unverified
+          text: Backfill performance on large DBs is acceptable with a synchronous implementation
+          evidence: No benchmark exists; 10k sessions / 10GB JSONL synchronous read would freeze startup. Background worker pool is non-negotiable
+        - id: A6
+          status: plausible
+          text: event-tree.js toggle logic is importable for reuse in slice 5
+          evidence: cmd/htmlgraph/dashboard/components/event-tree.js lines 285-370 — toggle embedded in private HTML-string render method; not exported. S5 must duplicate ~30 lines or extract a shared helper
+        - id: A7
+          status: unverified
+          text: Claude Code writes ai-title at session end (titles available immediately after first ingest)
+          evidence: ai-title write timing (start vs end of session) is unknown; affects whether new sessions show titles immediately
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Slice Assessment
+              items:
+                - badge: S1
+                  kind: warn
+                  text: 'Structurally sound — ai-title is a direct parallel to custom-title. CRITICAL: original UPDATE placement inside ensureSession was fatally wrong; revised location after storeParseResult mirrors proven model UPDATE pattern at ingest.go:337-338.'
+                - badge: S2
+                  kind: success
+                  text: Clean deletion slice. Retaining historical guard filters (NOT LIKE, isHeadlessSession) is the right conservative call.
+                - badge: S3
+                  kind: warn
+                  text: Motivation correct, but original slice underspecified performance constraints for large DBs. Revised with worker pool, resumability, 5-minute benchmark requirement.
+                - badge: S4
+                  kind: warn
+                  text: Catch-all routing conflict at serve.go:83 was the critical gap. Dispatch extension via extractSessionID is the correct minimal fix without touching the existing ingest path.
+                - badge: S5
+                  kind: info
+                  text: 'Toggle logic non-importability from event-tree.js was unaddressed. Clarified: default to ~30-line duplication with project-id-prefixed localStorage key. Design question q-disclosure-extract added for human review.'
+            - heading: Gaps & Missing Considerations
+              items:
+                - badge: Gap
+                  kind: warn
+                  text: ai-title write timing unverified (A7) — if Claude Code writes ai-title at session start, newly-created sessions may show stale titles until session concludes and re-ingest fires.
+                - badge: Gap
+                  kind: warn
+                  text: 'Preview endpoint content_truncated limit not specified — implementors need a concrete number (suggested: 200 chars per message).'
+                - badge: Gap
+                  kind: info
+                  text: Backfill marker location should be specified precisely (.htmlgraph/migrations/ai-title-backfill.done) to prevent ambiguity across concurrent serve instances.
+            - heading: Alternative Approaches
+              items:
+                - badge: Alt
+                  kind: info
+                  text: 'S4 alternative: register the preview route before the catch-all at serve.go:83 instead of extending extractSessionID dispatch — simpler but requires care about route ordering. Plan defaults to dispatch extension which is more explicit.'
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: What Exists to Leverage
+              items:
+                - badge: +
+                  kind: success
+                  text: parser.go:107 custom-title case — ai-title is a direct parallel addition with identical gjson.Get pattern.
+                - badge: +
+                  kind: success
+                  text: ingest.go:337-338 model UPDATE — exact template for S1's title UPDATE location and conditional WHERE pattern.
+                - badge: +
+                  kind: success
+                  text: ingest.ParseFile (parser.go:45) — backfill can reuse this directly; no new parsing infrastructure needed.
+                - badge: +
+                  kind: success
+                  text: event-tree.js data-toggle / expand-icon / localStorage conventions — well-documented by existing implementation; S5 can replicate without sharing code.
+            - heading: What the Plan Gets Wrong
+              items:
+                - badge: A2
+                  kind: danger
+                  text: 'FALSIFIED: ensureSession returns early at ingest.go:362 for existing sessions. Title UPDATE inside ensureSession never fires on re-ingest. Slice 1 revised to relocate UPDATE after storeParseResult.'
+                - badge: A3
+                  kind: danger
+                  text: 'FALSIFIED: /api/sessions/ catch-all at serve.go:83 absorbs all sub-paths. extractSessionID at api_ingest.go:64-66 only accepts /ingest. Slice 4 revised to add dispatch extension requirement.'
+                - badge: A4
+                  kind: warn
+                  text: TestParse_CustomTitle does not exist. Actual test is TestParse_FiltersMetaAndSystem at parser_test.go:94. Slice 1 tests section corrected.
+                - badge: A5
+                  kind: danger
+                  text: Backfill on 10k-session DBs reading 10GB JSONL synchronously would freeze startup. Background worker pool is non-negotiable. Slice 3 revised with explicit constraints.
+            - heading: Prior Art & Examples
+              items:
+                - badge: Art
+                  kind: info
+                  text: ingest.go:337-338 model UPDATE — canonical pattern for conditional column UPDATE after storeParseResult. S1 should follow identically.
+                - badge: Art
+                  kind: info
+                  text: isHeadlessSession guard (serve.go:360-371) — demonstrates startup-gate pattern for on-disk file operations. Backfill can use same pattern.
+                - badge: Art
+                  kind: info
+                  text: Activity feed CSS classes for user/assistant role styling — already production-tested; reusable in S5 without modification.
+    risks:
+        - risk: ensureSession early-return — title UPDATE inside ensureSession never fires for existing sessions (re-ingest after upgrade gets no title update)
+          severity: High
+          mitigation: Relocate UPDATE to after storeParseResult, mirroring model UPDATE at ingest.go:337-338. Slice 1 revised to specify this explicitly.
+        - risk: /api/sessions/ catch-all at serve.go:83 blocks new /preview endpoint — extractSessionID only accepts /ingest suffix
+          severity: High
+          mitigation: Extend extractSessionID and sessionIngestHandler to dispatch on suffix (/ingest vs /preview). Slice 4 revised to specify routing extension explicitly.
+        - risk: Backfill performance on large DBs — synchronous read of 10k sessions / 10GB JSONL freezes dashboard startup
+          severity: High
+          mitigation: Worker pool (4 concurrent workers) + rate-limited file I/O. Background goroutine only. Progress queryable. Resumable via marker. Slice 3 revised with 5-minute benchmark acceptance criterion.
+        - risk: Lazy-load endpoint hammering when many rows expanded simultaneously — each expansion triggers independent HTTP request
+          severity: Medium
+          mitigation: Client-side request dedup — track in-flight requests by session ID and skip duplicate fetches while a request is pending.
+        - risk: localStorage cross-project key collision — shared key across HtmlGraph projects on same origin causes expand state bleed
+          severity: Medium
+          mitigation: 'Prefix key with project ID: hg-sessions-expanded-{projectId}. Slice 5 revised to specify this key format.'
+        - risk: event-tree.js toggle not modular — S5 must duplicate ~30 lines of toggle/localStorage code
+          severity: Low
+          mitigation: Accept duplication for now (default per q-disclosure-extract). Extract shared disclosure.js if a third use-case appears. Design question q-disclosure-extract added for human review.
+        - risk: Sessions with missing JSONL silently skipped during backfill with no user-visible indication
+          severity: Low
+          mitigation: Log skipped sessions to stderr and leave title untouched (no NULL overwrite). Slice 3 done_when criteria revised to include this requirement.
+    synthesis: |
+        The plan is sound in structure and motivation, but shipped with two FALSIFIED implementation assumptions (S1's UPDATE location inside ensureSession would never fire for existing rows, and S4's routing omitted the catch-all conflict at serve.go:83) that have been corrected in the slice descriptions. Backfill performance on large DBs (R3) now has explicit constraints: background goroutine, 4-worker pool, 5-minute benchmark, resumability across restarts. S5 clarifies that the event-tree.js toggle logic is not importable and defaults to controlled duplication with a project-id-prefixed localStorage key. A new design question (q-disclosure-extract) surfaces the extract-vs-duplicate tradeoff for human review alongside the existing open questions Q1 and Q2. All HIGH risks have been addressed in the revised slice text; MED/LOW risks are documented with implementation guidance. Action items addressed: (1) S1 UPDATE relocated outside ensureSession; (2) S4 routing conflict acknowledged with dispatch extension specified; (3) S3 backfill performance constraints added; (4) S5 notes disclosure pattern duplication with optional precursor refactor.
