@@ -1554,12 +1554,30 @@ function paintGraphLegend() {
 // Active type filter state — null means "show all".
 var graphActiveTypes = null;
 
+// Race-proofing: track the current fetch so stale responses from a rapid
+// sequence of toggles don't overwrite newer graph state. Each call bumps the
+// token and aborts the previous request; the .then() checks the token before
+// rendering.
+var graphFetchToken = 0;
+var graphFetchController = null;
+
 function fetchGraph(types) {
   var url = buildProjectUrl('graph');
   if (types && types.length > 0) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'types=' + types.join(',');
-  fetch(url)
+
+  // Cancel any in-flight request before starting a new one.
+  if (graphFetchController) {
+    try { graphFetchController.abort(); } catch (e) {}
+  }
+  graphFetchController = typeof AbortController === 'function' ? new AbortController() : null;
+  var myToken = ++graphFetchToken;
+  var signal = graphFetchController ? graphFetchController.signal : undefined;
+
+  fetch(url, { signal: signal })
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      // Drop stale responses — only the latest token is allowed to render.
+      if (myToken !== graphFetchToken) return;
       document.getElementById('graph-count').textContent = data.nodes ? data.nodes.length : 0;
       var empty = document.getElementById('graph-empty');
       if (!data.nodes || data.nodes.length === 0) {
@@ -1569,7 +1587,9 @@ function fetchGraph(types) {
       empty.style.display = 'none';
       renderGraph(data);
     })
-    .catch(function() {
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      if (myToken !== graphFetchToken) return;
       document.getElementById('graph-empty').style.display = '';
     });
 }
@@ -1604,10 +1624,20 @@ function renderGraph(data) {
       ' <span style="opacity:0.6">' + count + capText + '</span>';
     btn.onclick = function() {
       if (!graphActiveTypes) {
+        // First click: drop the clicked type, keep all others.
         graphActiveTypes = allTypes.filter(function(t) { return t !== type; });
       } else {
         var idx = graphActiveTypes.indexOf(type);
-        if (idx >= 0) graphActiveTypes.splice(idx, 1); else graphActiveTypes.push(type);
+        if (idx >= 0) {
+          // Refuse to deselect the last remaining active type — a request
+          // with an empty list would silently reload the full graph and
+          // desync the toolbar from the canvas. The user can use Reset to
+          // return to the default view.
+          if (graphActiveTypes.length <= 1) return;
+          graphActiveTypes.splice(idx, 1);
+        } else {
+          graphActiveTypes.push(type);
+        }
         if (graphActiveTypes.length === allTypes.length) graphActiveTypes = null;
       }
       fetchGraph(graphActiveTypes);
@@ -2046,6 +2076,13 @@ function renderGraph(data) {
 // openProvenancePanel fetches and displays the causal chain for a graph node
 // in the fixed right-side drawer. Each upstream/downstream item is clickable
 // to drill into that node's own provenance.
+//
+// Race-proofed: rapid clicks on a chain of nodes would otherwise let a slow
+// earlier response overwrite the newer drawer. The token/abort pair mirrors
+// fetchGraph above.
+var provenanceFetchToken = 0;
+var provenanceFetchController = null;
+
 function openProvenancePanel(nodeId) {
   var panel = document.getElementById('provenance-panel');
   var titleEl = document.getElementById('provenance-title');
@@ -2053,9 +2090,17 @@ function openProvenancePanel(nodeId) {
   var upstreamEl = document.getElementById('provenance-upstream');
   var downstreamEl = document.getElementById('provenance-downstream');
 
-  fetch('/api/provenance/' + encodeURIComponent(nodeId))
+  if (provenanceFetchController) {
+    try { provenanceFetchController.abort(); } catch (e) {}
+  }
+  provenanceFetchController = typeof AbortController === 'function' ? new AbortController() : null;
+  var myToken = ++provenanceFetchToken;
+  var signal = provenanceFetchController ? provenanceFetchController.signal : undefined;
+
+  fetch('/api/provenance/' + encodeURIComponent(nodeId), { signal: signal })
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      if (myToken !== provenanceFetchToken) return;
       titleEl.textContent = data.node.title || data.node.id;
       badge.textContent = data.node.type;
       badge.className = 'type-badge type-' + data.node.type;
@@ -2091,6 +2136,8 @@ function openProvenancePanel(nodeId) {
       panel.classList.remove('hidden');
     })
     .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      if (myToken !== provenanceFetchToken) return;
       console.error('provenance fetch failed', err);
     });
 }
