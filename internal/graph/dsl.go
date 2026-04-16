@@ -227,6 +227,30 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 		} else {
 			query = `SELECT session_id FROM sessions`
 		}
+	case "agent":
+		// Agent nodes are the distinct agent_name across agent_lineage_trace
+		// and sessions.agent_assigned. Filter support is limited to the
+		// identity field (agent name itself) via the whitelist.
+		if sel.field != "" {
+			col, ok := allowedFilterColumns[sel.field]
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+			}
+			query = fmt.Sprintf(`
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				) WHERE %s = ?`, col)
+			args = append(args, sel.value)
+		} else {
+			query = `
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				)`
+		}
 	case "track":
 		if sel.field != "" {
 			col, ok := allowedFilterColumns[sel.field]
@@ -358,6 +382,30 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 			args = append(args, sel.value)
 		} else {
 			query = fmt.Sprintf(`SELECT session_id FROM sessions WHERE session_id IN (%s)`, inClause)
+		}
+	case "agent":
+		// Filter the candidate IDs down to names that actually appear as
+		// agents in either source table. No schema-backed field filters beyond
+		// identity are meaningful here, but we still honor the whitelist.
+		if sel.field != "" {
+			col, ok := allowedFilterColumns[sel.field]
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+			}
+			query = fmt.Sprintf(`
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				) WHERE name IN (%s) AND %s = ?`, inClause, col)
+			args = append(args, sel.value)
+		} else {
+			query = fmt.Sprintf(`
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				) WHERE name IN (%s)`, inClause)
 		}
 	case "track":
 		if sel.field != "" {

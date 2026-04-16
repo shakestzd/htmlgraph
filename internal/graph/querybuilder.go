@@ -287,15 +287,19 @@ func (q *QueryBuilder) resolveNodes(ids []string) ([]NodeResult, error) {
 		UNION ALL
 		SELECT DISTINCT file_path AS id, 'file' AS type, file_path AS title, '' AS status FROM feature_files WHERE file_path IN (%s)
 		UNION ALL
-		SELECT session_id AS id, 'session' AS type, COALESCE(title,'') AS title, COALESCE(status,'') AS status FROM sessions WHERE session_id IN (%s)`,
-		inClause, inClause, inClause, inClause, inClause)
+		SELECT session_id AS id, 'session' AS type, COALESCE(title,'') AS title, COALESCE(status,'') AS status FROM sessions WHERE session_id IN (%s)
+		UNION ALL
+		SELECT DISTINCT name AS id, 'agent' AS type, name AS title, '' AS status FROM (
+			SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+			UNION
+			SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+		) WHERE name IN (%s)`,
+		inClause, inClause, inClause, inClause, inClause, inClause)
 
-	fullArgs := make([]any, 0, len(args)*5)
-	fullArgs = append(fullArgs, args...)
-	fullArgs = append(fullArgs, args...)
-	fullArgs = append(fullArgs, args...)
-	fullArgs = append(fullArgs, args...)
-	fullArgs = append(fullArgs, args...)
+	fullArgs := make([]any, 0, len(args)*6)
+	for i := 0; i < 6; i++ {
+		fullArgs = append(fullArgs, args...)
+	}
 
 	rows, err := q.db.Query(query, fullArgs...)
 	if err != nil {

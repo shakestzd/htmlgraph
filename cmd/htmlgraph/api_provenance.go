@@ -70,8 +70,8 @@ func provenanceHandler(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		upstream := loadUpstreamLinks(database, id)
-		downstream := loadDownstreamLinks(database, id)
+		upstream := loadUpstreamLinks(database, id, node.Type)
+		downstream := loadDownstreamLinks(database, id, node.Type)
 
 		respondJSON(w, provenanceResponse{
 			Node:       node,
@@ -81,9 +81,11 @@ func provenanceHandler(database *sql.DB) http.HandlerFunc {
 	}
 }
 
-// resolveProvenanceNode looks up node metadata from features, sessions, or tracks tables.
+// resolveProvenanceNode looks up node metadata from features, sessions, tracks,
+// git_commits, feature_files, or agent sources. Agent nodes have no dedicated
+// table — they are derived from distinct agent names in agent_lineage_trace
+// and sessions.agent_assigned, so resolution comes last.
 func resolveProvenanceNode(database *sql.DB, id string) (provenanceNode, bool) {
-	// Try features table (includes features, bugs, spikes).
 	var node provenanceNode
 	err := database.QueryRow(
 		`SELECT id, COALESCE(type,'feature'), COALESCE(title,''), COALESCE(status,'todo')
@@ -93,7 +95,6 @@ func resolveProvenanceNode(database *sql.DB, id string) (provenanceNode, bool) {
 		return node, true
 	}
 
-	// Try tracks table.
 	err = database.QueryRow(
 		`SELECT id, 'track', COALESCE(title,''), COALESCE(status,'todo')
 		 FROM tracks WHERE id = ?`, id,
@@ -102,7 +103,6 @@ func resolveProvenanceNode(database *sql.DB, id string) (provenanceNode, bool) {
 		return node, true
 	}
 
-	// Try sessions table.
 	err = database.QueryRow(
 		`SELECT session_id, 'session', COALESCE(title,''), COALESCE(status,'')
 		 FROM sessions WHERE session_id = ?`, id,
@@ -111,7 +111,6 @@ func resolveProvenanceNode(database *sql.DB, id string) (provenanceNode, bool) {
 		return node, true
 	}
 
-	// Try commit nodes.
 	var hash, msg string
 	err = database.QueryRow(
 		`SELECT commit_hash, COALESCE(message,'') FROM git_commits WHERE commit_hash = ? LIMIT 1`, id,
@@ -120,7 +119,6 @@ func resolveProvenanceNode(database *sql.DB, id string) (provenanceNode, bool) {
 		return provenanceNode{ID: hash, Type: "commit", Title: msg, Status: "done"}, true
 	}
 
-	// Try file nodes.
 	var filePath string
 	err = database.QueryRow(
 		`SELECT file_path FROM feature_files WHERE file_path = ? LIMIT 1`, id,
@@ -129,67 +127,204 @@ func resolveProvenanceNode(database *sql.DB, id string) (provenanceNode, bool) {
 		return provenanceNode{ID: filePath, Type: "file", Title: filePath, Status: ""}, true
 	}
 
+	// Agent nodes: id IS the agent_name.
+	var agentName string
+	err = database.QueryRow(
+		`SELECT name FROM (
+			SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+			UNION
+			SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+		) WHERE name = ? LIMIT 1`, id,
+	).Scan(&agentName)
+	if err == nil {
+		return provenanceNode{ID: agentName, Type: "agent", Title: agentName, Status: ""}, true
+	}
+
 	return provenanceNode{}, false
 }
 
-// loadUpstreamLinks returns nodes that point TO the given id via graph_edges.
-func loadUpstreamLinks(database *sql.DB, id string) []provenanceLink {
-	rows, err := database.Query(
-		`SELECT from_node_id, relationship_type FROM graph_edges WHERE to_node_id = ?`, id,
-	)
-	if err != nil {
-		return []provenanceLink{}
-	}
-	defer rows.Close()
-
-	var links []provenanceLink
-	for rows.Next() {
-		var fromID, rel string
-		if err := rows.Scan(&fromID, &rel); err != nil {
-			continue
-		}
-		node, ok := resolveProvenanceNode(database, fromID)
-		link := provenanceLink{ID: fromID, Relationship: rel}
-		if ok {
-			link.Type = node.Type
-			link.Title = node.Title
-		}
-		links = append(links, link)
-	}
+// loadUpstreamLinks returns nodes that point TO the given id, combining
+// persisted graph_edges with query-time-derived edges (the same ones the
+// /api/graph endpoint produces for commit/file/agent/session nodes).
+func loadUpstreamLinks(database *sql.DB, id string, nodeType string) []provenanceLink {
+	links := loadPersistedEdges(database, id, true)
+	links = append(links, loadDerivedEdges(database, id, nodeType, true)...)
+	links = dedupeLinks(links)
+	resolveLinkMetadata(database, links)
 	if links == nil {
-		links = []provenanceLink{}
+		return []provenanceLink{}
 	}
 	return links
 }
 
-// loadDownstreamLinks returns nodes that the given id points TO via graph_edges.
-func loadDownstreamLinks(database *sql.DB, id string) []provenanceLink {
-	rows, err := database.Query(
-		`SELECT to_node_id, relationship_type FROM graph_edges WHERE from_node_id = ?`, id,
-	)
-	if err != nil {
+// loadDownstreamLinks returns nodes that the given id points TO.
+func loadDownstreamLinks(database *sql.DB, id string, nodeType string) []provenanceLink {
+	links := loadPersistedEdges(database, id, false)
+	links = append(links, loadDerivedEdges(database, id, nodeType, false)...)
+	links = dedupeLinks(links)
+	resolveLinkMetadata(database, links)
+	if links == nil {
 		return []provenanceLink{}
 	}
-	defer rows.Close()
+	return links
+}
 
+// loadPersistedEdges returns IDs and relationship types from graph_edges.
+// If upstream is true, returns edges pointing TO id; otherwise edges FROM id.
+func loadPersistedEdges(database *sql.DB, id string, upstream bool) []provenanceLink {
+	var query string
+	if upstream {
+		query = `SELECT from_node_id, relationship_type FROM graph_edges WHERE to_node_id = ?`
+	} else {
+		query = `SELECT to_node_id, relationship_type FROM graph_edges WHERE from_node_id = ?`
+	}
+	rows, err := database.Query(query, id)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
 	var links []provenanceLink
 	for rows.Next() {
-		var toID, rel string
-		if err := rows.Scan(&toID, &rel); err != nil {
+		var peerID, rel string
+		if err := rows.Scan(&peerID, &rel); err != nil {
 			continue
 		}
-		node, ok := resolveProvenanceNode(database, toID)
-		link := provenanceLink{ID: toID, Relationship: rel}
-		if ok {
-			link.Type = node.Type
-			link.Title = node.Title
-		}
-		links = append(links, link)
-	}
-	if links == nil {
-		links = []provenanceLink{}
+		links = append(links, provenanceLink{ID: peerID, Relationship: rel})
 	}
 	return links
+}
+
+// loadDerivedEdges returns IDs and relationship types from the same sources
+// as /api/graph derives at query time — git_commits, feature_files,
+// agent_lineage_trace, sessions.parent_session_id, sessions.agent_assigned.
+// These edges are not persisted to graph_edges, so a pure graph_edges query
+// would miss them.
+func loadDerivedEdges(database *sql.DB, id string, nodeType string, upstream bool) []provenanceLink {
+	var links []provenanceLink
+
+	switch nodeType {
+	case "feature", "bug", "spike":
+		if upstream {
+			// commits committed_for -> this feature
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT commit_hash FROM git_commits WHERE feature_id = ?`,
+				id, "committed_for")...)
+			// files touched_by -> this feature
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT file_path FROM feature_files WHERE feature_id = ?`,
+				id, "touched_by")...)
+			// agents worked_on -> this feature
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT agent_name FROM agent_lineage_trace WHERE feature_id = ? AND agent_name != ''`,
+				id, "worked_on")...)
+		}
+	case "session":
+		if upstream {
+			// agent ran_as -> this session
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT agent_name FROM agent_lineage_trace WHERE session_id = ? AND agent_name != ''`,
+				id, "ran_as")...)
+			// parent session spawned -> this session
+			links = append(links, queryPeerLinks(database,
+				`SELECT parent_session_id FROM sessions WHERE session_id = ? AND parent_session_id IS NOT NULL AND parent_session_id != ''`,
+				id, "spawned")...)
+		} else {
+			// this session spawned -> child sessions
+			links = append(links, queryPeerLinks(database,
+				`SELECT session_id FROM sessions WHERE parent_session_id = ?`,
+				id, "spawned")...)
+			// this session produced -> commits
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT commit_hash FROM git_commits WHERE session_id = ?`,
+				id, "produced_by")...)
+			// this session produced -> files
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT file_path FROM feature_files WHERE session_id = ?`,
+				id, "produced_in")...)
+		}
+	case "commit":
+		if !upstream {
+			// commit committed_for -> features
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT feature_id FROM git_commits WHERE commit_hash = ? AND feature_id IS NOT NULL AND feature_id != ''`,
+				id, "committed_for")...)
+			// commit produced_by -> sessions
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT session_id FROM git_commits WHERE commit_hash = ? AND session_id IS NOT NULL AND session_id != ''`,
+				id, "produced_by")...)
+		}
+	case "file":
+		if !upstream {
+			// file touched_by -> features
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT feature_id FROM feature_files WHERE file_path = ? AND feature_id IS NOT NULL AND feature_id != ''`,
+				id, "touched_by")...)
+			// file produced_in -> sessions
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT session_id FROM feature_files WHERE file_path = ? AND session_id IS NOT NULL AND session_id != ''`,
+				id, "produced_in")...)
+		}
+	case "agent":
+		if !upstream {
+			// agent ran_as -> sessions
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT session_id FROM agent_lineage_trace WHERE agent_name = ?`,
+				id, "ran_as")...)
+			// agent worked_on -> features
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT feature_id FROM agent_lineage_trace WHERE agent_name = ? AND feature_id IS NOT NULL AND feature_id != ''`,
+				id, "worked_on")...)
+		}
+	}
+	return links
+}
+
+// queryPeerLinks runs a query that returns a single ID column and wraps the
+// results as provenanceLink entries with the given relationship.
+func queryPeerLinks(database *sql.DB, query, arg, rel string) []provenanceLink {
+	rows, err := database.Query(query, arg)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var links []provenanceLink
+	for rows.Next() {
+		var peerID string
+		if err := rows.Scan(&peerID); err != nil || peerID == "" {
+			continue
+		}
+		links = append(links, provenanceLink{ID: peerID, Relationship: rel})
+	}
+	return links
+}
+
+// dedupeLinks removes duplicate (id, relationship) pairs so derived edges
+// that also appear in graph_edges aren't reported twice.
+func dedupeLinks(links []provenanceLink) []provenanceLink {
+	if len(links) == 0 {
+		return links
+	}
+	seen := make(map[string]struct{}, len(links))
+	out := make([]provenanceLink, 0, len(links))
+	for _, l := range links {
+		key := l.ID + "|" + l.Relationship
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, l)
+	}
+	return out
+}
+
+// resolveLinkMetadata populates Type and Title for each link in place.
+func resolveLinkMetadata(database *sql.DB, links []provenanceLink) {
+	for i := range links {
+		if node, ok := resolveProvenanceNode(database, links[i].ID); ok {
+			links[i].Type = node.Type
+			links[i].Title = node.Title
+		}
+	}
 }
 
 // commitsForFeatureHandler handles GET /api/graph/commits?feature=X.

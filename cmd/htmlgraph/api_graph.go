@@ -641,26 +641,40 @@ func loadTrackCooccurrenceEdges(database *sql.DB) []graphEdge {
 // loadCommitEdges derives two edge types from git_commits:
 //   - committed_for: commit -> feature (when feature_id is set)
 //   - produced_by:   commit -> session (when session_id is set)
+//
+// git_commits has composite PK (commit_hash, session_id), so a single commit
+// may appear with multiple (feature_id, session_id) tuples. Query DISTINCT
+// pairs separately for each edge type — grouping by commit_hash alone would
+// silently drop all but one edge per commit.
 func loadCommitEdges(database *sql.DB) []graphEdge {
-	rows, err := database.Query(`
-		SELECT commit_hash, COALESCE(feature_id, ''),
-		       COALESCE(session_id, '')
-		FROM git_commits
-		GROUP BY commit_hash`)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
 	var edges []graphEdge
-	for rows.Next() {
-		var hash, fid, sid string
-		if err := rows.Scan(&hash, &fid, &sid); err != nil {
-			continue
-		}
-		if fid != "" {
+
+	// committed_for edges: distinct (commit, feature) pairs.
+	fRows, err := database.Query(`
+		SELECT DISTINCT commit_hash, feature_id FROM git_commits
+		WHERE feature_id IS NOT NULL AND feature_id != ''`)
+	if err == nil {
+		defer fRows.Close()
+		for fRows.Next() {
+			var hash, fid string
+			if err := fRows.Scan(&hash, &fid); err != nil {
+				continue
+			}
 			edges = append(edges, graphEdge{Source: hash, Target: fid, Type: "committed_for"})
 		}
-		if sid != "" {
+	}
+
+	// produced_by edges: distinct (commit, session) pairs.
+	sRows, err := database.Query(`
+		SELECT DISTINCT commit_hash, session_id FROM git_commits
+		WHERE session_id IS NOT NULL AND session_id != ''`)
+	if err == nil {
+		defer sRows.Close()
+		for sRows.Next() {
+			var hash, sid string
+			if err := sRows.Scan(&hash, &sid); err != nil {
+				continue
+			}
 			edges = append(edges, graphEdge{Source: hash, Target: sid, Type: "produced_by"})
 		}
 	}

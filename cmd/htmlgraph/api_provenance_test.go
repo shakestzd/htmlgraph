@@ -222,3 +222,87 @@ func TestSessionsForFeatureHandler_ReturnsSessions(t *testing.T) {
 		t.Errorf("session_id: got %q, want sess-001", sessions[0].SessionID)
 	}
 }
+
+// TestProvenanceHandler_CommitNodeResolvesDerivedEdges verifies that
+// clicking a commit node returns its downstream feature + session links,
+// derived from git_commits rather than graph_edges. Regression for roborev
+// finding that commit/file/agent drill-downs were empty.
+func TestProvenanceHandler_CommitNodeResolvesDerivedEdges(t *testing.T) {
+	database, featureID := setupProvenanceDBWithData(t)
+	mux := buildSingleProjectMux(database, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/provenance/abc123def456", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/provenance/abc123def456: got %d, body: %s", w.Code, w.Body.String())
+	}
+	var resp provenanceResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Node.Type != "commit" {
+		t.Errorf("expected node.type=commit, got %q", resp.Node.Type)
+	}
+	// The commit was committed_for feat-prov-test and produced_by sess-001.
+	sawFeature, sawSession := false, false
+	for _, l := range resp.Downstream {
+		if l.ID == featureID && l.Relationship == "committed_for" {
+			sawFeature = true
+		}
+		if l.ID == "sess-001" && l.Relationship == "produced_by" {
+			sawSession = true
+		}
+	}
+	if !sawFeature {
+		t.Errorf("expected committed_for edge to %s in downstream; got %+v", featureID, resp.Downstream)
+	}
+	if !sawSession {
+		t.Errorf("expected produced_by edge to sess-001 in downstream; got %+v", resp.Downstream)
+	}
+}
+
+// TestProvenanceHandler_AgentNodeResolves verifies that agent nodes resolve
+// (previously returned 404 because resolveProvenanceNode skipped agents).
+func TestProvenanceHandler_AgentNodeResolves(t *testing.T) {
+	database, featureID := setupProvenanceDB(t)
+	_, err := database.Exec(
+		`INSERT INTO agent_lineage_trace (trace_id, session_id, root_session_id, agent_name, feature_id) VALUES (?, ?, ?, ?, ?)`,
+		"tr-1", "sess-agent", "sess-agent", "htmlgraph:sonnet-coder", featureID,
+	)
+	if err != nil {
+		t.Fatalf("seed lineage: %v", err)
+	}
+	mux := buildSingleProjectMux(database, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/provenance/htmlgraph:sonnet-coder", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET agent provenance: got %d, body: %s", w.Code, w.Body.String())
+	}
+	var resp provenanceResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Node.Type != "agent" {
+		t.Errorf("expected node.type=agent, got %q", resp.Node.Type)
+	}
+	sawRanAs, sawWorkedOn := false, false
+	for _, l := range resp.Downstream {
+		if l.ID == "sess-agent" && l.Relationship == "ran_as" {
+			sawRanAs = true
+		}
+		if l.ID == featureID && l.Relationship == "worked_on" {
+			sawWorkedOn = true
+		}
+	}
+	if !sawRanAs {
+		t.Errorf("expected ran_as edge to sess-agent; got %+v", resp.Downstream)
+	}
+	if !sawWorkedOn {
+		t.Errorf("expected worked_on edge to %s; got %+v", featureID, resp.Downstream)
+	}
+}

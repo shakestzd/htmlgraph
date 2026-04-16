@@ -296,3 +296,83 @@ func TestResolveNodes_SessionMetadata(t *testing.T) {
 		t.Errorf("expected status 'active', got %q", r.Status)
 	}
 }
+
+func TestIsNodeType_Agent(t *testing.T) {
+	for _, s := range []string{"agent", "agents"} {
+		if !graph.IsNodeType(s) {
+			t.Errorf("expected IsNodeType(%q) to be true", s)
+		}
+	}
+}
+
+func TestNormalizeNodeType_Agent(t *testing.T) {
+	if got := graph.NormalizeNodeType("agents"); got != "agent" {
+		t.Errorf("expected 'agent', got %q", got)
+	}
+	if got := graph.NormalizeNodeType("agent"); got != "agent" {
+		t.Errorf("expected 'agent', got %q", got)
+	}
+}
+
+// Regression: ExecuteDSL(..., "agents") must return actual agent names,
+// not fall through to the features table and silently return nothing.
+func TestExecuteDSL_AgentType(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO agent_lineage_trace (trace_id, session_id, root_session_id, agent_name) VALUES (?, ?, ?, ?)`,
+		"tr-1", "sess-1", "sess-1", "htmlgraph:sonnet-coder",
+	)
+	if err != nil {
+		t.Fatalf("seed lineage: %v", err)
+	}
+	_, err = database.Exec(
+		`INSERT INTO sessions (session_id, agent_assigned, status) VALUES (?, ?, ?)`,
+		"sess-2", "htmlgraph:opus-coder", "active",
+	)
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "agents")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 agent results, got %d: %+v", len(results), results)
+	}
+	seen := map[string]bool{}
+	for _, r := range results {
+		seen[r.ID] = true
+		if r.Type != "agent" {
+			t.Errorf("expected type 'agent', got %q for id=%q", r.Type, r.ID)
+		}
+	}
+	if !seen["htmlgraph:sonnet-coder"] || !seen["htmlgraph:opus-coder"] {
+		t.Errorf("missing expected agent names in results: %+v", results)
+	}
+}
+
+func TestExecuteDSL_AgentTypeSingular(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO agent_lineage_trace (trace_id, session_id, root_session_id, agent_name) VALUES (?, ?, ?, ?)`,
+		"tr-1", "sess-1", "sess-1", "htmlgraph:researcher",
+	)
+	if err != nil {
+		t.Fatalf("seed lineage: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "agent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].ID != "htmlgraph:researcher" {
+		t.Errorf("expected ID 'htmlgraph:researcher', got %q", results[0].ID)
+	}
+	if results[0].Type != "agent" {
+		t.Errorf("expected type 'agent', got %q", results[0].Type)
+	}
+}

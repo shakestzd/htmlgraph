@@ -202,6 +202,56 @@ func TestLoadCommitEdges_CommittedFor(t *testing.T) {
 	}
 }
 
+// TestLoadCommitEdges_MultipleSessionsAndFeatures verifies that when a single
+// commit_hash appears with multiple session_ids (which is legitimate given
+// git_commits' composite PK) all edges are returned — not silently dropped
+// by GROUP BY. Regression for roborev finding on loadCommitEdges.
+func TestLoadCommitEdges_MultipleSessionsAndFeatures(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	_, err := db.Exec(`INSERT INTO features (id, type, title, status) VALUES ('feat-a', 'feature', 'A', 'done')`)
+	if err != nil {
+		t.Fatalf("seed feature A: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO features (id, type, title, status) VALUES ('feat-b', 'feature', 'B', 'done')`)
+	if err != nil {
+		t.Fatalf("seed feature B: %v", err)
+	}
+
+	// Same commit hash recorded under two different sessions AND two
+	// different feature attributions (plausible when the same commit touches
+	// work across a subagent boundary or is ingested twice).
+	_, err = db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('hash-dup', 'sess-A', 'feat-a', 'm', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit 1: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('hash-dup', 'sess-B', 'feat-b', 'm', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit 2: %v", err)
+	}
+
+	edges := loadCommitEdges(db)
+
+	// Expect BOTH committed_for edges and BOTH produced_by edges — 4 total.
+	seen := map[string]bool{}
+	for _, e := range edges {
+		seen[e.Source+"|"+e.Target+"|"+e.Type] = true
+	}
+	expect := []string{
+		"hash-dup|feat-a|committed_for",
+		"hash-dup|feat-b|committed_for",
+		"hash-dup|sess-A|produced_by",
+		"hash-dup|sess-B|produced_by",
+	}
+	for _, k := range expect {
+		if !seen[k] {
+			t.Errorf("missing edge %q; got edges: %+v", k, edges)
+		}
+	}
+}
+
 // TestLoadCommitEdges_ProducedBy verifies that commit->session edges
 // (produced_by) are returned for commits with a session_id.
 func TestLoadCommitEdges_ProducedBy(t *testing.T) {
