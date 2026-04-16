@@ -20,12 +20,15 @@ func openGraphTestDB(t *testing.T) *sql.DB {
 
 // TestLoadGraphNodes_CommitNodesReturned verifies that loadGraphNodes returns
 // nodes with type="commit" when git_commits has data.
-func TestLoadGraphNodes_CommitNodesReturned(t *testing.T) {
+// TestLoadGraphNodes_CommitNodesOmitted verifies that git_commits rows do
+// NOT surface as graph nodes. Commits are sub-attributes of the session or
+// feature that produced them (visible via the provenance panel and the
+// /api/graph/commits endpoint), not standalone nodes. Design decision:
+// graph clutter reduction.
+func TestLoadGraphNodes_CommitNodesOmitted(t *testing.T) {
 	db := openGraphTestDB(t)
-
-	// Insert a commit row.
 	_, err := db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
-		VALUES ('abc123def456', 'sess-001', 'feat-abc', 'Fix a bug in the parser', '2026-01-01T00:00:00Z')`)
+		VALUES ('abc123def456', 'sess-001', 'feat-abc', 'Fix a bug', '2026-01-01T00:00:00Z')`)
 	if err != nil {
 		t.Fatalf("insert commit: %v", err)
 	}
@@ -34,32 +37,10 @@ func TestLoadGraphNodes_CommitNodesReturned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadGraphNodes: %v", err)
 	}
-
-	var commitNodes []graphNode
 	for _, n := range nodes {
 		if n.Type == "commit" {
-			commitNodes = append(commitNodes, n)
+			t.Errorf("expected no commit nodes, got %s", n.ID)
 		}
-	}
-
-	if len(commitNodes) == 0 {
-		t.Fatal("expected at least one commit node, got none")
-	}
-
-	found := false
-	for _, n := range commitNodes {
-		if n.ID == "abc123def456" {
-			found = true
-			if n.Title == "" {
-				t.Errorf("commit node title should not be empty")
-			}
-			if n.Status != "done" {
-				t.Errorf("commit node status: got %q, want %q", n.Status, "done")
-			}
-		}
-	}
-	if !found {
-		t.Errorf("commit node with hash abc123def456 not found in nodes")
 	}
 }
 
@@ -110,38 +91,9 @@ func TestLoadGraphNodes_FileNodesReturned(t *testing.T) {
 
 // TestLoadGraphNodes_CommitDeduplication verifies that the same commit hash
 // inserted with two different session_ids produces only one commit node.
-func TestLoadGraphNodes_CommitDeduplication(t *testing.T) {
-	db := openGraphTestDB(t)
-
-	// Insert two commit rows with the same hash but different session_ids
-	// (composite PK allows this).
-	_, err := db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
-		VALUES ('dedup-hash-001', 'sess-001', '', 'Shared commit first session', '2026-01-01T00:00:00Z')`)
-	if err != nil {
-		t.Fatalf("insert commit 1: %v", err)
-	}
-	_, err = db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
-		VALUES ('dedup-hash-001', 'sess-002', '', 'Shared commit second session', '2026-01-02T00:00:00Z')`)
-	if err != nil {
-		t.Fatalf("insert commit 2: %v", err)
-	}
-
-	nodes, _, err := loadGraphNodes(db)
-	if err != nil {
-		t.Fatalf("loadGraphNodes: %v", err)
-	}
-
-	count := 0
-	for _, n := range nodes {
-		if n.Type == "commit" && n.ID == "dedup-hash-001" {
-			count++
-		}
-	}
-
-	if count != 1 {
-		t.Errorf("expected exactly 1 commit node for deduplicated hash, got %d", count)
-	}
-}
+// The old TestLoadGraphNodes_CommitDeduplication tested dedup behavior
+// for commit nodes. Since commit nodes are no longer emitted at all
+// (see TestLoadGraphNodes_CommitNodesOmitted), dedup is irrelevant.
 
 // TestLoadGraphNodes_FileDeduplication verifies that the same file_path
 // inserted for different features produces only one file node.

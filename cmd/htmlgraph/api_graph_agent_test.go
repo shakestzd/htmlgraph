@@ -19,16 +19,16 @@ func setupAgentTestDB(t *testing.T) *sql.DB {
 
 // TestLoadGraphNodesIncludesAgents verifies that loadGraphNodes returns agent
 // nodes derived from the agent_lineage_trace table.
-func TestLoadGraphNodesIncludesAgents(t *testing.T) {
+// TestLoadGraphNodes_AgentNodesOmitted verifies that agent names do NOT
+// surface as graph nodes. Agents are the actor driving work, not a
+// thing in the graph — they're exposed via the "Filter by agent"
+// dropdown which scopes the graph to the work a given agent touched.
+// Design decision: graph clutter reduction.
+func TestLoadGraphNodes_AgentNodesOmitted(t *testing.T) {
 	db := setupAgentTestDB(t)
-
-	// Insert lineage rows with two distinct agent names.
 	_, err := db.Exec(`
 		INSERT INTO agent_lineage_trace (trace_id, root_session_id, session_id, agent_name, feature_id)
-		VALUES
-			('t1', 'root-1', 'sess-1', 'htmlgraph:researcher', 'feat-aaa'),
-			('t2', 'root-1', 'sess-2', 'htmlgraph:sonnet-coder', 'feat-bbb'),
-			('t3', 'root-2', 'sess-3', 'htmlgraph:researcher', 'feat-aaa')`)
+		VALUES ('t1', 'root-1', 'sess-1', 'htmlgraph:researcher', 'feat-aaa')`)
 	if err != nil {
 		t.Fatalf("seed lineage: %v", err)
 	}
@@ -37,64 +37,10 @@ func TestLoadGraphNodesIncludesAgents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadGraphNodes: %v", err)
 	}
-
-	agentNodes := make(map[string]graphNode)
 	for _, n := range nodes {
 		if n.Type == "agent" {
-			agentNodes[n.ID] = n
+			t.Errorf("expected no agent nodes, got %s", n.ID)
 		}
-	}
-
-	if len(agentNodes) != 2 {
-		t.Errorf("want 2 agent nodes, got %d: %v", len(agentNodes), agentNodes)
-	}
-
-	for _, name := range []string{"htmlgraph:researcher", "htmlgraph:sonnet-coder"} {
-		n, ok := agentNodes[name]
-		if !ok {
-			t.Errorf("agent node %q not found", name)
-			continue
-		}
-		if n.Title != name {
-			t.Errorf("agent node %q title = %q, want %q", name, n.Title, name)
-		}
-		if n.Activity <= 0 {
-			t.Errorf("agent node %q activity = %d, want > 0", name, n.Activity)
-		}
-	}
-}
-
-// TestLoadGraphNodesAgentDeduplication verifies that agent nodes are
-// deduplicated by agent_name even when appearing in multiple rows.
-func TestLoadGraphNodesAgentDeduplication(t *testing.T) {
-	db := setupAgentTestDB(t)
-
-	// Same agent name appearing 5 times across rows.
-	_, err := db.Exec(`
-		INSERT INTO agent_lineage_trace (trace_id, root_session_id, session_id, agent_name)
-		VALUES
-			('t1', 'root-1', 'sess-1', 'htmlgraph:researcher'),
-			('t2', 'root-1', 'sess-2', 'htmlgraph:researcher'),
-			('t3', 'root-2', 'sess-3', 'htmlgraph:researcher'),
-			('t4', 'root-3', 'sess-4', 'htmlgraph:researcher'),
-			('t5', 'root-3', 'sess-5', 'htmlgraph:researcher')`)
-	if err != nil {
-		t.Fatalf("seed lineage: %v", err)
-	}
-
-	nodes, _, err := loadGraphNodes(db)
-	if err != nil {
-		t.Fatalf("loadGraphNodes: %v", err)
-	}
-
-	count := 0
-	for _, n := range nodes {
-		if n.Type == "agent" && n.ID == "htmlgraph:researcher" {
-			count++
-		}
-	}
-	if count != 1 {
-		t.Errorf("want exactly 1 agent node for htmlgraph:researcher, got %d", count)
 	}
 }
 

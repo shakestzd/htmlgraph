@@ -96,18 +96,18 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		// worked on features from two different tracks, those tracks are related.
 		edges = append(edges, loadTrackCooccurrenceEdges(database)...)
 
-		// Derive commit and file edges.
-		edges = append(edges, loadCommitEdges(database)...)
+		// File edges (produced_in, touched_by) — commits and agents are
+		// no longer graph nodes, so their edge derivation is omitted.
 		edges = append(edges, loadFileEdges(database)...)
 
 		// Derive parent→child session edges from sessions.parent_session_id.
 		edges = append(edges, loadSessionHierarchyEdges(database)...)
 
-		// Derive spawned/worked_on edges from agent_lineage_trace.
+		// Derive session->feature (worked_on) edges from agent_lineage_trace.
+		// loadAgentLineageEdges emits both spawned (root->child session) AND
+		// worked_on (session->feature) edges — the latter are still wanted
+		// for session provenance even without agent nodes.
 		edges = append(edges, loadAgentLineageEdges(database)...)
-
-		// Derive agent→session (ran_as) and agent→feature (worked_on) edges.
-		edges = append(edges, loadAgentEdges(database)...)
 
 		// Deduplicate edges (explicit DB edges may duplicate implicit ones).
 		edges = deduplicateEdges(edges)
@@ -144,6 +144,16 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 				}
 			}
 			nodes = filtered
+		}
+
+		// Agent filter: ?agent=<name> restricts nodes to the set of
+		// sessions, features, and files that the named agent interacted
+		// with (via agent_lineage_trace). Tracks/plans/bugs/spikes
+		// survive only if they're reachable from one of those
+		// interactions, so the graph contracts to "what this agent
+		// actually touched."
+		if agentName := r.URL.Query().Get("agent"); agentName != "" {
+			nodes = filterByAgent(database, nodes, agentName)
 		}
 
 		// Per-type caps: sort capped types by activity DESC, truncate.
@@ -340,33 +350,12 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		}
 	}
 
-	// Commit nodes — deduplicated by commit_hash (composite PK means the
-	// same hash may appear multiple times with different session_ids).
-	crowRows, crowErr := database.Query(`
-		SELECT commit_hash, SUBSTR(message, 1, 80),
-		       COALESCE(feature_id, ''), COALESCE(session_id, '')
-		FROM git_commits
-		GROUP BY commit_hash
-		ORDER BY timestamp DESC
-		LIMIT 500`)
-	if crowErr == nil {
-		defer crowRows.Close()
-		for crowRows.Next() {
-			var hash, msg, fid, sid string
-			if err := crowRows.Scan(&hash, &msg, &fid, &sid); err != nil {
-				continue
-			}
-			nodes = append(nodes, graphNode{
-				ID:     hash,
-				Type:   "commit",
-				Title:  msg,
-				Status: "done",
-			})
-			trackIDs = append(trackIDs, "")
-		}
-	}
-
 	// File nodes — deduplicated by file_path across all features.
+	// Agent and commit nodes are intentionally NOT loaded: agents are
+	// exposed via the "Filter by agent" dropdown (the actor, not a
+	// node), and commits are sub-attributes of the session/feature
+	// that produced them (visible in the provenance panel, not as
+	// standalone nodes in the graph).
 	ffRows, ffErr := database.Query(`
 		SELECT file_path, COALESCE(feature_id, ''),
 		       COALESCE(session_id, '')
@@ -385,35 +374,6 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 				ID:    path,
 				Type:  "file",
 				Title: filepath.Base(path),
-			})
-			trackIDs = append(trackIDs, "")
-		}
-	}
-
-	// Agent nodes — distinct agent names from lineage trace and sessions.
-	agentRows, agentErr := database.Query(`
-		SELECT agent_name, COUNT(*) as activity
-		FROM (
-			SELECT agent_name FROM agent_lineage_trace WHERE agent_name != ''
-			UNION ALL
-			SELECT agent_assigned FROM sessions WHERE agent_assigned != ''
-		)
-		GROUP BY agent_name
-		ORDER BY activity DESC
-		LIMIT 100`)
-	if agentErr == nil {
-		defer agentRows.Close()
-		for agentRows.Next() {
-			var name string
-			var activity int
-			if err := agentRows.Scan(&name, &activity); err != nil {
-				continue
-			}
-			nodes = append(nodes, graphNode{
-				ID:       name,
-				Type:     "agent",
-				Title:    name,
-				Activity: activity,
 			})
 			trackIDs = append(trackIDs, "")
 		}
@@ -802,6 +762,119 @@ func loadAgentEdges(database *sql.DB) []graphEdge {
 		}
 	}
 	return edges
+}
+
+// filterByAgent returns only the nodes that the named agent touched —
+// via agent_lineage_trace (sessions + features the agent ran) and via
+// feature_files (files written by those sessions). Tracks/plans survive
+// only if a kept feature points to them through track_id. The filter is
+// applied after type filtering but before caps so caps reflect the
+// agent-scoped subset.
+func filterByAgent(database *sql.DB, nodes []graphNode, agentName string) []graphNode {
+	keep := make(map[string]bool)
+
+	// Sessions and features directly linked to the agent.
+	sfRows, err := database.Query(`
+		SELECT DISTINCT session_id, COALESCE(feature_id, '')
+		FROM agent_lineage_trace WHERE agent_name = ?`, agentName)
+	if err != nil {
+		return nodes
+	}
+	sessionIDs := make([]string, 0, 32)
+	for sfRows.Next() {
+		var sid, fid string
+		if err := sfRows.Scan(&sid, &fid); err != nil {
+			continue
+		}
+		if sid != "" {
+			keep[sid] = true
+			sessionIDs = append(sessionIDs, sid)
+		}
+		if fid != "" {
+			keep[fid] = true
+		}
+	}
+	sfRows.Close()
+
+	// Files produced by any of those sessions — so the agent's work on
+	// disk shows up in the filtered graph.
+	if len(sessionIDs) > 0 {
+		placeholders := make([]string, len(sessionIDs))
+		args := make([]any, len(sessionIDs))
+		for i, id := range sessionIDs {
+			placeholders[i] = "?"
+			args[i] = id
+		}
+		fRows, ferr := database.Query(
+			`SELECT DISTINCT file_path FROM feature_files WHERE session_id IN (`+
+				strings.Join(placeholders, ",")+`)`, args...)
+		if ferr == nil {
+			for fRows.Next() {
+				var fp string
+				if err := fRows.Scan(&fp); err == nil {
+					keep[fp] = true
+				}
+			}
+			fRows.Close()
+		}
+	}
+
+	// Tracks kept if any surviving feature belongs to them (track_id FK).
+	trackKeep := make(map[string]bool)
+	tRows, terr := database.Query(`
+		SELECT DISTINCT f.track_id FROM features f WHERE f.id IN (
+			SELECT feature_id FROM agent_lineage_trace WHERE agent_name = ? AND feature_id != ''
+		) AND f.track_id != ''`, agentName)
+	if terr == nil {
+		for tRows.Next() {
+			var tid string
+			if err := tRows.Scan(&tid); err == nil {
+				trackKeep[tid] = true
+			}
+		}
+		tRows.Close()
+	}
+
+	filtered := make([]graphNode, 0, len(keep))
+	for _, n := range nodes {
+		if keep[n.ID] || (n.Type == "track" && trackKeep[n.ID]) {
+			filtered = append(filtered, n)
+		}
+	}
+	return filtered
+}
+
+// agentsHandler returns the distinct agent names for the filter
+// dropdown. Ordered by activity DESC so the most-used agents appear
+// first.
+func agentsHandler(database *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		rows, err := database.Query(`
+			SELECT name, SUM(cnt) AS activity FROM (
+				SELECT agent_name AS name, COUNT(*) AS cnt
+					FROM agent_lineage_trace WHERE agent_name != ''
+					GROUP BY agent_name
+				UNION ALL
+				SELECT agent_assigned AS name, COUNT(*) AS cnt
+					FROM sessions WHERE agent_assigned != ''
+					GROUP BY agent_assigned
+			) GROUP BY name ORDER BY activity DESC`)
+		if err != nil {
+			respondJSON(w, []string{})
+			return
+		}
+		defer rows.Close()
+		out := []string{}
+		for rows.Next() {
+			var name string
+			var activity int
+			if err := rows.Scan(&name, &activity); err != nil {
+				continue
+			}
+			out = append(out, name)
+		}
+		respondJSON(w, out)
+	}
 }
 
 // loadGraphEdges fetches all rows from graph_edges.
