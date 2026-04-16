@@ -1,0 +1,299 @@
+package main
+
+import (
+	"database/sql"
+	"testing"
+
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+)
+
+// openGraphTestDB opens an in-memory SQLite database with full schema applied.
+func openGraphTestDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open in-memory db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+// TestLoadGraphNodes_CommitNodesReturned verifies that loadGraphNodes returns
+// nodes with type="commit" when git_commits has data.
+func TestLoadGraphNodes_CommitNodesReturned(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	// Insert a commit row.
+	_, err := db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('abc123def456', 'sess-001', 'feat-abc', 'Fix a bug in the parser', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit: %v", err)
+	}
+
+	nodes, _, err := loadGraphNodes(db)
+	if err != nil {
+		t.Fatalf("loadGraphNodes: %v", err)
+	}
+
+	var commitNodes []graphNode
+	for _, n := range nodes {
+		if n.Type == "commit" {
+			commitNodes = append(commitNodes, n)
+		}
+	}
+
+	if len(commitNodes) == 0 {
+		t.Fatal("expected at least one commit node, got none")
+	}
+
+	found := false
+	for _, n := range commitNodes {
+		if n.ID == "abc123def456" {
+			found = true
+			if n.Title == "" {
+				t.Errorf("commit node title should not be empty")
+			}
+			if n.Status != "done" {
+				t.Errorf("commit node status: got %q, want %q", n.Status, "done")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("commit node with hash abc123def456 not found in nodes")
+	}
+}
+
+// TestLoadGraphNodes_FileNodesReturned verifies that loadGraphNodes returns
+// nodes with type="file" when feature_files has data.
+func TestLoadGraphNodes_FileNodesReturned(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	// Insert a feature_file row (id is primary key, use file_path as id).
+	_, err := db.Exec(`INSERT INTO feature_files (id, file_path, feature_id, operation)
+		VALUES ('ff-001', 'internal/graph/dsl.go', 'feat-xyz', 'commit')`)
+	if err != nil {
+		t.Fatalf("insert feature_file: %v", err)
+	}
+
+	nodes, _, err := loadGraphNodes(db)
+	if err != nil {
+		t.Fatalf("loadGraphNodes: %v", err)
+	}
+
+	var fileNodes []graphNode
+	for _, n := range nodes {
+		if n.Type == "file" {
+			fileNodes = append(fileNodes, n)
+		}
+	}
+
+	if len(fileNodes) == 0 {
+		t.Fatal("expected at least one file node, got none")
+	}
+
+	found := false
+	for _, n := range fileNodes {
+		if n.ID == "internal/graph/dsl.go" {
+			found = true
+			if n.Title != "dsl.go" {
+				t.Errorf("file node title: got %q, want %q", n.Title, "dsl.go")
+			}
+			if n.Status != "" {
+				t.Errorf("file node status: got %q, want empty", n.Status)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("file node with path internal/graph/dsl.go not found in nodes")
+	}
+}
+
+// TestLoadGraphNodes_CommitDeduplication verifies that the same commit hash
+// inserted with two different session_ids produces only one commit node.
+func TestLoadGraphNodes_CommitDeduplication(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	// Insert two commit rows with the same hash but different session_ids
+	// (composite PK allows this).
+	_, err := db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('dedup-hash-001', 'sess-001', '', 'Shared commit first session', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit 1: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('dedup-hash-001', 'sess-002', '', 'Shared commit second session', '2026-01-02T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit 2: %v", err)
+	}
+
+	nodes, _, err := loadGraphNodes(db)
+	if err != nil {
+		t.Fatalf("loadGraphNodes: %v", err)
+	}
+
+	count := 0
+	for _, n := range nodes {
+		if n.Type == "commit" && n.ID == "dedup-hash-001" {
+			count++
+		}
+	}
+
+	if count != 1 {
+		t.Errorf("expected exactly 1 commit node for deduplicated hash, got %d", count)
+	}
+}
+
+// TestLoadGraphNodes_FileDeduplication verifies that the same file_path
+// inserted for different features produces only one file node.
+func TestLoadGraphNodes_FileDeduplication(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	// Insert two feature_files rows with the same file_path (different feature_ids).
+	_, err := db.Exec(`INSERT INTO feature_files (id, file_path, feature_id, operation)
+		VALUES ('ff-a1', 'cmd/main.go', 'feat-a', 'commit')`)
+	if err != nil {
+		t.Fatalf("insert feature_file 1: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO feature_files (id, file_path, feature_id, operation)
+		VALUES ('ff-b1', 'cmd/main.go', 'feat-b', 'commit')`)
+	if err != nil {
+		t.Fatalf("insert feature_file 2: %v", err)
+	}
+
+	nodes, _, err := loadGraphNodes(db)
+	if err != nil {
+		t.Fatalf("loadGraphNodes: %v", err)
+	}
+
+	count := 0
+	for _, n := range nodes {
+		if n.Type == "file" && n.ID == "cmd/main.go" {
+			count++
+		}
+	}
+
+	if count != 1 {
+		t.Errorf("expected exactly 1 file node for deduplicated path, got %d", count)
+	}
+}
+
+// TestLoadCommitEdges_CommittedFor verifies that commit->feature edges
+// (committed_for) are returned for commits with a feature_id.
+func TestLoadCommitEdges_CommittedFor(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	_, err := db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('hash-001', 'sess-001', 'feat-target', 'Some commit', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit: %v", err)
+	}
+
+	edges := loadCommitEdges(db)
+
+	found := false
+	for _, e := range edges {
+		if e.Source == "hash-001" && e.Target == "feat-target" && e.Type == "committed_for" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected committed_for edge from hash-001 to feat-target; got: %v", edges)
+	}
+}
+
+// TestLoadCommitEdges_ProducedBy verifies that commit->session edges
+// (produced_by) are returned for commits with a session_id.
+func TestLoadCommitEdges_ProducedBy(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	_, err := db.Exec(`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp)
+		VALUES ('hash-002', 'sess-xyz', '', 'Another commit', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert commit: %v", err)
+	}
+
+	edges := loadCommitEdges(db)
+
+	found := false
+	for _, e := range edges {
+		if e.Source == "hash-002" && e.Target == "sess-xyz" && e.Type == "produced_by" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected produced_by edge from hash-002 to sess-xyz; got: %v", edges)
+	}
+}
+
+// TestLoadFileEdges_ProducedIn verifies that file->session edges (produced_in)
+// are returned for feature_files with a non-null session_id.
+func TestLoadFileEdges_ProducedIn(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	_, err := db.Exec(`INSERT INTO feature_files (id, file_path, feature_id, session_id, operation)
+		VALUES ('ff-p1', 'pkg/foo.go', 'feat-1', 'sess-aaa', 'commit')`)
+	if err != nil {
+		t.Fatalf("insert feature_file: %v", err)
+	}
+
+	edges := loadFileEdges(db)
+
+	found := false
+	for _, e := range edges {
+		if e.Source == "pkg/foo.go" && e.Target == "sess-aaa" && e.Type == "produced_in" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected produced_in edge from pkg/foo.go to sess-aaa; got: %v", edges)
+	}
+}
+
+// TestLoadFileEdges_TouchedBy verifies that file->feature edges (touched_by)
+// are returned for feature_files with a feature_id.
+func TestLoadFileEdges_TouchedBy(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	_, err := db.Exec(`INSERT INTO feature_files (id, file_path, feature_id, operation)
+		VALUES ('ff-t1', 'pkg/bar.go', 'feat-2', 'commit')`)
+	if err != nil {
+		t.Fatalf("insert feature_file: %v", err)
+	}
+
+	edges := loadFileEdges(db)
+
+	found := false
+	for _, e := range edges {
+		if e.Source == "pkg/bar.go" && e.Target == "feat-2" && e.Type == "touched_by" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected touched_by edge from pkg/bar.go to feat-2; got: %v", edges)
+	}
+}
+
+// TestLoadFileEdges_NullSessionIDNoEdge verifies that a NULL session_id in
+// feature_files does NOT produce a produced_in edge.
+func TestLoadFileEdges_NullSessionIDNoEdge(t *testing.T) {
+	db := openGraphTestDB(t)
+
+	// Insert with explicit NULL session_id.
+	_, err := db.Exec(`INSERT INTO feature_files (id, file_path, feature_id, session_id, operation)
+		VALUES ('ff-n1', 'pkg/baz.go', 'feat-3', NULL, 'commit')`)
+	if err != nil {
+		t.Fatalf("insert feature_file: %v", err)
+	}
+
+	edges := loadFileEdges(db)
+
+	for _, e := range edges {
+		if e.Source == "pkg/baz.go" && e.Type == "produced_in" {
+			t.Errorf("unexpected produced_in edge for NULL session_id: %+v", e)
+		}
+	}
+}

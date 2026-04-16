@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
@@ -78,6 +79,10 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		// Derive track-to-track edges from shared sessions: if a session
 		// worked on features from two different tracks, those tracks are related.
 		edges = append(edges, loadTrackCooccurrenceEdges(database)...)
+
+		// Derive commit and file edges.
+		edges = append(edges, loadCommitEdges(database)...)
+		edges = append(edges, loadFileEdges(database)...)
 
 		// Deduplicate edges (explicit DB edges may duplicate implicit ones).
 		edges = deduplicateEdges(edges)
@@ -231,6 +236,56 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 			n.Type = "session"
 			n.Title = pickSessionLabel(n.ID, title, firstMsg, createdAt)
 			nodes = append(nodes, n)
+			trackIDs = append(trackIDs, "")
+		}
+	}
+
+	// Commit nodes — deduplicated by commit_hash (composite PK means the
+	// same hash may appear multiple times with different session_ids).
+	crowRows, crowErr := database.Query(`
+		SELECT commit_hash, SUBSTR(message, 1, 80),
+		       COALESCE(feature_id, ''), COALESCE(session_id, '')
+		FROM git_commits
+		GROUP BY commit_hash
+		ORDER BY timestamp DESC
+		LIMIT 500`)
+	if crowErr == nil {
+		defer crowRows.Close()
+		for crowRows.Next() {
+			var hash, msg, fid, sid string
+			if err := crowRows.Scan(&hash, &msg, &fid, &sid); err != nil {
+				continue
+			}
+			nodes = append(nodes, graphNode{
+				ID:     hash,
+				Type:   "commit",
+				Title:  msg,
+				Status: "done",
+			})
+			trackIDs = append(trackIDs, "")
+		}
+	}
+
+	// File nodes — deduplicated by file_path across all features.
+	ffRows, ffErr := database.Query(`
+		SELECT file_path, COALESCE(feature_id, ''),
+		       COALESCE(session_id, '')
+		FROM feature_files
+		GROUP BY file_path
+		ORDER BY file_path
+		LIMIT 500`)
+	if ffErr == nil {
+		defer ffRows.Close()
+		for ffRows.Next() {
+			var path, fid, sid string
+			if err := ffRows.Scan(&path, &fid, &sid); err != nil {
+				continue
+			}
+			nodes = append(nodes, graphNode{
+				ID:    path,
+				Type:  "file",
+				Title: filepath.Base(path),
+			})
 			trackIDs = append(trackIDs, "")
 		}
 	}
@@ -464,6 +519,63 @@ func loadTrackCooccurrenceEdges(database *sql.DB) []graphEdge {
 			Target: tgt,
 			Type:   "co_session",
 		})
+	}
+	return edges
+}
+
+// loadCommitEdges derives two edge types from git_commits:
+//   - committed_for: commit -> feature (when feature_id is set)
+//   - produced_by:   commit -> session (when session_id is set)
+func loadCommitEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT commit_hash, COALESCE(feature_id, ''),
+		       COALESCE(session_id, '')
+		FROM git_commits
+		GROUP BY commit_hash`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var hash, fid, sid string
+		if err := rows.Scan(&hash, &fid, &sid); err != nil {
+			continue
+		}
+		if fid != "" {
+			edges = append(edges, graphEdge{Source: hash, Target: fid, Type: "committed_for"})
+		}
+		if sid != "" {
+			edges = append(edges, graphEdge{Source: hash, Target: sid, Type: "produced_by"})
+		}
+	}
+	return edges
+}
+
+// loadFileEdges derives two edge types from feature_files:
+//   - produced_in: file -> session (when session_id is non-null)
+//   - touched_by:  file -> feature (when feature_id is set)
+func loadFileEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT DISTINCT file_path, COALESCE(feature_id, ''),
+		       COALESCE(session_id, '')
+		FROM feature_files`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var path, fid, sid string
+		if err := rows.Scan(&path, &fid, &sid); err != nil {
+			continue
+		}
+		if sid != "" {
+			edges = append(edges, graphEdge{Source: path, Target: sid, Type: "produced_in"})
+		}
+		if fid != "" {
+			edges = append(edges, graphEdge{Source: path, Target: fid, Type: "touched_by"})
+		}
 	}
 	return edges
 }
