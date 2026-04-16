@@ -84,6 +84,12 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		edges = append(edges, loadCommitEdges(database)...)
 		edges = append(edges, loadFileEdges(database)...)
 
+		// Derive parent→child session edges from sessions.parent_session_id.
+		edges = append(edges, loadSessionHierarchyEdges(database)...)
+
+		// Derive spawned/worked_on edges from agent_lineage_trace.
+		edges = append(edges, loadAgentLineageEdges(database)...)
+
 		// Deduplicate edges (explicit DB edges may duplicate implicit ones).
 		edges = deduplicateEdges(edges)
 
@@ -194,11 +200,10 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		trackIDs = append(trackIDs, "") // tracks don't have a parent track
 	}
 
-	// Sessions that worked on features — only include sessions with
-	// meaningful activity (>5 events) to avoid noise.
-	// Only include sessions that have actual transcript content —
-	// both agent_events (proves attribution) AND messages (proves ingest).
-	// Without the messages check, hook-only sessions surface as empty transcripts.
+	// Sessions: include sessions with meaningful activity (>5 events and
+	// at least one message) OR sessions that appear in agent_lineage_trace
+	// (subagent sessions) OR sessions with a parent_session_id set.
+	// Capped at 500 to avoid overwhelming the graph.
 	//
 	// The SELECT pulls enough for a useful node label: the sessions.title
 	// column (set by the background titler for human sessions), the first
@@ -216,15 +221,22 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		                 ORDER BY m.ordinal LIMIT 1), '') AS first_msg,
 		       COALESCE(s.created_at, '') AS created_at
 		FROM sessions s
-		WHERE EXISTS (
-		    SELECT 1 FROM agent_events e
-		    WHERE e.session_id = s.session_id AND e.feature_id != ''
-		    GROUP BY e.session_id HAVING COUNT(*) > 5
+		WHERE (
+		    EXISTS (
+		        SELECT 1 FROM agent_events e
+		        WHERE e.session_id = s.session_id AND e.feature_id != ''
+		        GROUP BY e.session_id HAVING COUNT(*) > 5
+		    )
+		    AND EXISTS (
+		        SELECT 1 FROM messages m WHERE m.session_id = s.session_id
+		    )
+		) OR s.session_id IN (
+		    SELECT session_id FROM agent_lineage_trace
+		    UNION
+		    SELECT session_id FROM sessions
+		    WHERE parent_session_id IS NOT NULL AND parent_session_id != ''
 		)
-		AND EXISTS (
-		    SELECT 1 FROM messages m WHERE m.session_id = s.session_id
-		)
-		LIMIT 200`)
+		LIMIT 500`)
 	if serr == nil {
 		defer srows.Close()
 		for srows.Next() {
@@ -575,6 +587,62 @@ func loadFileEdges(database *sql.DB) []graphEdge {
 		}
 		if fid != "" {
 			edges = append(edges, graphEdge{Source: path, Target: fid, Type: "touched_by"})
+		}
+	}
+	return edges
+}
+
+// loadSessionHierarchyEdges derives parent→child "spawned" edges from the
+// sessions.parent_session_id column.
+func loadSessionHierarchyEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT session_id, parent_session_id FROM sessions
+		WHERE parent_session_id IS NOT NULL AND parent_session_id != ''`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var childID, parentID string
+		if err := rows.Scan(&childID, &parentID); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{
+			Source: parentID, Target: childID, Type: "spawned",
+		})
+	}
+	return edges
+}
+
+// loadAgentLineageEdges derives edges from agent_lineage_trace:
+//   - "spawned": root_session_id → session_id (excludes self-edges)
+//   - "worked_on": session_id → feature_id (when set)
+//
+// Deduplication with loadSessionHierarchyEdges is handled by
+// deduplicateEdges in graphAPIHandler.
+func loadAgentLineageEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT session_id, root_session_id, COALESCE(feature_id, '')
+		FROM agent_lineage_trace
+		WHERE session_id != root_session_id`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var sessionID, rootSessionID, featureID string
+		if err := rows.Scan(&sessionID, &rootSessionID, &featureID); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{
+			Source: rootSessionID, Target: sessionID, Type: "spawned",
+		})
+		if featureID != "" {
+			edges = append(edges, graphEdge{
+				Source: sessionID, Target: featureID, Type: "worked_on",
+			})
 		}
 	}
 	return edges
