@@ -1868,20 +1868,17 @@ function renderGraph(data) {
       return d.type === 'spawned' ? '6,3' : null;
     });
 
-  // Node circles carry the type color as background, with an icon glyph
-  // inside for shape-based recognition. Uniform silhouette (all nodes
-  // are circles) reduces visual chaos; icons inside provide the
-  // differentiation without forcing the eye to parse nine distinct
-  // outline shapes at once.
+  // All nodes share ONE fill color (the feature slate). Type identity
+  // is carried entirely by the icon glyph inside — this turns the
+  // canvas into a uniform Obsidian-like field where the shape-language
+  // of the icons, not hue, distinguishes types. typeColor['feature']
+  // is used as the source so theme switches still work.
+  var uniformFill = typeColor['feature'] || '#9ca3af';
   var node = g.append('g').selectAll('circle')
     .data(nodes).enter().append('circle')
     .attr('r', visualRadius)
-    .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
-    .attr('fill-opacity', function(d) {
-      if (d.type === 'session') return 0.7;
-      if (d.type === 'file') return 0.7;
-      return GRAPH_LAYOUT.NODE_FILL_OPACITY;
-    })
+    .attr('fill', uniformFill)
+    .attr('fill-opacity', GRAPH_LAYOUT.NODE_FILL_OPACITY)
     .attr('stroke', 'var(--bg-primary)')
     .attr('stroke-width', 1.5)
     .attr('stroke-dasharray', function(d) { return d.type === 'plan' ? '4,2' : null; })
@@ -1904,14 +1901,12 @@ function renderGraph(data) {
   // inherits from --bg-primary so they read as "reversed out" text on
   // the circle fill, adapting to dark/light theme automatically.
   var ICON_MIN_SIZE = 10;
-  // Tracks and features are the most common node types — leaving them as
-  // plain colored circles keeps the canvas calm. Bug/spike/session/file
-  // icons are the "marked" types: they carry glyphs because their
-  // presence is informative (bugs = problems, spikes = investigations,
-  // sessions = agent runs, files = artifacts). Plan keeps its icon
-  // because it's visually similar to feature (both are work items) and
-  // the clipboard glyph disambiguates them.
-  var iconTypes = { plan:1, bug:1, spike:1, session:1, file:1 };
+  // All node types get an icon now — with uniform circle color (see
+  // below), the icon is the sole type differentiator. Glyphs are
+  // aligned with the terminal statusline metaphors: track=route,
+  // feature=lightbulb, bug=bug, spike=zap — so a user moving
+  // between the CLI prompt and the dashboard sees the same symbols.
+  var iconTypes = { track:1, plan:1, feature:1, bug:1, spike:1, session:1, file:1 };
   function iconSize(d) {
     return Math.max(ICON_MIN_SIZE, visualRadius(d) * 1.2);
   }
@@ -1930,7 +1925,7 @@ function renderGraph(data) {
   // in sync (used by drag/hover handlers that reuse typeColor).
   graphThemeObserver = new MutationObserver(function() {
     typeColor = getGraphPalette();
-    node.attr('fill', function(d) { return typeColor[d.type] || '#888'; });
+    node.attr('fill', typeColor['feature'] || '#9ca3af');
     paintGraphLegend();
   });
   graphThemeObserver.observe(document.documentElement, {
@@ -2039,11 +2034,7 @@ function renderGraph(data) {
     neighbors[id] = 1;
     icons.attr('opacity', function(d) { return neighbors[d.id] ? 0.95 : 0.08; });
     node.attr('fill-opacity', function(d) {
-      if (neighbors[d.id]) {
-        if (d.type === 'session' || d.type === 'file') return 0.7;
-        return GRAPH_LAYOUT.NODE_FILL_OPACITY;
-      }
-      return 0.08;
+      return neighbors[d.id] ? GRAPH_LAYOUT.NODE_FILL_OPACITY : 0.08;
     });
     trackLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
     hubLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
@@ -2058,10 +2049,7 @@ function renderGraph(data) {
     if (focusedNodeId === null) return;
     focusedNodeId = null;
     icons.attr('opacity', 0.95);
-    node.attr('fill-opacity', function(d) {
-      if (d.type === 'session' || d.type === 'file') return 0.7;
-      return GRAPH_LAYOUT.NODE_FILL_OPACITY;
-    });
+    node.attr('fill-opacity', GRAPH_LAYOUT.NODE_FILL_OPACITY);
     trackLabels.attr('opacity', 1);
     hubLabels.attr('opacity', 1);
     link.attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.55 : 0.10; });
