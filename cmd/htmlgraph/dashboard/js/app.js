@@ -1460,7 +1460,9 @@ var GRAPH_LAYOUT = {
     feature: 0.50,
     bug:     0.55,
     spike:   0.60,
-    session: 0.80
+    commit:  0.70,
+    session: 0.80,
+    file:    0.90
   },
   // Force-simulation cooldown. Lower starting alpha + faster decay
   // because nodes are pre-seeded near their final positions.
@@ -1484,7 +1486,9 @@ var GRAPH_LAYOUT = {
     plan:    '--text-muted',
     bug:     '--status-blocked',
     spike:   '--priority-high',
-    session: '--status-ip'
+    commit:  '--status-done',
+    session: '--status-ip',
+    file:    '--text-muted'
   },
   // Fill opacity for non-session nodes. Sessions stay at their
   // existing 0.6 — they're secondary. 0.88 takes a little more
@@ -1624,6 +1628,7 @@ function renderGraph(data) {
   // the circle actually provided and spilled onto the background.
   function visualRadius(d) {
     if (d.type === 'session') return Math.max(3, nodeRadius(d) * 0.6);
+    if (d.type === 'commit' || d.type === 'file') return Math.max(3, nodeRadius(d) * 0.5);
     return nodeRadius(d);
   }
 
@@ -1686,13 +1691,18 @@ function renderGraph(data) {
 
   // Edge color by relationship type for visual variety.
   var edgeColor = {
-    part_of:     '#4b5563',
-    blocked_by:  '#dc2626',
-    caused_by:   '#f59e0b',
-    implements:  '#3b82f6',
-    contains:    '#22c55e',
-    co_session:  '#8b5cf6',
-    worked_on:   '#06b6d4'
+    part_of:       '#4b5563',
+    blocked_by:    '#dc2626',
+    caused_by:     '#f59e0b',
+    implements:    '#3b82f6',
+    contains:      '#22c55e',
+    co_session:    '#8b5cf6',
+    worked_on:     '#06b6d4',
+    committed_for: '#10b981',
+    produced_by:   '#0ea5e9',
+    produced_in:   '#a78bfa',
+    touched_by:    '#6b7280',
+    spawned:       '#f97316'
   };
 
   // Edge lines — structural edges bolder, activity edges subtle.
@@ -1700,10 +1710,14 @@ function renderGraph(data) {
     .data(edges).enter().append('line')
     .attr('stroke', function(d) { return edgeColor[d.type] || '#6b7280'; })
     .attr('stroke-opacity', function(d) {
-      return d.type === 'worked_on' ? 0.25 : 0.6;
+      if (d.type === 'worked_on' || d.type === 'committed_for' || d.type === 'touched_by') return 0.25;
+      return 0.6;
     })
     .attr('stroke-width', function(d) {
       return d.type === 'worked_on' ? 0.7 : 1.2;
+    })
+    .attr('stroke-dasharray', function(d) {
+      return d.type === 'spawned' ? '6,3' : null;
     });
 
   // Node circles. Radius flows through visualRadius so the on-screen
@@ -1713,7 +1727,11 @@ function renderGraph(data) {
     .data(nodes).enter().append('circle')
     .attr('r', visualRadius)
     .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
-    .attr('fill-opacity', function(d) { return d.type === 'session' ? 0.6 : GRAPH_LAYOUT.NODE_FILL_OPACITY; })
+    .attr('fill-opacity', function(d) {
+      if (d.type === 'session') return 0.6;
+      if (d.type === 'commit' || d.type === 'file') return 0.5;
+      return GRAPH_LAYOUT.NODE_FILL_OPACITY;
+    })
     .attr('stroke', 'var(--bg-primary)')
     .attr('stroke-width', 1.5)
     // Plans share the grayscale tier with features. The dashed outline
