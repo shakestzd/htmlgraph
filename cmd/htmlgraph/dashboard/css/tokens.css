@@ -22,6 +22,12 @@
   --priority-critical: #ef4444;
   --error: #ef4444;
   --warning: #f59e0b;
+  /* Graph-specific colors. Separate from status/priority tokens so the
+     graph legend stays unambiguous: agent must not collide with spike
+     (both were --priority-high amber) and file must not collide with
+     plan (both were --text-muted grey). */
+  --graph-agent: #a855f7;  /* purple — AI workers */
+  --graph-file:  #94a3b8;  /* slate/cool grey — documents */
   --radius: 6px;
   --radius-sm: 4px;
   --font-sans: 'JetBrains Mono', ui-monospace, system-ui, sans-serif;
@@ -52,6 +58,8 @@
   --priority-critical: #dc2626;
   --error: #dc2626;
   --warning: #d97706;
+  --graph-agent: #7e22ce;  /* deeper purple for light mode contrast */
+  --graph-file:  #64748b;  /* darker slate for light mode contrast */
 }
 /* Light mode — event row adjustments */
 [data-theme="light"] .event-row:hover { background: rgba(74,110,0,0.04) !important; }

@@ -1487,10 +1487,10 @@ var GRAPH_LAYOUT = {
     plan:    '--text-muted',
     bug:     '--status-blocked',
     spike:   '--priority-high',
-    agent:   '--priority-high',
+    agent:   '--graph-agent',   // purple — was amber, collided with spike
     commit:  '--status-done',
     session: '--status-ip',
-    file:    '--text-muted'
+    file:    '--graph-file'     // slate — was muted grey, collided with plan
   },
   // Fill opacity for non-session nodes. Sessions stay at their
   // existing 0.6 — they're secondary. 0.88 takes a little more
@@ -1829,6 +1829,22 @@ function renderGraph(data) {
       })
     );
 
+  // Icon overlay — draw an SVG icon inside nodes that are large enough to
+  // read it. Small high-cardinality nodes (sessions, commits, files under
+  // ~10px radius) stay as colored circles only; icons there would be pixel
+  // mush. Icons inherit the node fill via currentColor so they follow the
+  // theme. Pointer-events disabled so drag/click still target the circle.
+  var ICON_MIN_RADIUS = 10;
+  var iconTypes = { track:1, plan:1, feature:1, bug:1, spike:1, agent:1, commit:1, session:1, file:1 };
+  var icons = g.append('g')
+    .attr('pointer-events', 'none')
+    .selectAll('use')
+    .data(nodes.filter(function(d) { return iconTypes[d.type] && visualRadius(d) >= ICON_MIN_RADIUS; }))
+    .enter().append('use')
+    .attr('href', function(d) { return '#icon-' + d.type; })
+    .attr('color', 'var(--bg-primary)')   // icon stroke/fill inherits via currentColor
+    .attr('opacity', 0.95);
+
   // Repaint nodes, labels, and legend on theme toggle without tearing
   // down the simulation. The closure captures `node` / the label
   // selections and reassigns `typeColor` so subsequent fill reads stay
@@ -2066,6 +2082,14 @@ function renderGraph(data) {
     node
       .attr('cx', function(d) { return d.x; })
       .attr('cy', function(d) { return d.y; });
+    // Icons sit at 60% of the node's visual radius so they don't touch the
+    // ring. Anchored via x/y = center - size/2 since <use> honors the symbol
+    // viewBox as its own coordinate space.
+    icons
+      .attr('width', function(d) { return visualRadius(d) * 1.2; })
+      .attr('height', function(d) { return visualRadius(d) * 1.2; })
+      .attr('x', function(d) { return d.x - visualRadius(d) * 0.6; })
+      .attr('y', function(d) { return d.y - visualRadius(d) * 0.6; });
     trackLabels
       .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
     hubLabels
@@ -2097,7 +2121,7 @@ function openProvenancePanel(nodeId) {
   var myToken = ++provenanceFetchToken;
   var signal = provenanceFetchController ? provenanceFetchController.signal : undefined;
 
-  fetch('/api/provenance/' + encodeURIComponent(nodeId), { signal: signal })
+  fetch(buildProjectUrl('provenance/' + encodeURIComponent(nodeId)), { signal: signal })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (myToken !== provenanceFetchToken) return;
