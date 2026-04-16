@@ -90,6 +90,9 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		// Derive spawned/worked_on edges from agent_lineage_trace.
 		edges = append(edges, loadAgentLineageEdges(database)...)
 
+		// Derive agent→session (ran_as) and agent→feature (worked_on) edges.
+		edges = append(edges, loadAgentEdges(database)...)
+
 		// Deduplicate edges (explicit DB edges may duplicate implicit ones).
 		edges = deduplicateEdges(edges)
 
@@ -297,6 +300,35 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 				ID:    path,
 				Type:  "file",
 				Title: filepath.Base(path),
+			})
+			trackIDs = append(trackIDs, "")
+		}
+	}
+
+	// Agent nodes — distinct agent names from lineage trace and sessions.
+	agentRows, agentErr := database.Query(`
+		SELECT agent_name, COUNT(*) as activity
+		FROM (
+			SELECT agent_name FROM agent_lineage_trace WHERE agent_name != ''
+			UNION ALL
+			SELECT agent_assigned FROM sessions WHERE agent_assigned != ''
+		)
+		GROUP BY agent_name
+		ORDER BY activity DESC
+		LIMIT 100`)
+	if agentErr == nil {
+		defer agentRows.Close()
+		for agentRows.Next() {
+			var name string
+			var activity int
+			if err := agentRows.Scan(&name, &activity); err != nil {
+				continue
+			}
+			nodes = append(nodes, graphNode{
+				ID:       name,
+				Type:     "agent",
+				Title:    name,
+				Activity: activity,
 			})
 			trackIDs = append(trackIDs, "")
 		}
@@ -643,6 +675,31 @@ func loadAgentLineageEdges(database *sql.DB) []graphEdge {
 			edges = append(edges, graphEdge{
 				Source: sessionID, Target: featureID, Type: "worked_on",
 			})
+		}
+	}
+	return edges
+}
+
+// loadAgentEdges derives agent→session (ran_as) and agent→feature (worked_on)
+// edges from agent_lineage_trace.
+func loadAgentEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT agent_name, session_id, COALESCE(feature_id, '')
+		FROM agent_lineage_trace
+		WHERE agent_name != ''`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var agent, sid, fid string
+		if err := rows.Scan(&agent, &sid, &fid); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{Source: agent, Target: sid, Type: "ran_as"})
+		if fid != "" {
+			edges = append(edges, graphEdge{Source: agent, Target: fid, Type: "worked_on"})
 		}
 	}
 	return edges

@@ -164,6 +164,8 @@ var knownNodeTypes = map[string]string{
 	"file":     "file",
 	"sessions": "session",
 	"session":  "session",
+	"agents":   "agent",
+	"agent":    "agent",
 }
 
 func isNodeType(s string) bool {

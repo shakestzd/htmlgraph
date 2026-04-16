@@ -1457,6 +1457,7 @@ var GRAPH_LAYOUT = {
   TYPE_BAND_Y: {
     track:   0.20,
     plan:    0.30,
+    agent:   0.35,
     feature: 0.50,
     bug:     0.55,
     spike:   0.60,
@@ -1486,6 +1487,7 @@ var GRAPH_LAYOUT = {
     plan:    '--text-muted',
     bug:     '--status-blocked',
     spike:   '--priority-high',
+    agent:   '--priority-high',
     commit:  '--status-done',
     session: '--status-ip',
     file:    '--text-muted'
@@ -1629,6 +1631,7 @@ function renderGraph(data) {
   function visualRadius(d) {
     if (d.type === 'session') return Math.max(3, nodeRadius(d) * 0.6);
     if (d.type === 'commit' || d.type === 'file') return Math.max(3, nodeRadius(d) * 0.5);
+    if (d.type === 'agent') return Math.max(4, nodeRadius(d) * 0.8);
     return nodeRadius(d);
   }
 
@@ -1702,7 +1705,8 @@ function renderGraph(data) {
     produced_by:   '#0ea5e9',
     produced_in:   '#a78bfa',
     touched_by:    '#6b7280',
-    spawned:       '#f97316'
+    spawned:       '#f97316',
+    ran_as:        '#f59e0b'
   };
 
   // Edge lines — structural edges bolder, activity edges subtle.
