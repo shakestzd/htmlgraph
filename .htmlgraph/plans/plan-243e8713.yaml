@@ -1,0 +1,343 @@
+meta:
+    id: plan-243e8713
+    track_id: trk-0677c709
+    title: Rich work graph — commit, file, and agent lineage nodes with unified provenance view
+    description: |
+        Extend the dashboard graph from work-item-only relationships to a full causal chain: add commit and file node types, materialize session hierarchy and agent lineage edges, build provenance query API endpoints, and render the unified graph in the D3 dashboard. Currently 1273 nodes / 1291 edges with zero commit or file nodes. The raw data exists in SQLite (51 git_commits, 299 feature_files, 141 agent_lineage_trace, 139 parent-child sessions) — it just needs to be surfaced as graph nodes and edges.
+    created_at: "2026-04-16"
+    status: draft
+    created_by: claude-opus
+    version: 1
+design:
+    problem: |
+        HtmlGraph's core value proposition is "see the full graph of AI-assisted work" — but the graph currently only shows work items (features, bugs, spikes, tracks) and a handful of filtered sessions. The causal chain (agent spawned → session created → feature claimed → commits produced → files modified) is entirely absent from the visualization. The raw data exists in SQLite across 5 tables (git_commits: 51 rows, feature_files: 299 rows, agent_lineage_trace: 141 rows, sessions: 139 parent→child pairs, tool_calls: 1454 rows) but none of it is surfaced as graph nodes or edges. The /api/graph endpoint only queries features, tracks, and sessions (with a >5 events filter), and the D3 frontend only has color/layout mappings for 6 node types. The internal/graph DSL and algorithms also don't model commit or file node types.
+    goals:
+        - '**Complete causal chain** — every agent spawn, session, commit, and file modification is a visible, clickable node in the graph'
+        - '**Provenance in one click** — clicking any node reveals its full upstream/downstream chain (who spawned the agent, what feature it worked on, what commits it produced, what files were touched)'
+        - '**Query API** — REST endpoints that answer ''what commits came from agent X?'', ''which sessions touched file Y?'', ''what agents worked on feature Z?'' returning structured JSON'
+        - '**Performance at scale** — graph renders smoothly with 2000+ nodes; query-time derivation for cheap joins, materialization only for hot dashboard paths'
+    constraints:
+        - Hybrid materialization — derive edges at query time where joins are cheap (< 50ms); only materialize into graph_edges for edges used in hot paths (graph API, lineage command)
+        - No schema-breaking changes — extend existing tables and graph_edges, don't replace them
+        - D3 force layout must remain usable — new node types need distinct visual treatment to avoid clutter (smaller radius, lower opacity, type-band positioning)
+        - Backward compatible API — existing /api/graph consumers must not break; new node/edge types are additive
+        - File nodes are high-cardinality — 299 feature_files today, could be 1000+ at scale. Must support filtering or pagination
+    approved: false
+    comment: ""
+slices:
+    - id: slice-1
+      num: 1
+      title: Commit and file nodes in graph API
+      what: |
+        Add commit and file nodes to the /api/graph endpoint in cmd/htmlgraph/api_graph.go.
+        1. Add a new query branch in loadGraphNodes (after the sessions query, ~line 250) that
+           reads from git_commits: SELECT commit_hash, 'commit', SUBSTR(message,1,80), 'done',
+           feature_id, session_id FROM git_commits. Map to graphNode with id=commit_hash,
+           type="commit", title=truncated message.
+
+        2. Add another query branch for files from feature_files: SELECT DISTINCT file_path,
+           'file', file_path, '' FROM feature_files. Map to graphNode with id=file_path,
+           type="file", title=basename(file_path). Deduplicate by file_path since multiple
+           features may touch the same file.
+
+        3. Create edges: commit→feature (type="committed_for"), commit→session (type="produced_by"),
+           file→commit (type="modified_in"), file→feature (type="touched_by"). These are derived
+           at query time from the existing foreign keys in git_commits and feature_files tables —
+           no graph_edges materialization needed.
+
+        4. Update the graphNode struct if needed (no new fields required — id, type, title, status,
+           edges, activity already cover everything).
+      why: |
+        This is the foundational slice. Without commit and file nodes in the API response, no downstream work (frontend, provenance, queries) can surface them. The data already exists in git_commits and feature_files — this slice just queries it and formats it as graph nodes with derived edges.
+      files:
+        - cmd/htmlgraph/api_graph.go
+      deps: []
+      done_when:
+        - GET /api/graph returns nodes with type='commit' (from git_commits table)
+        - GET /api/graph returns nodes with type='file' (from feature_files table, deduplicated)
+        - Edges exist between commit→feature, commit→session, file→commit, and file→feature
+        - Existing node types (feature, bug, track, session, spike, plan) are unchanged
+        - No N+1 queries — commit and file nodes loaded in bulk queries
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestGraphAPICommitNodes — insert test git_commits rows, call loadGraphNodes, assert commit nodes in response with correct type/title
+        Unit: TestGraphAPIFileNodes — insert test feature_files rows, assert file nodes deduplicated by path
+        Unit: TestGraphAPIDerivedEdges — assert commit→feature and file→feature edges are present
+        Integration: curl /api/graph, parse JSON, verify commit and file nodes appear alongside existing types
+        Regression: existing graph API tests must still pass
+      approved: false
+      comment: ""
+    - id: slice-2
+      num: 2
+      title: Session hierarchy and agent lineage edges
+      what: |
+        Add parent→child session edges and agent lineage edges to the graph API.
+        1. In loadGraphNodes or a new loadSessionHierarchyEdges function in api_graph.go,
+           query: SELECT session_id, parent_session_id FROM sessions WHERE parent_session_id
+           IS NOT NULL AND parent_session_id != ''. Create graphEdge with type="spawned" for
+           each parent→child pair.
+
+        2. Add agent lineage edges from agent_lineage_trace: SELECT trace_id, session_id,
+           root_session_id, agent_name, feature_id FROM agent_lineage_trace. Create edges:
+           root_session→child_session (type="spawned"), agent→feature (type="worked_on")
+           where feature_id is not null. Avoid duplicating edges already created by the
+           session hierarchy query.
+
+        3. Relax the session node filter. Currently sessions require >5 agent_events AND
+           at least one message (api_graph.go ~line 218). This excludes subagent sessions
+           that do real work but have few events. Add a second path: also include any session
+           that appears in agent_lineage_trace OR has parent_session_id set, regardless of
+           event count. Cap total session nodes at 500 to prevent graph overload.
+      why: |
+        The session hierarchy is the backbone of the causal chain — it shows how the orchestrator spawns subagents. Without these edges, sessions float as isolated nodes. The agent lineage data (141 rows) is already captured but invisible in the graph. Relaxing the session filter surfaces subagent sessions that are currently hidden.
+      files:
+        - cmd/htmlgraph/api_graph.go
+      deps: []
+      done_when:
+        - Parent→child session edges appear in /api/graph response with type='spawned'
+        - Agent lineage trace sessions appear as nodes even if they have <5 events
+        - Total session nodes capped at 500
+        - No duplicate edges between sessions (deduplicated across hierarchy and lineage sources)
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestSessionHierarchyEdges — insert parent/child sessions, verify spawned edges
+        Unit: TestAgentLineageEdges — insert lineage traces with feature_id, verify worked_on edges
+        Unit: TestRelaxedSessionFilter — insert session with 2 events but parent_session_id, verify it appears
+        Regression: existing session filtering still works for sessions without parents
+      approved: false
+      comment: ""
+    - id: slice-3
+      num: 3
+      title: D3 frontend — render commit and file nodes with visual distinction
+      what: |
+        Update the D3 graph rendering in cmd/htmlgraph/dashboard/js/app.js to handle commit and file node types.
+        1. Add TYPE_BAND_Y entries (~line 1639): commit=0.70, file=0.90 (below features,
+           near sessions). This prevents commit/file nodes from landing in the feature band.
+
+        2. Add TYPE_TOKEN entries (~line 1480): commit='--status-done' (muted green/teal),
+           file='--text-muted' (light gray). These should be visually subdued since there
+           are many of them.
+
+        3. Add edgeColor entries (~line 1687): committed_for='#10b981', produced_by='#0ea5e9',
+           modified_in='#a78bfa', touched_by='#6b7280', spawned='#f97316'.
+
+        4. Reduce visual weight for commit/file nodes: in nodeRadius, apply a 0.5 multiplier
+           for type==='commit' or type==='file' (similar to session's 0.6). In fill opacity,
+           use 0.5 for these types.
+
+        5. Update click handler (~line 1815): commit nodes could link to git show or remain
+           as tooltip-only. File nodes could open a file detail view or remain tooltip-only.
+           For MVP, show enhanced tooltip with full commit hash/message or full file path.
+
+        6. Update the HTML legend in the dashboard template to include commit and file
+           entries with [data-graph-type] attributes.
+
+        7. Add edge styling: spawned edges get stroke-dasharray='6,3' (dashed) to distinguish
+           from structural edges. committed_for and touched_by get low opacity (0.3) like
+           worked_on to reduce visual noise.
+      why: |
+        Without frontend changes, commit and file nodes would render as gray circles with no labels, no distinct position, and incorrect sizing — making the graph harder to read, not easier. Visual distinction is critical because these node types are high-cardinality and should be visually subordinate to the work item structure.
+      files:
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/index.html
+      deps:
+        - 1
+        - 2
+      done_when:
+        - Commit nodes render in teal/green with reduced radius, positioned in the 0.70 Y band
+        - File nodes render in muted gray with reduced radius, positioned in the 0.90 Y band
+        - New edge types have distinct colors in the visualization
+        - Legend shows commit and file entries
+        - Spawned edges render as dashed lines
+        - Graph remains readable with 2000+ nodes (no overlapping clusters)
+      effort: M
+      risk: Med
+      tests: |
+        Visual: Start dashboard, verify commit nodes appear as small teal circles below features
+        Visual: Verify file nodes appear as small gray circles at the bottom
+        Visual: Verify spawned edges are dashed orange lines
+        Visual: Verify legend has 8 entries (track, feature, bug, spike, plan, session, commit, file)
+        Regression: existing node types still render correctly with correct colors and sizing
+      approved: false
+      comment: ""
+    - id: slice-4
+      num: 4
+      title: Provenance query API — per-node causal chain endpoints
+      what: |
+        Add REST endpoints to cmd/htmlgraph/api_graph.go (or a new api_provenance.go file) that return the causal chain for any node.
+        1. GET /api/provenance/<id> — returns the full upstream and downstream chain for any
+           node ID (feature, session, commit, file path). Uses the existing lineage.go BFS
+           logic (or calls it directly) to traverse graph_edges + derived edges. Response:
+           { node: {...}, upstream: [{id, type, title, relationship}...], downstream: [...] }
+
+        2. GET /api/graph/commits?feature=<id> — returns commits linked to a feature.
+           Query: SELECT * FROM git_commits WHERE feature_id = ? ORDER BY timestamp DESC.
+
+        3. GET /api/graph/files?feature=<id> — returns files touched by a feature.
+           Query: SELECT * FROM feature_files WHERE feature_id = ? ORDER BY file_path.
+
+        4. GET /api/graph/sessions?feature=<id> — already partially exists via
+           internal/graph/sessions.go SessionsForFeature. Wire it to an HTTP endpoint.
+
+        5. Register all new routes in the project mux (alongside existing /api/graph).
+      why: |
+        The graph visualization shows the big picture, but users need to drill into a specific node's causal chain. These endpoints power both the dashboard drill-down and CLI consumers. The lineage command already does this for CLI — these endpoints bring it to the web UI.
+      files:
+        - cmd/htmlgraph/api_graph.go
+        - cmd/htmlgraph/server.go
+      deps:
+        - 1
+      done_when:
+        - GET /api/provenance/<feature-id> returns upstream sessions and downstream commits/files
+        - GET /api/graph/commits?feature=<id> returns commit list for a feature
+        - GET /api/graph/files?feature=<id> returns file list for a feature
+        - GET /api/graph/sessions?feature=<id> returns session list for a feature
+        - All endpoints return proper JSON with correct Content-Type headers
+        - 404 for unknown IDs, empty arrays for nodes with no connections
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestProvenanceEndpoint — insert feature with linked commits/files/sessions, assert full chain returned
+        Unit: TestCommitsByFeature — insert 3 commits for feat-X, verify /api/graph/commits?feature=feat-X returns all 3
+        Unit: TestFilesByFeature — similar for files
+        Integration: curl each endpoint, verify JSON schema and correct data
+        Regression: /api/graph still works as before
+      approved: false
+      comment: ""
+    - id: slice-5
+      num: 5
+      title: Dashboard provenance panel — click-to-drill node detail
+      what: |
+        Add a provenance detail panel to the dashboard that opens when clicking a graph node.
+        1. In app.js, modify the graph click handler (~line 1815). Instead of navigating away,
+           open a slide-in panel (or modal) that shows the node's causal chain. Call
+           GET /api/provenance/<id> and render the result.
+
+        2. Panel layout:
+           - Header: node title, type badge, status
+           - Upstream section: "Where did this come from?" — list of parent nodes with
+             relationship labels (e.g., "spawned by Session abc", "part of Track XYZ")
+           - Downstream section: "What did this produce?" — list of child nodes
+             (e.g., "produced Commit def123", "touched File src/foo.go")
+           - Each item in the chain is clickable to navigate to that node's provenance
+
+        3. For session nodes: also show agent name, duration, tool call count 4. For commit nodes: show full hash, message, timestamp, author 5. For file nodes: show all features that touched this file, with session attribution
+        6. Add the panel HTML to dashboard/index.html and CSS to dashboard/css/style.css.
+           Use the existing panel patterns from the session detail or work detail views.
+      why: |
+        The graph shows relationships visually, but users need structured detail on demand. The provenance panel is the "explain this node" view that makes the graph actionable — not just a pretty picture but an investigation tool.
+      files:
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/index.html
+        - cmd/htmlgraph/dashboard/css/style.css
+      deps:
+        - 3
+        - 4
+      done_when:
+        - Clicking any graph node opens a provenance panel showing upstream and downstream chain
+        - Panel shows relationship labels between nodes
+        - Each chain item is clickable to navigate to that node
+        - Panel closes cleanly and doesn't interfere with graph interaction
+        - Panel renders correctly in both light and dark themes
+      effort: L
+      risk: Med
+      tests: |
+        Visual: Click a feature node, verify panel shows linked sessions, commits, files
+        Visual: Click a session node, verify panel shows agent name and spawned-by chain
+        Visual: Click a commit node, verify panel shows full hash and linked feature
+        Visual: Click chain items to navigate between nodes
+        Visual: Toggle theme, verify panel colors update
+        Regression: existing click handlers (session→transcript, work item→detail) still work
+      approved: false
+      comment: ""
+    - id: slice-6
+      num: 6
+      title: Extend internal/graph DSL and algorithms for new node types
+      what: |
+        Update the internal/graph package to model commit and file node types.
+        1. In dsl.go, add "commit" and "file" to knownNodeTypes (around the type mapping).
+           This enables DSL queries like: feature[status=in-progress] -> committed_for -> commit
+
+        2. In algorithms.go, no changes needed — BFS/DFS already operate on graph_edges
+           generically. But verify that new edge types (committed_for, produced_by, modified_in,
+           touched_by, spawned) work correctly with DBShortestPath and DBReachable.
+
+        3. In sessions.go, extend SessionsForFeature to also return commit and file data
+           alongside session links (or add parallel functions CommitsForFeature, FilesForFeature).
+
+        4. In querybuilder.go, ensure the UNION query that resolves node metadata includes
+           git_commits and feature_files tables so commit/file nodes can be resolved by the
+           query builder.
+      why: |
+        The internal/graph package is used by CLI commands (graph cycles, graph path, graph reach) and the lineage command. Without these changes, queries involving commit or file nodes will fail silently or return incomplete results.
+      files:
+        - internal/graph/dsl.go
+        - internal/graph/sessions.go
+        - internal/graph/querybuilder.go
+      deps:
+        - 1
+      done_when:
+        - DSL queries like 'feature -> committed_for -> commit' parse and execute correctly
+        - DBShortestPath between a feature and a commit traverses through committed_for edges
+        - QueryBuilder resolves commit and file node metadata (title, type)
+        - No regressions in existing graph CLI commands
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestDSLCommitQuery — parse "feature -> committed_for -> commit", verify execution
+        Unit: TestQueryBuilderCommitResolution — resolve a commit node, verify title is commit message
+        Unit: TestShortestPathWithCommits — insert feature→commit edge, verify path found
+        Regression: all existing graph tests pass
+      approved: false
+      comment: ""
+questions:
+    - id: q-file-node-granularity
+      text: How should file nodes be represented — one node per unique path, or one node per (feature, path) pair?
+      description: |
+        feature_files has 299 rows but many files are touched by multiple features. If we create one node per unique file path, the graph is smaller but a file node connects to multiple features (showing cross-feature file coupling). If we create one node per (feature, path) pair, the graph has more nodes but each file node connects to exactly one feature. The former is more useful for understanding file hotspots; the latter avoids noisy many-to-many edges but loses the coupling signal.
+      recommended: unique-path
+      options:
+        - key: unique-path
+          label: One node per unique file path — shows cross-feature coupling, smaller graph, file nodes connect to multiple features
+        - key: per-feature-path
+          label: One node per (feature, path) pair — larger graph, cleaner edges, no cross-feature coupling visible
+      answer: null
+    - id: q-edge-materialization
+      text: Should new edge types (committed_for, spawned, touched_by) be materialized in graph_edges or derived at query time?
+      description: |
+        The design constraint says 'hybrid materialization'. commit→feature edges are cheap to derive (JOIN git_commits ON feature_id), so query-time derivation avoids write complexity. But the lineage command and graph CLI algorithms only read graph_edges — they won't see query-time-derived edges. Materializing all edges means the lineage command works out of the box but adds write complexity to the reindex path.
+      recommended: materialize-on-reindex
+      options:
+        - key: query-time-only
+          label: Query-time derivation only — simpler writes, but lineage/graph CLI won't see new edges without code changes
+        - key: materialize-on-reindex
+          label: Materialize into graph_edges during reindex — lineage/graph CLI work automatically, edges rebuilt on every reindex
+        - key: dual-path
+          label: Both — derive at query time in API, also materialize on reindex for CLI. Most complete but most complex
+      answer: null
+    - id: q-session-filter-threshold
+      text: What should the session node inclusion threshold be?
+      description: |
+        Currently sessions need >5 agent_events AND at least one message to appear in the graph. This filters out subagent sessions (which are the most interesting for causal chains). We need to relax this, but including ALL 516 sessions would overwhelm the graph. Options range from including only sessions with lineage data to including all sessions with a cap.
+      recommended: lineage-plus-threshold
+      options:
+        - key: lineage-plus-threshold
+          label: Include sessions in agent_lineage_trace OR with parent_session_id, PLUS existing >5 events filter. Estimated ~200 nodes.
+        - key: all-with-cap
+          label: Include all sessions, cap at 500 most recent. Simple but may include noise.
+        - key: connected-only
+          label: Include only sessions that have at least one edge to a work item (via agent_events, feature_files, or git_commits). Most selective.
+      answer: null
+    - id: q-provenance-panel-vs-page
+      text: Should the provenance drill-down be an inline panel or a separate page/view?
+      description: |
+        The dashboard currently uses view switching (Activity, Sessions, Work, Graph, Plans tabs). A provenance panel could be a slide-in overlay on the graph view (keeping the graph visible in the background) or a separate view tab. The overlay approach is more interactive (click node → see chain → click chain item → update panel) but adds UI complexity. A separate view is simpler but loses the visual graph context.
+      recommended: slide-in-panel
+      options:
+        - key: slide-in-panel
+          label: Slide-in panel overlaying the graph — interactive, keeps visual context, more complex to implement
+        - key: separate-view
+          label: New 'Provenance' tab — simpler, loses graph context, similar to existing Work detail view
+      answer: null
