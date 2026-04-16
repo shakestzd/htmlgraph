@@ -1470,7 +1470,7 @@ var GRAPH_LAYOUT = {
   // Inter-node repulsion. More negative = more spread. Tuned by eye
   // on a 500+ node graph; -220 gives the dense center room to breathe
   // without blowing the whole graph outside the viewport.
-  CHARGE_STRENGTH: -220,
+  CHARGE_STRENGTH: -320,
   // Per-type fill, keyed to design-system tokens so the graph inherits
   // the active theme automatically. Resolved live via
   // getComputedStyle(document.documentElement) at every getGraphPalette()
@@ -1807,7 +1807,9 @@ function renderGraph(data) {
     .alphaDecay(GRAPH_LAYOUT.SIM_ALPHA_DECAY)
     .force('link', d3.forceLink(edges).id(function(d) { return d.id; })
       .distance(function(d) {
-        return d.type === 'worked_on' ? 70 : 45;
+        if (d.type === 'worked_on') return 90;
+        if (d.type === 'part_of') return 70;     // feature -> track spacing
+        return 55;
       })
       .strength(function(d) {
         // Structural edges dominate the layout; activity edges are loose.
@@ -1819,7 +1821,16 @@ function renderGraph(data) {
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('x', d3.forceX(width / 2).strength(0.015))
     .force('y', d3.forceY(height / 2).strength(0.015))
-    .force('collision', d3.forceCollide().radius(function(d) { return visualRadius(d) + 3; }));
+    // Collision padding reserves space around each node so glyphs and
+    // labels don't overlap neighbors. Track nodes get a much larger
+    // pad because they carry a static text label below them — the
+    // label needs vertical breathing room or other nodes drift on top.
+    .force('collision', d3.forceCollide()
+      .radius(function(d) {
+        if (d.type === 'track') return visualRadius(d) + 26; // room for the label
+        return visualRadius(d) + 5;
+      })
+      .strength(0.9));
 
   // Edge color by relationship type for visual variety.
   var edgeColor = {
