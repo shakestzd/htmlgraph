@@ -30,7 +30,7 @@
      is retained for completeness even though agent nodes are filtered
      out of the graph — the dropdown legend still uses the token. */
   --graph-plan:    #14b8a6;  /* teal — blueprints */
-  --graph-feature: #e5e7eb;  /* near-white — headline work item */
+  --graph-feature: #9ca3af;  /* soft slate — not glaring in dark mode */
   --graph-file:    #eab308;  /* gold — document artifacts */
   --graph-agent:   #a855f7;  /* purple — AI workers (filter only) */
   --radius: 6px;

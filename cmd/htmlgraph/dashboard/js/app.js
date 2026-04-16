@@ -2027,17 +2027,32 @@ function renderGraph(data) {
     var neighbors = adjacency[id] || {};
     neighbors[id] = 1;
     icons.attr('opacity', function(d) { return neighbors[d.id] ? 0.95 : 0.08; });
+    node.attr('fill-opacity', function(d) {
+      if (neighbors[d.id]) {
+        if (d.type === 'session' || d.type === 'file') return 0.7;
+        return GRAPH_LAYOUT.NODE_FILL_OPACITY;
+      }
+      return 0.08;
+    });
+    trackLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
+    hubLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
     link.attr('stroke-opacity', function(d) {
       var s = d.source.id || d.source;
       var t = d.target.id || d.target;
-      if (s === id || t === id) return 0.9;          // incident edges full weight
-      return isStructuralEdge(d) ? 0.05 : 0.02;      // everything else fades hard
+      if (s === id || t === id) return 0.9;
+      return isStructuralEdge(d) ? 0.05 : 0.02;
     });
   }
   function clearFocus() {
     if (focusedNodeId === null) return;
     focusedNodeId = null;
     icons.attr('opacity', 0.95);
+    node.attr('fill-opacity', function(d) {
+      if (d.type === 'session' || d.type === 'file') return 0.7;
+      return GRAPH_LAYOUT.NODE_FILL_OPACITY;
+    });
+    trackLabels.attr('opacity', 1);
+    hubLabels.attr('opacity', 1);
     link.attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.55 : 0.10; });
   }
 
@@ -2144,27 +2159,52 @@ function renderGraph(data) {
   // paint-order stroke — labels wrap inside the node radius, never
   // cross onto the background, and a dark halo would visibly thicken
   // and blur the small font sizes that fit inside sub-20px nodes.
-  // Labels are currently disabled — the icon-only mode carries identity
-  // via glyph + color, and wrapped text inside small circles added more
-  // visual noise than signal. The tick handler and theme observer still
-  // reference trackLabels/hubLabels selections, so we create empty ones
-  // rather than stripping the references.
-  var trackLabelNodes = [];
-  var trackLabelGroup = g.append('g').style('display', 'none');
+  // Obsidian-style labels below each track and feature. Only the
+  // highest-cardinality work-item types get labels — bugs/spikes/
+  // sessions/files stay glyph-only to keep the canvas quiet. Labels
+  // sit OUTSIDE the circle (not wrapped inside) so small nodes still
+  // get a short title without squeezing unreadable 6px text.
+  var trackLabelNodes = nodes.filter(function(d) { return d.type === 'track'; });
+  var trackLabelGroup = g.append('g').attr('pointer-events', 'none');
   var trackLabels = trackLabelGroup.selectAll('text.track-label')
     .data(trackLabelNodes)
-    .enter().append('text');
+    .enter().append('text')
+    .attr('class', 'track-label')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'hanging')
+    .attr('font-size', '11px')
+    .attr('font-weight', '600')
+    .attr('fill', 'var(--text-primary)')
+    .text(function(d) { return truncateForNodeLabel(d.title || d.id, 36); });
 
-  // Hub node labels — fit inside the circle when node is large enough.
-  // Uses visualRadius (not nodeRadius) so the "is this big enough to
-  // label?" test matches the ACTUAL on-screen size, which for session
-  // nodes is 60% of nodeRadius. Without this, session labels thought
-  // they had 67% more space than the circle actually provided and
-  // spilled onto the background.
-  // Hub labels disabled alongside track labels — see comment above.
-  var hubLabels = g.append('g').style('display', 'none').selectAll('text.hub-label')
-    .data([])
-    .enter().append('text');
+  // Feature labels use a lighter weight and a bit smaller font so the
+  // track titles (which are the higher-level containers) read as
+  // primary. Only features with enough edge activity get labeled; the
+  // long tail of low-activity features stays anonymous to avoid a
+  // wall of text.
+  var featureLabelNodes = nodes.filter(function(d) {
+    return d.type === 'feature' && (d.edges || 0) >= 2;
+  });
+  var hubLabels = g.append('g').attr('pointer-events', 'none').selectAll('text.hub-label')
+    .data(featureLabelNodes)
+    .enter().append('text')
+    .attr('class', 'hub-label')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'hanging')
+    .attr('font-size', '10px')
+    .attr('font-weight', '400')
+    .attr('fill', 'var(--text-secondary)')
+    .text(function(d) { return truncateForNodeLabel(d.title || d.id, 30); });
+
+  // truncateForNodeLabel — short helper; wraps a title at word boundary
+  // if it exceeds max chars. Kept local to renderGraph so the existing
+  // wrapTextInCircle (still used elsewhere) isn't touched.
+  function truncateForNodeLabel(s, max) {
+    if (!s || s.length <= max) return s || '';
+    var cut = s.lastIndexOf(' ', max);
+    if (cut < max / 2) cut = max;
+    return s.slice(0, cut).replace(/[ ,.;:]+$/, '') + '…';
+  }
 
   graphSimulation.on('tick', function() {
     link
@@ -2183,10 +2223,14 @@ function renderGraph(data) {
       .attr('height', iconSize)
       .attr('x', function(d) { return d.x - iconSize(d) / 2; })
       .attr('y', function(d) { return d.y - iconSize(d) / 2; });
+    // Labels sit just BELOW the node (Obsidian-style). Offset is the
+    // node radius + a small gap so the text doesn't touch the ring.
     trackLabels
-      .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+      .attr('x', function(d) { return d.x; })
+      .attr('y', function(d) { return d.y + visualRadius(d) + 4; });
     hubLabels
-      .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+      .attr('x', function(d) { return d.x; })
+      .attr('y', function(d) { return d.y + visualRadius(d) + 3; });
   });
 }
 
