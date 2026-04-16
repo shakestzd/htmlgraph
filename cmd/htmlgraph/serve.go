@@ -66,7 +66,6 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 		respondJSON(w, map[string]any{
 			"mode":        "single",
 			"projectName": projectName,
-			"projectDir":  projectDir,
 		})
 	}))
 
