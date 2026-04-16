@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -26,8 +27,23 @@ type graphEdge struct {
 
 // graphData is the full response shape for /api/graph.
 type graphData struct {
-	Nodes []graphNode `json:"nodes"`
-	Edges []graphEdge `json:"edges"`
+	Nodes []graphNode        `json:"nodes"`
+	Edges []graphEdge        `json:"edges"`
+	Caps  map[string]capInfo `json:"caps,omitempty"`
+}
+
+// capInfo shows how many nodes of a type were available vs shown.
+type capInfo struct {
+	Total int `json:"total"`
+	Shown int `json:"shown"`
+}
+
+// perTypeCaps limits high-cardinality types. Uncapped types are absent.
+var perTypeCaps = map[string]int{
+	"session": 300,
+	"commit":  200,
+	"file":    200,
+	"agent":   100,
 }
 
 // graphAPIHandler returns a force-directed graph payload for the dashboard.
@@ -114,6 +130,57 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 			nodes[i].Activity = activityCounts[nodes[i].ID]
 		}
 
+		// Type filter: ?types=feature,session limits to those types.
+		caps := make(map[string]capInfo)
+		if typesParam := r.URL.Query().Get("types"); typesParam != "" {
+			allowed := make(map[string]bool)
+			for _, t := range strings.Split(typesParam, ",") {
+				allowed[strings.TrimSpace(t)] = true
+			}
+			filtered := make([]graphNode, 0, len(nodes))
+			for _, n := range nodes {
+				if allowed[n.Type] {
+					filtered = append(filtered, n)
+				}
+			}
+			nodes = filtered
+		}
+
+		// Per-type caps: sort capped types by activity DESC, truncate.
+		byType := make(map[string][]int) // type → indices into nodes
+		for i, n := range nodes {
+			byType[n.Type] = append(byType[n.Type], i)
+		}
+		keep := make(map[int]bool, len(nodes))
+		for t, indices := range byType {
+			cap, capped := perTypeCaps[t]
+			total := len(indices)
+			if capped && total > cap {
+				// Sort by activity DESC — keep highest-activity nodes.
+				sortByActivity(nodes, indices)
+				for _, idx := range indices[:cap] {
+					keep[idx] = true
+				}
+				caps[t] = capInfo{Total: total, Shown: cap}
+			} else {
+				for _, idx := range indices {
+					keep[idx] = true
+				}
+				if capped {
+					caps[t] = capInfo{Total: total, Shown: total}
+				}
+			}
+		}
+		if len(caps) > 0 {
+			capped := make([]graphNode, 0, len(keep))
+			for i, n := range nodes {
+				if keep[i] {
+					capped = append(capped, n)
+				}
+			}
+			nodes = capped
+		}
+
 		// Filter orphans unless ?all=true.
 		if !includeAll {
 			filtered := make([]graphNode, 0, len(nodes))
@@ -151,7 +218,11 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 			edges = []graphEdge{}
 		}
 
-		respondJSON(w, graphData{Nodes: nodes, Edges: edges})
+		var capsOut map[string]capInfo
+		if len(caps) > 0 {
+			capsOut = caps
+		}
+		respondJSON(w, graphData{Nodes: nodes, Edges: edges, Caps: capsOut})
 	}
 }
 
@@ -724,6 +795,15 @@ func loadGraphEdges(database *sql.DB) ([]graphEdge, error) {
 		edges = append(edges, e)
 	}
 	return edges, rows.Err()
+}
+
+// sortByActivity sorts the given index slice by the activity of the
+// corresponding nodes (descending). Used to keep highest-activity nodes
+// when applying per-type caps.
+func sortByActivity(nodes []graphNode, indices []int) {
+	sort.Slice(indices, func(i, j int) bool {
+		return nodes[indices[i]].Activity > nodes[indices[j]].Activity
+	})
 }
 
 // deduplicateEdges removes duplicate (source, target, type) triples.

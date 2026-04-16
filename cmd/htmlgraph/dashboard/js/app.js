@@ -1551,8 +1551,13 @@ function paintGraphLegend() {
   }
 }
 
-function fetchGraph() {
-  fetch(buildProjectUrl('graph'))
+// Active type filter state — null means "show all".
+var graphActiveTypes = null;
+
+function fetchGraph(types) {
+  var url = buildProjectUrl('graph');
+  if (types && types.length > 0) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'types=' + types.join(',');
+  fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       document.getElementById('graph-count').textContent = data.nodes ? data.nodes.length : 0;
@@ -1576,6 +1581,45 @@ function renderGraph(data) {
   if (oldSvg) oldSvg.remove();
   var oldTip = container.querySelector('.graph-tooltip');
   if (oldTip) oldTip.remove();
+
+  // Build or update the filter toolbar.
+  var oldToolbar = container.querySelector('.graph-filter-toolbar');
+  if (oldToolbar) oldToolbar.remove();
+  var allTypes = ['track', 'agent', 'feature', 'bug', 'spike', 'plan', 'session', 'commit', 'file'];
+  var typeCounts = {};
+  (data.nodes || []).forEach(function(n) { typeCounts[n.type] = (typeCounts[n.type] || 0) + 1; });
+  var toolbar = document.createElement('div');
+  toolbar.className = 'graph-filter-toolbar';
+  allTypes.forEach(function(type) {
+    if (!typeCounts[type] && !(graphActiveTypes && graphActiveTypes.indexOf(type) < 0)) return;
+    var btn = document.createElement('button');
+    var active = !graphActiveTypes || graphActiveTypes.indexOf(type) >= 0;
+    btn.className = 'graph-filter-btn' + (active ? ' active' : '');
+    btn.dataset.type = type;
+    var label = type.charAt(0).toUpperCase() + type.slice(1);
+    var count = typeCounts[type] || 0;
+    var capText = data.caps && data.caps[type] && data.caps[type].total > data.caps[type].shown
+      ? ' of ' + data.caps[type].total : '';
+    btn.innerHTML = '<span class="filter-dot" data-graph-type="' + type + '">\u25CF</span> ' + label +
+      ' <span style="opacity:0.6">' + count + capText + '</span>';
+    btn.onclick = function() {
+      if (!graphActiveTypes) {
+        graphActiveTypes = allTypes.filter(function(t) { return t !== type; });
+      } else {
+        var idx = graphActiveTypes.indexOf(type);
+        if (idx >= 0) graphActiveTypes.splice(idx, 1); else graphActiveTypes.push(type);
+        if (graphActiveTypes.length === allTypes.length) graphActiveTypes = null;
+      }
+      fetchGraph(graphActiveTypes);
+    };
+    toolbar.appendChild(btn);
+  });
+  var resetBtn = document.createElement('button');
+  resetBtn.className = 'graph-filter-btn';
+  resetBtn.textContent = 'Reset';
+  resetBtn.onclick = function() { graphActiveTypes = null; fetchGraph(); };
+  toolbar.appendChild(resetBtn);
+  container.insertBefore(toolbar, container.firstChild);
 
   if (graphSimulation) {
     graphSimulation.stop();
