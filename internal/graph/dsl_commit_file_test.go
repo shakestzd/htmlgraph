@@ -1,0 +1,298 @@
+package graph_test
+
+import (
+	"testing"
+
+	"github.com/shakestzd/htmlgraph/internal/graph"
+)
+
+// --- isNodeType and normalizeNodeType ---
+
+func TestIsNodeType_Commit(t *testing.T) {
+	for _, s := range []string{"commit", "commits"} {
+		if !graph.IsNodeType(s) {
+			t.Errorf("expected IsNodeType(%q) to be true", s)
+		}
+	}
+}
+
+func TestIsNodeType_File(t *testing.T) {
+	for _, s := range []string{"file", "files"} {
+		if !graph.IsNodeType(s) {
+			t.Errorf("expected IsNodeType(%q) to be true", s)
+		}
+	}
+}
+
+func TestIsNodeType_Session(t *testing.T) {
+	for _, s := range []string{"session", "sessions"} {
+		if !graph.IsNodeType(s) {
+			t.Errorf("expected IsNodeType(%q) to be true", s)
+		}
+	}
+}
+
+func TestNormalizeNodeType_Commit(t *testing.T) {
+	if got := graph.NormalizeNodeType("commits"); got != "commit" {
+		t.Errorf("expected 'commit', got %q", got)
+	}
+	if got := graph.NormalizeNodeType("commit"); got != "commit" {
+		t.Errorf("expected 'commit', got %q", got)
+	}
+}
+
+func TestNormalizeNodeType_File(t *testing.T) {
+	if got := graph.NormalizeNodeType("files"); got != "file" {
+		t.Errorf("expected 'file', got %q", got)
+	}
+	if got := graph.NormalizeNodeType("file"); got != "file" {
+		t.Errorf("expected 'file', got %q", got)
+	}
+}
+
+func TestNormalizeNodeType_Session(t *testing.T) {
+	if got := graph.NormalizeNodeType("sessions"); got != "session" {
+		t.Errorf("expected 'session', got %q", got)
+	}
+	if got := graph.NormalizeNodeType("session"); got != "session" {
+		t.Errorf("expected 'session', got %q", got)
+	}
+}
+
+// --- ExecuteDSL with commit type ---
+
+func TestExecuteDSL_CommitType(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, message) VALUES (?, ?, ?)`,
+		"abc123", "sess-1", "fix: some bug",
+	)
+	if err != nil {
+		t.Fatalf("seed commit: %v", err)
+	}
+	_, err = database.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, message) VALUES (?, ?, ?)`,
+		"def456", "sess-1", "feat: new feature",
+	)
+	if err != nil {
+		t.Fatalf("seed commit: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "commits")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 commits, got %d", len(results))
+	}
+}
+
+func TestExecuteDSL_CommitTypeSingular(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, message) VALUES (?, ?, ?)`,
+		"abc123", "sess-1", "fix: some bug",
+	)
+	if err != nil {
+		t.Fatalf("seed commit: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "commit")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("expected 1 commit, got %d", len(results))
+	}
+}
+
+func TestExecuteDSL_FileType(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO feature_files (id, feature_id, file_path, operation) VALUES (?, ?, ?, ?)`,
+		"ff-1", "feat-a", "internal/graph/dsl.go", "modified",
+	)
+	if err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+	_, err = database.Exec(
+		`INSERT INTO feature_files (id, feature_id, file_path, operation) VALUES (?, ?, ?, ?)`,
+		"ff-2", "feat-a", "internal/graph/querybuilder.go", "modified",
+	)
+	if err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "files")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 files, got %d", len(results))
+	}
+}
+
+func TestExecuteDSL_SessionType(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO sessions (session_id, agent_assigned, status) VALUES (?, ?, ?)`,
+		"sess-1", "claude", "active",
+	)
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	_, err = database.Exec(
+		`INSERT INTO sessions (session_id, agent_assigned, status) VALUES (?, ?, ?)`,
+		"sess-2", "claude", "completed",
+	)
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "sessions")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 sessions, got %d", len(results))
+	}
+}
+
+func TestExecuteDSL_SessionWithFilter(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO sessions (session_id, agent_assigned, status) VALUES (?, ?, ?)`,
+		"sess-1", "claude", "active",
+	)
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	_, err = database.Exec(
+		`INSERT INTO sessions (session_id, agent_assigned, status) VALUES (?, ?, ?)`,
+		"sess-2", "claude", "completed",
+	)
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "sessions[status=active]")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 || results[0].ID != "sess-1" {
+		t.Errorf("expected [sess-1], got %v", results)
+	}
+}
+
+func TestExecuteDSL_FeatureToCommitChain(t *testing.T) {
+	database := openTestDB(t)
+	seedFeature(t, database, "feat-a", "Feature A", "done")
+	_, err := database.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, message) VALUES (?, ?, ?)`,
+		"abc123", "sess-1", "feat: implement A",
+	)
+	if err != nil {
+		t.Fatalf("seed commit: %v", err)
+	}
+	seedEdge(t, database, "feat-a", "feature", "abc123", "commit", "committed_for")
+
+	results, err := graph.ExecuteDSL(database, "features -> committed_for -> commits")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 || results[0].ID != "abc123" {
+		t.Errorf("expected [abc123], got %v", results)
+	}
+}
+
+// --- resolveNodes includes commit/file/session metadata ---
+
+func TestResolveNodes_CommitMetadata(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, message) VALUES (?, ?, ?)`,
+		"abc123", "sess-1", "fix: resolve the issue with long message padding",
+	)
+	if err != nil {
+		t.Fatalf("seed commit: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "commits")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	r := results[0]
+	if r.ID != "abc123" {
+		t.Errorf("expected ID abc123, got %q", r.ID)
+	}
+	if r.Type != "commit" {
+		t.Errorf("expected type 'commit', got %q", r.Type)
+	}
+	if r.Title == "" {
+		t.Errorf("expected non-empty title for commit")
+	}
+	if r.Status != "done" {
+		t.Errorf("expected status 'done' for commit, got %q", r.Status)
+	}
+}
+
+func TestResolveNodes_FileMetadata(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO feature_files (id, feature_id, file_path, operation) VALUES (?, ?, ?, ?)`,
+		"ff-1", "feat-a", "internal/graph/dsl.go", "modified",
+	)
+	if err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "files")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	r := results[0]
+	if r.ID != "internal/graph/dsl.go" {
+		t.Errorf("expected ID internal/graph/dsl.go, got %q", r.ID)
+	}
+	if r.Type != "file" {
+		t.Errorf("expected type 'file', got %q", r.Type)
+	}
+	if r.Title != "internal/graph/dsl.go" {
+		t.Errorf("expected title to be file path, got %q", r.Title)
+	}
+}
+
+func TestResolveNodes_SessionMetadata(t *testing.T) {
+	database := openTestDB(t)
+	_, err := database.Exec(
+		`INSERT INTO sessions (session_id, agent_assigned, status) VALUES (?, ?, ?)`,
+		"sess-1", "claude", "active",
+	)
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	results, err := graph.ExecuteDSL(database, "sessions")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	r := results[0]
+	if r.ID != "sess-1" {
+		t.Errorf("expected ID sess-1, got %q", r.ID)
+	}
+	if r.Type != "session" {
+		t.Errorf("expected type 'session', got %q", r.Type)
+	}
+	if r.Status != "active" {
+		t.Errorf("expected status 'active', got %q", r.Status)
+	}
+}

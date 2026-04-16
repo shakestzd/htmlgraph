@@ -157,8 +157,37 @@ func (q *QueryBuilder) followEdges(sourceIDs []string, relType string) ([]string
 	return ids, rows.Err()
 }
 
+// tableColumns lists which columns each table exposes for filterByField.
+// Only tables that have a given column are included in the UNION arm.
+var tableColumns = map[string]map[string]bool{
+	"features": {
+		"status": true, "type": true, "priority": true, "track_id": true,
+	},
+	"tracks": {
+		"status": true, "type": true, "priority": true,
+	},
+	"git_commits": {
+		"commit_hash": true, "message": true, "session_id": true,
+	},
+	"feature_files": {
+		"file_path": true, "session_id": true,
+	},
+	"sessions": {
+		"session_id": true, "status": true,
+	},
+}
+
+// tableIDCols maps table name to its primary ID column for filterByField SELECTs.
+var tableIDCols = map[string]string{
+	"features":      "id",
+	"tracks":        "id",
+	"git_commits":   "commit_hash",
+	"feature_files": "file_path",
+	"sessions":      "session_id",
+}
+
 // filterByField keeps only IDs whose node metadata matches field=value.
-// Queries the union of features and tracks tables.
+// Searches all node tables that have the requested column.
 func (q *QueryBuilder) filterByField(ids []string, field, value string) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -167,30 +196,44 @@ func (q *QueryBuilder) filterByField(ids []string, field, value string) ([]strin
 	// Whitelist fields to prevent SQL injection.
 	col, ok := allowedFilterColumns[field]
 	if !ok {
-		return nil, fmt.Errorf("unsupported filter field %q; allowed: status, type, priority, track_id", field)
+		return nil, fmt.Errorf("unsupported filter field %q; allowed: status, type, priority, track_id, commit_hash, message, file_path, session_id", field)
 	}
 
 	placeholders := make([]string, len(ids))
-	args := make([]any, len(ids)+1)
+	idArgs := make([]any, len(ids))
 	for i, id := range ids {
 		placeholders[i] = "?"
-		args[i] = id
+		idArgs[i] = id
 	}
-	args[len(ids)] = value
 	inClause := strings.Join(placeholders, ",")
 
-	// Search features first, then tracks for type="track" items.
-	query := fmt.Sprintf(`
-		SELECT id FROM features WHERE id IN (%s) AND %s = ?
-		UNION
-		SELECT id FROM tracks WHERE id IN (%s) AND %s = ?`,
-		inClause, col, inClause, col)
+	// Build UNION arms only for tables that have the requested column.
+	tableOrder := []string{"features", "tracks", "git_commits", "feature_files", "sessions"}
+	var arms []string
+	var fullArgs []any
 
-	// Duplicate args for the UNION's second half.
-	fullArgs := make([]any, 0, len(args)*2)
-	fullArgs = append(fullArgs, args...)
-	fullArgs = append(fullArgs, args...)
+	for _, table := range tableOrder {
+		if !tableColumns[table][col] {
+			continue
+		}
+		idCol := tableIDCols[table]
+		distinct := ""
+		if table == "feature_files" {
+			distinct = "DISTINCT "
+		}
+		arms = append(arms, fmt.Sprintf(
+			`SELECT %s%s AS id FROM %s WHERE %s IN (%s) AND %s = ?`,
+			distinct, idCol, table, idCol, inClause, col))
+		fullArgs = append(fullArgs, idArgs...)
+		fullArgs = append(fullArgs, value)
+	}
 
+	if len(arms) == 0 {
+		// Column not found in any table; return empty.
+		return nil, nil
+	}
+
+	query := strings.Join(arms, "\nUNION\n")
 	rows, err := q.db.Query(query, fullArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("filter by %s: %w", field, err)
@@ -210,10 +253,14 @@ func (q *QueryBuilder) filterByField(ids []string, field, value string) ([]strin
 
 // allowedFilterColumns maps user-facing field names to SQL column names.
 var allowedFilterColumns = map[string]string{
-	"status":   "status",
-	"type":     "type",
-	"priority": "priority",
-	"track_id": "track_id",
+	"status":      "status",
+	"type":        "type",
+	"priority":    "priority",
+	"track_id":    "track_id",
+	"commit_hash": "commit_hash",
+	"message":     "message",
+	"file_path":   "file_path",
+	"session_id":  "session_id",
 }
 
 // resolveNodes looks up metadata for a set of node IDs.
@@ -230,13 +277,23 @@ func (q *QueryBuilder) resolveNodes(ids []string) ([]NodeResult, error) {
 	}
 	inClause := strings.Join(placeholders, ",")
 
+	// Each UNION arm needs its own copy of the id args.
 	query := fmt.Sprintf(`
 		SELECT id, type, title, status FROM features WHERE id IN (%s)
 		UNION ALL
-		SELECT id, type, title, status FROM tracks WHERE id IN (%s)`,
-		inClause, inClause)
+		SELECT id, type, title, status FROM tracks WHERE id IN (%s)
+		UNION ALL
+		SELECT commit_hash AS id, 'commit' AS type, SUBSTR(COALESCE(message,''),1,80) AS title, 'done' AS status FROM git_commits WHERE commit_hash IN (%s)
+		UNION ALL
+		SELECT DISTINCT file_path AS id, 'file' AS type, file_path AS title, '' AS status FROM feature_files WHERE file_path IN (%s)
+		UNION ALL
+		SELECT session_id AS id, 'session' AS type, COALESCE(title,'') AS title, COALESCE(status,'') AS status FROM sessions WHERE session_id IN (%s)`,
+		inClause, inClause, inClause, inClause, inClause)
 
-	fullArgs := make([]any, 0, len(args)*2)
+	fullArgs := make([]any, 0, len(args)*5)
+	fullArgs = append(fullArgs, args...)
+	fullArgs = append(fullArgs, args...)
+	fullArgs = append(fullArgs, args...)
 	fullArgs = append(fullArgs, args...)
 	fullArgs = append(fullArgs, args...)
 
