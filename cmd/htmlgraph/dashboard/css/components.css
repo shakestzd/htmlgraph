@@ -1166,6 +1166,15 @@
 .plan-detail-body .slice-name { font-size: 1rem; color: var(--text); }
 .plan-detail-body .slice-field-label { color: var(--accent); font-size: .8rem; }
 .plan-detail-body .slice-field-value { color: var(--text-dim); font-size: .95rem; }
+.slice-field-value ul,
+.slice-field-value ol { padding-left: 1.5em; margin: 0.3em 0 0.6em; }
+.slice-field-value ul { list-style-type: disc; }
+.slice-field-value ol { list-style-type: decimal; }
+.slice-field-value li { margin: 0.2em 0; }
+.slice-field-value p { margin: 0 0 0.5em; }
+.slice-field-value p:last-child { margin-bottom: 0; }
+.slice-field-value p.numbered-step { padding-left: 1.5em; text-indent: -1.5em; }
+p.numbered-step { padding-left: 1.5em; text-indent: -1.5em; }
 .plan-detail-body .slice-done-list li { font-size: .92rem; color: var(--text-dim); }
 .plan-detail-body .slice-deps { color: var(--text-muted); }
 

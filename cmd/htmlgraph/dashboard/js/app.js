@@ -1358,6 +1358,11 @@ function openPlanDetail(planId, title) {
             s.textContent = oldScript.textContent;
             body.appendChild(s);
           });
+          // After inline scripts (renderMd, data-markdown) have run,
+          // classify (N)-prefixed paragraphs for CSS hanging indent.
+          body.querySelectorAll('.slice-field-value p').forEach(function(p) {
+            if (/^\(\d+\)/.test(p.textContent)) p.classList.add('numbered-step');
+          });
           return;
         }
         var s = document.createElement('script');

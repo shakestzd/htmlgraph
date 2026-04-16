@@ -825,10 +825,17 @@ function renderMd(text){
   });
   s=s.replace(/^[*-] (.+)$/gm,'<li>$1</li>');
   s=s.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
-  s=s.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
-  s=s.replace(/\n\n/g,'</p><p>');
-  s=s.replace(/\n/g,'<br>');
-  return '<p>'+s+'</p>';
+  s=s.replace(/^\d+\. (.+)$/gm,'<li data-ol>$1</li>');
+  s=s.replace(/(<li data-ol>.*<\/li>\n?)+/g,'<ol>$&</ol>');
+  s=s.replace(/ data-ol/g,'');
+  // Split on paragraph boundaries and wrap each block.
+  var blocks=s.split(/\n\n/);
+  var html=blocks.map(function(block){
+    var trimmed=block.trim();
+    if(!trimmed) return '';
+    return '<p>'+trimmed.replace(/\n/g,'<br>')+'</p>';
+  }).filter(Boolean).join('');
+  return html||'<p></p>';
 }
 // Render inline markdown for elements with data-markdown attribute.
 // For block elements (div/p) replaces innerHTML; for inline (li/span)
