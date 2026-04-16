@@ -5,9 +5,9 @@ meta:
     description: |
         Extend the dashboard graph from work-item-only relationships to a full causal chain: add commit and file node types, materialize session hierarchy and agent lineage edges, build provenance query API endpoints, and render the unified graph in the D3 dashboard. Currently 1273 nodes / 1291 edges with zero commit or file nodes. The raw data exists in SQLite (51 git_commits, 299 feature_files, 141 agent_lineage_trace, 139 parent-child sessions) — it just needs to be surfaced as graph nodes and edges.
     created_at: "2026-04-16"
-    status: draft
+    status: todo
     created_by: claude-opus
-    version: 4
+    version: 6
 design:
     problem: |
         HtmlGraph's core value proposition is "see the full graph of AI-assisted work" — but the graph currently only shows work items (features, bugs, spikes, tracks) and a handful of filtered sessions. The causal chain (agent spawned → session created → feature claimed → commits produced → files modified) is entirely absent from the visualization. The raw data exists in SQLite across 5 tables (git_commits: 51 rows, feature_files: 299 rows, agent_lineage_trace: 141 rows, sessions: 139 parent→child pairs, tool_calls: 1454 rows) but none of it is surfaced as graph nodes or edges. The /api/graph endpoint only queries features, tracks, and sessions (with a >5 events filter), and the D3 frontend only has color/layout mappings for 6 node types. The internal/graph DSL and algorithms also don't model commit or file node types.
