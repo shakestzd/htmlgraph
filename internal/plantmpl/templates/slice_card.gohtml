@@ -7,16 +7,16 @@
     <span class="badge badge-pending" data-badge-for="slice-{{.Num}}">Pending</span>
   </div>
   {{if .HasStructuredContent}}
-  <div class="slice-field">{{if .What}}<div class="slice-field-label">What</div><div class="slice-field-value">{{.What}}</div>{{end}}</div>
-  {{if .Why}}<div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value">{{.Why}}</div></div>{{end}}
+  <div class="slice-field">{{if .What}}<div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">{{.What}}</div>{{end}}</div>
+  {{if .Why}}<div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">{{.Why}}</div></div>{{end}}
   {{if .Files}}<div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>{{.Files}}</code></div></div>{{end}}
-  {{if .DoneWhen}}<div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list">{{range .DoneWhen}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+  {{if .DoneWhen}}<div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list">{{range .DoneWhen}}<li data-markdown="">{{.}}</li>{{end}}</ul></div>{{end}}
   {{else}}
   {{if .ID}}<div class="slice-meta"><span>{{.ID}}</span></div>{{end}}
-  {{if .Description}}<div class="slice-field"><div class="slice-field-value">{{.Description}}</div></div>{{end}}
+  {{if .Description}}<div class="slice-field"><div class="slice-field-value" data-markdown="">{{.Description}}</div></div>{{end}}
   {{if .Files}}<div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>{{.Files}}</code></div></div>{{end}}
   {{end}}
-  {{if .Tests}}<div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests">{{.Tests}}</div></div>{{end}}
+  {{if .Tests}}<div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">{{.Tests}}</div></div>{{end}}
   <div class="slice-deps">Dependencies: {{.DepsLabel}}</div>
   <div class="approval-row">
     <label><input type="checkbox" data-section="slice-{{.Num}}" data-action="approve"> Approve slice</label>
