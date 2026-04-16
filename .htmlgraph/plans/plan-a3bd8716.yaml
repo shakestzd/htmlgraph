@@ -1,0 +1,227 @@
+meta:
+    id: plan-a3bd8716
+    track_id: trk-0677c709
+    title: Replace htmlgraph-titler with Claude Code native session metadata + inline session preview
+    description: |
+        Drop the htmlgraph-titler subsystem entirely (every invocation spends a Claude API message and provides marginal value). Source session titles from Claude Code's own `ai-title` JSONL event — the same metadata `claude --resume` uses. Redesign the sessions panel to mirror the activity feed's expandable disclosure pattern: each session row collapsed by default, expandable inline to preview the last few messages without navigating to a separate detail view.
+    created_at: "2026-04-16"
+    status: draft
+    created_by: claude-opus
+    version: 3
+design:
+    problem: |
+        The htmlgraph-titler subsystem runs `claude -p --model haiku` against the first 3 user messages of every newly-ingested session, plus a catch-up pass that titles up to 5 NULL-title sessions per ingest cycle (cmd/htmlgraph/titler.go:16-79, cmd/htmlgraph/serve.go:337-357). Each invocation costs a Claude API message against the user's quota. The titler also pollutes the activity feed with its own internal `[htmlgraph-titler]` prompts (recently filtered, but the underlying waste remains). Meanwhile, Claude Code already writes an `ai-title` JSONL event for every session — this is the title `claude --resume` displays — and our parser silently discards it (internal/ingest/parser.go:106 handles `custom-title` but not `ai-title`). The sessions panel itself (cmd/htmlgraph/dashboard/js/app.js:240-318) renders titles in a flat table where every row click navigates away to a full transcript view; users cannot peek at a session's recent messages without committing to that navigation.
+    goals:
+        - '**Zero Claude API spend on titles** — sessions get titles from Claude Code''s free `ai-title` event, not from `claude -p`'
+        - '**Faster session triage** — users can preview a session''s latest messages inline without navigating away'
+        - '**Smaller code surface** — delete titler.go entirely; all title logic flows through the existing JSONL ingest path'
+        - '**Idempotent ingest** — re-running ingest on the same JSONL converges to the current `ai-title` (no stale titler results stuck in DB)'
+    constraints:
+        - Cannot break the existing sessions API contract — `s.title` field must remain populated for backward-compatible JS consumers
+        - '`claude --resume` uses the `ai-title` event as the canonical title, so it is the right source of truth'
+        - Defense-in-depth filters in api.go (NOT LIKE '[htmlgraph-titler]%') must stay — historical DB rows from before this change may still contain titler-generated content
+        - The redesigned sessions panel must reuse the activity feed's disclosure CSS/JS pattern, not a new one (consistency + less code)
+    approved: false
+    comment: ""
+slices:
+    - id: slice-1
+      num: 1
+      title: Ingest Claude Code's `ai-title` event into sessions.title
+      what: |
+        Extend internal/ingest/parser.go:106 to handle `case "ai-title"` — `result.Title = gjson.Get(line, "aiTitle").String()` — alongside the existing `custom-title` case. Update cmd/htmlgraph/ingest.go ensureSession (lines 349-375) so that when result.Title is non-empty, it issues `UPDATE sessions SET title = ? WHERE session_id = ? AND (title IS NULL OR title <> ?)`. The conditional WHERE prevents redundant writes when the title hasn't changed. Idempotent on re-ingest.
+      why: |
+        Goal: Zero Claude API spend on titles. This slice unlocks Claude Code's free, native `ai-title` as the title source. Without this, slice 2 (deletion of the titler) would leave sessions title-less.
+      files:
+        - internal/ingest/parser.go
+        - internal/ingest/parser_test.go
+        - cmd/htmlgraph/ingest.go
+      deps: []
+      done_when:
+        - 'Parser unit test: a JSONL fixture containing an `ai-title` event populates result.Title with aiTitle''s string value'
+        - 'Integration: ingesting a real `~/.claude/projects/*/session.jsonl` containing `ai-title` results in `sessions.title` matching `aiTitle` in the DB'
+        - Re-ingesting the same JSONL with an updated `ai-title` value updates `sessions.title` to the new value (idempotent + convergent)
+        - Re-ingesting a JSONL with no change to `ai-title` issues no UPDATE (verified via SQL trace or row-affected count)
+      effort: S
+      risk: Low
+      tests: |
+        Unit (parser_test.go): Add `TestParse_AITitle` — parse a single-line JSONL containing
+          `{"type":"ai-title","aiTitle":"Test title","sessionId":"abc"}` and assert
+          result.Title == "Test title".
+        Integration (ingest_test.go or new): Seed a sessions row with NULL title, run ensureSession
+          with result.Title = "X", assert DB row title == "X". Re-run with same value, assert no
+          change. Re-run with "Y", assert DB row title == "Y".
+        Regression: Existing TestParse_CustomTitle still passes (we add a case, don't replace one).
+      approved: false
+      comment: ""
+    - id: slice-2
+      num: 2
+      title: Delete the htmlgraph-titler subsystem
+      what: |
+        Delete cmd/htmlgraph/titler.go entirely. In cmd/htmlgraph/serve.go remove the per-session generateTitle call at line 340 and the catch-up loop at lines 344-357. Keep the `isHeadlessSession` gate at lines 360-371 (it filters historical titler-spawned JSONL files that may still be on disk). Keep the `NOT LIKE '[htmlgraph-titler]%'` filters in cmd/htmlgraph/api.go, cmd/htmlgraph/api_graph.go, and the `"--"` sentinel handling in cmd/htmlgraph/dashboard/js/helpers.js — these protect against historical DB rows. Remove only the active write path.
+      why: |
+        Goals: Zero Claude API spend on titles + smaller code surface. This is the deletion that removes the subscriber; slice 1 must ship first or sessions stop getting titles entirely until backfill (slice 3) catches up.
+      files:
+        - cmd/htmlgraph/titler.go
+        - cmd/htmlgraph/serve.go
+      deps:
+        - 1
+      done_when:
+        - cmd/htmlgraph/titler.go does not exist
+        - No call site for `generateTitle` exists in the repo (verified by grep)
+        - go build ./... and go test ./... pass
+        - After running `htmlgraph serve` against a fresh JSONL containing an `ai-title` event, the session row in DB has the correct title without any `claude -p` process having been spawned (verify by tracing exec or inspecting process tree)
+      effort: S
+      risk: Low
+      tests: |
+        Unit: Compile-time — deletion is verified by build success.
+        Integration: Run serve against a test fixture JSONL containing `ai-title`. Assert no
+          subprocess named `claude` spawned during ingest. Assert sessions.title populated
+          from the JSONL value.
+        Regression: All existing tests pass. Specifically check that any test referencing
+          generateTitle or [htmlgraph-titler] behavior is updated or removed.
+      approved: false
+      comment: ""
+    - id: slice-3
+      num: 3
+      title: Backfill historical sessions on first launch after upgrade
+      what: |
+        Sessions ingested before this change have either (a) titler-generated titles, (b) NULL titles, or (c) the `"--"` failure sentinel. After upgrade, run a one-time backfill: enumerate all sessions in the DB, re-locate their JSONL on disk, re-parse for the latest `ai-title`, and UPDATE sessions.title where the JSONL's ai-title differs from the stored title. Gate this behind a one-time marker (e.g. a row in a `migrations` table or a sentinel file at `.htmlgraph/migrations/ai-title-backfill.done`) so it runs once per project per upgrade.
+      why: |
+        Without backfill, the existing 100s of sessions in users' DBs keep their stale titler titles forever. The new ai-title path only fires on subsequent ingests of *changed* JSONLs. Backfill brings the existing corpus to the new state in one pass.
+      files:
+        - cmd/htmlgraph/ingest.go
+        - cmd/htmlgraph/serve.go
+        - internal/ingest/parser.go
+      deps:
+        - 1
+      done_when:
+        - On first `htmlgraph serve` launch after upgrade, all existing sessions whose JSONL contains an `ai-title` event have their `sessions.title` updated to match
+        - The backfill is gated by a one-time marker — running serve twice does not run backfill twice
+        - Sessions whose JSONL is missing or has no `ai-title` event are left untouched (no overwrite to NULL)
+        - Backfill runs in the background and does not block startup or ingest
+      effort: M
+      risk: Med
+      tests: |
+        Unit: backfill function on a controlled set of sessions — assert correct UPDATEs issued.
+        Integration: Seed DB with 5 sessions (3 with titler titles, 1 NULL, 1 with `"--"`). Stage
+          corresponding JSONL files (4 with `ai-title`, 1 without). Run backfill. Assert: 4 sessions
+          have ai-title-derived titles, 1 NULL session with no ai-title remains NULL.
+        Regression: Re-running backfill is a no-op (marker present).
+      approved: false
+      comment: ""
+    - id: slice-4
+      num: 4
+      title: 'Sessions API: return last-N messages preview field'
+      what: |
+        Extend the sessions API response in cmd/htmlgraph/api.go to include a `preview_messages` field on each session: an array of the last N messages (default N=2: latest user prompt + latest assistant reply, each truncated to ~200 chars). Implementation choice (per design Q4): either (a) include in /api/sessions response, or (b) lazy-load via /api/sessions/{id}/preview when a row is expanded. The lazy-load endpoint is recommended to keep the initial sessions list payload small.
+      why: |
+        Goal: Faster session triage. The expandable sessions panel (slice 5) needs a data source for the inline preview. Lazy-loading per expansion avoids inflating the initial payload for sessions lists with hundreds of entries.
+      files:
+        - cmd/htmlgraph/api.go
+      deps:
+        - 1
+      done_when:
+        - GET /api/sessions/{id}/preview returns the last N (configurable, default 2) messages with role + truncated content
+        - Endpoint returns 200 + empty messages array (not 404) for a session with no events yet
+        - Endpoint excludes htmlgraph-internal events (toolUse for hooks, system messages) — only user/assistant turns
+        - Response time < 50ms for sessions with up to 1000 events (verified by query plan + benchmark)
+      effort: M
+      risk: Low
+      tests: |
+        Unit: SQL query test — given a sessions table with mixed event types, the preview query
+          returns only the last N user/assistant turns.
+        Integration: HTTP test — POST to ingest a fixture JSONL, GET preview, assert correct messages.
+        Regression: Existing /api/sessions response shape unchanged.
+      approved: false
+      comment: ""
+    - id: slice-5
+      num: 5
+      title: 'Sessions panel: inline disclosure with message preview'
+      what: |
+        Restructure renderSessions() in cmd/htmlgraph/dashboard/js/app.js:240-318 to render each session row with a chevron disclosure widget, mirroring the activity feed's pattern. Per design Q2, reuse the event-tree.js pattern (web component, localStorage-persisted expand state, `data-toggle` attribute, `expand-icon` chevron) — the recommendation is the persistent pattern since users browsing sessions benefit from preserved state across reloads. Per design Q5, chevron expands inline; row click still navigates to the full transcript view (preserves muscle memory). Expanded body fetches from the new /api/sessions/{id}/preview endpoint and renders the latest messages with the existing message-rendering CSS classes from the activity feed.
+      why: |
+        Goal: Faster session triage. Users currently must click into a session to see its content. Inline preview lets them browse a list of sessions and assess at a glance which one to dive into.
+      files:
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/components/event-tree.js
+        - cmd/htmlgraph/dashboard/styles.css
+      deps:
+        - 4
+      done_when:
+        - Each session row renders with a chevron and is collapsed by default
+        - Clicking the chevron toggles inline preview without navigating away
+        - Expand state persists across page reloads (via localStorage, key e.g. `hg-sessions-expanded`)
+        - Expanded preview shows latest 2 messages (user + assistant) with role labels and truncated content
+        - Clicking elsewhere on the row still navigates to the full transcript view
+        - 'Visual consistency: chevron icon, indentation, depth styling match the activity feed exactly'
+      effort: L
+      risk: Med
+      tests: |
+        Unit (JS, if test harness exists): toggle function flips expanded state and updates localStorage.
+        Integration: Browser snapshot — load /, assert sessions list renders with chevrons, click one,
+          assert preview rendered with last 2 messages, reload, assert state persisted.
+        Regression: Row-click navigation to full transcript still works (existing behavior).
+      approved: false
+      comment: ""
+questions:
+    - id: q-backfill-strategy
+      text: How do we handle existing titler-generated titles in users' DBs after upgrade?
+      description: |
+        Hundreds of users have sessions with titler-generated titles already stored in `sessions.title`. After we delete the titler and switch to `ai-title`, these stale titles persist unless we actively replace them. Options trade off user-visible behavior (do old titles change suddenly?) against implementation effort and risk of overwriting good titles.
+      recommended: backfill-once
+      options:
+        - key: leave-as-is
+          label: 'A: Leave existing titles untouched — only new sessions get ai-title; legacy sessions keep titler titles forever (mixed quality, but zero migration risk)'
+        - key: backfill-once
+          label: 'B: One-time backfill on first launch after upgrade — re-read every existing JSONL for ai-title and UPDATE sessions.title; gated by a marker so it runs once (recommended — converges to consistent state with low risk)'
+        - key: clear-and-relet-ingest
+          label: 'C: NULL out all titler-style titles on upgrade and let normal ingest repopulate naturally (simpler than backfill but causes a window where sessions show timestamps instead of titles)'
+      answer: null
+    - id: q-disclosure-pattern
+      text: Which disclosure widget pattern should the sessions panel reuse?
+      description: |
+        Two patterns exist in the dashboard: event-tree.js uses a web component with localStorage-persisted expand state (chevron via `data-toggle`, consistent with the activity feed's deep tree). app.js makePanel uses ephemeral local state (simpler, no persistence). The event-tree pattern offers more code reuse and a better UX for users browsing sessions across reloads, but requires extracting/sharing the toggle logic.
+      recommended: event-tree-pattern
+      options:
+        - key: event-tree-pattern
+          label: 'A: Reuse event-tree.js pattern — localStorage-persisted, `data-toggle`, `expand-icon`; matches activity feed exactly, more code shared (recommended)'
+        - key: makepanel-pattern
+          label: 'B: Use the makePanel pattern from app.js:879 — local state only, simpler, no persistence; expand state resets on reload'
+      answer: null
+    - id: q-preview-message-count
+      text: How many messages should the inline preview show?
+      description: |
+        The preview balances information density vs. visual noise. Showing only the latest user prompt is concise but loses context (you can't see what the assistant said). Showing N=2 mirrors `claude --resume` UX. A configurable count adds settings surface area for marginal benefit.
+      recommended: latest-two
+      options:
+        - key: latest-one-user
+          label: 'A: Latest user prompt only — most concise, easiest to scan, but loses assistant context'
+        - key: latest-two
+          label: 'B: Latest 2 messages (user + assistant) — concrete, mirrors `claude --resume` (recommended)'
+        - key: configurable-n
+          label: 'C: Configurable N via settings panel — flexible but adds settings surface area for marginal user benefit'
+      answer: null
+    - id: q-preview-data-source
+      text: Should preview messages ship in the /api/sessions response or via a dedicated lazy-load endpoint?
+      description: |
+        Including preview in the main sessions list response means one round-trip but inflates payload for users with hundreds of sessions (most never expanded). A dedicated endpoint /api/sessions/{id}/preview keeps the list payload small and only fetches preview content when a user actually expands a row. Trade-off: extra HTTP round-trip per expansion vs. smaller initial payload + cleaner separation.
+      recommended: lazy-endpoint
+      options:
+        - key: include-in-list
+          label: 'A: Include `preview_messages` field in /api/sessions response — single round-trip, larger initial payload'
+        - key: lazy-endpoint
+          label: 'B: New /api/sessions/{id}/preview endpoint, fetched on expansion — smaller initial payload, scales to long sessions lists (recommended)'
+      answer: null
+    - id: q-row-click-behavior
+      text: What should clicking a session row do — expand inline, or still navigate to full transcript?
+      description: |
+        Currently clicking a row navigates to the full transcript view. Adding inline expansion creates a click-target conflict. Three options: (A) chevron toggles, row navigates (preserves muscle memory, chevron is the discoverable opt-in); (B) row toggles, with a separate "View transcript" link in expanded body (more aggressive shift, breaks existing UX); (C) chevron toggles, row click does nothing — only the explicit link navigates (most cautious, but loses easy click-to-open).
+      recommended: chevron-toggles-row-navigates
+      options:
+        - key: chevron-toggles-row-navigates
+          label: 'A: Chevron expands inline; row click navigates to full transcript — preserves existing muscle memory (recommended)'
+        - key: row-toggles-link-navigates
+          label: 'B: Row click expands inline; explicit `View transcript ->` link in expanded body navigates'
+        - key: chevron-toggles-row-inert
+          label: 'C: Chevron expands inline; row click does nothing — only the explicit link navigates'
+      answer: null
