@@ -287,7 +287,7 @@ textarea::placeholder{color:var(--text-muted)}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 6 slices · Created 2026-04-16</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v4 · 8 slices · Created 2026-04-16</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -313,6 +313,8 @@ textarea::placeholder{color:var(--text-muted)}
     <div data-node="4" data-name="Provenance query API — per-node causal chain endpoints" data-status="pending" data-deps="1" data-files="2"></div>
     <div data-node="5" data-name="Dashboard provenance panel — click-to-drill node detail" data-status="pending" data-deps="3,4" data-files="4"></div>
     <div data-node="6" data-name="Extend internal/graph DSL and algorithms for new node types" data-status="pending" data-deps="1" data-files="3"></div>
+    <div data-node="7" data-name="Graph filtering — type toggles and node count budgets" data-status="pending" data-deps="1,2,3" data-files="3"></div>
+    <div data-node="8" data-name="Agent type nodes — surface who did the work" data-status="pending" data-deps="2,3" data-files="4"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -334,6 +336,7 @@ textarea::placeholder{color:var(--text-muted)}
 <li data-markdown>**Provenance in one click** — clicking any node reveals its full upstream/downstream chain (who spawned the agent, what feature it worked on, what commits it produced, what files were touched)</li>
 <li data-markdown>**Query API** — REST endpoints that answer &#39;what commits came from agent X?&#39;, &#39;which sessions touched file Y?&#39;, &#39;what agents worked on feature Z?&#39; returning structured JSON</li>
 <li data-markdown>**Performance at scale** — graph renders smoothly with 2000+ nodes; query-time derivation for cheap joins, materialization only for hot dashboard paths</li>
+<li data-markdown>**Agent attribution** — agent types are visible as graph nodes showing which AI agents did the most work, spawned the most sessions, and touched the most features</li>
 </ol>
 <h4>Constraints</h4>
 <ul>
@@ -579,7 +582,10 @@ Regression: /api/graph still works as before
      (e.g., &#34;produced Commit def123&#34;, &#34;touched File src/foo.go&#34;)
    - Each item in the chain is clickable to navigate to that node&#39;s provenance
 
-3. For session nodes: also show agent name, duration, tool call count 4. For commit nodes: show full hash, message, timestamp, author 5. For file nodes: show all features that touched this file, with session attribution
+3. For session nodes: also show agent name, duration, tool call count
+4. For commit nodes: show full hash, message, timestamp, author
+5. For file nodes: show all features that touched this file, with session attribution
+
 6. Add the panel HTML to dashboard/index.html and CSS to dashboard/css/style.css.
    Use the existing panel patterns from the session detail or work detail views.
 </div></div>
@@ -650,6 +656,112 @@ Regression: all existing graph tests pass
     <textarea data-section="slice-6" data-comment-for="slice-6" placeholder="Comments on slice 6..."></textarea>
   </div>
 </div>
+<div class="slice-card" data-slice="7" data-slice-name="slice-7" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#7</span>
+    <span class="slice-name">Graph filtering — type toggles and node count budgets</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-7">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add filtering controls to the graph API and dashboard frontend to manage node cardinality.
+
+Backend (cmd/htmlgraph/api_graph.go):
+1. Add a ?types=feature,session,commit query parameter to GET /api/graph. When present,
+   only return nodes of the specified types. When absent, return all types (backward compatible).
+2. Add per-type node count caps applied server-side: tracks=unlimited, features=unlimited,
+   bugs=unlimited, spikes=unlimited, plans=unlimited, sessions=300, commits=200, files=200,
+   agents=100. Caps apply after all nodes are loaded but before edge derivation. Order by
+   activity DESC (most connected first) to keep the most interesting nodes.
+3. Add a ?limit=N parameter for total node cap (default: 2000). Return the highest-activity
+   nodes across all types up to the limit.
+4. Return cap metadata in the response: { nodes: [...], edges: [...], caps: { sessions: {total: 516, shown: 300}, ... } }
+   so the frontend can show &#34;showing 300 of 516 sessions&#34;.
+
+Frontend (cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/index.html):
+1. Add a filter toolbar above the graph canvas with toggle buttons for each node type
+   (Track, Feature, Bug, Spike, Plan, Session, Commit, File, Agent). Each button has a
+   colored dot matching the node color and a count badge.
+2. Toggling a type off removes those nodes from the D3 simulation and re-renders.
+   Toggling on re-fetches with the updated ?types= parameter.
+3. Show &#34;Showing N of M&#34; text for capped types.
+4. Add a &#34;Reset&#34; button that removes all filters and returns to default view.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Without filtering, adding commit (51&#43;), file (299&#43;), session (300&#43;), and agent nodes will overwhelm the visualization. The graph goes from ~700 to potentially 1500&#43; nodes. Type toggles let users focus on the relationships they care about (e.g., &#34;show me just features and sessions&#34; or &#34;show me commits and files for this area&#34;). Per-type caps prevent any single high-cardinality type from dominating the graph.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/api_graph.go, cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/index.html</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">GET /api/graph?types=feature,session returns only feature and session nodes</li><li data-markdown="">Per-type caps enforced server-side (sessions 300, commits 200, files 200, agents 100)</li><li data-markdown="">Response includes caps metadata showing total vs shown counts</li><li data-markdown="">Dashboard has toggle buttons for each node type above the graph</li><li data-markdown="">Toggling a type off removes those nodes from the visualization</li><li data-markdown="">Capped types show Showing N of M indicator</li><li data-markdown="">Default view (no filters) works identically to current behavior</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestGraphAPITypeFilter — request ?types=feature,session, verify only those types returned
+Unit: TestGraphAPINodeCaps — insert 400 sessions, verify only 300 returned ordered by activity
+Unit: TestGraphAPICapsMetadata — verify response includes caps object with total/shown counts
+Visual: Toggle off file nodes, verify they disappear from graph
+Visual: Toggle on commits, verify they appear with correct colors
+Visual: Verify Showing 200 of 299 text appears for capped file nodes
+Regression: /api/graph without parameters returns same results as before
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1,2,3</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-7" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-7" data-comment-for="slice-7" placeholder="Comments on slice 7..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="8" data-slice-name="slice-8" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#8</span>
+    <span class="slice-name">Agent type nodes — surface who did the work</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-8">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add agent type nodes to the graph, making each distinct agent (e.g., &#34;htmlgraph:researcher&#34;,
+&#34;htmlgraph:sonnet-coder&#34;, &#34;htmlgraph:opus-coder&#34;) a first-class graph entity.
+
+Backend (cmd/htmlgraph/api_graph.go):
+1. Query distinct agent names: SELECT DISTINCT agent_name FROM agent_lineage_trace
+   WHERE agent_name != &#39;&#39; UNION SELECT DISTINCT agent_assigned FROM sessions
+   WHERE agent_assigned != &#39;&#39;. Map to graphNode with id=agent_name, type=&#34;agent&#34;,
+   title=agent_name.
+2. Derive edges: agent→session (type=&#34;ran_as&#34;) from agent_lineage_trace.agent_name →
+   agent_lineage_trace.session_id. Shows which sessions were run by which agent type.
+3. Derive edges: agent→feature (type=&#34;worked_on&#34;) from agent_lineage_trace WHERE
+   feature_id IS NOT NULL. Shows which agent types contributed to which features.
+4. Activity count for agent nodes: COUNT of agent_lineage_trace rows &#43; COUNT of sessions
+   WHERE agent_assigned = agent_name. Larger activity = larger node.
+
+Frontend (cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/index.html):
+1. TYPE_BAND_Y: agent=0.35 (between tracks at 0.20 and features at 0.50).
+2. TYPE_TOKEN: agent=&#39;--priority-high&#39; (amber/orange) — warm color to stand out as
+   the &#34;who&#34; in the graph, distinct from &#34;what&#34; (features) and &#34;how&#34; (sessions).
+3. edgeColor: ran_as=&#39;#f59e0b&#39; (amber).
+4. Radius multiplier 0.8, opacity 0.85 — important but fewer in number.
+5. Update legend to include Agent entry.
+6. Click handler: tooltip with agent name, total sessions, features worked on, tool calls.
+
+DSL (internal/graph/dsl.go):
+1. Add &#34;agent&#34; and &#34;agents&#34; to knownNodeTypes.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">The graph answers &#34;what was built&#34; and &#34;when&#34; but not &#34;who built it.&#34; Agent types are the AI workforce — showing them as graph nodes completes the full causal chain: orchestrator → agent type → session → feature → commit → files. The data already exists in agent_lineage_trace (141 rows with agent_name) and sessions.agent_assigned.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/api_graph.go, cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/index.html, internal/graph/dsl.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">GET /api/graph returns nodes with type=&#39;agent&#39; for each distinct agent name</li><li data-markdown="">Agent→session (ran_as) edges connect agent types to their sessions</li><li data-markdown="">Agent→feature (worked_on) edges connect agent types to features they contributed to</li><li data-markdown="">Agent nodes render in amber at the 0.35 Y band, sized by activity</li><li data-markdown="">Legend includes Agent entry</li><li data-markdown="">Clicking agent node shows tooltip with session/feature/tool counts</li><li data-markdown="">No duplicate agent nodes (DISTINCT on agent_name)</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestGraphAPIAgentNodes — insert agent_lineage_trace rows with different agent_names, verify distinct agent nodes
+Unit: TestGraphAPIAgentEdges — verify ran_as edges from agent to session, worked_on edges from agent to feature
+Unit: TestGraphAPIAgentActivity — verify activity count reflects session &#43; lineage counts
+Visual: Verify agent nodes appear as amber circles above the feature band
+Visual: Verify agent→session edges connect to the session cluster
+Visual: Click agent node, verify tooltip shows correct counts
+Regression: existing node types unchanged
+</div></div>
+  <div class="slice-deps">Dependencies: slices 2,3</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-8" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-8" data-comment-for="slice-8" placeholder="Comments on slice 8..."></textarea>
+  </div>
+</div>
 
     <!--PLAN_SLICE_CARDS-->
   </div>
@@ -708,6 +820,17 @@ Regression: all existing graph tests pass
       <textarea data-section="questions" data-question-rationale="q-provenance-panel-vs-page" placeholder="Rationale for q-provenance-panel-vs-page..."></textarea>
     </div>
     
+    <div class="question-block" id="q-agent-node-granularity">
+      <p>Should agent nodes represent agent types (e.g., &#39;htmlgraph:researcher&#39;) or individual agent instances (one per spawn)?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-agent-node-granularity" data-question="q-agent-node-granularity" value="One node per distinct agent_name — ~10 hub nodes, shows delegation patterns and workload distribution"> One node per distinct agent_name — ~10 hub nodes, shows delegation patterns and workload distribution <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-agent-node-granularity" data-question="q-agent-node-granularity" value="One node per trace_id — 141 nodes, shows individual agent runs, useful for debugging specific spawns"> One node per trace_id — 141 nodes, shows individual agent runs, useful for debugging specific spawns</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-agent-node-granularity" placeholder="Rationale for q-agent-node-granularity..."></textarea>
+    </div>
+    
     <table class="q-table">
       <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
       <tbody id="questionsRecap">
@@ -732,6 +855,12 @@ Regression: all existing graph tests pass
         
         <tr data-recap-for="q-provenance-panel-vs-page">
           <td>Should the provenance drill-down be an inline panel or a separate page/view?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-agent-node-granularity">
+          <td>Should agent nodes represent agent types (e.g., &#39;htmlgraph:researcher&#39;) or individual agent instances (one per spawn)?</td>
           <td class="recap-answer">&mdash;</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
@@ -831,11 +960,12 @@ Regression: all existing graph tests pass
   <li><span class="badge badge-warn">S4</span> BFS reuse requires edge materialization. Use TraceCommit()/TraceFile() primitives instead.</li>
   <li><span class="badge badge-success">S5</span> Panel UX approach is sound. Existing patterns in session/work detail views.</li>
   <li><span class="badge badge-warn">S6</span> Scope expanded: resolveTypeSelector, filterBySelectorDSL, allowedFilterColumns all need changes.</li>
+  <li><span class="badge badge-success">S7</span> Filtering addresses the high-cardinality risk. Per-type caps and toggle UI are well-specified.</li>
+  <li><span class="badge badge-success">S8</span> Agent nodes complete the causal chain. ~10 hub nodes add minimal graph weight with high information value.</li>
 </ul>
 <h5>Gaps &amp; Missing Considerations</h5>
 <ul>
   <li><span class="badge badge-warn">Gap</span> No reindex path described for materializing new edge types</li>
-  <li><span class="badge badge-warn">Gap</span> No per-type node count budgets to prevent graph overload</li>
   <li><span class="badge badge-info">Gap</span> Plan nodes in provenance chain (planned_in edges) not mentioned</li>
 </ul>
 <h5>Alternative Approaches</h5>
@@ -877,7 +1007,7 @@ Regression: all existing graph tests pass
     
     <div class="sub-section">
       <h4>Synthesis</h4>
-      <div style="font-size:.85rem;color:var(--text-dim)">The plan is fundamentally sound but has three critical issues that must be addressed: (1) file-&gt;commit edges cannot be derived (no FK) — replaced with file-&gt;session edges, (2) edge materialization strategy must be materialize-on-reindex for CLI compatibility, (3) git_commits composite PK requires deduplication. All three are addressed in this revision. The remaining medium-severity risks (D3 performance at scale, session filter threshold) are manageable with per-type node budgets and benchmarking.
+      <div style="font-size:.85rem;color:var(--text-dim)">The plan is fundamentally sound with three critical issues addressed in revision: (1) file-&gt;commit edges cannot be derived (no FK) — replaced with file-&gt;session edges, (2) edge materialization strategy must be materialize-on-reindex for CLI compatibility, (3) git_commits composite PK requires deduplication. Version 3 adds two new slices addressing gaps identified in critique: Slice 7 (filtering/caps) handles the high-cardinality risk, and Slice 8 (agent nodes) completes the causal chain with &#34;who did the work&#34; attribution. The remaining medium-severity risks (D3 performance, session threshold) are manageable with the per-type budgets in Slice 7.
 </div>
     </div>
     
@@ -892,7 +1022,7 @@ Regression: all existing graph tests pass
           <tr>
             <td>File node cardinality explosion — 299 today, could reach 1000&#43;</td>
             <td><span class="badge badge-blocked">High</span></td>
-            <td>Implement per-type node count cap (e.g., 200 hottest files by modification count)</td>
+            <td>Implement per-type node count cap (e.g., 200 hottest files by modification count) — addressed by Slice 7</td>
           </tr>
           
           <tr>
@@ -910,13 +1040,13 @@ Regression: all existing graph tests pass
           <tr>
             <td>D3 collision detection is O(n^2) — 2000 nodes = 4M distance checks per frame</td>
             <td><span class="badge badge-revision">Medium</span></td>
-            <td>Benchmark on 2000-node test graph. Enable d3-quadtree if &gt;100ms per tick.</td>
+            <td>Benchmark on 2000-node test graph. Enable d3-quadtree if &gt;100ms per tick. Slice 7 caps reduce node count.</td>
           </tr>
           
           <tr>
             <td>Session filter relaxation could spike session nodes to 500&#43;</td>
             <td><span class="badge badge-revision">Medium</span></td>
-            <td>Implement per-type node budgets (sessions cap 300, commits cap 100, files cap 200)</td>
+            <td>Implement per-type node budgets — addressed by Slice 7 (sessions cap 300)</td>
           </tr>
           
         </tbody>
@@ -938,8 +1068,8 @@ Regression: all existing graph tests pass
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">7</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">7</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">9</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">9</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -982,6 +1112,7 @@ Regression: all existing graph tests pass
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
+<script src="/js/marked.min.js"></script>
 <script>
 // Plan base path — derived from window.location.pathname so the same
 // rendered HTML works whether the file is served at the legacy
@@ -1043,7 +1174,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6","slice-7","slice-8"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
@@ -1348,31 +1479,12 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 // Chat panel
 // Global markdown renderer — shared by chat bubbles and data-markdown elements
-function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+if (typeof marked !== 'undefined') {
+  marked.setOptions({ breaks: false, gfm: true });
+}
 function renderMd(text){
-  var s=escHtml(text);
-  s=s.replace(/```(\w*)\n([\s\S]*?)```/g,function(_,lang,code){
-    return '<pre><code'+(lang?' class="language-'+lang+'"':'')+'>'+code.trim()+'</code></pre>';
-  });
-  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
-  s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-  s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
-  s=s.replace(/^### (.+)$/gm,'<h4>$1</h4>');
-  s=s.replace(/^## (.+)$/gm,'<h3>$1</h3>');
-  s=s.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm,function(_,hdr,sep,body){
-    var ths=hdr.split('|').filter(Boolean).map(function(c){return '<th>'+c.trim()+'</th>';}).join('');
-    var rows=body.trim().split('\n').map(function(row){
-      var tds=row.split('|').filter(Boolean).map(function(c){return '<td>'+c.trim()+'</td>';}).join('');
-      return '<tr>'+tds+'</tr>';
-    }).join('');
-    return '<table class="q-table"><thead><tr>'+ths+'</tr></thead><tbody>'+rows+'</tbody></table>';
-  });
-  s=s.replace(/^[*-] (.+)$/gm,'<li>$1</li>');
-  s=s.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
-  s=s.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
-  s=s.replace(/\n\n/g,'</p><p>');
-  s=s.replace(/\n/g,'<br>');
-  return '<p>'+s+'</p>';
+  if(!text||!text.trim()) return '<p></p>';
+  return marked.parse(text);
 }
 // Render inline markdown for elements with data-markdown attribute.
 // For block elements (div/p) replaces innerHTML; for inline (li/span)
@@ -1383,14 +1495,9 @@ function renderMd(text){
     if(!raw.trim()) return;
     var tag=el.tagName.toLowerCase();
     if(tag==='li'||tag==='span'||tag==='td'){
-      // Inline context — just apply bold/italic/code, no block transforms
-      var s=escHtml(raw);
-      s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
-      s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-      s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
-      el.innerHTML=s;
+      el.innerHTML=marked.parseInline(raw);
     } else {
-      el.innerHTML=renderMd(raw);
+      el.innerHTML=marked.parse(raw);
     }
     el.removeAttribute('data-markdown');
   });

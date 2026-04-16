@@ -7,7 +7,7 @@ meta:
     created_at: "2026-04-16"
     status: draft
     created_by: claude-opus
-    version: 2
+    version: 4
 design:
     problem: |
         HtmlGraph's core value proposition is "see the full graph of AI-assisted work" — but the graph currently only shows work items (features, bugs, spikes, tracks) and a handful of filtered sessions. The causal chain (agent spawned → session created → feature claimed → commits produced → files modified) is entirely absent from the visualization. The raw data exists in SQLite across 5 tables (git_commits: 51 rows, feature_files: 299 rows, agent_lineage_trace: 141 rows, sessions: 139 parent→child pairs, tool_calls: 1454 rows) but none of it is surfaced as graph nodes or edges. The /api/graph endpoint only queries features, tracks, and sessions (with a >5 events filter), and the D3 frontend only has color/layout mappings for 6 node types. The internal/graph DSL and algorithms also don't model commit or file node types.
@@ -16,6 +16,7 @@ design:
         - '**Provenance in one click** — clicking any node reveals its full upstream/downstream chain (who spawned the agent, what feature it worked on, what commits it produced, what files were touched)'
         - '**Query API** — REST endpoints that answer ''what commits came from agent X?'', ''which sessions touched file Y?'', ''what agents worked on feature Z?'' returning structured JSON'
         - '**Performance at scale** — graph renders smoothly with 2000+ nodes; query-time derivation for cheap joins, materialization only for hot dashboard paths'
+        - '**Agent attribution** — agent types are visible as graph nodes showing which AI agents did the most work, spawned the most sessions, and touched the most features'
     constraints:
         - Hybrid materialization — derive edges at query time where joins are cheap (< 50ms); only materialize into graph_edges for edges used in hot paths (graph API, lineage command)
         - No schema-breaking changes — extend existing tables and graph_edges, don't replace them
@@ -242,7 +243,10 @@ slices:
              (e.g., "produced Commit def123", "touched File src/foo.go")
            - Each item in the chain is clickable to navigate to that node's provenance
 
-        3. For session nodes: also show agent name, duration, tool call count 4. For commit nodes: show full hash, message, timestamp, author 5. For file nodes: show all features that touched this file, with session attribution
+        3. For session nodes: also show agent name, duration, tool call count
+        4. For commit nodes: show full hash, message, timestamp, author
+        5. For file nodes: show all features that touched this file, with session attribution
+
         6. Add the panel HTML to dashboard/index.html and CSS to dashboard/css/style.css.
            Use the existing panel patterns from the session detail or work detail views.
       why: |
@@ -323,6 +327,122 @@ slices:
         Regression: all existing graph tests pass
       approved: false
       comment: ""
+    - id: slice-7
+      num: 7
+      title: Graph filtering — type toggles and node count budgets
+      what: |
+        Add filtering controls to the graph API and dashboard frontend to manage node cardinality.
+
+        Backend (cmd/htmlgraph/api_graph.go):
+        1. Add a ?types=feature,session,commit query parameter to GET /api/graph. When present,
+           only return nodes of the specified types. When absent, return all types (backward compatible).
+        2. Add per-type node count caps applied server-side: tracks=unlimited, features=unlimited,
+           bugs=unlimited, spikes=unlimited, plans=unlimited, sessions=300, commits=200, files=200,
+           agents=100. Caps apply after all nodes are loaded but before edge derivation. Order by
+           activity DESC (most connected first) to keep the most interesting nodes.
+        3. Add a ?limit=N parameter for total node cap (default: 2000). Return the highest-activity
+           nodes across all types up to the limit.
+        4. Return cap metadata in the response: { nodes: [...], edges: [...], caps: { sessions: {total: 516, shown: 300}, ... } }
+           so the frontend can show "showing 300 of 516 sessions".
+
+        Frontend (cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/index.html):
+        1. Add a filter toolbar above the graph canvas with toggle buttons for each node type
+           (Track, Feature, Bug, Spike, Plan, Session, Commit, File, Agent). Each button has a
+           colored dot matching the node color and a count badge.
+        2. Toggling a type off removes those nodes from the D3 simulation and re-renders.
+           Toggling on re-fetches with the updated ?types= parameter.
+        3. Show "Showing N of M" text for capped types.
+        4. Add a "Reset" button that removes all filters and returns to default view.
+      why: |
+        Without filtering, adding commit (51+), file (299+), session (300+), and agent nodes will overwhelm the visualization. The graph goes from ~700 to potentially 1500+ nodes. Type toggles let users focus on the relationships they care about (e.g., "show me just features and sessions" or "show me commits and files for this area"). Per-type caps prevent any single high-cardinality type from dominating the graph.
+      files:
+        - cmd/htmlgraph/api_graph.go
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/index.html
+      deps:
+        - 1
+        - 2
+        - 3
+      done_when:
+        - GET /api/graph?types=feature,session returns only feature and session nodes
+        - Per-type caps enforced server-side (sessions 300, commits 200, files 200, agents 100)
+        - Response includes caps metadata showing total vs shown counts
+        - Dashboard has toggle buttons for each node type above the graph
+        - Toggling a type off removes those nodes from the visualization
+        - Capped types show Showing N of M indicator
+        - Default view (no filters) works identically to current behavior
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestGraphAPITypeFilter — request ?types=feature,session, verify only those types returned
+        Unit: TestGraphAPINodeCaps — insert 400 sessions, verify only 300 returned ordered by activity
+        Unit: TestGraphAPICapsMetadata — verify response includes caps object with total/shown counts
+        Visual: Toggle off file nodes, verify they disappear from graph
+        Visual: Toggle on commits, verify they appear with correct colors
+        Visual: Verify Showing 200 of 299 text appears for capped file nodes
+        Regression: /api/graph without parameters returns same results as before
+      approved: false
+      comment: ""
+    - id: slice-8
+      num: 8
+      title: Agent type nodes — surface who did the work
+      what: |
+        Add agent type nodes to the graph, making each distinct agent (e.g., "htmlgraph:researcher",
+        "htmlgraph:sonnet-coder", "htmlgraph:opus-coder") a first-class graph entity.
+
+        Backend (cmd/htmlgraph/api_graph.go):
+        1. Query distinct agent names: SELECT DISTINCT agent_name FROM agent_lineage_trace
+           WHERE agent_name != '' UNION SELECT DISTINCT agent_assigned FROM sessions
+           WHERE agent_assigned != ''. Map to graphNode with id=agent_name, type="agent",
+           title=agent_name.
+        2. Derive edges: agent→session (type="ran_as") from agent_lineage_trace.agent_name →
+           agent_lineage_trace.session_id. Shows which sessions were run by which agent type.
+        3. Derive edges: agent→feature (type="worked_on") from agent_lineage_trace WHERE
+           feature_id IS NOT NULL. Shows which agent types contributed to which features.
+        4. Activity count for agent nodes: COUNT of agent_lineage_trace rows + COUNT of sessions
+           WHERE agent_assigned = agent_name. Larger activity = larger node.
+
+        Frontend (cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/index.html):
+        1. TYPE_BAND_Y: agent=0.35 (between tracks at 0.20 and features at 0.50).
+        2. TYPE_TOKEN: agent='--priority-high' (amber/orange) — warm color to stand out as
+           the "who" in the graph, distinct from "what" (features) and "how" (sessions).
+        3. edgeColor: ran_as='#f59e0b' (amber).
+        4. Radius multiplier 0.8, opacity 0.85 — important but fewer in number.
+        5. Update legend to include Agent entry.
+        6. Click handler: tooltip with agent name, total sessions, features worked on, tool calls.
+
+        DSL (internal/graph/dsl.go):
+        1. Add "agent" and "agents" to knownNodeTypes.
+      why: |
+        The graph answers "what was built" and "when" but not "who built it." Agent types are the AI workforce — showing them as graph nodes completes the full causal chain: orchestrator → agent type → session → feature → commit → files. The data already exists in agent_lineage_trace (141 rows with agent_name) and sessions.agent_assigned.
+      files:
+        - cmd/htmlgraph/api_graph.go
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/index.html
+        - internal/graph/dsl.go
+      deps:
+        - 2
+        - 3
+      done_when:
+        - GET /api/graph returns nodes with type='agent' for each distinct agent name
+        - Agent→session (ran_as) edges connect agent types to their sessions
+        - Agent→feature (worked_on) edges connect agent types to features they contributed to
+        - Agent nodes render in amber at the 0.35 Y band, sized by activity
+        - Legend includes Agent entry
+        - Clicking agent node shows tooltip with session/feature/tool counts
+        - No duplicate agent nodes (DISTINCT on agent_name)
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestGraphAPIAgentNodes — insert agent_lineage_trace rows with different agent_names, verify distinct agent nodes
+        Unit: TestGraphAPIAgentEdges — verify ran_as edges from agent to session, worked_on edges from agent to feature
+        Unit: TestGraphAPIAgentActivity — verify activity count reflects session + lineage counts
+        Visual: Verify agent nodes appear as amber circles above the feature band
+        Visual: Verify agent→session edges connect to the session cluster
+        Visual: Click agent node, verify tooltip shows correct counts
+        Regression: existing node types unchanged
+      approved: false
+      comment: ""
 questions:
     - id: q-file-node-granularity
       text: How should file nodes be represented — one node per unique path, or one node per (feature, path) pair?
@@ -371,6 +491,17 @@ questions:
           label: Slide-in panel overlaying the graph — interactive, keeps visual context, more complex to implement
         - key: separate-view
           label: New 'Provenance' tab — simpler, loses graph context, similar to existing Work detail view
+      answer: null
+    - id: q-agent-node-granularity
+      text: Should agent nodes represent agent types (e.g., 'htmlgraph:researcher') or individual agent instances (one per spawn)?
+      description: |
+        agent_lineage_trace has 141 rows but only ~10 distinct agent_name values. If we create one node per agent type, the graph has ~10 high-connectivity hub nodes showing "this agent type ran 30 sessions and touched 15 features." If we create one node per agent instance (per trace_id), the graph has 141 more nodes but each connects to exactly one session. Agent types are more useful for understanding delegation patterns and workload distribution; instances are more useful for debugging specific agent runs.
+      recommended: agent-type
+      options:
+        - key: agent-type
+          label: One node per distinct agent_name — ~10 hub nodes, shows delegation patterns and workload distribution
+        - key: agent-instance
+          label: One node per trace_id — 141 nodes, shows individual agent runs, useful for debugging specific spawns
       answer: null
 critique:
     reviewed_at: "2026-04-16"
@@ -433,14 +564,17 @@ critique:
                 - badge: S6
                   kind: warn
                   text: 'Scope expanded: resolveTypeSelector, filterBySelectorDSL, allowedFilterColumns all need changes.'
+                - badge: S7
+                  kind: success
+                  text: Filtering addresses the high-cardinality risk. Per-type caps and toggle UI are well-specified.
+                - badge: S8
+                  kind: success
+                  text: Agent nodes complete the causal chain. ~10 hub nodes add minimal graph weight with high information value.
             - heading: Gaps & Missing Considerations
               items:
                 - badge: Gap
                   kind: warn
                   text: No reindex path described for materializing new edge types
-                - badge: Gap
-                  kind: warn
-                  text: No per-type node count budgets to prevent graph overload
                 - badge: Gap
                   kind: info
                   text: Plan nodes in provenance chain (planned_in edges) not mentioned
@@ -493,7 +627,7 @@ critique:
     risks:
         - risk: File node cardinality explosion — 299 today, could reach 1000+
           severity: High
-          mitigation: Implement per-type node count cap (e.g., 200 hottest files by modification count)
+          mitigation: Implement per-type node count cap (e.g., 200 hottest files by modification count) — addressed by Slice 7
         - risk: Query-time derivation breaks lineage CLI and graph algorithms
           severity: High
           mitigation: Materialize edges on reindex. Add reindex step for commit/file/session edges.
@@ -502,9 +636,9 @@ critique:
           mitigation: Use GROUP BY commit_hash in the query. Test with multi-session commits.
         - risk: D3 collision detection is O(n^2) — 2000 nodes = 4M distance checks per frame
           severity: Medium
-          mitigation: Benchmark on 2000-node test graph. Enable d3-quadtree if >100ms per tick.
+          mitigation: Benchmark on 2000-node test graph. Enable d3-quadtree if >100ms per tick. Slice 7 caps reduce node count.
         - risk: Session filter relaxation could spike session nodes to 500+
           severity: Medium
-          mitigation: Implement per-type node budgets (sessions cap 300, commits cap 100, files cap 200)
+          mitigation: Implement per-type node budgets — addressed by Slice 7 (sessions cap 300)
     synthesis: |
-        The plan is fundamentally sound but has three critical issues that must be addressed: (1) file->commit edges cannot be derived (no FK) — replaced with file->session edges, (2) edge materialization strategy must be materialize-on-reindex for CLI compatibility, (3) git_commits composite PK requires deduplication. All three are addressed in this revision. The remaining medium-severity risks (D3 performance at scale, session filter threshold) are manageable with per-type node budgets and benchmarking.
+        The plan is fundamentally sound with three critical issues addressed in revision: (1) file->commit edges cannot be derived (no FK) — replaced with file->session edges, (2) edge materialization strategy must be materialize-on-reindex for CLI compatibility, (3) git_commits composite PK requires deduplication. Version 3 adds two new slices addressing gaps identified in critique: Slice 7 (filtering/caps) handles the high-cardinality risk, and Slice 8 (agent nodes) completes the causal chain with "who did the work" attribution. The remaining medium-severity risks (D3 performance, session threshold) are manageable with the per-type budgets in Slice 7.
