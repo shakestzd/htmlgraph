@@ -1832,30 +1832,8 @@ function renderGraph(data) {
     node.attr('opacity', 1);
     link.attr('stroke-opacity', 0.5);
   }).on('click', function(e, d) {
-    // Route navigation by node type.
-    if (d.type === 'session') {
-      // Sessions navigate to the session transcript view.
-      currentView = 'sessions';
-      document.querySelectorAll('.nav-btn').forEach(function(b) {
-        b.classList.toggle('active', b.dataset.view === 'sessions');
-      });
-      document.querySelectorAll('.view').forEach(function(v) {
-        v.classList.toggle('active', v.id === 'v-sessions');
-      });
-      if (typeof openSessionDetail === 'function') {
-        openSessionDetail(d.id);
-      } else if (typeof openTranscript === 'function') {
-        openTranscript(d.id);
-      } else {
-        // Fallback: just load the sessions view.
-        fetchSessions && fetchSessions();
-      }
-      return;
-    }
-    // Tracks/features/bugs/spikes open in the work detail panel via
-    // the shared navigateToWorkDetail helper (same path used by the
-    // transcript stats work-item badges).
-    navigateToWorkDetail(d.id);
+    // All node types open the provenance panel for causal-chain drill-down.
+    openProvenancePanel(d.id);
   });
 
   // Wrap text inside a circle using real SVG measurement via getComputedTextLength.
@@ -2016,6 +1994,67 @@ function renderGraph(data) {
       .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
   });
 }
+
+// openProvenancePanel fetches and displays the causal chain for a graph node
+// in the fixed right-side drawer. Each upstream/downstream item is clickable
+// to drill into that node's own provenance.
+function openProvenancePanel(nodeId) {
+  var panel = document.getElementById('provenance-panel');
+  var titleEl = document.getElementById('provenance-title');
+  var badge = document.getElementById('provenance-type-badge');
+  var upstreamEl = document.getElementById('provenance-upstream');
+  var downstreamEl = document.getElementById('provenance-downstream');
+
+  fetch('/api/provenance/' + encodeURIComponent(nodeId))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      titleEl.textContent = data.node.title || data.node.id;
+      badge.textContent = data.node.type;
+      badge.className = 'type-badge type-' + data.node.type;
+
+      upstreamEl.innerHTML = '';
+      (data.upstream || []).forEach(function(link) {
+        var li = document.createElement('li');
+        var rel = document.createElement('span');
+        rel.className = 'provenance-rel';
+        rel.textContent = link.relationship;
+        var label = document.createElement('span');
+        label.textContent = link.title || link.id;
+        li.appendChild(rel);
+        li.appendChild(label);
+        li.onclick = function() { openProvenancePanel(link.id); };
+        upstreamEl.appendChild(li);
+      });
+
+      downstreamEl.innerHTML = '';
+      (data.downstream || []).forEach(function(link) {
+        var li = document.createElement('li');
+        var rel = document.createElement('span');
+        rel.className = 'provenance-rel';
+        rel.textContent = link.relationship;
+        var label = document.createElement('span');
+        label.textContent = link.title || link.id;
+        li.appendChild(rel);
+        li.appendChild(label);
+        li.onclick = function() { openProvenancePanel(link.id); };
+        downstreamEl.appendChild(li);
+      });
+
+      panel.classList.remove('hidden');
+    })
+    .catch(function(err) {
+      console.error('provenance fetch failed', err);
+    });
+}
+
+(function() {
+  var closeBtn = document.getElementById('provenance-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      document.getElementById('provenance-panel').classList.add('hidden');
+    });
+  }
+})();
 
 // openSessionDetail switches to the sessions view and highlights a specific session.
 function openSessionDetail(sessionId) {
