@@ -62,41 +62,36 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	// basename) so the UI can label the header when drilled in via a proxy.
 	projectDir := filepath.Dir(htmlgraphDir)
 	projectName := filepath.Base(projectDir)
-	mux.Handle("/api/mode", corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	mux.Handle("/api/mode", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, map[string]any{
 			"mode":        "single",
 			"projectName": projectName,
 			"projectDir":  projectDir,
 		})
-	})))
+	}))
 
 	// API endpoints registered before file server so they take precedence.
-	mux.Handle("/api/events/recent", corsMiddleware(recentEventsHandler(database)))
-	mux.Handle("/api/events/tree", corsMiddleware(treeHandler(database)))
-	mux.Handle("/api/events/stream", corsMiddleware(sseHandler(database)))
-	mux.Handle("/api/events/subagent", corsMiddleware(subagentEventsHandler(database)))
-	mux.Handle("/api/sessions", corsMiddleware(sessionsHandler(database, projectDir)))
-	mux.Handle("/api/features", corsMiddleware(featuresHandler(database, htmlgraphDir)))
-	mux.Handle("/api/stats", corsMiddleware(statsHandler(database, htmlgraphDir)))
-	mux.Handle("/api/initial-stats", corsMiddleware(initialStatsHandler(database)))
-	mux.Handle("/api/timeline", corsMiddleware(timelineHandler(database)))
-	mux.Handle("/api/transcript", corsMiddleware(transcriptHandler(database, htmlgraphDir)))
-	mux.Handle("/api/sessions/", corsMiddleware(sessionIngestHandler(database)))
-	mux.Handle("/api/features/", corsMiddleware(featureActivityRouter(database, htmlgraphDir)))
-	mux.Handle("/api/graph", corsMiddleware(graphAPIHandler(database)))
+	mux.Handle("/api/events/recent", recentEventsHandler(database))
+	mux.Handle("/api/events/tree", treeHandler(database))
+	mux.Handle("/api/events/stream", sseHandler(database))
+	mux.Handle("/api/events/subagent", subagentEventsHandler(database))
+	mux.Handle("/api/sessions", sessionsHandler(database, projectDir))
+	mux.Handle("/api/features", featuresHandler(database, htmlgraphDir))
+	mux.Handle("/api/stats", statsHandler(database, htmlgraphDir))
+	mux.Handle("/api/initial-stats", initialStatsHandler(database))
+	mux.Handle("/api/timeline", timelineHandler(database))
+	mux.Handle("/api/transcript", transcriptHandler(database, htmlgraphDir))
+	mux.Handle("/api/sessions/", sessionIngestHandler(database))
+	mux.Handle("/api/features/", featureActivityRouter(database, htmlgraphDir))
+	mux.Handle("/api/graph", graphAPIHandler(database))
 
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
-	mux.Handle("/api/plans", corsMiddleware(plansListHandler(htmlgraphDir, database)))
-	mux.Handle("/plans/", corsMiddleware(planFileHandler(htmlgraphDir)))
-	mux.Handle("/api/plans/", corsMiddleware(planRouter(database, htmlgraphDir)))
-
-	// .htmlgraph/ files accessible under /htmlgraph/
-	mux.Handle("/htmlgraph/", corsMiddleware(
-		http.StripPrefix("/htmlgraph/", http.FileServer(http.Dir(htmlgraphDir))),
-	))
+	mux.Handle("/api/plans", plansListHandler(htmlgraphDir, database))
+	mux.Handle("/plans/", planFileHandler(htmlgraphDir))
+	mux.Handle("/api/plans/", planRouter(database, htmlgraphDir))
 
 	// Serve embedded dashboard (index.html, css/, js/, components/)
-	mux.Handle("/", corsMiddleware(http.FileServer(http.FS(dashboardSub()))))
+	mux.Handle("/", http.FileServer(http.FS(dashboardSub())))
 
 	return mux
 }
@@ -376,17 +371,3 @@ func isHeadlessSession(result *ingest.ParseResult) bool {
 	return false
 }
 
-// corsMiddleware adds permissive CORS headers so in-browser HTML files can
-// fetch() local work-item files without a same-origin error.
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}

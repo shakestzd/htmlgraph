@@ -22,6 +22,7 @@ package main
 import (
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/shakestzd/htmlgraph/internal/paths"
 	"github.com/shakestzd/htmlgraph/internal/registry"
@@ -46,20 +47,20 @@ func buildGlobalMux() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// /api/mode — dashboard calls this on startup to detect global mode.
-	mux.Handle("/api/mode", corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	mux.Handle("/api/mode", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, map[string]any{"mode": "global"})
-	})))
+	}))
 
 	// /api/projects — registry list only. No DB access. Counts and
 	// per-project data come from the child via /p/<id>/api/*.
-	mux.Handle("/api/projects", corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	mux.Handle("/api/projects", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, listRegisteredProjects())
-	})))
+	}))
 
 	// Serve the embedded dashboard SPA (index.html, css/, js/,
 	// components/). The frontend calls /api/mode on startup to detect
 	// global mode and render the projects landing.
-	mux.Handle("/", corsMiddleware(http.FileServer(http.FS(dashboardSub()))))
+	mux.Handle("/", http.FileServer(http.FS(dashboardSub())))
 
 	return mux
 }
@@ -90,9 +91,9 @@ func listRegisteredProjects() []projectSummary {
 		out = append(out, projectSummary{
 			ID:           e.ID,
 			Name:         e.Name,
-			Dir:          e.ProjectDir,
+			Dir:          filepath.Base(e.ProjectDir),
 			LastSeen:     e.LastSeen,
-			GitRemoteURL: e.GitRemoteURL,
+			GitRemoteURL: shortenGitRemote(e.GitRemoteURL),
 		})
 	}
 	return out
@@ -113,4 +114,45 @@ func isLinkedWorktree(dir string) bool {
 		return false
 	}
 	return filepath.Clean(mainRoot) != filepath.Clean(dir)
+}
+
+// shortenGitRemote converts a raw Git remote URL into an owner/repo slug.
+// Examples:
+//
+//	https://github.com/owner/repo.git  → owner/repo
+//	git@github.com:owner/repo.git      → owner/repo
+//	ssh://git@github.com/owner/repo    → owner/repo
+//
+// If raw is empty or doesn't match a known pattern, it is returned as-is.
+func shortenGitRemote(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	s := raw
+
+	// Strip ssh://git@ prefix.
+	s = strings.TrimPrefix(s, "ssh://git@")
+
+	// Strip git@ prefix (SCP-style).
+	s = strings.TrimPrefix(s, "git@")
+
+	// Strip https:// or http:// prefix.
+	if after, ok := strings.CutPrefix(s, "https://"); ok {
+		s = after
+	} else if after, ok := strings.CutPrefix(s, "http://"); ok {
+		s = after
+	}
+
+	// Strip host (everything up to the first '/' or ':').
+	if idx := strings.IndexAny(s, "/:"); idx >= 0 {
+		s = s[idx+1:]
+	}
+
+	// Strip trailing .git.
+	s = strings.TrimSuffix(s, ".git")
+
+	if s == "" {
+		return raw
+	}
+	return s
 }

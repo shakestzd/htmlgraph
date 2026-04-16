@@ -156,7 +156,7 @@ func runParentServer(port int) error {
 
 	mux := buildParentMux(sup)
 
-	addr := fmt.Sprintf("localhost:%d", port)
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
 	// Auto-detect & print URLs.
 	entry := autoDetectCurrentProject()
@@ -200,7 +200,7 @@ func runParentServer(port int) error {
 // the /p/<id>/* reverse proxy handler registered here.
 func buildParentMux(sup *childproc.Supervisor) *http.ServeMux {
 	mux := buildGlobalMux()
-	mux.Handle("/p/", corsMiddleware(proxyHandler(sup)))
+	mux.Handle("/p/", proxyHandler(sup))
 	return mux
 }
 

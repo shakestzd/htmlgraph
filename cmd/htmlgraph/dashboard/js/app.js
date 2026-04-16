@@ -1209,8 +1209,7 @@ function renderProjectsLanding(projects) {
     meta.appendChild(last);
     if (p.gitRemoteURL) {
       var remote = document.createElement('span');
-      var short = p.gitRemoteURL.replace(/^https?:\/\/(github\.com|gitlab\.com|bitbucket\.org)\//, '').replace(/\.git$/, '');
-      remote.textContent = short;
+      remote.textContent = p.gitRemoteURL;
       remote.title = p.gitRemoteURL;
       meta.appendChild(remote);
     }
