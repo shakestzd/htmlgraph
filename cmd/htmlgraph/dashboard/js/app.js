@@ -1798,24 +1798,14 @@ function renderGraph(data) {
       return d.type === 'spawned' ? '6,3' : null;
     });
 
-  // Node circles. Radius flows through visualRadius so the on-screen
-  // size matches the value used by label wrapping and the collision
-  // force below — one source of truth for "how big is this node."
+  // Node circles — kept as invisible hit targets so drag/click/hover
+  // still work, but the visible identity is now carried entirely by the
+  // icon overlay. Fill is transparent; no stroke.
   var node = g.append('g').selectAll('circle')
     .data(nodes).enter().append('circle')
     .attr('r', visualRadius)
-    .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
-    .attr('fill-opacity', function(d) {
-      if (d.type === 'session') return 0.6;
-      if (d.type === 'commit' || d.type === 'file') return 0.5;
-      return GRAPH_LAYOUT.NODE_FILL_OPACITY;
-    })
-    .attr('stroke', 'var(--bg-primary)')
-    .attr('stroke-width', 1.5)
-    // Plans share the grayscale tier with features. The dashed outline
-    // signals "blueprint, not built yet" so the two tiers stay distinct
-    // even when their fill tokens resolve to similar neutrals.
-    .attr('stroke-dasharray', function(d) { return d.type === 'plan' ? '4,2' : null; })
+    .attr('fill', 'transparent')
+    .attr('stroke', 'none')
     .style('cursor', 'pointer')
     .call(d3.drag()
       .on('start', function(e, d) {
@@ -1829,20 +1819,24 @@ function renderGraph(data) {
       })
     );
 
-  // Icon overlay — draw an SVG icon inside nodes that are large enough to
-  // read it. Small high-cardinality nodes (sessions, commits, files under
-  // ~10px radius) stay as colored circles only; icons there would be pixel
-  // mush. Icons inherit the node fill via currentColor so they follow the
-  // theme. Pointer-events disabled so drag/click still target the circle.
-  var ICON_MIN_RADIUS = 10;
+  // Icon overlay — the icon IS the node now. No background circle, no
+  // label text; the glyph color carries semantic identity (bug red,
+  // commit green, agent purple, etc.). We enforce a minimum on-screen
+  // size (ICON_MIN_SIZE px) so small high-cardinality types stay
+  // legible. Pointer-events disabled so the underlying invisible
+  // circle still captures drag/click/hover.
+  var ICON_MIN_SIZE = 14;
   var iconTypes = { track:1, plan:1, feature:1, bug:1, spike:1, agent:1, commit:1, session:1, file:1 };
+  function iconSize(d) {
+    return Math.max(ICON_MIN_SIZE, visualRadius(d) * 1.8);
+  }
   var icons = g.append('g')
     .attr('pointer-events', 'none')
     .selectAll('use')
-    .data(nodes.filter(function(d) { return iconTypes[d.type] && visualRadius(d) >= ICON_MIN_RADIUS; }))
+    .data(nodes.filter(function(d) { return iconTypes[d.type]; }))
     .enter().append('use')
     .attr('href', function(d) { return '#icon-' + d.type; })
-    .attr('color', 'var(--bg-primary)')   // icon stroke/fill inherits via currentColor
+    .attr('color', function(d) { return typeColor[d.type] || '#888'; })
     .attr('opacity', 0.95);
 
   // Repaint nodes, labels, and legend on theme toggle without tearing
@@ -1851,13 +1845,7 @@ function renderGraph(data) {
   // in sync (used by drag/hover handlers that reuse typeColor).
   graphThemeObserver = new MutationObserver(function() {
     typeColor = getGraphPalette();
-    node.attr('fill', function(d) { return typeColor[d.type] || '#888'; });
-    if (typeof trackLabels !== 'undefined') {
-      trackLabels.attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); });
-    }
-    if (typeof hubLabels !== 'undefined') {
-      hubLabels.attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); });
-    }
+    icons.attr('color', function(d) { return typeColor[d.type] || '#888'; });
     paintGraphLegend();
   });
   graphThemeObserver.observe(document.documentElement, {
@@ -2033,21 +2021,16 @@ function renderGraph(data) {
   // paint-order stroke — labels wrap inside the node radius, never
   // cross onto the background, and a dark halo would visibly thicken
   // and blur the small font sizes that fit inside sub-20px nodes.
-  var trackLabelNodes = nodes.filter(function(d) { return d.type === 'track'; });
-  var trackLabelGroup = g.append('g');
+  // Labels are currently disabled — the icon-only mode carries identity
+  // via glyph + color, and wrapped text inside small circles added more
+  // visual noise than signal. The tick handler and theme observer still
+  // reference trackLabels/hubLabels selections, so we create empty ones
+  // rather than stripping the references.
+  var trackLabelNodes = [];
+  var trackLabelGroup = g.append('g').style('display', 'none');
   var trackLabels = trackLabelGroup.selectAll('text.track-label')
     .data(trackLabelNodes)
-    .enter().append('text')
-    .attr('class', 'track-label')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
-    .attr('font-weight', 'bold')
-    .attr('pointer-events', 'none');
-
-  trackLabels.each(function(d) {
-    wrapTextInCircle(d3.select(this), d.title, visualRadius(d));
-  });
+    .enter().append('text');
 
   // Hub node labels — fit inside the circle when node is large enough.
   // Uses visualRadius (not nodeRadius) so the "is this big enough to
@@ -2055,23 +2038,10 @@ function renderGraph(data) {
   // nodes is 60% of nodeRadius. Without this, session labels thought
   // they had 67% more space than the circle actually provided and
   // spilled onto the background.
-  var hubNodes = nodes.filter(function(d) {
-    return d.type !== 'track' && (d.edges || 0) >= 3 && visualRadius(d) >= 10;
-  });
-
-  var hubLabels = g.append('g').selectAll('text.hub-label')
-    .data(hubNodes)
-    .enter().append('text')
-    .attr('class', 'hub-label')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
-    .attr('font-weight', '600')
-    .attr('pointer-events', 'none');
-
-  hubLabels.each(function(d) {
-    wrapTextInCircle(d3.select(this), d.title, visualRadius(d));
-  });
+  // Hub labels disabled alongside track labels — see comment above.
+  var hubLabels = g.append('g').style('display', 'none').selectAll('text.hub-label')
+    .data([])
+    .enter().append('text');
 
   graphSimulation.on('tick', function() {
     link
@@ -2082,14 +2052,14 @@ function renderGraph(data) {
     node
       .attr('cx', function(d) { return d.x; })
       .attr('cy', function(d) { return d.y; });
-    // Icons sit at 60% of the node's visual radius so they don't touch the
-    // ring. Anchored via x/y = center - size/2 since <use> honors the symbol
-    // viewBox as its own coordinate space.
+    // Icons are now the only visible node glyph, so they're centered
+    // directly on (d.x, d.y) with size floored at ICON_MIN_SIZE so even
+    // a degree-1 file/commit remains legible.
     icons
-      .attr('width', function(d) { return visualRadius(d) * 1.2; })
-      .attr('height', function(d) { return visualRadius(d) * 1.2; })
-      .attr('x', function(d) { return d.x - visualRadius(d) * 0.6; })
-      .attr('y', function(d) { return d.y - visualRadius(d) * 0.6; });
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('x', function(d) { return d.x - iconSize(d) / 2; })
+      .attr('y', function(d) { return d.y - iconSize(d) / 2; });
     trackLabels
       .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
     hubLabels
