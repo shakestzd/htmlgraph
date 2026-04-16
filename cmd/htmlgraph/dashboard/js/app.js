@@ -1457,11 +1457,9 @@ var GRAPH_LAYOUT = {
   TYPE_BAND_Y: {
     track:   0.20,
     plan:    0.30,
-    agent:   0.35,
     feature: 0.50,
     bug:     0.55,
     spike:   0.60,
-    commit:  0.70,
     session: 0.80,
     file:    0.90
   },
@@ -1482,15 +1480,14 @@ var GRAPH_LAYOUT = {
   // (plan is differentiated with a dashed stroke in the node render);
   // bug/spike/session reuse semantic status/priority tokens.
   TYPE_TOKEN: {
-    track:   '--accent',
-    feature: '--text-secondary',
-    plan:    '--text-muted',
-    bug:     '--status-blocked',
-    spike:   '--priority-high',
-    agent:   '--graph-agent',   // purple — was amber, collided with spike
-    commit:  '--status-done',
-    session: '--status-ip',
-    file:    '--graph-file'     // slate — was muted grey, collided with plan
+    track:   '--accent',           // green
+    plan:    '--graph-plan',       // teal — was grey, collided with feature
+    feature: '--graph-feature',    // near-white — was grey, ambiguous
+    bug:     '--status-blocked',   // red
+    spike:   '--priority-high',    // amber
+    session: '--status-ip',        // blue
+    file:    '--graph-file',       // gold — was grey, ambiguous
+    agent:   '--graph-agent'       // purple (filter UI only; no graph nodes)
   },
   // Fill opacity for non-session nodes. Sessions stay at their
   // existing 0.6 — they're secondary. 0.88 takes a little more
@@ -1553,13 +1550,18 @@ function paintGraphLegend() {
 
 // Active type filter state — array means "show only these types",
 // null means "show all". Default opens to the work-item skeleton only
-// (track / plan / feature / bug / spike). Provenance layers (agent /
-// session / commit / file) are one toolbar click away but start
-// hidden so the graph doesn't open as a hairball. Research basis:
-// Cambridge Intelligence "don't visualize everything in your
-// underlying knowledge graph" — derive a workflow-focused subset.
+// (track / plan / feature / bug / spike). Provenance layers (session,
+// file) are one toolbar click away but start hidden so the graph
+// doesn't open as a hairball. Research basis: Cambridge Intelligence
+// "don't visualize everything in your underlying knowledge graph" —
+// derive a workflow-focused subset.
 var GRAPH_DEFAULT_TYPES = ['track', 'plan', 'feature', 'bug', 'spike'];
 var graphActiveTypes = GRAPH_DEFAULT_TYPES.slice();
+
+// Selected agent for "Filter by agent" dropdown. When set, the graph
+// contracts to only the sessions/features/files the named agent
+// interacted with (via agent_lineage_trace).
+var graphActiveAgent = '';
 
 // Race-proofing: track the current fetch so stale responses from a rapid
 // sequence of toggles don't overwrite newer graph state. Each call bumps the
@@ -1575,6 +1577,7 @@ function fetchGraph(types) {
   if (types === undefined) types = graphActiveTypes;
   var url = buildProjectUrl('graph');
   if (types && types.length > 0) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'types=' + types.join(',');
+  if (graphActiveAgent) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'agent=' + encodeURIComponent(graphActiveAgent);
 
   // Cancel any in-flight request before starting a new one.
   if (graphFetchController) {
@@ -1616,7 +1619,11 @@ function renderGraph(data) {
   // Build or update the filter toolbar.
   var oldToolbar = container.querySelector('.graph-filter-toolbar');
   if (oldToolbar) oldToolbar.remove();
-  var allTypes = ['track', 'agent', 'feature', 'bug', 'spike', 'plan', 'session', 'commit', 'file'];
+  // Agent and commit intentionally absent: agents are surfaced via the
+  // "Filter by agent" dropdown (they're the actor, not a node), and
+  // commits are sub-attributes of the session/feature that produced
+  // them (visible in the provenance panel, not as standalone nodes).
+  var allTypes = ['track', 'plan', 'feature', 'bug', 'spike', 'session', 'file'];
   var typeCounts = {};
   (data.nodes || []).forEach(function(n) { typeCounts[n.type] = (typeCounts[n.type] || 0) + 1; });
   var toolbar = document.createElement('div');
@@ -1655,6 +1662,37 @@ function renderGraph(data) {
     };
     toolbar.appendChild(btn);
   });
+  // "Filter by agent" dropdown. Populated lazily from /api/graph/agents.
+  // Changing it refetches the graph restricted to work that agent
+  // touched (via agent_lineage_trace). The dropdown lives in the
+  // toolbar (not the left nav) so the scope is always obvious.
+  var agentSelect = document.createElement('select');
+  agentSelect.className = 'graph-filter-btn';
+  agentSelect.style.padding = '4px 6px';
+  var blankOpt = document.createElement('option');
+  blankOpt.value = '';
+  blankOpt.textContent = 'All agents';
+  agentSelect.appendChild(blankOpt);
+  agentSelect.onchange = function() {
+    graphActiveAgent = agentSelect.value;
+    fetchGraph();
+  };
+  toolbar.appendChild(agentSelect);
+  // Fetch the agent list once per render. Preserves current selection
+  // so the user's filter doesn't reset on every re-render.
+  fetch(buildProjectUrl('graph/agents'))
+    .then(function(r) { return r.json(); })
+    .then(function(list) {
+      (list || []).forEach(function(name) {
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === graphActiveAgent) opt.selected = true;
+        agentSelect.appendChild(opt);
+      });
+    })
+    .catch(function() { /* ignore — dropdown just stays empty */ });
+
   var resetBtn = document.createElement('button');
   resetBtn.className = 'graph-filter-btn';
   resetBtn.textContent = 'Reset';
@@ -1662,6 +1700,7 @@ function renderGraph(data) {
   // A user who actually wants everything can hit every toolbar button.
   resetBtn.onclick = function() {
     graphActiveTypes = GRAPH_DEFAULT_TYPES.slice();
+    graphActiveAgent = '';
     fetchGraph();
   };
   toolbar.appendChild(resetBtn);
@@ -1818,14 +1857,23 @@ function renderGraph(data) {
       return d.type === 'spawned' ? '6,3' : null;
     });
 
-  // Node circles — kept as invisible hit targets so drag/click/hover
-  // still work, but the visible identity is now carried entirely by the
-  // icon overlay. Fill is transparent; no stroke.
+  // Node circles carry the type color as background, with an icon glyph
+  // inside for shape-based recognition. Uniform silhouette (all nodes
+  // are circles) reduces visual chaos; icons inside provide the
+  // differentiation without forcing the eye to parse nine distinct
+  // outline shapes at once.
   var node = g.append('g').selectAll('circle')
     .data(nodes).enter().append('circle')
     .attr('r', visualRadius)
-    .attr('fill', 'transparent')
-    .attr('stroke', 'none')
+    .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
+    .attr('fill-opacity', function(d) {
+      if (d.type === 'session') return 0.7;
+      if (d.type === 'file') return 0.7;
+      return GRAPH_LAYOUT.NODE_FILL_OPACITY;
+    })
+    .attr('stroke', 'var(--bg-primary)')
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', function(d) { return d.type === 'plan' ? '4,2' : null; })
     .style('cursor', 'pointer')
     .call(d3.drag()
       .on('start', function(e, d) {
@@ -1839,24 +1887,30 @@ function renderGraph(data) {
       })
     );
 
-  // Icon overlay — the icon IS the node now. No background circle, no
-  // label text; the glyph color carries semantic identity (bug red,
-  // commit green, agent purple, etc.). We enforce a minimum on-screen
-  // size (ICON_MIN_SIZE px) so small high-cardinality types stay
-  // legible. Pointer-events disabled so the underlying invisible
-  // circle still captures drag/click/hover.
-  var ICON_MIN_SIZE = 14;
-  var iconTypes = { track:1, plan:1, feature:1, bug:1, spike:1, agent:1, commit:1, session:1, file:1 };
+  // Icons sit inside the node circle, providing shape-based type
+  // differentiation on top of the color. Min 10px so small nodes keep
+  // some glyph readability; size scales with the node radius. Color
+  // inherits from --bg-primary so they read as "reversed out" text on
+  // the circle fill, adapting to dark/light theme automatically.
+  var ICON_MIN_SIZE = 10;
+  // Tracks and features are the most common node types — leaving them as
+  // plain colored circles keeps the canvas calm. Bug/spike/session/file
+  // icons are the "marked" types: they carry glyphs because their
+  // presence is informative (bugs = problems, spikes = investigations,
+  // sessions = agent runs, files = artifacts). Plan keeps its icon
+  // because it's visually similar to feature (both are work items) and
+  // the clipboard glyph disambiguates them.
+  var iconTypes = { plan:1, bug:1, spike:1, session:1, file:1 };
   function iconSize(d) {
-    return Math.max(ICON_MIN_SIZE, visualRadius(d) * 1.8);
+    return Math.max(ICON_MIN_SIZE, visualRadius(d) * 1.2);
   }
   var icons = g.append('g')
     .attr('pointer-events', 'none')
     .selectAll('use')
-    .data(nodes.filter(function(d) { return iconTypes[d.type]; }))
+    .data(nodes.filter(function(d) { return iconTypes[d.type] && visualRadius(d) >= 8; }))
     .enter().append('use')
     .attr('href', function(d) { return '#icon-' + d.type; })
-    .attr('color', function(d) { return typeColor[d.type] || '#888'; })
+    .attr('color', 'var(--bg-primary)')
     .attr('opacity', 0.95);
 
   // Repaint nodes, labels, and legend on theme toggle without tearing
@@ -1865,7 +1919,7 @@ function renderGraph(data) {
   // in sync (used by drag/hover handlers that reuse typeColor).
   graphThemeObserver = new MutationObserver(function() {
     typeColor = getGraphPalette();
-    icons.attr('color', function(d) { return typeColor[d.type] || '#888'; });
+    node.attr('fill', function(d) { return typeColor[d.type] || '#888'; });
     paintGraphLegend();
   });
   graphThemeObserver.observe(document.documentElement, {

@@ -22,12 +22,17 @@
   --priority-critical: #ef4444;
   --error: #ef4444;
   --warning: #f59e0b;
-  /* Graph-specific colors. Separate from status/priority tokens so the
-     graph legend stays unambiguous: agent must not collide with spike
-     (both were --priority-high amber) and file must not collide with
-     plan (both were --text-muted grey). */
-  --graph-agent: #a855f7;  /* purple — AI workers */
-  --graph-file:  #94a3b8;  /* slate/cool grey — documents */
+  /* Graph-specific colors. Separate from status/priority tokens so
+     graph legend stays unambiguous. feature/plan/file used to all be
+     neutral greys which made them indistinguishable on the canvas, so
+     each now gets its own hue: plan = teal (blueprint), file = gold
+     (artifact), feature = near-white (the headline work item). Agent
+     is retained for completeness even though agent nodes are filtered
+     out of the graph — the dropdown legend still uses the token. */
+  --graph-plan:    #14b8a6;  /* teal — blueprints */
+  --graph-feature: #e5e7eb;  /* near-white — headline work item */
+  --graph-file:    #eab308;  /* gold — document artifacts */
+  --graph-agent:   #a855f7;  /* purple — AI workers (filter only) */
   --radius: 6px;
   --radius-sm: 4px;
   --font-sans: 'JetBrains Mono', ui-monospace, system-ui, sans-serif;
@@ -58,8 +63,10 @@
   --priority-critical: #dc2626;
   --error: #dc2626;
   --warning: #d97706;
-  --graph-agent: #7e22ce;  /* deeper purple for light mode contrast */
-  --graph-file:  #64748b;  /* darker slate for light mode contrast */
+  --graph-plan:    #0d9488;  /* darker teal for light-mode contrast */
+  --graph-feature: #64748b;  /* slate so text-on-light is readable */
+  --graph-file:    #ca8a04;  /* darker gold for light-mode contrast */
+  --graph-agent:   #7e22ce;  /* deeper purple for light-mode contrast */
 }
 /* Light mode — event row adjustments */
 [data-theme="light"] .event-row:hover { background: rgba(74,110,0,0.04) !important; }
