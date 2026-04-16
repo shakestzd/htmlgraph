@@ -1638,7 +1638,11 @@ function renderGraph(data) {
     var count = typeCounts[type] || 0;
     var capText = data.caps && data.caps[type] && data.caps[type].total > data.caps[type].shown
       ? ' of ' + data.caps[type].total : '';
-    btn.innerHTML = '<span class="filter-dot" data-graph-type="' + type + '">\u25CF</span> ' + label +
+    // Use the type's SVG icon instead of a colored dot so the filter
+     // doubles as a legend. Icon inherits currentColor via CSS so
+     // active/inactive button states tint it automatically.
+    btn.innerHTML = '<svg class="filter-icon" width="12" height="12" aria-hidden="true">' +
+      '<use href="#icon-' + type + '"/></svg> ' + label +
       ' <span style="opacity:0.6">' + count + capText + '</span>';
     btn.onclick = function() {
       if (!graphActiveTypes) {
@@ -1822,38 +1826,27 @@ function renderGraph(data) {
     .force('x', d3.forceX(width / 2).strength(0.015))
     .force('y', d3.forceY(height / 2).strength(0.015))
     // Collision padding reserves space around each node so glyphs and
-    // labels don't overlap neighbors. Track nodes get a much larger
-    // pad because they carry a static text label below them — the
-    // label needs vertical breathing room or other nodes drift on top.
+    // labels don't overlap neighbors. Track nodes use their measured
+    // label half-width (set after labels render) so the effective
+    // collision disc covers both the circle AND the label strip. If
+    // the measurement hasn't happened yet (first tick), we fall back
+    // to a generous default so the layout doesn't settle too tightly
+    // before labels arrive.
     .force('collision', d3.forceCollide()
       .radius(function(d) {
-        if (d.type === 'track') return visualRadius(d) + 26; // room for the label
+        if (d.type === 'track') {
+          var halfW = d._labelHalfWidth || 80;
+          return Math.max(visualRadius(d) + 26, halfW + 8);
+        }
         return visualRadius(d) + 5;
       })
       .strength(0.9));
 
-  // Edge color by relationship type for visual variety.
-  var edgeColor = {
-    part_of:       '#4b5563',
-    blocked_by:    '#dc2626',
-    caused_by:     '#f59e0b',
-    implements:    '#3b82f6',
-    contains:      '#22c55e',
-    co_session:    '#8b5cf6',
-    worked_on:     '#06b6d4',
-    committed_for: '#10b981',
-    produced_by:   '#0ea5e9',
-    produced_in:   '#a78bfa',
-    touched_by:    '#6b7280',
-    spawned:       '#f97316',
-    ran_as:        '#f59e0b'
-  };
-
-  // Edge lines — structural edges carry the skeleton at full weight;
-  // provenance edges (session/agent/commit/file relationships) fall
-  // back to a faint layer so they're visible but don't form the
-  // hairball. Cambridge Intelligence calls this "layer separation":
-  // the workflow edges dominate; detail edges live in context.
+  // Edges share one uniform color. Differentiation by relationship
+  // type used to be encoded in the stroke; with many types and many
+  // overlapping lines, the rainbow effect added noise rather than
+  // signal. Structural vs provenance distinction now lives in stroke
+  // opacity + width, not hue. 'spawned' edges still dashed.
   var STRUCTURAL_EDGE_TYPES = {
     part_of: 1, blocked_by: 1, caused_by: 1, implements: 1,
     contains: 1, co_session: 1
@@ -1861,8 +1854,8 @@ function renderGraph(data) {
   function isStructuralEdge(d) { return !!STRUCTURAL_EDGE_TYPES[d.type]; }
   var link = g.append('g').selectAll('line')
     .data(edges).enter().append('line')
-    .attr('stroke', function(d) { return edgeColor[d.type] || '#6b7280'; })
-    .attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.55 : 0.10; })
+    .attr('stroke', 'var(--border-strong)')
+    .attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.45 : 0.08; })
     .attr('stroke-width', function(d) { return isStructuralEdge(d) ? 1.4 : 0.5; })
     .attr('stroke-dasharray', function(d) {
       return d.type === 'spawned' ? '6,3' : null;
@@ -2038,11 +2031,13 @@ function renderGraph(data) {
     });
     trackLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
     hubLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
+    // Hide non-incident edges completely when focused. Previous 0.05
+     // opacity was additive across many stacked lines and produced a
+     // visible residual hairball behind the focus subject.
     link.attr('stroke-opacity', function(d) {
       var s = d.source.id || d.source;
       var t = d.target.id || d.target;
-      if (s === id || t === id) return 0.9;
-      return isStructuralEdge(d) ? 0.05 : 0.02;
+      return (s === id || t === id) ? 0.9 : 0;
     });
   }
   function clearFocus() {
@@ -2173,8 +2168,34 @@ function renderGraph(data) {
     .attr('dominant-baseline', 'hanging')
     .attr('font-size', '11px')
     .attr('font-weight', '600')
+    // Paint-order halo — the stroke draws BEHIND the fill because
+    // paint-order is set to 'stroke'. A halo in the canvas background
+    // color creates a readable bubble around the text so the label
+    // stays legible even if it brushes a neighboring node.
+    .attr('paint-order', 'stroke')
+    .attr('stroke', 'var(--bg-primary)')
+    .attr('stroke-width', 3)
+    .attr('stroke-linejoin', 'round')
     .attr('fill', 'var(--text-primary)')
     .text(function(d) { return truncateForNodeLabel(d.title || d.id, 36); });
+
+  // Measure each track label's width so the collision force can widen
+  // the track's repulsion radius to match. Stored on the datum so the
+  // d3.forceCollide radius callback can read it. This is the simplest
+  // "bounding box" collision: we treat the track + label as a disc
+  // whose radius covers both. Not perfect (label is rectangular, not
+  // circular) but cheap and effective.
+  trackLabels.each(function(d) {
+    d._labelHalfWidth = (this.getComputedTextLength() || 80) / 2;
+  });
+  // Now that track labels know their width, re-initialize the
+  // collision force so it re-reads the radius for each track with
+  // the measured _labelHalfWidth, and give the simulation a gentle
+  // alpha kick so nodes re-settle without re-seeding positions.
+  if (graphSimulation) {
+    graphSimulation.force('collision').initialize(graphSimulation.nodes());
+    graphSimulation.alpha(0.3).restart();
+  }
 
   // Feature labels are intentionally disabled. With 250+ features in a
   // typical view, labeling even 10% of them (edges >= 2) produces

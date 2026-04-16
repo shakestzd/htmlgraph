@@ -1324,3 +1324,8 @@
   color: var(--text-primary);
   opacity: 1;
 }
+.graph-filter-btn .filter-icon {
+  color: currentColor;
+  vertical-align: middle;
+  margin-right: 3px;
+}

@@ -20,9 +20,12 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
     <symbol id="icon-track" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <!-- Lucide 'route' — matches the Nerd Font road glyph used by the
-           terminal statusline for track items. -->
-      <circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>
+      <!-- Custom 'road' — two parallel edges with center dashes. Mirrors
+           the FontAwesome road glyph (\uf018) that the terminal
+           statusline emits for track items, so the mental metaphor
+           carries across surfaces. -->
+      <path d="M5 3v18M19 3v18"/>
+      <path d="M12 4v3M12 11v3M12 18v2"/>
     </symbol>
     <symbol id="icon-plan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>
@@ -244,15 +247,9 @@
       <div class="view-title">Graph <span class="count" id="graph-count">0</span></div>
       <div id="graph-container" style="position:relative;width:100%;height:calc(100vh - 110px);">
         <div class="empty" id="graph-empty" style="display:none">No connected work items found.</div>
-        <div id="graph-legend">
-          <span data-graph-type="track">&#9679; Track</span>
-          <span data-graph-type="plan">&#9679; Plan</span>
-          <span data-graph-type="feature">&#9679; Feature</span>
-          <span data-graph-type="bug">&#9679; Bug</span>
-          <span data-graph-type="spike">&#9679; Spike</span>
-          <span data-graph-type="session">&#9679; Session</span>
-          <span data-graph-type="file">&#9679; File</span>
-        </div>
+        <!-- Legend removed — the filter toolbar at the top of the graph
+             serves both as type filter and as legend, since each filter
+             button shows the type icon and name. -->
       </div>
     </section>
 
