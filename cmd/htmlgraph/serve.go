@@ -84,6 +84,10 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	mux.Handle("/api/sessions/", corsMiddleware(sessionIngestHandler(database)))
 	mux.Handle("/api/features/", corsMiddleware(featureActivityRouter(database, htmlgraphDir)))
 	mux.Handle("/api/graph", corsMiddleware(graphAPIHandler(database)))
+	mux.Handle("/api/provenance/", corsMiddleware(provenanceHandler(database)))
+	mux.Handle("/api/graph/commits", corsMiddleware(commitsForFeatureHandler(database)))
+	mux.Handle("/api/graph/files", corsMiddleware(filesForFeatureHandler(database)))
+	mux.Handle("/api/graph/sessions", corsMiddleware(sessionsForFeatureHandler(database)))
 
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
 	mux.Handle("/api/plans", corsMiddleware(plansListHandler(htmlgraphDir, database)))
