@@ -260,3 +260,59 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// TestCodexAdapterRemovesStaleFiles seeds a fake stale file under an owned
+// subtree, runs Emit, and asserts the stale file is removed.
+func TestCodexAdapterRemovesStaleFiles(t *testing.T) {
+	repoRoot := t.TempDir()
+	seedAssets(t, repoRoot)
+	outDir := filepath.Join(repoRoot, "packages", "codex-plugin")
+
+	// Seed a stale file that will not be reproduced by Emit.
+	staleFile := filepath.Join(outDir, "commands", "stale-removed.md")
+	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(staleFile, []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := (codexAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Errorf("expected stale file to be removed; stat error=%v", err)
+	}
+}
+
+// TestGeminiAdapterRemovesStaleFiles seeds a fake stale file under an owned
+// subtree, runs Emit, and asserts the stale file is removed.
+func TestGeminiAdapterRemovesStaleFiles(t *testing.T) {
+	repoRoot := t.TempDir()
+	seedAssets(t, repoRoot)
+	// Gemini Phase 1 requires GEMINI.md at repo root when ContextFile is set.
+	if err := os.WriteFile(filepath.Join(repoRoot, "GEMINI.md"), []byte("# ctx\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outDir := filepath.Join(repoRoot, "packages", "gemini-extension")
+
+	// Seed a stale TOML under commands/ that will not be reproduced by Emit
+	// (the fixture manifest's commands dir contains hello.md → hello.toml,
+	// but not stale-removed.toml).
+	staleFile := filepath.Join(outDir, "commands", "htmlgraph", "stale-removed.toml")
+	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(staleFile, []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := (geminiAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Errorf("expected stale file to be removed; stat error=%v", err)
+	}
+}

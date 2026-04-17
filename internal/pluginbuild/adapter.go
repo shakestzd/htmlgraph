@@ -7,6 +7,25 @@ import (
 	"path/filepath"
 )
 
+// cleanOwnedSubtrees removes entire owned subtrees before emit so that renamed
+// or deleted source files do not leave stale output files behind. Only the
+// listed subtrees are removed — hand-maintained files at the outDir root (README,
+// .gitignore, etc.) and any other unowned directories are left untouched.
+//
+// Missing subtrees are silently skipped (clean no-op on first run).
+func cleanOwnedSubtrees(outDir string, ownedSubtrees []string) error {
+	for _, sub := range ownedSubtrees {
+		dir := filepath.Join(outDir, sub)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			return fmt.Errorf("clean owned subtree %s: %w", dir, err)
+		}
+	}
+	return nil
+}
+
 // Adapter emits a target-specific plugin tree from the shared manifest. Each
 // target (Claude Code, Codex CLI, …) registers one.
 type Adapter interface {

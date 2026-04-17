@@ -23,11 +23,24 @@ type codexAdapter struct{}
 
 func (codexAdapter) Name() string { return "codex" }
 
+// codexOwnedSubtrees lists the subdirectory names under the codex outDir that
+// build-ports fully regenerates. Hand-maintained files (README.md, etc.) live
+// outside these subtrees and are never touched by stale-file cleanup.
+var codexOwnedSubtrees = []string{"commands", "agents", "skills", "templates", "static", "config"}
+
 func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	target, ok := m.Targets[c.Name()]
 	if !ok {
 		return fmt.Errorf("manifest has no target %q", c.Name())
 	}
+
+	// Pre-clean owned subtrees so renamed/deleted source files don't leave
+	// stale output files behind. Non-owned files (README, hooks.json, etc.)
+	// at the outDir root are untouched.
+	if err := cleanOwnedSubtrees(outDir, codexOwnedSubtrees); err != nil {
+		return fmt.Errorf("codex pre-clean: %w", err)
+	}
+
 	if err := writeCodexManifest(m, filepath.Join(outDir, target.ManifestPath)); err != nil {
 		return err
 	}

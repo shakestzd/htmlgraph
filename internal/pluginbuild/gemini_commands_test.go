@@ -8,35 +8,44 @@ import (
 )
 
 func TestToGeminiCommandTOMLWrapsBody(t *testing.T) {
-	got := toGeminiCommandTOML("# hello\nbody")
-	if !strings.Contains(got, `prompt = """`) {
-		t.Errorf("missing triple-quote prompt opener:\n%s", got)
+	got, err := toGeminiCommandTOML("# hello\nbody")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(got, "prompt = '''") {
+		t.Errorf("missing literal triple-quote prompt opener:\n%s", got)
 	}
 	if !strings.Contains(got, "body") {
 		t.Errorf("missing body content:\n%s", got)
 	}
-	if !strings.HasSuffix(got, "\"\"\"\n") {
-		t.Errorf("missing triple-quote close:\n%s", got)
+	if !strings.HasSuffix(got, "'''\n") {
+		t.Errorf("missing literal triple-quote close:\n%s", got)
 	}
 }
 
-func TestToGeminiCommandTOMLEscapesTripleQuote(t *testing.T) {
-	// A literal """ in the body would prematurely terminate the TOML string.
-	// The helper must break it so the resulting TOML parses with exactly one
-	// prompt value. We verify by counting unescaped triple-quote runs — there
-	// should be exactly two (opener and closer) for the wrapper.
-	body := "before\n\"\"\"inside\"\"\"\nafter"
-	got := toGeminiCommandTOML(body)
-	if strings.Contains(got, "\n\"\"\"inside") {
-		t.Errorf("raw triple-quote survived, would break TOML parse:\n%s", got)
+func TestToGeminiCommandTOMLPreservesBackslashes(t *testing.T) {
+	// Backslashes, \n sequences, \uXXXX escapes and line-continuation backslashes
+	// must all pass through byte-for-byte — the TOML literal string must NOT
+	// interpret them. This exercises the core bug fix: TOML basic strings would
+	// have rewritten these sequences, but literal strings do not.
+	body := "run cmd \\\ncontinued\n\\n literal newline escape\n\\ue0b6 unicode escape"
+	got, err := toGeminiCommandTOML(body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	// The escaped form appears as ""\" — assert its presence.
-	if !strings.Contains(got, `""\"`) {
-		t.Errorf("expected escaped form \"\"\\\" in output:\n%s", got)
+	if !strings.Contains(got, body) {
+		t.Errorf("body not preserved byte-for-byte:\nwant body=%q\ngot toml=%q", body, got)
 	}
-	// The body content (without the bare triple-quotes) must still be there.
-	if !strings.Contains(got, "before") || !strings.Contains(got, "inside") || !strings.Contains(got, "after") {
-		t.Errorf("body content lost during escape:\n%s", got)
+}
+
+func TestToGeminiCommandTOMLRejectsTripleTick(t *testing.T) {
+	// A literal ''' in the body cannot appear inside a TOML multiline literal
+	// string — it would prematurely terminate the string. The helper must return
+	// an error rather than silently produce unparseable TOML.
+	body := "before\n'''\nafter"
+	_, err := toGeminiCommandTOML(body)
+	if err == nil {
+		t.Error("expected error when body contains ''', got nil")
 	}
 }
 
@@ -66,8 +75,8 @@ func TestGeminiAdapterEmitsCommandsTOML(t *testing.T) {
 		t.Fatalf("read emitted toml: %v", err)
 	}
 	s := string(data)
-	if !strings.Contains(s, `prompt = """`) {
-		t.Errorf("emitted toml missing prompt opener:\n%s", s)
+	if !strings.Contains(s, "prompt = '''") {
+		t.Errorf("emitted toml missing literal prompt opener:\n%s", s)
 	}
 	if !strings.Contains(s, "# hello") || !strings.Contains(s, "body") {
 		t.Errorf("emitted toml missing markdown body:\n%s", s)

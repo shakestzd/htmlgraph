@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// tripleTickForbidden is the sequence that cannot appear inside a TOML multiline
+// literal string. If source markdown ever contains it, toGeminiCommandTOML returns
+// an error instead of producing silently-broken TOML.
+const tripleTickForbidden = "'''"
+
 // init registers this phase's sub-emitter. Order within geminiSubEmitters is
 // deterministic by filename collation across gemini_*.go files, so assets/
 // commands/hooks never race even though each lives in its own file.
@@ -56,9 +61,13 @@ func emitGeminiCommands(m *Manifest, repoRoot, outDir string, t Target) error {
 		if err != nil {
 			return fmt.Errorf("read command %s: %w", e.Name(), err)
 		}
+		toml, err := toGeminiCommandTOML(string(body))
+		if err != nil {
+			return fmt.Errorf("encode gemini command %s: %w", e.Name(), err)
+		}
 		name := strings.TrimSuffix(e.Name(), ".md") + ".toml"
 		dst := filepath.Join(dstDir, name)
-		if err := os.WriteFile(dst, []byte(toGeminiCommandTOML(string(body))), 0o644); err != nil {
+		if err := os.WriteFile(dst, []byte(toml), 0o644); err != nil {
 			return fmt.Errorf("write gemini command %s: %w", dst, err)
 		}
 	}
@@ -66,11 +75,18 @@ func emitGeminiCommands(m *Manifest, repoRoot, outDir string, t Target) error {
 }
 
 // toGeminiCommandTOML wraps a markdown body as a TOML `prompt` value using a
-// triple-quoted multi-line string. Any literal `"""` inside the body is broken
-// by inserting a backslash (`""\"`) — TOML treats this as three quote chars in
-// the output but does NOT terminate the string, so we preserve the body
-// byte-for-byte while keeping TOML parseable.
-func toGeminiCommandTOML(mdBody string) string {
-	escaped := strings.ReplaceAll(mdBody, `"""`, `""\"`)
-	return "prompt = \"\"\"\n" + escaped + "\n\"\"\"\n"
+// multiline literal string ('''…'''). Literal strings pass all content through
+// verbatim — backslashes, \n sequences, and \uXXXX escapes are NOT interpreted
+// by the TOML parser, so the prompt round-trips byte-for-byte from source
+// markdown to parsed TOML value.
+//
+// The only restriction of TOML literal strings is that they cannot contain the
+// sequence '''  If the source contains that sequence, this function returns an
+// error — the caller should add an escape for that file or switch to a TOML
+// writer library rather than silently producing unparseable output.
+func toGeminiCommandTOML(mdBody string) (string, error) {
+	if strings.Contains(mdBody, tripleTickForbidden) {
+		return "", fmt.Errorf("command body contains %q which cannot appear inside a TOML multiline literal string", tripleTickForbidden)
+	}
+	return "prompt = '''\n" + mdBody + "\n'''\n", nil
 }

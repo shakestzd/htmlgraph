@@ -10,6 +10,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// findRepoRoot walks up from dir until it finds a directory containing go.mod,
+// which is treated as the repository root. Returns an error if no go.mod is
+// found before reaching the filesystem root. This is preferred over stripping a
+// fixed number of path components from the manifest path, which breaks when the
+// manifest is not at the canonical packages/plugin-core/manifest.json location.
+func findRepoRoot(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	for d := abs; ; {
+		if _, err := os.Stat(filepath.Join(d, "go.mod")); err == nil {
+			return d, nil
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", fmt.Errorf("could not locate repo root: no go.mod found walking up from %s", dir)
+		}
+		d = parent
+	}
+}
+
 // pluginBuildPortsCmd is `htmlgraph plugin build-ports`. It regenerates every
 // target plugin tree from packages/plugin-core/manifest.json — the single
 // source of truth for the HtmlGraph CLI companion plugin across Claude Code,
@@ -41,9 +63,13 @@ func pluginBuildPortsCmd() *cobra.Command {
 					return err
 				}
 			}
-			// ManifestPath is "packages/plugin-core/manifest.json"; strip its
-			// three components to recover the repo root.
-			repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(manifestPath)))
+			// Walk up from the manifest's directory to find go.mod — this
+			// correctly handles any manifest path, not just the canonical
+			// packages/plugin-core/manifest.json location.
+			repoRoot, err := findRepoRoot(filepath.Dir(manifestPath))
+			if err != nil {
+				return err
+			}
 
 			m, err := pluginbuild.Load(manifestPath)
 			if err != nil {
@@ -75,7 +101,8 @@ func pluginBuildPortsCmd() *cobra.Command {
 	cmd.Flags().StringVar(&targetFlag, "target", "all",
 		"target to emit: all | "+strings.Join(pluginbuild.Names(), " | "))
 	cmd.Flags().StringVar(&manifestFlag, "manifest", "",
-		"path to plugin-core manifest (default: autodetect packages/plugin-core/manifest.json)")
+		"path to plugin-core manifest (default: autodetect packages/plugin-core/manifest.json); "+
+			"repo root is inferred by walking up from the manifest's directory until go.mod is found")
 	cmd.Flags().StringVar(&outFlag, "out", "",
 		"override output directory (only meaningful with a single --target)")
 	return cmd

@@ -24,11 +24,24 @@ type geminiAdapter struct{}
 
 func (geminiAdapter) Name() string { return "gemini" }
 
+// geminiOwnedSubtrees lists the subdirectory names under the gemini outDir that
+// build-ports fully regenerates. Hand-maintained files (README.md, etc.) live
+// outside these subtrees and are never touched by stale-file cleanup.
+var geminiOwnedSubtrees = []string{"commands", "agents", "skills", "templates", "static", "config", "hooks"}
+
 func (g geminiAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	target, ok := m.Targets[g.Name()]
 	if !ok {
 		return fmt.Errorf("manifest has no target %q", g.Name())
 	}
+
+	// Pre-clean owned subtrees so renamed/deleted source files don't leave
+	// stale output files behind. Non-owned files (README, gemini-extension.json,
+	// GEMINI.md, etc.) at the outDir root are untouched.
+	if err := cleanOwnedSubtrees(outDir, geminiOwnedSubtrees); err != nil {
+		return fmt.Errorf("gemini pre-clean: %w", err)
+	}
+
 	if err := writeGeminiManifest(m, target, filepath.Join(outDir, target.ManifestPath)); err != nil {
 		return err
 	}
