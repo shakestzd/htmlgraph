@@ -135,6 +135,39 @@ func TestParse_ThinkingBlock(t *testing.T) {
 	}
 }
 
+func TestParse_AITitle(t *testing.T) {
+	jsonl := `{"type":"ai-title","aiTitle":"Test title","sessionId":"abc"}`
+
+	result, err := parse(strings.NewReader(jsonl))
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	if result.Title != "Test title" {
+		t.Errorf("Title = %q, want %q", result.Title, "Test title")
+	}
+}
+
+func TestParse_AITitle_DoesNotOverrideCustomTitle(t *testing.T) {
+	// If both custom-title and ai-title appear, last one wins (file order).
+	// This test verifies ai-title is parsed just like custom-title.
+	jsonl := strings.Join([]string{
+		`{"type":"custom-title","customTitle":"Custom","sessionId":"sess-5"}`,
+		`{"type":"ai-title","aiTitle":"AI Generated","sessionId":"sess-5"}`,
+		`{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"timestamp":"2026-03-27T20:00:00.000Z","sessionId":"sess-5"}`,
+	}, "\n")
+
+	result, err := parse(strings.NewReader(jsonl))
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	// Last title event wins — ai-title appears after custom-title.
+	if result.Title != "AI Generated" {
+		t.Errorf("Title = %q, want %q", result.Title, "AI Generated")
+	}
+}
+
 func TestToolCategory(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -107,6 +107,9 @@ func parse(r io.Reader) (*ParseResult, error) {
 		case "custom-title":
 			result.Title = gjson.Get(line, "customTitle").String()
 			continue
+		case "ai-title":
+			result.Title = gjson.Get(line, "aiTitle").String()
+			continue
 		case "file-history-snapshot", "queue-operation", "system":
 			continue
 		case "user":

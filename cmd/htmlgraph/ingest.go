@@ -338,6 +338,16 @@ func storeParseResult(database *sql.DB, sessionID, agentID string, result *inges
 			result.Model, sessionID)
 	}
 
+	// Update session title if the transcript carried one (ai-title or custom-title).
+	// Placed here (not in ensureSession) so re-ingestion always fires the UPDATE,
+	// even for existing sessions where ensureSession returns early.
+	if result.Title != "" {
+		database.Exec(
+			`UPDATE sessions SET title = ? WHERE session_id = ? AND (title IS NULL OR title = '' OR title = '--' OR title <> ?)`,
+			result.Title, sessionID, result.Title,
+		)
+	}
+
 	return msgCount, toolCount
 }
 
