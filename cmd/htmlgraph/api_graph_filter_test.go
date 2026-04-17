@@ -101,6 +101,55 @@ func TestGraphAPI_PerTypeCaps(t *testing.T) {
 	}
 }
 
+// TestFilterByAgent_AssignedOnlySource is a regression test for the
+// case where an agent appears in sessions.agent_assigned but not in
+// agent_lineage_trace. agentsHandler lists the agent, so
+// filterByAgent must also match it or the dropdown selection yields
+// an empty graph. See roborev job 109 finding #1.
+func TestFilterByAgent_AssignedOnlySource(t *testing.T) {
+	database, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	// Seed: a feature, a session with agent_assigned only (no lineage
+	// row), and an agent_event tying the session to the feature.
+	_, err = database.Exec(`INSERT INTO features (id, type, title, status) VALUES ('feat-a', 'feature', 'Feat A', 'done')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = database.Exec(`INSERT INTO sessions (session_id, agent_assigned, status, created_at) VALUES ('sess-x', 'assigned-only-agent', 'completed', '2026-04-16')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = database.Exec(`INSERT INTO agent_events (event_id, session_id, agent_id, feature_id, event_type, created_at) VALUES ('evt-1', 'sess-x', 'any', 'feat-a', 'tool_call', '2026-04-16T00:00:00Z')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nodes := []graphNode{
+		{ID: "feat-a", Type: "feature", Title: "Feat A"},
+		{ID: "sess-x", Type: "session", Title: "sess"},
+		{ID: "feat-other", Type: "feature", Title: "Other"},
+	}
+	filtered := filterByAgent(database, nodes, "assigned-only-agent")
+
+	kept := map[string]bool{}
+	for _, n := range filtered {
+		kept[n.ID] = true
+	}
+	if !kept["sess-x"] {
+		t.Error("expected assigned-only session sess-x to be kept")
+	}
+	if !kept["feat-a"] {
+		t.Error("expected feature feat-a (linked via agent_events) to be kept")
+	}
+	if kept["feat-other"] {
+		t.Error("expected feat-other to be filtered out")
+	}
+}
+
 func TestSortByActivity(t *testing.T) {
 	nodes := []graphNode{
 		{ID: "a", Activity: 10},

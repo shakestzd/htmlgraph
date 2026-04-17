@@ -764,31 +764,38 @@ func loadAgentEdges(database *sql.DB) []graphEdge {
 	return edges
 }
 
-// filterByAgent returns only the nodes that the named agent touched —
-// via agent_lineage_trace (sessions + features the agent ran) and via
-// feature_files (files written by those sessions). Tracks/plans survive
-// only if a kept feature points to them through track_id. The filter is
-// applied after type filtering but before caps so caps reflect the
-// agent-scoped subset.
+// filterByAgent returns only the nodes the named agent touched. The
+// agent dropdown (agentsHandler) lists agents from a UNION of
+// agent_lineage_trace.agent_name AND sessions.agent_assigned, so this
+// filter must match BOTH sources or "assigned-only" agents will
+// appear in the dropdown but produce an empty graph when selected.
+//
+// Kept nodes:
+//   - sessions where agent_lineage_trace.agent_name = X OR sessions.agent_assigned = X
+//   - features referenced by those sessions (via lineage.feature_id OR agent_events.feature_id)
+//   - files produced by those sessions (feature_files.session_id)
+//   - tracks that contain any kept feature (features.track_id FK)
 func filterByAgent(database *sql.DB, nodes []graphNode, agentName string) []graphNode {
 	keep := make(map[string]bool)
+	sessionIDs := make([]string, 0, 32)
 
-	// Sessions and features directly linked to the agent.
+	// Pass 1: sessions + features from agent_lineage_trace.
 	sfRows, err := database.Query(`
 		SELECT DISTINCT session_id, COALESCE(feature_id, '')
 		FROM agent_lineage_trace WHERE agent_name = ?`, agentName)
 	if err != nil {
 		return nodes
 	}
-	sessionIDs := make([]string, 0, 32)
 	for sfRows.Next() {
 		var sid, fid string
 		if err := sfRows.Scan(&sid, &fid); err != nil {
 			continue
 		}
 		if sid != "" {
+			if !keep[sid] {
+				sessionIDs = append(sessionIDs, sid)
+			}
 			keep[sid] = true
-			sessionIDs = append(sessionIDs, sid)
 		}
 		if fid != "" {
 			keep[fid] = true
@@ -796,8 +803,24 @@ func filterByAgent(database *sql.DB, nodes []graphNode, agentName string) []grap
 	}
 	sfRows.Close()
 
-	// Files produced by any of those sessions — so the agent's work on
-	// disk shows up in the filtered graph.
+	// Pass 2: sessions from sessions.agent_assigned. Features linked to
+	// these sessions are pulled via agent_events.feature_id below.
+	assignedRows, aerr := database.Query(`
+		SELECT DISTINCT session_id FROM sessions
+		WHERE agent_assigned = ? AND session_id != ''`, agentName)
+	if aerr == nil {
+		for assignedRows.Next() {
+			var sid string
+			if err := assignedRows.Scan(&sid); err == nil && sid != "" {
+				if !keep[sid] {
+					sessionIDs = append(sessionIDs, sid)
+				}
+				keep[sid] = true
+			}
+		}
+		assignedRows.Close()
+	}
+
 	if len(sessionIDs) > 0 {
 		placeholders := make([]string, len(sessionIDs))
 		args := make([]any, len(sessionIDs))
@@ -805,9 +828,27 @@ func filterByAgent(database *sql.DB, nodes []graphNode, agentName string) []grap
 			placeholders[i] = "?"
 			args[i] = id
 		}
+		inClause := strings.Join(placeholders, ",")
+
+		// Features referenced by any agent_event in those sessions —
+		// covers the assigned-only path which has no agent_lineage_trace row.
+		aeRows, aeerr := database.Query(
+			`SELECT DISTINCT feature_id FROM agent_events
+			 WHERE session_id IN (`+inClause+`) AND feature_id != ''`, args...)
+		if aeerr == nil {
+			for aeRows.Next() {
+				var fid string
+				if err := aeRows.Scan(&fid); err == nil {
+					keep[fid] = true
+				}
+			}
+			aeRows.Close()
+		}
+
+		// Files produced by any of those sessions.
 		fRows, ferr := database.Query(
-			`SELECT DISTINCT file_path FROM feature_files WHERE session_id IN (`+
-				strings.Join(placeholders, ",")+`)`, args...)
+			`SELECT DISTINCT file_path FROM feature_files
+			 WHERE session_id IN (`+inClause+`)`, args...)
 		if ferr == nil {
 			for fRows.Next() {
 				var fp string
@@ -820,11 +861,17 @@ func filterByAgent(database *sql.DB, nodes []graphNode, agentName string) []grap
 	}
 
 	// Tracks kept if any surviving feature belongs to them (track_id FK).
+	// Query the combined feature set from BOTH agent sources.
 	trackKeep := make(map[string]bool)
 	tRows, terr := database.Query(`
 		SELECT DISTINCT f.track_id FROM features f WHERE f.id IN (
-			SELECT feature_id FROM agent_lineage_trace WHERE agent_name = ? AND feature_id != ''
-		) AND f.track_id != ''`, agentName)
+			SELECT feature_id FROM agent_lineage_trace
+			  WHERE agent_name = ? AND feature_id != ''
+			UNION
+			SELECT e.feature_id FROM agent_events e
+			  JOIN sessions s ON s.session_id = e.session_id
+			  WHERE s.agent_assigned = ? AND e.feature_id != ''
+		) AND f.track_id != ''`, agentName, agentName)
 	if terr == nil {
 		for tRows.Next() {
 			var tid string

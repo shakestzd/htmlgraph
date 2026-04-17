@@ -376,3 +376,30 @@ func TestExecuteDSL_AgentTypeSingular(t *testing.T) {
 		t.Errorf("expected type 'agent', got %q", results[0].Type)
 	}
 }
+
+// TestExecuteDSL_RejectsWrongTypeField is a regression test for the
+// per-type filter column whitelist. Before the fix, fields were
+// validated against a single global whitelist, so features[message=X]
+// (message belongs to git_commits, not features) would pass validation
+// and then fail at SQL execution with an opaque "no such column"
+// error. Now the DSL rejects it at parse time with a meaningful
+// message. See roborev job 109 finding #3.
+func TestExecuteDSL_RejectsWrongTypeField(t *testing.T) {
+	database := openTestDB(t)
+
+	// features[message=X] — message isn't a features column.
+	_, err := graph.ExecuteDSL(database, "features[message=hello]")
+	if err == nil {
+		t.Fatal("expected error for features[message=X], got nil")
+	}
+	// sessions[type=Y] — type isn't a sessions column.
+	_, err = graph.ExecuteDSL(database, "sessions[type=foo]")
+	if err == nil {
+		t.Fatal("expected error for sessions[type=Y], got nil")
+	}
+	// commits[status=Z] — status isn't a commits column.
+	_, err = graph.ExecuteDSL(database, "commits[status=done]")
+	if err == nil {
+		t.Fatal("expected error for commits[status=Z], got nil")
+	}
+}

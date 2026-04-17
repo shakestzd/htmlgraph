@@ -220,10 +220,19 @@ func loadDerivedEdges(database *sql.DB, id string, nodeType string, upstream boo
 		}
 	case "session":
 		if upstream {
-			// agent ran_as -> this session
+			// agent ran_as -> this session. Pull from BOTH sources
+			// (agent_lineage_trace.agent_name AND sessions.agent_assigned)
+			// so a session whose agent was assigned (not lineage-traced)
+			// still surfaces its agent link in the provenance panel.
 			links = append(links, queryPeerLinks(database,
-				`SELECT DISTINCT agent_name FROM agent_lineage_trace WHERE session_id = ? AND agent_name != ''`,
-				id, "ran_as")...)
+				`SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace
+					  WHERE session_id = ? AND agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions
+					  WHERE session_id = ? AND agent_assigned != ''
+				 )`,
+				id, "ran_as", id)...)
 			// parent session spawned -> this session
 			links = append(links, queryPeerLinks(database,
 				`SELECT parent_session_id FROM sessions WHERE session_id = ? AND parent_session_id IS NOT NULL AND parent_session_id != ''`,
@@ -233,6 +242,20 @@ func loadDerivedEdges(database *sql.DB, id string, nodeType string, upstream boo
 			links = append(links, queryPeerLinks(database,
 				`SELECT session_id FROM sessions WHERE parent_session_id = ?`,
 				id, "spawned")...)
+			// this session worked_on -> features. Union of both sources:
+			// agent_lineage_trace.feature_id (orchestrator-declared work)
+			// and agent_events.feature_id (events emitted during the
+			// session). Matches what /api/graph surfaces for session
+			// nodes so the panel and canvas agree.
+			links = append(links, queryPeerLinks(database,
+				`SELECT DISTINCT feature_id FROM (
+					SELECT feature_id FROM agent_lineage_trace
+					  WHERE session_id = ? AND feature_id != ''
+					UNION
+					SELECT feature_id FROM agent_events
+					  WHERE session_id = ? AND feature_id != ''
+				 )`,
+				id, "worked_on", id)...)
 			// this session produced -> commits
 			links = append(links, queryPeerLinks(database,
 				`SELECT DISTINCT commit_hash FROM git_commits WHERE session_id = ?`,
@@ -280,9 +303,12 @@ func loadDerivedEdges(database *sql.DB, id string, nodeType string, upstream boo
 }
 
 // queryPeerLinks runs a query that returns a single ID column and wraps the
-// results as provenanceLink entries with the given relationship.
-func queryPeerLinks(database *sql.DB, query, arg, rel string) []provenanceLink {
-	rows, err := database.Query(query, arg)
+// results as provenanceLink entries with the given relationship. Extra
+// positional args after rel are forwarded to database.Query as bind params,
+// so a UNION query that needs the same ID bound twice can pass it twice.
+func queryPeerLinks(database *sql.DB, query, arg, rel string, extraArgs ...any) []provenanceLink {
+	args := append([]any{arg}, extraArgs...)
+	rows, err := database.Query(query, args...)
 	if err != nil {
 		return nil
 	}

@@ -196,9 +196,9 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 	switch nodeType {
 	case "commit":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT DISTINCT commit_hash FROM git_commits WHERE %s = ?`, col)
 			args = append(args, sel.value)
@@ -207,9 +207,9 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 		}
 	case "file":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT DISTINCT file_path FROM feature_files WHERE %s = ?`, col)
 			args = append(args, sel.value)
@@ -218,9 +218,9 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 		}
 	case "session":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT session_id FROM sessions WHERE %s = ?`, col)
 			args = append(args, sel.value)
@@ -232,9 +232,9 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 		// and sessions.agent_assigned. Filter support is limited to the
 		// identity field (agent name itself) via the whitelist.
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`
 				SELECT DISTINCT name FROM (
@@ -253,9 +253,9 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 		}
 	case "track":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT id FROM tracks WHERE %s = ?`, col)
 			args = append(args, sel.value)
@@ -265,9 +265,9 @@ func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 	default:
 		// features, bugs, spikes, plans, specs — all stored in features table
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT id FROM features WHERE type = ? AND %s = ?`, col)
 			args = append(args, nodeType, sel.value)
@@ -352,9 +352,9 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 	switch nodeType {
 	case "commit":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT DISTINCT commit_hash FROM git_commits WHERE commit_hash IN (%s) AND %s = ?`, inClause, col)
 			args = append(args, sel.value)
@@ -363,9 +363,9 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 		}
 	case "file":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT DISTINCT file_path FROM feature_files WHERE file_path IN (%s) AND %s = ?`, inClause, col)
 			args = append(args, sel.value)
@@ -374,9 +374,9 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 		}
 	case "session":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT session_id FROM sessions WHERE session_id IN (%s) AND %s = ?`, inClause, col)
 			args = append(args, sel.value)
@@ -388,9 +388,9 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 		// agents in either source table. No schema-backed field filters beyond
 		// identity are meaningful here, but we still honor the whitelist.
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`
 				SELECT DISTINCT name FROM (
@@ -409,9 +409,9 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 		}
 	case "track":
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT id FROM tracks WHERE id IN (%s) AND %s = ?`, inClause, col)
 			args = append(args, sel.value)
@@ -421,9 +421,9 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 	default:
 		// features, bugs, spikes, plans, specs
 		if sel.field != "" {
-			col, ok := allowedFilterColumns[sel.field]
+			col, ok := allowedColumnFor(nodeType, sel.field)
 			if !ok {
-				return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
 			}
 			query = fmt.Sprintf(`SELECT id FROM features WHERE id IN (%s) AND type = ? AND %s = ?`, inClause, col)
 			args = append(args, nodeType, sel.value)

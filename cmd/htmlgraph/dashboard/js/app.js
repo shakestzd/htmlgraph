@@ -1984,8 +1984,19 @@ function renderGraph(data) {
     tooltip.style('left', (e.clientX - rect.left + 12) + 'px').style('top', (e.clientY - rect.top - 10) + 'px');
   }).on('mouseout', function() {
     tooltip.style('opacity', 0);
-    node.attr('opacity', 1);
-    link.attr('stroke-opacity', 0.5);
+    // If a focus lens is active (focusedNodeId !== null), do NOT reset
+    // to the generic baseline — that would clobber the focused state.
+    // Re-apply the focus instead so moving the pointer off a node
+    // keeps the lens intact. When nothing is focused, fall back to
+    // the pre-focus defaults.
+    if (focusedNodeId !== null) {
+      focusOnNode(focusedNodeId);
+    } else {
+      node.attr('opacity', 1);
+      link.attr('stroke-opacity', function(d) {
+        return isStructuralEdge(d) ? 0.45 : 0.08;
+      });
+    }
   }).on('click', function(e, d) {
     // Click does two things:
     //   1. Open the provenance panel (causal-chain drill-down)

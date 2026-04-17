@@ -252,6 +252,12 @@ func (q *QueryBuilder) filterByField(ids []string, field, value string) ([]strin
 }
 
 // allowedFilterColumns maps user-facing field names to SQL column names.
+// allowedFilterColumns is the legacy global whitelist. It's kept for
+// backward compat with QueryBuilder.filterByField, which queries a
+// UNION of features and tracks (both of which share the status/type/
+// priority/track_id columns). New code should use typeFilterColumns
+// below, which validates per-node-type so a caller can't pass a
+// features-only column to a DSL selector on commits, etc.
 var allowedFilterColumns = map[string]string{
 	"status":      "status",
 	"type":        "type",
@@ -261,6 +267,39 @@ var allowedFilterColumns = map[string]string{
 	"message":     "message",
 	"file_path":   "file_path",
 	"session_id":  "session_id",
+}
+
+// typeFilterColumns maps normalized node type -> allowed filter fields
+// for that type's underlying table. The DSL uses this to reject
+// field/type combinations at parse time so queries like
+// features[message=X] or sessions[type=Y] don't fall through to SQL
+// and produce opaque "no such column" errors.
+var typeFilterColumns = map[string]map[string]string{
+	"feature": {"status": "status", "type": "type", "priority": "priority", "track_id": "track_id"},
+	"bug":     {"status": "status", "type": "type", "priority": "priority", "track_id": "track_id"},
+	"spike":   {"status": "status", "type": "type", "priority": "priority", "track_id": "track_id"},
+	"plan":    {"status": "status", "type": "type", "priority": "priority", "track_id": "track_id"},
+	"spec":    {"status": "status", "type": "type", "priority": "priority", "track_id": "track_id"},
+	"track":   {"status": "status", "priority": "priority"},
+	"commit":  {"commit_hash": "commit_hash", "message": "message", "session_id": "session_id"},
+	"file":    {"file_path": "file_path", "session_id": "session_id"},
+	"session": {"status": "status", "session_id": "session_id"},
+	"agent":   {}, // agent is a synthetic type; only identity equality via the UNION works
+}
+
+// allowedColumnFor resolves a filter field against the per-type whitelist.
+// Returns the SQL column name and true on success; (empty, false) if the
+// field is not allowed for that type. Caller uses the bool to decide
+// whether to return a DSL error.
+func allowedColumnFor(nodeType, field string) (string, bool) {
+	if cols, ok := typeFilterColumns[nodeType]; ok {
+		col, exists := cols[field]
+		return col, exists
+	}
+	// Unknown type — fall back to the legacy map so existing callers
+	// keep working. This is a soft failure, not a hard rejection.
+	col, ok := allowedFilterColumns[field]
+	return col, ok
 }
 
 // resolveNodes looks up metadata for a set of node IDs.
