@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Address roborev job 890 findings on PR #40 plugin-ports</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-bded2e45"
+             data-type="bug"
+             data-status="in-progress"
+             data-priority="high"
+             data-created="2026-04-17T21:14:01.721424"
+             data-updated="2026-04-17T21:14:44.189517" data-agent-assigned="claude-code" data-track-id="trk-2c3cbe63">
+
+        <header>
+            <h1>Address roborev job 890 findings on PR #40 plugin-ports</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-2c3cbe63.html" data-relationship="part_of" data-since="2026-04-17T21:14:01.724122">trk-2c3cbe63</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="6e037bfd-87db-499c-b243-e8f383a3b218.html" data-relationship="implemented_in" data-since="2026-04-17T21:14:44.189459">session 6e037bfd-87db-499c-b243-e8f383a3b218</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Roborev job 890 (codex) returned Fail on PR #40 (claude/port-htmlgraph-plugin-ILNOy) with three findings. Medium #1: gemini_commands.go:68-75 TOML backslash escaping corrupts shell continuations and JSON escapes; switch to literal string or proper TOML writer. Medium #2: assets.go/adapter.go/gemini_commands.go never delete files removed from source; add pre-emit cleanup or exact-sync. Low #3: plugin_build_ports.go:37-46 --manifest override assumes fixed path depth; derive repoRoot robustly.</p>
+        </section>
+    </article>
+</body>
+</html>

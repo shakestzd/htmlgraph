@@ -1,0 +1,89 @@
+{
+  "$schema": "./manifest.schema.json",
+  "_comment": "Single source of truth for the HtmlGraph CLI companion plugin. Both the Claude Code plugin (plugin/) and the Codex CLI plugin (packages/codex-plugin/) are generated from this file by `htmlgraph plugin build-ports`. Assets (commands, agents, skills, templates, static, config) are sourced from plugin/ verbatim — same markdown format works for both Claude and Codex.",
+
+  "name": "htmlgraph",
+  "version": "0.55.5",
+  "description": "Local-first observability and coordination platform for AI-assisted development. Go binary hooks for near-zero cold start.",
+  "author": {
+    "name": "Shakes Dlamini",
+    "email": "shakestzd@gmail.com",
+    "url": "https://github.com/shakestzd"
+  },
+  "homepage": "https://github.com/shakestzd/htmlgraph",
+  "repository": "https://github.com/shakestzd/htmlgraph",
+  "license": "MIT",
+  "category": "Development Tools",
+  "keywords": [
+    "observability",
+    "analytics",
+    "workflow",
+    "session-tracking",
+    "agent-coordination",
+    "html-graph",
+    "git-based",
+    "offline-first"
+  ],
+
+  "targets": {
+    "claude": {
+      "outDir": "plugin",
+      "manifestPath": ".claude-plugin/plugin.json",
+      "hooksPath": "hooks/hooks.json"
+    },
+    "codex": {
+      "outDir": "packages/codex-plugin",
+      "manifestPath": ".codex-plugin/plugin.json",
+      "hooksPath": "hooks.json",
+      "mcpPath": ".mcp.json"
+    },
+    "gemini": {
+      "outDir": "packages/gemini-extension",
+      "manifestPath": "gemini-extension.json",
+      "hooksPath": "hooks/hooks.json",
+      "contextFile": "GEMINI.md",
+      "commandNamespace": "htmlgraph"
+    }
+  },
+
+  "assetSources": {
+    "_comment": "Relative to repo root. Assets are copied verbatim into each target's outDir. Markdown-based formats (commands, agents, skills) are identical across Claude and Codex.",
+    "commands": "plugin/commands",
+    "agents": "plugin/agents",
+    "skills": "plugin/skills",
+    "templates": "plugin/templates",
+    "static": "plugin/static",
+    "config": "plugin/config"
+  },
+
+  "hooks": {
+    "_comment": "Canonical event names follow Claude Code conventions. Each entry declares the CLI handler (a thin wrapper over `htmlgraph hook <name>`) and per-target availability. Events unsupported by a target are omitted from that target's hooks.json. Target-specific events (e.g. Codex TaskStarted/TurnAborted) are declared with `targets: [codex]`.",
+    "events": [
+      { "name": "SessionStart",       "handler": "session-start",       "targets": ["claude", "codex", "gemini"] },
+      { "name": "SessionStart",       "handler": "session-resume",      "targets": ["claude"], "matcher": "resume" },
+      { "name": "SessionEnd",         "handler": "session-end",         "targets": ["claude"] },
+      { "name": "UserPromptSubmit",   "handler": "user-prompt",         "targets": ["claude", "codex", "gemini"] },
+      { "name": "UserPromptSubmit",   "handler": "timestamp",           "targets": ["claude"], "command": "date '+Current time: %Y-%m-%dT%H:%M:%S%z (%Z)'", "timeout": 2 },
+      { "name": "PreToolUse",         "handler": "pretooluse",          "targets": ["claude", "codex", "gemini"] },
+      { "name": "PostToolUse",        "handler": "posttooluse",         "targets": ["claude", "codex", "gemini"] },
+      { "name": "PostToolUse",        "handler": "exit-plan-mode",      "targets": ["claude"], "matcher": "ExitPlanMode", "timeout": 30 },
+      { "name": "SubagentStart",      "handler": "subagent-start",      "targets": ["claude"] },
+      { "name": "SubagentStop",       "handler": "subagent-stop",       "targets": ["claude"] },
+      { "name": "Stop",               "handler": "stop",                "targets": ["claude", "gemini"] },
+      { "name": "PostToolUseFailure", "handler": "posttooluse-failure", "targets": ["claude"] },
+      { "name": "PreCompact",         "handler": "pre-compact",         "targets": ["claude"] },
+      { "name": "TeammateIdle",       "handler": "teammate-idle",       "targets": ["claude"] },
+      { "name": "TaskCompleted",      "handler": "task-completed",      "targets": ["claude"] },
+      { "name": "InstructionsLoaded", "handler": "instructions-loaded", "targets": ["claude"] },
+      { "name": "WorktreeCreate",     "handler": "worktree-create",     "targets": ["claude"] },
+      { "name": "WorktreeRemove",     "handler": "worktree-remove",     "targets": ["claude"] },
+      { "name": "PostCompact",        "handler": "post-compact",        "targets": ["claude"] },
+      { "name": "TaskCreated",        "handler": "task-created",        "targets": ["claude"] },
+      { "name": "PermissionRequest",  "handler": "permission-request",  "targets": ["claude"] },
+      { "name": "ConfigChange",       "handler": "config-change",       "targets": ["claude"] },
+      { "name": "TaskStarted",        "handler": "task-started",        "targets": ["codex"] },
+      { "name": "TaskComplete",       "handler": "stop",                "targets": ["codex"] },
+      { "name": "TurnAborted",        "handler": "task-aborted",        "targets": ["codex"] }
+    ]
+  }
+}

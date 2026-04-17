@@ -144,3 +144,6 @@ internal/notebook/files/
 dist/
 _build/tailwind-*
 chrome/*.zip
+
+# Subagent worktrees (transient; created by Claude Code Agent tool)
+.claude/worktrees/
