@@ -154,8 +154,12 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 		t.Errorf("gemini contextFileName: %q", manifest.ContextFileName)
 	}
 
-	// Skeleton dirs exist. commands/ and hooks/ stay empty until Phase 2/3.
-	// agents/ and skills/ are populated by Phase 1 (see gemini_assets_test.go).
+	// All four skeleton dirs exist after Emit(). Populated content is asserted
+	// by the phase-specific tests: gemini_assets_test.go (agents, skills,
+	// GEMINI.md), gemini_commands_test.go (commands/), gemini_hooks_test.go
+	// (hooks/hooks.json). This test only guards the minimum-contract invariants
+	// — the manifest and the skeleton layout — so it doesn't churn whenever a
+	// phase adds populated state.
 	for _, dir := range []string{"commands", "agents", "skills", "hooks"} {
 		info, err := os.Stat(filepath.Join(outDir, dir))
 		if err != nil {
@@ -165,17 +169,6 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 		if !info.IsDir() {
 			t.Errorf("%q is not a directory", dir)
 		}
-	}
-	for _, emptyDir := range []string{"commands", "hooks"} {
-		entries, _ := os.ReadDir(filepath.Join(outDir, emptyDir))
-		if len(entries) != 0 {
-			t.Errorf("skeleton phase expects %q empty, got %d entries", emptyDir, len(entries))
-		}
-	}
-
-	// No hooks.json emitted yet — Phase 3 writes it. Verify absence.
-	if _, err := os.Stat(filepath.Join(outDir, "hooks", "hooks.json")); err == nil {
-		t.Errorf("Phase 0 must not emit hooks/hooks.json yet")
 	}
 }
 

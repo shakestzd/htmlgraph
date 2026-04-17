@@ -43,19 +43,10 @@ func TestGeminiAdapterCopiesVerbatimAssets(t *testing.T) {
 		t.Errorf("GEMINI.md content: %q", string(data))
 	}
 
-	// commands/ remains empty — Phase 2 handles command translation.
-	cmdDir := filepath.Join(outDir, "commands")
-	entries, err := os.ReadDir(cmdDir)
-	if err != nil {
-		t.Fatalf("read commands dir: %v", err)
-	}
-	if len(entries) != 0 {
-		var names []string
-		for _, e := range entries {
-			names = append(names, e.Name())
-		}
-		t.Errorf("Phase 1 must not populate commands/ (owned by Phase 2); got %v", names)
-	}
+	// commands/ is populated by Phase 2's gemini_commands.go sub-emitter once
+	// that phase lands; Phase 1 alone does not populate it. With all phases
+	// merged, this test only asserts Phase 1's contract (assets + context
+	// file are present) — the commands/ contents belong to Phase 2's tests.
 }
 
 // TestGeminiAdapterSkipsMissingContextFile makes sure the adapter tolerates

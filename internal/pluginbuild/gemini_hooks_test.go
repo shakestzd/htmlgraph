@@ -18,6 +18,12 @@ func TestGeminiAdapterEmitsHooksFromFixture(t *testing.T) {
 	repoRoot := t.TempDir()
 	seedAssets(t, repoRoot)
 	outDir := filepath.Join(repoRoot, "packages", "gemini-extension")
+	seedAssets(t, repoRoot)
+	// Phase 1's sub-emitter copies repo-root GEMINI.md; seed a placeholder so
+	// the full Emit chain doesn't fail before Phase 3's hook assertion runs.
+	if err := os.WriteFile(filepath.Join(repoRoot, "GEMINI.md"), []byte("# ctx\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	m := fixtureManifest()
 	// Tag the SessionStart/UserPromptSubmit/Stop fixture events for Gemini to
