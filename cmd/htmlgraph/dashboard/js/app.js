@@ -2176,13 +2176,21 @@ function renderGraph(data) {
   // get a short title without squeezing unreadable 6px text.
   var trackLabelNodes = nodes.filter(function(d) { return d.type === 'track'; });
   var trackLabelGroup = g.append('g').attr('pointer-events', 'none');
+  // trackLabelFontSize scales with node size so a big track's label
+  // reads at a distance and a small track's label doesn't hog
+  // canvas real estate. Range 9–16px matches the node radius clamp
+  // of [4,28] after the 0.55 multiplier — small tracks get ~9px,
+  // full-cap tracks get ~15px.
+  function trackLabelFontSize(d) {
+    return Math.max(9, Math.min(16, Math.round(visualRadius(d) * 0.55)));
+  }
   var trackLabels = trackLabelGroup.selectAll('text.track-label')
     .data(trackLabelNodes)
     .enter().append('text')
     .attr('class', 'track-label')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'hanging')
-    .attr('font-size', '11px')
+    .attr('font-size', function(d) { return trackLabelFontSize(d) + 'px'; })
     .attr('font-weight', '600')
     // Paint-order halo — the stroke draws BEHIND the fill because
     // paint-order is set to 'stroke'. A halo in the canvas background
@@ -2308,10 +2316,13 @@ function renderGraph(data) {
     // Labels sit just BELOW the node. Using transform so tspan x="0"
     // is relative to the label origin (lets multi-line wrapping via
     // tspan children render centered under the node without per-tick
-    // x rewriting on every tspan).
+    // x rewriting on every tspan). Gap below the circle scales up
+    // slightly for bigger labels so the first line has room to
+    // breathe against a thick stroke-width halo.
     trackLabels
       .attr('transform', function(d) {
-        return 'translate(' + d.x + ',' + (d.y + visualRadius(d) + 4) + ')';
+        var gap = 4 + Math.round(trackLabelFontSize(d) * 0.25);
+        return 'translate(' + d.x + ',' + (d.y + visualRadius(d) + gap) + ')';
       });
     hubLabels
       .attr('transform', function(d) {
