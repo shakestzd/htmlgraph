@@ -83,16 +83,30 @@ First run creates a tmux session named `htmlgraph-yolo`. On disconnect, detach i
 
 ## Plugin Source — Single Source of Truth
 
-**Edit `plugin/`, never `.claude/` (auto-synced, changes are lost).**
+HtmlGraph ships one plugin to multiple AI-tool targets (Claude Code, Codex CLI, …) from
+a single source. Each target's plugin tree is **generated** — never hand-edit it.
 
-| Edit here | Never here |
-|-----------|-----------|
-| `plugin/hooks/hooks.json` | `.claude/hooks/hooks.json` |
-| `plugin/agents/` | `.claude/agents/` |
-| `plugin/skills/` | `.claude/skills/` |
-| `cmd/` / `internal/` for Go logic | `.claude/` anything |
+**Layering (edit the left column only):**
 
-See `.claude/rules/plugin-development.md` for full plugin structure reference.
+| Layer | What lives there | Edit? |
+|-------|------------------|-------|
+| `packages/plugin-core/manifest.json` | Canonical plugin metadata + per-target output paths + hook event matrix (which events target Claude, Codex, or both) | YES |
+| `plugin/commands/`, `plugin/agents/`, `plugin/skills/`, `plugin/templates/`, `plugin/static/`, `plugin/config/` | Shared markdown/static assets — copied verbatim into every target tree | YES |
+| `cmd/`, `internal/` | Go CLI + hook handlers (all hooks are thin wrappers over `htmlgraph hook <handler>`) | YES |
+| `plugin/.claude-plugin/plugin.json`, `plugin/hooks/hooks.json` | Generated Claude Code tree | NO — regenerate |
+| `packages/codex-plugin/` | Generated Codex CLI tree | NO — regenerate |
+| `.claude/` (anything) | Auto-synced from `plugin/` — changes are lost | NO |
+
+**Regenerate after every manifest or asset edit:**
+
+```bash
+htmlgraph plugin build-ports              # all targets
+htmlgraph plugin build-ports --target codex
+htmlgraph plugin build-ports --target claude
+```
+
+See `packages/plugin-core/README.md` for the per-task recipes (new command, new hook,
+new target) and `.claude/rules/plugin-development.md` for full plugin structure reference.
 
 ---
 

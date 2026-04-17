@@ -1,38 +1,53 @@
 ---
 paths:
   - "plugin/**"
+  - "packages/plugin-core/**"
   - "cmd/**"
   - "internal/**"
 ---
 
 # Plugin Development
 
-**Source of truth:** `plugin/` — never edit `.claude/` directly (auto-synced from plugin).
+**Source of truth:**
 
-## Directory Structure
+- `packages/plugin-core/manifest.json` — plugin metadata, per-target output paths, hook event matrix
+- `plugin/{commands,agents,skills,templates,static,config}/` — shared markdown/static assets (copied verbatim into every target)
+- `cmd/` and `internal/` — Go CLI and hook handlers
 
-- `plugin/.claude-plugin/plugin.json` — manifest
-- `plugin/hooks/hooks.json` + `bin/htmlgraph` — Go binary hook handler
-- `plugin/agents/` — markdown agent definitions
-- `plugin/skills/` — skill directories with SKILL.md
-- `plugin/commands/` — slash commands
-- `plugin/config/` — classification, drift, validation
+**Generated — DO NOT hand-edit (regenerate via `htmlgraph plugin build-ports`):**
 
-**CRITICAL:** Don't put `commands/`, `agents/`, `skills/`, or `hooks/` inside `.claude-plugin/`. Only `plugin.json` belongs there.
+- `plugin/.claude-plugin/plugin.json`
+- `plugin/hooks/hooks.json`
+- everything under `packages/codex-plugin/`
+- everything under `.claude/` (auto-synced from `plugin/`)
+
+See `packages/plugin-core/README.md` for new-command / new-hook / new-target recipes.
+
+## Directory Structure (generated Claude tree)
+
+- `plugin/.claude-plugin/plugin.json` — manifest (generated)
+- `plugin/hooks/hooks.json` + `bin/htmlgraph` — Go binary hook handler (hooks.json generated)
+- `plugin/agents/` — markdown agent definitions (source asset, edit directly)
+- `plugin/skills/` — skill directories with SKILL.md (source asset, edit directly)
+- `plugin/commands/` — slash commands (source asset, edit directly)
+- `plugin/config/` — classification, drift, validation (source asset, edit directly)
+
+**CRITICAL:** Don't put `commands/`, `agents/`, `skills/`, or `hooks/` inside `.claude-plugin/`. Only `plugin.json` belongs there. Caveat: `plugin/` is the Claude target's output directory — the asset subtrees listed above are hand-edited (they are the shared source for every target), while `plugin/.claude-plugin/plugin.json` and `plugin/hooks/hooks.json` are generated from `packages/plugin-core/manifest.json` and must be regenerated, not hand-edited.
 
 ## Workflow
 
-1. Edit files in `plugin/`, `cmd/`, or `internal/`
-2. Run: `go build ./... && go vet ./... && go test ./...`
-3. Build: `htmlgraph build`
-4. Test: `htmlgraph claude --dev`
-5. Deploy: `./scripts/deploy-all.sh X.Y.Z --no-confirm`
+1. Edit shared source: `packages/plugin-core/manifest.json`, `plugin/{commands,agents,skills,…}/`, `cmd/`, or `internal/`
+2. Regenerate target trees: `htmlgraph plugin build-ports`
+3. Run: `go build ./... && go vet ./... && go test ./...`
+4. Build: `htmlgraph build`
+5. Test: `htmlgraph claude --dev`
+6. Deploy: `./scripts/deploy-all.sh X.Y.Z --no-confirm`
 
 ## Rules
 
-- Edit `plugin/hooks/hooks.json`, never `.claude/hooks/hooks.json`
+- Edit `packages/plugin-core/manifest.json` (never the generated `plugin/hooks/hooks.json` or `plugin/.claude-plugin/plugin.json`)
 - Edit Go source in `cmd/` or `internal/` for hook/CLI logic
-- Add agents to `plugin/agents/`, skills to `plugin/skills/`
+- Add agents to `plugin/agents/`, skills to `plugin/skills/`, commands to `plugin/commands/` — all targets pick them up after `htmlgraph plugin build-ports`
 - Hooks receive CloudEvent JSON on stdin — process via Go binary
 - No stderr from hooks (causes "hook error" in Claude Code UI)
 - Return `{}` to allow, `{"decision":"block","reason":"..."}` to block
