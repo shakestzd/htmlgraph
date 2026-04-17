@@ -86,14 +86,14 @@ func runServeChild(port int) error {
 		os.Stderr = f
 	}
 
-	// One-time background backfill: update sessions with legacy/empty titles
-	// from their JSONL ai-title events. Gated by a sentinel file so it runs
-	// at most once per installation. Non-blocking.
-	startAITitleBackfill(context.Background(), database, htmlgraphDir)
-
 	// Auto-ingest transcripts on startup and every 60s, scoped to this
-	// project via the explicit htmlgraphDir argument (not CWD).
-	go autoIngestLoop(database, htmlgraphDir)
+	// project via the explicit htmlgraphDir argument (not CWD). After the
+	// first ingest cycle completes we kick off a one-time ai-title backfill
+	// so it observes any newly-ingested legacy sessions instead of writing
+	// its `.done` marker against an empty sessions table.
+	go autoIngestLoop(database, htmlgraphDir, func() {
+		startAITitleBackfill(context.Background(), database, htmlgraphDir)
+	})
 
 	return (&http.Server{Handler: mux}).Serve(ln)
 }

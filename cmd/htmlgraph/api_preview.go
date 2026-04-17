@@ -66,10 +66,16 @@ func previewHandler(database *sql.DB) http.HandlerFunc {
 // The content of each message is truncated to previewTruncateLen runes.
 func previewMessages(database *sql.DB, sessionID string, n int) ([]previewMessage, error) {
 	// Fetch last N rows ordered DESC, then reverse to get chronological order.
+	// Exclude rows whose content is NULL or trims to empty — assistant turns
+	// that were purely tool-calls have no user-facing content and would
+	// surface as blank preview rows if included.
 	rows, err := database.Query(`
 		SELECT role, content
 		FROM messages
-		WHERE session_id = ? AND role IN ('user', 'assistant')
+		WHERE session_id = ?
+		  AND role IN ('user', 'assistant')
+		  AND content IS NOT NULL
+		  AND TRIM(content) <> ''
 		ORDER BY ordinal DESC
 		LIMIT ?`, sessionID, n)
 	if err != nil {

@@ -149,8 +149,8 @@ func TestParse_AITitle(t *testing.T) {
 }
 
 func TestParse_AITitle_DoesNotOverrideCustomTitle(t *testing.T) {
-	// If both custom-title and ai-title appear, last one wins (file order).
-	// This test verifies ai-title is parsed just like custom-title.
+	// User-authored `custom-title` always wins over Claude Code's
+	// `ai-title`, regardless of event ordering within the JSONL.
 	jsonl := strings.Join([]string{
 		`{"type":"custom-title","customTitle":"Custom","sessionId":"sess-5"}`,
 		`{"type":"ai-title","aiTitle":"AI Generated","sessionId":"sess-5"}`,
@@ -162,9 +162,26 @@ func TestParse_AITitle_DoesNotOverrideCustomTitle(t *testing.T) {
 		t.Fatalf("parse error: %v", err)
 	}
 
-	// Last title event wins — ai-title appears after custom-title.
-	if result.Title != "AI Generated" {
-		t.Errorf("Title = %q, want %q", result.Title, "AI Generated")
+	if result.Title != "Custom" {
+		t.Errorf("Title = %q, want %q (custom-title must win over later ai-title)", result.Title, "Custom")
+	}
+}
+
+func TestParse_AITitleBeforeCustomTitle_CustomStillWins(t *testing.T) {
+	// Event ordering is irrelevant: even when ai-title appears first,
+	// custom-title takes precedence because it reflects user intent.
+	jsonl := strings.Join([]string{
+		`{"type":"ai-title","aiTitle":"AI Generated","sessionId":"sess-6"}`,
+		`{"type":"custom-title","customTitle":"Custom","sessionId":"sess-6"}`,
+	}, "\n")
+
+	result, err := parse(strings.NewReader(jsonl))
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	if result.Title != "Custom" {
+		t.Errorf("Title = %q, want %q", result.Title, "Custom")
 	}
 }
 

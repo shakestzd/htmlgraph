@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -112,15 +113,25 @@ func runAITitleBackfill(database *sql.DB, htmlgraphDir string, forceRun bool) er
 	}()
 
 	// Single goroutine applies DB writes to avoid concurrent write contention.
+	// Track write failures so we can skip the `.done` marker on any error —
+	// otherwise transient DB failures would permanently silence the retry path
+	// for the affected sessions.
+	var writeErrs int
 	for u := range updates {
-		database.Exec(
+		if _, err := database.Exec(
 			`UPDATE sessions SET title = ? WHERE session_id = ?
 			  AND (title IS NULL OR title = '' OR title = '--' OR title LIKE '[htmlgraph-titler]%')
 			  AND COALESCE(title, '') <> ?`,
 			u.title, u.sessionID, u.title,
-		)
+		); err != nil {
+			writeErrs++
+			log.Printf("ai-title backfill: update failed for %s: %v\n", truncate(u.sessionID, 14), err)
+		}
 	}
 
+	if writeErrs > 0 {
+		return fmt.Errorf("ai-title backfill: %d update(s) failed; marker not written to allow retry", writeErrs)
+	}
 	return writeBackfillMarker(markerPath)
 }
 

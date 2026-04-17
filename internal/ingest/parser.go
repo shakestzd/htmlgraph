@@ -30,6 +30,13 @@ func EventID(sessionID, toolUseID, toolName string, index int) string {
 }
 
 // ParseResult holds the structured output of parsing a JSONL session file.
+//
+// Title carries the resolved session title with user intent preserved:
+// `custom-title` events (user-authored) always win over `ai-title` events
+// (Claude Code-authored). Tracking only a single field here and resolving
+// precedence during parsing prevents an `ai-title` written later in the
+// same transcript from silently overwriting a `custom-title` the user
+// had set earlier.
 type ParseResult struct {
 	SessionID string
 	Messages  []models.Message
@@ -37,6 +44,11 @@ type ParseResult struct {
 	Title     string
 	Model     string // most-used model
 	FileSize  int64
+
+	// hasCustomTitle records whether any `custom-title` event was observed
+	// in this transcript; used by the parser to ignore later `ai-title`
+	// events so the user-authored title is never overwritten.
+	hasCustomTitle bool
 }
 
 // ParseFile reads an entire Claude Code JSONL session file and returns
@@ -105,10 +117,20 @@ func parse(r io.Reader) (*ParseResult, error) {
 
 		switch lineType {
 		case "custom-title":
-			result.Title = gjson.Get(line, "customTitle").String()
+			if v := gjson.Get(line, "customTitle").String(); v != "" {
+				result.Title = v
+				result.hasCustomTitle = true
+			}
 			continue
 		case "ai-title":
-			result.Title = gjson.Get(line, "aiTitle").String()
+			// User-authored titles always win: skip ai-title if a
+			// custom-title was seen earlier in this transcript.
+			if result.hasCustomTitle {
+				continue
+			}
+			if v := gjson.Get(line, "aiTitle").String(); v != "" {
+				result.Title = v
+			}
 			continue
 		case "file-history-snapshot", "queue-operation", "system":
 			continue

@@ -242,6 +242,13 @@ function sessionSparkline(msgCount) {
 // In-flight preview fetch tracker — maps sessionId → true while pending.
 var _previewInFlight = {};
 
+// Response cache — maps sessionId → {messages: [...]} after a successful
+// fetch. Survives rerenders: when renderSessions() rebuilds the DOM, an
+// expanded row can re-populate itself from the cache instead of issuing a
+// fresh request (which would otherwise orphan a response into a detached
+// previewTd from the prior render).
+var _previewCache = {};
+
 // Per-project localStorage key for expanded session IDs.
 function _sessionsExpandedKey() {
   var pid = window.htmlgraphProjectId || window.location.pathname;
@@ -267,9 +274,51 @@ function _saveExpandedSessions(expandedSet) {
 // Global set of expanded session IDs, restored from localStorage.
 var _expandedSessions = _loadExpandedSessions();
 
-// Fetch and render preview for a session into its preview row.
+// Render a cached preview payload into the given cell.
+function _renderPreviewPayload(previewTd, msgs) {
+  var bodyDiv = document.createElement('div');
+  bodyDiv.className = 'session-preview-body';
+  if (!msgs || msgs.length === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'session-preview-error';
+    empty.textContent = 'No messages yet.';
+    bodyDiv.appendChild(empty);
+  } else {
+    msgs.forEach(function(msg) {
+      var row = document.createElement('div');
+      row.className = 'session-preview-msg';
+      var roleSpan = document.createElement('span');
+      roleSpan.className = 'session-preview-role role-' + (msg.role || 'unknown');
+      roleSpan.textContent = msg.role || '?';
+      var contentSpan = document.createElement('span');
+      contentSpan.className = 'session-preview-content';
+      contentSpan.textContent = msg.content_truncated || '';
+      row.appendChild(roleSpan);
+      row.appendChild(contentSpan);
+      bodyDiv.appendChild(row);
+    });
+  }
+  previewTd.textContent = '';
+  previewTd.appendChild(bodyDiv);
+}
+
+// Fetch and render preview for a session into its preview row. If the cache
+// already holds a response, render synchronously from the cache. Otherwise
+// show a loading state, fetch, and populate the cache on success — so a
+// later renderSessions() can re-render the same data into a fresh cell
+// without re-fetching.
 function _fetchSessionPreview(sessionId, previewTd) {
-  if (_previewInFlight[sessionId]) return; // dedup in-flight requests
+  // Cache hit: render and return. This is how rerenders recover their
+  // preview content after the DOM row they previously populated is gone.
+  if (_previewCache[sessionId]) {
+    _renderPreviewPayload(previewTd, _previewCache[sessionId].messages || []);
+    return;
+  }
+
+  // Already fetching for this session: leave the loading state in place.
+  // The in-flight fetch will populate the cache; rerenders after it lands
+  // will find the cache and render from it.
+  if (_previewInFlight[sessionId]) return;
   _previewInFlight[sessionId] = true;
 
   var loadingDiv = document.createElement('div');
@@ -288,33 +337,11 @@ function _fetchSessionPreview(sessionId, previewTd) {
     })
     .then(function(data) {
       delete _previewInFlight[sessionId];
-      var bodyDiv = document.createElement('div');
-      bodyDiv.className = 'session-preview-body';
-      var msgs = data.messages || [];
-      if (msgs.length === 0) {
-        var empty = document.createElement('div');
-        empty.className = 'session-preview-error';
-        empty.textContent = 'No messages yet.';
-        bodyDiv.appendChild(empty);
-      } else {
-        msgs.forEach(function(msg) {
-          var row = document.createElement('div');
-          row.className = 'session-preview-msg';
-          var roleSpan = document.createElement('span');
-          roleSpan.className = 'session-preview-role role-' + (msg.role || 'unknown');
-          roleSpan.textContent = msg.role || '?';
-          var contentSpan = document.createElement('span');
-          contentSpan.className = 'session-preview-content';
-          contentSpan.textContent = msg.content_truncated || '';
-          row.appendChild(roleSpan);
-          row.appendChild(contentSpan);
-          bodyDiv.appendChild(row);
-        });
-      }
-      previewTd.textContent = '';
-      previewTd.appendChild(bodyDiv);
+      _previewCache[sessionId] = { messages: data.messages || [] };
+      _renderPreviewPayload(previewTd, _previewCache[sessionId].messages);
     })
     .catch(function() {
+      // Do NOT cache failures: clear in-flight so a future expand can retry.
       delete _previewInFlight[sessionId];
       var bodyDiv = document.createElement('div');
       bodyDiv.className = 'session-preview-body';
@@ -339,11 +366,10 @@ function _toggleSessionPreview(sessionId, chevron, previewRow, previewTd) {
     _saveExpandedSessions(_expandedSessions);
     chevron.classList.add('expanded');
     previewRow.style.display = '';
-    // Only fetch if not already loaded (no child content yet other than loading).
-    if (!previewTd.dataset.loaded) {
-      previewTd.dataset.loaded = '1';
-      _fetchSessionPreview(sessionId, previewTd);
-    }
+    // _fetchSessionPreview short-circuits on cache hit and on in-flight
+    // requests, so it's safe (and correct) to call unconditionally here —
+    // that way a transient fetch failure can be retried by re-expanding.
+    _fetchSessionPreview(sessionId, previewTd);
   }
 }
 
@@ -462,9 +488,11 @@ function renderSessions() {
       };
     })(s.session_id, chevron, previewRow, previewTd));
 
-    // If already expanded on load, trigger fetch immediately
+    // If already expanded on load, populate the preview. _fetchSessionPreview
+    // will render from the cache synchronously if this session has been
+    // fetched already (e.g. on a prior render of the same sessions panel),
+    // or issue a fresh request otherwise.
     if (isExpanded) {
-      previewTd.dataset.loaded = '1';
       _fetchSessionPreview(s.session_id, previewTd);
     }
 

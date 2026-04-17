@@ -238,10 +238,19 @@ func resolveMarketplacePluginDir() string {
 // removes the previous os.Getwd() dependency so the child process spawned
 // by the parent server (slice 2) still scopes ingestion to the correct
 // project regardless of the child's CWD.
-func autoIngestLoop(database *sql.DB, htmlgraphDir string) {
+//
+// onFirstComplete runs after the initial ingest cycle returns. It is used to
+// sequence one-time startup work (e.g. the ai-title backfill) so that such
+// work observes a fully-populated sessions table on the very first launch
+// after upgrade.
+func autoIngestLoop(database *sql.DB, htmlgraphDir string, onFirstComplete func()) {
+	autoIngestOnce(database, htmlgraphDir)
+	if onFirstComplete != nil {
+		onFirstComplete()
+	}
 	for {
-		autoIngestOnce(database, htmlgraphDir)
 		time.Sleep(60 * time.Second)
+		autoIngestOnce(database, htmlgraphDir)
 	}
 }
 
