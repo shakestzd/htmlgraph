@@ -14,6 +14,7 @@ func pluginCmd() *cobra.Command {
 		Short: "Manage the HtmlGraph Claude Code plugin",
 	}
 	cmd.AddCommand(pluginInstallCmd())
+	cmd.AddCommand(pluginBuildPortsCmd())
 	return cmd
 }
 
