@@ -132,6 +132,12 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 	repoRoot := t.TempDir()
 	seedAssets(t, repoRoot)
+	// Phase 1 copies the repo-root context file when target.ContextFile is set.
+	// The skeleton test seeds a placeholder GEMINI.md so Emit succeeds; Phase 2
+	// and Phase 3 still populate commands/ and hooks/ respectively.
+	if err := os.WriteFile(filepath.Join(repoRoot, "GEMINI.md"), []byte("# ctx\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	outDir := filepath.Join(repoRoot, "packages", "gemini-extension")
 
 	if err := (geminiAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
@@ -148,7 +154,8 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 		t.Errorf("gemini contextFileName: %q", manifest.ContextFileName)
 	}
 
-	// Skeleton dirs exist and are empty — Phase 1/2/3 populate them.
+	// Skeleton dirs exist. commands/ and hooks/ stay empty until Phase 2/3.
+	// agents/ and skills/ are populated by Phase 1 (see gemini_assets_test.go).
 	for _, dir := range []string{"commands", "agents", "skills", "hooks"} {
 		info, err := os.Stat(filepath.Join(outDir, dir))
 		if err != nil {
@@ -158,9 +165,11 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 		if !info.IsDir() {
 			t.Errorf("%q is not a directory", dir)
 		}
-		entries, _ := os.ReadDir(filepath.Join(outDir, dir))
+	}
+	for _, emptyDir := range []string{"commands", "hooks"} {
+		entries, _ := os.ReadDir(filepath.Join(outDir, emptyDir))
 		if len(entries) != 0 {
-			t.Errorf("skeleton phase expects %q empty, got %d entries", dir, len(entries))
+			t.Errorf("skeleton phase expects %q empty, got %d entries", emptyDir, len(entries))
 		}
 	}
 
