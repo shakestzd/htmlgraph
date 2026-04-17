@@ -5,9 +5,9 @@ meta:
     description: |
         Drop the htmlgraph-titler subsystem entirely (every invocation spends a Claude API message and provides marginal value). Source session titles from Claude Code's own `ai-title` JSONL event — the same metadata `claude --resume` uses. Redesign the sessions panel to mirror the activity feed's expandable disclosure pattern: each session row collapsed by default, expandable inline to preview the last few messages without navigating to a separate detail view.
     created_at: "2026-04-16"
-    status: draft
+    status: finalized
     created_by: claude-opus
-    version: 4
+    version: 5
 design:
     problem: |
         The htmlgraph-titler subsystem runs `claude -p --model haiku` against the first 3 user messages of every newly-ingested session, plus a catch-up pass that titles up to 5 NULL-title sessions per ingest cycle (cmd/htmlgraph/titler.go:16-79, cmd/htmlgraph/serve.go:337-357). Each invocation costs a Claude API message against the user's quota. The titler also pollutes the activity feed with its own internal `[htmlgraph-titler]` prompts (recently filtered, but the underlying waste remains). Meanwhile, Claude Code already writes an `ai-title` JSONL event for every session — this is the title `claude --resume` displays — and our parser silently discards it (internal/ingest/parser.go:106 handles `custom-title` but not `ai-title`). The sessions panel itself (cmd/htmlgraph/dashboard/js/app.js:240-318) renders titles in a flat table where every row click navigates away to a full transcript view; users cannot peek at a session's recent messages without committing to that navigation.
@@ -26,6 +26,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-5206de52
       num: 1
       title: Ingest Claude Code's `ai-title` event into sessions.title
       what: |
@@ -55,6 +56,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-2
+      feature_id: feat-9e6dd35c
       num: 2
       title: Delete the htmlgraph-titler subsystem
       what: |
@@ -83,6 +85,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-3
+      feature_id: feat-626a16d8
       num: 3
       title: Backfill historical sessions on first launch after upgrade
       what: |
@@ -114,6 +117,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-4
+      feature_id: feat-6e9201f3
       num: 4
       title: 'Sessions API: return last-N messages preview field'
       what: |
@@ -142,6 +146,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-5
+      feature_id: feat-0e92ea12
       num: 5
       title: 'Sessions panel: inline disclosure with message preview'
       what: |
