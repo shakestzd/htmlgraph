@@ -45,6 +45,13 @@ type Target struct {
 	ManifestPath string `json:"manifestPath"`
 	HooksPath    string `json:"hooksPath"`
 	MCPPath      string `json:"mcpPath,omitempty"`
+	// ContextFile, when set, names a repo-relative file copied into the
+	// generated tree's root (e.g. Gemini's GEMINI.md). Empty means no copy.
+	ContextFile string `json:"contextFile,omitempty"`
+	// CommandNamespace, when set, wraps translated commands under
+	// commands/<namespace>/ so the slash-command resolves to /namespace:name
+	// (used by Gemini; Claude/Codex ignore this field).
+	CommandNamespace string `json:"commandNamespace,omitempty"`
 }
 
 // AssetSources names the repo-relative directories to copy verbatim into every

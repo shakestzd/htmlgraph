@@ -36,6 +36,13 @@
       "manifestPath": ".codex-plugin/plugin.json",
       "hooksPath": "hooks.json",
       "mcpPath": ".mcp.json"
+    },
+    "gemini": {
+      "outDir": "packages/gemini-extension",
+      "manifestPath": "gemini-extension.json",
+      "hooksPath": "hooks/hooks.json",
+      "contextFile": "GEMINI.md",
+      "commandNamespace": "htmlgraph"
     }
   },
 

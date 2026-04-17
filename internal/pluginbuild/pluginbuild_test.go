@@ -23,6 +23,7 @@ func fixtureManifest() *Manifest {
 		Targets: map[string]Target{
 			"claude": {OutDir: "plugin", ManifestPath: ".claude-plugin/plugin.json", HooksPath: "hooks/hooks.json"},
 			"codex":  {OutDir: "packages/codex-plugin", ManifestPath: ".codex-plugin/plugin.json", HooksPath: "hooks.json", MCPPath: ".mcp.json"},
+			"gemini": {OutDir: "packages/gemini-extension", ManifestPath: "gemini-extension.json", HooksPath: "hooks/hooks.json", ContextFile: "GEMINI.md", CommandNamespace: "htmlgraph"},
 		},
 		AssetSources: AssetSources{
 			Commands: "plugin/commands",
@@ -125,6 +126,47 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	// .mcp.json stub written.
 	if _, err := os.Stat(filepath.Join(outDir, ".mcp.json")); err != nil {
 		t.Errorf("expected .mcp.json stub: %v", err)
+	}
+}
+
+func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
+	repoRoot := t.TempDir()
+	seedAssets(t, repoRoot)
+	outDir := filepath.Join(repoRoot, "packages", "gemini-extension")
+
+	if err := (geminiAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+
+	// Manifest: required name/version/description plus contextFileName derived from target.ContextFile.
+	var manifest geminiExtensionJSON
+	readJSON(t, filepath.Join(outDir, "gemini-extension.json"), &manifest)
+	if manifest.Name != "htmlgraph" || manifest.Version != "0.0.0-test" {
+		t.Fatalf("gemini manifest wrong: %+v", manifest)
+	}
+	if manifest.ContextFileName != "GEMINI.md" {
+		t.Errorf("gemini contextFileName: %q", manifest.ContextFileName)
+	}
+
+	// Skeleton dirs exist and are empty — Phase 1/2/3 populate them.
+	for _, dir := range []string{"commands", "agents", "skills", "hooks"} {
+		info, err := os.Stat(filepath.Join(outDir, dir))
+		if err != nil {
+			t.Errorf("expected dir %q: %v", dir, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("%q is not a directory", dir)
+		}
+		entries, _ := os.ReadDir(filepath.Join(outDir, dir))
+		if len(entries) != 0 {
+			t.Errorf("skeleton phase expects %q empty, got %d entries", dir, len(entries))
+		}
+	}
+
+	// No hooks.json emitted yet — Phase 3 writes it. Verify absence.
+	if _, err := os.Stat(filepath.Join(outDir, "hooks", "hooks.json")); err == nil {
+		t.Errorf("Phase 0 must not emit hooks/hooks.json yet")
 	}
 }
 
