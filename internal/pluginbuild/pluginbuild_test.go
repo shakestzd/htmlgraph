@@ -92,6 +92,20 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	if plug.Author.Email != "t@example.com" {
 		t.Errorf("codex author.email: %+v", plug.Author)
 	}
+	// Codex manifest must also carry license, keywords, and interface.category
+	// so Codex's install surface can render without a second lookup.
+	if plug.License != "MIT" {
+		t.Errorf("codex license: %q", plug.License)
+	}
+	if len(plug.Keywords) == 0 || plug.Keywords[0] != "test" {
+		t.Errorf("codex keywords: %+v", plug.Keywords)
+	}
+	if plug.Interface.Category != "Dev" {
+		t.Errorf("codex interface.category: %q", plug.Interface.Category)
+	}
+	if plug.Interface.ShortDescription == "" || plug.Interface.DeveloperName != "Tester" {
+		t.Errorf("codex interface missing short/developer: %+v", plug.Interface)
+	}
 
 	hooksRaw, err := os.ReadFile(filepath.Join(outDir, "hooks.json"))
 	if err != nil {
