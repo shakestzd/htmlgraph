@@ -237,6 +237,116 @@ function sessionSparkline(msgCount) {
   return svg;
 }
 
+/* ── Sessions inline preview disclosure ────────────────────── */
+
+// In-flight preview fetch tracker — maps sessionId → true while pending.
+var _previewInFlight = {};
+
+// Per-project localStorage key for expanded session IDs.
+function _sessionsExpandedKey() {
+  var pid = window.htmlgraphProjectId || window.location.pathname;
+  return 'hg-sessions-expanded-' + pid;
+}
+
+// Load expanded session IDs from localStorage.
+function _loadExpandedSessions() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(_sessionsExpandedKey()) || '[]'));
+  } catch (e) {
+    return new Set();
+  }
+}
+
+// Persist expanded session IDs to localStorage.
+function _saveExpandedSessions(expandedSet) {
+  try {
+    localStorage.setItem(_sessionsExpandedKey(), JSON.stringify(Array.from(expandedSet)));
+  } catch (e) { /* non-fatal */ }
+}
+
+// Global set of expanded session IDs, restored from localStorage.
+var _expandedSessions = _loadExpandedSessions();
+
+// Fetch and render preview for a session into its preview row.
+function _fetchSessionPreview(sessionId, previewTd) {
+  if (_previewInFlight[sessionId]) return; // dedup in-flight requests
+  _previewInFlight[sessionId] = true;
+
+  var loadingDiv = document.createElement('div');
+  loadingDiv.className = 'session-preview-body';
+  var loadingMsg = document.createElement('div');
+  loadingMsg.className = 'session-preview-loading';
+  loadingMsg.textContent = 'Loading preview...';
+  loadingDiv.appendChild(loadingMsg);
+  previewTd.textContent = '';
+  previewTd.appendChild(loadingDiv);
+
+  fetch(buildProjectUrl('sessions/' + encodeURIComponent(sessionId) + '/preview'))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      delete _previewInFlight[sessionId];
+      var bodyDiv = document.createElement('div');
+      bodyDiv.className = 'session-preview-body';
+      var msgs = data.messages || [];
+      if (msgs.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'session-preview-error';
+        empty.textContent = 'No messages yet.';
+        bodyDiv.appendChild(empty);
+      } else {
+        msgs.forEach(function(msg) {
+          var row = document.createElement('div');
+          row.className = 'session-preview-msg';
+          var roleSpan = document.createElement('span');
+          roleSpan.className = 'session-preview-role role-' + (msg.role || 'unknown');
+          roleSpan.textContent = msg.role || '?';
+          var contentSpan = document.createElement('span');
+          contentSpan.className = 'session-preview-content';
+          contentSpan.textContent = msg.content_truncated || '';
+          row.appendChild(roleSpan);
+          row.appendChild(contentSpan);
+          bodyDiv.appendChild(row);
+        });
+      }
+      previewTd.textContent = '';
+      previewTd.appendChild(bodyDiv);
+    })
+    .catch(function() {
+      delete _previewInFlight[sessionId];
+      var bodyDiv = document.createElement('div');
+      bodyDiv.className = 'session-preview-body';
+      var errDiv = document.createElement('div');
+      errDiv.className = 'session-preview-error';
+      errDiv.textContent = 'Preview unavailable.';
+      bodyDiv.appendChild(errDiv);
+      previewTd.textContent = '';
+      previewTd.appendChild(bodyDiv);
+    });
+}
+
+// Toggle expand/collapse for a session preview row.
+function _toggleSessionPreview(sessionId, chevron, previewRow, previewTd) {
+  if (_expandedSessions.has(sessionId)) {
+    _expandedSessions.delete(sessionId);
+    _saveExpandedSessions(_expandedSessions);
+    chevron.classList.remove('expanded');
+    previewRow.style.display = 'none';
+  } else {
+    _expandedSessions.add(sessionId);
+    _saveExpandedSessions(_expandedSessions);
+    chevron.classList.add('expanded');
+    previewRow.style.display = '';
+    // Only fetch if not already loaded (no child content yet other than loading).
+    if (!previewTd.dataset.loaded) {
+      previewTd.dataset.loaded = '1';
+      _fetchSessionPreview(sessionId, previewTd);
+    }
+  }
+}
+
 function renderSessions() {
   var body = document.getElementById('sessions-body');
   var empty = document.getElementById('sessions-empty');
@@ -255,13 +365,27 @@ function renderSessions() {
 
   var frag = document.createDocumentFragment();
   sorted.forEach(function(s) {
+    var isExpanded = _expandedSessions.has(s.session_id);
+
     var tr = document.createElement('tr');
     tr.className = 'session-row' + (s.status === 'active' ? ' live' : '');
     tr.setAttribute('data-session-id', s.session_id);
-    tr.addEventListener('click', function() { openTranscript(s.session_id); });
+    tr.addEventListener('click', function(e) {
+      // Chevron click toggles preview; row click navigates.
+      if (e.target.closest('.expand-icon')) return;
+      openTranscript(s.session_id);
+    });
 
-    // Title cell
+    // Title cell — chevron + title + badges
     var titleTd = document.createElement('td');
+
+    // Chevron expand icon (mirrors event-tree pattern)
+    var chevron = document.createElement('span');
+    chevron.className = 'expand-icon' + (isExpanded ? ' expanded' : '');
+    chevron.textContent = '\u25B6';
+    chevron.title = 'Toggle preview';
+    titleTd.appendChild(chevron);
+
     var titleSpan = document.createElement('span');
     titleSpan.className = 'session-title';
     titleSpan.textContent = sessionDisplayTitle(s);
@@ -321,6 +445,31 @@ function renderSessions() {
     tr.appendChild(td(relTime(s.created_at), { className: 'mono' }));
 
     frag.appendChild(tr);
+
+    // Inline preview disclosure row (hidden by default unless expanded)
+    var previewRow = document.createElement('tr');
+    previewRow.className = 'session-preview-row' + (s.status === 'active' ? ' live' : '');
+    previewRow.style.display = isExpanded ? '' : 'none';
+
+    var previewTd = document.createElement('td');
+    previewTd.setAttribute('colspan', '6');
+
+    // Wire chevron click handler (needs reference to previewRow + previewTd)
+    chevron.addEventListener('click', (function(sid, ch, pr, ptd) {
+      return function(e) {
+        e.stopPropagation();
+        _toggleSessionPreview(sid, ch, pr, ptd);
+      };
+    })(s.session_id, chevron, previewRow, previewTd));
+
+    // If already expanded on load, trigger fetch immediately
+    if (isExpanded) {
+      previewTd.dataset.loaded = '1';
+      _fetchSessionPreview(s.session_id, previewTd);
+    }
+
+    previewRow.appendChild(previewTd);
+    frag.appendChild(previewRow);
   });
   body.appendChild(frag);
 }
