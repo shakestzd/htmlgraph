@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -84,6 +85,11 @@ func runServeChild(port int) error {
 		os.Stdout = f
 		os.Stderr = f
 	}
+
+	// One-time background backfill: update sessions with legacy/empty titles
+	// from their JSONL ai-title events. Gated by a sentinel file so it runs
+	// at most once per installation. Non-blocking.
+	startAITitleBackfill(context.Background(), database, htmlgraphDir)
 
 	// Auto-ingest transcripts on startup and every 60s, scoped to this
 	// project via the explicit htmlgraphDir argument (not CWD).
