@@ -2025,8 +2025,20 @@ function renderGraph(data) {
     focusedNodeId = id;
     var neighbors = adjacency[id] || {};
     neighbors[id] = 1;
+    // Resolve --accent at click time so theme swaps pick up the right
+    // shade (dark-mode neon #CDFF00 vs light-mode olive #4a6e00).
+    var accentColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent').trim() || '#CDFF00';
+    var baseColor = typeColor['feature'] || '#9ca3af';
     icons.attr('opacity', function(d) { return neighbors[d.id] ? 0.95 : 0.08; });
-    node.attr('fill-opacity', function(d) {
+    // The selected node AND its 1-hop neighborhood all get the neon
+    // accent fill — they're the focused subgraph. Everyone outside
+    // that neighborhood stays slate but fades to 0.08 opacity. Result:
+    // the focused cluster lights up as one coherent lime-colored
+    // shape, the rest recedes into context.
+    node.attr('fill', function(d) {
+      return neighbors[d.id] ? accentColor : baseColor;
+    }).attr('fill-opacity', function(d) {
       return neighbors[d.id] ? GRAPH_LAYOUT.NODE_FILL_OPACITY : 0.08;
     });
     trackLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
@@ -2044,10 +2056,14 @@ function renderGraph(data) {
     if (focusedNodeId === null) return;
     focusedNodeId = null;
     icons.attr('opacity', 0.95);
-    node.attr('fill-opacity', GRAPH_LAYOUT.NODE_FILL_OPACITY);
+    // Reset all nodes back to the uniform slate fill (the previously
+    // focused node was neon accent; other visible nodes were already
+    // slate but no harm in resetting everyone).
+    var baseColor = typeColor['feature'] || '#9ca3af';
+    node.attr('fill', baseColor).attr('fill-opacity', GRAPH_LAYOUT.NODE_FILL_OPACITY);
     trackLabels.attr('opacity', 1);
     hubLabels.attr('opacity', 1);
-    link.attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.55 : 0.10; });
+    link.attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.45 : 0.08; });
   }
 
   // Wrap text inside a circle using real SVG measurement via getComputedTextLength.
@@ -2176,8 +2192,59 @@ function renderGraph(data) {
     .attr('stroke', 'var(--bg-primary)')
     .attr('stroke-width', 3)
     .attr('stroke-linejoin', 'round')
-    .attr('fill', 'var(--text-primary)')
-    .text(function(d) { return truncateForNodeLabel(d.title || d.id, 36); });
+    .attr('fill', 'var(--text-primary)');
+
+  // Two-line wrap, 15 chars per line. Greedy word-boundary break:
+  // if a word would push line 1 past 15 chars, flush to line 2. If
+  // line 2 also overflows, truncate with an ellipsis so the label
+  // stays predictable. Lines render as <tspan dy> children.
+  trackLabels.each(function(d) {
+    var raw = d.title || d.id || '';
+    var lines = wrapAt(raw, 15, 2);
+    var sel = d3.select(this);
+    sel.text(null);
+    lines.forEach(function(line, i) {
+      sel.append('tspan')
+        .attr('x', 0)
+        .attr('dy', i === 0 ? 0 : '1.15em')
+        .text(line);
+    });
+  });
+
+  // wrapAt splits a string into at most `maxLines` lines of up to
+  // `maxChars` characters each, breaking on word boundaries. If the
+  // content would exceed maxLines, the last line is truncated with an
+  // ellipsis so no content silently overflows.
+  function wrapAt(text, maxChars, maxLines) {
+    var words = text.split(/\s+/).filter(Boolean);
+    var lines = [];
+    var line = '';
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var next = line ? line + ' ' + w : w;
+      if (next.length <= maxChars) {
+        line = next;
+      } else {
+        if (line) lines.push(line);
+        line = w.length <= maxChars ? w : w.slice(0, maxChars - 1) + '…';
+        if (lines.length >= maxLines) break;
+      }
+    }
+    if (line && lines.length < maxLines) lines.push(line);
+    // If input had more content that didn't fit, mark the last line
+    // with an ellipsis.
+    if (lines.length === maxLines) {
+      var used = lines.join(' ').length;
+      if (used < text.length - 1) {
+        var last = lines[maxLines - 1];
+        if (!last.endsWith('…')) {
+          if (last.length + 1 > maxChars) last = last.slice(0, maxChars - 1);
+          lines[maxLines - 1] = last + '…';
+        }
+      }
+    }
+    return lines.length ? lines : [''];
+  }
 
   // Measure each track label's width so the collision force can widen
   // the track's repulsion radius to match. Stored on the datum so the
@@ -2238,14 +2305,18 @@ function renderGraph(data) {
       .attr('height', iconSize)
       .attr('x', function(d) { return d.x - iconSize(d) / 2; })
       .attr('y', function(d) { return d.y - iconSize(d) / 2; });
-    // Labels sit just BELOW the node (Obsidian-style). Offset is the
-    // node radius + a small gap so the text doesn't touch the ring.
+    // Labels sit just BELOW the node. Using transform so tspan x="0"
+    // is relative to the label origin (lets multi-line wrapping via
+    // tspan children render centered under the node without per-tick
+    // x rewriting on every tspan).
     trackLabels
-      .attr('x', function(d) { return d.x; })
-      .attr('y', function(d) { return d.y + visualRadius(d) + 4; });
+      .attr('transform', function(d) {
+        return 'translate(' + d.x + ',' + (d.y + visualRadius(d) + 4) + ')';
+      });
     hubLabels
-      .attr('x', function(d) { return d.x; })
-      .attr('y', function(d) { return d.y + visualRadius(d) + 3; });
+      .attr('transform', function(d) {
+        return 'translate(' + d.x + ',' + (d.y + visualRadius(d) + 3) + ')';
+      });
   });
 }
 
