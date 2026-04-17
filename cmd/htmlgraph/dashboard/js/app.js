@@ -2261,7 +2261,23 @@ function renderGraph(data) {
   // whose radius covers both. Not perfect (label is rectangular, not
   // circular) but cheap and effective.
   trackLabels.each(function(d) {
-    d._labelHalfWidth = (this.getComputedTextLength() || 80) / 2;
+    // For wrapped labels with <tspan> children, getComputedTextLength
+    // on the parent returns the SUM of tspan widths (total glyph run),
+    // not the widest individual line. We need the widest line for
+    // collision reservation, so iterate the tspans and take the max.
+    // Fall back to the parent length / line count if tspan measurement
+    // isn't available (test environments etc.).
+    var widest = 0;
+    var tspans = this.querySelectorAll('tspan');
+    if (tspans.length) {
+      tspans.forEach(function(t) {
+        var w = t.getComputedTextLength ? t.getComputedTextLength() : 0;
+        if (w > widest) widest = w;
+      });
+    } else {
+      widest = this.getComputedTextLength ? this.getComputedTextLength() : 80;
+    }
+    d._labelHalfWidth = (widest || 80) / 2;
   });
   // Now that track labels know their width, re-initialize the
   // collision force so it re-reads the radius for each track with
