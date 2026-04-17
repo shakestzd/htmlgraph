@@ -11,13 +11,19 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/ingest"
 )
 
-// sessionIngestHandler handles POST /api/sessions/{id}/ingest.
-// It discovers the JSONL file for the given session ID, parses it,
-// and stores messages and tool calls in the database.
-// The endpoint is idempotent: it re-ingests only when the file has changed
-// since the last sync timestamp (or when no messages exist yet).
+// sessionIngestHandler handles requests under /api/sessions/{id}/.
+// It dispatches to the appropriate sub-handler based on the URL suffix:
+//   - /ingest  → existing ingest logic (POST)
+//   - /preview → new preview handler (GET)
 func sessionIngestHandler(database *sql.DB) http.HandlerFunc {
+	preview := previewHandler(database)
 	return func(w http.ResponseWriter, r *http.Request) {
+		_, suffix := extractSessionIDWithSuffix(r.URL.Path)
+		if suffix == "/preview" {
+			preview.ServeHTTP(w, r)
+			return
+		}
+
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -54,22 +60,38 @@ func sessionIngestHandler(database *sql.DB) http.HandlerFunc {
 	}
 }
 
+// extractSessionIDWithSuffix pulls the session UUID and the action suffix from
+// a URL path like /api/sessions/{id}/ingest or /api/sessions/{id}/preview.
+// The suffix is returned as "/ingest" or "/preview" (with leading slash).
+// Returns ("", "") if the path does not match the expected pattern.
+func extractSessionIDWithSuffix(path string) (sessionID, suffix string) {
+	path = strings.TrimSuffix(path, "/")
+	const prefix = "/api/sessions/"
+	if !strings.HasPrefix(path, prefix) {
+		return "", ""
+	}
+	rest := path[len(prefix):]
+	// rest must be "{id}/ingest" or "{id}/preview"
+	for _, sfx := range []string{"/ingest", "/preview"} {
+		if strings.HasSuffix(rest, sfx) {
+			id := rest[:len(rest)-len(sfx)]
+			if id == "" {
+				return "", ""
+			}
+			return id, sfx
+		}
+	}
+	return "", ""
+}
+
 // extractSessionID pulls the session UUID from a URL path like
 // /api/sessions/{id}/ingest. Returns empty string if not found.
 func extractSessionID(path string) string {
-	// Strip trailing slash
-	path = strings.TrimSuffix(path, "/")
-	// Expect: /api/sessions/{id}/ingest
-	const prefix = "/api/sessions/"
-	const suffix = "/ingest"
-	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, suffix) {
+	id, suffix := extractSessionIDWithSuffix(path)
+	if suffix != "/ingest" {
 		return ""
 	}
-	mid := path[len(prefix) : len(path)-len(suffix)]
-	if mid == "" {
-		return ""
-	}
-	return mid
+	return id
 }
 
 // ingestSession finds the JSONL file for sessionID, checks whether a
