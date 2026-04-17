@@ -10,7 +10,7 @@ paths:
 
 **Source of truth:**
 
-- `packages/plugin-core/manifest.json` — plugin metadata, per-target output paths, hook event matrix
+- `packages/plugin-core/manifest.json` — plugin metadata, per-target output paths, hook event matrix (Claude, Codex, Gemini)
 - `plugin/{commands,agents,skills,templates,static,config}/` — shared markdown/static assets (copied verbatim into every target)
 - `cmd/` and `internal/` — Go CLI and hook handlers
 
@@ -19,6 +19,7 @@ paths:
 - `plugin/.claude-plugin/plugin.json`
 - `plugin/hooks/hooks.json`
 - everything under `packages/codex-plugin/`
+- everything under `packages/gemini-extension/` (except its hand-written `README.md`)
 - everything under `.claude/` (auto-synced from `plugin/`)
 
 See `packages/plugin-core/README.md` for new-command / new-hook / new-target recipes.
