@@ -148,7 +148,9 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 		t.Errorf("gemini contextFileName: %q", manifest.ContextFileName)
 	}
 
-	// Skeleton dirs exist and are empty — Phase 1/2/3 populate them.
+	// Skeleton dirs exist — Phase 1/2/3 populate them (commands is owned by
+	// Phase 2, so it's no longer asserted empty; agents/skills/hooks still are
+	// until their respective phases land).
 	for _, dir := range []string{"commands", "agents", "skills", "hooks"} {
 		info, err := os.Stat(filepath.Join(outDir, dir))
 		if err != nil {
@@ -157,6 +159,9 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 		}
 		if !info.IsDir() {
 			t.Errorf("%q is not a directory", dir)
+		}
+		if dir == "commands" {
+			continue
 		}
 		entries, _ := os.ReadDir(filepath.Join(outDir, dir))
 		if len(entries) != 0 {
