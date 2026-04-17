@@ -38,33 +38,33 @@ target are not emitted to that target's hooks file.
 Derived from `manifest.json → hooks.events`. Update this table whenever you
 edit the manifest.
 
-| Event | Handler | Claude | Codex | Notes |
-|-------|---------|:---:|:---:|-------|
-| `SessionStart` | `session-start` | x | x | |
-| `SessionStart` | `session-resume` | x | | matcher: `resume` |
-| `SessionEnd` | `session-end` | x | | |
-| `UserPromptSubmit` | `user-prompt` | x | x | |
-| `UserPromptSubmit` | `timestamp` | x | | shell `command:` only — injects local timestamp |
-| `PreToolUse` | `pretooluse` | x | x | |
-| `PostToolUse` | `posttooluse` | x | x | |
-| `PostToolUse` | `exit-plan-mode` | x | | matcher: `ExitPlanMode` |
-| `PostToolUseFailure` | `posttooluse-failure` | x | | |
-| `SubagentStart` | `subagent-start` | x | | |
-| `SubagentStop` | `subagent-stop` | x | | |
-| `Stop` | `stop` | x | | |
-| `PreCompact` | `pre-compact` | x | | |
-| `PostCompact` | `post-compact` | x | | |
-| `TeammateIdle` | `teammate-idle` | x | | |
-| `TaskCompleted` | `task-completed` | x | | |
-| `TaskCreated` | `task-created` | x | | |
-| `InstructionsLoaded` | `instructions-loaded` | x | | |
-| `WorktreeCreate` | `worktree-create` | x | | |
-| `WorktreeRemove` | `worktree-remove` | x | | |
-| `PermissionRequest` | `permission-request` | x | | |
-| `ConfigChange` | `config-change` | x | | |
-| `TaskStarted` | `task-started` | | x | Codex-specific |
-| `TaskComplete` | `stop` | | x | Codex-specific — reuses `stop` handler |
-| `TurnAborted` | `task-aborted` | | x | Codex-specific |
+| Event | Handler | Claude | Codex | Gemini | Notes |
+|-------|---------|:---:|:---:|:---:|-------|
+| `SessionStart` | `session-start` | x | x | x | |
+| `SessionStart` | `session-resume` | x | | | matcher: `resume` |
+| `SessionEnd` | `session-end` | x | | | |
+| `UserPromptSubmit` | `user-prompt` | x | x | x | |
+| `UserPromptSubmit` | `timestamp` | x | | | shell `command:` only — injects local timestamp |
+| `PreToolUse` | `pretooluse` | x | x | x | |
+| `PostToolUse` | `posttooluse` | x | x | x | |
+| `PostToolUse` | `exit-plan-mode` | x | | | matcher: `ExitPlanMode` |
+| `PostToolUseFailure` | `posttooluse-failure` | x | | | |
+| `SubagentStart` | `subagent-start` | x | | | |
+| `SubagentStop` | `subagent-stop` | x | | | |
+| `Stop` | `stop` | x | | x | |
+| `PreCompact` | `pre-compact` | x | | | |
+| `PostCompact` | `post-compact` | x | | | |
+| `TeammateIdle` | `teammate-idle` | x | | | |
+| `TaskCompleted` | `task-completed` | x | | | |
+| `TaskCreated` | `task-created` | x | | | |
+| `InstructionsLoaded` | `instructions-loaded` | x | | | |
+| `WorktreeCreate` | `worktree-create` | x | | | |
+| `WorktreeRemove` | `worktree-remove` | x | | | |
+| `PermissionRequest` | `permission-request` | x | | | |
+| `ConfigChange` | `config-change` | x | | | |
+| `TaskStarted` | `task-started` | | x | | Codex-specific |
+| `TaskComplete` | `stop` | | x | | Codex-specific — reuses `stop` handler |
+| `TurnAborted` | `task-aborted` | | x | | Codex-specific |
 
 ## Recipes
 
