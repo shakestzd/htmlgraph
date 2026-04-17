@@ -70,6 +70,11 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	}))
 
 	// API endpoints registered before file server so they take precedence.
+	// Merge note: main dropped corsMiddleware(...) wrappers as part of
+	// the local HTTP server security hardening (commit 6ad59d1ae). The
+	// feature branch's new /api/graph/agents, /api/provenance/ and
+	// /api/graph/{commits,files,sessions} routes are registered
+	// WITHOUT the wrapper to stay consistent with that hardening.
 	mux.Handle("/api/events/recent", recentEventsHandler(database))
 	mux.Handle("/api/events/tree", treeHandler(database))
 	mux.Handle("/api/events/stream", sseHandler(database))
@@ -83,6 +88,11 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	mux.Handle("/api/sessions/", sessionIngestHandler(database))
 	mux.Handle("/api/features/", featureActivityRouter(database, htmlgraphDir))
 	mux.Handle("/api/graph", graphAPIHandler(database))
+	mux.Handle("/api/graph/agents", agentsHandler(database))
+	mux.Handle("/api/provenance/", provenanceHandler(database))
+	mux.Handle("/api/graph/commits", commitsForFeatureHandler(database))
+	mux.Handle("/api/graph/files", filesForFeatureHandler(database))
+	mux.Handle("/api/graph/sessions", sessionsForFeatureHandler(database))
 
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
 	mux.Handle("/api/plans", plansListHandler(htmlgraphDir, database))

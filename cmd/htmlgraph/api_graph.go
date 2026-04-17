@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"net/http"
+	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -25,8 +27,23 @@ type graphEdge struct {
 
 // graphData is the full response shape for /api/graph.
 type graphData struct {
-	Nodes []graphNode `json:"nodes"`
-	Edges []graphEdge `json:"edges"`
+	Nodes []graphNode        `json:"nodes"`
+	Edges []graphEdge        `json:"edges"`
+	Caps  map[string]capInfo `json:"caps,omitempty"`
+}
+
+// capInfo shows how many nodes of a type were available vs shown.
+type capInfo struct {
+	Total int `json:"total"`
+	Shown int `json:"shown"`
+}
+
+// perTypeCaps limits high-cardinality types. Uncapped types are absent.
+var perTypeCaps = map[string]int{
+	"session": 300,
+	"commit":  200,
+	"file":    200,
+	"agent":   100,
 }
 
 // graphAPIHandler returns a force-directed graph payload for the dashboard.
@@ -79,6 +96,19 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 		// worked on features from two different tracks, those tracks are related.
 		edges = append(edges, loadTrackCooccurrenceEdges(database)...)
 
+		// File edges (produced_in, touched_by) — commits and agents are
+		// no longer graph nodes, so their edge derivation is omitted.
+		edges = append(edges, loadFileEdges(database)...)
+
+		// Derive parent→child session edges from sessions.parent_session_id.
+		edges = append(edges, loadSessionHierarchyEdges(database)...)
+
+		// Derive session->feature (worked_on) edges from agent_lineage_trace.
+		// loadAgentLineageEdges emits both spawned (root->child session) AND
+		// worked_on (session->feature) edges — the latter are still wanted
+		// for session provenance even without agent nodes.
+		edges = append(edges, loadAgentLineageEdges(database)...)
+
 		// Deduplicate edges (explicit DB edges may duplicate implicit ones).
 		edges = deduplicateEdges(edges)
 
@@ -100,11 +130,86 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 			nodes[i].Activity = activityCounts[nodes[i].ID]
 		}
 
-		// Filter orphans unless ?all=true.
-		if !includeAll {
+		// Type filter: ?types=feature,session limits to those types.
+		caps := make(map[string]capInfo)
+		if typesParam := r.URL.Query().Get("types"); typesParam != "" {
+			allowed := make(map[string]bool)
+			for _, t := range strings.Split(typesParam, ",") {
+				allowed[strings.TrimSpace(t)] = true
+			}
 			filtered := make([]graphNode, 0, len(nodes))
 			for _, n := range nodes {
-				if n.Edges > 0 {
+				if allowed[n.Type] {
+					filtered = append(filtered, n)
+				}
+			}
+			nodes = filtered
+		}
+
+		// Agent filter: ?agent=<name> restricts nodes to the set of
+		// sessions, features, and files that the named agent interacted
+		// with (via agent_lineage_trace). Tracks/plans/bugs/spikes
+		// survive only if they're reachable from one of those
+		// interactions, so the graph contracts to "what this agent
+		// actually touched."
+		if agentName := r.URL.Query().Get("agent"); agentName != "" {
+			nodes = filterByAgent(database, nodes, agentName)
+		}
+
+		// Per-type caps: sort capped types by activity DESC, truncate.
+		byType := make(map[string][]int) // type → indices into nodes
+		for i, n := range nodes {
+			byType[n.Type] = append(byType[n.Type], i)
+		}
+		keep := make(map[int]bool, len(nodes))
+		for t, indices := range byType {
+			cap, capped := perTypeCaps[t]
+			total := len(indices)
+			if capped && total > cap {
+				// Sort by activity DESC — keep highest-activity nodes.
+				sortByActivity(nodes, indices)
+				for _, idx := range indices[:cap] {
+					keep[idx] = true
+				}
+				caps[t] = capInfo{Total: total, Shown: cap}
+			} else {
+				for _, idx := range indices {
+					keep[idx] = true
+				}
+				if capped {
+					caps[t] = capInfo{Total: total, Shown: total}
+				}
+			}
+		}
+		if len(caps) > 0 {
+			capped := make([]graphNode, 0, len(keep))
+			for i, n := range nodes {
+				if keep[i] {
+					capped = append(capped, n)
+				}
+			}
+			nodes = capped
+		}
+
+		// Filter orphans unless ?all=true.
+		//
+		// Two thresholds by type to match visual weight:
+		//   - Work-item nodes (feature/bug/spike/plan/track) need >=1 edge.
+		//   - High-cardinality provenance types (commit/file/session/agent)
+		//     need >=2 edges — degree-1 nodes are decorative leaves that
+		//     add clutter without contributing to any causal chain beyond
+		//     their one anchor.
+		if !includeAll {
+			highCardinality := map[string]bool{
+				"commit": true, "file": true, "session": true, "agent": true,
+			}
+			filtered := make([]graphNode, 0, len(nodes))
+			for _, n := range nodes {
+				threshold := 1
+				if highCardinality[n.Type] {
+					threshold = 2
+				}
+				if n.Edges >= threshold {
 					filtered = append(filtered, n)
 				}
 			}
@@ -137,7 +242,11 @@ func graphAPIHandler(database *sql.DB) http.HandlerFunc {
 			edges = []graphEdge{}
 		}
 
-		respondJSON(w, graphData{Nodes: nodes, Edges: edges})
+		var capsOut map[string]capInfo
+		if len(caps) > 0 {
+			capsOut = caps
+		}
+		respondJSON(w, graphData{Nodes: nodes, Edges: edges, Caps: capsOut})
 	}
 }
 
@@ -189,11 +298,10 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		trackIDs = append(trackIDs, "") // tracks don't have a parent track
 	}
 
-	// Sessions that worked on features — only include sessions with
-	// meaningful activity (>5 events) to avoid noise.
-	// Only include sessions that have actual transcript content —
-	// both agent_events (proves attribution) AND messages (proves ingest).
-	// Without the messages check, hook-only sessions surface as empty transcripts.
+	// Sessions: include sessions with meaningful activity (>5 events and
+	// at least one message) OR sessions that appear in agent_lineage_trace
+	// (subagent sessions) OR sessions with a parent_session_id set.
+	// Capped at 500 to avoid overwhelming the graph.
 	//
 	// The SELECT pulls enough for a useful node label: the sessions.title
 	// column (set by the background titler for human sessions), the first
@@ -211,15 +319,22 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 		                 ORDER BY m.ordinal LIMIT 1), '') AS first_msg,
 		       COALESCE(s.created_at, '') AS created_at
 		FROM sessions s
-		WHERE EXISTS (
-		    SELECT 1 FROM agent_events e
-		    WHERE e.session_id = s.session_id AND e.feature_id != ''
-		    GROUP BY e.session_id HAVING COUNT(*) > 5
+		WHERE (
+		    EXISTS (
+		        SELECT 1 FROM agent_events e
+		        WHERE e.session_id = s.session_id AND e.feature_id != ''
+		        GROUP BY e.session_id HAVING COUNT(*) > 5
+		    )
+		    AND EXISTS (
+		        SELECT 1 FROM messages m WHERE m.session_id = s.session_id
+		    )
+		) OR s.session_id IN (
+		    SELECT session_id FROM agent_lineage_trace
+		    UNION
+		    SELECT session_id FROM sessions
+		    WHERE parent_session_id IS NOT NULL AND parent_session_id != ''
 		)
-		AND EXISTS (
-		    SELECT 1 FROM messages m WHERE m.session_id = s.session_id
-		)
-		LIMIT 200`)
+		LIMIT 500`)
 	if serr == nil {
 		defer srows.Close()
 		for srows.Next() {
@@ -231,6 +346,35 @@ func loadGraphNodes(database *sql.DB) ([]graphNode, []string, error) {
 			n.Type = "session"
 			n.Title = pickSessionLabel(n.ID, title, firstMsg, createdAt)
 			nodes = append(nodes, n)
+			trackIDs = append(trackIDs, "")
+		}
+	}
+
+	// File nodes — deduplicated by file_path across all features.
+	// Agent and commit nodes are intentionally NOT loaded: agents are
+	// exposed via the "Filter by agent" dropdown (the actor, not a
+	// node), and commits are sub-attributes of the session/feature
+	// that produced them (visible in the provenance panel, not as
+	// standalone nodes in the graph).
+	ffRows, ffErr := database.Query(`
+		SELECT file_path, COALESCE(feature_id, ''),
+		       COALESCE(session_id, '')
+		FROM feature_files
+		GROUP BY file_path
+		ORDER BY file_path
+		LIMIT 500`)
+	if ffErr == nil {
+		defer ffRows.Close()
+		for ffRows.Next() {
+			var path, fid, sid string
+			if err := ffRows.Scan(&path, &fid, &sid); err != nil {
+				continue
+			}
+			nodes = append(nodes, graphNode{
+				ID:    path,
+				Type:  "file",
+				Title: filepath.Base(path),
+			})
 			trackIDs = append(trackIDs, "")
 		}
 	}
@@ -468,6 +612,318 @@ func loadTrackCooccurrenceEdges(database *sql.DB) []graphEdge {
 	return edges
 }
 
+// loadCommitEdges derives two edge types from git_commits:
+//   - committed_for: commit -> feature (when feature_id is set)
+//   - produced_by:   commit -> session (when session_id is set)
+//
+// git_commits has composite PK (commit_hash, session_id), so a single commit
+// may appear with multiple (feature_id, session_id) tuples. Query DISTINCT
+// pairs separately for each edge type — grouping by commit_hash alone would
+// silently drop all but one edge per commit.
+func loadCommitEdges(database *sql.DB) []graphEdge {
+	var edges []graphEdge
+
+	// committed_for edges: distinct (commit, feature) pairs.
+	fRows, err := database.Query(`
+		SELECT DISTINCT commit_hash, feature_id FROM git_commits
+		WHERE feature_id IS NOT NULL AND feature_id != ''`)
+	if err == nil {
+		defer fRows.Close()
+		for fRows.Next() {
+			var hash, fid string
+			if err := fRows.Scan(&hash, &fid); err != nil {
+				continue
+			}
+			edges = append(edges, graphEdge{Source: hash, Target: fid, Type: "committed_for"})
+		}
+	}
+
+	// produced_by edges: distinct (commit, session) pairs.
+	sRows, err := database.Query(`
+		SELECT DISTINCT commit_hash, session_id FROM git_commits
+		WHERE session_id IS NOT NULL AND session_id != ''`)
+	if err == nil {
+		defer sRows.Close()
+		for sRows.Next() {
+			var hash, sid string
+			if err := sRows.Scan(&hash, &sid); err != nil {
+				continue
+			}
+			edges = append(edges, graphEdge{Source: hash, Target: sid, Type: "produced_by"})
+		}
+	}
+	return edges
+}
+
+// loadFileEdges derives two edge types from feature_files:
+//   - produced_in: file -> session (when session_id is non-null)
+//   - touched_by:  file -> feature (when feature_id is set)
+func loadFileEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT DISTINCT file_path, COALESCE(feature_id, ''),
+		       COALESCE(session_id, '')
+		FROM feature_files`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var path, fid, sid string
+		if err := rows.Scan(&path, &fid, &sid); err != nil {
+			continue
+		}
+		if sid != "" {
+			edges = append(edges, graphEdge{Source: path, Target: sid, Type: "produced_in"})
+		}
+		if fid != "" {
+			edges = append(edges, graphEdge{Source: path, Target: fid, Type: "touched_by"})
+		}
+	}
+	return edges
+}
+
+// loadSessionHierarchyEdges derives parent→child "spawned" edges from the
+// sessions.parent_session_id column.
+func loadSessionHierarchyEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT session_id, parent_session_id FROM sessions
+		WHERE parent_session_id IS NOT NULL AND parent_session_id != ''`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var childID, parentID string
+		if err := rows.Scan(&childID, &parentID); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{
+			Source: parentID, Target: childID, Type: "spawned",
+		})
+	}
+	return edges
+}
+
+// loadAgentLineageEdges derives edges from agent_lineage_trace:
+//   - "spawned": root_session_id → session_id (excludes self-edges)
+//   - "worked_on": session_id → feature_id (when set)
+//
+// Deduplication with loadSessionHierarchyEdges is handled by
+// deduplicateEdges in graphAPIHandler.
+func loadAgentLineageEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT session_id, root_session_id, COALESCE(feature_id, '')
+		FROM agent_lineage_trace
+		WHERE session_id != root_session_id`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var sessionID, rootSessionID, featureID string
+		if err := rows.Scan(&sessionID, &rootSessionID, &featureID); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{
+			Source: rootSessionID, Target: sessionID, Type: "spawned",
+		})
+		if featureID != "" {
+			edges = append(edges, graphEdge{
+				Source: sessionID, Target: featureID, Type: "worked_on",
+			})
+		}
+	}
+	return edges
+}
+
+// loadAgentEdges derives agent→session (ran_as) and agent→feature (worked_on)
+// edges from agent_lineage_trace.
+func loadAgentEdges(database *sql.DB) []graphEdge {
+	rows, err := database.Query(`
+		SELECT agent_name, session_id, COALESCE(feature_id, '')
+		FROM agent_lineage_trace
+		WHERE agent_name != ''`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var edges []graphEdge
+	for rows.Next() {
+		var agent, sid, fid string
+		if err := rows.Scan(&agent, &sid, &fid); err != nil {
+			continue
+		}
+		edges = append(edges, graphEdge{Source: agent, Target: sid, Type: "ran_as"})
+		if fid != "" {
+			edges = append(edges, graphEdge{Source: agent, Target: fid, Type: "worked_on"})
+		}
+	}
+	return edges
+}
+
+// filterByAgent returns only the nodes the named agent touched. The
+// agent dropdown (agentsHandler) lists agents from a UNION of
+// agent_lineage_trace.agent_name AND sessions.agent_assigned, so this
+// filter must match BOTH sources or "assigned-only" agents will
+// appear in the dropdown but produce an empty graph when selected.
+//
+// Kept nodes:
+//   - sessions where agent_lineage_trace.agent_name = X OR sessions.agent_assigned = X
+//   - features referenced by those sessions (via lineage.feature_id OR agent_events.feature_id)
+//   - files produced by those sessions (feature_files.session_id)
+//   - tracks that contain any kept feature (features.track_id FK)
+func filterByAgent(database *sql.DB, nodes []graphNode, agentName string) []graphNode {
+	keep := make(map[string]bool)
+	sessionIDs := make([]string, 0, 32)
+
+	// Pass 1: sessions + features from agent_lineage_trace.
+	sfRows, err := database.Query(`
+		SELECT DISTINCT session_id, COALESCE(feature_id, '')
+		FROM agent_lineage_trace WHERE agent_name = ?`, agentName)
+	if err != nil {
+		return nodes
+	}
+	for sfRows.Next() {
+		var sid, fid string
+		if err := sfRows.Scan(&sid, &fid); err != nil {
+			continue
+		}
+		if sid != "" {
+			if !keep[sid] {
+				sessionIDs = append(sessionIDs, sid)
+			}
+			keep[sid] = true
+		}
+		if fid != "" {
+			keep[fid] = true
+		}
+	}
+	sfRows.Close()
+
+	// Pass 2: sessions from sessions.agent_assigned. Features linked to
+	// these sessions are pulled via agent_events.feature_id below.
+	assignedRows, aerr := database.Query(`
+		SELECT DISTINCT session_id FROM sessions
+		WHERE agent_assigned = ? AND session_id != ''`, agentName)
+	if aerr == nil {
+		for assignedRows.Next() {
+			var sid string
+			if err := assignedRows.Scan(&sid); err == nil && sid != "" {
+				if !keep[sid] {
+					sessionIDs = append(sessionIDs, sid)
+				}
+				keep[sid] = true
+			}
+		}
+		assignedRows.Close()
+	}
+
+	if len(sessionIDs) > 0 {
+		placeholders := make([]string, len(sessionIDs))
+		args := make([]any, len(sessionIDs))
+		for i, id := range sessionIDs {
+			placeholders[i] = "?"
+			args[i] = id
+		}
+		inClause := strings.Join(placeholders, ",")
+
+		// Features referenced by any agent_event in those sessions —
+		// covers the assigned-only path which has no agent_lineage_trace row.
+		aeRows, aeerr := database.Query(
+			`SELECT DISTINCT feature_id FROM agent_events
+			 WHERE session_id IN (`+inClause+`) AND feature_id != ''`, args...)
+		if aeerr == nil {
+			for aeRows.Next() {
+				var fid string
+				if err := aeRows.Scan(&fid); err == nil {
+					keep[fid] = true
+				}
+			}
+			aeRows.Close()
+		}
+
+		// Files produced by any of those sessions.
+		fRows, ferr := database.Query(
+			`SELECT DISTINCT file_path FROM feature_files
+			 WHERE session_id IN (`+inClause+`)`, args...)
+		if ferr == nil {
+			for fRows.Next() {
+				var fp string
+				if err := fRows.Scan(&fp); err == nil {
+					keep[fp] = true
+				}
+			}
+			fRows.Close()
+		}
+	}
+
+	// Tracks kept if any surviving feature belongs to them (track_id FK).
+	// Query the combined feature set from BOTH agent sources.
+	trackKeep := make(map[string]bool)
+	tRows, terr := database.Query(`
+		SELECT DISTINCT f.track_id FROM features f WHERE f.id IN (
+			SELECT feature_id FROM agent_lineage_trace
+			  WHERE agent_name = ? AND feature_id != ''
+			UNION
+			SELECT e.feature_id FROM agent_events e
+			  JOIN sessions s ON s.session_id = e.session_id
+			  WHERE s.agent_assigned = ? AND e.feature_id != ''
+		) AND f.track_id != ''`, agentName, agentName)
+	if terr == nil {
+		for tRows.Next() {
+			var tid string
+			if err := tRows.Scan(&tid); err == nil {
+				trackKeep[tid] = true
+			}
+		}
+		tRows.Close()
+	}
+
+	filtered := make([]graphNode, 0, len(keep))
+	for _, n := range nodes {
+		if keep[n.ID] || (n.Type == "track" && trackKeep[n.ID]) {
+			filtered = append(filtered, n)
+		}
+	}
+	return filtered
+}
+
+// agentsHandler returns the distinct agent names for the filter
+// dropdown. Ordered by activity DESC so the most-used agents appear
+// first.
+func agentsHandler(database *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		rows, err := database.Query(`
+			SELECT name, SUM(cnt) AS activity FROM (
+				SELECT agent_name AS name, COUNT(*) AS cnt
+					FROM agent_lineage_trace WHERE agent_name != ''
+					GROUP BY agent_name
+				UNION ALL
+				SELECT agent_assigned AS name, COUNT(*) AS cnt
+					FROM sessions WHERE agent_assigned != ''
+					GROUP BY agent_assigned
+			) GROUP BY name ORDER BY activity DESC`)
+		if err != nil {
+			respondJSON(w, []string{})
+			return
+		}
+		defer rows.Close()
+		out := []string{}
+		for rows.Next() {
+			var name string
+			var activity int
+			if err := rows.Scan(&name, &activity); err != nil {
+				continue
+			}
+			out = append(out, name)
+		}
+		respondJSON(w, out)
+	}
+}
+
 // loadGraphEdges fetches all rows from graph_edges.
 func loadGraphEdges(database *sql.DB) ([]graphEdge, error) {
 	rows, err := database.Query(`
@@ -487,6 +943,15 @@ func loadGraphEdges(database *sql.DB) ([]graphEdge, error) {
 		edges = append(edges, e)
 	}
 	return edges, rows.Err()
+}
+
+// sortByActivity sorts the given index slice by the activity of the
+// corresponding nodes (descending). Used to keep highest-activity nodes
+// when applying per-type caps.
+func sortByActivity(nodes []graphNode, indices []int) {
+	sort.Slice(indices, func(i, j int) bool {
+		return nodes[indices[i]].Activity > nodes[indices[j]].Activity
+	})
 }
 
 // deduplicateEdges removes duplicate (source, target, type) triples.

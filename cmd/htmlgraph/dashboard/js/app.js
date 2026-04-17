@@ -1641,7 +1641,8 @@ var GRAPH_LAYOUT = {
     feature: 0.50,
     bug:     0.55,
     spike:   0.60,
-    session: 0.80
+    session: 0.80,
+    file:    0.90
   },
   // Force-simulation cooldown. Lower starting alpha + faster decay
   // because nodes are pre-seeded near their final positions.
@@ -1650,7 +1651,7 @@ var GRAPH_LAYOUT = {
   // Inter-node repulsion. More negative = more spread. Tuned by eye
   // on a 500+ node graph; -220 gives the dense center room to breathe
   // without blowing the whole graph outside the viewport.
-  CHARGE_STRENGTH: -220,
+  CHARGE_STRENGTH: -320,
   // Per-type fill, keyed to design-system tokens so the graph inherits
   // the active theme automatically. Resolved live via
   // getComputedStyle(document.documentElement) at every getGraphPalette()
@@ -1660,12 +1661,14 @@ var GRAPH_LAYOUT = {
   // (plan is differentiated with a dashed stroke in the node render);
   // bug/spike/session reuse semantic status/priority tokens.
   TYPE_TOKEN: {
-    track:   '--accent',
-    feature: '--text-secondary',
-    plan:    '--text-muted',
-    bug:     '--status-blocked',
-    spike:   '--priority-high',
-    session: '--status-ip'
+    track:   '--accent',           // green
+    plan:    '--graph-plan',       // teal — was grey, collided with feature
+    feature: '--graph-feature',    // near-white — was grey, ambiguous
+    bug:     '--status-blocked',   // red
+    spike:   '--priority-high',    // amber
+    session: '--status-ip',        // blue
+    file:    '--graph-file',       // gold — was grey, ambiguous
+    agent:   '--graph-agent'       // purple (filter UI only; no graph nodes)
   },
   // Fill opacity for non-session nodes. Sessions stay at their
   // existing 0.6 — they're secondary. 0.88 takes a little more
@@ -1726,10 +1729,50 @@ function paintGraphLegend() {
   }
 }
 
-function fetchGraph() {
-  fetch(buildProjectUrl('graph'))
+// Active type filter state — array means "show only these types",
+// null means "show all". Default opens to the work-item skeleton only
+// (track / plan / feature / bug / spike). Provenance layers (session,
+// file) are one toolbar click away but start hidden so the graph
+// doesn't open as a hairball. Research basis: Cambridge Intelligence
+// "don't visualize everything in your underlying knowledge graph" —
+// derive a workflow-focused subset.
+var GRAPH_DEFAULT_TYPES = ['track', 'plan', 'feature', 'bug', 'spike'];
+var graphActiveTypes = GRAPH_DEFAULT_TYPES.slice();
+
+// Selected agent for "Filter by agent" dropdown. When set, the graph
+// contracts to only the sessions/features/files the named agent
+// interacted with (via agent_lineage_trace).
+var graphActiveAgent = '';
+
+// Race-proofing: track the current fetch so stale responses from a rapid
+// sequence of toggles don't overwrite newer graph state. Each call bumps the
+// token and aborts the previous request; the .then() checks the token before
+// rendering.
+var graphFetchToken = 0;
+var graphFetchController = null;
+
+function fetchGraph(types) {
+  // If caller didn't pass an explicit filter, fall back to the module
+  // state (graphActiveTypes). That way the initial page load and the
+  // post-Reset fetch both pick up the current filter.
+  if (types === undefined) types = graphActiveTypes;
+  var url = buildProjectUrl('graph');
+  if (types && types.length > 0) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'types=' + types.join(',');
+  if (graphActiveAgent) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'agent=' + encodeURIComponent(graphActiveAgent);
+
+  // Cancel any in-flight request before starting a new one.
+  if (graphFetchController) {
+    try { graphFetchController.abort(); } catch (e) {}
+  }
+  graphFetchController = typeof AbortController === 'function' ? new AbortController() : null;
+  var myToken = ++graphFetchToken;
+  var signal = graphFetchController ? graphFetchController.signal : undefined;
+
+  fetch(url, { signal: signal })
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      // Drop stale responses — only the latest token is allowed to render.
+      if (myToken !== graphFetchToken) return;
       document.getElementById('graph-count').textContent = data.nodes ? data.nodes.length : 0;
       var empty = document.getElementById('graph-empty');
       if (!data.nodes || data.nodes.length === 0) {
@@ -1739,7 +1782,9 @@ function fetchGraph() {
       empty.style.display = 'none';
       renderGraph(data);
     })
-    .catch(function() {
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      if (myToken !== graphFetchToken) return;
       document.getElementById('graph-empty').style.display = '';
     });
 }
@@ -1751,6 +1796,100 @@ function renderGraph(data) {
   if (oldSvg) oldSvg.remove();
   var oldTip = container.querySelector('.graph-tooltip');
   if (oldTip) oldTip.remove();
+
+  // Build or update the filter toolbar.
+  var oldToolbar = container.querySelector('.graph-filter-toolbar');
+  if (oldToolbar) oldToolbar.remove();
+  // Agent and commit intentionally absent: agents are surfaced via the
+  // "Filter by agent" dropdown (they're the actor, not a node), and
+  // commits are sub-attributes of the session/feature that produced
+  // them (visible in the provenance panel, not as standalone nodes).
+  var allTypes = ['track', 'plan', 'feature', 'bug', 'spike', 'session', 'file'];
+  var typeCounts = {};
+  (data.nodes || []).forEach(function(n) { typeCounts[n.type] = (typeCounts[n.type] || 0) + 1; });
+  var toolbar = document.createElement('div');
+  toolbar.className = 'graph-filter-toolbar';
+  allTypes.forEach(function(type) {
+    if (!typeCounts[type] && !(graphActiveTypes && graphActiveTypes.indexOf(type) < 0)) return;
+    var btn = document.createElement('button');
+    var active = !graphActiveTypes || graphActiveTypes.indexOf(type) >= 0;
+    btn.className = 'graph-filter-btn' + (active ? ' active' : '');
+    btn.dataset.type = type;
+    var label = type.charAt(0).toUpperCase() + type.slice(1);
+    var count = typeCounts[type] || 0;
+    var capText = data.caps && data.caps[type] && data.caps[type].total > data.caps[type].shown
+      ? ' of ' + data.caps[type].total : '';
+    // Use the type's SVG icon instead of a colored dot so the filter
+     // doubles as a legend. Icon inherits currentColor via CSS so
+     // active/inactive button states tint it automatically.
+    btn.innerHTML = '<svg class="filter-icon" width="12" height="12" aria-hidden="true">' +
+      '<use href="#icon-' + type + '"/></svg> ' + label +
+      ' <span style="opacity:0.6">' + count + capText + '</span>';
+    btn.onclick = function() {
+      if (!graphActiveTypes) {
+        // First click: drop the clicked type, keep all others.
+        graphActiveTypes = allTypes.filter(function(t) { return t !== type; });
+      } else {
+        var idx = graphActiveTypes.indexOf(type);
+        if (idx >= 0) {
+          // Refuse to deselect the last remaining active type — a request
+          // with an empty list would silently reload the full graph and
+          // desync the toolbar from the canvas. The user can use Reset to
+          // return to the default view.
+          if (graphActiveTypes.length <= 1) return;
+          graphActiveTypes.splice(idx, 1);
+        } else {
+          graphActiveTypes.push(type);
+        }
+        if (graphActiveTypes.length === allTypes.length) graphActiveTypes = null;
+      }
+      fetchGraph(graphActiveTypes);
+    };
+    toolbar.appendChild(btn);
+  });
+  // "Filter by agent" dropdown. Populated lazily from /api/graph/agents.
+  // Changing it refetches the graph restricted to work that agent
+  // touched (via agent_lineage_trace). The dropdown lives in the
+  // toolbar (not the left nav) so the scope is always obvious.
+  var agentSelect = document.createElement('select');
+  agentSelect.className = 'graph-filter-btn';
+  agentSelect.style.padding = '4px 6px';
+  var blankOpt = document.createElement('option');
+  blankOpt.value = '';
+  blankOpt.textContent = 'All agents';
+  agentSelect.appendChild(blankOpt);
+  agentSelect.onchange = function() {
+    graphActiveAgent = agentSelect.value;
+    fetchGraph();
+  };
+  toolbar.appendChild(agentSelect);
+  // Fetch the agent list once per render. Preserves current selection
+  // so the user's filter doesn't reset on every re-render.
+  fetch(buildProjectUrl('graph/agents'))
+    .then(function(r) { return r.json(); })
+    .then(function(list) {
+      (list || []).forEach(function(name) {
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === graphActiveAgent) opt.selected = true;
+        agentSelect.appendChild(opt);
+      });
+    })
+    .catch(function() { /* ignore — dropdown just stays empty */ });
+
+  var resetBtn = document.createElement('button');
+  resetBtn.className = 'graph-filter-btn';
+  resetBtn.textContent = 'Reset';
+  // Reset returns to the workflow default, not "show everything".
+  // A user who actually wants everything can hit every toolbar button.
+  resetBtn.onclick = function() {
+    graphActiveTypes = GRAPH_DEFAULT_TYPES.slice();
+    graphActiveAgent = '';
+    fetchGraph();
+  };
+  toolbar.appendChild(resetBtn);
+  container.insertBefore(toolbar, container.firstChild);
 
   if (graphSimulation) {
     graphSimulation.stop();
@@ -1805,6 +1944,8 @@ function renderGraph(data) {
   // the circle actually provided and spilled onto the background.
   function visualRadius(d) {
     if (d.type === 'session') return Math.max(3, nodeRadius(d) * 0.6);
+    if (d.type === 'commit' || d.type === 'file') return Math.max(3, nodeRadius(d) * 0.5);
+    if (d.type === 'agent') return Math.max(4, nodeRadius(d) * 0.8);
     return nodeRadius(d);
   }
 
@@ -1851,7 +1992,9 @@ function renderGraph(data) {
     .alphaDecay(GRAPH_LAYOUT.SIM_ALPHA_DECAY)
     .force('link', d3.forceLink(edges).id(function(d) { return d.id; })
       .distance(function(d) {
-        return d.type === 'worked_on' ? 70 : 45;
+        if (d.type === 'worked_on') return 90;
+        if (d.type === 'part_of') return 70;     // feature -> track spacing
+        return 55;
       })
       .strength(function(d) {
         // Structural edges dominate the layout; activity edges are loose.
@@ -1863,43 +2006,55 @@ function renderGraph(data) {
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('x', d3.forceX(width / 2).strength(0.015))
     .force('y', d3.forceY(height / 2).strength(0.015))
-    .force('collision', d3.forceCollide().radius(function(d) { return visualRadius(d) + 3; }));
+    // Collision padding reserves space around each node so glyphs and
+    // labels don't overlap neighbors. Track nodes use their measured
+    // label half-width (set after labels render) so the effective
+    // collision disc covers both the circle AND the label strip. If
+    // the measurement hasn't happened yet (first tick), we fall back
+    // to a generous default so the layout doesn't settle too tightly
+    // before labels arrive.
+    .force('collision', d3.forceCollide()
+      .radius(function(d) {
+        if (d.type === 'track') {
+          var halfW = d._labelHalfWidth || 80;
+          return Math.max(visualRadius(d) + 26, halfW + 8);
+        }
+        return visualRadius(d) + 5;
+      })
+      .strength(0.9));
 
-  // Edge color by relationship type for visual variety.
-  var edgeColor = {
-    part_of:     '#4b5563',
-    blocked_by:  '#dc2626',
-    caused_by:   '#f59e0b',
-    implements:  '#3b82f6',
-    contains:    '#22c55e',
-    co_session:  '#8b5cf6',
-    worked_on:   '#06b6d4'
+  // Edges share one uniform color. Differentiation by relationship
+  // type used to be encoded in the stroke; with many types and many
+  // overlapping lines, the rainbow effect added noise rather than
+  // signal. Structural vs provenance distinction now lives in stroke
+  // opacity + width, not hue. 'spawned' edges still dashed.
+  var STRUCTURAL_EDGE_TYPES = {
+    part_of: 1, blocked_by: 1, caused_by: 1, implements: 1,
+    contains: 1, co_session: 1
   };
-
-  // Edge lines — structural edges bolder, activity edges subtle.
+  function isStructuralEdge(d) { return !!STRUCTURAL_EDGE_TYPES[d.type]; }
   var link = g.append('g').selectAll('line')
     .data(edges).enter().append('line')
-    .attr('stroke', function(d) { return edgeColor[d.type] || '#6b7280'; })
-    .attr('stroke-opacity', function(d) {
-      return d.type === 'worked_on' ? 0.25 : 0.6;
-    })
-    .attr('stroke-width', function(d) {
-      return d.type === 'worked_on' ? 0.7 : 1.2;
+    .attr('stroke', 'var(--border-strong)')
+    .attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.45 : 0.08; })
+    .attr('stroke-width', function(d) { return isStructuralEdge(d) ? 1.4 : 0.5; })
+    .attr('stroke-dasharray', function(d) {
+      return d.type === 'spawned' ? '6,3' : null;
     });
 
-  // Node circles. Radius flows through visualRadius so the on-screen
-  // size matches the value used by label wrapping and the collision
-  // force below — one source of truth for "how big is this node."
+  // All nodes share ONE fill color (the feature slate). Type identity
+  // is carried entirely by the icon glyph inside — this turns the
+  // canvas into a uniform Obsidian-like field where the shape-language
+  // of the icons, not hue, distinguishes types. typeColor['feature']
+  // is used as the source so theme switches still work.
+  var uniformFill = typeColor['feature'] || '#9ca3af';
   var node = g.append('g').selectAll('circle')
     .data(nodes).enter().append('circle')
     .attr('r', visualRadius)
-    .attr('fill', function(d) { return typeColor[d.type] || '#888'; })
-    .attr('fill-opacity', function(d) { return d.type === 'session' ? 0.6 : GRAPH_LAYOUT.NODE_FILL_OPACITY; })
+    .attr('fill', uniformFill)
+    .attr('fill-opacity', GRAPH_LAYOUT.NODE_FILL_OPACITY)
     .attr('stroke', 'var(--bg-primary)')
     .attr('stroke-width', 1.5)
-    // Plans share the grayscale tier with features. The dashed outline
-    // signals "blueprint, not built yet" so the two tiers stay distinct
-    // even when their fill tokens resolve to similar neutrals.
     .attr('stroke-dasharray', function(d) { return d.type === 'plan' ? '4,2' : null; })
     .style('cursor', 'pointer')
     .call(d3.drag()
@@ -1914,19 +2069,37 @@ function renderGraph(data) {
       })
     );
 
+  // Icons sit inside the node circle, providing shape-based type
+  // differentiation on top of the color. Min 10px so small nodes keep
+  // some glyph readability; size scales with the node radius. Color
+  // inherits from --bg-primary so they read as "reversed out" text on
+  // the circle fill, adapting to dark/light theme automatically.
+  var ICON_MIN_SIZE = 10;
+  // All node types get an icon now — with uniform circle color (see
+  // below), the icon is the sole type differentiator. Glyphs are
+  // aligned with the terminal statusline metaphors: track=route,
+  // feature=lightbulb, bug=bug, spike=zap — so a user moving
+  // between the CLI prompt and the dashboard sees the same symbols.
+  var iconTypes = { track:1, plan:1, feature:1, bug:1, spike:1, session:1, file:1 };
+  function iconSize(d) {
+    return Math.max(ICON_MIN_SIZE, visualRadius(d) * 1.2);
+  }
+  var icons = g.append('g')
+    .attr('pointer-events', 'none')
+    .selectAll('use')
+    .data(nodes.filter(function(d) { return iconTypes[d.type] && visualRadius(d) >= 8; }))
+    .enter().append('use')
+    .attr('href', function(d) { return '#icon-' + d.type; })
+    .attr('color', 'var(--bg-primary)')
+    .attr('opacity', 0.95);
+
   // Repaint nodes, labels, and legend on theme toggle without tearing
   // down the simulation. The closure captures `node` / the label
   // selections and reassigns `typeColor` so subsequent fill reads stay
   // in sync (used by drag/hover handlers that reuse typeColor).
   graphThemeObserver = new MutationObserver(function() {
     typeColor = getGraphPalette();
-    node.attr('fill', function(d) { return typeColor[d.type] || '#888'; });
-    if (typeof trackLabels !== 'undefined') {
-      trackLabels.attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); });
-    }
-    if (typeof hubLabels !== 'undefined') {
-      hubLabels.attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); });
-    }
+    node.attr('fill', typeColor['feature'] || '#9ca3af');
     paintGraphLegend();
   });
   graphThemeObserver.observe(document.documentElement, {
@@ -1992,34 +2165,98 @@ function renderGraph(data) {
     tooltip.style('left', (e.clientX - rect.left + 12) + 'px').style('top', (e.clientY - rect.top - 10) + 'px');
   }).on('mouseout', function() {
     tooltip.style('opacity', 0);
-    node.attr('opacity', 1);
-    link.attr('stroke-opacity', 0.5);
-  }).on('click', function(e, d) {
-    // Route navigation by node type.
-    if (d.type === 'session') {
-      // Sessions navigate to the session transcript view.
-      currentView = 'sessions';
-      document.querySelectorAll('.nav-btn').forEach(function(b) {
-        b.classList.toggle('active', b.dataset.view === 'sessions');
+    // If a focus lens is active (focusedNodeId !== null), do NOT reset
+    // to the generic baseline — that would clobber the focused state.
+    // Re-apply the focus instead so moving the pointer off a node
+    // keeps the lens intact. When nothing is focused, fall back to
+    // the pre-focus defaults.
+    if (focusedNodeId !== null) {
+      focusOnNode(focusedNodeId);
+    } else {
+      node.attr('opacity', 1);
+      link.attr('stroke-opacity', function(d) {
+        return isStructuralEdge(d) ? 0.45 : 0.08;
       });
-      document.querySelectorAll('.view').forEach(function(v) {
-        v.classList.toggle('active', v.id === 'v-sessions');
-      });
-      if (typeof openSessionDetail === 'function') {
-        openSessionDetail(d.id);
-      } else if (typeof openTranscript === 'function') {
-        openTranscript(d.id);
-      } else {
-        // Fallback: just load the sessions view.
-        fetchSessions && fetchSessions();
-      }
-      return;
     }
-    // Tracks/features/bugs/spikes open in the work detail panel via
-    // the shared navigateToWorkDetail helper (same path used by the
-    // transcript stats work-item badges).
-    navigateToWorkDetail(d.id);
+  }).on('click', function(e, d) {
+    // Click does two things:
+    //   1. Open the provenance panel (causal-chain drill-down)
+    //   2. Focus the graph on this node's 1-hop neighborhood — fade
+    //      everything else to 0.08. This is the "lens" pattern from
+    //      classic focus+context research: keep the context visible
+    //      but suppress it so the subject stands out.
+    e.stopPropagation();
+    openProvenancePanel(d.id);
+    focusOnNode(d.id);
   });
+
+  // Background click clears the focus lens (but doesn't touch the
+  // provenance panel — that has its own × button). Attached to the SVG
+  // root so any click that doesn't land on a node bubbles up here.
+  svg.on('click', function(e) {
+    // Only fire when the click target IS the svg/g layer (bubbled),
+    // not when a node handled it (we stopPropagation above).
+    if (e.target === svg.node() || e.target.tagName === 'g') {
+      clearFocus();
+    }
+  });
+
+  // Build an adjacency map once per render. Nodes in the same 1-hop
+  // neighborhood stay at full opacity under focus; all others fade.
+  // Include the focused node itself so it doesn't dim itself.
+  var adjacency = {};
+  edges.forEach(function(edge) {
+    var s = edge.source.id || edge.source;
+    var t = edge.target.id || edge.target;
+    (adjacency[s] = adjacency[s] || {})[t] = 1;
+    (adjacency[t] = adjacency[t] || {})[s] = 1;
+  });
+
+  var focusedNodeId = null;
+  function focusOnNode(id) {
+    focusedNodeId = id;
+    var neighbors = adjacency[id] || {};
+    neighbors[id] = 1;
+    // Resolve --accent at click time so theme swaps pick up the right
+    // shade (dark-mode neon #CDFF00 vs light-mode olive #4a6e00).
+    var accentColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent').trim() || '#CDFF00';
+    var baseColor = typeColor['feature'] || '#9ca3af';
+    icons.attr('opacity', function(d) { return neighbors[d.id] ? 0.95 : 0.08; });
+    // The selected node AND its 1-hop neighborhood all get the neon
+    // accent fill — they're the focused subgraph. Everyone outside
+    // that neighborhood stays slate but fades to 0.08 opacity. Result:
+    // the focused cluster lights up as one coherent lime-colored
+    // shape, the rest recedes into context.
+    node.attr('fill', function(d) {
+      return neighbors[d.id] ? accentColor : baseColor;
+    }).attr('fill-opacity', function(d) {
+      return neighbors[d.id] ? GRAPH_LAYOUT.NODE_FILL_OPACITY : 0.08;
+    });
+    trackLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
+    hubLabels.attr('opacity', function(d) { return neighbors[d.id] ? 1 : 0.15; });
+    // Hide non-incident edges completely when focused. Previous 0.05
+     // opacity was additive across many stacked lines and produced a
+     // visible residual hairball behind the focus subject.
+    link.attr('stroke-opacity', function(d) {
+      var s = d.source.id || d.source;
+      var t = d.target.id || d.target;
+      return (s === id || t === id) ? 0.9 : 0;
+    });
+  }
+  function clearFocus() {
+    if (focusedNodeId === null) return;
+    focusedNodeId = null;
+    icons.attr('opacity', 0.95);
+    // Reset all nodes back to the uniform slate fill (the previously
+    // focused node was neon accent; other visible nodes were already
+    // slate but no harm in resetting everyone).
+    var baseColor = typeColor['feature'] || '#9ca3af';
+    node.attr('fill', baseColor).attr('fill-opacity', GRAPH_LAYOUT.NODE_FILL_OPACITY);
+    trackLabels.attr('opacity', 1);
+    hubLabels.attr('opacity', 1);
+    link.attr('stroke-opacity', function(d) { return isStructuralEdge(d) ? 0.45 : 0.08; });
+  }
 
   // Wrap text inside a circle using real SVG measurement via getComputedTextLength.
   // Uses binary iteration: tries to fit text, shrinks font if needed, hides if too small.
@@ -2124,45 +2361,148 @@ function renderGraph(data) {
   // paint-order stroke — labels wrap inside the node radius, never
   // cross onto the background, and a dark halo would visibly thicken
   // and blur the small font sizes that fit inside sub-20px nodes.
+  // Obsidian-style labels below each track and feature. Only the
+  // highest-cardinality work-item types get labels — bugs/spikes/
+  // sessions/files stay glyph-only to keep the canvas quiet. Labels
+  // sit OUTSIDE the circle (not wrapped inside) so small nodes still
+  // get a short title without squeezing unreadable 6px text.
   var trackLabelNodes = nodes.filter(function(d) { return d.type === 'track'; });
-  var trackLabelGroup = g.append('g');
+  var trackLabelGroup = g.append('g').attr('pointer-events', 'none');
+  // trackLabelFontSize scales with node size so a big track's label
+  // reads at a distance and a small track's label doesn't hog
+  // canvas real estate. Range 9–16px matches the node radius clamp
+  // of [4,28] after the 0.55 multiplier — small tracks get ~9px,
+  // full-cap tracks get ~15px.
+  function trackLabelFontSize(d) {
+    return Math.max(9, Math.min(16, Math.round(visualRadius(d) * 0.55)));
+  }
   var trackLabels = trackLabelGroup.selectAll('text.track-label')
     .data(trackLabelNodes)
     .enter().append('text')
     .attr('class', 'track-label')
     .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
-    .attr('font-weight', 'bold')
-    .attr('pointer-events', 'none');
-
-  trackLabels.each(function(d) {
-    wrapTextInCircle(d3.select(this), d.title, visualRadius(d));
-  });
-
-  // Hub node labels — fit inside the circle when node is large enough.
-  // Uses visualRadius (not nodeRadius) so the "is this big enough to
-  // label?" test matches the ACTUAL on-screen size, which for session
-  // nodes is 60% of nodeRadius. Without this, session labels thought
-  // they had 67% more space than the circle actually provided and
-  // spilled onto the background.
-  var hubNodes = nodes.filter(function(d) {
-    return d.type !== 'track' && (d.edges || 0) >= 3 && visualRadius(d) >= 10;
-  });
-
-  var hubLabels = g.append('g').selectAll('text.hub-label')
-    .data(hubNodes)
-    .enter().append('text')
-    .attr('class', 'hub-label')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('fill', function(d) { return pickLabelColor(typeColor[d.type] || '#888'); })
+    .attr('dominant-baseline', 'hanging')
+    .attr('font-size', function(d) { return trackLabelFontSize(d) + 'px'; })
     .attr('font-weight', '600')
-    .attr('pointer-events', 'none');
+    // Paint-order halo — the stroke draws BEHIND the fill because
+    // paint-order is set to 'stroke'. A halo in the canvas background
+    // color creates a readable bubble around the text so the label
+    // stays legible even if it brushes a neighboring node.
+    .attr('paint-order', 'stroke')
+    .attr('stroke', 'var(--bg-primary)')
+    .attr('stroke-width', 3)
+    .attr('stroke-linejoin', 'round')
+    .attr('fill', 'var(--text-primary)');
 
-  hubLabels.each(function(d) {
-    wrapTextInCircle(d3.select(this), d.title, visualRadius(d));
+  // Two-line wrap, 15 chars per line. Greedy word-boundary break:
+  // if a word would push line 1 past 15 chars, flush to line 2. If
+  // line 2 also overflows, truncate with an ellipsis so the label
+  // stays predictable. Lines render as <tspan dy> children.
+  trackLabels.each(function(d) {
+    var raw = d.title || d.id || '';
+    var lines = wrapAt(raw, 15, 2);
+    var sel = d3.select(this);
+    sel.text(null);
+    lines.forEach(function(line, i) {
+      sel.append('tspan')
+        .attr('x', 0)
+        .attr('dy', i === 0 ? 0 : '1.15em')
+        .text(line);
+    });
   });
+
+  // wrapAt splits a string into at most `maxLines` lines of up to
+  // `maxChars` characters each, breaking on word boundaries. If the
+  // content would exceed maxLines, the last line is truncated with an
+  // ellipsis so no content silently overflows.
+  function wrapAt(text, maxChars, maxLines) {
+    var words = text.split(/\s+/).filter(Boolean);
+    var lines = [];
+    var line = '';
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var next = line ? line + ' ' + w : w;
+      if (next.length <= maxChars) {
+        line = next;
+      } else {
+        if (line) lines.push(line);
+        line = w.length <= maxChars ? w : w.slice(0, maxChars - 1) + '…';
+        if (lines.length >= maxLines) break;
+      }
+    }
+    if (line && lines.length < maxLines) lines.push(line);
+    // If input had more content that didn't fit, mark the last line
+    // with an ellipsis.
+    if (lines.length === maxLines) {
+      var used = lines.join(' ').length;
+      if (used < text.length - 1) {
+        var last = lines[maxLines - 1];
+        if (!last.endsWith('…')) {
+          if (last.length + 1 > maxChars) last = last.slice(0, maxChars - 1);
+          lines[maxLines - 1] = last + '…';
+        }
+      }
+    }
+    return lines.length ? lines : [''];
+  }
+
+  // Measure each track label's width so the collision force can widen
+  // the track's repulsion radius to match. Stored on the datum so the
+  // d3.forceCollide radius callback can read it. This is the simplest
+  // "bounding box" collision: we treat the track + label as a disc
+  // whose radius covers both. Not perfect (label is rectangular, not
+  // circular) but cheap and effective.
+  trackLabels.each(function(d) {
+    // For wrapped labels with <tspan> children, getComputedTextLength
+    // on the parent returns the SUM of tspan widths (total glyph run),
+    // not the widest individual line. We need the widest line for
+    // collision reservation, so iterate the tspans and take the max.
+    // Fall back to the parent length / line count if tspan measurement
+    // isn't available (test environments etc.).
+    var widest = 0;
+    var tspans = this.querySelectorAll('tspan');
+    if (tspans.length) {
+      tspans.forEach(function(t) {
+        var w = t.getComputedTextLength ? t.getComputedTextLength() : 0;
+        if (w > widest) widest = w;
+      });
+    } else {
+      widest = this.getComputedTextLength ? this.getComputedTextLength() : 80;
+    }
+    d._labelHalfWidth = (widest || 80) / 2;
+  });
+  // Now that track labels know their width, re-initialize the
+  // collision force so it re-reads the radius for each track with
+  // the measured _labelHalfWidth, and give the simulation a gentle
+  // alpha kick so nodes re-settle without re-seeding positions.
+  if (graphSimulation) {
+    graphSimulation.force('collision').initialize(graphSimulation.nodes());
+    graphSimulation.alpha(0.3).restart();
+  }
+
+  // Feature labels are intentionally disabled. With 250+ features in a
+  // typical view, labeling even 10% of them (edges >= 2) produces
+  // overlapping walls of text (verified: user feedback after previous
+  // pass). Feature titles stay reachable via:
+  //   1. Hover tooltip (see the mouseover handler above).
+  //   2. Provenance panel (click the node).
+  //   3. Focus lens — clicking the node also brings its title into
+  //      the panel header which stays pinned until dismissed.
+  // Track labels stay on because 42 tracks is a manageable amount of
+  // static text and tracks are the top-level organizing principle.
+  var hubLabels = g.append('g').attr('pointer-events', 'none').selectAll('text.hub-label')
+    .data([])
+    .enter().append('text');
+
+  // truncateForNodeLabel — short helper; wraps a title at word boundary
+  // if it exceeds max chars. Kept local to renderGraph so the existing
+  // wrapTextInCircle (still used elsewhere) isn't touched.
+  function truncateForNodeLabel(s, max) {
+    if (!s || s.length <= max) return s || '';
+    var cut = s.lastIndexOf(' ', max);
+    if (cut < max / 2) cut = max;
+    return s.slice(0, cut).replace(/[ ,.;:]+$/, '') + '…';
+  }
 
   graphSimulation.on('tick', function() {
     link
@@ -2173,12 +2513,109 @@ function renderGraph(data) {
     node
       .attr('cx', function(d) { return d.x; })
       .attr('cy', function(d) { return d.y; });
+    // Icons are now the only visible node glyph, so they're centered
+    // directly on (d.x, d.y) with size floored at ICON_MIN_SIZE so even
+    // a degree-1 file/commit remains legible.
+    icons
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('x', function(d) { return d.x - iconSize(d) / 2; })
+      .attr('y', function(d) { return d.y - iconSize(d) / 2; });
+    // Labels sit just BELOW the node. Using transform so tspan x="0"
+    // is relative to the label origin (lets multi-line wrapping via
+    // tspan children render centered under the node without per-tick
+    // x rewriting on every tspan). Gap below the circle scales up
+    // slightly for bigger labels so the first line has room to
+    // breathe against a thick stroke-width halo.
     trackLabels
-      .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+      .attr('transform', function(d) {
+        var gap = 4 + Math.round(trackLabelFontSize(d) * 0.25);
+        return 'translate(' + d.x + ',' + (d.y + visualRadius(d) + gap) + ')';
+      });
     hubLabels
-      .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+      .attr('transform', function(d) {
+        return 'translate(' + d.x + ',' + (d.y + visualRadius(d) + 3) + ')';
+      });
   });
 }
+
+// openProvenancePanel fetches and displays the causal chain for a graph node
+// in the fixed right-side drawer. Each upstream/downstream item is clickable
+// to drill into that node's own provenance.
+//
+// Race-proofed: rapid clicks on a chain of nodes would otherwise let a slow
+// earlier response overwrite the newer drawer. The token/abort pair mirrors
+// fetchGraph above.
+var provenanceFetchToken = 0;
+var provenanceFetchController = null;
+
+function openProvenancePanel(nodeId) {
+  var panel = document.getElementById('provenance-panel');
+  var titleEl = document.getElementById('provenance-title');
+  var badge = document.getElementById('provenance-type-badge');
+  var upstreamEl = document.getElementById('provenance-upstream');
+  var downstreamEl = document.getElementById('provenance-downstream');
+
+  if (provenanceFetchController) {
+    try { provenanceFetchController.abort(); } catch (e) {}
+  }
+  provenanceFetchController = typeof AbortController === 'function' ? new AbortController() : null;
+  var myToken = ++provenanceFetchToken;
+  var signal = provenanceFetchController ? provenanceFetchController.signal : undefined;
+
+  fetch(buildProjectUrl('provenance/' + encodeURIComponent(nodeId)), { signal: signal })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (myToken !== provenanceFetchToken) return;
+      titleEl.textContent = data.node.title || data.node.id;
+      badge.textContent = data.node.type;
+      badge.className = 'type-badge type-' + data.node.type;
+
+      upstreamEl.innerHTML = '';
+      (data.upstream || []).forEach(function(link) {
+        var li = document.createElement('li');
+        var rel = document.createElement('span');
+        rel.className = 'provenance-rel';
+        rel.textContent = link.relationship;
+        var label = document.createElement('span');
+        label.textContent = link.title || link.id;
+        li.appendChild(rel);
+        li.appendChild(label);
+        li.onclick = function() { openProvenancePanel(link.id); };
+        upstreamEl.appendChild(li);
+      });
+
+      downstreamEl.innerHTML = '';
+      (data.downstream || []).forEach(function(link) {
+        var li = document.createElement('li');
+        var rel = document.createElement('span');
+        rel.className = 'provenance-rel';
+        rel.textContent = link.relationship;
+        var label = document.createElement('span');
+        label.textContent = link.title || link.id;
+        li.appendChild(rel);
+        li.appendChild(label);
+        li.onclick = function() { openProvenancePanel(link.id); };
+        downstreamEl.appendChild(li);
+      });
+
+      panel.classList.remove('hidden');
+    })
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      if (myToken !== provenanceFetchToken) return;
+      console.error('provenance fetch failed', err);
+    });
+}
+
+(function() {
+  var closeBtn = document.getElementById('provenance-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      document.getElementById('provenance-panel').classList.add('hidden');
+    });
+  }
+})();
 
 // openSessionDetail switches to the sessions view and highlights a specific session.
 function openSessionDetail(sessionId) {

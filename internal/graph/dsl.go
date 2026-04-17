@@ -158,12 +158,23 @@ var knownNodeTypes = map[string]string{
 	"plan":     "plan",
 	"specs":    "spec",
 	"spec":     "spec",
+	"commits":  "commit",
+	"commit":   "commit",
+	"files":    "file",
+	"file":     "file",
+	"sessions": "session",
+	"session":  "session",
+	"agents":   "agent",
+	"agent":    "agent",
 }
 
 func isNodeType(s string) bool {
 	_, ok := knownNodeTypes[strings.ToLower(s)]
 	return ok
 }
+
+// IsNodeType is the exported version of isNodeType for use in tests.
+func IsNodeType(s string) bool { return isNodeType(s) }
 
 func normalizeNodeType(s string) string {
 	if t, ok := knownNodeTypes[strings.ToLower(s)]; ok {
@@ -172,34 +183,94 @@ func normalizeNodeType(s string) string {
 	return strings.ToLower(s)
 }
 
+// NormalizeNodeType is the exported version of normalizeNodeType for use in tests.
+func NormalizeNodeType(s string) string { return normalizeNodeType(s) }
+
 // resolveTypeSelector queries for all node IDs matching a type+filter selector.
 func resolveTypeSelector(db *sql.DB, sel nodeSelector) ([]string, error) {
 	nodeType := normalizeNodeType(sel.nodeType)
 
-	// Determine which table to query.
-	table := "features"
-	if nodeType == "track" {
-		table = "tracks"
-	}
-
 	var query string
 	var args []any
 
-	if sel.field != "" {
-		col, ok := allowedFilterColumns[sel.field]
-		if !ok {
-			return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
-		}
-		if table == "tracks" {
-			query = fmt.Sprintf(`SELECT id FROM tracks WHERE %s = ?`, col)
+	switch nodeType {
+	case "commit":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT DISTINCT commit_hash FROM git_commits WHERE %s = ?`, col)
+			args = append(args, sel.value)
 		} else {
-			query = fmt.Sprintf(`SELECT id FROM features WHERE type = ? AND %s = ?`, col)
-			args = append(args, nodeType)
+			query = `SELECT DISTINCT commit_hash FROM git_commits`
 		}
-		args = append(args, sel.value)
-	} else {
-		if table == "tracks" {
+	case "file":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT DISTINCT file_path FROM feature_files WHERE %s = ?`, col)
+			args = append(args, sel.value)
+		} else {
+			query = `SELECT DISTINCT file_path FROM feature_files`
+		}
+	case "session":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT session_id FROM sessions WHERE %s = ?`, col)
+			args = append(args, sel.value)
+		} else {
+			query = `SELECT session_id FROM sessions`
+		}
+	case "agent":
+		// Agent nodes are the distinct agent_name across agent_lineage_trace
+		// and sessions.agent_assigned. Filter support is limited to the
+		// identity field (agent name itself) via the whitelist.
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				) WHERE %s = ?`, col)
+			args = append(args, sel.value)
+		} else {
+			query = `
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				)`
+		}
+	case "track":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT id FROM tracks WHERE %s = ?`, col)
+			args = append(args, sel.value)
+		} else {
 			query = `SELECT id FROM tracks`
+		}
+	default:
+		// features, bugs, spikes, plans, specs — all stored in features table
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT id FROM features WHERE type = ? AND %s = ?`, col)
+			args = append(args, nodeType, sel.value)
 		} else {
 			query = `SELECT id FROM features WHERE type = ?`
 			args = append(args, nodeType)
@@ -265,36 +336,97 @@ func filterBySelectorDSL(db *sql.DB, ids []string, sel nodeSelector) ([]string, 
 	}
 
 	nodeType := normalizeNodeType(sel.nodeType)
-	table := "features"
-	if nodeType == "track" {
-		table = "tracks"
-	}
 
 	placeholders := make([]string, len(ids))
-	args := make([]any, len(ids))
+	baseArgs := make([]any, len(ids))
 	for i, id := range ids {
 		placeholders[i] = "?"
-		args[i] = id
+		baseArgs[i] = id
 	}
 	inClause := strings.Join(placeholders, ",")
 
 	var query string
-	if sel.field != "" {
-		col, ok := allowedFilterColumns[sel.field]
-		if !ok {
-			return nil, fmt.Errorf("dsl: unsupported filter field %q", sel.field)
-		}
-		if table == "tracks" {
-			query = fmt.Sprintf(`SELECT id FROM tracks WHERE id IN (%s) AND %s = ?`, inClause, col)
+	args := make([]any, len(baseArgs), len(baseArgs)+2)
+	copy(args, baseArgs)
+
+	switch nodeType {
+	case "commit":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT DISTINCT commit_hash FROM git_commits WHERE commit_hash IN (%s) AND %s = ?`, inClause, col)
+			args = append(args, sel.value)
 		} else {
-			query = fmt.Sprintf(`SELECT id FROM features WHERE id IN (%s) AND type = ? AND %s = ?`,
-				inClause, col)
-			args = append(args, nodeType)
+			query = fmt.Sprintf(`SELECT DISTINCT commit_hash FROM git_commits WHERE commit_hash IN (%s)`, inClause)
 		}
-		args = append(args, sel.value)
-	} else {
-		if table == "tracks" {
+	case "file":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT DISTINCT file_path FROM feature_files WHERE file_path IN (%s) AND %s = ?`, inClause, col)
+			args = append(args, sel.value)
+		} else {
+			query = fmt.Sprintf(`SELECT DISTINCT file_path FROM feature_files WHERE file_path IN (%s)`, inClause)
+		}
+	case "session":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT session_id FROM sessions WHERE session_id IN (%s) AND %s = ?`, inClause, col)
+			args = append(args, sel.value)
+		} else {
+			query = fmt.Sprintf(`SELECT session_id FROM sessions WHERE session_id IN (%s)`, inClause)
+		}
+	case "agent":
+		// Filter the candidate IDs down to names that actually appear as
+		// agents in either source table. No schema-backed field filters beyond
+		// identity are meaningful here, but we still honor the whitelist.
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				) WHERE name IN (%s) AND %s = ?`, inClause, col)
+			args = append(args, sel.value)
+		} else {
+			query = fmt.Sprintf(`
+				SELECT DISTINCT name FROM (
+					SELECT agent_name AS name FROM agent_lineage_trace WHERE agent_name != ''
+					UNION
+					SELECT agent_assigned AS name FROM sessions WHERE agent_assigned != ''
+				) WHERE name IN (%s)`, inClause)
+		}
+	case "track":
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT id FROM tracks WHERE id IN (%s) AND %s = ?`, inClause, col)
+			args = append(args, sel.value)
+		} else {
 			query = fmt.Sprintf(`SELECT id FROM tracks WHERE id IN (%s)`, inClause)
+		}
+	default:
+		// features, bugs, spikes, plans, specs
+		if sel.field != "" {
+			col, ok := allowedColumnFor(nodeType, sel.field)
+			if !ok {
+				return nil, fmt.Errorf("dsl: unsupported filter field %q for %s", sel.field, nodeType)
+			}
+			query = fmt.Sprintf(`SELECT id FROM features WHERE id IN (%s) AND type = ? AND %s = ?`, inClause, col)
+			args = append(args, nodeType, sel.value)
 		} else {
 			query = fmt.Sprintf(`SELECT id FROM features WHERE id IN (%s) AND type = ?`, inClause)
 			args = append(args, nodeType)

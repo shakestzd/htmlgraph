@@ -13,6 +13,52 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+
+<!-- Graph node icons. Hidden SVG sprite referenced via <use href="#icon-<type>">
+     in the D3 graph renderer. Paths are MIT-licensed: 'git-commit' is Octicons,
+     the rest are Lucide. Icons draw in currentColor so they inherit the node
+     fill/stroke via CSS. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="icon-track" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Custom 'road' — two parallel edges with center dashes. Mirrors
+           the FontAwesome road glyph (\uf018) that the terminal
+           statusline emits for track items, so the mental metaphor
+           carries across surfaces. -->
+      <path d="M5 3v18M19 3v18"/>
+      <path d="M12 4v3M12 11v3M12 18v2"/>
+    </symbol>
+    <symbol id="icon-plan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>
+    </symbol>
+    <symbol id="icon-feature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Lucide 'lightbulb' — matches the Nerd Font lightbulb glyph
+           (\uf0eb) used by the terminal statusline for feature items. -->
+      <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>
+    </symbol>
+    <symbol id="icon-bug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/>
+    </symbol>
+    <symbol id="icon-spike" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Lucide 'zap' — matches the Nerd Font bolt glyph (\uf0e7) used
+           by the terminal statusline for spike items. -->
+      <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+    </symbol>
+    <symbol id="icon-agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
+    </symbol>
+    <symbol id="icon-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/>
+    </symbol>
+    <symbol id="icon-session" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+    </symbol>
+    <symbol id="icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+    </symbol>
+  </defs>
+</svg>
+
 <div class="shell">
 
   <!-- Header -->
@@ -202,16 +248,29 @@
       <div class="view-title">Graph <span class="count" id="graph-count">0</span></div>
       <div id="graph-container" style="position:relative;width:100%;height:calc(100vh - 110px);">
         <div class="empty" id="graph-empty" style="display:none">No connected work items found.</div>
-        <div id="graph-legend">
-          <span data-graph-type="track">&#9679; Track</span>
-          <span data-graph-type="feature">&#9679; Feature</span>
-          <span data-graph-type="bug">&#9679; Bug</span>
-          <span data-graph-type="spike">&#9679; Spike</span>
-          <span data-graph-type="plan">&#9679; Plan</span>
-          <span data-graph-type="session">&#9679; Session</span>
-        </div>
+        <!-- Legend removed — the filter toolbar at the top of the graph
+             serves both as type filter and as legend, since each filter
+             button shows the type icon and name. -->
       </div>
     </section>
+
+    <aside id="provenance-panel" class="provenance-panel hidden">
+        <div class="provenance-header">
+            <h3 id="provenance-title"></h3>
+            <span id="provenance-type-badge" class="type-badge"></span>
+            <button id="provenance-close" class="close-btn">&times;</button>
+        </div>
+        <div id="provenance-content" class="provenance-content">
+            <div class="provenance-section">
+                <h4>Upstream — where did this come from?</h4>
+                <ul id="provenance-upstream"></ul>
+            </div>
+            <div class="provenance-section">
+                <h4>Downstream — what did this produce?</h4>
+                <ul id="provenance-downstream"></ul>
+            </div>
+        </div>
+    </aside>
 
   </main>
 </div>
