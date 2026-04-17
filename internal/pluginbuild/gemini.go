@@ -35,8 +35,24 @@ func (g geminiAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	if err := ensureGeminiSkeletonDirs(outDir); err != nil {
 		return err
 	}
+	// Sub-emitters populate the skeleton across phases (assets, commands,
+	// hooks). Each lives in its own file and registers via init() so phases
+	// land without sharing edits to this function. Order follows filename
+	// collation across gemini_*.go files — deterministic by Go semantics.
+	for _, emit := range geminiSubEmitters {
+		if err := emit(m, repoRoot, outDir, target); err != nil {
+			return err
+		}
+	}
 	return nil
 }
+
+// GeminiSubEmitter is the signature every phase uses to extend the Gemini
+// adapter. Phase files (gemini_assets.go, gemini_commands.go, gemini_hooks.go)
+// append to geminiSubEmitters in init().
+type GeminiSubEmitter func(m *Manifest, repoRoot, outDir string, target Target) error
+
+var geminiSubEmitters []GeminiSubEmitter
 
 // geminiExtensionJSON is the Gemini extension manifest schema. Only the
 // fields HtmlGraph currently uses are modeled; Gemini tolerates omitted
