@@ -261,7 +261,6 @@ func autoIngestOnce(database *sql.DB, htmlgraphDir string) {
 	if err != nil {
 		return
 	}
-	var newSessions []string
 	for _, sf := range files {
 		// Check if re-ingest is needed: skip if file hasn't changed since last sync.
 		needsIngest := false
@@ -309,7 +308,6 @@ func autoIngestOnce(database *sql.DB, htmlgraphDir string) {
 		if msgCount > 0 {
 			log.Printf("auto-ingest: %s — %d msgs, %d tools\n",
 				truncate(sf.SessionID, 14), msgCount, toolCount)
-			newSessions = append(newSessions, sf.SessionID)
 		}
 	}
 
@@ -340,27 +338,6 @@ func autoIngestOnce(database *sql.DB, htmlgraphDir string) {
 		database.Exec(`UPDATE sessions SET status = ? WHERE session_id = ?`, status, sf.SessionID)
 	}
 
-	// Generate titles for newly ingested sessions (runs sequentially to
-	// avoid hammering claude CLI).
-	for _, sid := range newSessions {
-		generateTitle(database, sid)
-	}
-
-	// Also title any older sessions that are missing titles.
-	rows, err := database.Query(`
-		SELECT s.session_id FROM sessions s
-		WHERE (s.title IS NULL OR s.title = '')
-		  AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
-		LIMIT 5`)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var sid string
-			if rows.Scan(&sid) == nil {
-				generateTitle(database, sid)
-			}
-		}
-	}
 }
 
 // isHeadlessSession returns true if the session was created by the
