@@ -1,27 +1,31 @@
 # plugin-core — DRY source of truth for HtmlGraph plugin ports
 
-All HtmlGraph plugin ports (Claude Code, Codex CLI, …) are generated from the
+All HtmlGraph plugin ports (Claude Code, Codex CLI, Gemini CLI) are generated from the
 files in this directory so we never edit the same logic twice.
 
 ## Source of truth
 
 - **`manifest.json`** — plugin metadata, per-target output paths, hook event
-  matrix. Both `plugin/.claude-plugin/plugin.json` and
-  `packages/codex-plugin/.codex-plugin/plugin.json` are generated from it.
+  matrix. `plugin/.claude-plugin/plugin.json`,
+  `packages/codex-plugin/.codex-plugin/plugin.json`, and
+  `packages/gemini-extension/gemini-extension.json` are all generated from it.
 - **Assets** (commands, agents, skills, templates, static, config) live in
   `plugin/…/` and are copied verbatim into each target. The markdown formats
   (SKILL.md, agent `.md`, slash-command `.md`) are compatible with Claude Code
-  and Codex CLI, so no per-target translation is needed.
-- **Generated trees** — `plugin/` (Claude) and `packages/codex-plugin/` (Codex)
-  are output directories. Treat them as build artifacts: do not hand-edit
-  anything under `plugin/.claude-plugin/`, `plugin/hooks/hooks.json`, or
-  `packages/codex-plugin/`. Regenerate instead.
+  and Codex CLI, so no per-target translation is needed. Gemini CLI requires
+  TOML slash commands, so a sub-emitter translates the markdown on the way out.
+- **Generated trees** — `plugin/` (Claude), `packages/codex-plugin/` (Codex),
+  and `packages/gemini-extension/` (Gemini) are output directories. Treat them
+  as build artifacts: do not hand-edit anything under `plugin/.claude-plugin/`,
+  `plugin/hooks/hooks.json`, `packages/codex-plugin/`, or
+  `packages/gemini-extension/`. Regenerate instead.
 
 ## Build
 
     htmlgraph plugin build-ports              # regenerate all targets
     htmlgraph plugin build-ports --target codex
     htmlgraph plugin build-ports --target claude
+    htmlgraph plugin build-ports --target gemini
 
 The command writes each target's tree under the `outDir` declared in
 `manifest.json → targets.<name>`.
@@ -123,37 +127,53 @@ Three places, always in this order:
 Then run `htmlgraph plugin build-ports && htmlgraph build` and update the
 **Hook event matrix** table above.
 
-### Add a new target (e.g. Gemini)
+### Add a new target
 
-1. **Manifest** — add a `targets.<name>` entry:
+Gemini CLI is the current reference — see `internal/pluginbuild/gemini.go` for
+the canonical sub-emitter registration pattern.
+
+1. **Manifest** — add a `targets.<name>` entry. Alongside `outDir`,
+   `manifestPath`, `hooksPath`, and the optional `mcpPath`, the schema also
+   supports:
+
+   - `contextFile` — path (relative to the repo root) of a context/instruction
+     file that should be copied into the target tree. Gemini uses this for its
+     `GEMINI.md` file.
+   - `commandNamespace` — sub-directory under `commands/` that holds the
+     target's slash commands. Gemini groups its translated TOML commands under
+     a namespace so they don't collide with other extensions.
+
+   Example:
 
    ```json
-   "gemini": {
-     "outDir": "packages/gemini-plugin",
-     "manifestPath": ".gemini-plugin/plugin.json",
-     "hooksPath": "hooks.json"
+   "mytool": {
+     "outDir": "packages/mytool-extension",
+     "manifestPath": "mytool-extension.json",
+     "hooksPath": "hooks/hooks.json",
+     "contextFile": "MYTOOL.md",
+     "commandNamespace": "htmlgraph"
    }
    ```
 
-   `mcpPath` is optional (see Codex for an example). Then tag each applicable
-   hook event in `hooks.events` with `"gemini"` in its `targets` list.
+   Then tag each applicable hook event in `hooks.events` with `"mytool"` in its
+   `targets` list.
 
 2. **Adapter** — implement the `Adapter` interface in a new file under
-   `internal/pluginbuild/` (model it on `claude.go` / `codex.go`):
+   `internal/pluginbuild/` (model it on `claude.go` / `codex.go` / `gemini.go`):
 
    ```go
    package pluginbuild
 
-   type geminiAdapter struct{}
+   type mytoolAdapter struct{}
 
-   func init() { Register(geminiAdapter{}) }
+   func init() { Register(mytoolAdapter{}) }
 
-   func (geminiAdapter) Name() string { return "gemini" }
+   func (mytoolAdapter) Name() string { return "mytool" }
 
-   func (geminiAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
+   func (mytoolAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
        // 1. write the target-specific plugin.json from m (use writeJSON)
        // 2. write the target-specific hooks.json from m.Hooks.Events
-       //    (filter with HookEvent.AppliesTo("gemini"))
+       //    (filter with HookEvent.AppliesTo("mytool"))
        // 3. copy assets with copyAssetTree(...) using m.AssetSources
        return nil
    }
@@ -168,9 +188,18 @@ Then run `htmlgraph plugin build-ports && htmlgraph build` and update the
    `init()` must call `Register(...)` so the target is discoverable by
    `htmlgraph plugin build-ports --target <name>`. Duplicate registrations panic.
 
+   **Sub-emitters for format translation.** If the target needs per-asset
+   translation (e.g. Gemini's markdown-to-TOML slash commands), do **not**
+   extend `copyAssetTree` — add a sub-emitter file instead (for example,
+   `gemini_commands.go`, `gemini_assets.go`, `gemini_hooks.go`) that registers
+   a callback in `init()`. The parent adapter iterates its sub-emitter slice,
+   so each phase or format converter can land independently. See
+   `internal/pluginbuild/gemini.go` for the canonical registration pattern
+   (the `geminiSubEmitters` slice and `GeminiSubEmitter` signature).
+
 3. **Regenerate and verify**:
 
    ```bash
    htmlgraph build
-   htmlgraph plugin build-ports --target gemini
+   htmlgraph plugin build-ports --target mytool
    ```
