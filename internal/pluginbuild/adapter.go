@@ -58,6 +58,11 @@ func Names() []string {
 // copyAssetTree copies srcDir into dstDir recursively. Missing sources are
 // silently skipped — every target is expected to accept a superset of assets
 // and missing ones simply mean that the parent chose not to ship that surface.
+//
+// When srcDir and dstDir resolve to the same directory (common for the Claude
+// target where assetSources live under plugin/ and outDir is plugin/) the copy
+// is a no-op: walking a directory while writing over its files truncates them
+// to zero bytes.
 func copyAssetTree(srcDir, dstDir string) error {
 	info, err := os.Stat(srcDir)
 	if os.IsNotExist(err) {
@@ -68,6 +73,13 @@ func copyAssetTree(srcDir, dstDir string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("asset source %s is not a directory", srcDir)
+	}
+	same, err := samePath(srcDir, dstDir)
+	if err != nil {
+		return err
+	}
+	if same {
+		return nil
 	}
 	if err := os.MkdirAll(dstDir, 0o755); err != nil {
 		return err
@@ -86,6 +98,28 @@ func copyAssetTree(srcDir, dstDir string) error {
 		}
 		return copyFile(path, target)
 	})
+}
+
+// samePath reports whether a and b refer to the same filesystem location after
+// resolving symlinks and relative components.
+func samePath(a, b string) (bool, error) {
+	aAbs, err := filepath.Abs(a)
+	if err != nil {
+		return false, err
+	}
+	bAbs, err := filepath.Abs(b)
+	if err != nil {
+		return false, err
+	}
+	if aAbs == bAbs {
+		return true, nil
+	}
+	aReal, errA := filepath.EvalSymlinks(aAbs)
+	bReal, errB := filepath.EvalSymlinks(bAbs)
+	if errA == nil && errB == nil {
+		return aReal == bReal, nil
+	}
+	return false, nil
 }
 
 func copyFile(src, dst string) error {
