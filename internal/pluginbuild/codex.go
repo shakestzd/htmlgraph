@@ -8,12 +8,17 @@ import (
 
 func init() { Register(codexAdapter{}) }
 
-// codexAdapter emits the Codex CLI plugin tree. Layout:
+// codexAdapter emits the Codex CLI marketplace tree. Layout:
 //
-//	<outDir>/.codex-plugin/plugin.json
-//	<outDir>/hooks.json           (at plugin root, not hooks/)
-//	<outDir>/.mcp.json            (optional, at plugin root)
-//	<outDir>/{commands,agents,skills,templates,static,config}/
+//	<outDir>/.agents/plugins/marketplace.json
+//	<outDir>/.agents/plugins/htmlgraph/.codex-plugin/plugin.json
+//	<outDir>/.agents/plugins/htmlgraph/hooks.json
+//	<outDir>/.agents/plugins/htmlgraph/.mcp.json
+//	<outDir>/.agents/plugins/htmlgraph/{commands,agents,skills,templates,static,config}/
+//
+// Codex 0.121.0+ registers plugins exclusively via `codex marketplace add <path>`.
+// Codex expects the marketplace root to contain `.agents/plugins/marketplace.json`
+// and plugin content to live under `.agents/plugins/<plugin-name>/`.
 //
 // Codex hook event names differ from Claude in a few places (TaskStarted,
 // TaskComplete, TurnAborted) — the manifest's `targets` field controls which
@@ -23,10 +28,11 @@ type codexAdapter struct{}
 
 func (codexAdapter) Name() string { return "codex" }
 
-// codexOwnedSubtrees lists the subdirectory names under the codex outDir that
-// build-ports fully regenerates. Hand-maintained files (README.md, etc.) live
-// outside these subtrees and are never touched by stale-file cleanup.
-var codexOwnedSubtrees = []string{"commands", "agents", "skills", "templates", "static", "config"}
+// codexOwnedSubtrees lists paths relative to the marketplace outDir that
+// build-ports fully regenerates. These are cleaned before each emit to prevent
+// stale files accumulating. marketplace.json is regenerated separately.
+// Hand-maintained files (README.md) outside these paths are never touched.
+var codexOwnedSubtrees = []string{".agents"}
 
 func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	target, ok := m.Targets[c.Name()]
@@ -34,25 +40,112 @@ func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 		return fmt.Errorf("manifest has no target %q", c.Name())
 	}
 
+	// Determine where plugin content lives inside the marketplace tree.
+	// Codex expects: <outDir>/.agents/plugins/<plugin-name>/
+	pluginSubdir := target.PluginSubdir
+	if pluginSubdir == "" {
+		pluginSubdir = ".agents/plugins/htmlgraph"
+	}
+	pluginDir := filepath.Join(outDir, pluginSubdir)
+
 	// Pre-clean owned subtrees so renamed/deleted source files don't leave
-	// stale output files behind. Non-owned files (README, hooks.json, etc.)
-	// at the outDir root are untouched.
+	// stale output files behind. marketplace.json is inside the owned subtree.
 	if err := cleanOwnedSubtrees(outDir, codexOwnedSubtrees); err != nil {
 		return fmt.Errorf("codex pre-clean: %w", err)
 	}
 
-	if err := writeCodexManifest(m, filepath.Join(outDir, target.ManifestPath)); err != nil {
+	// Write marketplace.json at <outDir>/.agents/plugins/marketplace.json.
+	// source.path is relative to the directory containing marketplace.json
+	// (i.e. .agents/plugins/), so emit only the final plugin directory name.
+	mktPath := filepath.Join(outDir, ".agents", "plugins", "marketplace.json")
+	pluginName := filepath.Base(pluginSubdir)
+	if err := writeCodexMarketplace(m, target, mktPath, pluginName); err != nil {
 		return err
 	}
-	if err := writeCodexHooks(m, filepath.Join(outDir, target.HooksPath)); err != nil {
+
+	// Write per-plugin files under plugins/htmlgraph/.
+	if err := writeCodexManifest(m, filepath.Join(pluginDir, target.ManifestPath)); err != nil {
+		return err
+	}
+	if err := writeCodexHooks(m, filepath.Join(pluginDir, target.HooksPath)); err != nil {
 		return err
 	}
 	if target.MCPPath != "" {
-		if err := ensureCodexMCP(filepath.Join(outDir, target.MCPPath)); err != nil {
+		if err := ensureCodexMCP(filepath.Join(pluginDir, target.MCPPath)); err != nil {
 			return err
 		}
 	}
-	return copyAssets(m, repoRoot, outDir)
+	return copyAssets(m, repoRoot, pluginDir)
+}
+
+// codexMarketplaceJSON is the schema for marketplace.json at the root of a
+// Codex marketplace directory. Codex reads this file on `codex marketplace add`.
+type codexMarketplaceJSON struct {
+	Name      string                 `json:"name"`
+	Interface codexMktInterfaceJSON  `json:"interface"`
+	Plugins   []codexMktPluginJSON   `json:"plugins"`
+}
+
+type codexMktInterfaceJSON struct {
+	DisplayName string `json:"displayName"`
+}
+
+type codexMktPluginJSON struct {
+	Name     string               `json:"name"`
+	Source   codexMktSourceJSON   `json:"source"`
+	Policy   codexMktPolicyJSON   `json:"policy"`
+	Category string               `json:"category,omitempty"`
+}
+
+type codexMktSourceJSON struct {
+	Source string `json:"source"`
+	Path   string `json:"path"`
+}
+
+type codexMktPolicyJSON struct {
+	Installation   string `json:"installation"`
+	Authentication string `json:"authentication"`
+}
+
+// writeCodexMarketplace writes marketplace.json to path. pluginName is the
+// bare plugin directory name (e.g. "htmlgraph"); source.path is emitted as
+// "./<pluginName>" which is relative to the directory that contains
+// marketplace.json (i.e. <outDir>/.agents/plugins/).
+func writeCodexMarketplace(m *Manifest, target Target, path, pluginName string) error {
+	name := target.MarketplaceName
+	if name == "" {
+		name = m.Name
+	}
+	displayName := target.MarketplaceDisplayName
+	if displayName == "" {
+		displayName = m.Name
+	}
+	category := target.MarketplaceCategory
+	if category == "" {
+		category = m.Category
+	}
+
+	// source.path is relative to the directory containing marketplace.json.
+	relPath := "./" + filepath.ToSlash(pluginName)
+
+	return writeJSON(path, codexMarketplaceJSON{
+		Name:      name,
+		Interface: codexMktInterfaceJSON{DisplayName: displayName},
+		Plugins: []codexMktPluginJSON{
+			{
+				Name: m.Name,
+				Source: codexMktSourceJSON{
+					Source: "local",
+					Path:   relPath,
+				},
+				Policy: codexMktPolicyJSON{
+					Installation:   "AVAILABLE",
+					Authentication: "ON_INSTALL",
+				},
+				Category: category,
+			},
+		},
+	})
 }
 
 // codexPluginJSON mirrors the Codex plugin manifest schema. The top-level
