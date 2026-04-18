@@ -7,15 +7,16 @@ name: Gemini Extension — Subtree Split
 #   gemini extensions install shakestzd/htmlgraph --ref gemini-extension-vX.Y.Z
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to tag (e.g. v0.55.6). Defaults to the tag that triggered the event."
-        required: false
-        default: ""
+        description: 'Version tag (e.g. v0.55.6)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -42,16 +43,18 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          if [[ -n "${{ inputs.version }}" ]]; then
-            VERSION="${{ inputs.version }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
           else
-            # release event: github.event.release.tag_name is the release tag (e.g. v0.55.6)
-            VERSION="${{ github.event.release.tag_name }}"
+            # push event: github.ref_name is the tag (e.g. v0.55.6)
+            version="${{ github.ref_name }}"
           fi
-          # Ensure leading 'v'
-          if [[ "$VERSION" != v* ]]; then VERSION="v${VERSION}"; fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: ${VERSION}"
+          if [ -z "$version" ] || [ "$version" = "v" ]; then
+            echo "ERROR: version is empty or invalid" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${version}"
 
       - name: Run subtree-split script
         id: split

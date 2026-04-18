@@ -31,13 +31,10 @@ cd "$PROJECT_ROOT"
 REF="${1:-HEAD}"
 VERSION="${2:-}"
 
-# ── Derive version from latest tag if not provided ──────────────────────────
-if [[ -z "$VERSION" ]]; then
-  VERSION="$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)"
-  if [[ -z "$VERSION" ]]; then
-    echo "ERROR: No v* tag found and VERSION not provided. Pass a version as \$2." >&2
-    exit 1
-  fi
+# ── Validate version argument ────────────────────────────────────────────────
+if [ -z "${VERSION:-}" ] || [ "$VERSION" = "v" ]; then
+  echo "ERROR: version argument missing or invalid" >&2
+  exit 1
 fi
 
 # Strip leading 'v' if caller passed it bare, then normalise tag name.
