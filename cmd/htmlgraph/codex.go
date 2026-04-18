@@ -1,0 +1,343 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+)
+
+// codexMarketplaceRepo is the GitHub repo that hosts the codex marketplace.
+const codexMarketplaceRepo = "shakestzd/htmlgraph"
+
+// codexMarketplaceSparse is the sparse path within the monorepo.
+const codexMarketplaceSparse = "packages/codex-marketplace"
+
+// codexConfigPath returns the path to ~/.codex/config.toml.
+func codexConfigPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".codex", "config.toml")
+}
+
+// codexMarketplaceSection is the TOML key that indicates our marketplace is registered.
+const codexMarketplaceSection = `[marketplaces.htmlgraph]`
+
+// isCodexMarketplaceInstalled returns true if ~/.codex/config.toml contains
+// evidence that the htmlgraph marketplace (or plugin) is already registered.
+// Supports both the [marketplaces.htmlgraph] and [plugins."htmlgraph@htmlgraph"] forms.
+func isCodexMarketplaceInstalled() bool {
+	return isCodexMarketplaceInstalledAt(codexConfigPath())
+}
+
+// isCodexMarketplaceInstalledAt is the testable core that reads the given path.
+func isCodexMarketplaceInstalledAt(configPath string) bool {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	content := string(data)
+	return strings.Contains(content, "[marketplaces.htmlgraph]") ||
+		strings.Contains(content, `[plugins."htmlgraph@htmlgraph"]`)
+}
+
+// isCodexHooksEnabled returns true if config.toml already has codex_hooks = true.
+func isCodexHooksEnabled() bool {
+	return isCodexHooksEnabledAt(codexConfigPath())
+}
+
+// isCodexHooksEnabledAt is the testable core.
+func isCodexHooksEnabledAt(configPath string) bool {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "codex_hooks") && strings.Contains(trimmed, "=") {
+			parts := strings.SplitN(trimmed, "=", 2)
+			if len(parts) == 2 && strings.TrimSpace(parts[1]) == "true" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// appendCodexHooksFlag appends [features] codex_hooks = true to config.toml.
+func appendCodexHooksFlag(configPath string) error {
+	f, err := os.OpenFile(configPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", configPath, err)
+	}
+	defer f.Close()
+	_, err = fmt.Fprintln(f, "\n[features]\ncodex_hooks = true")
+	return err
+}
+
+// promptYesNo asks the user a yes/no question and returns true if they answer y/Y/yes.
+// If yes is true (--yes flag), the function returns true without prompting.
+func promptYesNo(question string, yes bool) bool {
+	if yes {
+		return true
+	}
+	fmt.Print(question + " [y/N]: ")
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	answer := strings.TrimSpace(strings.ToLower(line))
+	return answer == "y" || answer == "yes"
+}
+
+// codexCmd returns the cobra command for `htmlgraph codex`.
+func codexCmd() *cobra.Command {
+	var init_, continue_, dev, cleanup, dryRun, yes bool
+	var resumeID string
+
+	cmd := &cobra.Command{
+		Use:   "codex",
+		Short: "Launch Codex CLI with HtmlGraph context",
+		Long: `Launch Codex CLI with HtmlGraph observability context.
+
+Modes:
+  htmlgraph codex                   Launch Codex interactively with HtmlGraph env.
+  htmlgraph codex --init            Install the HtmlGraph Codex marketplace (idempotent).
+  htmlgraph codex --continue        Resume the last Codex session (codex resume --last).
+  htmlgraph codex --resume <id>     Resume a specific Codex session by ID.
+  htmlgraph codex --dev             Register local packages/codex-marketplace/ and launch.
+
+Session IDs come from ~/.codex/session_index.jsonl.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			switch {
+			case init_:
+				return runCodexInit(yes, dryRun)
+			case dev:
+				return launchCodexDev(resumeID, cleanup, dryRun, args)
+			case continue_:
+				return launchCodexContinue(resumeID, args)
+			default:
+				return launchCodexDefault(resumeID, args)
+			}
+		},
+	}
+
+	cmd.Flags().BoolVar(&init_, "init", false, "Install the HtmlGraph Codex marketplace plugin (idempotent)")
+	cmd.Flags().BoolVar(&continue_, "continue", false, "Resume the last Codex session")
+	cmd.Flags().BoolVar(&dev, "dev", false, "Register local packages/codex-marketplace/ and launch Codex")
+	cmd.Flags().BoolVar(&cleanup, "cleanup", false, "With --dev: unregister the local marketplace on exit")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would happen without executing")
+	cmd.Flags().BoolVar(&yes, "yes", false, "Answer yes to all prompts (non-interactive)")
+	cmd.Flags().StringVar(&resumeID, "resume", "", "Resume a specific Codex session by ID")
+
+	return cmd
+}
+
+// runCodexInit installs the HtmlGraph Codex marketplace plugin, idempotently.
+// Corresponds to: htmlgraph codex --init
+func runCodexInit(yes, dryRun bool) error {
+	configPath := codexConfigPath()
+
+	// Idempotency check — skip if already installed.
+	if isCodexMarketplaceInstalledAt(configPath) {
+		fmt.Println("HtmlGraph Codex marketplace is already installed.")
+		fmt.Println("To launch: htmlgraph codex")
+		return nil
+	}
+
+	addArgs := []string{
+		"marketplace", "add",
+		codexMarketplaceRepo,
+		"--sparse", codexMarketplaceSparse,
+	}
+	fmt.Printf("Installing HtmlGraph Codex marketplace...\n")
+	fmt.Printf("  repo: %s  sparse: %s\n", codexMarketplaceRepo, codexMarketplaceSparse)
+
+	if dryRun {
+		fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
+	} else {
+		if out, err := exec.Command("codex", addArgs...).CombinedOutput(); err != nil {
+			return fmt.Errorf("codex marketplace add failed: %w\n%s", err, strings.TrimSpace(string(out)))
+		}
+		fmt.Println("HtmlGraph Codex marketplace installed.")
+	}
+
+	// Optionally enable codex_hooks feature flag.
+	if !isCodexHooksEnabledAt(configPath) {
+		if promptYesNo("Enable the codex_hooks feature flag in ~/.codex/config.toml?", yes) {
+			if dryRun {
+				fmt.Println("[dry-run] would append [features] codex_hooks = true to ~/.codex/config.toml")
+			} else {
+				if err := appendCodexHooksFlag(configPath); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: could not enable codex_hooks: %v\n", err)
+				} else {
+					fmt.Println("codex_hooks feature flag enabled.")
+				}
+			}
+		}
+	} else {
+		fmt.Println("codex_hooks feature flag is already enabled.")
+	}
+
+	fmt.Println()
+	fmt.Println("Setup complete. Run: htmlgraph codex")
+	return nil
+}
+
+// launchCodexDefault launches Codex interactively with HtmlGraph env injection.
+// Corresponds to: htmlgraph codex
+func launchCodexDefault(resumeID string, extraArgs []string) error {
+	projectRoot, _ := resolveProjectRoot()
+	fmt.Println("Launching Codex CLI with HtmlGraph context...")
+	return execCodex(codexLaunchOpts{
+		ResumeID:    resumeID,
+		ExtraArgs:   extraArgs,
+		ProjectRoot: projectRoot,
+	})
+}
+
+// launchCodexContinue resumes the last Codex session.
+// Corresponds to: htmlgraph codex --continue
+func launchCodexContinue(resumeID string, extraArgs []string) error {
+	projectRoot, _ := resolveProjectRoot()
+	fmt.Println("Resuming last Codex session...")
+	return execCodex(codexLaunchOpts{
+		ResumeLast:  resumeID == "", // only pass --last when no specific ID
+		ResumeID:    resumeID,
+		ExtraArgs:   extraArgs,
+		ProjectRoot: projectRoot,
+	})
+}
+
+// launchCodexDev registers the local packages/codex-marketplace/ and launches Codex.
+// Corresponds to: htmlgraph codex --dev [--cleanup]
+func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) error {
+	// Resolve the local marketplace path relative to the project root.
+	localMarketplace, err := resolveLocalCodexMarketplace()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Launching Codex CLI in dev mode...\n")
+	fmt.Printf("  Local marketplace: %s\n", localMarketplace)
+
+	// Register the local marketplace if not already registered.
+	configPath := codexConfigPath()
+	if !isCodexMarketplaceInstalledAt(configPath) {
+		addArgs := []string{"marketplace", "add", localMarketplace}
+		if dryRun {
+			fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
+		} else {
+			if out, err := exec.Command("codex", addArgs...).CombinedOutput(); err != nil {
+				return fmt.Errorf("registering local marketplace failed: %w\n%s", err, strings.TrimSpace(string(out)))
+			}
+			fmt.Println("Local marketplace registered.")
+		}
+	} else {
+		fmt.Println("Marketplace already registered — skipping re-add.")
+	}
+
+	projectRoot, _ := resolveProjectRoot()
+
+	if dryRun {
+		fmt.Printf("[dry-run] would exec: codex (resume=%q) in %s\n", resumeID, projectRoot)
+		return nil
+	}
+
+	err = execCodex(codexLaunchOpts{
+		ResumeID:    resumeID,
+		ExtraArgs:   extraArgs,
+		ProjectRoot: projectRoot,
+	})
+
+	// --cleanup: unregister the local marketplace after session ends.
+	if cleanup && !dryRun {
+		fmt.Println("Cleaning up local marketplace registration...")
+		removeArgs := []string{"marketplace", "remove", localMarketplace}
+		if out, rmErr := exec.Command("codex", removeArgs...).CombinedOutput(); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: marketplace remove failed: %v (%s)\n",
+				rmErr, strings.TrimSpace(string(out)))
+		}
+	}
+
+	return err
+}
+
+// resolveLocalCodexMarketplace returns the absolute path to packages/codex-marketplace/
+// by walking up from CWD to find the project root (directory containing .htmlgraph/).
+// Returns an error if no project root is found or the marketplace directory is missing.
+func resolveLocalCodexMarketplace() (string, error) {
+	htmlgraphDir, err := findHtmlgraphDir()
+	if err != nil {
+		return "", fmt.Errorf("could not find project root (.htmlgraph/ directory not found)\n" +
+			"Run from the HtmlGraph project directory, or use htmlgraph codex --init for the marketplace version")
+	}
+	projectRoot := filepath.Dir(htmlgraphDir)
+	marketplacePath := filepath.Join(projectRoot, "packages", "codex-marketplace")
+	if _, statErr := os.Stat(marketplacePath); os.IsNotExist(statErr) {
+		return "", fmt.Errorf("packages/codex-marketplace/ not found at %s\n"+
+			"Run from the HtmlGraph repo root, or use htmlgraph codex --init for the marketplace version",
+			marketplacePath)
+	}
+	abs, err := filepath.Abs(marketplacePath)
+	if err != nil {
+		return "", fmt.Errorf("resolving absolute path for %s: %w", marketplacePath, err)
+	}
+	return abs, nil
+}
+
+// codexLaunchOpts controls how Codex is launched.
+type codexLaunchOpts struct {
+	// ResumeLast, when true, passes "resume --last" to codex.
+	ResumeLast bool
+	// ResumeID, if non-empty, passes "resume <id>" to codex.
+	// Takes precedence over ResumeLast.
+	ResumeID string
+	// ExtraArgs are forwarded to the codex process.
+	ExtraArgs []string
+	// ProjectRoot is the absolute path to the project root.
+	// When set, Codex is started with this as the working directory, and
+	// HTMLGRAPH_PROJECT_DIR env var is injected.
+	ProjectRoot string
+}
+
+// execCodex builds the codex argv and execs it, replacing the current process.
+// Returns only on exec error.
+func execCodex(opts codexLaunchOpts) error {
+	codexPath, err := exec.LookPath("codex")
+	if err != nil {
+		return fmt.Errorf("codex not found in PATH: %w\nInstall Codex CLI first: https://github.com/openai/codex", err)
+	}
+
+	var codexArgs []string
+
+	// Determine if we're resuming.
+	if opts.ResumeID != "" {
+		codexArgs = append(codexArgs, "resume", opts.ResumeID)
+	} else if opts.ResumeLast {
+		codexArgs = append(codexArgs, "resume", "--last")
+	}
+
+	codexArgs = append(codexArgs, opts.ExtraArgs...)
+
+	c := exec.Command(codexPath, codexArgs...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	// Inject HTMLGRAPH_PROJECT_DIR so htmlgraph CLI and hooks resolve to the
+	// correct project root regardless of CWD.
+	if opts.ProjectRoot != "" {
+		c.Env = append(os.Environ(), "HTMLGRAPH_PROJECT_DIR="+opts.ProjectRoot)
+		c.Dir = opts.ProjectRoot
+	}
+
+	if err := c.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitErr.ExitCode())
+		}
+		return err
+	}
+	return nil
+}
