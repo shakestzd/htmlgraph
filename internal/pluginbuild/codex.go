@@ -32,7 +32,9 @@ func (codexAdapter) Name() string { return "codex" }
 // build-ports fully regenerates. These are cleaned before each emit to prevent
 // stale files accumulating. marketplace.json is regenerated separately.
 // Hand-maintained files (README.md) outside these paths are never touched.
-var codexOwnedSubtrees = []string{".agents"}
+// The owned subtree is narrowed to the plugin's own directory to avoid
+// deleting sibling plugins under .agents/plugins/.
+var codexOwnedSubtrees = []string{".agents/plugins/htmlgraph"}
 
 func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	target, ok := m.Targets[c.Name()]
@@ -56,10 +58,15 @@ func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 
 	// Write marketplace.json at <outDir>/.agents/plugins/marketplace.json.
 	// source.path is relative to the directory containing marketplace.json
-	// (i.e. .agents/plugins/), so emit only the final plugin directory name.
+	// (i.e. .agents/plugins/), so compute as filepath.Rel against that directory.
 	mktPath := filepath.Join(outDir, ".agents", "plugins", "marketplace.json")
-	pluginName := filepath.Base(pluginSubdir)
-	if err := writeCodexMarketplace(m, target, mktPath, pluginName); err != nil {
+	mktDir := filepath.Dir(mktPath)
+	rel, err := filepath.Rel(mktDir, pluginDir)
+	if err != nil {
+		return fmt.Errorf("compute relative path for source.path: %w", err)
+	}
+	sourcePath := "./" + filepath.ToSlash(rel)
+	if err := writeCodexMarketplace(m, target, mktPath, sourcePath); err != nil {
 		return err
 	}
 
@@ -107,11 +114,10 @@ type codexMktPolicyJSON struct {
 	Authentication string `json:"authentication"`
 }
 
-// writeCodexMarketplace writes marketplace.json to path. pluginName is the
-// bare plugin directory name (e.g. "htmlgraph"); source.path is emitted as
-// "./<pluginName>" which is relative to the directory that contains
-// marketplace.json (i.e. <outDir>/.agents/plugins/).
-func writeCodexMarketplace(m *Manifest, target Target, path, pluginName string) error {
+// writeCodexMarketplace writes marketplace.json to path. sourcePath is the
+// relative path to the plugin directory, computed relative to the directory
+// containing marketplace.json (i.e. <outDir>/.agents/plugins/).
+func writeCodexMarketplace(m *Manifest, target Target, path, sourcePath string) error {
 	name := target.MarketplaceName
 	if name == "" {
 		name = m.Name
@@ -126,7 +132,6 @@ func writeCodexMarketplace(m *Manifest, target Target, path, pluginName string) 
 	}
 
 	// source.path is relative to the directory containing marketplace.json.
-	relPath := "./" + filepath.ToSlash(pluginName)
 
 	return writeJSON(path, codexMarketplaceJSON{
 		Name:      name,
@@ -136,7 +141,7 @@ func writeCodexMarketplace(m *Manifest, target Target, path, pluginName string) 
 				Name: m.Name,
 				Source: codexMktSourceJSON{
 					Source: "local",
-					Path:   relPath,
+					Path:   sourcePath,
 				},
 				Policy: codexMktPolicyJSON{
 					Installation:   "AVAILABLE",
