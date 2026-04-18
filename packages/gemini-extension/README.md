@@ -1,5 +1,31 @@
 # gemini-extension — Generated Gemini CLI extension tree
 
+## Installing the extension (end users)
+
+The extension is distributed via a CI-maintained split branch. Install by pinning to a
+versioned tag published on every release:
+
+```
+gemini extensions install shakestzd/htmlgraph --ref gemini-extension-v<version>
+```
+
+For example, using the latest release:
+
+```
+gemini extensions install shakestzd/htmlgraph --ref gemini-extension-v0.55.5
+```
+
+The tag `gemini-extension-vX.Y.Z` points to a branch root that contains **only** the
+extension tree (no other monorepo paths). This is required because `gemini extensions install`
+has no subpath or sparse-checkout flag — the extension manifest must live at the repo root at
+the referenced ref.
+
+The distribution branch `gemini-extension-dist` and per-release tags are maintained
+automatically by the CI workflow `.github/workflows/gemini-subtree.yml` on every GitHub
+release. You do not need to manage this branch manually.
+
+---
+
 **This tree is generated from `packages/plugin-core/`. Do not hand-edit.**
 
 Regenerate with:
