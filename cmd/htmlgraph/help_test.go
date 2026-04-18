@@ -237,6 +237,7 @@ var internalPlumbingAllowlist = map[string]bool{
 	"serve-child":   true,
 	"hook":          true,
 	"claude":        true,
+	"codex":         true,
 	"orchestrator":  true,
 	"install-hooks": true,
 	"report":        true,
