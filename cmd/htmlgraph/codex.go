@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -67,15 +68,84 @@ func isCodexHooksEnabledAt(configPath string) bool {
 	return false
 }
 
-// appendCodexHooksFlag appends [features] codex_hooks = true to config.toml.
-func appendCodexHooksFlag(configPath string) error {
-	f, err := os.OpenFile(configPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+// getCodexMarketplacePathAt parses config.toml and returns the registered htmlgraph
+// marketplace path, or empty string if not found.
+func getCodexMarketplacePathAt(configPath string) string {
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("opening %s: %w", configPath, err)
+		return ""
 	}
-	defer f.Close()
-	_, err = fmt.Fprintln(f, "\n[features]\ncodex_hooks = true")
-	return err
+
+	tree := make(map[string]interface{})
+	if err := toml.Unmarshal(data, &tree); err != nil {
+		return ""
+	}
+
+	// Check [marketplaces.htmlgraph]
+	if mkts, ok := tree["marketplaces"].(map[string]interface{}); ok {
+		if hg, ok := mkts["htmlgraph"].(map[string]interface{}); ok {
+			if source, ok := hg["source"].(string); ok {
+				return source
+			}
+			if path, ok := hg["path"].(string); ok {
+				return path
+			}
+		}
+	}
+
+	// Check [plugins."htmlgraph@htmlgraph"]
+	if plugins, ok := tree["plugins"].(map[string]interface{}); ok {
+		if hg, ok := plugins["htmlgraph@htmlgraph"].(map[string]interface{}); ok {
+			if source, ok := hg["source"].(string); ok {
+				return source
+			}
+			if path, ok := hg["path"].(string); ok {
+				return path
+			}
+		}
+	}
+
+	return ""
+}
+
+// ensureCodexHooksEnabled parses the config.toml file, merges codex_hooks = true
+// into the [features] table (creating the section if absent), and writes it back.
+// This is idempotent: if codex_hooks = true is already set, it's a no-op after
+// re-serialization.
+func ensureCodexHooksEnabled(configPath string) error {
+	// Read existing config, if any
+	data, err := os.ReadFile(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("reading %s: %w", configPath, err)
+	}
+
+	// Parse or create the TOML tree
+	tree := make(map[string]interface{})
+	if err == nil && len(data) > 0 {
+		if err := toml.Unmarshal(data, &tree); err != nil {
+			return fmt.Errorf("parsing %s: %w", configPath, err)
+		}
+	}
+
+	// Ensure [features] table exists and set codex_hooks = true
+	features, ok := tree["features"].(map[string]interface{})
+	if !ok {
+		features = make(map[string]interface{})
+		tree["features"] = features
+	}
+	features["codex_hooks"] = true
+
+	// Marshal back to TOML and write
+	newData, err := toml.Marshal(tree)
+	if err != nil {
+		return fmt.Errorf("marshaling TOML: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, newData, 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", configPath, err)
+	}
+
+	return nil
 }
 
 // promptYesNo asks the user a yes/no question and returns true if they answer y/Y/yes.
@@ -136,40 +206,42 @@ Session IDs come from ~/.codex/session_index.jsonl.`,
 
 // runCodexInit installs the HtmlGraph Codex marketplace plugin, idempotently.
 // Corresponds to: htmlgraph codex --init
+// Phase 1: Install / verify marketplace (idempotent).
+// Phase 2: Check codex_hooks — prompt user if not set.
 func runCodexInit(yes, dryRun bool) error {
 	configPath := codexConfigPath()
 
-	// Idempotency check — skip if already installed.
-	if isCodexMarketplaceInstalledAt(configPath) {
-		fmt.Println("HtmlGraph Codex marketplace is already installed.")
-		fmt.Println("To launch: htmlgraph codex")
-		return nil
-	}
-
-	addArgs := []string{
-		"marketplace", "add",
-		codexMarketplaceRepo,
-		"--sparse", codexMarketplaceSparse,
-	}
-	fmt.Printf("Installing HtmlGraph Codex marketplace...\n")
-	fmt.Printf("  repo: %s  sparse: %s\n", codexMarketplaceRepo, codexMarketplaceSparse)
-
-	if dryRun {
-		fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
-	} else {
-		if out, err := exec.Command("codex", addArgs...).CombinedOutput(); err != nil {
-			return fmt.Errorf("codex marketplace add failed: %w\n%s", err, strings.TrimSpace(string(out)))
+	// Phase 1: Install or verify marketplace.
+	marketplaceInstalled := isCodexMarketplaceInstalledAt(configPath)
+	if !marketplaceInstalled {
+		addArgs := []string{
+			"marketplace", "add",
+			codexMarketplaceRepo,
+			"--sparse", codexMarketplaceSparse,
 		}
-		fmt.Println("HtmlGraph Codex marketplace installed.")
+		fmt.Printf("Installing HtmlGraph Codex marketplace...\n")
+		fmt.Printf("  repo: %s  sparse: %s\n", codexMarketplaceRepo, codexMarketplaceSparse)
+
+		if dryRun {
+			fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
+		} else {
+			if out, err := exec.Command("codex", addArgs...).CombinedOutput(); err != nil {
+				return fmt.Errorf("codex marketplace add failed: %w\n%s", err, strings.TrimSpace(string(out)))
+			}
+			fmt.Println("HtmlGraph Codex marketplace installed.")
+		}
+	} else {
+		fmt.Println("HtmlGraph Codex marketplace is already installed.")
 	}
 
-	// Optionally enable codex_hooks feature flag.
+	// Phase 2: Check and optionally enable codex_hooks feature flag.
+	// This runs on every --init so partial setups can be repaired.
 	if !isCodexHooksEnabledAt(configPath) {
 		if promptYesNo("Enable the codex_hooks feature flag in ~/.codex/config.toml?", yes) {
 			if dryRun {
-				fmt.Println("[dry-run] would append [features] codex_hooks = true to ~/.codex/config.toml")
+				fmt.Println("[dry-run] would enable codex_hooks = true in ~/.codex/config.toml")
 			} else {
-				if err := appendCodexHooksFlag(configPath); err != nil {
+				if err := ensureCodexHooksEnabled(configPath); err != nil {
 					fmt.Fprintf(os.Stderr, "warning: could not enable codex_hooks: %v\n", err)
 				} else {
 					fmt.Println("codex_hooks feature flag enabled.")
@@ -212,6 +284,8 @@ func launchCodexContinue(resumeID string, extraArgs []string) error {
 
 // launchCodexDev registers the local packages/codex-marketplace/ and launches Codex.
 // Corresponds to: htmlgraph codex --dev [--cleanup]
+// If a mismatched marketplace is already registered (e.g., from a prior --init),
+// it is removed and replaced with the local path.
 func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) error {
 	// Resolve the local marketplace path relative to the project root.
 	localMarketplace, err := resolveLocalCodexMarketplace()
@@ -222,9 +296,30 @@ func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) e
 	fmt.Printf("Launching Codex CLI in dev mode...\n")
 	fmt.Printf("  Local marketplace: %s\n", localMarketplace)
 
-	// Register the local marketplace if not already registered.
+	// Ensure the local marketplace is registered (replace mismatched registrations).
 	configPath := codexConfigPath()
-	if !isCodexMarketplaceInstalledAt(configPath) {
+	registeredPath := getCodexMarketplacePathAt(configPath)
+
+	// Convert to absolute paths for comparison
+	localAbs, _ := filepath.Abs(localMarketplace)
+	registeredAbs, _ := filepath.Abs(registeredPath)
+
+	if registeredAbs != "" && registeredAbs != localAbs {
+		// Mismatched registration: remove the old one
+		fmt.Printf("Replacing mismatched marketplace registration (%s)\n", registeredPath)
+		removeArgs := []string{"marketplace", "remove", registeredPath}
+		if dryRun {
+			fmt.Printf("[dry-run] codex %s\n", strings.Join(removeArgs, " "))
+		} else {
+			if out, err := exec.Command("codex", removeArgs...).CombinedOutput(); err != nil {
+				return fmt.Errorf("removing mismatched marketplace failed: %w\n%s", err, strings.TrimSpace(string(out)))
+			}
+		}
+		registeredPath = "" // Force re-add
+	}
+
+	// Add the local marketplace if not already registered at the correct path
+	if registeredAbs != localAbs {
 		addArgs := []string{"marketplace", "add", localMarketplace}
 		if dryRun {
 			fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
@@ -235,7 +330,7 @@ func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) e
 			fmt.Println("Local marketplace registered.")
 		}
 	} else {
-		fmt.Println("Marketplace already registered — skipping re-add.")
+		fmt.Println("Local marketplace already registered — proceeding.")
 	}
 
 	projectRoot, _ := resolveProjectRoot()

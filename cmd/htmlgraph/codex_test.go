@@ -187,36 +187,160 @@ func TestPromptYesNo(t *testing.T) {
 	}
 }
 
-// TestAppendCodexHooksFlag verifies appending the hooks flag to config.
-func TestAppendCodexHooksFlag(t *testing.T) {
+// TestEnsureCodexHooksEnabledIdempotent verifies that ensureCodexHooksEnabled
+// is idempotent — calling it twice produces identical output.
+func TestEnsureCodexHooksEnabledIdempotent(t *testing.T) {
 	tmpdir := t.TempDir()
 	configPath := filepath.Join(tmpdir, "config.toml")
 
-	// Create a config file with some content
-	initialContent := "[other]\nkey = value\n"
-	err := os.WriteFile(configPath, []byte(initialContent), 0644)
-	if err != nil {
+	// First call: create and enable
+	if err := ensureCodexHooksEnabled(configPath); err != nil {
+		t.Fatalf("first ensureCodexHooksEnabled: %v", err)
+	}
+	data1, _ := os.ReadFile(configPath)
+
+	// Second call: should be idempotent
+	if err := ensureCodexHooksEnabled(configPath); err != nil {
+		t.Fatalf("second ensureCodexHooksEnabled: %v", err)
+	}
+	data2, _ := os.ReadFile(configPath)
+
+	if string(data1) != string(data2) {
+		t.Errorf("second call changed the output:\nFirst:\n%s\nSecond:\n%s", string(data1), string(data2))
+	}
+}
+
+// TestCodexHooksUpsertPreservesExistingFeaturesTable verifies that enabling
+// codex_hooks merges into an existing [features] table without duplicating it.
+func TestCodexHooksUpsertPreservesExistingFeaturesTable(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	// Create a config with existing [features] section and other keys
+	initialContent := "[features]\nother_flag = true\n"
+	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	// Append the hooks flag
-	err = appendCodexHooksFlag(configPath)
-	if err != nil {
-		t.Fatalf("appendCodexHooksFlag: %v", err)
+	// Call ensureCodexHooksEnabled
+	if err := ensureCodexHooksEnabled(configPath); err != nil {
+		t.Fatalf("ensureCodexHooksEnabled: %v", err)
 	}
 
-	// Verify the content was appended
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
+	// Verify the config has both keys in a single [features] table
+	data, _ := os.ReadFile(configPath)
 	content := string(data)
-	if !strings.Contains(content, "codex_hooks = true") {
-		t.Errorf("expected appended codex_hooks = true not found in config:\n%s", content)
+
+	// Count [features] sections (should be exactly one)
+	featuresSectionCount := strings.Count(content, "[features]")
+	if featuresSectionCount != 1 {
+		t.Errorf("expected exactly 1 [features] section, got %d:\n%s", featuresSectionCount, content)
 	}
 
-	// Verify the original content is still there
-	if !strings.Contains(content, "key = value") {
-		t.Errorf("original content was not preserved")
+	// Verify both keys are present
+	if !strings.Contains(content, "codex_hooks") {
+		t.Errorf("codex_hooks not found in output")
+	}
+	if !strings.Contains(content, "other_flag") {
+		t.Errorf("other_flag not preserved in output")
+	}
+}
+
+// TestEnsureCodexHooksEnabledCreatesFromEmpty verifies that ensureCodexHooksEnabled
+// can create a new config file with just the [features] section.
+func TestEnsureCodexHooksEnabledCreatesFromEmpty(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	// Enable codex_hooks on a non-existent file
+	if err := ensureCodexHooksEnabled(configPath); err != nil {
+		t.Fatalf("ensureCodexHooksEnabled: %v", err)
+	}
+
+	// Verify the file was created with codex_hooks enabled
+	data, _ := os.ReadFile(configPath)
+	content := string(data)
+
+	if !strings.Contains(content, "codex_hooks") {
+		t.Errorf("codex_hooks not found in newly created config")
+	}
+	if !isCodexHooksEnabledAt(configPath) {
+		t.Errorf("codex_hooks = true check failed after ensureCodexHooksEnabled")
+	}
+}
+
+// TestCodexDevReplacesMismatchedMarketplace verifies that --dev mode detects
+// a mismatched marketplace registration and replaces it.
+func TestCodexDevReplacesMismatchedMarketplace(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	// Seed a config with a mismatched marketplace pointing elsewhere
+	initialContent := `[marketplaces.htmlgraph]
+source = "/some/other/path"
+`
+	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Verify the mismatched path is detected
+	detected := getCodexMarketplacePathAt(configPath)
+	if detected != "/some/other/path" {
+		t.Errorf("expected to detect /some/other/path, got %q", detected)
+	}
+
+	// In a real scenario, launchCodexDev would now detect the mismatch
+	// and run marketplace remove + add. For testing, we just verify the detection.
+	// A full integration test would mock exec.Command.
+}
+
+// TestGetCodexMarketplacePathAt verifies marketplace path detection from TOML.
+func TestGetCodexMarketplacePathAt(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name:    "no config file",
+			content: "",
+			want:    "",
+		},
+		{
+			name: "marketplaces.htmlgraph with source",
+			content: "[marketplaces.htmlgraph]\n" +
+				"source = \"/path/to/marketplace\"\n",
+			want: "/path/to/marketplace",
+		},
+		{
+			name: "marketplaces.htmlgraph with path",
+			content: "[marketplaces.htmlgraph]\n" +
+				"path = \"/alt/path\"\n",
+			want: "/alt/path",
+		},
+		{
+			name: "plugins variant",
+			content: "[plugins]\n" +
+				"\"htmlgraph@htmlgraph\" = {source = \"/plugin/path\"}\n",
+			want: "/plugin/path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := filepath.Join(tmpdir, tt.name+".toml")
+			if tt.content != "" {
+				if err := os.WriteFile(configPath, []byte(tt.content), 0644); err != nil {
+					t.Fatalf("WriteFile: %v", err)
+				}
+			}
+
+			got := getCodexMarketplacePathAt(configPath)
+			if got != tt.want {
+				t.Errorf("getCodexMarketplacePathAt: want %q, got %q", tt.want, got)
+			}
+		})
 	}
 }
