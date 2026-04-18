@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:feature-start
 
 Start working on a feature (moves it to in-progress)
@@ -83,4 +83,4 @@ List available features and prompt for selection
 All activity will now be attributed to this feature.
 What would you like to work on first?
 
-"""
+'''

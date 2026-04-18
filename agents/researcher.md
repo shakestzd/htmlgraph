@@ -2,23 +2,13 @@
 name: researcher
 description: Research, debug, and visual QA agent. Use for investigating unfamiliar systems, root cause analysis of errors, and visual quality assurance of web UIs. Enforces research-first philosophy — documentation before trial-and-error.
 model: sonnet
-color: cyan
+max_turns: 40
 tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
-  - Edit
-  - Skill
-  - WebSearch
-  - WebFetch
-  - mcp__claude-in-chrome__computer
-maxTurns: 40
-skills:
-  - agent-context
-  - diagnose
-memory: project
-initialPrompt: "Begin with research and documentation before making changes."
+    - read_file
+    - grep_search
+    - glob
+    - run_shell_command
+    - replace
 ---
 
 # Researcher Agent

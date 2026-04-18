@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:help
 
 Display available HtmlGraph commands and usage
@@ -89,4 +89,4 @@ htmlgraph serve
 # Open http://localhost:8080
 ```
 
-"""
+'''

@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:recommend
 
 Get smart recommendations on what to work on next, including project health, bottleneck analysis, and parallel opportunities.
@@ -44,4 +44,4 @@ This command invokes `htmlgraph recommend` via the CLI, which provides all analy
 3. Analyze the **recommended items** for parallel execution opportunities
 4. Propose next action: either parallel launch or sequential plan
 
-"""
+'''

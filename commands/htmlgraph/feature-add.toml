@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:feature-add
 
 Add a new feature to the backlog
@@ -66,4 +66,4 @@ Start working on it with:
 htmlgraph feature start {feature_id}
 ```
 
-"""
+'''

@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:end
 
 End the current session and record work summary
@@ -74,4 +74,4 @@ Gracefully end the current session and show work summary
 Session recorded in `.htmlgraph/sessions/`
 View dashboard: `htmlgraph serve`
 
-"""
+'''

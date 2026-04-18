@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:plan-list
 
 List all YAML plans in the project with their status, slice counts, and creation dates. Sorted newest first.
@@ -23,4 +23,4 @@ Present the output as-is. If the user wants to review a specific plan, suggest:
 /htmlgraph:plan-review <plan-id>
 ```
 
-"""
+'''

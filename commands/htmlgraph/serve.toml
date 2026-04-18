@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:serve
 
 Start the dashboard server
@@ -67,4 +67,4 @@ The dashboard shows:
 
 Server is running in the background. To stop: `kill %1` or `kill $(lsof -ti :{port})`.
 
-"""
+'''

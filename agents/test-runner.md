@@ -2,17 +2,12 @@
 name: test-runner
 description: Quality assurance agent. Use after code changes to run tests, type checks, linting, and validate that quality gates pass.
 model: haiku
-color: yellow
+max_turns: 20
 tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
-maxTurns: 20
-skills:
-  - agent-context
-  - code-quality-skill
-initialPrompt: "Run `htmlgraph agent-init` to load project context."
+    - read_file
+    - grep_search
+    - glob
+    - run_shell_command
 ---
 
 # Test Runner Agent
