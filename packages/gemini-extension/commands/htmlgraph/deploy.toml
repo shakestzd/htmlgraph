@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:deploy
 
 Deploy a new HtmlGraph release. Handles quality gates, git push, GitHub Release, marketplace sync, plugin update, and CLI binary rebuild.
@@ -86,4 +86,4 @@ cat ~/.local/share/htmlgraph/.binary-version
 - ALWAYS verify post-deployment that CLI and plugin versions match
 - Patch (X.Y.Z+1) for bug fixes, Minor (X.Y+1.0) for features, Major (X+1.0.0) for breaking changes
 
-"""
+'''

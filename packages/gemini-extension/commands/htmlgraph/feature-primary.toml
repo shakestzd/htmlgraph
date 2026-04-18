@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:feature-primary
 
 Set the primary feature for activity attribution
@@ -61,4 +61,4 @@ All subsequent activity will be attributed to this feature unless it matches ano
 ### Other Active Features
 {other_active_features}
 
-"""
+'''

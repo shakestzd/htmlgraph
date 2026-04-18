@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:status
 
 Check project status and active features
@@ -62,4 +62,4 @@ Show project progress and current feature
 - Use `/htmlgraph:recommend` to get recommendations
 - Run `htmlgraph serve` to open dashboard
 
-"""
+'''

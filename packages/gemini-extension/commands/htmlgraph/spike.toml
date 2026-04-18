@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:spike
 
 Create a research/planning spike
@@ -67,4 +67,4 @@ Present the spike ID and title from CLI output using the output template below.
 
 Spike is active. Complete the steps to finish planning.
 
-"""
+'''

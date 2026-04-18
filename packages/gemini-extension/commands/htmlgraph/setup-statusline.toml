@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 ---
 description: Set up Oh My Posh status line with HtmlGraph active work item display
 ---
@@ -226,4 +226,4 @@ To override OMP binary: set HTMLGRAPH_OMP_BIN
 To override theme path: set HTMLGRAPH_OMP_CONFIG
 ```
 
-"""
+'''

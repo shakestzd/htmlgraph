@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:git-commit
 
 Commit changes using Bash-copilot first, haiku-coder as fallback.
@@ -104,4 +104,4 @@ Files changed: <count>
 Message: <message>
 ```
 
-"""
+'''

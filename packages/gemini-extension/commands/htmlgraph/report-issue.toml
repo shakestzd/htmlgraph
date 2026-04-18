@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 ---
 name: report-issue
 description: Report an issue with HtmlGraph to the development team
@@ -75,4 +75,4 @@ EOF
 
 **IMPORTANT:** Never include sensitive information (API keys, tokens, file contents) in the issue. Only include version numbers, error messages, and user-provided descriptions.
 
-"""
+'''

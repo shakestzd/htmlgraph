@@ -12,7 +12,7 @@ func init() {
 	geminiSubEmitters = append(geminiSubEmitters, emitGeminiAssets)
 }
 
-// emitGeminiAssets copies the verbatim-reusable asset trees (agents, skills,
+// emitGeminiAssets copies the verbatim-reusable asset trees (skills,
 // templates, static, config) plus the repo-root context file (GEMINI.md) into
 // the generated Gemini extension tree.
 //
@@ -20,11 +20,14 @@ func init() {
 // definitions and a different on-disk layout (commands/<namespace>/*.toml).
 // Phase 2 owns the .md → .toml translation and lives in its own file.
 //
+// Agents are deliberately NOT copied here — gemini_agents.go translates agent
+// frontmatter from Claude conventions to Gemini conventions and owns the
+// agents/ subtree. Copying verbatim here would overwrite the translated files.
+//
 // Missing sources are tolerated (copyAssetTree treats them as no-ops), which
 // mirrors how copyAssets behaves for the Claude and Codex targets.
 func emitGeminiAssets(m *Manifest, repoRoot, outDir string, t Target) error {
 	pairs := []struct{ src, dst string }{
-		{m.AssetSources.Agents, "agents"},
 		{m.AssetSources.Skills, "skills"},
 		{m.AssetSources.Templates, "templates"},
 		{m.AssetSources.Static, "static"},

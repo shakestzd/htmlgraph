@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:plan-review
 
 Open a YAML plan in the interactive marimo review notebook for human review and approval.
@@ -61,4 +61,4 @@ Open the Codex Interoperability plan for review
      "SELECT COUNT(*) FROM plan_feedback WHERE plan_id='<plan-id>' AND action='approve' AND value='True'"
    ```
 
-"""
+'''
