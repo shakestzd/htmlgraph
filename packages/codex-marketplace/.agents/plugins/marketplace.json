@@ -1,0 +1,20 @@
+{
+  "name": "htmlgraph",
+  "interface": {
+    "displayName": "HtmlGraph"
+  },
+  "plugins": [
+    {
+      "name": "htmlgraph",
+      "source": {
+        "source": "local",
+        "path": "./htmlgraph"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Development Tools"
+    }
+  ]
+}

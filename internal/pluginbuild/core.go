@@ -52,6 +52,14 @@ type Target struct {
 	// commands/<namespace>/ so the slash-command resolves to /namespace:name
 	// (used by Gemini; Claude/Codex ignore this field).
 	CommandNamespace string `json:"commandNamespace,omitempty"`
+	// Marketplace metadata for targets that wrap the plugin in a marketplace
+	// container (e.g. Codex 0.121.0+). Empty values mean no marketplace wrapping.
+	MarketplaceName        string `json:"marketplaceName,omitempty"`
+	MarketplaceDisplayName string `json:"marketplaceDisplayName,omitempty"`
+	MarketplaceCategory    string `json:"marketplaceCategory,omitempty"`
+	// PluginSubdir is the relative path under outDir where the actual plugin
+	// content lives when marketplace wrapping is used (e.g. "plugins/htmlgraph").
+	PluginSubdir string `json:"pluginSubdir,omitempty"`
 }
 
 // AssetSources names the repo-relative directories to copy verbatim into every

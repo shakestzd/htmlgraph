@@ -22,7 +22,16 @@ func fixtureManifest() *Manifest {
 		Keywords:    []string{"test"},
 		Targets: map[string]Target{
 			"claude": {OutDir: "plugin", ManifestPath: ".claude-plugin/plugin.json", HooksPath: "hooks/hooks.json"},
-			"codex":  {OutDir: "packages/codex-plugin", ManifestPath: ".codex-plugin/plugin.json", HooksPath: "hooks.json", MCPPath: ".mcp.json"},
+			"codex": {
+				OutDir:                 "packages/codex-marketplace",
+				ManifestPath:           ".codex-plugin/plugin.json",
+				HooksPath:              "hooks.json",
+				MCPPath:                ".mcp.json",
+				MarketplaceName:        "htmlgraph",
+				MarketplaceDisplayName: "HtmlGraph",
+				MarketplaceCategory:    "Dev",
+				PluginSubdir:           ".agents/plugins/htmlgraph",
+			},
 			"gemini": {OutDir: "packages/gemini-extension", ManifestPath: "gemini-extension.json", HooksPath: "hooks/hooks.json", ContextFile: "GEMINI.md", CommandNamespace: "htmlgraph"},
 		},
 		AssetSources: AssetSources{
@@ -79,14 +88,15 @@ func TestClaudeAdapterEmitsManifestAndHooks(t *testing.T) {
 func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	repoRoot := t.TempDir()
 	seedAssets(t, repoRoot)
-	outDir := filepath.Join(repoRoot, "packages", "codex-plugin")
+	outDir := filepath.Join(repoRoot, "packages", "codex-marketplace")
+	pluginDir := filepath.Join(outDir, ".agents", "plugins", "htmlgraph")
 
 	if err := (codexAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
 		t.Fatalf("Emit: %v", err)
 	}
 
 	var plug codexPluginJSON
-	readJSON(t, filepath.Join(outDir, ".codex-plugin", "plugin.json"), &plug)
+	readJSON(t, filepath.Join(pluginDir, ".codex-plugin", "plugin.json"), &plug)
 	if plug.Interface.DisplayName != "HtmlGraph" {
 		t.Errorf("codex interface.displayName: %+v", plug.Interface)
 	}
@@ -108,7 +118,7 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 		t.Errorf("codex interface missing short/developer: %+v", plug.Interface)
 	}
 
-	hooksRaw, err := os.ReadFile(filepath.Join(outDir, "hooks.json"))
+	hooksRaw, err := os.ReadFile(filepath.Join(pluginDir, "hooks.json"))
 	if err != nil {
 		t.Fatalf("read hooks.json: %v", err)
 	}
@@ -123,8 +133,8 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 		t.Errorf("codex hooks should not contain Claude-only Stop event")
 	}
 
-	// .mcp.json stub written.
-	if _, err := os.Stat(filepath.Join(outDir, ".mcp.json")); err != nil {
+	// .mcp.json stub written under plugin subdir.
+	if _, err := os.Stat(filepath.Join(pluginDir, ".mcp.json")); err != nil {
 		t.Errorf("expected .mcp.json stub: %v", err)
 	}
 }
@@ -266,10 +276,11 @@ func contains(s, sub string) bool {
 func TestCodexAdapterRemovesStaleFiles(t *testing.T) {
 	repoRoot := t.TempDir()
 	seedAssets(t, repoRoot)
-	outDir := filepath.Join(repoRoot, "packages", "codex-plugin")
+	outDir := filepath.Join(repoRoot, "packages", "codex-marketplace")
 
-	// Seed a stale file that will not be reproduced by Emit.
-	staleFile := filepath.Join(outDir, "commands", "stale-removed.md")
+	// Seed a stale file inside .agents/ (the owned subtree) that will not be
+	// reproduced by Emit.
+	staleFile := filepath.Join(outDir, ".agents", "plugins", "htmlgraph", "commands", "stale-removed.md")
 	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
