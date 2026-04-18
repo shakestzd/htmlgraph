@@ -283,10 +283,11 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Automode support — permission-mode auto + HtmlGraph guardrails</h1>
-  <p style="color:var(--text-dim)">Add 'htmlgraph auto' sibling subcommand, extend guard matrix to recognize auto mode, subscribe to PermissionDenied hook, close bash guard gaps (curl|bash, force-push), add consecutive-deny circuit breaker, document mode matrix.</p>
+  <p style="color:var(--text-dim)">Add 'htmlgraph auto' as a sibling subcommand to 'htmlgraph yolo' that launches Claude Code with --permission-mode auto (Anthropic's classifier-based destructive-pattern blocker, v2.1.111+) while still applying the HtmlGraph PreToolUse guard suite. Extend the bash guard to catch patterns automode catches (curl|bash, force-push), subscribe to the new PermissionDenied hook for classifier-denial telemetry, add a consecutive-deny circuit breaker so stuck-agent retry loops escalate, and document the full mode matrix.
+</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 0 slices · Created 2026-04-18</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v3 · 5 slices · Created 2026-04-18</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -306,6 +307,11 @@ textarea::placeholder{color:var(--text-muted)}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="htmlgraph auto subcommand — launch Claude with --permission-mode auto + guard suite" data-status="pending" data-deps="" data-files="6"></div>
+    <div data-node="2" data-name="Destructive bash guard — curl|bash, wget|sh, force-push, tee, cp" data-status="pending" data-deps="" data-files="2"></div>
+    <div data-node="3" data-name="PermissionDenied hook → agent_events telemetry" data-status="pending" data-deps="" data-files="7"></div>
+    <div data-node="4" data-name="Consecutive-deny circuit breaker — escalate stuck-agent retry loops" data-status="pending" data-deps="3" data-files="5"></div>
+    <div data-node="5" data-name="Mode matrix docs — yolo vs auto vs default" data-status="pending" data-deps="1" data-files="4"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -318,17 +324,34 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
-    <!--PLAN_DESIGN_CONTENT-->
-    <div class="sub-section">
-      <h4>Open Questions</h4>
-      <!--PLAN_QUESTIONS-->
-    </div>
+    <h4>Problem</h4>
+<div data-markdown>Anthropic shipped --permission-mode auto in Claude Code v2.1.111 (2026-04-16): a classifier model pre-reviews each tool call and blocks destructive patterns (curl|bash, force-push, mass deletion, IAM grants, etc.). HtmlGraph&#39;s PreToolUse guards (work-item attribution, TDD commit, budget, UI screenshot, worktree isolation, research-first, bash-file-write blocklist) are orthogonal — domain-specific work-discipline controls automode has no concept of. Today there is no way to launch Claude with both layers active in a single command, no telemetry from the classifier, no circuit breaker for retry loops, and the HtmlGraph bash guard misses several patterns that automode catches (curl|bash, wget|sh, git push --force, tee, cp). The launchClaudeAuto() helper already exists at cmd/htmlgraph/claude.go:195 but is unreachable from any user-facing subcommand, and isYoloFromEvent() at internal/hooks/yolo_guard.go:25 only recognizes &#39;bypassPermissions&#39; as a strict mode — &#39;auto&#39; falls through and yolo-only guards (worktree, TDD, budget, UI, diff-review) silently disengage.
+</div>
+<h4>Goals</h4>
+<ol>
+<li data-markdown>**Layered defense in one command** — `htmlgraph auto` launches Claude with `--permission-mode auto` AND the full HtmlGraph guard suite (work-item, TDD, worktree, budget, UI validation, research-first), measured by: invoking the command produces both classifier blocks and HtmlGraph hook blocks for the appropriate tool patterns.</li>
+<li data-markdown>**Bash guard parity with automode blocklist** — `bashFileWritePattern` (or a new sibling `bashDestructivePattern`) catches `curl|bash`, `wget|sh`, `git push --force`, `tee` to non-`.htmlgraph/` paths, and `cp` to source files; verified by table-driven tests in `pretooluse_test.go`.</li>
+<li data-markdown>**Classifier-denial telemetry** — Every `PermissionDenied` hook event is recorded in `agent_events` with `event_type=&#39;permission_denied&#39;` and the denied tool/input summary; queryable via the dashboard and `htmlgraph analytics`.</li>
+<li data-markdown>**Stuck-agent escalation** — After N consecutive `PermissionDenied` events for the same session (default 3), the next PreToolUse is hard-blocked with a circuit-breaker message instructing the user to intervene; verified by integration test.</li>
+<li data-markdown>**User-facing mode matrix** — A docs page (or extension to `docs/blog/posts/yolo-mode.md`) explains default vs `--permission-mode plan` vs `auto` vs `bypassPermissions` vs `htmlgraph yolo` vs `htmlgraph auto`, including which guards apply in each.</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li data-markdown>Plugin source-of-truth rule — hook event matrix is declared in `packages/plugin-core/manifest.json`; `plugin/hooks/hooks.json` is generated by `htmlgraph plugin build-ports`. Never hand-edit generated files.</li>
+<li data-markdown>Hook state rule — gates must be reproducible across session restarts; the circuit breaker counter must read from durable state (`agent_events` SQL query), not in-memory session state.</li>
+<li data-markdown>Hooks must not write to stderr — debug output goes to `debug.log`. Allow returns `{}`, deny returns `{&#34;decision&#34;:&#34;block&#34;,&#34;reason&#34;:&#34;...&#34;}`.</li>
+<li data-markdown>`event_type` is a CHECK enum at `internal/db/schema.go:124-129` — adding `permission_denied` requires a schema migration (SQLite ALTER TABLE rebuild pattern), or we choose a different storage approach.</li>
+<li data-markdown>automode requires Anthropic Max+ plan — `htmlgraph auto` must fail gracefully on plans without auto-mode access (parse classifier-disabled error from claude CLI, or document as pre-flight requirement).</li>
+<li data-markdown>Existing 5 features (feat-2d2dfc12, feat-9c14a3ef, feat-fdad254b, feat-e86dbcdb, feat-85ef5a6b) are already filed on trk-68655b2a — slices map 1:1 to these features via the slice.feature_id field so finalize reuses them rather than creating duplicates.</li>
+</ul>
+
     <div class="approval-row">
       <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
 </details>
+
 
 <!-- Structure Outline (hidden when empty) -->
 
@@ -337,7 +360,164 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    
+    <div class="slice-card" data-slice="1" data-slice-name="slice-1" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">htmlgraph auto subcommand — launch Claude with --permission-mode auto &#43; guard suite</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add `cmd/htmlgraph/auto.go` exposing `htmlgraph auto` as a Cobra command, registered as a sibling to `yoloCmd()` under `claudeCmd()` at `cmd/htmlgraph/claude.go:97`. Mirror yolo&#39;s flag surface: `--dev`, `--init`, `--continue`, `--no-worktree`, `--tmux`, `--track`, `--feature`, `--resume`. The command calls the existing `launchClaudeAuto()` helper at `cmd/htmlgraph/claude.go:195` (which sets both `EnableAutoMode: true` and `PermissionMode: &#34;auto&#34;`). Extend `isYoloFromEvent()` at `internal/hooks/yolo_guard.go:25` to also recognize `event.PermissionMode == &#34;auto&#34;` as a strict mode (return true), so all yolo-gated guards (worktree, TDD commit, budget, UI validation, diff review, subagent work-item) activate under auto mode too. Update yolo&#39;s flag help text at `cmd/htmlgraph/yolo.go:64-65` to list `auto` alongside `bypassPermissions` and `acceptEdits` if relevant. Add tmux session name `htmlgraph-auto` distinct from `htmlgraph-yolo` so users can run both simultaneously.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Goal 1 (layered defense) is unreachable today — `launchClaudeAuto()` exists in code but is wired to no user-facing command. Without `htmlgraph auto`, users wanting both classifier protection and HtmlGraph guards must hand-craft a `claude --permission-mode auto --plugin-dir ...` invocation and lose the work-item/track/feature plumbing. The `isYoloFromEvent` extension is the single point that gates ~6 guards; missing it means auto mode silently runs without TDD/budget/worktree enforcement.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/auto.go, cmd/htmlgraph/claude.go, cmd/htmlgraph/yolo.go, internal/hooks/yolo_guard.go, internal/hooks/yolo_guard_test.go, cmd/htmlgraph/auto_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`htmlgraph auto --help` shows the same flag surface as `htmlgraph yolo` (with auto-specific tmux name).</li><li data-markdown="">`htmlgraph auto` invocation calls `launchClaudeAuto()` and `--permission-mode auto` appears in the resulting `claude` argv (verified by dry-run mode or unit test).</li><li data-markdown="">Test `TestIsYoloFromEvent_AutoMode` in `yolo_guard_test.go` asserts that an event with `permission_mode=&#34;auto&#34;` returns `true` from `isYoloFromEvent`.</li><li data-markdown="">`go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...` all pass.</li><li data-markdown="">Pre-flight check or graceful error message when Claude returns &#39;auto mode requires Max plan&#39;.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit (cmd/htmlgraph/auto_test.go):
+  - TestAutoCmd_FlagSurface — assert all expected flags are registered
+  - TestAutoCmd_BuildsClaudeArgs — dry-run produces argv containing &#34;--permission-mode&#34; &#34;auto&#34;
+  - TestAutoCmd_TmuxSessionName — when --tmux, session name is &#34;htmlgraph-auto&#34;
+Unit (internal/hooks/yolo_guard_test.go):
+  - TestIsYoloFromEvent_AutoMode — event.PermissionMode=&#34;auto&#34; → true
+  - TestIsYoloFromEvent_BypassPermissions — existing behavior preserved
+  - TestIsYoloFromEvent_Default — event.PermissionMode=&#34;default&#34; → false
+  - TestIsYoloFromEvent_Plan — event.PermissionMode=&#34;plan&#34; → false
+Integration (cmd/htmlgraph/auto_integration_test.go):
+  - Dry-run launch → verify final argv contains both --permission-mode auto and HtmlGraph plugin-dir flags
+Regression: All existing TestYolo* tests must still pass — extending isYoloFromEvent must not regress bypassPermissions behavior.
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="2" data-slice-name="slice-2" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#2</span>
+    <span class="slice-name">Destructive bash guard — curl|bash, wget|sh, force-push, tee, cp</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add `bashDestructivePattern` regex to `internal/hooks/pretooluse.go` (alongside `bashFileWritePattern` at line 343) that matches: `curl ... | (bash|sh)`, `wget ... | (bash|sh)`, `git push ... --force` (and `-f`), `git push --force-with-lease` to protected branches (main/master), `tee` writing outside `.htmlgraph/`, `cp` writing to repo source files, and `chmod &#43;x` on downloaded files. Wire a new guard `checkBashDestructiveGuard` called from `PreToolUse()` BEFORE the work-item guard so destructive intent fails fast. The guard hard-blocks (returns `{&#34;decision&#34;:&#34;block&#34;,&#34;reason&#34;:...}`) when in strict mode (yolo or auto), and warns-only via debug.log in default mode (consistent with classifier behavior in auto mode being authoritative). Provide a deterministic backstop for users not on Max&#43; who can&#39;t access automode. Anchor regexes to command shape (not substrings) per the hook state rule.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Goal 2 (bash guard parity). Today&#39;s bash guard catches sed/redirects/rm/mv/dd but misses pipe-from-network-to-shell and force-push — exactly the patterns automode&#39;s classifier blocks. Users on plans without automode access have zero deterministic protection from these. Even on automode, the deterministic Go guard runs first and gives a faster, citable failure (file:line) before round-tripping to the classifier.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/hooks/pretooluse.go, internal/hooks/pretooluse_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Regex matches `curl https://example.com/install.sh | bash`, `wget -O - url | sh`, `git push --force origin main`, `git push -f`.</li><li data-markdown="">Regex does NOT match `htmlgraph yolo --no-worktree` (false positive check) or `git push origin feature-branch` (non-force).</li><li data-markdown="">Hard-block fires in yolo and auto modes; warn-only in default mode (verified by table-driven test).</li><li data-markdown="">Block reason cites the matched pattern category (e.g. &#39;pipe-to-shell&#39;, &#39;force-push&#39;) so users understand.</li><li data-markdown="">All existing pretooluse tests still pass.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit (internal/hooks/pretooluse_test.go):
+  - TestBashDestructiveGuard_PipeToShell — curl|bash, wget|sh variants → block
+  - TestBashDestructiveGuard_ForcePush — git push --force, -f, --force-with-lease to main → block
+  - TestBashDestructiveGuard_AllowsNormalGit — git push, git push origin feature-branch → allow
+  - TestBashDestructiveGuard_AllowsHtmlGraphCLI — htmlgraph commands containing &#39;force&#39; string → allow
+  - TestBashDestructiveGuard_StrictModeOnly — default mode logs warning but allows; yolo/auto mode blocks
+  - TestBashDestructiveGuard_TeeAndCp — tee/cp variants matched correctly
+Regression: Full pretooluse_test.go suite (TestIsBashFileWrite_*, TestIsBashHtmlGraphWrite_*) must pass unchanged.
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="3" data-slice-name="slice-3" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#3</span>
+    <span class="slice-name">PermissionDenied hook → agent_events telemetry</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-3">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add `permission_denied` to the `event_type` CHECK enum at `internal/db/schema.go:124-129` AND `internal/db/schema.go:494-497` (current &#43; migration paths) — SQLite ALTER TABLE rebuild pattern (create new table, copy data, drop old, rename). Add migration to `internal/db/migrations/`. Create handler `internal/hooks/permission_denied.go` mirroring `permission_request.go`: read CloudEvent from stdin, extract `tool_name`, `tool_input`, `reason`/`message`, insert via `db.InsertEvent` with `event_type=&#34;permission_denied&#34;`. Register in `cmd/htmlgraph/hook.go:42` via `hookSubcmd(&#34;permission-denied&#34;, ..., hooks.PermissionDenied)`. Add to `packages/plugin-core/manifest.json:hooks.events` array with `targets: [&#34;claude&#34;]` (auto mode is Claude-only). Regenerate `plugin/hooks/hooks.json` via `htmlgraph plugin build-ports --target claude`. Handler returns `{}` (telemetry only — does not block; the deny already happened upstream).
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Goal 3 (telemetry). Without recording PermissionDenied events, we have no visibility into what the classifier is blocking, no data to tune our deterministic guards, and no foundation for the circuit breaker (slice 4) to count. The schema migration is a one-time cost to enable a new dimension of observability.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>packages/plugin-core/manifest.json, internal/db/schema.go, internal/db/migrations/, internal/hooks/permission_denied.go, internal/hooks/permission_denied_test.go, cmd/htmlgraph/hook.go, plugin/hooks/hooks.json</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`packages/plugin-core/manifest.json` includes a `PermissionDenied` event entry; `htmlgraph plugin build-ports --target claude` regenerates `plugin/hooks/hooks.json` containing it.</li><li data-markdown="">Schema migration adds `permission_denied` to the event_type CHECK enum without breaking existing event inserts (idempotent on existing dbs).</li><li data-markdown="">Handler inserts an `agent_event` row with `event_type=&#39;permission_denied&#39;`, `tool_name`, `input_summary`, `tool_input`, `output_summary` (the deny reason), and `session_id`.</li><li data-markdown="">`htmlgraph hook permission-denied` accepts a CloudEvent on stdin and exits 0 with `{}` on success.</li><li data-markdown="">Dashboard query `SELECT * FROM agent_events WHERE event_type=&#39;permission_denied&#39;` returns recorded denials.</li><li data-markdown="">All quality gates pass.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit (internal/hooks/permission_denied_test.go):
+  - TestPermissionDenied_InsertsEvent — handler reads stdin event, calls InsertEvent with correct fields
+  - TestPermissionDenied_ReturnsEmptyJSON — does not block (always {} on success)
+  - TestPermissionDenied_HandlesMissingFields — graceful when reason/tool_name absent
+Unit (internal/db/event_repo_test.go):
+  - TestInsertEvent_PermissionDenied — InsertEvent accepts permission_denied event_type after migration
+Migration test (internal/db/schema_test.go):
+  - TestSchema_PermissionDeniedMigration — fresh db has new enum; existing db (seeded with old schema) migrates cleanly without data loss
+Integration: end-to-end via `htmlgraph hook permission-denied` with sample CloudEvent fixture; verify row inserted.
+Regression: existing event_type values still INSERT successfully; existing migration tests pass.
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-3" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="4" data-slice-name="slice-4" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#4</span>
+    <span class="slice-name">Consecutive-deny circuit breaker — escalate stuck-agent retry loops</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-4">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Extend `internal/hooks/pretooluse.go` to query `agent_events` at the start of every PreToolUse: count `permission_denied` events for the current `session_id` since the last non-denied tool_call (or in the last K minutes, whichever is shorter — tunable via constant). When count &gt;= 3 (default), hard-block the next tool call with a circuit-breaker message: `&#34;Circuit breaker tripped: 3 consecutive permission denials in this session. Pause and review with the user before retrying.&#34;` Reset the counter when any non-denied tool_call succeeds. Add a hidden `--reset-circuit-breaker` flag to `htmlgraph` (or a session-scoped escape hatch in `permission_denied.go`) for manual unstuck. Anchor counter to durable SQL query (per hook state rule), not in-memory state.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Goal 4 (escalation). Today a denied PreToolUse simply returns the block, and the agent retries indefinitely with minor variations — burning tokens, spinning forever, and obscuring the root cause. The circuit breaker forces a hard stop after a small number of denials so the user can intervene. Reading from `agent_events` (slice 3) keeps the gate reproducible across session restarts.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/hooks/pretooluse.go, internal/hooks/circuit_breaker.go, internal/hooks/circuit_breaker_test.go, internal/db/event_repo.go, cmd/htmlgraph/auto.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">After 3 PermissionDenied events for the same session_id with no successful tool_call between them, the 4th PreToolUse returns `{&#34;decision&#34;:&#34;block&#34;,&#34;reason&#34;:&#34;Circuit breaker ...&#34;}`.</li><li data-markdown="">A successful tool_call resets the counter (verified by integration test: deny, deny, allow, deny, deny → not blocked).</li><li data-markdown="">The threshold is a named constant (e.g. `circuitBreakerThreshold = 3`) for easy tuning.</li><li data-markdown="">Counter query is a SQL aggregate against `agent_events`, not in-memory state.</li><li data-markdown="">Manual reset path documented (e.g. `htmlgraph session reset-circuit-breaker &lt;session-id&gt;` or equivalent).</li><li data-markdown="">All quality gates pass.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit (internal/hooks/circuit_breaker_test.go):
+  - TestCircuitBreaker_BelowThreshold — 2 denials → no block
+  - TestCircuitBreaker_AtThreshold — 3 denials → block on 4th call
+  - TestCircuitBreaker_ResetByAllow — deny,deny,allow,deny,deny → no block
+  - TestCircuitBreaker_PerSession — denials in session A do not affect session B
+  - TestCircuitBreaker_TimeWindow — denials older than K minutes do not count
+Unit (internal/db/event_repo_test.go):
+  - TestCountConsecutiveDenials_Query — SQL helper returns expected counts
+Integration: end-to-end via fixture-driven PreToolUse calls with seeded agent_events.
+Regression: PreToolUse latency does not regress measurably (add a benchmark if not present).
+</div></div>
+  <div class="slice-deps">Dependencies: slices 3</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-4" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="5" data-slice-name="slice-5" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#5</span>
+    <span class="slice-name">Mode matrix docs — yolo vs auto vs default</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-5">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Document the full permission-mode surface. Choices: extend `docs/blog/posts/yolo-mode.md` with an &#34;Auto mode&#34; section, OR create a dedicated `docs/permission-modes.md` (decided via Q5 below). Cover: (1) Anthropic flags — `default`, `plan`, `acceptEdits`, `auto`, `bypassPermissions` — what each enables/blocks; (2) HtmlGraph wrappers — `htmlgraph claude` (default), `htmlgraph yolo` (--permission-mode bypassPermissions &#43; yolo guards), `htmlgraph auto` (--permission-mode auto &#43; yolo guards); (3) which guards apply in each mode (matrix table); (4) when to use which (decision tree); (5) PermissionDenied telemetry surface (where to find it). Update `AGENTS.md` and `CLAUDE.md` if the mode matrix changes user-facing guidance. Cross-link from blog post.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Goal 5 (user-facing matrix). Without docs, users will misuse modes — running yolo when auto is safer, or vice versa. The matrix becomes especially important once `htmlgraph auto` ships, because users now have a meaningful choice between two autonomous modes. Docs blocked by slice 1 so the table reflects the actually-shipping command surface.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>docs/blog/posts/yolo-mode.md, docs/permission-modes.md, AGENTS.md, CLAUDE.md</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Matrix table lists all 5 Anthropic permission modes × all HtmlGraph guards × resulting behavior.</li><li data-markdown="">Decision tree answers: &#39;I want to run autonomously and I&#39;m on Max&#43;&#39; → htmlgraph auto; &#39;I want to run autonomously without Max&#43;&#39; → htmlgraph yolo; etc.</li><li data-markdown="">PermissionDenied telemetry section explains how to query/view denials.</li><li data-markdown="">Cross-links from `docs/blog/posts/yolo-mode.md` and (if created) `docs/permission-modes.md`.</li><li data-markdown="">Markdown lint passes (if there&#39;s a docs lint step).</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Manual: read-through with a fresh user perspective; verify matrix accuracy by cross-referencing slice 1 implementation.
+Optional automated: a docs-link checker if one is part of CI; otherwise rely on human review at finalize.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-5" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
+  </div>
+</div>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
@@ -346,14 +526,113 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="questions" class="section-card" data-phase="questions" data-status="pending">
   <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
   <div class="section-body">
+    
+    <div class="question-block" id="q-strict-mode-rename">
+      <p>Should `isYoloFromEvent` be renamed to `isStrictModeFromEvent` (or similar) when extended to recognize `auto`?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-strict-mode-rename" data-question="q-strict-mode-rename" value="A: Extend only — keep `isYoloFromEvent` name; add a doc comment explaining it returns true for any strict autonomous mode (yolo OR auto). Lowest blast radius, defer rename until justified by a 3rd mode."> A: Extend only — keep `isYoloFromEvent` name; add a doc comment explaining it returns true for any strict autonomous mode (yolo OR auto). Lowest blast radius, defer rename until justified by a 3rd mode. <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-strict-mode-rename" data-question="q-strict-mode-rename" value="B: Rename now — rename to `isStrictModeFromEvent` and `IsStrictMode` across all call sites. Cleanest semantics; adds ~50-100 lines of mechanical churn to slice 1."> B: Rename now — rename to `isStrictModeFromEvent` and `IsStrictMode` across all call sites. Cleanest semantics; adds ~50-100 lines of mechanical churn to slice 1.</label>
+      
+      <label><input type="radio" name="q-strict-mode-rename" data-question="q-strict-mode-rename" value="C: Dual helpers — keep `isYoloFromEvent` for backwards compat, add `isStrictModeFromEvent` that wraps it &#43; auto check. Avoids churn but bifurcates the concept."> C: Dual helpers — keep `isYoloFromEvent` for backwards compat, add `isStrictModeFromEvent` that wraps it &#43; auto check. Avoids churn but bifurcates the concept.</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-strict-mode-rename" placeholder="Rationale for q-strict-mode-rename..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-bash-guard-default-mode">
+      <p>Should the new destructive bash guard hard-block in default mode, or only in strict (yolo/auto) modes?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-bash-guard-default-mode" data-question="q-bash-guard-default-mode" value="A: Warn in default, block in strict — non-disruptive for existing default-mode users; deterministic protection in yolo/auto. Matches the layered-defense philosophy."> A: Warn in default, block in strict — non-disruptive for existing default-mode users; deterministic protection in yolo/auto. Matches the layered-defense philosophy. <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-bash-guard-default-mode" data-question="q-bash-guard-default-mode" value="B: Block everywhere — strongest protection; opinionated default; potential breaking change for users with legitimate curl|bash workflows."> B: Block everywhere — strongest protection; opinionated default; potential breaking change for users with legitimate curl|bash workflows.</label>
+      
+      <label><input type="radio" name="q-bash-guard-default-mode" data-question="q-bash-guard-default-mode" value="C: Block in strict only, no warn in default — minimal change; users in default mode see no signal. Weakest option."> C: Block in strict only, no warn in default — minimal change; users in default mode see no signal. Weakest option.</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-bash-guard-default-mode" placeholder="Rationale for q-bash-guard-default-mode..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-circuit-breaker-reset">
+      <p>How should the consecutive-deny circuit breaker be reset?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-circuit-breaker-reset" data-question="q-circuit-breaker-reset" value="A: Reset on next UserPromptSubmit — natural UX (user has clearly intervened); requires UserPromptSubmit hook to also count denials reset. Risk: a user spamming the same prompt won&#39;t be re-blocked until 3 more denials."> A: Reset on next UserPromptSubmit — natural UX (user has clearly intervened); requires UserPromptSubmit hook to also count denials reset. Risk: a user spamming the same prompt won&#39;t be re-blocked until 3 more denials. <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-circuit-breaker-reset" data-question="q-circuit-breaker-reset" value="B: Manual CLI reset — explicit `htmlgraph session reset-circuit-breaker`. Safest but adds friction; users may not know the command exists."> B: Manual CLI reset — explicit `htmlgraph session reset-circuit-breaker`. Safest but adds friction; users may not know the command exists.</label>
+      
+      <label><input type="radio" name="q-circuit-breaker-reset" data-question="q-circuit-breaker-reset" value="C: Time-window reset — counter only counts denials in last K (e.g. 5) minutes. Self-healing but agents can spin around the window edge."> C: Time-window reset — counter only counts denials in last K (e.g. 5) minutes. Self-healing but agents can spin around the window edge.</label>
+      
+      <label><input type="radio" name="q-circuit-breaker-reset" data-question="q-circuit-breaker-reset" value="D: Hybrid — UserPromptSubmit reset &#43; 5-minute time window. Best UX but highest implementation cost."> D: Hybrid — UserPromptSubmit reset &#43; 5-minute time window. Best UX but highest implementation cost.</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-circuit-breaker-reset" placeholder="Rationale for q-circuit-breaker-reset..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-permission-denied-storage">
+      <p>Add `permission_denied` to the agent_events CHECK enum, or store denials in a separate table?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-permission-denied-storage" data-question="q-permission-denied-storage" value="A: Extend the CHECK enum — single source of truth, simpler queries, but requires SQLite ALTER TABLE rebuild migration. Slice 4 just queries agent_events directly."> A: Extend the CHECK enum — single source of truth, simpler queries, but requires SQLite ALTER TABLE rebuild migration. Slice 4 just queries agent_events directly. <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-permission-denied-storage" data-question="q-permission-denied-storage" value="B: Separate `permission_denials` table — no migration to existing schema, but slice 4 must JOIN or UNION two tables to count denials. Bifurcates event data."> B: Separate `permission_denials` table — no migration to existing schema, but slice 4 must JOIN or UNION two tables to count denials. Bifurcates event data.</label>
+      
+      <label><input type="radio" name="q-permission-denied-storage" data-question="q-permission-denied-storage" value="C: Drop the CHECK constraint entirely — most flexible but loses validation; new event_type strings can be inserted accidentally."> C: Drop the CHECK constraint entirely — most flexible but loses validation; new event_type strings can be inserted accidentally.</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-permission-denied-storage" placeholder="Rationale for q-permission-denied-storage..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-docs-location">
+      <p>Where should the mode matrix documentation live?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-docs-location" data-question="q-docs-location" value="A: Dedicated `docs/permission-modes.md` reference &#43; update blog post to link it. Canonical doc lives long; blog stays as the launch announcement."> A: Dedicated `docs/permission-modes.md` reference &#43; update blog post to link it. Canonical doc lives long; blog stays as the launch announcement. <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-docs-location" data-question="q-docs-location" value="B: Just extend `yolo-mode.md` with auto section. Lowest effort; keeps narrative together; doc decays as the blog post ages."> B: Just extend `yolo-mode.md` with auto section. Lowest effort; keeps narrative together; doc decays as the blog post ages.</label>
+      
+      <label><input type="radio" name="q-docs-location" data-question="q-docs-location" value="C: Document in `AGENTS.md` and `CLAUDE.md` only. Closest to agent eyes but invisible to human users browsing the site."> C: Document in `AGENTS.md` and `CLAUDE.md` only. Closest to agent eyes but invisible to human users browsing the site.</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-docs-location" placeholder="Rationale for q-docs-location..."></textarea>
+    </div>
+    
     <table class="q-table">
       <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
       <tbody id="questionsRecap">
-        <!--PLAN_QUESTIONS_RECAP-->
+        
+        <tr data-recap-for="q-strict-mode-rename">
+          <td>Should `isYoloFromEvent` be renamed to `isStrictModeFromEvent` (or similar) when extended to recognize `auto`?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-bash-guard-default-mode">
+          <td>Should the new destructive bash guard hard-block in default mode, or only in strict (yolo/auto) modes?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-circuit-breaker-reset">
+          <td>How should the consecutive-deny circuit breaker be reset?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-permission-denied-storage">
+          <td>Add `permission_denied` to the agent_events CHECK enum, or store denials in a separate table?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-docs-location">
+          <td>Where should the mode matrix documentation live?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
       </tbody>
     </table>
   </div>
 </details>
+
 
 
 
@@ -364,8 +643,8 @@ textarea::placeholder{color:var(--text-muted)}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">6</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">6</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -469,7 +748,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
