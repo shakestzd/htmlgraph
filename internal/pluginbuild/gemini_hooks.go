@@ -2,6 +2,7 @@ package pluginbuild
 
 import (
 	"path/filepath"
+	"strings"
 )
 
 // Register hooks.json emission as a Gemini sub-emitter. Gemini's hook schema
@@ -15,6 +16,11 @@ func init() { geminiSubEmitters = append(geminiSubEmitters, emitGeminiHooks) }
 // so matcher groups for the same event name stay adjacent. When no events
 // are tagged for Gemini, the file is not emitted — this keeps skeleton-only
 // builds (pre-Phase-3 fixtures, tests) from writing stub hooks.json files.
+//
+// Translation rules applied per event:
+//   - Event name: use e.GeminiEventName when set, fall back to e.Name.
+//   - Command var: $GEMINI_EXTENSION_DIR → ${extensionPath}.
+//   - Matcher: empty string → "*" (Gemini requires an explicit wildcard).
 func emitGeminiHooks(m *Manifest, repoRoot, outDir string, t Target) error {
 	hooks := map[string][]claudeMatcherGroup{}
 	order := []string{}
@@ -23,22 +29,41 @@ func emitGeminiHooks(m *Manifest, repoRoot, outDir string, t Target) error {
 		if !e.AppliesTo("gemini") {
 			continue
 		}
+
+		// Resolve the Gemini event name: prefer the explicit override, fall back
+		// to the canonical Claude event name.
+		eventName := e.GeminiEventName
+		if eventName == "" {
+			eventName = e.Name
+		}
+
 		cmd := e.Command
 		if cmd == "" {
 			cmd = "htmlgraph hook " + e.Handler
 		}
+		// Variable substitution: Gemini exposes the extension directory as
+		// ${extensionPath}, not $GEMINI_EXTENSION_DIR.
+		cmd = strings.ReplaceAll(cmd, "$GEMINI_EXTENSION_DIR", "${extensionPath}")
+
+		// Matcher: Gemini requires an explicit wildcard ("*") where Claude uses
+		// an empty string to mean "match all".
+		matcher := e.Matcher
+		if matcher == "" {
+			matcher = "*"
+		}
+
 		group := claudeMatcherGroup{
-			Matcher: e.Matcher,
+			Matcher: matcher,
 			Hooks: []claudeHookEntry{{
 				Type:    "command",
 				Command: cmd,
 				Timeout: e.Timeout,
 			}},
 		}
-		if _, seen := hooks[e.Name]; !seen {
-			order = append(order, e.Name)
+		if _, seen := hooks[eventName]; !seen {
+			order = append(order, eventName)
 		}
-		hooks[e.Name] = append(hooks[e.Name], group)
+		hooks[eventName] = append(hooks[eventName], group)
 	}
 
 	if len(order) == 0 {

@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 ---
 name: error-analysis
 description: Systematically capture, analyze, and track errors with HtmlGraph spike-based investigation workflow
@@ -321,4 +321,4 @@ claude --debug <command>  # Test with verbose output
 - Better documentation (captures learning)
 - More efficient debugging (systematic vs reactive)
 
-"""
+'''

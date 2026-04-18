@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:research
 
 Perform structured research before planning implementation. Uses WebSearch to gather best practices, patterns, and solutions from the web.
@@ -290,4 +290,4 @@ htmlgraph spike show {spike_id}
 
 Note in your response that research has been validated so that `/htmlgraph:plan` can incorporate findings when creating the track.
 
-"""
+'''

@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:init
 
 Initialize HtmlGraph in a project
@@ -82,4 +82,4 @@ Note:
 # Open http://localhost:8080
 ```
 
-"""
+'''

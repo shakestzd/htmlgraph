@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:feature-complete
 
 Mark a feature as complete
@@ -79,4 +79,4 @@ Complete the current active feature
 - Features (3-8 files) → `Task(subagent_type="htmlgraph:sonnet-coder")`
 - Architecture (10+ files) → `Task(subagent_type="htmlgraph:opus-coder")`
 
-"""
+'''

@@ -2,19 +2,14 @@
 name: sonnet-coder
 description: Balanced code execution agent for moderate complexity tasks
 model: sonnet
-color: blue
+max_turns: 40
 tools:
-  - Read
-  - Edit
-  - Write
-  - Grep
-  - Glob
-  - Bash
-maxTurns: 40
-skills:
-  - agent-context
-  - code-quality-skill
-initialPrompt: "Run `htmlgraph agent-init` to load project context, then `htmlgraph status` to check active work items."
+    - read_file
+    - replace
+    - write_file
+    - grep_search
+    - glob
+    - run_shell_command
 ---
 
 # Sonnet Coder Agent

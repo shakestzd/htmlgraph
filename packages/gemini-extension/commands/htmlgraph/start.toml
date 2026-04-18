@@ -1,4 +1,4 @@
-prompt = """
+prompt = '''
 # /htmlgraph:start
 
 Start a new session with context continuity and status overview
@@ -123,4 +123,4 @@ Based on strategic analysis, I recommend:
 4. Create new work item (`/htmlgraph:plan`)
 5. Something else
 
-"""
+'''
