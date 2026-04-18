@@ -39,7 +39,12 @@ func emitGeminiHooks(m *Manifest, repoRoot, outDir string, t Target) error {
 
 		cmd := e.Command
 		if cmd == "" {
-			cmd = "htmlgraph hook " + e.Handler
+			// Use GeminiHandler when set, fall back to Handler.
+			handler := e.Handler
+			if e.GeminiHandler != "" {
+				handler = e.GeminiHandler
+			}
+			cmd = "htmlgraph hook " + handler
 		}
 		// Variable substitution: Gemini exposes the extension directory as
 		// ${extensionPath}, not $GEMINI_EXTENSION_DIR.

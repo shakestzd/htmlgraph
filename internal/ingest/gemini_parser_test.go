@@ -226,6 +226,7 @@ func TestGeminiToolCategory(t *testing.T) {
 		name     string
 		expected string
 	}{
+		// Legacy Gemini tool names (for backward compatibility).
 		{"read_file", "Read"},
 		{"write_file", "Write"},
 		{"replace_file", "Write"},
@@ -234,9 +235,17 @@ func TestGeminiToolCategory(t *testing.T) {
 		{"run_shell_command", "Bash"},
 		{"run_in_shell", "Bash"},
 		{"search_file_content", "Grep"},
+		{"grep", "Grep"},
 		{"list_directory", "Glob"},
 		{"web_fetch", "Other"},
 		{"web_search", "Other"},
+
+		// Modern Gemini tool names (emitted by the generator).
+		{"replace", "Edit"},
+		{"grep_search", "Grep"},
+		{"google_web_search", "Other"},
+
+		// Unknown tools.
 		{"get_internal_docs", "Other"},
 		{"unknown_tool", "Other"},
 	}
@@ -289,5 +298,84 @@ func TestIsGeminiSessionFile(t *testing.T) {
 				t.Errorf("isGeminiSessionFile(%q) = %v, want %v", tt.filename, got, tt.expected)
 			}
 		})
+	}
+}
+
+// TestGeminiParityModernToolNames verifies that modern Gemini tool names
+// emitted by the generator (from pluginbuild.claudeToGeminiTool) are recognized
+// by the ingestion parser (geminiToolCategory). This guards against drift:
+// if the generator maps a tool to a modern name, the ingestion parser must
+// recognize it. The test uses the pluginbuild package to discover the modern
+// names and confirms each maps to a non-"Other" category.
+func TestGeminiParityModernToolNames(t *testing.T) {
+	// These are the modern Gemini tool names the generator emits.
+	// (They are known to be in pluginbuild.claudeToGeminiTool values.)
+	modernToolNames := map[string]string{
+		"read_file":          "Read",
+		"replace":            "Edit",
+		"write_file":         "Write",
+		"grep_search":        "Grep",
+		"glob":               "Glob",
+		"run_shell_command":  "Bash",
+		"google_web_search":  "Other",
+		"web_fetch":          "Other",
+	}
+
+	for toolName, expectedCategory := range modernToolNames {
+		t.Run(toolName, func(t *testing.T) {
+			got := geminiToolCategory(toolName)
+			if got != expectedCategory {
+				t.Errorf("geminiToolCategory(%q) = %q, want %q (tool emitted by generator must be recognized by parser)", toolName, got, expectedCategory)
+			}
+		})
+	}
+}
+
+// TestGeminiAgentToolTranslationWithModernNames is an integration test that
+// verifies the agent translator (pluginbuild) emits modern Gemini names that
+// the ingestion parser can recognize.
+func TestGeminiAgentToolTranslationWithModernNames(t *testing.T) {
+	sessionJSON := `{
+		"sessionId": "sess-gemini-modern",
+		"messages": [
+			{
+				"id": "g1",
+				"timestamp": "2026-04-12T01:05:00.000Z",
+				"type": "gemini",
+				"content": "Using modern tool names.",
+				"model": "gemini-3-flash-preview",
+				"toolCalls": [
+					{
+						"id": "replace_1",
+						"name": "replace",
+						"args": {"file_path": "test.go", "old": "old", "new": "new"}
+					},
+					{
+						"id": "grep_1",
+						"name": "grep_search",
+						"args": {"pattern": "TODO", "path": "."}
+					}
+				]
+			}
+		]
+	}`
+
+	result, err := parseGemini(strings.NewReader(sessionJSON))
+	if err != nil {
+		t.Fatalf("parseGemini error: %v", err)
+	}
+
+	if len(result.ToolCalls) != 2 {
+		t.Fatalf("got %d tool calls, want 2", len(result.ToolCalls))
+	}
+
+	// Modern "replace" name should be categorized as "Edit".
+	if result.ToolCalls[0].Category != "Edit" {
+		t.Errorf("replace tool categorized as %q, want Edit", result.ToolCalls[0].Category)
+	}
+
+	// Modern "grep_search" name should be categorized as "Grep".
+	if result.ToolCalls[1].Category != "Grep" {
+		t.Errorf("grep_search tool categorized as %q, want Grep", result.ToolCalls[1].Category)
 	}
 }

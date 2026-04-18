@@ -69,7 +69,7 @@
       { "name": "PostToolUse",        "handler": "exit-plan-mode",      "targets": ["claude"], "matcher": "ExitPlanMode", "timeout": 30 },
       { "name": "SubagentStart",      "handler": "subagent-start",      "targets": ["claude"] },
       { "name": "SubagentStop",       "handler": "subagent-stop",       "targets": ["claude"] },
-      { "name": "Stop",               "handler": "stop",                "targets": ["claude", "gemini"], "geminiEventName": "SessionEnd" },
+      { "name": "Stop",               "handler": "stop",                "targets": ["claude", "gemini"], "geminiEventName": "SessionEnd", "geminiHandler": "session-end" },
       { "name": "PostToolUseFailure", "handler": "posttooluse-failure", "targets": ["claude"] },
       { "name": "PreCompact",         "handler": "pre-compact",         "targets": ["claude"] },
       { "name": "TeammateIdle",       "handler": "teammate-idle",       "targets": ["claude"] },

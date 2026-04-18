@@ -267,21 +267,23 @@ func parseGeminiTimestamp(ts string) time.Time {
 }
 
 // geminiToolCategory maps Gemini CLI tool names to canonical HtmlGraph categories.
+// Accepts both modern Gemini names (emitted by the generator) and legacy names
+// for backward compatibility with historical sessions.
 func geminiToolCategory(name string) string {
 	switch name {
 	case "read_file":
 		return "Read"
 	case "write_file", "replace_file":
 		return "Write"
-	case "edit_file", "replace_string_in_file":
+	case "edit_file", "replace_string_in_file", "replace":
 		return "Edit"
 	case "run_shell_command", "run_in_shell":
 		return "Bash"
-	case "search_file_content", "grep":
+	case "search_file_content", "grep", "grep_search":
 		return "Grep"
 	case "list_directory", "glob":
 		return "Glob"
-	case "web_fetch", "web_search":
+	case "web_fetch", "web_search", "google_web_search":
 		return "Other"
 	default:
 		return "Other"

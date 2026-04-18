@@ -161,6 +161,46 @@ func TestGeminiAgentNoFrontmatterPassesThrough(t *testing.T) {
 	}
 }
 
+// TestGeminiAgentWebToolsTranslated verifies that WebSearch and WebFetch are
+// correctly translated to their Gemini equivalents.
+func TestGeminiAgentWebToolsTranslated(t *testing.T) {
+	input := `---
+name: researchagent
+description: Agent with web tools
+tools:
+  - WebSearch
+  - WebFetch
+  - Read
+---
+# Research Agent
+`
+	out, err := translateAgentFrontmatter("researchagent.md", []byte(input))
+	if err != nil {
+		t.Fatalf("translateAgentFrontmatter: %v", err)
+	}
+	s := string(out)
+
+	// WebSearch must be translated to google_web_search.
+	if !strings.Contains(s, "google_web_search") {
+		t.Errorf("expected WebSearch translated to google_web_search:\n%s", s)
+	}
+
+	// WebFetch must be translated to web_fetch.
+	if !strings.Contains(s, "web_fetch") {
+		t.Errorf("expected WebFetch translated to web_fetch:\n%s", s)
+	}
+
+	// Read must still be translated.
+	if !strings.Contains(s, "read_file") {
+		t.Errorf("expected Read translated to read_file:\n%s", s)
+	}
+
+	// Original tool names must not appear.
+	if strings.Contains(s, "WebSearch") || strings.Contains(s, "WebFetch") {
+		t.Errorf("original tool names should have been translated:\n%s", s)
+	}
+}
+
 // TestGeminiAgentEmitterWritesTranslatedFiles is an integration test that
 // exercises emitGeminiAgents end-to-end: seeds a source agent, runs the
 // emitter, and confirms the translated output is written to the destination.

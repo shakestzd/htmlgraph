@@ -76,6 +76,8 @@ type HookMatrix struct {
 // the list of target names for which this entry is emitted.
 // GeminiEventName, when set, overrides the Claude event name in the Gemini
 // output. When empty the Claude event name is used unchanged.
+// GeminiHandler, when set, overrides the handler for Gemini targets. When empty
+// the Handler field is used unchanged.
 type HookEvent struct {
 	Name            string   `json:"name"`
 	Handler         string   `json:"handler"`
@@ -84,6 +86,7 @@ type HookEvent struct {
 	Timeout         int      `json:"timeout,omitempty"`
 	Targets         []string `json:"targets"`
 	GeminiEventName string   `json:"geminiEventName,omitempty"`
+	GeminiHandler   string   `json:"geminiHandler,omitempty"`
 }
 
 // AppliesTo reports whether the event should be emitted for the named target.

@@ -24,7 +24,7 @@ func TestGeminiHookEventNameTranslation(t *testing.T) {
 			{Name: "UserPromptSubmit", Handler: "user-prompt", Targets: []string{"gemini"}, GeminiEventName: "BeforeAgent"},
 			{Name: "PreToolUse", Handler: "pretooluse", Targets: []string{"gemini"}, GeminiEventName: "BeforeTool"},
 			{Name: "PostToolUse", Handler: "posttooluse", Targets: []string{"gemini"}, GeminiEventName: "AfterTool"},
-			{Name: "Stop", Handler: "stop", Targets: []string{"gemini"}, GeminiEventName: "SessionEnd"},
+			{Name: "Stop", Handler: "stop", Targets: []string{"gemini"}, GeminiEventName: "SessionEnd", GeminiHandler: "session-end"},
 		}},
 	}
 
@@ -52,6 +52,47 @@ func TestGeminiHookEventNameTranslation(t *testing.T) {
 		if strings.Contains(s, notWant) {
 			t.Errorf("Claude event name %q should be translated, not passed through:\n%s", notWant, s)
 		}
+	}
+}
+
+// TestGeminiHookHandlerOverride verifies that geminiHandler overrides the default
+// handler for Gemini targets. This is used to route Stop (handler: stop) to
+// session-end for Gemini while keeping it as stop for Claude.
+func TestGeminiHookHandlerOverride(t *testing.T) {
+	m := &Manifest{
+		Name:    "test",
+		Version: "0.0.0",
+		Targets: map[string]Target{
+			"gemini": {
+				OutDir:       "out",
+				ManifestPath: "gemini-extension.json",
+				HooksPath:    "hooks/hooks.json",
+			},
+		},
+		Hooks: HookMatrix{Events: []HookEvent{
+			{Name: "Stop", Handler: "stop", Targets: []string{"gemini"}, GeminiEventName: "SessionEnd", GeminiHandler: "session-end"},
+		}},
+	}
+
+	outDir := t.TempDir()
+	target := m.Targets["gemini"]
+
+	if err := emitGeminiHooks(m, t.TempDir(), outDir, target); err != nil {
+		t.Fatalf("emitGeminiHooks: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "hooks", "hooks.json"))
+	if err != nil {
+		t.Fatalf("read hooks.json: %v", err)
+	}
+	s := string(data)
+
+	// Gemini SessionEnd event must invoke session-end handler, not stop.
+	if !strings.Contains(s, "htmlgraph hook session-end") {
+		t.Errorf("expected SessionEnd to invoke 'htmlgraph hook session-end' for Gemini:\n%s", s)
+	}
+	if strings.Contains(s, "htmlgraph hook stop") {
+		t.Errorf("Gemini SessionEnd should not invoke 'htmlgraph hook stop' (that's Claude's):\n%s", s)
 	}
 }
 
@@ -165,8 +206,11 @@ func TestGeminiAdapterEmitsHooksFromFixture(t *testing.T) {
 			e.Targets = append(e.Targets, "gemini")
 		case e.Name == "UserPromptSubmit" && e.Handler == "user-prompt":
 			e.Targets = append(e.Targets, "gemini")
+			e.GeminiEventName = "BeforeAgent"
 		case e.Name == "Stop" && e.Handler == "stop":
 			e.Targets = append(e.Targets, "gemini")
+			e.GeminiEventName = "SessionEnd"
+			e.GeminiHandler = "session-end"
 		}
 	}
 

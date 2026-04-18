@@ -9,6 +9,8 @@ tools:
     - glob
     - run_shell_command
     - replace
+    - google_web_search
+    - web_fetch
 ---
 
 # Researcher Agent

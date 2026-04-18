@@ -15,13 +15,18 @@ import (
 // Tools absent from this map are dropped with a warning logged — Gemini does not
 // recognise Claude-specific tool names, so passing them through would cause
 // extension load failures or silent no-ops.
+//
+// Browser MCP tools (mcp__claude-in-chrome__*) have no direct Gemini analogue
+// and are intentionally omitted — they remain dropped with a warning.
 var claudeToGeminiTool = map[string]string{
-	"Read":  "read_file",
-	"Edit":  "replace",
-	"Write": "write_file",
-	"Grep":  "grep_search",
-	"Glob":  "glob",
-	"Bash":  "run_shell_command",
+	"Read":      "read_file",
+	"Edit":      "replace",
+	"Write":     "write_file",
+	"Grep":      "grep_search",
+	"Glob":      "glob",
+	"Bash":      "run_shell_command",
+	"WebSearch": "google_web_search",
+	"WebFetch":  "web_fetch",
 }
 
 // geminiAgentFrontmatter is the translated agent frontmatter emitted into the
