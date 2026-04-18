@@ -139,11 +139,6 @@ type geminiLaunchOpts struct {
 // (or returning an error if exec fails). If opts.DryRun is true, prints the
 // intended command and returns without executing.
 func execGemini(opts geminiLaunchOpts) error {
-	geminiPath, err := exec.LookPath("gemini")
-	if err != nil {
-		return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
-	}
-
 	var geminiArgs []string
 
 	if opts.ListSessions {
@@ -166,6 +161,11 @@ func execGemini(opts geminiLaunchOpts) error {
 			fmt.Printf("[dry-run] in directory: %s\n", opts.ProjectRoot)
 		}
 		return nil
+	}
+
+	geminiPath, err := exec.LookPath("gemini")
+	if err != nil {
+		return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
 	}
 
 	c := exec.Command(geminiPath, geminiArgs...)
