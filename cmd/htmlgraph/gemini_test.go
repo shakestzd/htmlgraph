@@ -274,3 +274,28 @@ func TestGeminiDryRunHonoredForAllModes(t *testing.T) {
 		})
 	}
 }
+
+// TestGeminiDevPassesConsent verifies that buildGeminiLinkArgs includes --consent.
+// This ensures that `gemini extensions link` doesn't hang on interactive prompts
+// when other extensions are in a broken state.
+func TestGeminiDevPassesConsent(t *testing.T) {
+	localExtPath := "/path/to/packages/gemini-extension"
+	args := buildGeminiLinkArgs(localExtPath)
+
+	// Verify args structure: should be ["extensions", "link", <path>, "--consent"]
+	if len(args) != 4 {
+		t.Errorf("expected 4 args, got %d: %v", len(args), args)
+	}
+	if args[0] != "extensions" {
+		t.Errorf("expected args[0]='extensions', got %q", args[0])
+	}
+	if args[1] != "link" {
+		t.Errorf("expected args[1]='link', got %q", args[1])
+	}
+	if args[2] != localExtPath {
+		t.Errorf("expected args[2]=%q, got %q", localExtPath, args[2])
+	}
+	if args[3] != "--consent" {
+		t.Errorf("expected args[3]='--consent', got %q", args[3])
+	}
+}

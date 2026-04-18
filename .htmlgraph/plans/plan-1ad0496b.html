@@ -287,7 +287,7 @@ textarea::placeholder{color:var(--text-muted)}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v5 · 5 slices · Created 2026-04-18</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v6 · 5 slices · Created 2026-04-18</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -675,6 +675,205 @@ Optional automated: a docs-link checker if one is part of CI; otherwise rely on 
   </div>
 </details>
 
+
+
+<details id="critique" class="section-card" data-phase="critique" data-status="pending">
+  <summary><span>Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
+  <div class="section-body">
+
+    
+    <div class="sub-section">
+      <h4>Assumption Verification</h4>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">launchClaudeAuto() is unreachable from any user-facing subcommand</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">htmlgraph claude --auto already invokes it via cmd/htmlgraph/claude.go:79-82 (the auto bool flag and case auto: branch). Plan revised: framing changed from &#39;dead code&#39; to &#39;reachable only via --auto flag, no UX-symmetric subcommand&#39;.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">isYoloFromEvent at internal/hooks/yolo_guard.go:25 gates 5 (not 6) yolo-only guards</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Worktree (yolo_guard.go:321,343), TDD-commit (:247), budget (:271), UI validation (:652), diff-review (:415). Work-item and research-first are always-on (pretooluse.go:103-127) and would fire under auto mode regardless. Plan corrected.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">event_type CHECK enum lives in two synchronized locations (schema.go:124-129 and :494-497)</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Existing migrateAgentEventsAddCheckConstraint at schema.go:532 is the copy-and-swap pattern to mirror. Both must update together.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">PermissionRequest handler lives in permission_request.go</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Handler is at internal/hooks/missing_events.go:238 — file permission_request.go does not exist. Plan corrected to cite missing_events.go:238 and use the recordSimpleEvent helper at missing_events.go:19.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">manifest.json:hooks.events targets field supports [&#34;claude&#34;]-only routing</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">PermissionRequest entry at manifest.json:86 already uses targets: [&#34;claude&#34;].</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">UserPromptSubmit hook is already subscribed (manifest.json:69, hook.go:53)</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Confirms the user-prompt option for circuit-breaker reset is feasible.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">idx_agent_events_session_ts_desc covers the circuit-breaker query</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">Index at schema.go:419 — slice 4 needs no new index; plan updated.</p>
+        </div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      
+      <div>
+        <h4>Haiku (design review)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>Slice Assessment</h5>
+<ul>
+  <li><span class="badge badge-warn">S1</span> Single point of failure: isYoloFromEvent gates 5 strict-mode guards. If extension is wrong, all silently disengage in auto mode. Comprehensive test matrix required.</li>
+  <li><span class="badge badge-info">S2</span> Bash guard scope is tight; warn-default-block-strict (Q2 default) is balanced but the warning UX must include matched pattern category and file:line for actionability.</li>
+  <li><span class="badge badge-info">S3</span> Storage choice (Q4) is left to reviewer; extend-enum recommended and aligns with the existing migrateAgentEventsAddCheckConstraint pattern.</li>
+  <li><span class="badge badge-warn">S4</span> Heaviest slice: depends on slice 3, queries durable state, must handle reset. Reset mechanism (Q3) lacks decisive recommendation in original plan; revised to recommend hybrid (UserPromptSubmit + time window + manual escape).</li>
+  <li><span class="badge badge-info">S5</span> Docs slice now correctly depends on 1+2+3+4 (was just 1) — matrix can&#39;t be accurate until all behaviors are settled.</li>
+</ul>
+<h5>Question Assessments</h5>
+<ul>
+  <li><span class="badge badge-warn">Q1</span> Original &#39;extend-only&#39; recommendation was weak — function name actively misleads in auto-mode code paths. Revised to recommend rename-now: ~50-100 lines of mechanical churn buys correct semantics for the foreseeable future.</li>
+  <li><span class="badge badge-warn">Q3</span> Original &#39;user-prompt&#39; recommendation has a loophole: spamming same prompt evades safety mechanism. Revised to recommend hybrid (best UX+safety blend).</li>
+</ul>
+<h5>Gaps Identified</h5>
+<ul>
+  <li><span class="badge badge-warn">Gap</span> Original plan didn&#39;t explicitly address: pre-flight for Max+ plan access (what &#39;graceful&#39; looks like), CI/contributor testing without Max+, telemetry field truncation/PII, threshold-tuning rationale, consecutive-deny precise semantics. All addressed in revised slice 1, 3, 4 done_when criteria.</li>
+  <li><span class="badge badge-danger">Gap</span> HIGH risk identified by feasibility critic: extending isYoloFromEvent activates worktree guard for auto mode → users on main hit immediate worktree block. Decision deferred to NEW question Q-worktree-default (3 options: mandate / opt-in / mode-aware-guard).</li>
+</ul>
+<h5>Alternative Decompositions Considered</h5>
+<ul>
+  <li><span class="badge badge-info">Alt</span> Slice 1: New isAutoMode() predicate wrapped with isYoloFromEvent under isStrictMode — adds indirection, less invasive than rename.</li>
+  <li><span class="badge badge-info">Alt</span> Slice 2: Separate pipe-to-shell vs force-push into two guards for per-pattern tuning — adds complexity for orthogonal threat models.</li>
+  <li><span class="badge badge-info">Alt</span> Slice 3: Avoid migration entirely with a permission_denial_audit.jsonl file rebuilt on startup — no schema change but adds filesystem dependency.</li>
+  <li><span class="badge badge-info">Alt</span> Slice 4: Warn on 2nd denial, escalate-block on 3rd — gives users a chance to course-correct before circuit breaks.</li>
+</ul>
+</div>
+      </div>
+      
+      
+      <div>
+        <h4>Sonnet (feasibility)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>What Exists to Leverage</h5>
+<ul>
+  <li><span class="badge badge-success">Found</span> launchClaudeAuto() helper at cmd/htmlgraph/claude.go:195 — already wired and tested via --auto flag.</li>
+  <li><span class="badge badge-success">Found</span> recordSimpleEvent() helper at internal/hooks/missing_events.go:19 — single-insert pattern for telemetry handlers; slice 3 must use this, not open-code db.InsertEvent.</li>
+  <li><span class="badge badge-success">Found</span> migrateAgentEventsAddCheckConstraint at internal/db/schema.go:532 — exact copy-and-swap migration pattern with metadata-key idempotency. Slice 3 mirrors this.</li>
+  <li><span class="badge badge-success">Found</span> idx_agent_events_session_ts_desc at schema.go:419 — already covers slice 4&#39;s count query. No new index needed.</li>
+  <li><span class="badge badge-success">Found</span> HTMLGRAPH_GUARDS_OFF=1 kill switch at pretooluse.go:21 — circuit breaker and destructive-bash guard must respect it (added to constraints + done_when).</li>
+  <li><span class="badge badge-success">Found</span> PermissionRequest handler at internal/hooks/missing_events.go:238 — exact shape to clone; manifest.json:86 entry to mirror.</li>
+</ul>
+<h5>What the Plan Originally Got Wrong</h5>
+<ul>
+  <li><span class="badge badge-danger">Fix</span> FALSIFIED: &#39;launchClaudeAuto() unreachable&#39; — htmlgraph claude --auto already calls it. UX gap is real (no standalone subcommand) but helper is not dead code. Revised problem statement and slice 1 framing.</li>
+  <li><span class="badge badge-danger">Fix</span> FALSIFIED: file path &#39;permission_request.go&#39; — handler lives at missing_events.go:238. Revised slice 3 file paths.</li>
+  <li><span class="badge badge-warn">Fix</span> Inaccurate guard count: &#39;~6 guards gate on isYoloFromEvent&#39;. Actually 5 (worktree, TDD, budget, UI, diff-review). Work-item and research-first are always-on. Revised goal statement and slice 1 why.</li>
+  <li><span class="badge badge-warn">Fix</span> Hook return semantics: plan said &#39;returns {}&#39;. In Go, non-blocking handlers return &amp;HookResult{Continue: true} (which serializes to {}). Revised slice 3 done_when.</li>
+  <li><span class="badge badge-warn">Fix</span> Slice 4 file list included cmd/htmlgraph/auto.go — wrong, circuit breaker lives entirely in internal/hooks/. Revised file list.</li>
+</ul>
+<h5>Prior Art</h5>
+<ul>
+  <li><span class="badge badge-info">Ref</span> PermissionRequest at internal/hooks/missing_events.go:238 — exact handler shape to clone for PermissionDenied.</li>
+  <li><span class="badge badge-info">Ref</span> migrateAgentEventsAddCheckConstraint at schema.go:532 — idempotent copy-and-swap pattern for enum extension.</li>
+  <li><span class="badge badge-info">Ref</span> idx_agent_events_session_ts_desc at schema.go:419 — covers session+timestamp queries.</li>
+</ul>
+</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Synthesis</h4>
+      <div style="font-size:.85rem;color:var(--text-dim)">Plan revised to address all FALSIFIED assumptions and HIGH risks before human review. Major changes: (1) Problem statement reframed — launchClaudeAuto is reachable via --auto flag, UX gap is the missing standalone subcommand. (2) Slice 1 corrected to enumerate the 5 yolo-gated guards (not 6) and acknowledge work-item/research-first as always-on. (3) Slice 3 cites missing_events.go:238, uses recordSimpleEvent helper, mirrors migrateAgentEventsAddCheckConstraint with metadata-key idempotency, returns &amp;HookResult{Continue: true}. (4) Slice 4 removes incorrect cmd/htmlgraph/auto.go file, gates circuit breaker on ctx.IsYoloMode for default-mode latency, notes existing index covers query, respects HTMLGRAPH_GUARDS_OFF. (5) Slice 5 deps tightened to 1+2+3+4 so matrix is accurate. (6) NEW Q-worktree-default added for the HIGH risk worktree-activation decision. (7) Q1 and Q3 recommendations strengthened (rename-now, hybrid). Action items for reviewer: (a) answer all 6 questions — Q-worktree-default is the most consequential UX choice, (b) approve or reject each slice, (c) optionally amend any slice via the dashboard before finalize.</div>
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Risk Assessment</h4>
+      <table class="q-table">
+        <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          
+          <tr>
+            <td>Extending isYoloFromEvent activates worktree guard for auto mode → users on main hit immediate worktree block on first Write/Edit</td>
+            <td><span class="badge badge-blocked">High</span></td>
+            <td>Decision required via Q-worktree-default (mandate / opt-in / mode-aware-guard). All three options are workable; mandate is recommended for UX consistency with yolo.</td>
+          </tr>
+          
+          <tr>
+            <td>Single point of failure in isYoloFromEvent — if logic is wrong, 5 strict-mode guards silently disengage in auto mode</td>
+            <td><span class="badge badge-blocked">High</span></td>
+            <td>Comprehensive test matrix in slice 1 (TestIsYoloFromEvent_AutoMode plus regression tests for bypassPermissions, default, plan, acceptEdits). Add at least one integration test where auto mode actively enforces a guard (e.g., TDD commit) and verify it blocks.</td>
+          </tr>
+          
+          <tr>
+            <td>Five (now six) unanswered design questions create implementation ambiguity if dispatch starts before review</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Plan workflow forces human review/answer before finalize; this risk only materializes if reviewer skips question answers.</td>
+          </tr>
+          
+          <tr>
+            <td>Circuit-breaker reset via UserPromptSubmit alone is fragile (loophole &#43; hook ordering)</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Q-circuit-breaker-reset revised to recommend hybrid (UserPromptSubmit &#43; time window &#43; manual CLI escape).</td>
+          </tr>
+          
+          <tr>
+            <td>SQLite migration runs on every Open() until check passes, slow on large agent_events tables</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Mirror the metadata-key idempotency from migrateAgentEventsAddCheckConstraint — added explicitly to slice 3 done_when.</td>
+          </tr>
+          
+          <tr>
+            <td>Circuit breaker DB query on every PreToolUse adds latency in default mode</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Gate on ctx.IsYoloMode — circuit breaker is only meaningful in strict modes. Added to slice 4 done_when and tests (TestCircuitBreaker_DefaultModeSkipped).</td>
+          </tr>
+          
+          <tr>
+            <td>PermissionDenied is Claude-only — circuit breaker count is always 0 in non-Claude harnesses</td>
+            <td><span class="badge badge-pending">Low</span></td>
+            <td>Already handled by IsYoloMode gate; non-Claude harnesses don&#39;t have auto mode either.</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+
+    
+
+  </div>
+</details>
 
 
 

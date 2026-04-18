@@ -230,6 +230,12 @@ func launchGeminiResume(index string, extraArgs []string, dryRun bool) error {
 	})
 }
 
+// buildGeminiLinkArgs returns the args for `gemini extensions link`.
+// Exported for testability.
+func buildGeminiLinkArgs(localExtPath string) []string {
+	return []string{"extensions", "link", localExtPath, "--consent"}
+}
+
 // launchGeminiDev links the local packages/gemini-extension and launches Gemini.
 // Corresponds to: htmlgraph gemini --dev [--isolate]
 func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
@@ -243,10 +249,11 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 	fmt.Printf("  Local extension: %s\n", localExtPath)
 
 	// Link the extension (idempotent — it's a live pointer).
-	linkArgs := []string{"extensions", "link", localExtPath}
+	linkArgs := buildGeminiLinkArgs(localExtPath)
 	if dryRun {
 		fmt.Printf("[dry-run] gemini %s\n", strings.Join(linkArgs, " "))
 	} else {
+		fmt.Println("Linking extension...")
 		geminiPath, err := exec.LookPath("gemini")
 		if err != nil {
 			return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
@@ -254,6 +261,16 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 		if out, linkErr := exec.Command(geminiPath, linkArgs...).CombinedOutput(); linkErr != nil {
 			return fmt.Errorf("gemini extensions link failed: %w\n%s", linkErr, strings.TrimSpace(string(out)))
 		}
+
+		// Verify filesystem state: check that the extension metadata was actually created.
+		// If another extension is in a broken state, gemini may have prompted interactively
+		// and blocked the link, but we'd still reach this point without stdin.
+		home, _ := os.UserHomeDir()
+		metaPath := filepath.Join(home, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+		if _, err := os.Stat(metaPath); err != nil {
+			return fmt.Errorf("gemini extensions link appeared to succeed but %s was not created — the link may have been blocked by an interactive prompt in gemini. Check gemini extensions list and try: 'gemini extensions link %s --consent' manually", metaPath, localExtPath)
+		}
+
 		fmt.Println("Extension linked (live pointer to local source).")
 	}
 
