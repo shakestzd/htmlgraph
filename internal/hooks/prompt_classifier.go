@@ -122,17 +122,17 @@ func ClassifyPrompt(prompt string) PromptIntent {
 // ---------- guidance generators ----------
 
 // GenerateGuidance produces the additionalContext string for CIGS injection.
-// It combines work-item attribution (already handled by buildAttributionGuidance)
-// with intent-specific orchestrator directives.
+// It combines intent-specific orchestrator directives with an optional
+// terse active-item hint (one-liner, not full attribution block).
 //
 // Parameters:
 //   - intent: classification result from ClassifyPrompt
 //   - activeFeatureID: currently active work item (may be "")
 //   - activeWorkType: type of the active work item ("feature", "spike", "bug", or "")
-//   - attributionBlock: pre-built attribution guidance from buildAttributionGuidance
+//   - activeItemHint: terse one-liner "ACTIVE: <id> — <title>" or "" (not full block)
 //
 // Returns the combined guidance string (may be empty).
-func GenerateGuidance(intent PromptIntent, activeFeatureID, activeWorkType, attributionBlock string) string {
+func GenerateGuidance(intent PromptIntent, activeFeatureID, activeWorkType, activeItemHint string) string {
 	var parts []string
 
 	directive := intentDirective(intent, activeFeatureID, activeWorkType)
@@ -145,8 +145,8 @@ func GenerateGuidance(intent PromptIntent, activeFeatureID, activeWorkType, attr
 		parts = append(parts, cigsBlock)
 	}
 
-	if attributionBlock != "" {
-		parts = append(parts, attributionBlock)
+	if activeItemHint != "" {
+		parts = append(parts, activeItemHint)
 	}
 
 	return strings.Join(parts, "\n\n")
@@ -197,6 +197,7 @@ func intentDirective(intent PromptIntent, activeFeatureID, activeWorkType string
 	}
 
 	// No active work item — nudge toward creating one.
+	// Prioritize: Implementation > Bug > Investigation
 	if !hasActive {
 		if intent.IsImplementation {
 			return "ORCHESTRATOR DIRECTIVE: Implementation work detected but no active work item.\n" +

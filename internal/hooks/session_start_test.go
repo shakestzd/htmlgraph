@@ -251,3 +251,111 @@ func TestInsertAndGetSessionProjectDir(t *testing.T) {
 		t.Errorf("project_dir round-trip: got %q, want %q", got.ProjectDir, s.ProjectDir)
 	}
 }
+
+func TestSessionStartIncludesFullAttribution(t *testing.T) {
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+
+	database, err := db.Open(filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	defer database.Close()
+
+	// Add some open work items so attribution block is generated.
+	now := time.Now().UTC()
+	if err := db.InsertFeature(database, &db.Feature{
+		ID:        "feat-001",
+		Type:      "feature",
+		Title:     "Auth system",
+		Status:    "in-progress",
+		Priority:  "high",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("InsertFeature: %v", err)
+	}
+
+	sessionID := "test-session-attribution"
+	event := &CloudEvent{SessionID: sessionID, CWD: projectDir}
+
+	t.Setenv("CLAUDE_SESSION_ID", "")
+	t.Setenv("HTMLGRAPH_PARENT_SESSION", "")
+	t.Setenv("HTMLGRAPH_NESTING_DEPTH", "")
+	t.Setenv("CLAUDE_ENV_FILE", "")
+
+	result, err := SessionStart(event, database, projectDir)
+	if err != nil {
+		t.Fatalf("SessionStart: %v", err)
+	}
+
+	// SessionStart should return full attribution block as additionalContext.
+	if result.AdditionalContext == "" {
+		t.Fatal("expected AdditionalContext with full attribution block")
+	}
+
+	// Should contain open work items listing.
+	if !testContainsStr(result.AdditionalContext, "Open work items") {
+		t.Errorf("attribution should list 'Open work items', got: %s", result.AdditionalContext)
+	}
+
+	// Should contain the open feature.
+	if !testContainsStr(result.AdditionalContext, "feat-001") {
+		t.Errorf("attribution should list feat-001, got: %s", result.AdditionalContext)
+	}
+
+	// Should contain CLI quick-reference.
+	if !testContainsStr(result.AdditionalContext, "htmlgraph CLI") {
+		t.Errorf("attribution should mention 'htmlgraph CLI', got: %s", result.AdditionalContext)
+	}
+
+	// Should contain required flags reminder.
+	if !testContainsStr(result.AdditionalContext, "--track") {
+		t.Errorf("attribution should mention '--track' requirement, got: %s", result.AdditionalContext)
+	}
+}
+
+func TestSessionStartNoAttributionWhenNoOpenItems(t *testing.T) {
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+
+	database, err := db.Open(filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	defer database.Close()
+
+	// No features added — no open work items.
+	sessionID := "test-session-no-items"
+	event := &CloudEvent{SessionID: sessionID, CWD: projectDir}
+
+	t.Setenv("CLAUDE_SESSION_ID", "")
+	t.Setenv("HTMLGRAPH_PARENT_SESSION", "")
+	t.Setenv("HTMLGRAPH_NESTING_DEPTH", "")
+	t.Setenv("CLAUDE_ENV_FILE", "")
+
+	result, err := SessionStart(event, database, projectDir)
+	if err != nil {
+		t.Fatalf("SessionStart: %v", err)
+	}
+
+	// When no open items, SessionStart should not emit additional context
+	// (or return empty result).
+	if result.AdditionalContext != "" && testContainsStr(result.AdditionalContext, "Open work items") {
+		t.Errorf("should not list open items when none exist, got: %s", result.AdditionalContext)
+	}
+}
+
+// testContainsStr is a helper for test assertions (avoids import cycle).
+func testContainsStr(s, substr string) bool {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

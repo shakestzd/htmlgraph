@@ -69,11 +69,11 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	// Look up active work item type for intent-specific directives.
 	activeWorkType := getActiveWorkItemType(database, featureID)
 
-	// Build attribution block (open work items listing).
-	attributionBlock := buildAttributionGuidance(database, sessionID, featureID)
+	// Build terse active item one-liner (only when active item exists).
+	activeItemHint := buildActiveItemOneLiner(database, featureID)
 
-	// Combine classification guidance with attribution.
-	guidance := GenerateGuidance(intent, featureID, activeWorkType, attributionBlock)
+	// Combine classification guidance with terse active item hint.
+	guidance := GenerateGuidance(intent, featureID, activeWorkType, activeItemHint)
 
 	result := &HookResult{}
 	if guidance != "" {
@@ -129,6 +129,7 @@ const compactCLIRef = `**htmlgraph CLI** — feature|bug|spike|track|plan [creat
 
 // buildAttributionGuidance returns a compact CIGS attribution block listing
 // open work items so Claude can call htmlgraph feature start for the right item.
+// Used once per session in SessionStart hook.
 func buildAttributionGuidance(database *sql.DB, sessionID, activeFeatureID string) string {
 	open := listOpenWorkItems(database)
 	if len(open) == 0 {
@@ -157,6 +158,23 @@ func buildAttributionGuidance(database *sql.DB, sessionID, activeFeatureID strin
 	}
 	lines = append(lines, "", compactCLIRef)
 	return joinLines(lines)
+}
+
+// buildActiveItemOneLiner returns a terse "ACTIVE: <id> — <title>" string when
+// an active item is set, or empty string when none. Used per-turn in UserPromptSubmit.
+func buildActiveItemOneLiner(database *sql.DB, featureID string) string {
+	if featureID == "" {
+		return ""
+	}
+
+	var title sql.NullString
+	err := database.QueryRow(
+		`SELECT title FROM features WHERE id = ?`, featureID,
+	).Scan(&title)
+	if err != nil || !title.Valid || title.String == "" {
+		return fmt.Sprintf("ACTIVE: %s", featureID)
+	}
+	return fmt.Sprintf("ACTIVE: %s — %s", featureID, title.String)
 }
 
 // buildActiveFeatureContext returns a rich context block for the active feature.
