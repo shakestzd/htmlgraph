@@ -11,14 +11,16 @@ func init() { Register(codexAdapter{}) }
 // codexAdapter emits the Codex CLI marketplace tree. Layout:
 //
 //	<outDir>/.agents/plugins/marketplace.json
-//	<outDir>/.agents/plugins/htmlgraph/.codex-plugin/plugin.json
-//	<outDir>/.agents/plugins/htmlgraph/hooks.json
-//	<outDir>/.agents/plugins/htmlgraph/.mcp.json
-//	<outDir>/.agents/plugins/htmlgraph/{commands,agents,skills,templates,static,config}/
+//	<outDir>/plugins/htmlgraph/.codex-plugin/plugin.json
+//	<outDir>/plugins/htmlgraph/hooks.json
+//	<outDir>/plugins/htmlgraph/.mcp.json
+//	<outDir>/plugins/htmlgraph/{commands,agents,skills,templates,static,config}/
 //
 // Codex 0.121.0+ registers plugins exclusively via `codex marketplace add <path>`.
-// Codex expects the marketplace root to contain `.agents/plugins/marketplace.json`
-// and plugin content to live under `.agents/plugins/<plugin-name>/`.
+// Per the Codex docs, `source.path` is resolved relative to the marketplace root
+// (the directory passed to `codex marketplace add`), NOT relative to the
+// `.agents/plugins/` folder. Plugin content therefore lives under `plugins/`
+// at the marketplace root, and marketplace.json's source.path is `"./plugins/htmlgraph"`.
 //
 // Codex hook event names differ from Claude in a few places (TaskStarted,
 // TaskComplete, TurnAborted) — the manifest's `targets` field controls which
@@ -32,9 +34,10 @@ func (codexAdapter) Name() string { return "codex" }
 // build-ports fully regenerates. These are cleaned before each emit to prevent
 // stale files accumulating. marketplace.json is regenerated separately.
 // Hand-maintained files (README.md) outside these paths are never touched.
-// The owned subtree is narrowed to the plugin's own directory to avoid
-// deleting sibling plugins under .agents/plugins/.
-var codexOwnedSubtrees = []string{".agents/plugins/htmlgraph"}
+// Both plugins/htmlgraph (the current plugin tree location) and the former
+// .agents/plugins/htmlgraph (old layout, cleaned on migration) are owned.
+// Narrowing to htmlgraph avoids deleting sibling plugins.
+var codexOwnedSubtrees = []string{"plugins/htmlgraph", ".agents/plugins/htmlgraph"}
 
 func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	target, ok := m.Targets[c.Name()]
@@ -43,25 +46,25 @@ func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	}
 
 	// Determine where plugin content lives inside the marketplace tree.
-	// Codex expects: <outDir>/.agents/plugins/<plugin-name>/
+	// Per Codex docs, source.path is resolved relative to the marketplace root
+	// (outDir), so plugin content lives at <outDir>/plugins/<plugin-name>/
 	pluginSubdir := target.PluginSubdir
 	if pluginSubdir == "" {
-		pluginSubdir = ".agents/plugins/htmlgraph"
+		pluginSubdir = "plugins/htmlgraph"
 	}
 	pluginDir := filepath.Join(outDir, pluginSubdir)
 
 	// Pre-clean owned subtrees so renamed/deleted source files don't leave
-	// stale output files behind. marketplace.json is inside the owned subtree.
+	// stale output files behind.
 	if err := cleanOwnedSubtrees(outDir, codexOwnedSubtrees); err != nil {
 		return fmt.Errorf("codex pre-clean: %w", err)
 	}
 
 	// Write marketplace.json at <outDir>/.agents/plugins/marketplace.json.
-	// source.path is relative to the directory containing marketplace.json
-	// (i.e. .agents/plugins/), so compute as filepath.Rel against that directory.
+	// source.path is resolved relative to the marketplace root (outDir), so
+	// compute as filepath.Rel from outDir to pluginDir.
 	mktPath := filepath.Join(outDir, ".agents", "plugins", "marketplace.json")
-	mktDir := filepath.Dir(mktPath)
-	rel, err := filepath.Rel(mktDir, pluginDir)
+	rel, err := filepath.Rel(outDir, pluginDir)
 	if err != nil {
 		return fmt.Errorf("compute relative path for source.path: %w", err)
 	}
@@ -88,9 +91,9 @@ func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 // codexMarketplaceJSON is the schema for marketplace.json at the root of a
 // Codex marketplace directory. Codex reads this file on `codex marketplace add`.
 type codexMarketplaceJSON struct {
-	Name      string                 `json:"name"`
-	Interface codexMktInterfaceJSON  `json:"interface"`
-	Plugins   []codexMktPluginJSON   `json:"plugins"`
+	Name      string                `json:"name"`
+	Interface codexMktInterfaceJSON `json:"interface"`
+	Plugins   []codexMktPluginJSON  `json:"plugins"`
 }
 
 type codexMktInterfaceJSON struct {
@@ -98,10 +101,10 @@ type codexMktInterfaceJSON struct {
 }
 
 type codexMktPluginJSON struct {
-	Name     string               `json:"name"`
-	Source   codexMktSourceJSON   `json:"source"`
-	Policy   codexMktPolicyJSON   `json:"policy"`
-	Category string               `json:"category,omitempty"`
+	Name     string             `json:"name"`
+	Source   codexMktSourceJSON `json:"source"`
+	Policy   codexMktPolicyJSON `json:"policy"`
+	Category string             `json:"category,omitempty"`
 }
 
 type codexMktSourceJSON struct {
@@ -115,8 +118,8 @@ type codexMktPolicyJSON struct {
 }
 
 // writeCodexMarketplace writes marketplace.json to path. sourcePath is the
-// relative path to the plugin directory, computed relative to the directory
-// containing marketplace.json (i.e. <outDir>/.agents/plugins/).
+// relative path to the plugin directory, computed relative to the marketplace
+// root (outDir), since Codex resolves source.path from the marketplace root.
 func writeCodexMarketplace(m *Manifest, target Target, path, sourcePath string) error {
 	name := target.MarketplaceName
 	if name == "" {
@@ -130,8 +133,6 @@ func writeCodexMarketplace(m *Manifest, target Target, path, sourcePath string) 
 	if category == "" {
 		category = m.Category
 	}
-
-	// source.path is relative to the directory containing marketplace.json.
 
 	return writeJSON(path, codexMarketplaceJSON{
 		Name:      name,
@@ -165,6 +166,7 @@ type codexPluginJSON struct {
 	Repository  string             `json:"repository,omitempty"`
 	License     string             `json:"license,omitempty"`
 	Keywords    []string           `json:"keywords,omitempty"`
+	Skills      string             `json:"skills,omitempty"`
 	Interface   codexInterfaceJSON `json:"interface"`
 }
 
@@ -196,6 +198,7 @@ func writeCodexManifest(m *Manifest, path string) error {
 		Repository: m.Repository,
 		License:    m.License,
 		Keywords:   m.Keywords,
+		Skills:     "./skills/",
 		Interface: codexInterfaceJSON{
 			DisplayName:      "HtmlGraph",
 			ShortDescription: m.Description,

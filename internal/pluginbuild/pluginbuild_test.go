@@ -30,7 +30,7 @@ func fixtureManifest() *Manifest {
 				MarketplaceName:        "htmlgraph",
 				MarketplaceDisplayName: "HtmlGraph",
 				MarketplaceCategory:    "Dev",
-				PluginSubdir:           ".agents/plugins/htmlgraph",
+				PluginSubdir:           "plugins/htmlgraph",
 			},
 			"gemini": {OutDir: "packages/gemini-extension", ManifestPath: "gemini-extension.json", HooksPath: "hooks/hooks.json", ContextFile: "GEMINI.md", CommandNamespace: "htmlgraph"},
 		},
@@ -89,7 +89,9 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	repoRoot := t.TempDir()
 	seedAssets(t, repoRoot)
 	outDir := filepath.Join(repoRoot, "packages", "codex-marketplace")
-	pluginDir := filepath.Join(outDir, ".agents", "plugins", "htmlgraph")
+	// Plugin content lives under plugins/htmlgraph/ at the marketplace root,
+	// per the Codex docs: source.path is relative to the marketplace root (outDir).
+	pluginDir := filepath.Join(outDir, "plugins", "htmlgraph")
 
 	if err := (codexAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
 		t.Fatalf("Emit: %v", err)
@@ -278,9 +280,9 @@ func TestCodexAdapterRemovesStaleFiles(t *testing.T) {
 	seedAssets(t, repoRoot)
 	outDir := filepath.Join(repoRoot, "packages", "codex-marketplace")
 
-	// Seed a stale file inside .agents/ (the owned subtree) that will not be
-	// reproduced by Emit.
-	staleFile := filepath.Join(outDir, ".agents", "plugins", "htmlgraph", "commands", "stale-removed.md")
+	// Seed a stale file inside plugins/htmlgraph/ (the owned subtree) that will
+	// not be reproduced by Emit.
+	staleFile := filepath.Join(outDir, "plugins", "htmlgraph", "commands", "stale-removed.md")
 	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
