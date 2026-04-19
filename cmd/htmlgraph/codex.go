@@ -132,13 +132,11 @@ func removeCodexHtmlgraphRegistrations(configPath string) (bool, error) {
 
 	removed := false
 
-	// Remove from [plugins] — any "htmlgraph@..." entry
+	// Remove from [plugins] — only the exact "htmlgraph@htmlgraph" entry
 	if plugins, ok := tree["plugins"].(map[string]interface{}); ok {
-		for key := range plugins {
-			if strings.HasPrefix(key, "htmlgraph@") || key == "htmlgraph" {
-				delete(plugins, key)
-				removed = true
-			}
+		if _, exists := plugins["htmlgraph@htmlgraph"]; exists {
+			delete(plugins, "htmlgraph@htmlgraph")
+			removed = true
 		}
 		// If [plugins] is now empty, remove the whole section
 		if len(plugins) == 0 {
