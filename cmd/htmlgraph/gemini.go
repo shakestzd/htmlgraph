@@ -362,19 +362,6 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 
 	projectRoot, _ := resolveProjectRoot()
 
-	if dryRun {
-		ext := ""
-		if isolate {
-			ext = "htmlgraph"
-		}
-		if ext != "" {
-			fmt.Printf("[dry-run] would exec: gemini -e %s in %s\n", ext, projectRoot)
-		} else {
-			fmt.Printf("[dry-run] would exec: gemini in %s\n", projectRoot)
-		}
-		return nil
-	}
-
 	ext := ""
 	if isolate {
 		ext = "htmlgraph"
@@ -384,6 +371,7 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 		Extension:   ext,
 		ExtraArgs:   extraArgs,
 		ProjectRoot: projectRoot,
+		DryRun:      dryRun,
 	})
 }
 

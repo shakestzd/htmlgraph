@@ -472,6 +472,91 @@ func TestGeminiDryRunSurfacesSystemMd(t *testing.T) {
 	}
 }
 
+// TestGeminiDevDryRunSurfacesSystemMd verifies that --dev --dry-run also includes
+// the GEMINI_SYSTEM_MD line, ensuring the dev path routes through execGemini.
+func TestGeminiDevDryRunSurfacesSystemMd(t *testing.T) {
+	outBuf := &strings.Builder{}
+
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+
+	// Simulate --dev --dry-run with no --isolate.
+	// launchGeminiDev should now route through execGemini with DryRun: true,
+	// ensuring the central GEMINI_SYSTEM_MD line prints.
+	opts := geminiLaunchOpts{
+		Extension:   "", // No isolate
+		ProjectRoot: "/test/project",
+		DryRun:      true,
+	}
+	execErr := execGemini(opts)
+
+	w.Close()
+	os.Stdout = origStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	outBuf.Write(buf[:n])
+
+	if execErr != nil {
+		t.Fatalf("execGemini dev --dry-run returned error: %v", execErr)
+	}
+
+	output := outBuf.String()
+	if !strings.Contains(output, "GEMINI_SYSTEM_MD=") {
+		t.Errorf("dev --dry-run output missing GEMINI_SYSTEM_MD line; got:\n%s", output)
+	}
+	if !strings.Contains(output, "[dry-run]") {
+		t.Errorf("dev --dry-run output missing [dry-run] prefix; got:\n%s", output)
+	}
+	if !strings.Contains(output, "in directory:") {
+		t.Errorf("dev --dry-run output missing 'in directory:' line; got:\n%s", output)
+	}
+}
+
+// TestGeminiDevDryRunWithIsolateSurfacesSystemMd verifies that --dev --isolate --dry-run
+// also includes the GEMINI_SYSTEM_MD line.
+func TestGeminiDevDryRunWithIsolateSurfacesSystemMd(t *testing.T) {
+	outBuf := &strings.Builder{}
+
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+
+	// Simulate --dev --isolate --dry-run.
+	opts := geminiLaunchOpts{
+		Extension:   "htmlgraph",
+		ProjectRoot: "/test/project",
+		DryRun:      true,
+	}
+	execErr := execGemini(opts)
+
+	w.Close()
+	os.Stdout = origStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	outBuf.Write(buf[:n])
+
+	if execErr != nil {
+		t.Fatalf("execGemini dev --isolate --dry-run returned error: %v", execErr)
+	}
+
+	output := outBuf.String()
+	if !strings.Contains(output, "GEMINI_SYSTEM_MD=") {
+		t.Errorf("dev --isolate --dry-run output missing GEMINI_SYSTEM_MD line; got:\n%s", output)
+	}
+	if !strings.Contains(output, "-e htmlgraph") {
+		t.Errorf("dev --isolate --dry-run output missing '-e htmlgraph'; got:\n%s", output)
+	}
+}
+
 // TestExecGeminiSetsGEMINI_SYSTEM_MDEnv verifies that the GEMINI_SYSTEM_MD line
 // in dry-run output points to an existing file with an absolute path.
 func TestExecGeminiSetsGEMINI_SYSTEM_MDEnv(t *testing.T) {
