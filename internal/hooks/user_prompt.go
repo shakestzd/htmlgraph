@@ -15,7 +15,7 @@ import (
 // It inserts a UserQuery agent_event, classifies the prompt intent,
 // and returns combined CIGS attribution + classification guidance.
 func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" || event.Prompt == "" {
 		return &HookResult{Continue: true}, nil
 	}

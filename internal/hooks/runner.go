@@ -193,3 +193,24 @@ func EnvSessionID(eventSessionID string) string {
 	}
 	return ""
 }
+
+// resolveSessionIDWithHarness resolves the session ID using harness-aware logic.
+// For non-Claude harnesses (Codex, Gemini), it prefers the CloudEvent.SessionID
+// from the payload and avoids env var fallback, since those can leak from a
+// parent Claude orchestrator shell. For Claude, it uses the standard fallback
+// chain (event, env, file).
+func resolveSessionIDWithHarness(event *CloudEvent) string {
+	// For Codex/Gemini, always trust the payload's session_id and don't
+	// fall back to env vars which may have leaked from parent Claude shell.
+	if event.AgentID == "codex" || event.AgentID == "gemini" {
+		if sid := agent.NormaliseSessionID(event.SessionID); sid != "" {
+			return sid
+		}
+		// If the harness-specific session_id is missing (unusual), still try env
+		// but only as last resort — this avoids using stale parent env.
+		return ""
+	}
+
+	// Claude: use standard fallback chain (event → env → file).
+	return EnvSessionID(event.SessionID)
+}

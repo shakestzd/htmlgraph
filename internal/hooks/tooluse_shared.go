@@ -66,7 +66,7 @@ type toolUseContext struct {
 func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext {
 	start := time.Now()
 
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" {
 		return nil
 	}
