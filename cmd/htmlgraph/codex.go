@@ -108,6 +108,72 @@ func getCodexMarketplacePathAt(configPath string) string {
 	return ""
 }
 
+// removeCodexHtmlgraphRegistrations removes any HtmlGraph marketplace or plugin
+// registrations from the given config.toml file. It is idempotent — if the file
+// does not exist or contains no htmlgraph entries, it is a no-op.
+// Returns (removed bool, error). removed=true indicates at least one entry was deleted.
+func removeCodexHtmlgraphRegistrations(configPath string) (bool, error) {
+	// Read existing config, if any
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // file doesn't exist; no-op
+		}
+		return false, fmt.Errorf("reading %s: %w", configPath, err)
+	}
+
+	// Parse the TOML tree
+	tree := make(map[string]interface{})
+	if len(data) > 0 {
+		if err := toml.Unmarshal(data, &tree); err != nil {
+			return false, fmt.Errorf("parsing %s: %w", configPath, err)
+		}
+	}
+
+	removed := false
+
+	// Remove from [plugins] — only the exact "htmlgraph@htmlgraph" entry
+	if plugins, ok := tree["plugins"].(map[string]interface{}); ok {
+		if _, exists := plugins["htmlgraph@htmlgraph"]; exists {
+			delete(plugins, "htmlgraph@htmlgraph")
+			removed = true
+		}
+		// If [plugins] is now empty, remove the whole section
+		if len(plugins) == 0 {
+			delete(tree, "plugins")
+		}
+	}
+
+	// Remove from [marketplaces] — the "htmlgraph" entry
+	if mkts, ok := tree["marketplaces"].(map[string]interface{}); ok {
+		if _, exists := mkts["htmlgraph"]; exists {
+			delete(mkts, "htmlgraph")
+			removed = true
+		}
+		// If [marketplaces] is now empty, remove the whole section
+		if len(mkts) == 0 {
+			delete(tree, "marketplaces")
+		}
+	}
+
+	// If nothing was removed, no need to rewrite the file
+	if !removed {
+		return false, nil
+	}
+
+	// Marshal back to TOML and write
+	newData, err := toml.Marshal(tree)
+	if err != nil {
+		return false, fmt.Errorf("marshaling TOML: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, newData, 0644); err != nil {
+		return false, fmt.Errorf("writing %s: %w", configPath, err)
+	}
+
+	return true, nil
+}
+
 // ensureCodexHooksEnabled parses the config.toml file, merges codex_hooks = true
 // into the [features] table (creating the section if absent), and writes it back.
 // This is idempotent: if codex_hooks = true is already set, it's a no-op after
@@ -305,14 +371,21 @@ func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) e
 	registeredAbs, _ := filepath.Abs(registeredPath)
 
 	if registeredAbs != "" && registeredAbs != localAbs {
-		// Mismatched registration: remove the old one
-		fmt.Printf("Replacing mismatched marketplace registration (%s)\n", registeredPath)
-		removeArgs := []string{"marketplace", "remove", registeredPath}
+		// Mismatched registration: remove the old one via direct TOML editing
+		oldPathDisplay := registeredPath
+		if oldPathDisplay == "" {
+			oldPathDisplay = "(unknown previous path)"
+		}
+		fmt.Printf("Replacing mismatched marketplace registration (%s)\n", oldPathDisplay)
 		if dryRun {
-			fmt.Printf("[dry-run] codex %s\n", strings.Join(removeArgs, " "))
+			fmt.Printf("[dry-run] would remove HtmlGraph registrations from %s\n", configPath)
 		} else {
-			if out, err := exec.Command("codex", removeArgs...).CombinedOutput(); err != nil {
-				return fmt.Errorf("removing mismatched marketplace failed: %w\n%s", err, strings.TrimSpace(string(out)))
+			removed, rmErr := removeCodexHtmlgraphRegistrations(configPath)
+			if rmErr != nil {
+				return fmt.Errorf("removing mismatched marketplace from %s: %w", configPath, rmErr)
+			}
+			if removed {
+				fmt.Println("Mismatched registration removed from config.toml.")
 			}
 		}
 		registeredPath = "" // Force re-add
@@ -349,10 +422,11 @@ func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) e
 	// --cleanup: unregister the local marketplace after session ends.
 	if cleanup && !dryRun {
 		fmt.Println("Cleaning up local marketplace registration...")
-		removeArgs := []string{"marketplace", "remove", localMarketplace}
-		if out, rmErr := exec.Command("codex", removeArgs...).CombinedOutput(); rmErr != nil {
-			fmt.Fprintf(os.Stderr, "warning: marketplace remove failed: %v (%s)\n",
-				rmErr, strings.TrimSpace(string(out)))
+		removed, rmErr := removeCodexHtmlgraphRegistrations(configPath)
+		if rmErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not remove marketplace registration: %v\n", rmErr)
+		} else if !removed {
+			fmt.Println("No HtmlGraph registrations found to clean up.")
 		}
 	}
 
