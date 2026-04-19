@@ -77,6 +77,17 @@ type HookResult struct {
 	AdditionalContext string `json:"additionalContext,omitempty"`  // injected into conversation
 }
 
+// ReadRawStdin reads all bytes from stdin without parsing. This is used by the
+// harness-routing layer in runHookNamed to inspect the raw payload before
+// choosing a dialect-specific parser.
+func ReadRawStdin() ([]byte, error) {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("reading stdin: %w", err)
+	}
+	return data, nil
+}
+
 // ReadInput reads and parses a CloudEvent from stdin.
 func ReadInput() (*CloudEvent, error) {
 	ev, _, err := ReadInputRaw()
