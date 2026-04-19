@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>[RESTORED bug-e9d53133] htmlgraph gemini doesn&#39;t inject orchestrator prompt</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-b3c0693a"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-04-19T08:39:20.502963"
+             data-updated="2026-04-19T15:28:36.245476" data-agent-assigned="claude-code" data-track-id="trk-a7ee6791">
+
+        <header>
+            <h1>[RESTORED bug-e9d53133] htmlgraph gemini doesn&#39;t inject orchestrator prompt</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-a87c8c04.html" data-relationship="caused_by" data-since="2026-04-19T08:39:20.50386">bug-a87c8c04</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a7ee6791.html" data-relationship="part_of" data-since="2026-04-19T08:39:20.504099">trk-a7ee6791</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Original: bug-e9d53133. No equivalent of claude --append-system-prompt was wired. Fixed in PR #46 via GEMINI_SYSTEM_MD env var pointing at an embedded cmd/htmlgraph/prompts/gemini-system.md with per-harness tool-name placeholder rendering.</p>
+        </section>
+    </article>
+</body>
+</html>
