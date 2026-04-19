@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -227,6 +229,157 @@ func promptYesNo(question string, yes bool) bool {
 	return answer == "y" || answer == "yes"
 }
 
+// copyDir recursively copies src directory to dst.
+// If dst exists, it is removed first (idempotent).
+// Uses filepath.Walk + os.MkdirAll + io.Copy for portability.
+func copyDir(src, dst string) error {
+	// Remove destination if it exists
+	if err := os.RemoveAll(dst); err != nil {
+		return fmt.Errorf("remove existing destination: %w", err)
+	}
+
+	// Walk the source directory
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Compute relative path
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		// Destination path
+		dstPath := filepath.Join(dst, rel)
+
+		if info.IsDir() {
+			// Create directory
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		// Copy file
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		// Create parent directories if needed
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return err
+		}
+
+		dstFile, err := os.Create(dstPath)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return err
+		}
+
+		return os.Chmod(dstPath, info.Mode())
+	})
+}
+
+// parseCodexMarketplaceJSON parses the marketplace.json file at
+// <marketplaceRoot>/.agents/plugins/marketplace.json and returns:
+// - marketplace name (e.g., "htmlgraph")
+// - plugin name (e.g., "htmlgraph")
+// - plugin source subpath (e.g., "htmlgraph", corresponding to "./htmlgraph" in the JSON)
+func parseCodexMarketplaceJSON(marketplaceRoot string) (mktName, pluginName, pluginSourceSubpath string, err error) {
+	jsonPath := filepath.Join(marketplaceRoot, ".agents", "plugins", "marketplace.json")
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return "", "", "", fmt.Errorf("read marketplace.json at %s: %w", jsonPath, err)
+	}
+
+	var mkt struct {
+		Name    string `json:"name"`
+		Plugins []struct {
+			Name   string `json:"name"`
+			Source struct {
+				Path string `json:"path"`
+			} `json:"source"`
+		} `json:"plugins"`
+	}
+
+	if err := json.Unmarshal(data, &mkt); err != nil {
+		return "", "", "", fmt.Errorf("parse marketplace.json: %w", err)
+	}
+
+	if len(mkt.Plugins) == 0 {
+		return "", "", "", fmt.Errorf("marketplace.json has no plugins defined")
+	}
+
+	mktName = mkt.Name
+	pluginName = mkt.Plugins[0].Name
+	// Remove leading "./" if present
+	pluginSourceSubpath = strings.TrimPrefix(mkt.Plugins[0].Source.Path, "./")
+
+	return mktName, pluginName, pluginSourceSubpath, nil
+}
+
+// parseCodexPluginVersion reads the plugin version from the plugin's
+// .codex-plugin/plugin.json manifest at the given marketplace root + subpath.
+func parseCodexPluginVersion(marketplaceRoot, pluginSourceSubpath string) (string, error) {
+	jsonPath := filepath.Join(marketplaceRoot, pluginSourceSubpath, ".codex-plugin", "plugin.json")
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return "", fmt.Errorf("read plugin.json at %s: %w", jsonPath, err)
+	}
+
+	var manifest struct {
+		Version string `json:"version"`
+	}
+
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return "", fmt.Errorf("parse plugin.json: %w", err)
+	}
+
+	if manifest.Version == "" {
+		return "", fmt.Errorf("plugin.json has no version field")
+	}
+
+	return manifest.Version, nil
+}
+
+// installCodexPluginToCache copies the plugin source tree to Codex's expected
+// cache layout so the plugin is immediately usable without the user manually
+// invoking /plugin → install in the TUI.
+//
+// Cache path layout per Codex docs:
+//
+//	~/.codex/plugins/cache/<marketplaceName>/<pluginName>/<version>/
+//
+// For example:
+//
+//	~/.codex/plugins/cache/htmlgraph/htmlgraph/0.55.5/
+func installCodexPluginToCache(marketplaceRoot, marketplaceName, pluginName, pluginSourceSubpath string) error {
+	// Get the plugin version
+	version, err := parseCodexPluginVersion(marketplaceRoot, pluginSourceSubpath)
+	if err != nil {
+		return fmt.Errorf("determine plugin version: %w", err)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("get home directory: %w", err)
+	}
+
+	src := filepath.Join(marketplaceRoot, pluginSourceSubpath)
+	dst := filepath.Join(home, ".codex", "plugins", "cache", marketplaceName, pluginName, version)
+
+	// Idempotent: remove dst if it exists, then copy fresh
+	if err := copyDir(src, dst); err != nil {
+		return fmt.Errorf("copy plugin to cache at %s: %w", dst, err)
+	}
+
+	return nil
+}
+
 // codexCmd returns the cobra command for `htmlgraph codex`.
 func codexCmd() *cobra.Command {
 	var init_, continue_, dev, cleanup, dryRun, yes bool
@@ -298,6 +451,32 @@ func runCodexInit(yes, dryRun bool) error {
 		}
 	} else {
 		fmt.Println("HtmlGraph Codex marketplace is already installed.")
+	}
+
+	// Phase 1b: Install plugin to cache.
+	// This only works if we have a project root (for --init from the repo).
+	// If running --init from outside the repo, we assume the sparse checkout has
+	// already populated the marketplace source, but we won't install to cache
+	// (that requires knowing the source path structure).
+	if projectRoot, err := resolveProjectRoot(); err == nil {
+		localMarketplace := filepath.Join(projectRoot, "packages", "codex-marketplace")
+		if _, statErr := os.Stat(localMarketplace); statErr == nil {
+			// We have the marketplace source locally; install to cache
+			mktName, plgName, plgSub, parseErr := parseCodexMarketplaceJSON(localMarketplace)
+			if parseErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not parse marketplace.json: %v\n", parseErr)
+			} else {
+				if dryRun {
+					fmt.Printf("[dry-run] would install plugin to ~/.codex/plugins/cache/%s/%s/<version>/\n", mktName, plgName)
+				} else {
+					if installErr := installCodexPluginToCache(localMarketplace, mktName, plgName, plgSub); installErr != nil {
+						fmt.Fprintf(os.Stderr, "warning: could not install plugin to cache: %v\n", installErr)
+					} else {
+						fmt.Printf("Plugin installed to ~/.codex/plugins/cache/%s/%s/<version>/\n", mktName, plgName)
+					}
+				}
+			}
+		}
 	}
 
 	// Phase 2: Check and optionally enable codex_hooks feature flag.
@@ -404,6 +583,22 @@ func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) e
 		}
 	} else {
 		fmt.Println("Local marketplace already registered — proceeding.")
+	}
+
+	// Install plugin to cache (so it's available without manual /plugin install)
+	if !dryRun {
+		mktName, plgName, plgSub, parseErr := parseCodexMarketplaceJSON(localMarketplace)
+		if parseErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not parse marketplace.json: %v\n", parseErr)
+		} else {
+			if installErr := installCodexPluginToCache(localMarketplace, mktName, plgName, plgSub); installErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not install plugin to cache: %v\n", installErr)
+			} else {
+				fmt.Printf("Plugin installed to ~/.codex/plugins/cache/%s/%s/<version>/\n", mktName, plgName)
+			}
+		}
+	} else {
+		fmt.Printf("[dry-run] would install plugin to ~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/\n")
 	}
 
 	projectRoot, _ := resolveProjectRoot()
