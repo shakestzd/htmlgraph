@@ -117,6 +117,7 @@ func parseCodexEvent(raw []byte) (*CloudEvent, error) {
 	}
 
 	ev := &CloudEvent{
+		AgentID:        "codex",
 		SessionID:      p.SessionID,
 		CWD:            p.CWD,
 		PermissionMode: p.PermissionMode,
@@ -141,6 +142,7 @@ func parseGeminiEvent(raw []byte) (*CloudEvent, error) {
 	}
 
 	ev := &CloudEvent{
+		AgentID: "gemini",
 		// Gemini may use "invocation_id" as the session identifier;
 		// fall back to session_id if present.
 		SessionID: p.SessionID,

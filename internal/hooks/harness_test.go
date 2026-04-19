@@ -135,6 +135,17 @@ func TestParseCodexUserPrompt(t *testing.T) {
 	}
 }
 
+func TestParseCodexEventSetsAgentID(t *testing.T) {
+	ev, err := parseCodexEvent([]byte(codexSessionStartJSON))
+	if err != nil {
+		t.Fatalf("parseCodexEvent: %v", err)
+	}
+
+	if ev.AgentID != "codex" {
+		t.Errorf("AgentID = %q, want codex", ev.AgentID)
+	}
+}
+
 // --- parseGeminiEvent tests ---
 
 func TestParseGeminiSessionStart(t *testing.T) {
@@ -187,6 +198,17 @@ func TestParseGeminiBeforeTool(t *testing.T) {
 	}
 	if ev.ToolInput == nil {
 		t.Error("ToolInput should be populated")
+	}
+}
+
+func TestParseGeminiEventSetsAgentID(t *testing.T) {
+	ev, err := parseGeminiEvent([]byte(geminiSessionStartJSON))
+	if err != nil {
+		t.Fatalf("parseGeminiEvent: %v", err)
+	}
+
+	if ev.AgentID != "gemini" {
+		t.Errorf("AgentID = %q, want gemini", ev.AgentID)
 	}
 }
 
