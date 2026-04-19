@@ -126,10 +126,7 @@ func bareLaunchNudge(projectDir string) string {
 func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*HookResult, error) {
 	handlerStart := time.Now()
 
-	sessionID := NormaliseSessionID(event.SessionID)
-	if sessionID == "" {
-		sessionID = os.Getenv("CLAUDE_SESSION_ID")
-	}
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" {
 		sessionID = uuid.New().String()
 	}
@@ -204,6 +201,24 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 	if event.TranscriptPath != "" {
 		_, _ = database.Exec(`UPDATE sessions SET transcript_path = ? WHERE session_id = ?`,
 			event.TranscriptPath, sessionID)
+	}
+
+	// Persist the session-start event to agent_events for dashboard activity feed.
+	ev := &models.AgentEvent{
+		EventID:      uuid.New().String(),
+		AgentID:      s.AgentAssigned,
+		EventType:    models.EventStart,
+		Timestamp:    now,
+		ToolName:     "SessionStart",
+		InputSummary: "Session started",
+		SessionID:    sessionID,
+		Status:       "recorded",
+		Source:       "hook",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := db.InsertEvent(database, ev); err != nil {
+		debugLog(projectDir, "[error] handler=session-start session=%s: insert event: %v", shortID, err)
 	}
 
 	// Warn the user when the CLI and plugin versions have drifted.

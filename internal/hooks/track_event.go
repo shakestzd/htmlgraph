@@ -13,7 +13,7 @@ import (
 // TrackEvent handles generic Claude Code hook events that should be recorded
 // as agent_events without blocking (e.g. InstructionsLoaded, PreCompact).
 func TrackEvent(toolName string, event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" {
 		return &HookResult{Continue: true}, nil
 	}

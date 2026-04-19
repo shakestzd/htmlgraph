@@ -66,7 +66,7 @@ type toolUseContext struct {
 func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext {
 	start := time.Now()
 
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" {
 		return nil
 	}
@@ -149,7 +149,7 @@ func resolveAgentID(event *CloudEvent) string {
 		return id
 	}
 	// Fall back to the per-subagent hint file (written when CLAUDE_ENV_FILE is unset).
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID != "" {
 		if hint := paths.ReadSubagentHint(sessionID); hint.AgentID != "" {
 			return hint.AgentID

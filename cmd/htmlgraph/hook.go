@@ -163,13 +163,29 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 }
 
 // runHookNamed is like runHook but also records a trace entry for diagnostics.
+// It performs harness detection from the raw stdin payload so that Codex and
+// Gemini payloads are parsed with their own dialect adapters and responses are
+// emitted in the harness-appropriate wire format. Claude is the default path and
+// its behaviour is unchanged.
 func runHookNamed(subcommand string, handler func(*hooks.CloudEvent) (*hooks.HookResult, error)) error {
 	start := time.Now()
 
-	event, rawPayload, err := hooks.ReadInputRaw()
+	// Read raw stdin bytes first so we can detect the harness before parsing.
+	rawPayload, err := hooks.ReadRawStdin()
 	if err != nil {
-		hooks.LogError("runHook", "", fmt.Sprintf("read input: %v", err))
-		return hooks.Allow()
+		hooks.LogError("runHook", "", fmt.Sprintf("read stdin: %v", err))
+		// Detect harness fails gracefully to Claude when payload is unreadable.
+		return hooks.WriteResultForHarness(hooks.HarnessClaude, hooks.AllowForHarness(hooks.HarnessClaude))
+	}
+
+	// Detect the harness from the raw payload shape.
+	harness := hooks.DetectHarness(rawPayload)
+
+	// Parse the event using the harness-specific input adapter.
+	event, err := hooks.ParseEventForHarness(harness, rawPayload)
+	if err != nil {
+		hooks.LogError("runHook", "", fmt.Sprintf("parse event (%s): %v", harness, err))
+		return hooks.WriteResultForHarness(harness, hooks.AllowForHarness(harness))
 	}
 
 	hooks.TraceInvocation(subcommand, rawPayload, event)
@@ -182,11 +198,11 @@ func runHookNamed(subcommand string, handler func(*hooks.CloudEvent) (*hooks.Hoo
 			os.Exit(2)
 		}
 		hooks.LogError("runHook", event.SessionID, fmt.Sprintf("handler error: %v", err))
-		return hooks.Allow()
+		return hooks.WriteResultForHarness(harness, hooks.AllowForHarness(harness))
 	}
 	if result == nil {
 		hooks.LogError("runHook", event.SessionID, "handler returned nil result")
-		return hooks.Allow()
+		return hooks.WriteResultForHarness(harness, hooks.AllowForHarness(harness))
 	}
 
 	projectDir := hooks.ResolveProjectDir(event.CWD, event.SessionID)
@@ -196,6 +212,7 @@ func runHookNamed(subcommand string, handler func(*hooks.CloudEvent) (*hooks.Hoo
 		"session": event.SessionID[:hooks.MinSessionLen(event.SessionID)],
 	}, start, "completed")
 
-	return hooks.WriteResult(result)
+	// Emit the result in the harness-appropriate wire format.
+	return hooks.WriteResultForHarness(harness, result)
 }
 

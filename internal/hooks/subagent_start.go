@@ -15,7 +15,7 @@ import (
 // It records a task_delegation agent_event, links it to the current UserQuery,
 // and writes env vars so the subagent's hooks know their parent and identity.
 func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" {
 		return &HookResult{Continue: true}, nil
 	}
@@ -75,7 +75,7 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 // It marks the task_delegation for this specific agent as completed and
 // stores the last assistant message as the output summary.
 func SubagentStop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
 	if sessionID == "" {
 		return &HookResult{Continue: true}, nil
 	}

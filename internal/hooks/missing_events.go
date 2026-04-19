@@ -22,7 +22,12 @@ func recordSimpleEvent(
 	event *CloudEvent,
 	database *sql.DB,
 ) (*HookResult, error) {
-	sessionID := EnvSessionID(event.SessionID)
+	sessionID := resolveSessionIDWithHarness(event)
+	if sessionID == "" {
+		// For non-Claude harnesses where the session_id was missing,
+		// try the env var fallback as last resort.
+		sessionID = EnvSessionID(event.SessionID)
+	}
 	if sessionID == "" {
 		return &HookResult{Continue: true}, nil
 	}
