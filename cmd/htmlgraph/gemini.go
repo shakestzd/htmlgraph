@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -135,6 +136,57 @@ type geminiLaunchOpts struct {
 	DryRun bool
 }
 
+// renderGeminiSystemPrompt pre-processes the embedded orchestrator prompt by
+// substituting tool-name placeholders with literal tool names. This is a defensive
+// measure: even if Gemini's GEMINI_SYSTEM_MD substitution ever regresses, users will
+// see literal tool names (read_file, replace, etc.) rather than template variables.
+//
+// Section placeholders (${AgentSkills}, ${SubAgents}, ${AvailableTools}) are left
+// unchanged — they benefit from Gemini's runtime rendering and are more complex
+// to emulate statically.
+func renderGeminiSystemPrompt(content string) string {
+	toolNameReplacements := map[string]string{
+		"${read_file_ToolName}":            "read_file",
+		"${replace_ToolName}":              "replace",
+		"${write_file_ToolName}":           "write_file",
+		"${grep_search_ToolName}":          "grep_search",
+		"${glob_ToolName}":                 "glob",
+		"${run_shell_command_ToolName}":    "run_shell_command",
+		"${web_fetch_ToolName}":            "web_fetch",
+		"${google_web_search_ToolName}":    "google_web_search",
+	}
+
+	result := content
+	for placeholder, literal := range toolNameReplacements {
+		result = strings.ReplaceAll(result, placeholder, literal)
+	}
+	return result
+}
+
+// writeGeminiSystemPrompt writes the embedded orchestrator prompt to a temp file
+// and returns the absolute path. Gemini reads the file at startup via GEMINI_SYSTEM_MD.
+// The caller does not need to clean up — the OS temp dir is cleared automatically.
+func writeGeminiSystemPrompt() (string, error) {
+	f, err := os.CreateTemp("", "htmlgraph-gemini-system-*.md")
+	if err != nil {
+		return "", fmt.Errorf("creating temp file: %w", err)
+	}
+	// Pre-render tool-name placeholders before writing.
+	rendered := renderGeminiSystemPrompt(geminiSystemPrompt)
+	if _, err := f.WriteString(rendered); err != nil {
+		f.Close()
+		return "", fmt.Errorf("writing gemini system prompt: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("closing temp file: %w", err)
+	}
+	abs, err := filepath.Abs(f.Name())
+	if err != nil {
+		return "", fmt.Errorf("resolving absolute path for temp file: %w", err)
+	}
+	return abs, nil
+}
+
 // execGemini builds the gemini argv and runs it, replacing the current process
 // (or returning an error if exec fails). If opts.DryRun is true, prints the
 // intended command and returns without executing.
@@ -155,7 +207,15 @@ func execGemini(opts geminiLaunchOpts) error {
 
 	geminiArgs = append(geminiArgs, opts.ExtraArgs...)
 
+	// Write the embedded orchestrator prompt to a tmpfile and inject via GEMINI_SYSTEM_MD.
+	// The env var expects an absolute path; Gemini does a full override (not append).
+	systemMdPath, err := writeGeminiSystemPrompt()
+	if err != nil {
+		return fmt.Errorf("failed to prepare GEMINI_SYSTEM_MD: %w", err)
+	}
+
 	if opts.DryRun {
+		fmt.Printf("[dry-run] GEMINI_SYSTEM_MD=%s\n", systemMdPath)
 		fmt.Printf("[dry-run] gemini %s\n", strings.Join(geminiArgs, " "))
 		if opts.ProjectRoot != "" {
 			fmt.Printf("[dry-run] in directory: %s\n", opts.ProjectRoot)
@@ -173,14 +233,15 @@ func execGemini(opts geminiLaunchOpts) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
-	// Inject HTMLGRAPH_PROJECT_DIR and HTMLGRAPH_AGENT so hooks and skills
-	// resolve to the correct project root regardless of CWD.
+	// Inject HTMLGRAPH_PROJECT_DIR, HTMLGRAPH_AGENT, and GEMINI_SYSTEM_MD so hooks,
+	// skills, and the orchestrator prompt all resolve correctly regardless of CWD.
 	env := os.Environ()
 	if opts.ProjectRoot != "" {
 		env = append(env, "HTMLGRAPH_PROJECT_DIR="+opts.ProjectRoot)
 		c.Dir = opts.ProjectRoot
 	}
 	env = append(env, "HTMLGRAPH_AGENT=gemini")
+	env = append(env, "GEMINI_SYSTEM_MD="+systemMdPath)
 	c.Env = env
 
 	if err := c.Run(); err != nil {
@@ -230,6 +291,38 @@ func launchGeminiResume(index string, extraArgs []string, dryRun bool) error {
 	})
 }
 
+// geminiExtensionMetadata represents the install metadata for the htmlgraph extension.
+type geminiExtensionMetadata struct {
+	Source string `json:"source"`
+	Type   string `json:"type"`
+}
+
+// isExtensionAlreadyLinkedToLocalPath checks if the htmlgraph extension is already
+// linked (as a live pointer) to the specified local path. Returns true only if
+// the metadata exists, matches the local path, and is a link type.
+func isExtensionAlreadyLinkedToLocalPath(localExtPath string) bool {
+	home, _ := os.UserHomeDir()
+	metaPath := filepath.Join(home, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return false
+	}
+
+	var meta geminiExtensionMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return false
+	}
+
+	return meta.Type == "link" && meta.Source == localExtPath
+}
+
+// buildGeminiLinkArgs returns the args for `gemini extensions link`.
+// Exported for testability.
+func buildGeminiLinkArgs(localExtPath string) []string {
+	return []string{"extensions", "link", localExtPath, "--consent"}
+}
+
 // launchGeminiDev links the local packages/gemini-extension and launches Gemini.
 // Corresponds to: htmlgraph gemini --dev [--isolate]
 func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
@@ -242,35 +335,78 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 	fmt.Printf("Launching Gemini CLI in dev mode...\n")
 	fmt.Printf("  Local extension: %s\n", localExtPath)
 
-	// Link the extension (idempotent — it's a live pointer).
-	linkArgs := []string{"extensions", "link", localExtPath}
+	// Check idempotency: if already linked to this local path, skip the link exec.
+	// If linked elsewhere or installed from a different source, uninstall first.
+	if !dryRun {
+		if isExtensionAlreadyLinkedToLocalPath(localExtPath) {
+			fmt.Println("Extension already linked (live pointer to local source).")
+		} else {
+			// Check if there's a stale install that needs cleaning up.
+			home, _ := os.UserHomeDir()
+			metaPath := filepath.Join(home, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+			if data, err := os.ReadFile(metaPath); err == nil {
+				var meta geminiExtensionMetadata
+				if json.Unmarshal(data, &meta) == nil && (meta.Type != "link" || meta.Source != localExtPath) {
+					// Stale or wrong-source install — uninstall first.
+					fmt.Println("Replacing existing htmlgraph extension install...")
+					geminiPath, geminiErr := exec.LookPath("gemini")
+					if geminiErr != nil {
+						return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", geminiErr)
+					}
+					uninstallArgs := []string{"extensions", "uninstall", "htmlgraph"}
+					// Surface uninstall errors rather than swallowing them.
+					out, uninstallErr := exec.Command(geminiPath, uninstallArgs...).CombinedOutput()
+					if uninstallErr != nil {
+						return fmt.Errorf("gemini extensions uninstall (while replacing stale install) failed: %w\n%s", uninstallErr, strings.TrimSpace(string(out)))
+					}
+				}
+			}
+
+			// Link the extension (idempotent — it's a live pointer).
+			linkArgs := buildGeminiLinkArgs(localExtPath)
+			fmt.Println("Linking extension...")
+			geminiPath, err := exec.LookPath("gemini")
+			if err != nil {
+				return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
+			}
+			if out, linkErr := exec.Command(geminiPath, linkArgs...).CombinedOutput(); linkErr != nil {
+				return fmt.Errorf("gemini extensions link failed: %w\n%s", linkErr, strings.TrimSpace(string(out)))
+			}
+
+			// Verify filesystem state: re-read the metadata file and validate its contents.
+			// Check that type == "link" and source == localExtPath, not just that the file exists.
+			// This catches cases where gemini may have used a different path or install method.
+			home2, _ := os.UserHomeDir()
+			metaPath2 := filepath.Join(home2, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+			metaData, err := os.ReadFile(metaPath2)
+			if err != nil {
+				return fmt.Errorf("gemini extensions link appeared to succeed but %s was not created — the link may have been blocked by an interactive prompt in gemini. Check gemini extensions list and try: 'gemini extensions link %s --consent' manually", metaPath2, localExtPath)
+			}
+
+			var postLinkMeta geminiExtensionMetadata
+			if err := json.Unmarshal(metaData, &postLinkMeta); err != nil {
+				return fmt.Errorf("gemini extensions link produced invalid metadata at %s: %w", metaPath2, err)
+			}
+
+			if postLinkMeta.Type != "link" {
+				return fmt.Errorf("gemini extensions link produced wrong type at %s: got %q, want \"link\"", metaPath2, postLinkMeta.Type)
+			}
+
+			if postLinkMeta.Source != localExtPath {
+				return fmt.Errorf("gemini extensions link did not update source path: still points at %q, expected %q — try `gemini extensions uninstall htmlgraph` manually and retry", postLinkMeta.Source, localExtPath)
+			}
+
+			fmt.Println("Extension linked (live pointer to local source).")
+		}
+	}
+
+	// Handle dry-run mode for link.
 	if dryRun {
+		linkArgs := buildGeminiLinkArgs(localExtPath)
 		fmt.Printf("[dry-run] gemini %s\n", strings.Join(linkArgs, " "))
-	} else {
-		geminiPath, err := exec.LookPath("gemini")
-		if err != nil {
-			return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
-		}
-		if out, linkErr := exec.Command(geminiPath, linkArgs...).CombinedOutput(); linkErr != nil {
-			return fmt.Errorf("gemini extensions link failed: %w\n%s", linkErr, strings.TrimSpace(string(out)))
-		}
-		fmt.Println("Extension linked (live pointer to local source).")
 	}
 
 	projectRoot, _ := resolveProjectRoot()
-
-	if dryRun {
-		ext := ""
-		if isolate {
-			ext = "htmlgraph"
-		}
-		if ext != "" {
-			fmt.Printf("[dry-run] would exec: gemini -e %s in %s\n", ext, projectRoot)
-		} else {
-			fmt.Printf("[dry-run] would exec: gemini in %s\n", projectRoot)
-		}
-		return nil
-	}
 
 	ext := ""
 	if isolate {
@@ -281,6 +417,7 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 		Extension:   ext,
 		ExtraArgs:   extraArgs,
 		ProjectRoot: projectRoot,
+		DryRun:      dryRun,
 	})
 }
 
