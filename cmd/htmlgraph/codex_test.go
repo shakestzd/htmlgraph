@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -455,5 +456,295 @@ func TestRemoveCodexHtmlgraphRegistrationsNonexistentFile(t *testing.T) {
 	}
 	if removed {
 		t.Errorf("expected removed=false for non-existent file, got true")
+	}
+}
+
+// TestParseCodexMarketplaceJSON verifies that parseCodexMarketplaceJSON correctly
+// extracts marketplace name, plugin name, and plugin source subpath from marketplace.json.
+func TestParseCodexMarketplaceJSON(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	// Create the directory structure
+	pluginsDir := filepath.Join(tmpdir, ".agents", "plugins")
+	if err := os.MkdirAll(pluginsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Create marketplace.json
+	marketplaceJSON := map[string]interface{}{
+		"name": "htmlgraph",
+		"interface": map[string]interface{}{
+			"displayName": "HtmlGraph",
+		},
+		"plugins": []map[string]interface{}{
+			{
+				"name": "htmlgraph",
+				"source": map[string]interface{}{
+					"source": "local",
+					"path":   "./htmlgraph",
+				},
+				"policy": map[string]interface{}{
+					"installation":   "AVAILABLE",
+					"authentication": "ON_INSTALL",
+				},
+				"category": "Development Tools",
+			},
+		},
+	}
+
+	data, err := json.Marshal(marketplaceJSON)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	marketplaceFile := filepath.Join(pluginsDir, "marketplace.json")
+	if err := os.WriteFile(marketplaceFile, data, 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Parse and verify
+	mktName, plgName, plgSub, err := parseCodexMarketplaceJSON(tmpdir)
+	if err != nil {
+		t.Fatalf("parseCodexMarketplaceJSON: %v", err)
+	}
+
+	if mktName != "htmlgraph" {
+		t.Errorf("expected marketplace name 'htmlgraph', got %q", mktName)
+	}
+	if plgName != "htmlgraph" {
+		t.Errorf("expected plugin name 'htmlgraph', got %q", plgName)
+	}
+	if plgSub != "htmlgraph" {
+		t.Errorf("expected plugin subpath 'htmlgraph' (without ./), got %q", plgSub)
+	}
+}
+
+// TestParseCodexPluginVersion verifies that parseCodexPluginVersion correctly
+// extracts the version from plugin.json.
+func TestParseCodexPluginVersion(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	// Create the directory structure
+	pluginDir := filepath.Join(tmpdir, "htmlgraph", ".codex-plugin")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Create plugin.json
+	pluginJSON := map[string]interface{}{
+		"version": "0.55.5",
+		"name":    "htmlgraph",
+	}
+
+	data, err := json.Marshal(pluginJSON)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	pluginFile := filepath.Join(pluginDir, "plugin.json")
+	if err := os.WriteFile(pluginFile, data, 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Parse and verify
+	version, err := parseCodexPluginVersion(tmpdir, "htmlgraph")
+	if err != nil {
+		t.Fatalf("parseCodexPluginVersion: %v", err)
+	}
+
+	if version != "0.55.5" {
+		t.Errorf("expected version '0.55.5', got %q", version)
+	}
+}
+
+// TestCopyDirCreatesExpectedLayout verifies that copyDir successfully copies
+// a source directory tree to a destination, creating all necessary subdirectories.
+func TestCopyDirCreatesExpectedLayout(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	// Create source directory with some files and subdirectories
+	srcDir := filepath.Join(tmpdir, "src")
+	if err := os.MkdirAll(filepath.Join(srcDir, "subdir"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Create some test files
+	files := map[string]string{
+		"file1.txt":          "content1",
+		"subdir/file2.txt":   "content2",
+		"subdir/file3.json":  `{"key": "value"}`,
+	}
+
+	for relPath, content := range files {
+		fullPath := filepath.Join(srcDir, relPath)
+		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+			t.Fatalf("WriteFile %s: %v", relPath, err)
+		}
+	}
+
+	// Copy to destination
+	dstDir := filepath.Join(tmpdir, "dst")
+	if err := copyDir(srcDir, dstDir); err != nil {
+		t.Fatalf("copyDir: %v", err)
+	}
+
+	// Verify all files exist and have correct content
+	for relPath, expectedContent := range files {
+		fullPath := filepath.Join(dstDir, relPath)
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			t.Fatalf("ReadFile %s: %v", relPath, err)
+		}
+		if string(content) != expectedContent {
+			t.Errorf("file %s: expected %q, got %q", relPath, expectedContent, string(content))
+		}
+	}
+}
+
+// TestCopyDirIdempotent verifies that copyDir is idempotent — calling it twice
+// with the same destination produces identical results (destination is cleared first).
+func TestCopyDirIdempotent(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	// Create source directory with a file
+	srcDir := filepath.Join(tmpdir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testFile := filepath.Join(srcDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("content"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	dstDir := filepath.Join(tmpdir, "dst")
+
+	// First copy
+	if err := copyDir(srcDir, dstDir); err != nil {
+		t.Fatalf("first copyDir: %v", err)
+	}
+	data1, err := os.ReadFile(filepath.Join(dstDir, "test.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile after first copy: %v", err)
+	}
+
+	// Second copy (should be idempotent)
+	if err := copyDir(srcDir, dstDir); err != nil {
+		t.Fatalf("second copyDir: %v", err)
+	}
+	data2, err := os.ReadFile(filepath.Join(dstDir, "test.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile after second copy: %v", err)
+	}
+
+	if !bytes.Equal(data1, data2) {
+		t.Errorf("idempotency check failed: content differs after second copy")
+	}
+}
+
+// TestInstallCodexPluginToCacheCreatesExpectedLayout verifies that
+// installCodexPluginToCache creates the expected cache layout.
+func TestInstallCodexPluginToCacheCreatesExpectedLayout(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	// Set HOME to tmpdir for this test so UserHomeDir() returns tmpdir
+	oldHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", oldHome)
+	os.Setenv("HOME", tmpdir)
+
+	// Create a fake marketplace with plugin.json and a test file
+	marketplaceRoot := filepath.Join(tmpdir, "marketplace")
+	pluginSourceDir := filepath.Join(marketplaceRoot, "htmlgraph")
+	if err := os.MkdirAll(filepath.Join(pluginSourceDir, ".codex-plugin"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Create plugin.json with version
+	pluginJSON := map[string]interface{}{
+		"version": "0.55.5",
+	}
+	data, _ := json.Marshal(pluginJSON)
+	if err := os.WriteFile(filepath.Join(pluginSourceDir, ".codex-plugin", "plugin.json"), data, 0644); err != nil {
+		t.Fatalf("WriteFile plugin.json: %v", err)
+	}
+
+	// Create a test file in the plugin
+	testFile := filepath.Join(pluginSourceDir, "test.md")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("WriteFile test.md: %v", err)
+	}
+
+	// Install to cache
+	if err := installCodexPluginToCache(marketplaceRoot, "htmlgraph", "htmlgraph", "htmlgraph"); err != nil {
+		t.Fatalf("installCodexPluginToCache: %v", err)
+	}
+
+	// Verify cache layout
+	expectedCachePath := filepath.Join(tmpdir, ".codex", "plugins", "cache", "htmlgraph", "htmlgraph", "0.55.5")
+	expectedPluginJSON := filepath.Join(expectedCachePath, ".codex-plugin", "plugin.json")
+	if _, err := os.Stat(expectedPluginJSON); err != nil {
+		t.Fatalf("cache layout check failed: %s does not exist: %v", expectedPluginJSON, err)
+	}
+
+	expectedTestFile := filepath.Join(expectedCachePath, "test.md")
+	if _, err := os.Stat(expectedTestFile); err != nil {
+		t.Fatalf("cache layout check failed: %s does not exist: %v", expectedTestFile, err)
+	}
+}
+
+// TestInstallCodexPluginToCacheIdempotent verifies that installCodexPluginToCache
+// is idempotent — calling it twice produces identical cache state.
+func TestInstallCodexPluginToCacheIdempotent(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	// Set HOME to tmpdir
+	oldHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", oldHome)
+	os.Setenv("HOME", tmpdir)
+
+	// Create fake marketplace
+	marketplaceRoot := filepath.Join(tmpdir, "marketplace")
+	pluginSourceDir := filepath.Join(marketplaceRoot, "htmlgraph")
+	if err := os.MkdirAll(filepath.Join(pluginSourceDir, ".codex-plugin"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Create plugin.json
+	pluginJSON := map[string]interface{}{
+		"version": "0.55.5",
+	}
+	data, _ := json.Marshal(pluginJSON)
+	if err := os.WriteFile(filepath.Join(pluginSourceDir, ".codex-plugin", "plugin.json"), data, 0644); err != nil {
+		t.Fatalf("WriteFile plugin.json: %v", err)
+	}
+
+	// Create a test file
+	testFile := filepath.Join(pluginSourceDir, "test.md")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("WriteFile test.md: %v", err)
+	}
+
+	// First install
+	if err := installCodexPluginToCache(marketplaceRoot, "htmlgraph", "htmlgraph", "htmlgraph"); err != nil {
+		t.Fatalf("first installCodexPluginToCache: %v", err)
+	}
+
+	cachePath := filepath.Join(tmpdir, ".codex", "plugins", "cache", "htmlgraph", "htmlgraph", "0.55.5", "test.md")
+	data1, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("ReadFile after first install: %v", err)
+	}
+
+	// Second install (should be idempotent)
+	if err := installCodexPluginToCache(marketplaceRoot, "htmlgraph", "htmlgraph", "htmlgraph"); err != nil {
+		t.Fatalf("second installCodexPluginToCache: %v", err)
+	}
+
+	data2, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("ReadFile after second install: %v", err)
+	}
+
+	if !bytes.Equal(data1, data2) {
+		t.Errorf("idempotency check failed: cache content differs after second install")
 	}
 }
