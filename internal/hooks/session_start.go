@@ -470,11 +470,20 @@ func UpdateActiveFeature(database *sql.DB, sessionID, featureID string) error {
 	return err
 }
 
-// buildSessionStartAttribution returns the full attribution block: the existing
-// "HtmlGraph plugin is active…" intro, plus open work items roster, CLI quick-ref,
-// and required flags reminder. Emitted once per session in SessionStart.
-// Returns empty string if there are no open work items to reference.
+// buildSessionStartAttribution returns the full attribution block: open work
+// items roster, CLI quick-ref, and required flags reminder. Emitted once per
+// session in SessionStart. Returns empty string if there are no open work items
+// to reference, allowing bareLaunchNudge to decide whether to emit a nudge.
 func buildSessionStartAttribution(database *sql.DB) string {
+	// List all open work items.
+	open := listOpenWorkItems(database)
+	if len(open) == 0 {
+		// No open items — return empty to let SessionStart fall through to
+		// bareLaunchNudge, which decides whether to emit the nudge based on
+		// launch-mode detection.
+		return ""
+	}
+
 	// Build the intro.
 	lines := []string{
 		"HtmlGraph plugin is active in this project. For the best experience with orchestrated delegation, " +
@@ -482,14 +491,6 @@ func buildSessionStartAttribution(database *sql.DB) string {
 			"on how to delegate work, select models, and manage tasks. You can also start sessions with " +
 			"`htmlgraph claude` for automatic orchestrator mode.",
 		"",
-	}
-
-	// Append the full attribution block (via buildAttributionGuidance logic).
-	// Pass empty activeFeatureID so it lists all open items, not filtering one out.
-	open := listOpenWorkItems(database)
-	if len(open) == 0 {
-		// No open items — just return the intro, skip the roster section.
-		return strings.Join(lines[:len(lines)-1], "\n")
 	}
 
 	lines = append(lines, "## Work Item Attribution (CIGS)", "")
