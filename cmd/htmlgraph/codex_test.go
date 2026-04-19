@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -342,5 +343,117 @@ func TestGetCodexMarketplacePathAt(t *testing.T) {
 				t.Errorf("getCodexMarketplacePathAt: want %q, got %q", tt.want, got)
 			}
 		})
+	}
+}
+
+// TestRemoveCodexHtmlgraphRegistrations verifies that removeCodexHtmlgraphRegistrations
+// correctly deletes htmlgraph entries while preserving other config sections.
+func TestRemoveCodexHtmlgraphRegistrations(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	// Create a realistic config with htmlgraph entries plus other unrelated config
+	initialContent := `[plugins]
+"htmlgraph@htmlgraph" = {source = "/old/path"}
+"github@openai-curated" = {source = "https://github.com/openai/curated"}
+
+[marketplaces]
+htmlgraph = {source = "/also/old/path"}
+other_marketplace = {source = "https://other.com"}
+
+[mcp_servers]
+my_server = {command = "/path/to/server"}
+
+[features]
+some_feature = true
+`
+	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Call removeCodexHtmlgraphRegistrations
+	removed, err := removeCodexHtmlgraphRegistrations(configPath)
+	if err != nil {
+		t.Fatalf("removeCodexHtmlgraphRegistrations: %v", err)
+	}
+	if !removed {
+		t.Errorf("expected removed=true, got false")
+	}
+
+	// Read the result and verify
+	data, _ := os.ReadFile(configPath)
+	content := string(data)
+
+	// htmlgraph entries should be gone
+	if strings.Contains(content, `"htmlgraph@htmlgraph"`) {
+		t.Errorf("htmlgraph@htmlgraph should be removed but is still present")
+	}
+	if strings.Contains(content, "htmlgraph = ") {
+		t.Errorf("[marketplaces.htmlgraph] should be removed but is still present")
+	}
+
+	// Other entries must be preserved
+	if !strings.Contains(content, "github@openai-curated") {
+		t.Errorf("github@openai-curated plugin should be preserved but was removed")
+	}
+	if !strings.Contains(content, "other_marketplace") {
+		t.Errorf("other_marketplace should be preserved but was removed")
+	}
+	if !strings.Contains(content, "mcp_servers") {
+		t.Errorf("[mcp_servers] section should be preserved but was removed")
+	}
+	if !strings.Contains(content, "some_feature") {
+		t.Errorf("[features] section should be preserved but was removed")
+	}
+}
+
+// TestRemoveCodexHtmlgraphRegistrationsNoop verifies that removeCodexHtmlgraphRegistrations
+// returns removed=false and preserves file content byte-for-byte when no htmlgraph entries exist.
+func TestRemoveCodexHtmlgraphRegistrationsNoop(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	// Create a config with no htmlgraph entries
+	initialContent := `[plugins]
+"github@openai-curated" = {source = "https://github.com/openai/curated"}
+
+[mcp_servers]
+my_server = {command = "/path/to/server"}
+`
+	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Read the original content for comparison
+	originalData, _ := os.ReadFile(configPath)
+
+	// Call removeCodexHtmlgraphRegistrations
+	removed, err := removeCodexHtmlgraphRegistrations(configPath)
+	if err != nil {
+		t.Fatalf("removeCodexHtmlgraphRegistrations: %v", err)
+	}
+	if removed {
+		t.Errorf("expected removed=false (no htmlgraph entries), got true")
+	}
+
+	// Verify the file was not modified
+	finalData, _ := os.ReadFile(configPath)
+	if !bytes.Equal(originalData, finalData) {
+		t.Errorf("file was modified when it should have been left unchanged.\nOriginal:\n%s\nFinal:\n%s",
+			string(originalData), string(finalData))
+	}
+}
+
+// TestRemoveCodexHtmlgraphRegistrationsNonexistentFile verifies that removeCodexHtmlgraphRegistrations
+// gracefully handles a non-existent config file.
+func TestRemoveCodexHtmlgraphRegistrationsNonexistentFile(t *testing.T) {
+	configPath := "/nonexistent/path/config.toml"
+
+	removed, err := removeCodexHtmlgraphRegistrations(configPath)
+	if err != nil {
+		t.Fatalf("removeCodexHtmlgraphRegistrations on non-existent file: %v", err)
+	}
+	if removed {
+		t.Errorf("expected removed=false for non-existent file, got true")
 	}
 }
