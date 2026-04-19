@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -228,8 +229,15 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		return &HookResult{AdditionalContext: warning}, nil
 	}
 
-	// Nudge the user toward the orchestrator skill when Claude was launched
-	// without `htmlgraph claude` (bare launch — no orchestrator system prompt).
+	// Emit full attribution block at session start (once per session).
+	// This includes: intro + open work items roster + CLI quick-ref + required flags.
+	attribution := buildSessionStartAttribution(database)
+	if attribution != "" {
+		return &HookResult{AdditionalContext: attribution}, nil
+	}
+
+	// Fallback nudge if no attribution block was generated (no open items).
+	// This nudge uses the same "HtmlGraph plugin is active..." message.
 	if nudge := bareLaunchNudge(projectDir); nudge != "" {
 		return &HookResult{AdditionalContext: nudge}, nil
 	}
@@ -460,6 +468,39 @@ func UpdateActiveFeature(database *sql.DB, sessionID, featureID string) error {
 		nullableStr(featureID), time.Now().UTC().Format(time.RFC3339), sessionID,
 	)
 	return err
+}
+
+// buildSessionStartAttribution returns the full attribution block: open work
+// items roster, CLI quick-ref, and required flags reminder. Emitted once per
+// session in SessionStart. Returns empty string if there are no open work items
+// to reference, allowing bareLaunchNudge to decide whether to emit a nudge.
+func buildSessionStartAttribution(database *sql.DB) string {
+	// List all open work items.
+	open := listOpenWorkItems(database)
+	if len(open) == 0 {
+		// No open items — return empty to let SessionStart fall through to
+		// bareLaunchNudge, which decides whether to emit the nudge based on
+		// launch-mode detection.
+		return ""
+	}
+
+	// Build the intro.
+	lines := []string{
+		"HtmlGraph plugin is active in this project. For the best experience with orchestrated delegation, " +
+			"work tracking, and quality gates, use the /htmlgraph:orchestrator-directives-skill for guidance " +
+			"on how to delegate work, select models, and manage tasks. You can also start sessions with " +
+			"`htmlgraph claude` for automatic orchestrator mode.",
+		"",
+	}
+
+	lines = append(lines, "## Work Item Attribution (CIGS)", "")
+	lines = append(lines, "**Open work items** — run `htmlgraph feature start <id>`:")
+	for _, item := range open {
+		lines = append(lines, fmt.Sprintf("  `%s` — %s [%s]", item.id, item.title, item.status))
+	}
+	lines = append(lines, "", compactCLIRef)
+
+	return joinLines(lines)
 }
 
 // ensure db package is referenced (used via db.nullStr in other files).
