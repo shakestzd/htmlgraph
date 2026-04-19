@@ -404,3 +404,114 @@ func TestIsExtensionAlreadyLinkedToLocalPathNoMetadata(t *testing.T) {
 	// Since we can't override UserHomeDir without refactoring, we test the
 	// json unmarshaling and type check logic directly (as done above).
 }
+
+// TestGeminiSystemPromptFileWritten verifies that writeGeminiSystemPrompt creates a
+// temp file containing orchestrator marker text.
+func TestGeminiSystemPromptFileWritten(t *testing.T) {
+	path, err := writeGeminiSystemPrompt()
+	if err != nil {
+		t.Fatalf("writeGeminiSystemPrompt: %v", err)
+	}
+
+	// File must exist at an absolute path.
+	if !strings.HasPrefix(path, "/") {
+		t.Errorf("expected absolute path, got %q", path)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("temp file does not exist: %v", err)
+	}
+
+	// File must contain orchestrator marker text.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "orchestrator") {
+		t.Errorf("gemini system prompt missing 'orchestrator' marker; got:\n%.200s", content)
+	}
+	// Verify the "delegate" directive is present too.
+	if !strings.Contains(content, "delegate") {
+		t.Errorf("gemini system prompt missing 'delegate' directive; got:\n%.200s", content)
+	}
+}
+
+// TestGeminiDryRunSurfacesSystemMd verifies that dry-run output includes the
+// GEMINI_SYSTEM_MD line so users can see the prompt injection.
+func TestGeminiDryRunSurfacesSystemMd(t *testing.T) {
+	outBuf := &strings.Builder{}
+
+	// Capture stdout by temporarily redirecting os.Stdout.
+	// We use execGemini directly with DryRun=true to avoid subprocess invocation.
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+
+	execErr := execGemini(geminiLaunchOpts{DryRun: true})
+
+	w.Close()
+	os.Stdout = origStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	outBuf.Write(buf[:n])
+
+	if execErr != nil {
+		t.Fatalf("execGemini dry-run returned error: %v", execErr)
+	}
+
+	output := outBuf.String()
+	if !strings.Contains(output, "GEMINI_SYSTEM_MD=") {
+		t.Errorf("dry-run output missing GEMINI_SYSTEM_MD line; got:\n%s", output)
+	}
+	if !strings.Contains(output, "[dry-run]") {
+		t.Errorf("dry-run output missing [dry-run] prefix; got:\n%s", output)
+	}
+}
+
+// TestExecGeminiSetsGEMINI_SYSTEM_MDEnv verifies that the GEMINI_SYSTEM_MD line
+// in dry-run output points to an existing file with an absolute path.
+func TestExecGeminiSetsGEMINI_SYSTEM_MDEnv(t *testing.T) {
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+
+	execErr := execGemini(geminiLaunchOpts{DryRun: true})
+
+	w.Close()
+	os.Stdout = origStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if execErr != nil {
+		t.Fatalf("execGemini dry-run returned error: %v", execErr)
+	}
+
+	// Parse the GEMINI_SYSTEM_MD path from output.
+	var systemMdPath string
+	for _, line := range strings.Split(output, "\n") {
+		const prefix = "[dry-run] GEMINI_SYSTEM_MD="
+		if strings.HasPrefix(line, prefix) {
+			systemMdPath = strings.TrimPrefix(line, prefix)
+			break
+		}
+	}
+
+	if systemMdPath == "" {
+		t.Fatalf("could not find GEMINI_SYSTEM_MD line in dry-run output:\n%s", output)
+	}
+	if !strings.HasPrefix(systemMdPath, "/") {
+		t.Errorf("GEMINI_SYSTEM_MD path is not absolute: %q", systemMdPath)
+	}
+	if _, err := os.Stat(systemMdPath); err != nil {
+		t.Errorf("GEMINI_SYSTEM_MD path does not exist: %v", err)
+	}
+}

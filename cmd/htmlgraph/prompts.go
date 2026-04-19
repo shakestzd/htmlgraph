@@ -7,3 +7,6 @@ var systemPromptContent string
 
 //go:embed prompts/yolo-prompt.md
 var yoloPromptContent string
+
+//go:embed prompts/gemini-system.md
+var geminiSystemPrompt string

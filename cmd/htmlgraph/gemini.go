@@ -136,6 +136,28 @@ type geminiLaunchOpts struct {
 	DryRun bool
 }
 
+// writeGeminiSystemPrompt writes the embedded orchestrator prompt to a temp file
+// and returns the absolute path. Gemini reads the file at startup via GEMINI_SYSTEM_MD.
+// The caller does not need to clean up — the OS temp dir is cleared automatically.
+func writeGeminiSystemPrompt() (string, error) {
+	f, err := os.CreateTemp("", "htmlgraph-gemini-system-*.md")
+	if err != nil {
+		return "", fmt.Errorf("creating temp file: %w", err)
+	}
+	if _, err := f.WriteString(geminiSystemPrompt); err != nil {
+		f.Close()
+		return "", fmt.Errorf("writing gemini system prompt: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("closing temp file: %w", err)
+	}
+	abs, err := filepath.Abs(f.Name())
+	if err != nil {
+		return "", fmt.Errorf("resolving absolute path for temp file: %w", err)
+	}
+	return abs, nil
+}
+
 // execGemini builds the gemini argv and runs it, replacing the current process
 // (or returning an error if exec fails). If opts.DryRun is true, prints the
 // intended command and returns without executing.
@@ -156,7 +178,15 @@ func execGemini(opts geminiLaunchOpts) error {
 
 	geminiArgs = append(geminiArgs, opts.ExtraArgs...)
 
+	// Write the embedded orchestrator prompt to a tmpfile and inject via GEMINI_SYSTEM_MD.
+	// The env var expects an absolute path; Gemini does a full override (not append).
+	systemMdPath, err := writeGeminiSystemPrompt()
+	if err != nil {
+		return fmt.Errorf("failed to prepare GEMINI_SYSTEM_MD: %w", err)
+	}
+
 	if opts.DryRun {
+		fmt.Printf("[dry-run] GEMINI_SYSTEM_MD=%s\n", systemMdPath)
 		fmt.Printf("[dry-run] gemini %s\n", strings.Join(geminiArgs, " "))
 		if opts.ProjectRoot != "" {
 			fmt.Printf("[dry-run] in directory: %s\n", opts.ProjectRoot)
@@ -174,14 +204,15 @@ func execGemini(opts geminiLaunchOpts) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
-	// Inject HTMLGRAPH_PROJECT_DIR and HTMLGRAPH_AGENT so hooks and skills
-	// resolve to the correct project root regardless of CWD.
+	// Inject HTMLGRAPH_PROJECT_DIR, HTMLGRAPH_AGENT, and GEMINI_SYSTEM_MD so hooks,
+	// skills, and the orchestrator prompt all resolve correctly regardless of CWD.
 	env := os.Environ()
 	if opts.ProjectRoot != "" {
 		env = append(env, "HTMLGRAPH_PROJECT_DIR="+opts.ProjectRoot)
 		c.Dir = opts.ProjectRoot
 	}
 	env = append(env, "HTMLGRAPH_AGENT=gemini")
+	env = append(env, "GEMINI_SYSTEM_MD="+systemMdPath)
 	c.Env = env
 
 	if err := c.Run(); err != nil {
