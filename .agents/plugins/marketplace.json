@@ -1,14 +1,14 @@
 {
   "name": "htmlgraph",
   "interface": {
-    "displayName": "HtmlGraph"
+    "displayName": "HtmlGraph (local dev)"
   },
   "plugins": [
     {
       "name": "htmlgraph",
       "source": {
         "source": "local",
-        "path": "./plugins/htmlgraph"
+        "path": "./packages/codex-marketplace/plugins/htmlgraph"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
