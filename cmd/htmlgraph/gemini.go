@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -230,6 +231,32 @@ func launchGeminiResume(index string, extraArgs []string, dryRun bool) error {
 	})
 }
 
+// geminiExtensionMetadata represents the install metadata for the htmlgraph extension.
+type geminiExtensionMetadata struct {
+	Source string `json:"source"`
+	Type   string `json:"type"`
+}
+
+// isExtensionAlreadyLinkedToLocalPath checks if the htmlgraph extension is already
+// linked (as a live pointer) to the specified local path. Returns true only if
+// the metadata exists, matches the local path, and is a link type.
+func isExtensionAlreadyLinkedToLocalPath(localExtPath string) bool {
+	home, _ := os.UserHomeDir()
+	metaPath := filepath.Join(home, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return false
+	}
+
+	var meta geminiExtensionMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return false
+	}
+
+	return meta.Type == "link" && meta.Source == localExtPath
+}
+
 // buildGeminiLinkArgs returns the args for `gemini extensions link`.
 // Exported for testability.
 func buildGeminiLinkArgs(localExtPath string) []string {
@@ -248,30 +275,58 @@ func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
 	fmt.Printf("Launching Gemini CLI in dev mode...\n")
 	fmt.Printf("  Local extension: %s\n", localExtPath)
 
-	// Link the extension (idempotent — it's a live pointer).
-	linkArgs := buildGeminiLinkArgs(localExtPath)
+	// Check idempotency: if already linked to this local path, skip the link exec.
+	// If linked elsewhere or installed from a different source, uninstall first.
+	if !dryRun {
+		if isExtensionAlreadyLinkedToLocalPath(localExtPath) {
+			fmt.Println("Extension already linked (live pointer to local source).")
+		} else {
+			// Check if there's a stale install that needs cleaning up.
+			home, _ := os.UserHomeDir()
+			metaPath := filepath.Join(home, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+			if data, err := os.ReadFile(metaPath); err == nil {
+				var meta geminiExtensionMetadata
+				if json.Unmarshal(data, &meta) == nil && (meta.Type != "link" || meta.Source != localExtPath) {
+					// Stale or wrong-source install — uninstall first.
+					fmt.Println("Replacing existing htmlgraph extension install...")
+					geminiPath, geminiErr := exec.LookPath("gemini")
+					if geminiErr != nil {
+						return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", geminiErr)
+					}
+					uninstallArgs := []string{"extensions", "uninstall", "htmlgraph"}
+					// Attempt uninstall; if it fails (extension not present), continue anyway.
+					exec.Command(geminiPath, uninstallArgs...).Run() // Ignore error
+				}
+			}
+
+			// Link the extension (idempotent — it's a live pointer).
+			linkArgs := buildGeminiLinkArgs(localExtPath)
+			fmt.Println("Linking extension...")
+			geminiPath, err := exec.LookPath("gemini")
+			if err != nil {
+				return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
+			}
+			if out, linkErr := exec.Command(geminiPath, linkArgs...).CombinedOutput(); linkErr != nil {
+				return fmt.Errorf("gemini extensions link failed: %w\n%s", linkErr, strings.TrimSpace(string(out)))
+			}
+
+			// Verify filesystem state: check that the extension metadata was actually created.
+			// If another extension is in a broken state, gemini may have prompted interactively
+			// and blocked the link, but we'd still reach this point without stdin.
+			home2, _ := os.UserHomeDir()
+			metaPath2 := filepath.Join(home2, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
+			if _, err := os.Stat(metaPath2); err != nil {
+				return fmt.Errorf("gemini extensions link appeared to succeed but %s was not created — the link may have been blocked by an interactive prompt in gemini. Check gemini extensions list and try: 'gemini extensions link %s --consent' manually", metaPath2, localExtPath)
+			}
+
+			fmt.Println("Extension linked (live pointer to local source).")
+		}
+	}
+
+	// Handle dry-run mode for link.
 	if dryRun {
+		linkArgs := buildGeminiLinkArgs(localExtPath)
 		fmt.Printf("[dry-run] gemini %s\n", strings.Join(linkArgs, " "))
-	} else {
-		fmt.Println("Linking extension...")
-		geminiPath, err := exec.LookPath("gemini")
-		if err != nil {
-			return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
-		}
-		if out, linkErr := exec.Command(geminiPath, linkArgs...).CombinedOutput(); linkErr != nil {
-			return fmt.Errorf("gemini extensions link failed: %w\n%s", linkErr, strings.TrimSpace(string(out)))
-		}
-
-		// Verify filesystem state: check that the extension metadata was actually created.
-		// If another extension is in a broken state, gemini may have prompted interactively
-		// and blocked the link, but we'd still reach this point without stdin.
-		home, _ := os.UserHomeDir()
-		metaPath := filepath.Join(home, ".gemini", "extensions", "htmlgraph", ".gemini-extension-install.json")
-		if _, err := os.Stat(metaPath); err != nil {
-			return fmt.Errorf("gemini extensions link appeared to succeed but %s was not created — the link may have been blocked by an interactive prompt in gemini. Check gemini extensions list and try: 'gemini extensions link %s --consent' manually", metaPath, localExtPath)
-		}
-
-		fmt.Println("Extension linked (live pointer to local source).")
 	}
 
 	projectRoot, _ := resolveProjectRoot()
