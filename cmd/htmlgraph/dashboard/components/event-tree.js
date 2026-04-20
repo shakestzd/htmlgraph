@@ -586,7 +586,13 @@ class HgEventTree extends HTMLElement {
   renderTurn(turn) {
     var uq = turn.user_query;
     var isExp = this.expanded.has(uq.event_id);
-    var hasChildren = turn.children && turn.children.length > 0;
+    // A turn has children when EITHER hook events OR an OTel trace
+    // exists. Previously we only checked turn.children (hook-derived),
+    // so turns with only OTel data rendered chevron-less and couldn't
+    // be collapsed — making the tree hard to navigate.
+    var hasHookChildren = turn.children && turn.children.length > 0;
+    var hasSpans = this._spansForTurn(turn).length > 0;
+    var hasChildren = hasHookChildren || hasSpans;
     var expandIcon = hasChildren
       ? '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(uq.event_id) + '">\u25B6</span>'
       : '<span class="expand-icon-spacer"></span>';
