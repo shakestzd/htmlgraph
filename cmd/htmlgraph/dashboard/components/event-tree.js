@@ -663,6 +663,15 @@ class HgEventTree extends HTMLElement {
       subagentBadge = '<span class="badge badge-subagent" style="background-color: ' + col + '">' + esc(d.subagent_type) + '</span>';
     }
 
+    // Work-item attribution: span rows mirror hook rows by rendering the
+    // feature badge when feature_id is populated. Attribution comes from
+    // active_work_items at ingest time (see writer.go); this lights up
+    // only for sessions whose root agent claimed a work item before the
+    // signal arrived. Pre-attribution rows stay silent.
+    var featureBdg = (isToolSpan && span.feature_id)
+      ? this.featureBadge(span.feature_id, span.feature_title)
+      : '';
+
     // For tool spans, also surface the preceding api_request (the LLM
     // turn that chose this tool) — its model / cost / duration attribute
     // to "deciding this tool call" and so belong on the tool row.
@@ -714,6 +723,7 @@ class HgEventTree extends HTMLElement {
       + mcpServerPill
       + '<span class="' + chipClass + '"' + chipStyle + '>' + esc(label) + '</span>'
       + subagentBadge
+      + featureBdg
       + modelBdg
       + costBdg
       + permissionBdg
@@ -810,7 +820,25 @@ class HgEventTree extends HTMLElement {
       if (ad.request_id)        rows.push(['request id', ad.request_id]);
       if (ad.speed)             rows.push(['mode', ad.speed]);
     }
-    if (rows.length === 0) return '';
+    // Long-content code panels: render old_string / new_string /
+    // content as <pre> blocks below the key/value list. Kept separate
+    // from `rows` so they span full width. Syntax highlighting + diff
+    // rendering + collapse-long toggles are tracked in feat-292f87fe.
+    var codeBlocks = '';
+    if (span.tool_name === 'Edit') {
+      if (d.old_string) {
+        codeBlocks += this._codeBlock('old_string', d.old_string, d.old_string_len, d.content_truncated);
+      }
+      if (d.new_string) {
+        codeBlocks += this._codeBlock('new_string', d.new_string, d.new_string_len, d.content_truncated);
+      }
+    } else if (span.tool_name === 'Write') {
+      if (d.content) {
+        codeBlocks += this._codeBlock('content', d.content, d.content_len, d.content_truncated);
+      }
+    }
+
+    if (rows.length === 0 && !codeBlocks) return '';
 
     var padLeft = (depth + 1) * 1.25;
     var bgAlpha = 0.03 + depth * 0.03;
@@ -821,6 +849,20 @@ class HgEventTree extends HTMLElement {
     return '<div class="event-row event-row-otel-detail depth-' + depth + '"'
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
       + kvHtml
+      + codeBlocks
+      + '</div>';
+  }
+
+  // _codeBlock emits a labeled <pre><code> block for a string attribute
+  // (old_string, new_string, content). The full length is shown as a
+  // header so users know whether truncation lost content. Syntax
+  // highlighting is deferred to feat-292f87fe.
+  _codeBlock(label, content, fullLen, wasTruncated) {
+    var header = esc(label);
+    if (fullLen) header += ' (' + fullLen + ' chars' + (wasTruncated ? ', truncated' : '') + ')';
+    return '<div class="otel-detail-code">'
+      + '<div class="otel-detail-code-header">' + header + '</div>'
+      + '<pre class="otel-detail-code-body"><code>' + esc(content) + '</code></pre>'
       + '</div>';
   }
 

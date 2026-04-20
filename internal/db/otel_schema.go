@@ -114,6 +114,17 @@ func CreateOtelTables(db *sql.DB) error {
 			return fmt.Errorf("exec OTel DDL: %w\nSQL: %.160s", err, stmt)
 		}
 	}
+
+	// Idempotent migration: feature_id column added after initial schema
+	// so existing DBs pick it up on the next `htmlgraph serve`. Duplicate
+	// column errors are expected on re-runs and are silently swallowed,
+	// matching the convention used elsewhere in internal/db/schema.go.
+	if _, err := db.Exec(`ALTER TABLE otel_signals ADD COLUMN feature_id TEXT`); err != nil {
+		// Ignore "duplicate column" errors — the column is already there.
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_otel_feature_ts ON otel_signals(feature_id, ts_micros) WHERE feature_id IS NOT NULL`); err != nil {
+		// Index creation is non-critical; continue.
+	}
 	return nil
 }
 

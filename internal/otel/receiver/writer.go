@@ -71,8 +71,8 @@ func (w *Writer) prepare() error {
 			tokens_thought, tokens_tool, tokens_reasoning,
 			cost_usd, cost_source,
 			duration_ms, success, error_msg, attempt, status_code,
-			attrs_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			attrs_json, feature_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return fmt.Errorf("prepare insert: %w", err)
 	}
@@ -154,6 +154,11 @@ func (w *Writer) WriteBatch(
 	// Track sessions we've already upserted this batch so we don't
 	// fire a redundant INSERT per signal.
 	seen := map[string]bool{}
+	// Per-session cache of active work item (feature/bug/spike claimed
+	// by the session's root agent). Populated lazily on first signal
+	// for each session so we issue at most one SELECT per distinct
+	// session per batch, regardless of signal count.
+	featureByID := map[string]string{}
 	resObservedAt := time.Now().UnixMicro()
 
 	insertStmt := tx.Stmt(w.insertStmt)
@@ -197,6 +202,21 @@ func (w *Writer) WriteBatch(
 			}
 		}
 
+		// Look up the session's active work item on first encounter,
+		// then reuse the cached value. Uses the __root__ sentinel since
+		// OTel signals don't carry an agent_id — subagent-level
+		// attribution is the planned follow-up (feat-82e11bbb).
+		featureID, cached := featureByID[s.SessionID]
+		if !cached {
+			var fid sql.NullString
+			_ = tx.QueryRowContext(ctx,
+				`SELECT work_item_id FROM active_work_items WHERE session_id = ? AND agent_id = ?`,
+				s.SessionID, "__root__",
+			).Scan(&fid)
+			featureID = fid.String
+			featureByID[s.SessionID] = featureID
+		}
+
 		res, execErr := insertStmt.ExecContext(ctx,
 			s.SignalID, string(s.Harness), s.SessionID, nullStr(s.PromptID),
 			nullStr(s.TraceID), nullStr(s.SpanID), nullStr(s.ParentSpan),
@@ -209,7 +229,7 @@ func (w *Writer) WriteBatch(
 			nullFloat(s.CostUSD), nullStr(string(s.CostSource)),
 			nullInt64(s.DurationMs), successVal, nullStr(s.ErrorMsg),
 			nullInt(s.Attempt), nullInt(s.StatusCode),
-			string(attrsJSON),
+			string(attrsJSON), nullStr(featureID),
 		)
 		if execErr != nil {
 			return inserted, fmt.Errorf("insert signal %s: %w", s.SignalID, execErr)

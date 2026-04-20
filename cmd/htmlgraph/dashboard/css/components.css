@@ -452,6 +452,36 @@
   word-break: break-all;
 }
 
+/* Code preview blocks for Edit / Write tool expansion. Plain <pre>
+   rendering for now — syntax highlighting is tracked in feat-292f87fe. */
+.otel-detail-code {
+  margin-top: 0.35rem;
+}
+.otel-detail-code-header {
+  color: #8b949e;
+  font-size: 0.6rem;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.15rem;
+}
+.otel-detail-code-body {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(56, 139, 253, 0.2);
+  border-radius: 4px;
+  padding: 0.5rem 0.65rem;
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.otel-detail-code-body code {
+  font-family: var(--font-mono, monospace);
+}
+
 /* Feature badge */
 .badge-feature {
   font-size: 0.6rem;

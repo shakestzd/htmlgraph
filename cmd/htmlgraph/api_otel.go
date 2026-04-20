@@ -236,22 +236,24 @@ type promptJSON struct {
 // path, subagent type, etc.) without pulling the full payload — raw
 // API bodies with OTEL_LOG_RAW_API_BODIES=1 can exceed 60 KB per signal.
 type spanJSON struct {
-	SignalID   string     `json:"signal_id"`
-	TraceID    string     `json:"trace_id"`
-	SpanID     string     `json:"span_id"`
-	ParentSpan string     `json:"parent_span"`
-	NativeName string     `json:"native_name"`
-	Canonical  string     `json:"canonical"`
-	ToolName   string     `json:"tool_name"`
-	Model      string     `json:"model"`
-	TsMicros   int64      `json:"ts_micros"`
-	DurationMs int64      `json:"duration_ms"`
-	TokensIn   int64      `json:"tokens_in"`
-	TokensOut  int64      `json:"tokens_out"`
-	CostUSD    float64    `json:"cost_usd"`
-	Decision   string     `json:"decision"`
-	Success    *bool      `json:"success,omitempty"`
-	Details    spanDetail `json:"details"`
+	SignalID     string     `json:"signal_id"`
+	TraceID      string     `json:"trace_id"`
+	SpanID       string     `json:"span_id"`
+	ParentSpan   string     `json:"parent_span"`
+	NativeName   string     `json:"native_name"`
+	Canonical    string     `json:"canonical"`
+	ToolName     string     `json:"tool_name"`
+	Model        string     `json:"model"`
+	TsMicros     int64      `json:"ts_micros"`
+	DurationMs   int64      `json:"duration_ms"`
+	TokensIn     int64      `json:"tokens_in"`
+	TokensOut    int64      `json:"tokens_out"`
+	CostUSD      float64    `json:"cost_usd"`
+	Decision     string     `json:"decision"`
+	Success      *bool      `json:"success,omitempty"`
+	FeatureID    string     `json:"feature_id,omitempty"`    // work item attribution (feat-xxx / bug-xxx / spk-xxx)
+	FeatureTitle string     `json:"feature_title,omitempty"` // joined from features.title
+	Details      spanDetail `json:"details"`
 }
 
 // spanDetail holds the whitelisted attributes extracted from attrs_json
@@ -269,8 +271,12 @@ type spanDetail struct {
 	Limit          int64  `json:"limit,omitempty"`           // Read: line count
 	OldStringLen   int64  `json:"old_string_len,omitempty"`  // Edit: char count of old_string
 	NewStringLen   int64  `json:"new_string_len,omitempty"`  // Edit: char count of new_string
+	OldString      string `json:"old_string,omitempty"`      // Edit: truncated old_string (4 KB max)
+	NewString      string `json:"new_string,omitempty"`      // Edit: truncated new_string (4 KB max)
 	ReplaceAll     bool   `json:"replace_all,omitempty"`     // Edit: replace_all flag
 	ContentLen     int64  `json:"content_len,omitempty"`     // Write: char count of content
+	Content        string `json:"content,omitempty"`         // Write: truncated content (4 KB max)
+	Truncated      bool   `json:"content_truncated,omitempty"` // true when any of the above were cut
 	URL            string `json:"url,omitempty"`             // WebFetch
 	Query          string `json:"query,omitempty"`           // WebSearch
 	Pattern        string `json:"pattern,omitempty"`         // Grep/Glob
@@ -307,21 +313,28 @@ func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 			http.Error(w, "session_id required", http.StatusBadRequest)
 			return
 		}
+		// LEFT JOIN features so work-item attribution populated at ingest
+		// time (writer.go) picks up the human title. Pre-attribution
+		// rows (signals captured before feat-82e11bbb landed) have
+		// feature_id IS NULL and the join drops out cleanly.
 		rows, err := database.Query(`
-			SELECT signal_id,
-				COALESCE(trace_id, ''), COALESCE(span_id, ''), COALESCE(parent_span, ''),
-				native, canonical,
-				COALESCE(tool_name, ''), COALESCE(model, ''),
-				ts_micros,
-				COALESCE(duration_ms, 0),
-				COALESCE(tokens_in, 0), COALESCE(tokens_out, 0),
-				COALESCE(cost_usd, 0),
-				COALESCE(decision, ''),
-				success,
-				COALESCE(attrs_json, '{}')
-			FROM otel_signals
-			WHERE session_id = ? AND kind = 'span'
-			ORDER BY ts_micros ASC`, sessionID)
+			SELECT s.signal_id,
+				COALESCE(s.trace_id, ''), COALESCE(s.span_id, ''), COALESCE(s.parent_span, ''),
+				s.native, s.canonical,
+				COALESCE(s.tool_name, ''), COALESCE(s.model, ''),
+				s.ts_micros,
+				COALESCE(s.duration_ms, 0),
+				COALESCE(s.tokens_in, 0), COALESCE(s.tokens_out, 0),
+				COALESCE(s.cost_usd, 0),
+				COALESCE(s.decision, ''),
+				s.success,
+				COALESCE(s.attrs_json, '{}'),
+				COALESCE(s.feature_id, ''),
+				COALESCE(f.title, '')
+			FROM otel_signals s
+			LEFT JOIN features f ON f.id = s.feature_id
+			WHERE s.session_id = ? AND s.kind = 'span'
+			ORDER BY s.ts_micros ASC`, sessionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -339,6 +352,7 @@ func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 				&s.TsMicros, &s.DurationMs,
 				&s.TokensIn, &s.TokensOut, &s.CostUSD,
 				&s.Decision, &successVal, &attrsRaw,
+				&s.FeatureID, &s.FeatureTitle,
 			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -481,17 +495,38 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 			d.FullCommand = s
 		}
 	}
-	// Edit-tool change size. We never surface the full old/new strings
-	// (they can be arbitrarily large and contain user code); we track
-	// only their lengths as an indicator of change magnitude.
-	if d.OldStringLen == 0 {
-		if s, _ := ti["old_string"].(string); s != "" {
+	// Edit-tool change: track both the truncated strings AND their full
+	// lengths. The dashboard detail panel shows the strings; the length
+	// fields let callers decide whether to render "...truncated" or
+	// request the full content separately. Cap at 4 KB — anything
+	// larger almost always spans multiple screens and needs its own
+	// dedicated renderer (see feat-292f87fe for the code-preview
+	// follow-up with syntax highlighting and collapse-long toggles).
+	const maxStringBytes = 4096
+	if s, _ := ti["old_string"].(string); s != "" {
+		if d.OldStringLen == 0 {
 			d.OldStringLen = int64(len(s))
 		}
+		if d.OldString == "" {
+			if len(s) > maxStringBytes {
+				d.OldString = s[:maxStringBytes]
+				d.Truncated = true
+			} else {
+				d.OldString = s
+			}
+		}
 	}
-	if d.NewStringLen == 0 {
-		if s, _ := ti["new_string"].(string); s != "" {
+	if s, _ := ti["new_string"].(string); s != "" {
+		if d.NewStringLen == 0 {
 			d.NewStringLen = int64(len(s))
+		}
+		if d.NewString == "" {
+			if len(s) > maxStringBytes {
+				d.NewString = s[:maxStringBytes]
+				d.Truncated = true
+			} else {
+				d.NewString = s
+			}
 		}
 	}
 	if !d.ReplaceAll {
@@ -499,10 +534,18 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 			d.ReplaceAll = b
 		}
 	}
-	// Write-tool content length.
-	if d.ContentLen == 0 {
-		if s, _ := ti["content"].(string); s != "" {
+	// Write-tool content: same treatment as Edit's strings.
+	if s, _ := ti["content"].(string); s != "" {
+		if d.ContentLen == 0 {
 			d.ContentLen = int64(len(s))
+		}
+		if d.Content == "" {
+			if len(s) > maxStringBytes {
+				d.Content = s[:maxStringBytes]
+				d.Truncated = true
+			} else {
+				d.Content = s
+			}
 		}
 	}
 	// Grep output mode + search root.
