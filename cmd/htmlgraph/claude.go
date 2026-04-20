@@ -429,6 +429,14 @@ func launchClaude(opts LaunchOpts) error {
 		return fmt.Errorf("claude not found in PATH: %w", err)
 	}
 
+	// When OTel is enabled, the spawned claude will export to
+	// 127.0.0.1:4318 (our OTLP receiver). If htmlgraph serve isn't
+	// already running, signals drop silently. Auto-start a detached
+	// serve so the dashboard and receiver are both live for the
+	// duration of this claude session (and beyond). See
+	// claude_serve_autostart.go for the probe + spawn logic.
+	ensureServeForOtel(opts.ProjectRoot)
+
 	c := exec.Command(claudePath, claudeArgs...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
