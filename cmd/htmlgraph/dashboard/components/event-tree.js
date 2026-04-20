@@ -211,10 +211,17 @@ class HgEventTree extends HTMLElement {
     return { byTrace: byTrace, roots: roots, byId: byId };
   }
 
-  // _spansForTurn returns the root spans from the trace whose first span's
-  // start timestamp is nearest the turn's user_query timestamp. This is the
-  // same heuristic as _otelForTurn — a stand-in until native prompt_id ↔
-  // trace_id correlation ships. Returns [] when no match.
+  // _spansForTurn returns the root spans from the trace produced BY
+  // this turn. A trace belongs to turn N when its earliest span timestamp
+  // sits in the window [turn_N.ts, turn_N+1.ts). That's the causal
+  // ordering: a tool call happens strictly AFTER the user prompt that
+  // triggered it. Using absolute-time "nearest" is wrong because it can
+  // pull a previous turn's trace (slightly earlier) instead of THIS
+  // turn's in-flight trace (slightly later).
+  //
+  // Falls back to absolute-nearest only when no forward-window match
+  // exists (handles pathological cases like mid-session resumes where
+  // hook-timestamp alignment can drift).
   _spansForTurn(turn) {
     var uq = turn.user_query;
     if (!uq || !uq.session_id) return [];
@@ -223,12 +230,39 @@ class HgEventTree extends HTMLElement {
     if (!uq.timestamp) return idx.roots;
     var ts = Date.parse(uq.timestamp) * 1000;
     if (!ts) return idx.roots;
-    // Pick the trace whose earliest root span is nearest to the turn ts.
+
+    // Find the next turn in THIS session (chronological next). tree.turns
+    // is newest-first, so the "next" turn chronologically is the one with
+    // a larger timestamp than ts within the same session.
+    var sid = uq.session_id;
+    var nextTs = Infinity;
+    for (var i = 0; i < (this.turns||[]).length; i++) {
+      var otherUQ = this.turns[i].user_query;
+      if (!otherUQ || otherUQ.session_id !== sid) continue;
+      if (!otherUQ.timestamp) continue;
+      var otherTs = Date.parse(otherUQ.timestamp) * 1000;
+      if (otherTs > ts && otherTs < nextTs) nextTs = otherTs;
+    }
+
+    // Window match: smallest earliest_ts that falls in [ts, nextTs).
+    var winner = null, winnerEarliest = Infinity;
+    Object.keys(idx.byTrace).forEach(function(tid) {
+      var earliest = Math.min.apply(null, idx.byTrace[tid].map(function(r) { return r.ts_micros; }));
+      if (earliest >= ts && earliest < nextTs && earliest < winnerEarliest) {
+        winner = tid;
+        winnerEarliest = earliest;
+      }
+    });
+    if (winner) return idx.byTrace[winner];
+
+    // Fallback: absolute-nearest, but only consider traces that haven't
+    // already been claimed by a LATER turn via the forward-window rule.
+    // This prevents the latest turn's trace from being stolen by an
+    // earlier turn's "nearest" match.
     var bestTrace = null;
     var bestDiff = Infinity;
     Object.keys(idx.byTrace).forEach(function(tid) {
-      var traceRoots = idx.byTrace[tid];
-      var earliest = Math.min.apply(null, traceRoots.map(function(r) { return r.ts_micros; }));
+      var earliest = Math.min.apply(null, idx.byTrace[tid].map(function(r) { return r.ts_micros; }));
       var d = Math.abs(earliest - ts);
       if (d < bestDiff) { bestTrace = tid; bestDiff = d; }
     });
