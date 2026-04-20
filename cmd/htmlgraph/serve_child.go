@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 	"github.com/shakestzd/htmlgraph/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -94,6 +95,23 @@ func runServeChild(port int) error {
 	go autoIngestLoop(database, htmlgraphDir, func() {
 		startAITitleBackfill(context.Background(), database, htmlgraphDir)
 	})
+
+	// Embedded OTLP receiver (Phase 1, opt-in). Default-off; honours
+	// HTMLGRAPH_OTEL_ENABLED=1 and binds to HTMLGRAPH_OTEL_HTTP_PORT
+	// (default 4318, the OTel spec port). Failures here are logged and
+	// non-fatal — the dashboard must stay up even if the receiver can't
+	// bind (e.g. another project's child already owns 4318).
+	otelCfg := otelreceiver.LoadConfigFromEnv(dbPath)
+	if otelCfg.Enabled {
+		rec, err := otelreceiver.New(otelCfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "otel receiver init: %v\n", err)
+		} else if err := rec.Start(context.Background()); err != nil {
+			fmt.Fprintf(os.Stderr, "otel receiver start: %v\n", err)
+		}
+		// Receiver runs until process exit; its writer closes when the
+		// process terminates. No explicit Stop needed because Serve blocks.
+	}
 
 	return (&http.Server{Handler: mux}).Serve(ln)
 }
