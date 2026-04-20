@@ -262,6 +262,7 @@ type spanDetail struct {
 	FullCommand   string `json:"full_command,omitempty"`    // Bash: exact command executed
 	BashCommand   string `json:"bash_command,omitempty"`    // Bash: un-shelled command
 	Description   string `json:"description,omitempty"`     // Bash: human description
+	Timeout       int64  `json:"timeout,omitempty"`         // Bash: timeout in milliseconds (tool_input)
 	FilePath      string `json:"file_path,omitempty"`       // Read/Edit/Write: target path
 	Offset        int64  `json:"offset,omitempty"`          // Read: 1-based start line
 	Limit         int64  `json:"limit,omitempty"`           // Read: line count
@@ -449,6 +450,9 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 	if d.Limit == 0 {
 		d.Limit = pullInt(ti, "limit")
 	}
+	if d.Timeout == 0 {
+		d.Timeout = pullInt(ti, "timeout")
+	}
 	if d.Pattern == "" {
 		if s, _ := ti["pattern"].(string); s != "" {
 			d.Pattern = s
@@ -457,6 +461,14 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 	if d.URL == "" {
 		if s, _ := ti["url"].(string); s != "" {
 			d.URL = s
+		}
+	}
+	// Bash's full command lives on `command` in tool_input but on
+	// `full_command` in the span attrs — normalize so FullCommand is
+	// always populated when available anywhere.
+	if d.FullCommand == "" {
+		if s, _ := ti["command"].(string); s != "" {
+			d.FullCommand = s
 		}
 	}
 }
@@ -502,6 +514,7 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	d.Attempt = pullInt(raw, "attempt")
 	d.Offset = pullInt(raw, "offset")
 	d.Limit = pullInt(raw, "limit")
+	d.Timeout = pullInt(raw, "timeout")
 	return d
 }
 

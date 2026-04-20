@@ -394,6 +394,34 @@
   white-space: nowrap;
 }
 
+/* Expanded-row detail panel — key/value list showing full command,
+   description, timeout, URL, prompt, model, tokens, cost, etc. that
+   don't fit on the compact row. */
+.event-row-otel-detail {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.35rem;
+  border-left: 2px solid rgba(56,139,253,0.25);
+  display: block;
+  white-space: normal;
+  line-height: 1.4;
+}
+.otel-detail-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.otel-detail-key {
+  color: #8b949e;
+  min-width: 6.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+.otel-detail-val {
+  color: #c9d1d9;
+  word-break: break-all;
+}
+
 /* Feature badge */
 .badge-feature {
   font-size: 0.6rem;

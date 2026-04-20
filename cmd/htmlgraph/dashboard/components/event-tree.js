@@ -172,6 +172,27 @@ class HgEventTree extends HTMLElement {
       }
     });
 
+    // Absorb each api_request span into the tool span that immediately
+    // FOLLOWS it in its parent's child list. The api_request is the
+    // LLM turn that decided to call that tool, so its model/cost/tokens
+    // morally attribute to the tool call. The trailing api_request in a
+    // turn (the final response) has no following tool and stays as its
+    // own row. Done BEFORE reverse so "preceding" means chronologically
+    // earlier.
+    Object.values(byId).forEach(function(parent) {
+      if (!parent.children || parent.children.length < 2) return;
+      var kids = parent.children;
+      for (var i = 0; i < kids.length - 1; i++) {
+        var cur = kids[i], nxt = kids[i + 1];
+        if (cur.canonical === 'api_request' && nxt.tool_name) {
+          nxt._precedingApi = cur;
+          cur._absorbedInto = nxt.span_id;
+        }
+      }
+      // Drop absorbed api_requests from the child list in place.
+      parent.children = kids.filter(function(c) { return !c._absorbedInto; });
+    });
+
     // Reverse every children array so the most recent span renders first,
     // matching the activity feed's overall "newest at top" ordering.
     // The endpoint returns spans in ascending ts_micros order; reversing
@@ -631,11 +652,18 @@ class HgEventTree extends HTMLElement {
       subagentBadge = '<span class="badge badge-subagent" style="background-color: ' + col + '">' + esc(d.subagent_type) + '</span>';
     }
 
-    var modelBdg = span.model
-      ? '<span class="badge badge-otel">' + esc(span.model) + '</span>'
+    // For tool spans, also surface the preceding api_request (the LLM
+    // turn that chose this tool) — its model / cost / duration attribute
+    // to "deciding this tool call" and so belong on the tool row.
+    var api = (isToolSpan && span._precedingApi) ? span._precedingApi : null;
+    var apiModel = (api && api.model) || span.model;
+    var apiCost = api ? api.cost_usd : span.cost_usd;
+
+    var modelBdg = apiModel
+      ? '<span class="badge badge-otel" title="' + esc(api ? 'Model for the api_request that decided this tool call' : 'Model') + '">' + esc(apiModel) + '</span>'
       : '';
-    var costBdg = (span.cost_usd > 0)
-      ? '<span class="badge badge-otel">$' + span.cost_usd.toFixed(4) + '</span>'
+    var costBdg = (apiCost > 0)
+      ? '<span class="badge badge-otel">$' + apiCost.toFixed(4) + '</span>'
       : '';
     var retryBdg = (d.attempt && d.attempt > 1)
       ? '<span class="badge badge-otel" title="Attempt number">attempt ' + d.attempt + '</span>'
@@ -651,10 +679,21 @@ class HgEventTree extends HTMLElement {
     var execErrorBdg = rollup.execErrorBadge;
     var rangeBdg = this._rangeBadge(span);
 
+    // Hover tooltip: for Bash show the full command (since summary is
+    // description); for other tools, show the native span name for
+    // provenance. esc() prevents quote-breakout.
+    var rowTitle = '';
+    if (span.tool_name === 'Bash' && d.full_command) {
+      rowTitle = d.full_command;
+    } else if (span.native_name) {
+      rowTitle = span.native_name;
+    }
+
     var html = '<div class="event-row event-row-otel-span depth-' + depth + ' ' + errBorder + '"'
       + ' data-span-id="' + esc(span.span_id) + '"'
       + ' data-trace-id="' + esc(span.trace_id) + '"'
       + (span.parent_span ? ' data-parent-span="' + esc(span.parent_span) + '"' : '')
+      + (rowTitle ? ' title="' + esc(rowTitle) + '"' : '')
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
       + expandIcon
       + traceChip
@@ -671,14 +710,72 @@ class HgEventTree extends HTMLElement {
       + '</div>';
 
     if (isExp && hasChildren) {
-      // When expanded, show all children. When collapsed, we already
-      // surfaced the permission/exec info via badges above — skip them
-      // here. Skipping happens in the isExp=false branch (no children
-      // rendered at all), which is consistent with how the hook tree
-      // handles collapsed rows.
+      // When expanded, first render a detail block for the tool row
+      // itself (full command, timeout, prompt, URL, etc.), then the
+      // child spans below it. When collapsed, no detail block — the
+      // badges already summarize.
+      var detailBlock = this._spanDetailBlock(span, depth + 1);
+      if (detailBlock) html += detailBlock;
       html += span.children.map(c => this.renderSpan(c, depth + 1)).join('');
     }
     return html;
+  }
+
+  // _spanDetailBlock renders a single fixed-width panel below a tool
+  // row when it's expanded, showing the full input context the summary
+  // line couldn't fit. Returns '' when there's nothing worth showing.
+  _spanDetailBlock(span, depth) {
+    var d = span.details || {};
+    if (!span.tool_name) return '';
+    var rows = [];
+    if (span.tool_name === 'Bash') {
+      if (d.full_command) rows.push(['command', d.full_command]);
+      if (d.description)  rows.push(['description', d.description]);
+      if (d.timeout)      rows.push(['timeout', d.timeout + 'ms']);
+    } else if (span.tool_name === 'Read') {
+      if (d.file_path)    rows.push(['file', d.file_path]);
+      if (d.offset || d.limit) {
+        var start = d.offset || 1;
+        var end = d.limit ? (start + d.limit - 1) : '';
+        rows.push(['range', end ? ('lines ' + start + '–' + end) : ('offset ' + start)]);
+      }
+    } else if (span.tool_name === 'Edit' || span.tool_name === 'Write' || span.tool_name === 'NotebookEdit') {
+      if (d.file_path)    rows.push(['file', d.file_path]);
+    } else if (span.tool_name === 'Grep' || span.tool_name === 'Glob') {
+      if (d.pattern)      rows.push(['pattern', d.pattern]);
+    } else if (span.tool_name === 'Task' || span.tool_name === 'Agent') {
+      if (d.subagent_type) rows.push(['subagent', d.subagent_type]);
+      if (d.description)   rows.push(['prompt', d.description]);
+    } else if (span.tool_name === 'WebFetch' || span.tool_name === 'WebSearch') {
+      if (d.url)          rows.push(['url', d.url]);
+    } else if (span.tool_name === 'Skill') {
+      if (d.skill_name)   rows.push(['skill', d.skill_name]);
+    }
+    // Preceding api_request: if absorbed, show the details we hid from
+    // the top-level tree so expanding the tool reveals the full context.
+    if (span._precedingApi) {
+      var api = span._precedingApi;
+      var ad = api.details || {};
+      if (api.model)            rows.push(['model', api.model]);
+      if (api.tokens_in)        rows.push(['input tokens', api.tokens_in.toLocaleString()]);
+      if (api.tokens_out)       rows.push(['output tokens', api.tokens_out.toLocaleString()]);
+      if (api.cost_usd > 0)     rows.push(['cost', '$' + api.cost_usd.toFixed(6)]);
+      if (api.duration_ms)      rows.push(['api duration', api.duration_ms + 'ms']);
+      if (ad.request_id)        rows.push(['request id', ad.request_id]);
+      if (ad.speed)             rows.push(['mode', ad.speed]);
+    }
+    if (rows.length === 0) return '';
+
+    var padLeft = (depth + 1) * 1.25;
+    var bgAlpha = 0.03 + depth * 0.03;
+    var kvHtml = rows.map(function(r) {
+      return '<div class="otel-detail-row"><span class="otel-detail-key">' + esc(r[0]) + '</span>'
+        + '<span class="otel-detail-val">' + esc(String(r[1])) + '</span></div>';
+    }).join('');
+    return '<div class="event-row event-row-otel-detail depth-' + depth + '"'
+      + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
+      + kvHtml
+      + '</div>';
   }
 
   // _toolChildRollup scans a tool span's immediate children for
@@ -773,10 +870,15 @@ class HgEventTree extends HTMLElement {
   // Priority: tool-specific detail (command, file path, etc.) > a
   // derived label for infrastructure spans > the native name as a
   // fallback so rows are never empty.
+  //
+  // For Bash: prefer the human "description" over the raw command —
+  // "Push rollup + enrichment commit" scans faster than a 60-char shell
+  // string. The full command is exposed via a hover title + detail row
+  // on expand.
   _spanSummary(span) {
     var d = span.details || {};
     if (span.tool_name === 'Bash') {
-      return d.full_command || d.bash_command || d.description || '';
+      return d.description || d.full_command || d.bash_command || '';
     }
     if (span.tool_name === 'Read' || span.tool_name === 'Edit' || span.tool_name === 'Write' || span.tool_name === 'NotebookEdit') {
       return d.file_path || '';
@@ -791,9 +893,10 @@ class HgEventTree extends HTMLElement {
       return d.skill_name || '';
     }
     if (span.tool_name === 'Task' || span.tool_name === 'Agent') {
-      // Subagent type is already shown as a dedicated badge; keep summary
-      // empty to avoid duplication.
-      return '';
+      // For subagent delegations, surface the description/prompt-summary
+      // ("Multi-tool subagent for span nesting verification") since the
+      // agent name is already shown as a distinct chip.
+      return d.description || '';
     }
     // tool_blocked_on_user is a misleading name — it's the PERMISSION
     // GATE span covering the time between tool emit and execution. It
