@@ -642,6 +642,15 @@ class HgEventTree extends HTMLElement {
       : '';
     var durBdg = dur ? '<span class="turn-stats">' + dur + '</span>' : '';
 
+    // For tool spans, roll up the child permission + exec spans into
+    // compact badges on this row (instead of forcing the user to expand
+    // the tool just to see the outcome). The children still render
+    // in full when the tool span is expanded.
+    var rollup = this._toolChildRollup(span);
+    var permissionBdg = rollup.permissionBadge;
+    var execErrorBdg = rollup.execErrorBadge;
+    var rangeBdg = this._rangeBadge(span);
+
     var html = '<div class="event-row event-row-otel-span depth-' + depth + ' ' + errBorder + '"'
       + ' data-span-id="' + esc(span.span_id) + '"'
       + ' data-trace-id="' + esc(span.trace_id) + '"'
@@ -653,15 +662,93 @@ class HgEventTree extends HTMLElement {
       + subagentBadge
       + modelBdg
       + costBdg
+      + permissionBdg
+      + execErrorBdg
       + retryBdg
+      + rangeBdg
       + '<span class="event-summary">' + esc(summary) + '</span>'
       + durBdg
       + '</div>';
 
     if (isExp && hasChildren) {
+      // When expanded, show all children. When collapsed, we already
+      // surfaced the permission/exec info via badges above — skip them
+      // here. Skipping happens in the isExp=false branch (no children
+      // rendered at all), which is consistent with how the hook tree
+      // handles collapsed rows.
       html += span.children.map(c => this.renderSpan(c, depth + 1)).join('');
     }
     return html;
+  }
+
+  // _toolChildRollup scans a tool span's immediate children for
+  // infrastructure spans (permission + exec) and returns compact badges
+  // that summarize the outcomes. Only applies to tool_result canonical
+  // spans with tool_name set — leaves non-tool spans alone.
+  //
+  // Badges:
+  //   permissionBadge — green "✓ auto" / "✓ user" chip for approvals,
+  //                     red "✗ blocked" chip for user rejections. Empty
+  //                     when no permission child or source=unknown.
+  //   execErrorBadge  — red "failed" chip when exec child reports
+  //                     success=false. Empty on success or no exec child.
+  _toolChildRollup(span) {
+    var empty = { permissionBadge: '', execErrorBadge: '' };
+    if (span.canonical !== 'tool_result' || !span.tool_name || !span.children) {
+      return empty;
+    }
+    var perm = span.children.find(function(c) { return c.canonical === 'tool_blocked_on_user'; });
+    var exec = span.children.find(function(c) { return c.canonical === 'tool_execution'; });
+
+    var permBadge = '';
+    if (perm) {
+      var d = perm.details || {};
+      switch (d.decision_source) {
+        case 'config':
+        case 'hook':
+          permBadge = '<span class="badge badge-approve" title="Auto-approved (' + esc(d.decision_source) + ')">\u2713 auto</span>';
+          break;
+        case 'user_permanent':
+        case 'user_temporary':
+          permBadge = '<span class="badge badge-approve" title="User approved (' + esc(d.decision_source) + ')">\u2713 user</span>';
+          break;
+        case 'user_reject':
+          permBadge = '<span class="badge badge-reject" title="User rejected the tool call">\u2717 blocked</span>';
+          break;
+        case 'user_abort':
+          permBadge = '<span class="badge badge-reject" title="User aborted the turn">\u2717 aborted</span>';
+          break;
+        default: // unknown / empty — omit
+          permBadge = '';
+      }
+    }
+
+    var execBadge = '';
+    if (exec && exec.success === false) {
+      execBadge = '<span class="badge badge-reject" title="Tool execution reported failure">failed</span>';
+    }
+
+    return { permissionBadge: permBadge, execErrorBadge: execBadge };
+  }
+
+  // _rangeBadge renders a compact line-range badge for Read/Edit tool
+  // spans when offset/limit or old_string/new_string context is present
+  // in the span's details. Returns an empty string when no range data
+  // is available (most Read calls don't pass offset/limit).
+  _rangeBadge(span) {
+    if (!span.tool_name) return '';
+    var d = span.details || {};
+    if (span.tool_name === 'Read') {
+      if (d.offset || d.limit) {
+        var start = d.offset || 1;
+        var end = d.limit ? (start + d.limit - 1) : '?';
+        return '<span class="badge badge-otel" title="Line range">L' + start + '\u2013' + end + '</span>';
+      }
+    }
+    // Edit/Write/NotebookEdit don't currently expose a range in the
+    // span's attrs; that data lives on the tool_result log's tool_input.
+    // A follow-up can surface it once we join spans to logs.
+    return '';
   }
 
   // _spanCanonicalLabel returns a short human label for non-tool spans.

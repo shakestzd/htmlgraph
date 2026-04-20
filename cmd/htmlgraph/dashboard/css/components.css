@@ -374,6 +374,26 @@
   margin-right: 0.35rem;
 }
 
+/* Approve / reject badges rolled up onto tool rows. Semantic green for
+   any flavor of approval, semantic red for rejection or execution
+   failure — matches the palette used by badge-status-* elsewhere. */
+.badge-approve {
+  background: rgba(63,185,80,0.2);
+  color: #3fb950;
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.badge-reject {
+  background: rgba(248,81,73,0.2);
+  color: #f85149;
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
 /* Feature badge */
 .badge-feature {
   font-size: 0.6rem;

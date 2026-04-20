@@ -263,6 +263,8 @@ type spanDetail struct {
 	BashCommand   string `json:"bash_command,omitempty"`    // Bash: un-shelled command
 	Description   string `json:"description,omitempty"`     // Bash: human description
 	FilePath      string `json:"file_path,omitempty"`       // Read/Edit/Write: target path
+	Offset        int64  `json:"offset,omitempty"`          // Read: 1-based start line
+	Limit         int64  `json:"limit,omitempty"`           // Read: line count
 	URL           string `json:"url,omitempty"`             // WebFetch/WebSearch
 	Pattern       string `json:"pattern,omitempty"`         // Grep/Glob
 	SkillName     string `json:"skill_name,omitempty"`      // Skill tool
@@ -337,7 +339,125 @@ func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 			s.Details = extractSpanDetails(attrsRaw)
 			out = append(out, s)
 		}
+
+		// Second pass: enrich tool spans with context from their matching
+		// tool_result log. Tool input details (Read offset/limit, Agent
+		// subagent_type, Edit old_string length, etc.) live on the log
+		// side only — the span carries a thinner attr set. Matching is
+		// by (tool_name, ordinality) within the session; tool spans and
+		// tool_result logs are emitted 1:1 per tool call, so this gives
+		// deterministic pairing without fuzzy timestamp matching.
+		enrichToolSpansFromLogs(database, sessionID, out)
+
 		respondJSON(w, map[string]any{"spans": out})
+	}
+}
+
+// enrichToolSpansFromLogs fetches tool_result logs for the session and
+// merges the nested tool_input attrs into the matching tool span's
+// Details. Mutates the out slice in place. Failures (DB error, bad JSON)
+// are logged at debug-level elsewhere; one missing enrichment shouldn't
+// poison the whole endpoint.
+func enrichToolSpansFromLogs(database *sql.DB, sessionID string, out []spanJSON) {
+	rows, err := database.Query(`
+		SELECT COALESCE(tool_name, ''), COALESCE(attrs_json, '{}')
+		FROM otel_signals
+		WHERE session_id = ? AND kind = 'log' AND canonical = 'tool_result'
+		ORDER BY ts_micros ASC`, sessionID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	// Group log attrs by tool_name, in emit order.
+	logsByTool := map[string][]string{}
+	for rows.Next() {
+		var tool, attrs string
+		if err := rows.Scan(&tool, &attrs); err != nil {
+			continue
+		}
+		if tool == "" {
+			continue
+		}
+		logsByTool[tool] = append(logsByTool[tool], attrs)
+	}
+
+	// Per tool, walk the spans in order and pair with logs in order.
+	// Eligible spans: any span that carries a tool_name and is a logical
+	// tool invocation. Claude's adapter canonicalizes ordinary tool spans
+	// as "tool_result" and Agent/Task subagent tool spans as
+	// "subagent_invocation" — both need enrichment from their matching
+	// tool_result log. Infrastructure spans (interaction, llm_request,
+	// tool.execution, tool.blocked_on_user) have no corresponding log.
+	spanIdxByTool := map[string]int{}
+	for i := range out {
+		s := &out[i]
+		if s.ToolName == "" {
+			continue
+		}
+		if s.Canonical != "tool_result" && s.Canonical != "subagent_invocation" {
+			continue
+		}
+		logs := logsByTool[s.ToolName]
+		idx := spanIdxByTool[s.ToolName]
+		spanIdxByTool[s.ToolName] = idx + 1
+		if idx >= len(logs) {
+			continue
+		}
+		mergeLogIntoSpanDetails(&s.Details, logs[idx])
+	}
+}
+
+// mergeLogIntoSpanDetails parses a tool_result log's attrs_json and
+// merges fields the span doesn't already have. Specifically pulls the
+// nested tool_input string and extracts keys like offset, limit,
+// subagent_type, description.
+func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
+	var logAttrs map[string]any
+	if err := json.Unmarshal([]byte(logAttrsRaw), &logAttrs); err != nil {
+		return
+	}
+	// tool_input is a JSON-encoded string inside attrs; parse it.
+	toolInputStr, ok := logAttrs["tool_input"].(string)
+	if !ok || toolInputStr == "" {
+		return
+	}
+	var ti map[string]any
+	if err := json.Unmarshal([]byte(toolInputStr), &ti); err != nil {
+		return
+	}
+	// Fill in only fields the span didn't already populate. Later adapter
+	// versions may surface these on the span directly — prefer span-side.
+	if d.SubagentType == "" {
+		if s, _ := ti["subagent_type"].(string); s != "" {
+			d.SubagentType = s
+		}
+	}
+	if d.Description == "" {
+		if s, _ := ti["description"].(string); s != "" {
+			d.Description = s
+		}
+	}
+	if d.FilePath == "" {
+		if s, _ := ti["file_path"].(string); s != "" {
+			d.FilePath = s
+		}
+	}
+	if d.Offset == 0 {
+		d.Offset = pullInt(ti, "offset")
+	}
+	if d.Limit == 0 {
+		d.Limit = pullInt(ti, "limit")
+	}
+	if d.Pattern == "" {
+		if s, _ := ti["pattern"].(string); s != "" {
+			d.Pattern = s
+		}
+	}
+	if d.URL == "" {
+		if s, _ := ti["url"].(string); s != "" {
+			d.URL = s
+		}
 	}
 }
 
@@ -377,25 +497,40 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	d.DecisionSrc = pull("source")
 	d.Speed = pull("speed")
 	d.RequestID = pull("request_id")
-	// attempt may be int or string depending on SDK version.
-	if v, ok := raw["attempt"]; ok {
-		switch x := v.(type) {
-		case float64:
-			d.Attempt = int64(x)
-		case string:
-			// Best-effort parse; ignore errors.
-			var n int64
-			for i := 0; i < len(x); i++ {
-				if x[i] < '0' || x[i] > '9' {
-					n = 0
-					break
-				}
-				n = n*10 + int64(x[i]-'0')
-			}
-			d.Attempt = n
-		}
-	}
+	// Numeric fields that may arrive as int (OTLP/gRPC binary) or as
+	// string (OTLP/HTTP JSON). Best-effort parse in both cases.
+	d.Attempt = pullInt(raw, "attempt")
+	d.Offset = pullInt(raw, "offset")
+	d.Limit = pullInt(raw, "limit")
 	return d
+}
+
+// pullInt extracts a numeric attr, accepting int / float / digit-string.
+// Returns 0 when missing or unparseable — consistent with other
+// "not reported" conventions in this file.
+func pullInt(raw map[string]any, key string) int64 {
+	v, ok := raw[key]
+	if !ok {
+		return 0
+	}
+	switch x := v.(type) {
+	case float64:
+		return int64(x)
+	case int64:
+		return x
+	case int:
+		return int64(x)
+	case string:
+		var n int64
+		for i := 0; i < len(x); i++ {
+			if x[i] < '0' || x[i] > '9' {
+				return 0
+			}
+			n = n*10 + int64(x[i]-'0')
+		}
+		return n
+	}
+	return 0
 }
 
 
