@@ -39,6 +39,16 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("creating indexes: %w", err)
 	}
 
+	if err := CreateOtelTables(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("creating OTel tables: %w", err)
+	}
+
+	if err := CreateOtelIndexes(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("creating OTel indexes: %w", err)
+	}
+
 	// Idempotent migrations for columns added after initial schema.
 	db.Exec(`ALTER TABLE sessions ADD COLUMN title TEXT`)
 	db.Exec(`ALTER TABLE sessions ADD COLUMN active_feature_id TEXT`)

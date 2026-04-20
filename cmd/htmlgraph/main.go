@@ -240,6 +240,7 @@ func buildRoot() *cobra.Command {
 	root.AddCommand(initCmd())
 	root.AddCommand(setupCmd())
 	root.AddCommand(setupCLICmd())
+	root.AddCommand(pricingCmd())
 
 	return root
 }
