@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -229,22 +230,49 @@ type promptJSON struct {
 // spanJSON is one row of the /api/otel/spans response. Shapes a
 // single OTel span for the client-side tree builder: the client groups
 // by trace_id and walks parent_span → span_id to reconstruct the tree.
+//
+// Details carries a whitelisted subset of the signal's attrs_json so
+// the dashboard can render tool-specific content (bash command, file
+// path, subagent type, etc.) without pulling the full payload — raw
+// API bodies with OTEL_LOG_RAW_API_BODIES=1 can exceed 60 KB per signal.
 type spanJSON struct {
-	SignalID     string  `json:"signal_id"`
-	TraceID      string  `json:"trace_id"`
-	SpanID       string  `json:"span_id"`
-	ParentSpan   string  `json:"parent_span"`
-	NativeName   string  `json:"native_name"`
-	Canonical    string  `json:"canonical"`
-	ToolName     string  `json:"tool_name"`
-	Model        string  `json:"model"`
-	TsMicros     int64   `json:"ts_micros"`
-	DurationMs   int64   `json:"duration_ms"`
-	TokensIn     int64   `json:"tokens_in"`
-	TokensOut    int64   `json:"tokens_out"`
-	CostUSD      float64 `json:"cost_usd"`
-	Decision     string  `json:"decision"`
-	Success      *bool   `json:"success,omitempty"`
+	SignalID   string     `json:"signal_id"`
+	TraceID    string     `json:"trace_id"`
+	SpanID     string     `json:"span_id"`
+	ParentSpan string     `json:"parent_span"`
+	NativeName string     `json:"native_name"`
+	Canonical  string     `json:"canonical"`
+	ToolName   string     `json:"tool_name"`
+	Model      string     `json:"model"`
+	TsMicros   int64      `json:"ts_micros"`
+	DurationMs int64      `json:"duration_ms"`
+	TokensIn   int64      `json:"tokens_in"`
+	TokensOut  int64      `json:"tokens_out"`
+	CostUSD    float64    `json:"cost_usd"`
+	Decision   string     `json:"decision"`
+	Success    *bool      `json:"success,omitempty"`
+	Details    spanDetail `json:"details"`
+}
+
+// spanDetail holds the whitelisted attributes extracted from attrs_json
+// that the dashboard needs to render rich span rows. Anything not in
+// this struct stays in the SQLite attrs_json column for drill-through
+// via a future "span detail" view.
+type spanDetail struct {
+	FullCommand   string `json:"full_command,omitempty"`    // Bash: exact command executed
+	BashCommand   string `json:"bash_command,omitempty"`    // Bash: un-shelled command
+	Description   string `json:"description,omitempty"`     // Bash: human description
+	FilePath      string `json:"file_path,omitempty"`       // Read/Edit/Write: target path
+	URL           string `json:"url,omitempty"`             // WebFetch/WebSearch
+	Pattern       string `json:"pattern,omitempty"`         // Grep/Glob
+	SkillName     string `json:"skill_name,omitempty"`      // Skill tool
+	SubagentType  string `json:"subagent_type,omitempty"`   // Agent/Task delegation target
+	MCPServerName string `json:"mcp_server_name,omitempty"` // MCP tool
+	MCPToolName   string `json:"mcp_tool_name,omitempty"`   // MCP tool
+	DecisionSrc   string `json:"decision_source,omitempty"` // tool.blocked_on_user
+	Speed         string `json:"speed,omitempty"`           // llm_request: fast|normal
+	RequestID     string `json:"request_id,omitempty"`      // llm_request: Anthropic request ID
+	Attempt       int64  `json:"attempt,omitempty"`         // llm_request: retry number
 }
 
 // otelSpansHandler returns every span persisted for the given session,
@@ -276,7 +304,8 @@ func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 				COALESCE(tokens_in, 0), COALESCE(tokens_out, 0),
 				COALESCE(cost_usd, 0),
 				COALESCE(decision, ''),
-				success
+				success,
+				COALESCE(attrs_json, '{}')
 			FROM otel_signals
 			WHERE session_id = ? AND kind = 'span'
 			ORDER BY ts_micros ASC`, sessionID)
@@ -290,12 +319,13 @@ func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var s spanJSON
 			var successVal sql.NullInt64
+			var attrsRaw string
 			if err := rows.Scan(
 				&s.SignalID, &s.TraceID, &s.SpanID, &s.ParentSpan,
 				&s.NativeName, &s.Canonical, &s.ToolName, &s.Model,
 				&s.TsMicros, &s.DurationMs,
 				&s.TokensIn, &s.TokensOut, &s.CostUSD,
-				&s.Decision, &successVal,
+				&s.Decision, &successVal, &attrsRaw,
 			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -304,11 +334,70 @@ func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 				b := successVal.Int64 == 1
 				s.Success = &b
 			}
+			s.Details = extractSpanDetails(attrsRaw)
 			out = append(out, s)
 		}
 		respondJSON(w, map[string]any{"spans": out})
 	}
 }
+
+// extractSpanDetails pulls the whitelisted attributes out of attrs_json.
+// Unrecognized keys are ignored so the payload stays small; callers can
+// drill into the raw JSON later if we add a detail-view endpoint.
+//
+// Returns a zero-value spanDetail on any JSON error — one bad row should
+// not poison the whole endpoint.
+func extractSpanDetails(attrsRaw string) spanDetail {
+	var d spanDetail
+	if attrsRaw == "" || attrsRaw == "{}" {
+		return d
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(attrsRaw), &raw); err != nil {
+		return d
+	}
+	pull := func(k string) string {
+		if v, ok := raw[k]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+		return ""
+	}
+	d.FullCommand = pull("full_command")
+	d.BashCommand = pull("bash_command")
+	d.Description = pull("description")
+	d.FilePath = pull("file_path")
+	d.URL = pull("url")
+	d.Pattern = pull("pattern")
+	d.SkillName = pull("skill_name")
+	d.SubagentType = pull("subagent_type")
+	d.MCPServerName = pull("mcp_server_name")
+	d.MCPToolName = pull("mcp_tool_name")
+	d.DecisionSrc = pull("source")
+	d.Speed = pull("speed")
+	d.RequestID = pull("request_id")
+	// attempt may be int or string depending on SDK version.
+	if v, ok := raw["attempt"]; ok {
+		switch x := v.(type) {
+		case float64:
+			d.Attempt = int64(x)
+		case string:
+			// Best-effort parse; ignore errors.
+			var n int64
+			for i := 0; i < len(x); i++ {
+				if x[i] < '0' || x[i] > '9' {
+					n = 0
+					break
+				}
+				n = n*10 + int64(x[i]-'0')
+			}
+			d.Attempt = n
+		}
+	}
+	return d
+}
+
 
 // readMaterializedRollup fetches the row from otel_session_rollup.
 // Returns (zero, false, nil) when no row exists, so the caller can

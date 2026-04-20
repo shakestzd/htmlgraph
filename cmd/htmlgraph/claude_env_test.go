@@ -34,12 +34,48 @@ func assertEnvNotSet(t *testing.T, env []string, key string) {
 }
 
 func TestBuildClaudeLaunchEnv_OptOutByDefault(t *testing.T) {
+	// Explicitly clear any gate + OTEL_* parent env so the test is
+	// hermetic regardless of the shell it runs in. (The launcher is
+	// expected to pass through any non-empty user OTEL_* values, so a
+	// shell that already exports them would otherwise leak into the
+	// assertion.)
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
+	t.Setenv("CLAUDE_CODE_ENABLE_TELEMETRY", "")
+	t.Setenv("CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "")
+	t.Setenv("OTEL_METRICS_EXPORTER", "")
+	t.Setenv("OTEL_LOGS_EXPORTER", "")
+	t.Setenv("OTEL_TRACES_EXPORTER", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
 	env := buildClaudeLaunchEnv("")
-	// With the gate off, none of the OTel exporter vars are added.
-	assertEnvNotSet(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY")
-	assertEnvNotSet(t, env, "OTEL_METRICS_EXPORTER")
-	assertEnvNotSet(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT")
+	// Gate off: every OTel var is either unset or preserves the empty
+	// value from the parent env. Neither state enables telemetry — Claude
+	// Code treats empty CLAUDE_CODE_ENABLE_TELEMETRY as disabled.
+	for _, key := range []string{
+		"CLAUDE_CODE_ENABLE_TELEMETRY",
+		"OTEL_METRICS_EXPORTER",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+	} {
+		assertEnvEmptyOrUnset(t, env, key)
+	}
+}
+
+// assertEnvEmptyOrUnset accepts either "missing from env slice" or
+// "present with empty value" — both satisfy Claude Code's "telemetry
+// disabled" contract, and t.Setenv("KEY", "") produces the latter.
+func assertEnvEmptyOrUnset(t *testing.T, env []string, key string) {
+	t.Helper()
+	prefix := key + "="
+	for _, kv := range env {
+		if strings.HasPrefix(kv, prefix) {
+			if got := strings.TrimPrefix(kv, prefix); got != "" {
+				t.Errorf("%s = %q, want empty or unset", key, got)
+			}
+			return
+		}
+	}
+	// Not in env slice at all — also fine.
 }
 
 func TestBuildClaudeLaunchEnv_InjectsWhenEnabled(t *testing.T) {

@@ -347,16 +347,22 @@
   font-family: var(--font-mono, monospace);
 }
 
-/* OTel span rows — distinct from hook-derived rows so provenance is
-   unambiguous. Rendered inside an expanded turn when /api/otel/spans
-   returns data for that session. */
+/* OTel span rows — distinct from hook-derived rows via left border +
+   tinted background. Within a span row, tool chips reuse the same
+   tool-Bash / tool-Read / tool-Edit classes as hook rows so a Bash
+   span and a Bash hook event share the green color family. Only the
+   "tool-otel" fallback (used for infrastructure spans like api_request
+   / tool_execution / interaction) gets the neutral blue treatment. */
 .event-row-otel-span {
   border-left: 2px solid rgba(56,139,253,0.45);
 }
 .event-row-otel-span .tool-chip.tool-otel {
-  background: rgba(56,139,253,0.2);
-  color: #79b8ff;
+  background: rgba(125,165,221,0.18);
+  color: #9cc5ff;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
 }
+/* Trace chip — only shown on trace roots. Subtle, uppercase, tight. */
 .tool-chip.tool-otel-trace {
   background: rgba(56,139,253,0.3);
   color: #c8e1ff;
@@ -365,6 +371,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.05rem 0.35rem;
+  margin-right: 0.35rem;
 }
 
 /* Feature badge */

@@ -119,20 +119,70 @@ class HgEventTree extends HTMLElement {
   }
 
   // _indexSpans groups spans by trace_id and builds parent→children lookup.
-  // Returns { byTrace: { traceId: [roots...] }, allSpans: [span with .children] }
-  // so we can render either a trace rooted at its interaction span or drill
-  // in from any parent. Each span entry gets a .children array populated.
+  //
+  // Handles a real-life quirk: Claude Code emits the root `interaction`
+  // span only at turn rollup, while child spans (api_request, tool_result,
+  // tool.execution, tool.blocked_on_user) export continuously. For
+  // in-flight sessions this leaves us with orphan children whose parent
+  // span_id references a span we haven't received yet. Treating every
+  // orphan as its own root explodes the tree horizontally.
+  //
+  // Fix: synthesize one placeholder parent per unique orphan parent_span,
+  // flagged with is_pending=true so renderSpan can label it "pending
+  // root — interaction span not yet received". All orphan children group
+  // under their shared synthetic root, and the rendered tree looks right.
   _indexSpans(spans) {
     var byId = {};
     spans.forEach(function(s) { s.children = []; byId[s.span_id] = s; });
-    var roots = [];
+
+    // Identify orphan parents (parent_span non-empty but not in byId).
+    var orphanParents = {};
     spans.forEach(function(s) {
+      if (s.parent_span && !byId[s.parent_span]) {
+        orphanParents[s.parent_span] = {
+          span_id: s.parent_span,
+          parent_span: '',
+          trace_id: s.trace_id,
+          canonical: 'interaction',
+          native_name: 'claude_code.interaction (pending)',
+          tool_name: '',
+          model: '',
+          ts_micros: s.ts_micros,
+          duration_ms: 0,
+          tokens_in: 0, tokens_out: 0, cost_usd: 0,
+          decision: '',
+          details: {},
+          children: [],
+          _pending: true,
+        };
+      }
+    });
+    // Merge synthetic parents into byId so the parent-link step below
+    // sees them.
+    Object.keys(orphanParents).forEach(function(id) {
+      if (!byId[id]) byId[id] = orphanParents[id];
+    });
+
+    var roots = [];
+    Object.values(byId).forEach(function(s) {
       if (s.parent_span && byId[s.parent_span]) {
         byId[s.parent_span].children.push(s);
       } else {
         roots.push(s);
       }
     });
+
+    // Reverse every children array so the most recent span renders first,
+    // matching the activity feed's overall "newest at top" ordering.
+    // The endpoint returns spans in ascending ts_micros order; reversing
+    // here keeps the server query simple (it's still chronologically
+    // ordered, which helps span-to-span joining) while the UI surface
+    // flips to reverse-chronological.
+    Object.values(byId).forEach(function(s) {
+      if (s.children.length > 1) s.children.reverse();
+    });
+    roots.reverse();
+
     var byTrace = {};
     roots.forEach(function(s) {
       (byTrace[s.trace_id] = byTrace[s.trace_id] || []).push(s);
@@ -505,37 +555,92 @@ class HgEventTree extends HTMLElement {
   }
 
   // renderSpan emits a tree row for an OTel span and recursively renders
-  // its children. Uses distinct styling (.event-row-otel-span + trace chip)
-  // so OTel-sourced rows are visually separable from hook-sourced rows.
+  // its children. Uses the same tool-chip classes as hook-sourced rows
+  // (tool-Bash/Read/Edit/etc.) so Bash is green, Read is blue, Agent is
+  // pink regardless of where the row came from. The "trace" chip appears
+  // only on trace roots — every descendant already inherits the blue
+  // left-border + tinted background, which is enough provenance.
+  //
+  // Summary text prefers tool-specific detail (bash full_command, Read
+  // file_path, Grep pattern, Agent subagent_type) over the native span
+  // name. This mirrors how hook rows show input_summary rather than
+  // "tool_call".
+  //
   // Span IDs are used as toggle keys, namespaced with "span:" so they
   // don't collide with event_id-keyed toggles from the hook-derived tree.
   renderSpan(span, depth) {
     if (depth > 5) return '';
     if (!span) return '';
+
     var toggleKey = 'span:' + span.span_id;
     var hasChildren = span.children && span.children.length > 0;
-    var isExp = this.expanded.has(toggleKey);
+    // Synthetic pending roots default to expanded so the actual tool
+    // activity is visible without an extra click — users shouldn't have
+    // to discover a placeholder node just to see their own tool calls.
+    var isExp = this.expanded.has(toggleKey) || (span._pending && !this.expanded.has('collapse:' + span.span_id));
     var expandIcon = hasChildren
       ? '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(toggleKey) + '">\u25B6</span>'
       : '<span class="expand-icon-spacer"></span>';
 
-    // Label: use tool_name when available, otherwise the canonical span
-    // name (interaction / api_request / tool_execution / tool_blocked_on_user).
-    var label = span.tool_name
-      ? span.tool_name
-      : (span.canonical || span.native_name || 'span');
-    var dur = span.duration_ms ? (span.duration_ms >= 1000 ? (span.duration_ms / 1000).toFixed(2) + 's' : span.duration_ms + 'ms') : '';
+    var d = span.details || {};
+    var isToolSpan = Boolean(span.tool_name);
+    var isRoot = !span.parent_span;
+
+    // Label + chip class.
+    // - Tool spans (tool_name=Bash/Read/Edit/Agent): use existing
+    //   .tool-{Name} classes for consistent coloring with hook rows.
+    // - Non-tool spans (interaction, llm_request, tool_execution,
+    //   tool_blocked_on_user): use a neutral .tool-otel class.
+    var label, chipClass, chipStyle = '';
+    if (isToolSpan) {
+      label = span.tool_name;
+      chipClass = 'tool-chip tool-' + span.tool_name;
+      // Subagent delegations (Task/Agent tool) take on the agent's
+      // color family — researcher=cyan, haiku=green, etc.
+      if ((span.tool_name === 'Task' || span.tool_name === 'Agent') && d.subagent_type) {
+        chipStyle = ' style="background-color: ' + this.agentBadgeColor(d.subagent_type) + '; color: #ffffff"';
+      }
+    } else {
+      label = this._spanCanonicalLabel(span);
+      chipClass = 'tool-chip tool-otel';
+    }
+
+    // Summary text: tool-specific detail beats the native span name.
+    var summary = this._spanSummary(span);
+
+    var dur = span.duration_ms
+      ? (span.duration_ms >= 1000 ? (span.duration_ms / 1000).toFixed(2) + 's' : span.duration_ms + 'ms')
+      : '';
 
     var errBorder = (span.success === false) ? 'border-error' : '';
     var padLeft = (depth + 1) * 1.25;
-    var bgAlpha = 0.04 + depth * 0.05;
+    var bgAlpha = 0.04 + depth * 0.04;
 
+    var traceChip = '';
+    if (isRoot) {
+      if (span._pending) {
+        traceChip = '<span class="tool-chip tool-otel-trace" title="Root interaction span not yet received — children are grouped here provisionally">pending</span>';
+      } else {
+        traceChip = '<span class="tool-chip tool-otel-trace" title="OTel trace root: ' + esc(span.native_name) + '">trace</span>';
+      }
+    }
+
+    var subagentBadge = '';
+    if (isToolSpan && (span.tool_name === 'Task' || span.tool_name === 'Agent') && d.subagent_type) {
+      var col = this.agentBadgeColor(d.subagent_type);
+      subagentBadge = '<span class="badge badge-subagent" style="background-color: ' + col + '">' + esc(d.subagent_type) + '</span>';
+    }
+
+    var modelBdg = span.model
+      ? '<span class="badge badge-otel">' + esc(span.model) + '</span>'
+      : '';
     var costBdg = (span.cost_usd > 0)
       ? '<span class="badge badge-otel">$' + span.cost_usd.toFixed(4) + '</span>'
       : '';
-    var modelBdg = span.model ? '<span class="badge badge-otel">' + esc(span.model) + '</span>' : '';
+    var retryBdg = (d.attempt && d.attempt > 1)
+      ? '<span class="badge badge-otel" title="Attempt number">attempt ' + d.attempt + '</span>'
+      : '';
     var durBdg = dur ? '<span class="turn-stats">' + dur + '</span>' : '';
-    var traceChip = '<span class="tool-chip tool-otel-trace" title="OTel span: ' + esc(span.native_name) + '">trace</span>';
 
     var html = '<div class="event-row event-row-otel-span depth-' + depth + ' ' + errBorder + '"'
       + ' data-span-id="' + esc(span.span_id) + '"'
@@ -544,10 +649,12 @@ class HgEventTree extends HTMLElement {
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
       + expandIcon
       + traceChip
-      + '<span class="tool-chip tool-otel">' + esc(label) + '</span>'
+      + '<span class="' + chipClass + '"' + chipStyle + '>' + esc(label) + '</span>'
+      + subagentBadge
       + modelBdg
       + costBdg
-      + '<span class="event-summary">' + esc(span.native_name) + '</span>'
+      + retryBdg
+      + '<span class="event-summary">' + esc(summary) + '</span>'
       + durBdg
       + '</div>';
 
@@ -555,6 +662,66 @@ class HgEventTree extends HTMLElement {
       html += span.children.map(c => this.renderSpan(c, depth + 1)).join('');
     }
     return html;
+  }
+
+  // _spanCanonicalLabel returns a short human label for non-tool spans.
+  // Maps claude_code.interaction → "interaction", claude_code.llm_request
+  // → "api_request", tool.execution → "exec", tool.blocked_on_user →
+  // "permission", etc.
+  _spanCanonicalLabel(span) {
+    switch (span.canonical) {
+      case 'interaction':           return 'interaction';
+      case 'api_request':           return 'api_request';
+      case 'tool_execution':        return 'exec';
+      case 'tool_blocked_on_user':  return 'permission';
+      default:
+        // Strip the harness prefix if present (claude_code.*).
+        var n = span.native_name || '';
+        var i = n.indexOf('.');
+        return i >= 0 ? n.slice(i + 1) : (n || 'span');
+    }
+  }
+
+  // _spanSummary returns the descriptive text for a span row.
+  // Priority: tool-specific detail (command, file path, etc.) > a
+  // derived label for infrastructure spans > the native name as a
+  // fallback so rows are never empty.
+  _spanSummary(span) {
+    var d = span.details || {};
+    if (span.tool_name === 'Bash') {
+      return d.full_command || d.bash_command || d.description || '';
+    }
+    if (span.tool_name === 'Read' || span.tool_name === 'Edit' || span.tool_name === 'Write' || span.tool_name === 'NotebookEdit') {
+      return d.file_path || '';
+    }
+    if (span.tool_name === 'Grep' || span.tool_name === 'Glob') {
+      return d.pattern || '';
+    }
+    if (span.tool_name === 'WebFetch' || span.tool_name === 'WebSearch') {
+      return d.url || '';
+    }
+    if (span.tool_name === 'Skill') {
+      return d.skill_name || '';
+    }
+    if (span.tool_name === 'Task' || span.tool_name === 'Agent') {
+      // Subagent type is already shown as a dedicated badge; keep summary
+      // empty to avoid duplication.
+      return '';
+    }
+    // Non-tool spans: tool_blocked_on_user carries a decision source.
+    if (span.canonical === 'tool_blocked_on_user') {
+      return d.decision_source ? ('blocked: ' + d.decision_source) : 'permission check';
+    }
+    if (span.canonical === 'tool_execution') {
+      return 'executed';
+    }
+    if (span.canonical === 'interaction') {
+      return '';
+    }
+    if (span.canonical === 'api_request') {
+      return d.speed === 'fast' ? 'fast mode' : '';
+    }
+    return '';
   }
 }
 
