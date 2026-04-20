@@ -340,6 +340,64 @@ class HgEventTree extends HTMLElement {
     return (n / 1000000).toFixed(2) + 'M';
   }
 
+  // _turnStatsFromSpans walks the actual span subtree for a turn and
+  // tallies the metrics that appear in the turn header (tool calls,
+  // cost, tokens, api errors). Counting from the matched subtree is
+  // inherently scoped to THIS turn — no risk of session-wide aggregates
+  // leaking across turns, which is what the /api/otel/rollup data did.
+  //
+  // Returns { hasData: false } when the turn has no OTel spans; callers
+  // fall back to hook-derived stats or no badge.
+  _turnStatsFromSpans(turn) {
+    var roots = this._spansForTurn(turn);
+    if (!roots || roots.length === 0) return { hasData: false };
+    var stats = { hasData: true, tool_calls: 0, api_errors: 0, cost: 0, tokens_in: 0, tokens_out: 0 };
+    var self = this;
+    var visit = function(span) {
+      if (!span) return;
+      // Tool calls: tool_result or subagent_invocation with a tool_name.
+      if (span.tool_name && (span.canonical === 'tool_result' || span.canonical === 'subagent_invocation')) {
+        stats.tool_calls++;
+      }
+      // API request spans carry cost/tokens directly.
+      if (span.canonical === 'api_request') {
+        stats.cost += span.cost_usd || 0;
+        stats.tokens_in += span.tokens_in || 0;
+        stats.tokens_out += span.tokens_out || 0;
+      }
+      // Absorbed api_request (attached to a tool span via _precedingApi
+      // in _indexSpans) — those were pulled out of the rendered tree
+      // but still contribute to the cost/token totals.
+      if (span._precedingApi) {
+        stats.cost += span._precedingApi.cost_usd || 0;
+        stats.tokens_in += span._precedingApi.tokens_in || 0;
+        stats.tokens_out += span._precedingApi.tokens_out || 0;
+      }
+      if (span.canonical === 'api_error' || span.success === false) {
+        // rare: api_error rarely lands as a span, but guard both paths.
+        if (span.canonical === 'api_error') stats.api_errors++;
+      }
+      (span.children || []).forEach(visit);
+    };
+    roots.forEach(visit);
+    return stats;
+  }
+
+  // _turnCostBadge renders the per-turn cost/token/error badge from
+  // stats computed by _turnStatsFromSpans. Same visual treatment as
+  // _otelBadges so the per-turn and per-prompt paths look identical.
+  _turnCostBadge(stats) {
+    var parts = [];
+    if (stats.cost > 0) parts.push('$' + stats.cost.toFixed(4));
+    var tokens = (stats.tokens_in || 0) + (stats.tokens_out || 0);
+    if (tokens > 0) parts.push(this._fmtTokens(tokens) + ' tok');
+    if (stats.api_errors > 0) parts.push(stats.api_errors + ' err');
+    if (parts.length === 0) return '';
+    return '<span class="badge badge-otel" title="Computed from this turn\'s OTel span subtree">'
+      + parts.map(esc).join(' · ')
+      + '</span>';
+  }
+
   async loadFeatureTitles() {
     var ids = new Set();
     this.turns.forEach(function collectIds(t) {
@@ -597,10 +655,31 @@ class HgEventTree extends HTMLElement {
       ? '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(uq.event_id) + '">\u25B6</span>'
       : '<span class="expand-icon-spacer"></span>';
 
+    // Per-turn stats: prefer counts derived from the OTel span subtree
+    // (spans attributed to THIS specific turn via the forward-window
+    // matcher) over hook-derived turn.stats. The hook counts are stale
+    // when UserPromptSubmit drops or when the receiver + hook clocks
+    // are out of sync; _otelBadges likewise lookup per-prompt data via
+    // nearest-match which can double-count across turns. Counting from
+    // the actual matched subtree is the single source of truth.
+    var turnStats = this._turnStatsFromSpans(turn);
     var s = turn.stats || {};
-    var statsHtml = '<span class="turn-stats">' + (s.tool_count || 0) + ' tools' + (s.error_count ? ', ' + s.error_count + ' errors' : '') + '</span>';
+    var toolCount, errorCount;
+    if (turnStats.hasData) {
+      toolCount = turnStats.tool_calls;
+      errorCount = turnStats.api_errors;
+    } else {
+      toolCount = s.tool_count || 0;
+      errorCount = s.error_count || 0;
+    }
+    var statsHtml = '<span class="turn-stats">' + toolCount + ' tools' + (errorCount ? ', ' + errorCount + ' errors' : '') + '</span>';
     var featureBdg = this.featureBadge(uq.feature_id, uq.feature_title);
-    var otelBdg = this._otelBadges(turn);
+    // Cost / token badge: sum from the span subtree when it exists,
+    // otherwise fall back to the prompt-endpoint nearest-match
+    // (_otelBadges), otherwise empty.
+    var otelBdg = turnStats.hasData
+      ? this._turnCostBadge(turnStats)
+      : this._otelBadges(turn);
 
     var html = '<div class="turn-group">'
       + '<div class="event-row depth-0 user-query-row"'
