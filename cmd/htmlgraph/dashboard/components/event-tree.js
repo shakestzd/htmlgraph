@@ -708,9 +708,31 @@ class HgEventTree extends HTMLElement {
       // empty to avoid duplication.
       return '';
     }
-    // Non-tool spans: tool_blocked_on_user carries a decision source.
+    // tool_blocked_on_user is a misleading name — it's the PERMISSION
+    // GATE span covering the time between tool emit and execution. It
+    // does NOT mean the tool was blocked. The decision_source attribute
+    // tells us how the gate resolved:
+    //   config          → auto-approved via settings / --allowedTools
+    //   hook            → auto-approved via a PreToolUse hook
+    //   user_permanent  → user approved, remembered for the session
+    //   user_temporary  → user approved, single-use
+    //   user_reject     → user blocked the call
+    //   user_abort      → user cancelled the turn
+    //   unknown         → no permission decision recorded
     if (span.canonical === 'tool_blocked_on_user') {
-      return d.decision_source ? ('blocked: ' + d.decision_source) : 'permission check';
+      switch (d.decision_source) {
+        case 'config':         return 'auto-approved (config)';
+        case 'hook':           return 'auto-approved (hook)';
+        case 'user_permanent': return 'user approved (remember)';
+        case 'user_temporary': return 'user approved';
+        case 'user_reject':    return 'blocked by user';
+        case 'user_abort':     return 'aborted by user';
+        case '':
+        case 'unknown':
+        case undefined:
+        case null:             return 'permission check';
+        default:               return 'decision: ' + d.decision_source;
+      }
     }
     if (span.canonical === 'tool_execution') {
       return 'executed';
