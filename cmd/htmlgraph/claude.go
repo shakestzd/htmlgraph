@@ -434,12 +434,17 @@ func launchClaude(opts LaunchOpts) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
-	// When running in a worktree, inject HTMLGRAPH_PROJECT_DIR so all
-	// htmlgraph CLI commands and hooks resolve to the main .htmlgraph/,
-	// not the worktree copy.
+	// Compose the child env: start from os.Environ, layer
+	// HTMLGRAPH_PROJECT_DIR when running in a worktree, and layer OTel
+	// exporter vars when HTMLGRAPH_OTEL_ENABLED=1 so Claude's OTLP
+	// pipeline points at the htmlgraph serve receiver. See
+	// claude_env.go:buildClaudeLaunchEnv for precedence rules (user-set
+	// OTEL_* always wins).
+	var worktreeOverride string
 	if opts.HtmlgraphRoot != "" && opts.HtmlgraphRoot != opts.ProjectRoot {
-		c.Env = append(os.Environ(), "HTMLGRAPH_PROJECT_DIR="+opts.HtmlgraphRoot)
+		worktreeOverride = opts.HtmlgraphRoot
 	}
+	c.Env = buildClaudeLaunchEnv(worktreeOverride)
 
 	// Set working directory to project root so Claude starts in the right place,
 	// even if this command is run from a subdirectory like packages/go.
