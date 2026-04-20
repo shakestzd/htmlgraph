@@ -278,6 +278,16 @@
 .tool-Grep      { background: rgba(251,146,60,0.2); color: #fb923c; }
 .tool-Glob      { background: rgba(168,85,247,0.2); color: #a855f7; }
 .tool-Task, .tool-Agent { background: rgba(236,72,153,0.2); color: #ec4899; }
+/* Task-management family — TaskCreate / TaskUpdate / TaskList / TaskGet /
+   TaskStop / TaskOutput are the harness-level todo tools (distinct from
+   Task/Agent subagent delegation above). Indigo family so they don't
+   collide visually with the pink Task/Agent chip. */
+.tool-TaskCreate,
+.tool-TaskUpdate,
+.tool-TaskList,
+.tool-TaskGet,
+.tool-TaskStop,
+.tool-TaskOutput { background: rgba(99,102,241,0.22); color: #a5b4fc; }
 .tool-UserQuery { background: rgba(88,166,255,0.2); color: #58a6ff; }
 .tool-Stop      { background: rgba(139,148,158,0.2); color: #8b949e; }
 /* Light mode: darker text on lighter backgrounds for contrast */
@@ -288,6 +298,12 @@
 [data-theme="light"] .tool-Grep      { background: rgba(234,88,12,0.12);  color: #c2410c; }
 [data-theme="light"] .tool-Glob      { background: rgba(126,34,206,0.12); color: #7e22ce; }
 [data-theme="light"] .tool-Task, [data-theme="light"] .tool-Agent { background: rgba(190,24,93,0.12); color: #be185d; }
+[data-theme="light"] .tool-TaskCreate,
+[data-theme="light"] .tool-TaskUpdate,
+[data-theme="light"] .tool-TaskList,
+[data-theme="light"] .tool-TaskGet,
+[data-theme="light"] .tool-TaskStop,
+[data-theme="light"] .tool-TaskOutput { background: rgba(79,70,229,0.14); color: #4338ca; }
 [data-theme="light"] .tool-UserQuery { background: rgba(29,78,216,0.12);  color: #1d4ed8; }
 [data-theme="light"] .tool-Stop      { background: rgba(107,114,128,0.12); color: #4b5563; }
 
@@ -347,16 +363,12 @@
   font-family: var(--font-mono, monospace);
 }
 
-/* OTel span rows — distinct from hook-derived rows via left border +
-   tinted background. Within a span row, tool chips reuse the same
-   tool-Bash / tool-Read / tool-Edit classes as hook rows so a Bash
-   span and a Bash hook event share the green color family. Only the
-   "tool-otel" fallback (used for infrastructure spans like api_request
-   / tool_execution / interaction) gets the neutral blue treatment. */
-.event-row-otel-span {
-  border-left: 2px solid rgba(56,139,253,0.45);
-}
-.event-row-otel-span .tool-chip.tool-otel {
+/* OTel infrastructure-span chip (interaction / api_request /
+   tool_execution / tool_blocked_on_user). Rendered on plain event-rows
+   — OTel spans are the canonical tree now, so there's no distinct
+   blue-left-border section anymore. The chip itself stays subtly
+   tinted so infra spans read differently from user-facing tool rows. */
+.tool-chip.tool-otel {
   background: rgba(125,165,221,0.18);
   color: #9cc5ff;
   font-family: var(--font-mono, monospace);

@@ -244,29 +244,26 @@ class HgEventTree extends HTMLElement {
       if (otherTs > ts && otherTs < nextTs) nextTs = otherTs;
     }
 
-    // Window match: smallest earliest_ts that falls in [ts, nextTs).
+    // Window match: smallest earliest_ts that falls in [ts - slop, nextTs).
+    // 1-second slop on the lower bound absorbs harmless clock skew — OTel
+    // exporters can start a span a few hundred ms BEFORE the hook-logged
+    // user_query timestamp when they're batching aggressively. Any larger
+    // slop risks stealing a previous turn's trailing trace.
+    //
+    // No absolute-nearest fallback. A turn without a forward-window
+    // trace genuinely has no OTel data (pre-receiver session, or a turn
+    // whose exporter dropped). Returning [] is the honest answer — the
+    // renderer then falls through to hook-derived children.
+    var slop = 1_000_000; // 1 s in micros
     var winner = null, winnerEarliest = Infinity;
     Object.keys(idx.byTrace).forEach(function(tid) {
       var earliest = Math.min.apply(null, idx.byTrace[tid].map(function(r) { return r.ts_micros; }));
-      if (earliest >= ts && earliest < nextTs && earliest < winnerEarliest) {
+      if (earliest >= (ts - slop) && earliest < nextTs && earliest < winnerEarliest) {
         winner = tid;
         winnerEarliest = earliest;
       }
     });
-    if (winner) return idx.byTrace[winner];
-
-    // Fallback: absolute-nearest, but only consider traces that haven't
-    // already been claimed by a LATER turn via the forward-window rule.
-    // This prevents the latest turn's trace from being stolen by an
-    // earlier turn's "nearest" match.
-    var bestTrace = null;
-    var bestDiff = Infinity;
-    Object.keys(idx.byTrace).forEach(function(tid) {
-      var earliest = Math.min.apply(null, idx.byTrace[tid].map(function(r) { return r.ts_micros; }));
-      var d = Math.abs(earliest - ts);
-      if (d < bestDiff) { bestTrace = tid; bestDiff = d; }
-    });
-    return bestTrace ? idx.byTrace[bestTrace] : [];
+    return winner ? idx.byTrace[winner] : [];
   }
 
   // _otelForTurn returns the OTel prompt breakdown nearest (by wall-clock)
@@ -571,18 +568,18 @@ class HgEventTree extends HTMLElement {
       + statsHtml
       + '</div>';
 
-    if (isExp && turn.children) {
-      html += turn.children.map(c => this.renderEvent(c, 1)).join('');
-    }
-
-    // OTel span subtree — only when expanded, to avoid bloating collapsed
-    // rows. Rendered after hook children so hook-derived hierarchy stays
-    // primary and trace detail is supplementary. One rendered tree per
-    // turn; rooted at the nearest matching trace's root spans.
     if (isExp) {
+      // Prefer OTel spans when present — they're the canonical source
+      // of hierarchy (subagent tool calls nest natively, no custom
+      // attribution logic needed). When a turn has no OTel data — e.g.
+      // a pre-OTel session or a session without the receiver enabled —
+      // fall back to hook-derived children so older content still
+      // renders.
       var rootSpans = this._spansForTurn(turn);
       if (rootSpans && rootSpans.length > 0) {
         html += rootSpans.map(s => this.renderSpan(s, 1)).join('');
+      } else if (turn.children) {
+        html += turn.children.map(c => this.renderEvent(c, 1)).join('');
       }
     }
 
@@ -705,8 +702,11 @@ class HgEventTree extends HTMLElement {
       : '';
 
     var errBorder = (span.success === false) ? 'border-error' : '';
+    // Match hook-row visual treatment: same padding ladder, same
+    // bg-alpha ladder, same base row class. Span rows no longer look
+    // visually distinct from hook rows — the span tree IS the tree now.
     var padLeft = (depth + 1) * 1.25;
-    var bgAlpha = 0.04 + depth * 0.04;
+    var bgAlpha = 0.05 + depth * 0.08;
 
     var traceChip = '';
     if (isRoot) {
@@ -772,12 +772,12 @@ class HgEventTree extends HTMLElement {
       rowTitle = span.native_name;
     }
 
-    var html = '<div class="event-row event-row-otel-span depth-' + depth + ' ' + errBorder + '"'
+    var html = '<div class="event-row depth-' + depth + ' ' + errBorder + '"'
       + ' data-span-id="' + esc(span.span_id) + '"'
       + ' data-trace-id="' + esc(span.trace_id) + '"'
       + (span.parent_span ? ' data-parent-span="' + esc(span.parent_span) + '"' : '')
       + (rowTitle ? ' title="' + esc(rowTitle) + '"' : '')
-      + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
+      + ' style="padding-left: ' + padLeft + 'rem; background: rgba(0,0,0,' + bgAlpha + ')">'
       + expandIcon
       + traceChip
       + mcpServerPill
@@ -814,7 +814,9 @@ class HgEventTree extends HTMLElement {
     if (!span.tool_name) return '';
     var rows = [];
     if (span.tool_name === 'Bash') {
-      if (d.full_command)   rows.push(['command', d.full_command]);
+      // command becomes a <pre><code> code block below — it's typically
+      // multiline and long enough to deserve code rendering. Keep
+      // description/timeout/git-commit as simple kv rows.
       if (d.description)    rows.push(['description', d.description]);
       if (d.timeout)        rows.push(['timeout', d.timeout + 'ms']);
       if (d.git_commit_id)  rows.push(['git commit', d.git_commit_id]);
@@ -855,6 +857,14 @@ class HgEventTree extends HTMLElement {
       if (d.skill_name)     rows.push(['skill', d.skill_name]);
     } else if (span.tool_name === 'TodoWrite') {
       if (d.todo_count)     rows.push(['todos', d.todo_count]);
+    } else if (span.tool_name === 'TaskCreate' || span.tool_name === 'TaskUpdate' ||
+               span.tool_name === 'TaskList'   || span.tool_name === 'TaskGet' ||
+               span.tool_name === 'TaskStop'   || span.tool_name === 'TaskOutput') {
+      // Task-management family — show whatever identifying args the
+      // tool_input carried (description, prompt summary, task id).
+      if (d.description)    rows.push(['description', d.description]);
+      if (d.prompt)         rows.push(['prompt', d.prompt]);
+      if (d.subagent_type)  rows.push(['subagent', d.subagent_type]);
     } else if (span.tool_name && span.tool_name.indexOf('mcp__') === 0) {
       // MCP tool: show server + tool split + any common args.
       var mcp = this._parseMCPToolName(span.tool_name);
@@ -880,50 +890,100 @@ class HgEventTree extends HTMLElement {
       if (ad.request_id)        rows.push(['request id', ad.request_id]);
       if (ad.speed)             rows.push(['mode', ad.speed]);
     }
-    // Long-content code panels: render old_string / new_string /
-    // content as <pre> blocks below the key/value list. Kept separate
-    // from `rows` so they span full width. Syntax highlighting + diff
-    // rendering + collapse-long toggles are tracked in feat-292f87fe.
+    // Long-content code panels: render Bash command / Edit old_string /
+    // Edit new_string / Write content as <pre><code class="language-xxx">
+    // blocks. The language class is set from the file extension (for
+    // file-backed tools) or "bash" for Bash. A future syntax-highlighting
+    // library (feat-292f87fe) will pick up the class and colorize.
     var codeBlocks = '';
-    if (span.tool_name === 'Edit') {
+    if (span.tool_name === 'Bash') {
+      if (d.full_command) {
+        codeBlocks += this._codeBlock('command', d.full_command, d.full_command.length, false, 'bash');
+      }
+    } else if (span.tool_name === 'Edit') {
+      var editLang = this._detectLanguage(d.file_path);
       if (d.old_string) {
-        codeBlocks += this._codeBlock('old_string', d.old_string, d.old_string_len, d.content_truncated);
+        codeBlocks += this._codeBlock('old_string', d.old_string, d.old_string_len, d.content_truncated, editLang);
       }
       if (d.new_string) {
-        codeBlocks += this._codeBlock('new_string', d.new_string, d.new_string_len, d.content_truncated);
+        codeBlocks += this._codeBlock('new_string', d.new_string, d.new_string_len, d.content_truncated, editLang);
       }
     } else if (span.tool_name === 'Write') {
       if (d.content) {
-        codeBlocks += this._codeBlock('content', d.content, d.content_len, d.content_truncated);
+        codeBlocks += this._codeBlock('content', d.content, d.content_len, d.content_truncated, this._detectLanguage(d.file_path));
       }
     }
 
     if (rows.length === 0 && !codeBlocks) return '';
 
     var padLeft = (depth + 1) * 1.25;
-    var bgAlpha = 0.03 + depth * 0.03;
+    var bgAlpha = 0.05 + depth * 0.08;
     var kvHtml = rows.map(function(r) {
       return '<div class="otel-detail-row"><span class="otel-detail-key">' + esc(r[0]) + '</span>'
         + '<span class="otel-detail-val">' + esc(String(r[1])) + '</span></div>';
     }).join('');
     return '<div class="event-row event-row-otel-detail depth-' + depth + '"'
-      + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
+      + ' style="padding-left: ' + padLeft + 'rem; background: rgba(0,0,0,' + bgAlpha + ')">'
       + kvHtml
       + codeBlocks
       + '</div>';
   }
 
   // _codeBlock emits a labeled <pre><code> block for a string attribute
-  // (old_string, new_string, content). The full length is shown as a
-  // header so users know whether truncation lost content. Syntax
-  // highlighting is deferred to feat-292f87fe.
-  _codeBlock(label, content, fullLen, wasTruncated) {
+  // (bash command, edit old_string/new_string, write content). The full
+  // length is shown in the header so users know whether truncation lost
+  // content. The language-* class on <code> lets a future syntax
+  // highlighter (Prism / highlight.js per feat-292f87fe) colorize the
+  // block without further JS changes.
+  _codeBlock(label, content, fullLen, wasTruncated, language) {
     var header = esc(label);
     if (fullLen) header += ' (' + fullLen + ' chars' + (wasTruncated ? ', truncated' : '') + ')';
+    if (language) header += ' · ' + esc(language);
+    var codeClass = language ? ' class="language-' + esc(language) + '"' : '';
     return '<div class="otel-detail-code">'
       + '<div class="otel-detail-code-header">' + header + '</div>'
-      + '<pre class="otel-detail-code-body"><code>' + esc(content) + '</code></pre>'
+      + '<pre class="otel-detail-code-body"><code' + codeClass + '>' + esc(content) + '</code></pre>'
       + '</div>';
+  }
+
+  // _detectLanguage maps a file path extension to a Prism/highlight.js
+  // language identifier. Returns empty string when the extension isn't
+  // recognized (code block still renders, just without language class).
+  // Extend this as we add languages — the full list tracked in
+  // feat-292f87fe.
+  _detectLanguage(filePath) {
+    if (!filePath) return '';
+    var dot = filePath.lastIndexOf('.');
+    if (dot === -1) return '';
+    var ext = filePath.slice(dot + 1).toLowerCase();
+    switch (ext) {
+      case 'go':                 return 'go';
+      case 'js': case 'mjs':     return 'javascript';
+      case 'ts': case 'tsx':     return 'typescript';
+      case 'jsx':                return 'jsx';
+      case 'py':                 return 'python';
+      case 'rb':                 return 'ruby';
+      case 'rs':                 return 'rust';
+      case 'java':               return 'java';
+      case 'c': case 'h':        return 'c';
+      case 'cpp': case 'cc': case 'hpp': return 'cpp';
+      case 'cs':                 return 'csharp';
+      case 'sh': case 'bash':    return 'bash';
+      case 'zsh':                return 'bash';
+      case 'fish':               return 'bash';
+      case 'html': case 'htm':   return 'html';
+      case 'css':                return 'css';
+      case 'scss': case 'sass':  return 'scss';
+      case 'json':               return 'json';
+      case 'yaml': case 'yml':   return 'yaml';
+      case 'toml':               return 'toml';
+      case 'xml':                return 'xml';
+      case 'md': case 'markdown': return 'markdown';
+      case 'sql':                return 'sql';
+      case 'proto':              return 'protobuf';
+      case 'dockerfile':         return 'docker';
+      default:                   return '';
+    }
   }
 
   // _toolChildRollup scans a tool span's immediate children for
@@ -1123,6 +1183,11 @@ class HgEventTree extends HTMLElement {
     }
     if (span.tool_name === 'TodoWrite') {
       return d.todo_count ? d.todo_count + ' todos' : '';
+    }
+    if (span.tool_name === 'TaskCreate' || span.tool_name === 'TaskUpdate' ||
+        span.tool_name === 'TaskList'   || span.tool_name === 'TaskGet'    ||
+        span.tool_name === 'TaskStop'   || span.tool_name === 'TaskOutput') {
+      return d.description || d.subagent_type || '';
     }
     // MCP tools: when tool_input carries something obviously summarizable
     // use it; otherwise leave empty (expand to see full args).
