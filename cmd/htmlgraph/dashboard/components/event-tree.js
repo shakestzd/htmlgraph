@@ -244,6 +244,18 @@ class HgEventTree extends HTMLElement {
       if (otherTs > ts && otherTs < nextTs) nextTs = otherTs;
     }
 
+    // Cap the latest turn's window at ts + 15 minutes. Without a cap,
+    // every span after the latest KNOWN turn gets attributed to it —
+    // including spans from LATER turns we haven't loaded yet (SSE lag,
+    // UserPromptSubmit hook failures, etc.). A 15-minute ceiling keeps
+    // attribution conservative: live in-flight traces finish well
+    // within that window, and stray later-turn spans are dropped rather
+    // than misattributed.
+    var latestTurnCap = 15 * 60 * 1_000_000; // 15 min in micros
+    if (nextTs === Infinity) {
+      nextTs = ts + latestTurnCap;
+    }
+
     // Window match: smallest earliest_ts that falls in [ts - slop, nextTs).
     // 1-second slop on the lower bound absorbs harmless clock skew — OTel
     // exporters can start a span a few hundred ms BEFORE the hook-logged
@@ -263,7 +275,26 @@ class HgEventTree extends HTMLElement {
         winnerEarliest = earliest;
       }
     });
-    return winner ? idx.byTrace[winner] : [];
+    if (!winner) return [];
+
+    // Peel off the "interaction" wrapper (or synthetic pending root)
+    // so the tool spans become the turn's direct children. The user
+    // prompt IS the turn root — rendering "interaction" as an
+    // intermediate row just repeats the same information at two depths.
+    // Real tool calls (Bash, Edit, MCP, etc.) should attach straight
+    // to the user query. Walk any interaction/pending roots one level
+    // down; leave non-wrapper roots untouched.
+    var roots = idx.byTrace[winner];
+    var flat = [];
+    roots.forEach(function(r) {
+      var isWrapper = r._pending || r.canonical === 'interaction';
+      if (isWrapper && r.children && r.children.length) {
+        flat = flat.concat(r.children);
+      } else {
+        flat.push(r);
+      }
+    });
+    return flat;
   }
 
   // _otelForTurn returns the OTel prompt breakdown nearest (by wall-clock)
@@ -535,6 +566,15 @@ class HgEventTree extends HTMLElement {
     var filtered = this.turns.filter((t) => this._turnMatchesFilters(t, filters));
     this._updateFilterCount(filtered.length, this.turns.length);
     this.innerHTML = filtered.map(t => this.renderTurn(t)).join('');
+
+    // Syntax-highlight any newly-injected <code class="language-xxx">
+    // blocks. Prism.highlightAllUnder walks the subtree and tokenizes
+    // each element that hasn't been highlighted yet. Silent no-op when
+    // Prism isn't loaded (e.g. offline, CDN unreachable) — code still
+    // renders as plain monospace.
+    if (typeof Prism !== 'undefined' && Prism.highlightAllUnder) {
+      try { Prism.highlightAllUnder(this); } catch (_) {}
+    }
   }
 
   _updateFilterCount(shown, total) {
