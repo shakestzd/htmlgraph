@@ -259,23 +259,33 @@ type spanJSON struct {
 // this struct stays in the SQLite attrs_json column for drill-through
 // via a future "span detail" view.
 type spanDetail struct {
-	FullCommand   string `json:"full_command,omitempty"`    // Bash: exact command executed
-	BashCommand   string `json:"bash_command,omitempty"`    // Bash: un-shelled command
-	Description   string `json:"description,omitempty"`     // Bash: human description
-	Timeout       int64  `json:"timeout,omitempty"`         // Bash: timeout in milliseconds (tool_input)
-	FilePath      string `json:"file_path,omitempty"`       // Read/Edit/Write: target path
-	Offset        int64  `json:"offset,omitempty"`          // Read: 1-based start line
-	Limit         int64  `json:"limit,omitempty"`           // Read: line count
-	URL           string `json:"url,omitempty"`             // WebFetch/WebSearch
-	Pattern       string `json:"pattern,omitempty"`         // Grep/Glob
-	SkillName     string `json:"skill_name,omitempty"`      // Skill tool
-	SubagentType  string `json:"subagent_type,omitempty"`   // Agent/Task delegation target
-	MCPServerName string `json:"mcp_server_name,omitempty"` // MCP tool
-	MCPToolName   string `json:"mcp_tool_name,omitempty"`   // MCP tool
-	DecisionSrc   string `json:"decision_source,omitempty"` // tool.blocked_on_user
-	Speed         string `json:"speed,omitempty"`           // llm_request: fast|normal
-	RequestID     string `json:"request_id,omitempty"`      // llm_request: Anthropic request ID
-	Attempt       int64  `json:"attempt,omitempty"`         // llm_request: retry number
+	FullCommand    string `json:"full_command,omitempty"`    // Bash: exact command executed
+	BashCommand    string `json:"bash_command,omitempty"`    // Bash: un-shelled command
+	Description    string `json:"description,omitempty"`     // Bash / Task / Agent: human description
+	Timeout        int64  `json:"timeout,omitempty"`         // Bash: timeout in milliseconds
+	GitCommitID    string `json:"git_commit_id,omitempty"`   // Bash: commit SHA when `git commit` succeeds
+	FilePath       string `json:"file_path,omitempty"`       // Read/Edit/Write/NotebookEdit
+	Offset         int64  `json:"offset,omitempty"`          // Read: 1-based start line
+	Limit          int64  `json:"limit,omitempty"`           // Read: line count
+	OldStringLen   int64  `json:"old_string_len,omitempty"`  // Edit: char count of old_string
+	NewStringLen   int64  `json:"new_string_len,omitempty"`  // Edit: char count of new_string
+	ReplaceAll     bool   `json:"replace_all,omitempty"`     // Edit: replace_all flag
+	ContentLen     int64  `json:"content_len,omitempty"`     // Write: char count of content
+	URL            string `json:"url,omitempty"`             // WebFetch
+	Query          string `json:"query,omitempty"`           // WebSearch
+	Pattern        string `json:"pattern,omitempty"`         // Grep/Glob
+	Path           string `json:"path,omitempty"`            // Grep/Glob: search root
+	OutputMode     string `json:"output_mode,omitempty"`     // Grep: content|files_with_matches|count
+	Prompt         string `json:"prompt,omitempty"`          // Task/Agent: delegation prompt (truncated)
+	SkillName      string `json:"skill_name,omitempty"`      // Skill tool
+	SubagentType   string `json:"subagent_type,omitempty"`   // Agent/Task delegation target
+	MCPServerName  string `json:"mcp_server_name,omitempty"` // MCP tool
+	MCPToolName    string `json:"mcp_tool_name,omitempty"`   // MCP tool
+	TodoCount      int64  `json:"todo_count,omitempty"`      // TodoWrite: count of todos
+	DecisionSrc    string `json:"decision_source,omitempty"` // tool.blocked_on_user
+	Speed          string `json:"speed,omitempty"`           // llm_request: fast|normal
+	RequestID      string `json:"request_id,omitempty"`      // llm_request: Anthropic request ID
+	Attempt        int64  `json:"attempt,omitempty"`         // llm_request: retry number
 }
 
 // otelSpansHandler returns every span persisted for the given session,
@@ -471,6 +481,64 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 			d.FullCommand = s
 		}
 	}
+	// Edit-tool change size. We never surface the full old/new strings
+	// (they can be arbitrarily large and contain user code); we track
+	// only their lengths as an indicator of change magnitude.
+	if d.OldStringLen == 0 {
+		if s, _ := ti["old_string"].(string); s != "" {
+			d.OldStringLen = int64(len(s))
+		}
+	}
+	if d.NewStringLen == 0 {
+		if s, _ := ti["new_string"].(string); s != "" {
+			d.NewStringLen = int64(len(s))
+		}
+	}
+	if !d.ReplaceAll {
+		if b, ok := ti["replace_all"].(bool); ok {
+			d.ReplaceAll = b
+		}
+	}
+	// Write-tool content length.
+	if d.ContentLen == 0 {
+		if s, _ := ti["content"].(string); s != "" {
+			d.ContentLen = int64(len(s))
+		}
+	}
+	// Grep output mode + search root.
+	if d.OutputMode == "" {
+		if s, _ := ti["output_mode"].(string); s != "" {
+			d.OutputMode = s
+		}
+	}
+	if d.Path == "" {
+		if s, _ := ti["path"].(string); s != "" {
+			d.Path = s
+		}
+	}
+	// WebSearch query.
+	if d.Query == "" {
+		if s, _ := ti["query"].(string); s != "" {
+			d.Query = s
+		}
+	}
+	// Task / Agent delegation prompt — truncate aggressively since the
+	// full prompt can be tens of thousands of chars for researcher-style
+	// delegations with embedded files.
+	if d.Prompt == "" {
+		if s, _ := ti["prompt"].(string); s != "" {
+			if len(s) > 400 {
+				s = s[:400] + "..."
+			}
+			d.Prompt = s
+		}
+	}
+	// TodoWrite: count entries.
+	if d.TodoCount == 0 {
+		if arr, ok := ti["todos"].([]any); ok {
+			d.TodoCount = int64(len(arr))
+		}
+	}
 }
 
 // extractSpanDetails pulls the whitelisted attributes out of attrs_json.
@@ -499,9 +567,13 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	d.FullCommand = pull("full_command")
 	d.BashCommand = pull("bash_command")
 	d.Description = pull("description")
+	d.GitCommitID = pull("git_commit_id")
 	d.FilePath = pull("file_path")
 	d.URL = pull("url")
+	d.Query = pull("query")
 	d.Pattern = pull("pattern")
+	d.Path = pull("path")
+	d.OutputMode = pull("output_mode")
 	d.SkillName = pull("skill_name")
 	d.SubagentType = pull("subagent_type")
 	d.MCPServerName = pull("mcp_server_name")
@@ -509,6 +581,11 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	d.DecisionSrc = pull("source")
 	d.Speed = pull("speed")
 	d.RequestID = pull("request_id")
+	if v, ok := raw["replace_all"]; ok {
+		if b, ok := v.(bool); ok {
+			d.ReplaceAll = b
+		}
+	}
 	// Numeric fields that may arrive as int (OTLP/gRPC binary) or as
 	// string (OTLP/HTTP JSON). Best-effort parse in both cases.
 	d.Attempt = pullInt(raw, "attempt")

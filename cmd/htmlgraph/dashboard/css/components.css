@@ -394,6 +394,36 @@
   white-space: nowrap;
 }
 
+/* Compact model-family chip — short label ("Opus 4.7" vs the verbose
+   claude-opus-4-7-20251014), colored by family (purple/blue/green) so
+   trace rows inherit the same color semantics as subagent badges. */
+.badge-model {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-weight: 500;
+}
+
+/* MCP tool chip + server pill. The server pill is a tight, color-coded
+   prefix; the tool chip sits right next to it with a neutral color so
+   the server color reads first. */
+.tool-chip.tool-mcp {
+  background: rgba(148,163,184,0.2);
+  color: #cbd5e1;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+}
+.tool-chip.tool-mcp-server {
+  font-size: 0.55rem;
+  padding: 0.05rem 0.35rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  margin-right: 0.15rem;
+}
+
 /* Expanded-row detail panel — key/value list showing full command,
    description, timeout, URL, prompt, model, tokens, cost, etc. that
    don't fit on the compact row. */

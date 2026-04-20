@@ -607,15 +607,26 @@ class HgEventTree extends HTMLElement {
     var isToolSpan = Boolean(span.tool_name);
     var isRoot = !span.parent_span;
 
-    // Label + chip class.
-    // - Tool spans (tool_name=Bash/Read/Edit/Agent): use existing
-    //   .tool-{Name} classes for consistent coloring with hook rows.
+    // Label + chip class + optional MCP-server pill.
+    // - Built-in tool spans (Bash/Read/Edit/Agent/...): use existing
+    //   .tool-{Name} classes for color consistency with hook rows.
+    // - MCP tools (name pattern mcp__server__tool): strip the prefix,
+    //   render a small color-coded server pill + the tool's own name.
     // - Non-tool spans (interaction, llm_request, tool_execution,
-    //   tool_blocked_on_user): use a neutral .tool-otel class.
-    var label, chipClass, chipStyle = '';
+    //   tool_blocked_on_user): neutral .tool-otel class.
+    var label, chipClass, chipStyle = '', mcpServerPill = '';
     if (isToolSpan) {
-      label = span.tool_name;
-      chipClass = 'tool-chip tool-' + span.tool_name;
+      var mcp = this._parseMCPToolName(span.tool_name);
+      if (mcp) {
+        label = mcp.toolName;
+        chipClass = 'tool-chip tool-mcp';
+        mcpServerPill = '<span class="tool-chip tool-mcp-server" '
+          + 'style="background-color: ' + this._mcpServerColor(mcp.serverName) + '; color: #ffffff"'
+          + ' title="MCP server">' + esc(mcp.serverName) + '</span>';
+      } else {
+        label = span.tool_name;
+        chipClass = 'tool-chip tool-' + span.tool_name;
+      }
       // Subagent delegations (Task/Agent tool) take on the agent's
       // color family — researcher=cyan, haiku=green, etc.
       if ((span.tool_name === 'Task' || span.tool_name === 'Agent') && d.subagent_type) {
@@ -659,9 +670,12 @@ class HgEventTree extends HTMLElement {
     var apiModel = (api && api.model) || span.model;
     var apiCost = api ? api.cost_usd : span.cost_usd;
 
-    var modelBdg = apiModel
-      ? '<span class="badge badge-otel" title="' + esc(api ? 'Model for the api_request that decided this tool call' : 'Model') + '">' + esc(apiModel) + '</span>'
-      : '';
+    // Compact, color-coded model badge. Inline-styled so each family
+    // (Opus/Sonnet/Haiku, plus generic for OpenAI/Google) gets its
+    // own color without inflating CSS. The short label ("Opus 4.7",
+    // "Sonnet 4.6", "Haiku 4.5") scans far faster than the full
+    // "claude-opus-4-7-20251014" id at row scale.
+    var modelBdg = apiModel ? this._modelBadge(apiModel, api ? 'Model for the api_request that decided this tool call' : 'Model') : '';
     var costBdg = (apiCost > 0)
       ? '<span class="badge badge-otel">$' + apiCost.toFixed(4) + '</span>'
       : '';
@@ -697,6 +711,7 @@ class HgEventTree extends HTMLElement {
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
       + expandIcon
       + traceChip
+      + mcpServerPill
       + '<span class="' + chipClass + '"' + chipStyle + '>' + esc(label) + '</span>'
       + subagentBadge
       + modelBdg
@@ -729,27 +744,58 @@ class HgEventTree extends HTMLElement {
     if (!span.tool_name) return '';
     var rows = [];
     if (span.tool_name === 'Bash') {
-      if (d.full_command) rows.push(['command', d.full_command]);
-      if (d.description)  rows.push(['description', d.description]);
-      if (d.timeout)      rows.push(['timeout', d.timeout + 'ms']);
+      if (d.full_command)   rows.push(['command', d.full_command]);
+      if (d.description)    rows.push(['description', d.description]);
+      if (d.timeout)        rows.push(['timeout', d.timeout + 'ms']);
+      if (d.git_commit_id)  rows.push(['git commit', d.git_commit_id]);
     } else if (span.tool_name === 'Read') {
-      if (d.file_path)    rows.push(['file', d.file_path]);
+      if (d.file_path)      rows.push(['file', d.file_path]);
       if (d.offset || d.limit) {
         var start = d.offset || 1;
         var end = d.limit ? (start + d.limit - 1) : '';
         rows.push(['range', end ? ('lines ' + start + '–' + end) : ('offset ' + start)]);
       }
-    } else if (span.tool_name === 'Edit' || span.tool_name === 'Write' || span.tool_name === 'NotebookEdit') {
-      if (d.file_path)    rows.push(['file', d.file_path]);
-    } else if (span.tool_name === 'Grep' || span.tool_name === 'Glob') {
-      if (d.pattern)      rows.push(['pattern', d.pattern]);
+    } else if (span.tool_name === 'Edit') {
+      if (d.file_path)      rows.push(['file', d.file_path]);
+      if (d.old_string_len || d.new_string_len) {
+        rows.push(['change', '\u2212' + (d.old_string_len || 0) + ' \u2192 +' + (d.new_string_len || 0) + ' chars']);
+      }
+      if (d.replace_all)    rows.push(['replace_all', 'true']);
+    } else if (span.tool_name === 'Write') {
+      if (d.file_path)      rows.push(['file', d.file_path]);
+      if (d.content_len)    rows.push(['content', d.content_len + ' chars']);
+    } else if (span.tool_name === 'NotebookEdit') {
+      if (d.file_path)      rows.push(['notebook', d.file_path]);
+    } else if (span.tool_name === 'Grep') {
+      if (d.pattern)        rows.push(['pattern', d.pattern]);
+      if (d.path)           rows.push(['path', d.path]);
+      if (d.output_mode)    rows.push(['output', d.output_mode]);
+    } else if (span.tool_name === 'Glob') {
+      if (d.pattern)        rows.push(['pattern', d.pattern]);
+      if (d.path)           rows.push(['path', d.path]);
     } else if (span.tool_name === 'Task' || span.tool_name === 'Agent') {
-      if (d.subagent_type) rows.push(['subagent', d.subagent_type]);
-      if (d.description)   rows.push(['prompt', d.description]);
-    } else if (span.tool_name === 'WebFetch' || span.tool_name === 'WebSearch') {
-      if (d.url)          rows.push(['url', d.url]);
+      if (d.subagent_type)  rows.push(['subagent', d.subagent_type]);
+      if (d.description)    rows.push(['description', d.description]);
+      if (d.prompt)         rows.push(['prompt', d.prompt]);
+    } else if (span.tool_name === 'WebFetch') {
+      if (d.url)            rows.push(['url', d.url]);
+    } else if (span.tool_name === 'WebSearch') {
+      if (d.query)          rows.push(['query', d.query]);
     } else if (span.tool_name === 'Skill') {
-      if (d.skill_name)   rows.push(['skill', d.skill_name]);
+      if (d.skill_name)     rows.push(['skill', d.skill_name]);
+    } else if (span.tool_name === 'TodoWrite') {
+      if (d.todo_count)     rows.push(['todos', d.todo_count]);
+    } else if (span.tool_name && span.tool_name.indexOf('mcp__') === 0) {
+      // MCP tool: show server + tool split + any common args.
+      var mcp = this._parseMCPToolName(span.tool_name);
+      if (mcp) {
+        rows.push(['server', mcp.serverName]);
+        rows.push(['tool', mcp.toolName]);
+      }
+      if (d.url)            rows.push(['url', d.url]);
+      if (d.query)          rows.push(['query', d.query]);
+      if (d.pattern)        rows.push(['pattern', d.pattern]);
+      if (d.file_path)      rows.push(['file', d.file_path]);
     }
     // Preceding api_request: if absorbed, show the details we hid from
     // the top-level tree so expanding the tool reveals the full context.
@@ -779,19 +825,20 @@ class HgEventTree extends HTMLElement {
   }
 
   // _toolChildRollup scans a tool span's immediate children for
-  // infrastructure spans (permission + exec) and returns compact badges
-  // that summarize the outcomes. Only applies to tool_result canonical
-  // spans with tool_name set — leaves non-tool spans alone.
+  // infrastructure spans (permission + exec) and returns badges that
+  // surface only the meaningful outcomes.
   //
-  // Badges:
-  //   permissionBadge — green "✓ auto" / "✓ user" chip for approvals,
-  //                     red "✗ blocked" chip for user rejections. Empty
-  //                     when no permission child or source=unknown.
-  //   execErrorBadge  — red "failed" chip when exec child reports
-  //                     success=false. Empty on success or no exec child.
+  // Auto-approval (config / hook) is the silent happy path — don't
+  // render a chip for it (would clutter every row with "✓ auto"). A
+  // tiny dot on the tool row's left indicates "yes this ran" if
+  // visual presence is needed; see .event-row-otel-span::before in
+  // components.css.
+  //
+  // User-approved, blocked, rejected, aborted, and exec-failed states
+  // DO get loud badges — they're the exceptional cases worth seeing.
   _toolChildRollup(span) {
     var empty = { permissionBadge: '', execErrorBadge: '' };
-    if (span.canonical !== 'tool_result' || !span.tool_name || !span.children) {
+    if ((span.canonical !== 'tool_result' && span.canonical !== 'subagent_invocation') || !span.tool_name || !span.children) {
       return empty;
     }
     var perm = span.children.find(function(c) { return c.canonical === 'tool_blocked_on_user'; });
@@ -803,7 +850,9 @@ class HgEventTree extends HTMLElement {
       switch (d.decision_source) {
         case 'config':
         case 'hook':
-          permBadge = '<span class="badge badge-approve" title="Auto-approved (' + esc(d.decision_source) + ')">\u2713 auto</span>';
+          // Auto-approved — omit. Provenance survives on the tool row's
+          // title tooltip and the detail panel.
+          permBadge = '';
           break;
         case 'user_permanent':
         case 'user_temporary':
@@ -826,6 +875,78 @@ class HgEventTree extends HTMLElement {
     }
 
     return { permissionBadge: permBadge, execErrorBadge: execBadge };
+  }
+
+  // _modelBadge returns a compact color-coded model chip. Maps Claude
+  // model families to the existing agent palette (opus=purple,
+  // sonnet=blue, haiku=green) so trace rows share color semantics with
+  // subagent badges. Unknown/third-party models fall back to the
+  // generic .badge-otel style.
+  _modelBadge(model, title) {
+    var short = this._shortModelName(model);
+    var color = this._modelColor(model);
+    if (!color) {
+      return '<span class="badge badge-otel" title="' + esc(title || 'Model: ' + model) + '">' + esc(short) + '</span>';
+    }
+    return '<span class="badge badge-model" style="background-color: ' + color + '; color: #ffffff"'
+      + ' title="' + esc((title ? title + '\n' : '') + model) + '">' + esc(short) + '</span>';
+  }
+
+  // _shortModelName trims Claude's verbose ids to a human label.
+  // claude-opus-4-7              → Opus 4.7
+  // claude-opus-4-7-20251014     → Opus 4.7
+  // claude-sonnet-4-6-20251005   → Sonnet 4.6
+  // claude-haiku-4-5-20251001    → Haiku 4.5
+  // gpt-5, gpt-4.1-mini          → passed through
+  _shortModelName(model) {
+    if (!model) return '';
+    var m = model.toLowerCase();
+    var match = m.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/);
+    if (match) {
+      var family = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+      return family + ' ' + match[2] + '.' + match[3];
+    }
+    // Strip trailing -YYYYMMDD date stamps for other providers too.
+    return model.replace(/-\d{8}$/, '');
+  }
+
+  _modelColor(model) {
+    if (!model) return '';
+    var m = model.toLowerCase();
+    if (m.indexOf('opus') !== -1)   return '#a855f7'; // purple — matches badge-agent-opus
+    if (m.indexOf('sonnet') !== -1) return '#3b82f6'; // blue   — matches badge-agent-sonnet
+    if (m.indexOf('haiku') !== -1)  return '#22c55e'; // green  — matches badge-agent-haiku
+    return ''; // unknown → fall back to neutral
+  }
+
+  // _parseMCPToolName splits "mcp__<server>__<tool>" into its parts so
+  // the renderer can show the server as a separate pill and the tool
+  // name unqualified. Returns null when the name doesn't match the
+  // MCP convention, so callers fall through to standard rendering.
+  _parseMCPToolName(name) {
+    if (!name || name.indexOf('mcp__') !== 0) return null;
+    var rest = name.slice(5); // drop "mcp__"
+    var sep = rest.indexOf('__');
+    if (sep <= 0) return { serverName: rest, toolName: '' };
+    return {
+      serverName: rest.slice(0, sep),
+      toolName: rest.slice(sep + 2),
+    };
+  }
+
+  // _mcpServerColor returns a deterministic color for a given MCP
+  // server name so multiple tools from the same server share a color.
+  // Hash the name to an HSL hue, keep saturation+lightness constant so
+  // every server gets a distinct but consistent tint. No static map —
+  // new servers get a color automatically.
+  _mcpServerColor(serverName) {
+    var hash = 0;
+    for (var i = 0; i < serverName.length; i++) {
+      hash = ((hash << 5) - hash) + serverName.charCodeAt(i);
+      hash |= 0; // force int32
+    }
+    var hue = Math.abs(hash) % 360;
+    return 'hsl(' + hue + ', 55%, 45%)';
   }
 
   // _rangeBadge renders a compact line-range badge for Read/Edit tool
@@ -897,6 +1018,14 @@ class HgEventTree extends HTMLElement {
       // ("Multi-tool subagent for span nesting verification") since the
       // agent name is already shown as a distinct chip.
       return d.description || '';
+    }
+    if (span.tool_name === 'TodoWrite') {
+      return d.todo_count ? d.todo_count + ' todos' : '';
+    }
+    // MCP tools: when tool_input carries something obviously summarizable
+    // use it; otherwise leave empty (expand to see full args).
+    if (span.tool_name && span.tool_name.indexOf('mcp__') === 0) {
+      return d.url || d.query || d.pattern || '';
     }
     // tool_blocked_on_user is a misleading name — it's the PERMISSION
     // GATE span covering the time between tool emit and execution. It
