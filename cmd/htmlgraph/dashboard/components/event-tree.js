@@ -485,8 +485,21 @@ class HgEventTree extends HTMLElement {
   toggle(eventId) {
     if (this.expanded.has(eventId)) {
       this.expanded.delete(eventId);
+      // Record explicit collapse so auto-expand-newest-turn doesn't
+      // immediately re-expand on the next render. Limited to the most
+      // recent 10 collapses — older entries age out automatically.
+      var collapsed = JSON.parse(localStorage.getItem('hg-collapsed') || '[]');
+      collapsed = collapsed.filter(function(id) { return id !== eventId; });
+      collapsed.unshift(eventId);
+      if (collapsed.length > 10) collapsed = collapsed.slice(0, 10);
+      localStorage.setItem('hg-collapsed', JSON.stringify(collapsed));
     } else {
       this.expanded.add(eventId);
+      // Clear from collapsed list on re-expansion so auto-expand can
+      // reclaim it later if it becomes the top turn again.
+      var collapsed2 = JSON.parse(localStorage.getItem('hg-collapsed') || '[]');
+      collapsed2 = collapsed2.filter(function(id) { return id !== eventId; });
+      localStorage.setItem('hg-collapsed', JSON.stringify(collapsed2));
     }
     this.saveExpanded();
     this.render();
@@ -506,6 +519,19 @@ class HgEventTree extends HTMLElement {
       this.innerHTML = '<div class="empty-state">No activity yet. Start a Claude Code session to see activity.</div>';
       this._updateFilterCount(0, 0);
       return;
+    }
+
+    // Auto-expand the newest turn so live activity is visible without
+    // a manual click. The user's explicit collapse wins — if they've
+    // toggled off the top turn, we respect that via hg-collapsed. Older
+    // turns stay user-controlled via the existing localStorage-backed
+    // expand set.
+    var topTurn = this.turns[0];
+    if (topTurn && topTurn.user_query && topTurn.user_query.event_id) {
+      var collapsed = JSON.parse(localStorage.getItem('hg-collapsed') || '[]');
+      if (collapsed.indexOf(topTurn.user_query.event_id) === -1) {
+        this.expanded.add(topTurn.user_query.event_id);
+      }
     }
 
     var filters = this.getFilterValues();
