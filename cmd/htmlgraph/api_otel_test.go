@@ -214,6 +214,7 @@ func TestOtelHandlers_RejectNonGet(t *testing.T) {
 		otelRollupHandler(database),
 		otelPromptsHandler(database),
 		otelCostHandler(database),
+		otelSpansHandler(database),
 	} {
 		req := httptest.NewRequest(http.MethodPost, "/api/otel/x?session_id=sess-api-1", nil)
 		rec := httptest.NewRecorder()
@@ -221,5 +222,59 @@ func TestOtelHandlers_RejectNonGet(t *testing.T) {
 		if rec.Code != http.StatusMethodNotAllowed {
 			t.Errorf("POST status = %d, want 405", rec.Code)
 		}
+	}
+}
+
+// TestOtelSpansHandler inserts two spans with a parent/child link and
+// verifies the endpoint returns them with trace_id / parent_span / span_id
+// preserved so the client-side tree builder has every field it needs.
+func TestOtelSpansHandler(t *testing.T) {
+	database := seedOtelSignals(t)
+	// seedOtelSignals doesn't add spans — insert two here under sess-api-1.
+	_, err := database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span,
+			tool_name, duration_ms, attrs_json
+		) VALUES
+		('span-root', 'claude_code', 'sess-api-1', 'span', 'interaction', 'claude_code.interaction',
+			100, 'trace-1', 'span-root-id', '', '', 25000, '{}'),
+		('span-tool', 'claude_code', 'sess-api-1', 'span', 'tool_result', 'claude_code.tool',
+			200, 'trace-1', 'span-tool-id', 'span-root-id', 'Bash', 6799, '{}')`)
+	if err != nil {
+		t.Fatalf("seed spans: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/otel/spans?session_id=sess-api-1", nil)
+	rec := httptest.NewRecorder()
+	otelSpansHandler(database).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var body struct {
+		Spans []spanJSON `json:"spans"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if len(body.Spans) != 2 {
+		t.Fatalf("got %d spans, want 2", len(body.Spans))
+	}
+	if body.Spans[0].SpanID != "span-root-id" || body.Spans[0].ParentSpan != "" {
+		t.Errorf("root span wrong: %+v", body.Spans[0])
+	}
+	if body.Spans[1].ParentSpan != "span-root-id" {
+		t.Errorf("child ParentSpan = %q, want span-root-id", body.Spans[1].ParentSpan)
+	}
+	if body.Spans[1].ToolName != "Bash" {
+		t.Errorf("child ToolName = %q", body.Spans[1].ToolName)
+	}
+}
+
+func TestOtelSpansHandler_400ForMissingParam(t *testing.T) {
+	database := seedOtelSignals(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/otel/spans", nil)
+	rec := httptest.NewRecorder()
+	otelSpansHandler(database).ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
 	}
 }

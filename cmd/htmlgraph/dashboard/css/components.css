@@ -347,6 +347,26 @@
   font-family: var(--font-mono, monospace);
 }
 
+/* OTel span rows — distinct from hook-derived rows so provenance is
+   unambiguous. Rendered inside an expanded turn when /api/otel/spans
+   returns data for that session. */
+.event-row-otel-span {
+  border-left: 2px solid rgba(56,139,253,0.45);
+}
+.event-row-otel-span .tool-chip.tool-otel {
+  background: rgba(56,139,253,0.2);
+  color: #79b8ff;
+}
+.tool-chip.tool-otel-trace {
+  background: rgba(56,139,253,0.3);
+  color: #c8e1ff;
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.35rem;
+}
+
 /* Feature badge */
 .badge-feature {
   font-size: 0.6rem;

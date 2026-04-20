@@ -226,6 +226,90 @@ type promptJSON struct {
 	APIErrors           int64   `json:"api_errors"`
 }
 
+// spanJSON is one row of the /api/otel/spans response. Shapes a
+// single OTel span for the client-side tree builder: the client groups
+// by trace_id and walks parent_span → span_id to reconstruct the tree.
+type spanJSON struct {
+	SignalID     string  `json:"signal_id"`
+	TraceID      string  `json:"trace_id"`
+	SpanID       string  `json:"span_id"`
+	ParentSpan   string  `json:"parent_span"`
+	NativeName   string  `json:"native_name"`
+	Canonical    string  `json:"canonical"`
+	ToolName     string  `json:"tool_name"`
+	Model        string  `json:"model"`
+	TsMicros     int64   `json:"ts_micros"`
+	DurationMs   int64   `json:"duration_ms"`
+	TokensIn     int64   `json:"tokens_in"`
+	TokensOut    int64   `json:"tokens_out"`
+	CostUSD      float64 `json:"cost_usd"`
+	Decision     string  `json:"decision"`
+	Success      *bool   `json:"success,omitempty"`
+}
+
+// otelSpansHandler returns every span persisted for the given session,
+// ordered by timestamp. Clients build the tree by grouping on trace_id
+// and linking parent_span → span_id. Typical payload is small (~100
+// spans for a busy session); no pagination.
+//
+// GET /api/otel/spans?session_id=<id>
+//   200 { "spans": [...] } — empty array if none exist
+//   400 when session_id is missing
+func otelSpansHandler(database *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		sessionID := r.URL.Query().Get("session_id")
+		if sessionID == "" {
+			http.Error(w, "session_id required", http.StatusBadRequest)
+			return
+		}
+		rows, err := database.Query(`
+			SELECT signal_id,
+				COALESCE(trace_id, ''), COALESCE(span_id, ''), COALESCE(parent_span, ''),
+				native, canonical,
+				COALESCE(tool_name, ''), COALESCE(model, ''),
+				ts_micros,
+				COALESCE(duration_ms, 0),
+				COALESCE(tokens_in, 0), COALESCE(tokens_out, 0),
+				COALESCE(cost_usd, 0),
+				COALESCE(decision, ''),
+				success
+			FROM otel_signals
+			WHERE session_id = ? AND kind = 'span'
+			ORDER BY ts_micros ASC`, sessionID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		out := []spanJSON{}
+		for rows.Next() {
+			var s spanJSON
+			var successVal sql.NullInt64
+			if err := rows.Scan(
+				&s.SignalID, &s.TraceID, &s.SpanID, &s.ParentSpan,
+				&s.NativeName, &s.Canonical, &s.ToolName, &s.Model,
+				&s.TsMicros, &s.DurationMs,
+				&s.TokensIn, &s.TokensOut, &s.CostUSD,
+				&s.Decision, &successVal,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if successVal.Valid {
+				b := successVal.Int64 == 1
+				s.Success = &b
+			}
+			out = append(out, s)
+		}
+		respondJSON(w, map[string]any{"spans": out})
+	}
+}
+
 // readMaterializedRollup fetches the row from otel_session_rollup.
 // Returns (zero, false, nil) when no row exists, so the caller can
 // fall back to a live aggregation.

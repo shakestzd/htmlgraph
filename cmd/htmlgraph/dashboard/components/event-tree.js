@@ -7,11 +7,13 @@ class HgEventTree extends HTMLElement {
     this.featureTitles = {};
     this.expanded = new Set(JSON.parse(localStorage.getItem('hg-expanded') || '[]'));
     this._filterDebounce = null;
-    // OTel data cache, keyed by session_id. Populated from /api/otel/prompts
-    // and /api/otel/rollup after turns load. Absent when receiver is disabled
-    // or no signals have arrived — rendering falls back to the non-OTel path.
+    // OTel data cache, keyed by session_id. Populated from /api/otel/prompts,
+    // /api/otel/rollup, and /api/otel/spans after turns load. Absent when
+    // the receiver is disabled or no signals have arrived — rendering
+    // degrades silently to the non-OTel path.
     this.otelPromptsBySession = {};
     this.otelRollupBySession = {};
+    this.otelSpansBySession = {};
   }
 
   connectedCallback() {
@@ -106,7 +108,60 @@ class HgEventTree extends HTMLElement {
           self.otelRollupBySession[sid] = await rResp.json();
         }
       } catch(_) {}
+      try {
+        var sResp = await fetch(buildProjectUrl('otel/spans', 'session_id=' + encodeURIComponent(sid)));
+        if (sResp.ok) {
+          var sBody = await sResp.json();
+          self.otelSpansBySession[sid] = self._indexSpans(sBody.spans || []);
+        }
+      } catch(_) {}
     }));
+  }
+
+  // _indexSpans groups spans by trace_id and builds parent→children lookup.
+  // Returns { byTrace: { traceId: [roots...] }, allSpans: [span with .children] }
+  // so we can render either a trace rooted at its interaction span or drill
+  // in from any parent. Each span entry gets a .children array populated.
+  _indexSpans(spans) {
+    var byId = {};
+    spans.forEach(function(s) { s.children = []; byId[s.span_id] = s; });
+    var roots = [];
+    spans.forEach(function(s) {
+      if (s.parent_span && byId[s.parent_span]) {
+        byId[s.parent_span].children.push(s);
+      } else {
+        roots.push(s);
+      }
+    });
+    var byTrace = {};
+    roots.forEach(function(s) {
+      (byTrace[s.trace_id] = byTrace[s.trace_id] || []).push(s);
+    });
+    return { byTrace: byTrace, roots: roots, byId: byId };
+  }
+
+  // _spansForTurn returns the root spans from the trace whose first span's
+  // start timestamp is nearest the turn's user_query timestamp. This is the
+  // same heuristic as _otelForTurn — a stand-in until native prompt_id ↔
+  // trace_id correlation ships. Returns [] when no match.
+  _spansForTurn(turn) {
+    var uq = turn.user_query;
+    if (!uq || !uq.session_id) return [];
+    var idx = this.otelSpansBySession[uq.session_id];
+    if (!idx || !idx.roots || idx.roots.length === 0) return [];
+    if (!uq.timestamp) return idx.roots;
+    var ts = Date.parse(uq.timestamp) * 1000;
+    if (!ts) return idx.roots;
+    // Pick the trace whose earliest root span is nearest to the turn ts.
+    var bestTrace = null;
+    var bestDiff = Infinity;
+    Object.keys(idx.byTrace).forEach(function(tid) {
+      var traceRoots = idx.byTrace[tid];
+      var earliest = Math.min.apply(null, traceRoots.map(function(r) { return r.ts_micros; }));
+      var d = Math.abs(earliest - ts);
+      if (d < bestDiff) { bestTrace = tid; bestDiff = d; }
+    });
+    return bestTrace ? idx.byTrace[bestTrace] : [];
   }
 
   // _otelForTurn returns the OTel prompt breakdown nearest (by wall-clock)
@@ -388,6 +443,18 @@ class HgEventTree extends HTMLElement {
     if (isExp && turn.children) {
       html += turn.children.map(c => this.renderEvent(c, 1)).join('');
     }
+
+    // OTel span subtree — only when expanded, to avoid bloating collapsed
+    // rows. Rendered after hook children so hook-derived hierarchy stays
+    // primary and trace detail is supplementary. One rendered tree per
+    // turn; rooted at the nearest matching trace's root spans.
+    if (isExp) {
+      var rootSpans = this._spansForTurn(turn);
+      if (rootSpans && rootSpans.length > 0) {
+        html += rootSpans.map(s => this.renderSpan(s, 1)).join('');
+      }
+    }
+
     html += '</div>';
     return html;
   }
@@ -433,6 +500,59 @@ class HgEventTree extends HTMLElement {
 
     if (isExp && evt.children) {
       html += evt.children.map(c => this.renderEvent(c, depth + 1)).join('');
+    }
+    return html;
+  }
+
+  // renderSpan emits a tree row for an OTel span and recursively renders
+  // its children. Uses distinct styling (.event-row-otel-span + trace chip)
+  // so OTel-sourced rows are visually separable from hook-sourced rows.
+  // Span IDs are used as toggle keys, namespaced with "span:" so they
+  // don't collide with event_id-keyed toggles from the hook-derived tree.
+  renderSpan(span, depth) {
+    if (depth > 5) return '';
+    if (!span) return '';
+    var toggleKey = 'span:' + span.span_id;
+    var hasChildren = span.children && span.children.length > 0;
+    var isExp = this.expanded.has(toggleKey);
+    var expandIcon = hasChildren
+      ? '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(toggleKey) + '">\u25B6</span>'
+      : '<span class="expand-icon-spacer"></span>';
+
+    // Label: use tool_name when available, otherwise the canonical span
+    // name (interaction / api_request / tool_execution / tool_blocked_on_user).
+    var label = span.tool_name
+      ? span.tool_name
+      : (span.canonical || span.native_name || 'span');
+    var dur = span.duration_ms ? (span.duration_ms >= 1000 ? (span.duration_ms / 1000).toFixed(2) + 's' : span.duration_ms + 'ms') : '';
+
+    var errBorder = (span.success === false) ? 'border-error' : '';
+    var padLeft = (depth + 1) * 1.25;
+    var bgAlpha = 0.04 + depth * 0.05;
+
+    var costBdg = (span.cost_usd > 0)
+      ? '<span class="badge badge-otel">$' + span.cost_usd.toFixed(4) + '</span>'
+      : '';
+    var modelBdg = span.model ? '<span class="badge badge-otel">' + esc(span.model) + '</span>' : '';
+    var durBdg = dur ? '<span class="turn-stats">' + dur + '</span>' : '';
+    var traceChip = '<span class="tool-chip tool-otel-trace" title="OTel span: ' + esc(span.native_name) + '">trace</span>';
+
+    var html = '<div class="event-row event-row-otel-span depth-' + depth + ' ' + errBorder + '"'
+      + ' data-span-id="' + esc(span.span_id) + '"'
+      + ' data-trace-id="' + esc(span.trace_id) + '"'
+      + (span.parent_span ? ' data-parent-span="' + esc(span.parent_span) + '"' : '')
+      + ' style="padding-left: ' + padLeft + 'rem; background: rgba(56,139,253,' + bgAlpha + ')">'
+      + expandIcon
+      + traceChip
+      + '<span class="tool-chip tool-otel">' + esc(label) + '</span>'
+      + modelBdg
+      + costBdg
+      + '<span class="event-summary">' + esc(span.native_name) + '</span>'
+      + durBdg
+      + '</div>';
+
+    if (isExp && hasChildren) {
+      html += span.children.map(c => this.renderSpan(c, depth + 1)).join('');
     }
     return html;
   }
