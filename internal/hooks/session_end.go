@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/otel/materialize"
 	"github.com/shakestzd/htmlgraph/internal/paths"
 )
 
@@ -71,6 +72,12 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 
 	// Clean up the session-scoped project dir hint file now that this session is ending.
 	paths.CleanupSessionHint(sessionID)
+
+	// Materialize OTel rollup (no-op if no signals received for this session).
+	// Non-fatal: errors are logged but do not block SessionEnd completion.
+	if err := materialize.Materialize(database, projectDir, sessionID); err != nil {
+		debugLog(projectDir, "[error] handler=session-end session=%s: materialize otel: %v", sessionID[:minLen(sessionID, 8)], err)
+	}
 
 	return &HookResult{Continue: true}, nil
 }

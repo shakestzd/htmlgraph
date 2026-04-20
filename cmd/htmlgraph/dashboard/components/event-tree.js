@@ -7,6 +7,11 @@ class HgEventTree extends HTMLElement {
     this.featureTitles = {};
     this.expanded = new Set(JSON.parse(localStorage.getItem('hg-expanded') || '[]'));
     this._filterDebounce = null;
+    // OTel data cache, keyed by session_id. Populated from /api/otel/prompts
+    // and /api/otel/rollup after turns load. Absent when receiver is disabled
+    // or no signals have arrived — rendering falls back to the non-OTel path.
+    this.otelPromptsBySession = {};
+    this.otelRollupBySession = {};
   }
 
   connectedCallback() {
@@ -67,9 +72,84 @@ class HgEventTree extends HTMLElement {
       this.turns = [];
     }
     await this.loadFeatureTitles();
+    await this.loadOtelData();
     this.updateCount();
     this._populateDropdowns();
     this.render();
+  }
+
+  // loadOtelData fetches per-prompt and per-session OTel aggregates for
+  // every session currently in the turn list. One request per session.
+  // Silently treats 404 / network errors as "no OTel data" — rendering
+  // degrades to the non-OTel path without logging.
+  async loadOtelData() {
+    var sessionIds = new Set();
+    this.turns.forEach(function(t) {
+      if (t.user_query && t.user_query.session_id) {
+        sessionIds.add(t.user_query.session_id);
+      }
+    });
+    if (sessionIds.size === 0) return;
+
+    var self = this;
+    await Promise.all(Array.from(sessionIds).map(async function(sid) {
+      try {
+        var pResp = await fetch(buildProjectUrl('otel/prompts', 'session_id=' + encodeURIComponent(sid)));
+        if (pResp.ok) {
+          var body = await pResp.json();
+          self.otelPromptsBySession[sid] = body.prompts || [];
+        }
+      } catch(_) {}
+      try {
+        var rResp = await fetch(buildProjectUrl('otel/rollup', 'session_id=' + encodeURIComponent(sid)));
+        if (rResp.ok) {
+          self.otelRollupBySession[sid] = await rResp.json();
+        }
+      } catch(_) {}
+    }));
+  }
+
+  // _otelForTurn returns the OTel prompt breakdown nearest (by wall-clock)
+  // to the turn's user_query timestamp, or null if no OTel data exists for
+  // this session. Matching by nearest-timestamp is a stand-in until hooks
+  // and OTel events can be joined on a native prompt_id (later phase).
+  _otelForTurn(turn) {
+    var uq = turn.user_query;
+    if (!uq || !uq.session_id) return null;
+    var prompts = this.otelPromptsBySession[uq.session_id];
+    if (!prompts || prompts.length === 0) return null;
+    if (!uq.timestamp) return prompts[0];
+    var ts = Date.parse(uq.timestamp) * 1000; // ms → micros
+    if (!ts) return prompts[0];
+    var best = null;
+    var bestDiff = Infinity;
+    for (var i = 0; i < prompts.length; i++) {
+      var d = Math.abs((prompts[i].first_ts_micros || 0) - ts);
+      if (d < bestDiff) { best = prompts[i]; bestDiff = d; }
+    }
+    return best;
+  }
+
+  // _otelBadges returns an HTML fragment with cost/token/retry badges
+  // for a turn when OTel data is available; empty string otherwise.
+  _otelBadges(turn) {
+    var p = this._otelForTurn(turn);
+    if (!p) return '';
+    var parts = [];
+    if (p.cost_usd > 0) parts.push('$' + p.cost_usd.toFixed(4));
+    var totalTokens = (p.tokens_in || 0) + (p.tokens_out || 0) + (p.tokens_cache_read || 0) + (p.tokens_cache_creation || 0);
+    if (totalTokens > 0) parts.push(this._fmtTokens(totalTokens) + ' tok');
+    if (p.api_errors > 0) parts.push(p.api_errors + ' err');
+    if (parts.length === 0) return '';
+    return '<span class="badge badge-otel" title="From OTel api_request events">'
+      + parts.map(esc).join(' · ')
+      + '</span>';
+  }
+
+  _fmtTokens(n) {
+    if (n < 1000) return '' + n;
+    if (n < 1000000) return (n / 1000).toFixed(1) + 'k';
+    return (n / 1000000).toFixed(2) + 'M';
   }
 
   async loadFeatureTitles() {
@@ -291,6 +371,7 @@ class HgEventTree extends HTMLElement {
     var s = turn.stats || {};
     var statsHtml = '<span class="turn-stats">' + (s.tool_count || 0) + ' tools' + (s.error_count ? ', ' + s.error_count + ' errors' : '') + '</span>';
     var featureBdg = this.featureBadge(uq.feature_id, uq.feature_title);
+    var otelBdg = this._otelBadges(turn);
 
     var html = '<div class="turn-group">'
       + '<div class="event-row depth-0 user-query-row"'
@@ -300,6 +381,7 @@ class HgEventTree extends HTMLElement {
       + '<span class="event-time">' + formatTime(uq.timestamp) + '</span>'
       + '<span class="event-summary">' + esc(uq.input_summary || '') + '</span>'
       + featureBdg
+      + otelBdg
       + statsHtml
       + '</div>';
 

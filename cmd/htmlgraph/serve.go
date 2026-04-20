@@ -94,6 +94,12 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	mux.Handle("/api/graph/files", filesForFeatureHandler(database))
 	mux.Handle("/api/graph/sessions", sessionsForFeatureHandler(database))
 
+	// OTel telemetry endpoints — query otel_signals and otel_session_rollup
+	// populated by the embedded OTLP receiver (see internal/otel/receiver).
+	mux.Handle("/api/otel/rollup", otelRollupHandler(database))
+	mux.Handle("/api/otel/prompts", otelPromptsHandler(database))
+	mux.Handle("/api/otel/cost", otelCostHandler(database))
+
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
 	mux.Handle("/api/plans", plansListHandler(htmlgraphDir, database))
 	mux.Handle("/plans/", planFileHandler(htmlgraphDir))

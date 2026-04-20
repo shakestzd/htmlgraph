@@ -335,6 +335,18 @@
 .badge-status-recorded  { background: rgba(139,148,158,0.2); color: #8b949e; }
 .badge-status-unknown   { background: rgba(139,148,158,0.2); color: #6e7681; }
 
+/* OTel cost/token badge on turn rows — populated from /api/otel/prompts.
+   Rendered only when the OTLP receiver has signals for the session. */
+.badge-otel {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(56,139,253,0.15);
+  color: #58a6ff;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
 /* Feature badge */
 .badge-feature {
   font-size: 0.6rem;
