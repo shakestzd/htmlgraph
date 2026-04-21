@@ -763,6 +763,13 @@ class HgEventTree extends HTMLElement {
       + '</div>';
 
     if (isExp) {
+      // Render assistant_text logs first (text-only turn responses) so they
+      // appear before tool spans.
+      var assistantTexts = this._assistantTextsForTurn(turn);
+      if (assistantTexts.length > 0) {
+        html += assistantTexts.map(log => this.renderAssistantText(log, uq.feature_id)).join('');
+      }
+
       // Prefer OTel spans when present — they're the canonical source
       // of hierarchy (subagent tool calls nest natively, no custom
       // attribution logic needed). When a turn has no OTel data — e.g.
@@ -798,11 +805,6 @@ class HgEventTree extends HTMLElement {
       } else if (turn.children) {
         html += turn.children.map(c => this.renderEvent(c, 1)).join('');
       }
-      // Render assistant_text logs (text-only turn responses).
-      var assistantTexts = this._assistantTextsForTurn(turn);
-      if (assistantTexts.length > 0) {
-        html += assistantTexts.map(log => this.renderAssistantText(log, uq.feature_id)).join('');
-      }
     }
 
     html += '</div>';
@@ -811,6 +813,7 @@ class HgEventTree extends HTMLElement {
 
   // renderAssistantText renders a single assistant_text log as a depth-1
   // row showing the assistant's text response. Collapsed by default, expandable.
+  // When expanded, applies markdown formatting if marked.js is available.
   renderAssistantText(log, parentFeatureId) {
     var logId = log.signal_id || 'atxt-' + Math.random().toString(36).slice(2);
     var isExp = this.expanded.has(logId);
@@ -850,11 +853,31 @@ class HgEventTree extends HTMLElement {
       + '</div>';
 
     if (isExp) {
+      // Configure marked on first use
+      if (window.marked && !window._markedConfigured) {
+        window.marked.setOptions({ breaks: true, gfm: true });
+        window._markedConfigured = true;
+      }
+
+      var body;
+      if (window.marked && typeof window.marked.parse === 'function') {
+        // Parse markdown and wrap in a safe div
+        var markedHtml = window.marked.parse(text);
+        // Sanitize if DOMPurify is available, otherwise use as-is (marked is already safe by default)
+        if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+          markedHtml = window.DOMPurify.sanitize(markedHtml);
+        }
+        body = '<div class="assistant-text-body markdown">' + markedHtml + '</div>';
+      } else {
+        // Fallback to plain pre if marked is not available
+        body = '<pre class="assistant-text-pre" style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
+          + esc(text)
+          + '</pre>';
+      }
+
       html += '<div class="event-row depth-2 assistant-text-detail"'
         + ' style="padding-left: 3.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem;">'
-        + '<pre style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
-        + esc(text)
-        + '</pre>'
+        + body
         + '</div>';
     }
 
