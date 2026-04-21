@@ -197,9 +197,6 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 	if status == "in-progress" {
 		if sessionID != "" {
 			if p.DB != nil {
-				// Short-circuit: skip all writes if this (session, agent) already
-				// claims this work item. Eliminates redundant SQLite writes under
-				// parallel dispatch where N subagents call start on their own feature.
 				currentActive := dbpkg.GetActiveWorkItem(p.DB, sessionID, agentID)
 				if currentActive != id {
 					// New per-agent attribution table (primary write path).
@@ -214,16 +211,23 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 					if agentID == dbpkg.AgentRootSentinel {
 						_ = hooks.UpdateActiveFeature(p.DB, sessionID, id)
 					}
-					claim := &models.Claim{
-						ClaimID:          "clm-" + uuid.NewString()[:8],
-						WorkItemID:       id,
-						OwnerSessionID:   sessionID,
-						OwnerAgent:       agentForClaim(),
-						ClaimedByAgentID: agentID,
-						Status:           models.ClaimInProgress,
-					}
-					_ = dbpkg.ClaimItem(p.DB, claim, 30*time.Minute)
 				}
+				// Always write (or renew) the claim row regardless of whether
+				// active_work_items already shows this item for (session, agent).
+				// active_work_items and claims are separate tables that can diverge:
+				// an expired or never-written claim row causes ClaimedItem=="" in
+				// the PreToolUse guard, blocking all Write/Edit. ClaimItemOrRenew
+				// is idempotent — it refreshes an existing live claim's lease or
+				// inserts a new row if none exists (bug-0d55d8e4).
+				claim := &models.Claim{
+					ClaimID:          "clm-" + uuid.NewString()[:8],
+					WorkItemID:       id,
+					OwnerSessionID:   sessionID,
+					OwnerAgent:       agentForClaim(),
+					ClaimedByAgentID: agentID,
+					Status:           models.ClaimInProgress,
+				}
+				_ = dbpkg.ClaimItemOrRenew(p.DB, claim, 30*time.Minute)
 			}
 			autoImplementedInEdge(col, id, sessionID, p.DB)
 		}
