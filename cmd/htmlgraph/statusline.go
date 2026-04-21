@@ -150,29 +150,6 @@ func resolveTrackContext(database *sql.DB, dir, featureID string) string {
 	return fmt.Sprintf("%s %s [%d/%d]", iconFor("track"), title, done, total)
 }
 
-func statuslineFromHTML(dir string) error {
-	p, err := workitem.Open(dir, "claude-code")
-	if err != nil {
-		return nil
-	}
-	defer p.Close()
-
-	for _, typeName := range []string{"bug", "feature"} {
-		col := collectionFor(p, typeName)
-		nodes, err := col.List()
-		if err != nil {
-			continue
-		}
-		for _, n := range nodes {
-			if n.Status == "in-progress" {
-				fmt.Printf("%s %s\n", iconFor(typeName), truncate(n.Title, 30))
-				return nil
-			}
-		}
-	}
-
-	return nil
-}
 
 func iconFor(typeName string) string {
 	switch typeName {
