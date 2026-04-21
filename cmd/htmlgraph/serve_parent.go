@@ -166,6 +166,16 @@ func runParentServer(port int) error {
 	}
 	fmt.Println("Press Ctrl+C to stop.")
 
+	// Write the per-project serve lockfile so concurrent launcher invocations
+	// (from a second terminal opening another Claude session) detect a live
+	// serve process and skip spawning a duplicate that would collide on :8080.
+	// Best-effort: missing .htmlgraph/ or write errors are silently ignored.
+	if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
+		projectDir := filepath.Dir(htmlgraphDir)
+		writeServeLock(projectDir)
+		defer removeServeLock(projectDir)
+	}
+
 	server := &http.Server{
 		Addr:    addr,
 		Handler: mux,

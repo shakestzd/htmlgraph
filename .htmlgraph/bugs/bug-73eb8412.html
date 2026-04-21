@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Subagent tool calls flash as roots before nesting under Agent span (OTel arrival race)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-73eb8412"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-21T00:47:09.667939"
+             data-updated="2026-04-21T01:07:21.231802" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Subagent tool calls flash as roots before nesting under Agent span (OTel arrival race)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-ebefd886.html" data-relationship="caused_by" data-since="2026-04-21T00:47:09.669608">feat-ebefd886</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:47:09.672354">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Visible race: subagent-emitted tool spans (Read/Edit/Bash) reach the dashboard BEFORE their parent Agent/subagent_invocation span does (because Agent has long duration and OTel spans emit on END). _indexSpans sees parent_span pointing at nothing, synthesizes a pending root, and renders them at turn root. Moments later the Agent span arrives, re-render nests them correctly. User perceives a flash / lag in nesting. Fix options: (1) grace-period orphan queue — stash orphans for ~5-10s, reconcile on each new span batch, only synthesize roots after timeout; (2) optimistic subagent reparenting — when a same-trace Agent span has started but not ended and its start_time precedes the orphan, provisionally reparent under it. Dependent on F4/F1/F3/F2 polish pass landing first (they also touch event-tree.js indexing).</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -15,6 +15,12 @@ window.htmlgraphMode = 'single';
 window.htmlgraphProjects = [];
 window.htmlgraphProjectId = '';
 
+// Terminal state — tracks the currently running ttyd sidecar pid.
+var terminalPid = null;
+// The last work-item ID opened in the Work detail panel; passed to the
+// terminal start request so the session is pre-scoped to that item.
+window.htmlgraphActiveWorkItem = '';
+
 /* ── Navigation ────────────────────────────────────────────── */
 document.querySelector('.nav').addEventListener('click', function(e) {
   var btn = e.target.closest('.nav-btn');
@@ -830,6 +836,9 @@ function closeWorkDetail() {
 }
 
 function openWorkDetail(id) {
+  // Track the active work item so the terminal button can pre-scope sessions.
+  window.htmlgraphActiveWorkItem = id;
+
   var detail = document.getElementById('work-detail');
   var board = document.getElementById('kanban-board');
   var empty = document.getElementById('work-empty');
@@ -1307,8 +1316,11 @@ function detectMode() {
     }
     // Inside a project (single mode served by a child under /p/<id>/)
     // — label the header with the project name returned by /api/mode.
+    // Also expose projectRoot so the event-tree component can relativize
+    // absolute paths (e.g. strip /Users/shakes/DevProjects/htmlgraph/ prefix).
     if (data.mode === 'single' && data.projectName) {
       window.htmlgraphProjectName = data.projectName;
+      window.htmlgraphProjectRoot = data.projectRoot || null;
       var pe = document.getElementById('brand-project');
       if (pe) {
         pe.textContent = '/ ' + data.projectName;
@@ -2642,3 +2654,66 @@ function highlightSession(sessionId) {
   el.style.outline = '2px solid var(--accent)';
   setTimeout(function() { el.style.outline = ''; }, 2000);
 }
+
+/* ── Embedded terminal (ttyd sidecar) ─────────────────────── */
+
+// openTerminal starts a ttyd sidecar and shows the overlay iframe.
+function openTerminal() {
+  var workItem = window.htmlgraphActiveWorkItem || '';
+  fetch(buildProjectUrl('terminal/start'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ work_item: workItem })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) { alert('Terminal error: ' + data.error); return; }
+    terminalPid = data.pid;
+    var frame = document.getElementById('terminal-frame');
+    var title = document.getElementById('terminal-title');
+    var overlay = document.getElementById('terminal-overlay');
+    frame.src = data.url;
+    title.textContent = workItem ? ('Claude Terminal — ' + workItem) : 'Claude Terminal';
+    overlay.classList.remove('hidden');
+  })
+  .catch(function(err) { alert('Could not start terminal: ' + err); });
+}
+
+// closeTerminal stops the sidecar and hides the overlay.
+function closeTerminal() {
+  var overlay = document.getElementById('terminal-overlay');
+  var frame = document.getElementById('terminal-frame');
+  overlay.classList.add('hidden');
+  frame.src = 'about:blank';
+  if (terminalPid) {
+    var pid = terminalPid;
+    terminalPid = null;
+    fetch(buildProjectUrl('terminal/stop'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pid: pid })
+    }).catch(function() {});
+  }
+}
+
+// Wire the Terminal nav button.
+var openTerminalBtn = document.getElementById('open-terminal-btn');
+if (openTerminalBtn) {
+  openTerminalBtn.addEventListener('click', openTerminal);
+}
+
+// Wire the close button inside the overlay.
+var terminalCloseBtn = document.getElementById('terminal-close');
+if (terminalCloseBtn) {
+  terminalCloseBtn.addEventListener('click', closeTerminal);
+}
+
+// Best-effort stop on page unload so the ttyd process does not linger.
+window.addEventListener('beforeunload', function() {
+  if (terminalPid) {
+    navigator.sendBeacon(
+      buildProjectUrl('terminal/stop'),
+      JSON.stringify({ pid: terminalPid })
+    );
+  }
+});

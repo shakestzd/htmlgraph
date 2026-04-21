@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SessionStart hook Pass 2: source-aware smart context (startup|resume|clear|compact)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-2b146a86"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-20T23:42:07.419764"
+             data-updated="2026-04-20T23:42:07.420767" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>SessionStart hook Pass 2: source-aware smart context (startup|resume|clear|compact)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-20T23:42:07.420672">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Branch SessionStart output on CloudEvent.source so each entry-mode surfaces exactly the context that matters for THAT mode. Today we emit the same block regardless of whether the user started fresh, resumed, or just hit /clear.
+
+Proposed branches:
+
+SOURCE=startup, no active claim:
+  Line 1: most-recently-touched in-progress item (likely pick-up candidate)
+  Line 2: otel receiver status (from pass 1)
+
+SOURCE=startup, active claim exists:
+  Line 1: 'active:  — '
+  Line 2: otel receiver status
+
+SOURCE=resume:
+  Line 1: active work item for THIS session (JOIN sessions + active_work_items ON session_id). Skip open-items list — the resumed transcript already has full context.
+  Line 2: git-diff-stat since sessions.start_commit if something changed on disk during the gap.
+
+SOURCE=clear or SOURCE=compact:
+  Line 1: active work item (just wiped context — this is the one case a FRESH reminder matters).
+  Line 2: recent activity summary — last 3 tool calls from this session's agent_events since a synthetic 'context checkpoint'.
+  Line 3: otel receiver status.
+
+Edge cases to resolve:
+- What if previous session's claim was completed by another agent between sessions? Verify claim still valid (status != done) before surfacing.
+- What if multiple sessions share the same active_work_items row via root sentinel? Dedupe.
+- Git-diff-stat should skip if untracked files only, otherwise it's noise.
+
+Depends on: pass 1 (the trim + autostart foundation). Do pass 1 first to establish the cleaner baseline, then layer source-awareness on top.
+
+Files: same as pass 1, plus CloudEvent parsing to read the source field.</p>
+        </section>
+    </article>
+</body>
+</html>

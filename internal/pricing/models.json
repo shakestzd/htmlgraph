@@ -1,0 +1,107 @@
+{
+  "_metadata": {
+    "source": "https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json",
+    "filtered_for": "htmlgraph OTel cost derivation",
+    "last_updated": "2026-04-20",
+    "notes": "Costs are USD per token (not per MTok). cache_read is ~0.10x input for Anthropic (5-min cache); cache_creation is ~1.25x input (5-min). Values empirically verified against Claude Code emissions where possible."
+  },
+
+  "claude-opus-4-7": {
+    "provider": "anthropic",
+    "input_cost_per_token": 0.000005,
+    "output_cost_per_token": 0.000025,
+    "cache_read_input_token_cost": 0.0000005,
+    "cache_creation_input_token_cost": 0.00000625
+  },
+  "claude-opus-4-6": {
+    "provider": "anthropic",
+    "input_cost_per_token": 0.000005,
+    "output_cost_per_token": 0.000025,
+    "cache_read_input_token_cost": 0.0000005,
+    "cache_creation_input_token_cost": 0.00000625
+  },
+  "claude-sonnet-4-6": {
+    "provider": "anthropic",
+    "input_cost_per_token": 0.000003,
+    "output_cost_per_token": 0.000015,
+    "cache_read_input_token_cost": 0.0000003,
+    "cache_creation_input_token_cost": 0.00000375
+  },
+  "claude-sonnet-4-5": {
+    "provider": "anthropic",
+    "input_cost_per_token": 0.000003,
+    "output_cost_per_token": 0.000015,
+    "cache_read_input_token_cost": 0.0000003,
+    "cache_creation_input_token_cost": 0.00000375
+  },
+  "claude-haiku-4-5": {
+    "provider": "anthropic",
+    "input_cost_per_token": 0.000001,
+    "output_cost_per_token": 0.000005,
+    "cache_read_input_token_cost": 0.0000001,
+    "cache_creation_input_token_cost": 0.00000125
+  },
+  "claude-haiku-4-5-20251001": {
+    "provider": "anthropic",
+    "input_cost_per_token": 0.000001,
+    "output_cost_per_token": 0.000005,
+    "cache_read_input_token_cost": 0.0000001,
+    "cache_creation_input_token_cost": 0.00000125
+  },
+
+  "gpt-5": {
+    "provider": "openai",
+    "input_cost_per_token": 0.00000125,
+    "output_cost_per_token": 0.00001,
+    "cache_read_input_token_cost": 0.000000125
+  },
+  "gpt-5-mini": {
+    "provider": "openai",
+    "input_cost_per_token": 0.00000025,
+    "output_cost_per_token": 0.000002,
+    "cache_read_input_token_cost": 0.000000025
+  },
+  "gpt-4.1": {
+    "provider": "openai",
+    "input_cost_per_token": 0.000002,
+    "output_cost_per_token": 0.000008,
+    "cache_read_input_token_cost": 0.0000005
+  },
+  "gpt-4.1-mini": {
+    "provider": "openai",
+    "input_cost_per_token": 0.0000004,
+    "output_cost_per_token": 0.0000016,
+    "cache_read_input_token_cost": 0.0000001
+  },
+  "o3": {
+    "provider": "openai",
+    "input_cost_per_token": 0.000002,
+    "output_cost_per_token": 0.000008,
+    "cache_read_input_token_cost": 0.0000005
+  },
+  "o4-mini": {
+    "provider": "openai",
+    "input_cost_per_token": 0.0000011,
+    "output_cost_per_token": 0.0000044,
+    "cache_read_input_token_cost": 0.000000275
+  },
+
+  "gemini-2.5-pro": {
+    "provider": "google",
+    "input_cost_per_token": 0.00000125,
+    "output_cost_per_token": 0.00001,
+    "cache_read_input_token_cost": 0.00000031
+  },
+  "gemini-2.5-flash": {
+    "provider": "google",
+    "input_cost_per_token": 0.0000003,
+    "output_cost_per_token": 0.0000025,
+    "cache_read_input_token_cost": 0.000000075
+  },
+  "gemini-2.5-flash-lite": {
+    "provider": "google",
+    "input_cost_per_token": 0.0000001,
+    "output_cost_per_token": 0.0000004,
+    "cache_read_input_token_cost": 0.000000025
+  }
+}

@@ -429,17 +429,34 @@ func launchClaude(opts LaunchOpts) error {
 		return fmt.Errorf("claude not found in PATH: %w", err)
 	}
 
+	// Show the one-time OTel first-launch notice before starting the
+	// server so users see the explanation before any server output.
+	MaybeShowOtelNotice(opts.ProjectRoot)
+
+	// When OTel is enabled, the spawned claude will export to
+	// 127.0.0.1:4318 (our OTLP receiver). If htmlgraph serve isn't
+	// already running, signals drop silently. Auto-start a detached
+	// serve so the dashboard and receiver are both live for the
+	// duration of this claude session (and beyond). See
+	// claude_serve_autostart.go for the probe + spawn logic.
+	ensureServeForOtel(opts.ProjectRoot)
+
 	c := exec.Command(claudePath, claudeArgs...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
-	// When running in a worktree, inject HTMLGRAPH_PROJECT_DIR so all
-	// htmlgraph CLI commands and hooks resolve to the main .htmlgraph/,
-	// not the worktree copy.
+	// Compose the child env: start from os.Environ, layer
+	// HTMLGRAPH_PROJECT_DIR when running in a worktree, and layer OTel
+	// exporter vars when HTMLGRAPH_OTEL_ENABLED=1 so Claude's OTLP
+	// pipeline points at the htmlgraph serve receiver. See
+	// claude_env.go:buildClaudeLaunchEnv for precedence rules (user-set
+	// OTEL_* always wins).
+	var worktreeOverride string
 	if opts.HtmlgraphRoot != "" && opts.HtmlgraphRoot != opts.ProjectRoot {
-		c.Env = append(os.Environ(), "HTMLGRAPH_PROJECT_DIR="+opts.HtmlgraphRoot)
+		worktreeOverride = opts.HtmlgraphRoot
 	}
+	c.Env = buildClaudeLaunchEnv(worktreeOverride)
 
 	// Set working directory to project root so Claude starts in the right place,
 	// even if this command is run from a subdirectory like packages/go.

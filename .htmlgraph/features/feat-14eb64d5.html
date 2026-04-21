@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Surface MCP tool inputs in span detail panel</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-14eb64d5"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-21T00:34:03.574041"
+             data-updated="2026-04-21T00:39:56.030952" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Surface MCP tool inputs in span detail panel</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:34:03.579777">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-21T00:34:04.874269">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>MCP tool spans (mcp__*) only carry metadata in attrs_json — no input args. The actual tool_input (args JSON) lives on the sibling tool_result log. Extend enrichToolSpansFromLogs / mergeLogIntoSpanDetails in cmd/htmlgraph/api_otel.go to parse tool_input for MCP tools the same way it already does for Read/Edit/Bash. Expose key fields in spanDetail and render in the span detail panel (event-tree.js _spanDetailBlock). For javascript_tool show 'text' as a code block; for navigate show 'url'; for generic MCP show the parsed JSON args as a code block.</p>
+        </section>
+    </article>
+</body>
+</html>

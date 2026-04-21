@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Subagent tool-call spans not nested under Agent span in activity feed</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-d0fa005b"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-21T00:06:51.680025"
+             data-updated="2026-04-21T00:17:12.687301" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Subagent tool-call spans not nested under Agent span in activity feed</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:06:51.680906">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-21T00:06:51.907993">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>In the activity feed, tool calls issued by a subagent (spawned via Task/Agent) render as siblings of the Agent span at turn root, not as nested children. Symptom (screenshot): 8 Read spans with feat-7aade9d4 badge appear above the Agent row, Agent row at the bottom, zero indentation on the Read rows. Expected: Reads indented under the Agent row (with extra subagent-depth from feat-26b8a5db). Hypothesis: (a) subagent's tool spans emit with parent_span_id NOT pointing at the orchestrator's Agent tool span (points at subagent-internal op span instead), so _indexSpans treats them as orphans and synthesizes a pending root; OR (b) hierarchy link exists but _indexSpans / _spansForTurn flattens / reparents incorrectly. Need: researcher to probe a real trace in .htmlgraph/htmlgraph.db to see actual parent_span_id chain for a subagent invocation, then identify whether this is a tracer/writer bug (Go side) or a dashboard hierarchy-builder bug (JS side).</p>
+        </section>
+    </article>
+</body>
+</html>

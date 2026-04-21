@@ -250,6 +250,7 @@ var internalPlumbingAllowlist = map[string]bool{
 	"trace":         true,
 	"graph":         true,
 	"query":         true,
+	"pricing":       true, // OTel model-pricing maintenance subcommand
 	// Less frequently used — omitted from compact output to stay within line budget.
 	"dev":       true,
 	"plugin":    true,

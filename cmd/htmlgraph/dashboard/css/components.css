@@ -278,6 +278,16 @@
 .tool-Grep      { background: rgba(251,146,60,0.2); color: #fb923c; }
 .tool-Glob      { background: rgba(168,85,247,0.2); color: #a855f7; }
 .tool-Task, .tool-Agent { background: rgba(236,72,153,0.2); color: #ec4899; }
+/* Task-management family — TaskCreate / TaskUpdate / TaskList / TaskGet /
+   TaskStop / TaskOutput are the harness-level todo tools (distinct from
+   Task/Agent subagent delegation above). Indigo family so they don't
+   collide visually with the pink Task/Agent chip. */
+.tool-TaskCreate,
+.tool-TaskUpdate,
+.tool-TaskList,
+.tool-TaskGet,
+.tool-TaskStop,
+.tool-TaskOutput { background: rgba(99,102,241,0.22); color: #a5b4fc; }
 .tool-UserQuery { background: rgba(88,166,255,0.2); color: #58a6ff; }
 .tool-Stop      { background: rgba(139,148,158,0.2); color: #8b949e; }
 /* Light mode: darker text on lighter backgrounds for contrast */
@@ -288,6 +298,12 @@
 [data-theme="light"] .tool-Grep      { background: rgba(234,88,12,0.12);  color: #c2410c; }
 [data-theme="light"] .tool-Glob      { background: rgba(126,34,206,0.12); color: #7e22ce; }
 [data-theme="light"] .tool-Task, [data-theme="light"] .tool-Agent { background: rgba(190,24,93,0.12); color: #be185d; }
+[data-theme="light"] .tool-TaskCreate,
+[data-theme="light"] .tool-TaskUpdate,
+[data-theme="light"] .tool-TaskList,
+[data-theme="light"] .tool-TaskGet,
+[data-theme="light"] .tool-TaskStop,
+[data-theme="light"] .tool-TaskOutput { background: rgba(79,70,229,0.14); color: #4338ca; }
 [data-theme="light"] .tool-UserQuery { background: rgba(29,78,216,0.12);  color: #1d4ed8; }
 [data-theme="light"] .tool-Stop      { background: rgba(107,114,128,0.12); color: #4b5563; }
 
@@ -334,6 +350,213 @@
 .badge-status-failed    { background: rgba(248,81,73,0.2); color: #f85149; }
 .badge-status-recorded  { background: rgba(139,148,158,0.2); color: #8b949e; }
 .badge-status-unknown   { background: rgba(139,148,158,0.2); color: #6e7681; }
+
+/* OTel cost/token badge on turn rows — populated from /api/otel/prompts.
+   Rendered only when the OTLP receiver has signals for the session. */
+.badge-otel {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(56,139,253,0.15);
+  color: #58a6ff;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+/* OTel infrastructure-span chip (interaction / api_request /
+   tool_execution / tool_blocked_on_user). Rendered on plain event-rows
+   — OTel spans are the canonical tree now, so there's no distinct
+   blue-left-border section anymore. The chip itself stays subtly
+   tinted so infra spans read differently from user-facing tool rows. */
+.tool-chip.tool-otel {
+  background: rgba(125,165,221,0.18);
+  color: #9cc5ff;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+}
+/* Trace chip — only shown on trace roots. Subtle, uppercase, tight. */
+.tool-chip.tool-otel-trace {
+  background: rgba(56,139,253,0.3);
+  color: #c8e1ff;
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.35rem;
+  margin-right: 0.35rem;
+}
+
+/* Approve / reject badges rolled up onto tool rows. Semantic green for
+   any flavor of approval, semantic red for rejection or execution
+   failure — matches the palette used by badge-status-* elsewhere. */
+.badge-approve {
+  background: rgba(63,185,80,0.2);
+  color: #3fb950;
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.badge-reject {
+  background: rgba(248,81,73,0.2);
+  color: #f85149;
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* Compact model-family chip — short label ("Opus 4.7" vs the verbose
+   claude-opus-4-7-20251014), colored by family (purple/blue/green) so
+   trace rows inherit the same color semantics as subagent badges. */
+.badge-model {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-weight: 500;
+}
+
+/* MCP tool chip + server pill. The server pill is a tight, color-coded
+   prefix; the tool chip sits right next to it with a neutral color so
+   the server color reads first. */
+.tool-chip.tool-mcp {
+  background: rgba(148,163,184,0.2);
+  color: #cbd5e1;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+}
+.tool-chip.tool-mcp-server {
+  font-size: 0.55rem;
+  padding: 0.05rem 0.35rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  margin-right: 0.15rem;
+}
+
+/* Expanded-row detail panel — key/value list showing full command,
+   description, timeout, URL, prompt, model, tokens, cost, etc. that
+   don't fit on the compact row. */
+.event-row-otel-detail {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.35rem;
+  border-left: 2px solid rgba(56,139,253,0.25);
+  display: block;
+  white-space: normal;
+  line-height: 1.4;
+}
+.otel-detail-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.otel-detail-key {
+  color: #8b949e;
+  min-width: 6.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+.otel-detail-val {
+  color: #c9d1d9;
+  word-break: break-all;
+}
+
+/* Code preview blocks for Edit / Write tool expansion. Plain <pre>
+   rendering for now — syntax highlighting is tracked in feat-292f87fe. */
+.otel-detail-code {
+  margin-top: 0.35rem;
+}
+.otel-detail-code-header {
+  color: #8b949e;
+  font-size: 0.6rem;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.15rem;
+}
+.otel-detail-code-body {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(56, 139, 253, 0.2);
+  border-radius: 4px;
+  padding: 0.5rem 0.65rem;
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.otel-detail-code-body code {
+  font-family: var(--font-mono, monospace);
+}
+
+/* ── Assistant text markdown body ─────────────────────────────── */
+.assistant-text-body.markdown {
+  line-height: 1.55;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.assistant-text-body.markdown p {
+  margin: 6px 0;
+}
+.assistant-text-body.markdown ul,
+.assistant-text-body.markdown ol {
+  margin: 6px 0 6px 22px;
+  padding: 0;
+}
+.assistant-text-body.markdown li {
+  margin: 2px 0;
+}
+.assistant-text-body.markdown h1,
+.assistant-text-body.markdown h2,
+.assistant-text-body.markdown h3 {
+  margin: 10px 0 4px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.assistant-text-body.markdown h1 { font-size: 15px; }
+.assistant-text-body.markdown h2 { font-size: 14px; }
+.assistant-text-body.markdown h3 { font-size: 13px; }
+.assistant-text-body.markdown pre {
+  background: rgba(255,255,255,0.04);
+  padding: 8px 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 6px 0;
+}
+.assistant-text-body.markdown code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+}
+.assistant-text-body.markdown pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.assistant-text-body.markdown a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+.assistant-text-body.markdown a:hover {
+  text-decoration: underline;
+}
+.assistant-text-body.markdown blockquote {
+  border-left: 3px solid #444;
+  margin: 6px 0;
+  padding-left: 10px;
+  color: #aaa;
+}
 
 /* Feature badge */
 .badge-feature {
@@ -1396,4 +1619,53 @@ p.numbered-step { padding-left: 1.5em; text-indent: -1.5em; }
   color: currentColor;
   vertical-align: middle;
   margin-right: 3px;
+}
+
+/* ── Terminal overlay ──────────────────────────────────────── */
+.terminal-overlay {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 720px;
+  height: 480px;
+  min-width: 400px;
+  min-height: 240px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  background: var(--bg, #111);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  resize: both;
+}
+.terminal-overlay.hidden { display: none; }
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--surface, #1a1a1a);
+  border-bottom: 1px solid var(--border, #333);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.terminal-close {
+  background: transparent;
+  border: 0;
+  color: var(--text, #eee);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+.terminal-close:hover { color: #f88; }
+.terminal-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #000;
 }

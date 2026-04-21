@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>OTel Integration — telemetry capture, span hierarchy, cost attribution</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="trk-c4615ad2"
+             data-type="track"
+             data-status="todo"
+             data-priority="high"
+             data-created="2026-04-21T00:01:38.30447"
+             data-updated="2026-04-21T11:35:28.877572" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>OTel Integration — telemetry capture, span hierarchy, cost attribution</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="contains">
+                <h3>Contains:</h3>
+                <ul>
+                    <li><a href="feat-4b4be3ec.html" data-relationship="contains" data-since="2026-04-21T00:01:38.412114">Render OTel spans as primary turn children (Phase 5)</a></li>
+                    <li><a href="feat-afbb4dc9.html" data-relationship="contains" data-since="2026-04-21T00:01:38.514365">Manage OTel env vars in htmlgraph launchers (default-on &#43; first-launch notice)</a></li>
+                    <li><a href="feat-82e11bbb.html" data-relationship="contains" data-since="2026-04-21T00:01:38.616978">Work item attribution on OTel span rows</a></li>
+                    <li><a href="feat-292f87fe.html" data-relationship="contains" data-since="2026-04-21T00:01:38.719443">OTel span detail: code preview with syntax highlighting for Edit/Write</a></li>
+                    <li><a href="feat-26b8a5db.html" data-relationship="contains" data-since="2026-04-21T00:01:38.823012">Deepen subagent tool-call indent in activity feed</a></li>
+                    <li><a href="feat-7aade9d4.html" data-relationship="contains" data-since="2026-04-21T00:01:38.927168">Activity feed noise reduction: inherit badges, relative paths, drop api_request footer, gate chevron</a></li>
+                    <li><a href="bug-d0fa005b.html" data-relationship="contains" data-since="2026-04-21T00:06:51.680906">Subagent tool-call spans not nested under Agent span in activity feed</a></li>
+                    <li><a href="feat-14eb64d5.html" data-relationship="contains" data-since="2026-04-21T00:34:03.579777">Surface MCP tool inputs in span detail panel</a></li>
+                    <li><a href="feat-ebefd886.html" data-relationship="contains" data-since="2026-04-21T00:34:03.846889">Bundle consecutive same-server MCP tool calls into a collapsible group</a></li>
+                    <li><a href="feat-378817e2.html" data-relationship="contains" data-since="2026-04-21T00:34:04.125463">Expose window.htmlgraphProjectRoot so absolute paths strip reliably</a></li>
+                    <li><a href="feat-79f99a81.html" data-relationship="contains" data-since="2026-04-21T00:34:04.51201">Drop exec &#43; auto-approve permission rows from tool children</a></li>
+                    <li><a href="bug-73eb8412.html" data-relationship="contains" data-since="2026-04-21T00:47:09.672354">Subagent tool calls flash as roots before nesting under Agent span (OTel arrival race)</a></li>
+                    <li><a href="feat-e1efb972.html" data-relationship="contains" data-since="2026-04-21T01:07:16.050515">SubagentStart &#43; orphan-span placeholder to eliminate Agent-span arrival flash</a></li>
+                    <li><a href="bug-3c4acb55.html" data-relationship="contains" data-since="2026-04-21T01:13:51.261231">Text-only turns not shown in activity feed — assistant text response missing</a></li>
+                    <li><a href="bug-049df2a4.html" data-relationship="contains" data-since="2026-04-21T02:57:27.713836">Subagent tool spans occasionally emit with parent_span=interaction instead of parent_span=Agent (TRACEPARENT propagation gap)</a></li>
+                    <li><a href="bug-6ab963d3.html" data-relationship="contains" data-since="2026-04-21T09:58:32.174515">OTel silently drops spans on SQLITE_BUSY &#43; parallel launcher spawns collide on :8080</a></li>
+                    <li><a href="bug-f4b7dbc8.html" data-relationship="contains" data-since="2026-04-21T09:58:32.284187">assistant_text rows fail to render: _assistantTextsForTurn returns 0 despite data present</a></li>
+                    <li><a href="bug-f6575739.html" data-relationship="contains" data-since="2026-04-21T10:56:57.883825">assistant_text parent_span uses transcript parentUuid verbatim — points at tool_result on turns with tool calls</a></li>
+                    <li><a href="feat-28b62b51.html" data-relationship="contains" data-since="2026-04-21T11:12:45.225773">Assistant text: render at top of turn &#43; apply markdown</a></li>
+                    <li><a href="bug-dda7cc2b.html" data-relationship="contains" data-since="2026-04-21T11:35:28.771645">Receiver gate in serve-child uses isTruthy while launcher defaults on — receiver skipped when HTMLGRAPH_OTEL_ENABLED is unset</a></li>
+                    <li><a href="bug-d2ba2a82.html" data-relationship="contains" data-since="2026-04-21T11:35:28.877055">Hardcoded :4318 causes cross-project OTel data leakage when multiple projects are open</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Comprehensive OpenTelemetry integration: OTLP/HTTP receiver, Claude adapter, span-as-canonical activity feed, per-turn cost/token badges, work-item attribution on spans, subagent hierarchy rendering, launcher env management + first-launch notice, syntax-highlighted span detail previews. Retroactive umbrella for all OTel-related work (Phase 0-5 + ongoing polish).</p>
+        </section>
+    </article>
+</body>
+</html>

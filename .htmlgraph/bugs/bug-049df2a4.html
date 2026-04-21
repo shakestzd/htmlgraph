@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Subagent tool spans occasionally emit with parent_span=interaction instead of parent_span=Agent (TRACEPARENT propagation gap)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-049df2a4"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-04-21T02:57:27.710747"
+             data-updated="2026-04-21T03:09:04.989102" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Subagent tool spans occasionally emit with parent_span=interaction instead of parent_span=Agent (TRACEPARENT propagation gap)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-21T02:58:18.472927">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T02:57:27.713836">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Evidence from DB (trace d3fa3d2fd8600a97): subagent-emitted Edit spans 6793b5c483f3666c and fbbe292a126f251f have parent_span=interaction, not parent_span=Agent, even though they were produced inside the subagent's execution window. Subsequent spans in the same trace (Bash, tool_execution, etc.) correctly parent to the Agent span (433e504d97f50699). Pattern: spans emitted early in the subagent lifecycle (before Claude Code fully establishes Agent-span OTel context) leak upward to the interaction scope; spans emitted later correctly inherit the Agent context. Dashboard cannot fix this in _indexSpans because the parent_span pointer itself is wrong. Workaround options: (1) receiver-side re-attribution by overlap window — if a tool span's [start, end] is contained within some Agent span's [start, end] in the same trace, re-parent under the Agent; (2) re-attribution by htmlgraph.agent_id resource attribute — for new dispatches, every subagent-emitted span carries agent_id as a resource attr; any span whose resource agent_id matches an Agent span AND whose parent_span points elsewhere is provably mis-parented, re-parent in internal/otel/receiver/writer.go. Option 2 is cleanest but only works post-feat-e1efb972 (once OTEL_RESOURCE_ATTRIBUTES injection is in effect). Likely upstream: Claude Code internal trace context propagation around subagent invocation.</p>
+        </section>
+    </article>
+</body>
+</html>

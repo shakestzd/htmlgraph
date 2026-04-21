@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Expose window.htmlgraphProjectRoot so absolute paths strip reliably</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-378817e2"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-21T00:34:04.124446"
+             data-updated="2026-04-21T00:49:35.231099" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Expose window.htmlgraphProjectRoot so absolute paths strip reliably</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-21T00:39:56.263764">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:34:04.125463">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Currently _relativizePath falls back to a marker-dir heuristic (/cmd/, /internal/, /plugin/, /packages/, /scripts/, /.htmlgraph/) because window.htmlgraphProjectRoot is never set. That misses .claude/, .github/, top-level dotfiles, and any non-listed directory. Server knows the project root (project_dir) — inject it into the dashboard HTML as an inline script setting window.htmlgraphProjectRoot = '...' (look for index.html template or serve.go render path). Update _relativizePath to prefer prefix-strip over the marker heuristic when the global is set. Validate: .claude/settings.local.json should render as .claude/settings.local.json.</p>
+        </section>
+    </article>
+</body>
+</html>

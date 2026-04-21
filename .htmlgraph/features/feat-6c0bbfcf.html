@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SessionStart hook Pass 1: trim redundant output &#43; serve autostart</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-6c0bbfcf"
+             data-type="feature"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-20T23:42:07.320991"
+             data-updated="2026-04-20T23:42:07.322229" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>SessionStart hook Pass 1: trim redundant output &#43; serve autostart</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-20T23:42:07.322177">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>SessionStart and SessionResume hooks currently emit ~15 lines of context on every fire. Much of it duplicates the system prompt (CLI reference block, orchestrator-directives pitch) which the launcher already injects via CLAUDE.md.
+
+Scope (pass 1, small/safe):
+1. Drop the CLI reference block (htmlgraph CLI — feature|bug|spike|… line) from SessionStart output. Already surfaced via /htmlgraph:orchestrator-directives-skill and CLAUDE.md system prompt.
+2. Drop the orchestrator-directives pitch line. Same reason.
+3. Limit the open-items list from all-in-progress to the 3 most-recently-touched items (sort by updated_at DESC, limit 3). Add tail line 'N more — htmlgraph wip' when truncated.
+4. Add serve health check: TCP-probe configured OTLP port (default 4318). When HTMLGRAPH_OTEL_ENABLED=1 and the port isn't bound, spawn htmlgraph serve detached (same logic as the launcher autostart added in claude_serve_autostart.go). Emit one status line: 'otel receiver: http://127.0.0.1:4318' or 'otel receiver: starting' / 'otel receiver: down'.
+
+Net effect: cut ~15 lines of output to ~5. No behaviour regressions — every useful piece of info stays, just once each.
+
+Files:
+- internal/hooks/session_start.go
+- internal/hooks/session_end.go (SessionResume)
+- new helper for TCP probe + spawn — can lift claude_serve_autostart.go's ensureServeForOtel into a shared helper
+
+Verification: restart claude (fresh and resumed), confirm SessionStart output is terse and still useful.</p>
+        </section>
+    </article>
+</body>
+</html>

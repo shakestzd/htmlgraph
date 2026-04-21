@@ -60,6 +60,8 @@ func recordSimpleEvent(
 
 // Stop handles the Stop Claude Code hook event (agent/session stopped).
 // Records a checkpoint event and captures the last assistant message as output.
+// Also reads the transcript JSONL to persist the assistant reply text as an
+// assistant_text otel_signals row so the dashboard can render text-only turns.
 func Stop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	summary := "Agent stopped"
 	if event.LastAssistantMessage != "" {
@@ -69,6 +71,27 @@ func Stop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		}
 		summary = fmt.Sprintf("Agent stopped: %s", msg)
 	}
+
+	// Read the transcript and persist the last assistant text turn as an
+	// otel_signals row with canonical='assistant_text'. This is a fast
+	// synchronous file read — no network calls. Errors are logged to
+	// debug.log only and never block the Stop response.
+	sessionID := resolveSessionIDWithHarness(event)
+	if sessionID == "" {
+		sessionID = EnvSessionID(event.SessionID)
+	}
+	if sessionID != "" {
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
+		insertAssistantTextSignal(database, projectDir, sessionID, event.TranscriptPath)
+		// Backfill any user prompts missed by the live UserPromptSubmit hook path.
+		// Non-fatal: errors are logged to debug.log and never block the Stop response.
+		if n, err := backfillMissedUserPrompts(database, projectDir, sessionID, event.TranscriptPath); err != nil {
+			debugLog(projectDir, "[user-prompt-backfill] stop hook: %v", err)
+		} else if n > 0 {
+			debugLog(projectDir, "[user-prompt-backfill] stop: %d prompts recovered (session=%s)", n, sessionID[:minSessionLen(sessionID)])
+		}
+	}
+
 	return recordSimpleEvent(models.EventEnd, "Stop", summary, "recorded", event, database)
 }
 

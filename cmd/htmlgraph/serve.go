@@ -66,6 +66,7 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 		respondJSON(w, map[string]any{
 			"mode":        "single",
 			"projectName": projectName,
+			"projectRoot": projectDir,
 		})
 	}))
 
@@ -94,10 +95,23 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	mux.Handle("/api/graph/files", filesForFeatureHandler(database))
 	mux.Handle("/api/graph/sessions", sessionsForFeatureHandler(database))
 
+	// OTel telemetry endpoints — query otel_signals and otel_session_rollup
+	// populated by the embedded OTLP receiver (see internal/otel/receiver).
+	mux.Handle("/api/otel/rollup", otelRollupHandler(database))
+	mux.Handle("/api/otel/prompts", otelPromptsHandler(database))
+	mux.Handle("/api/otel/cost", otelCostHandler(database))
+	mux.Handle("/api/otel/spans", otelSpansHandler(database))
+	mux.Handle("/api/otel/logs", otelLogsHandler(database))
+
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
 	mux.Handle("/api/plans", plansListHandler(htmlgraphDir, database))
 	mux.Handle("/plans/", planFileHandler(htmlgraphDir))
 	mux.Handle("/api/plans/", planRouter(database, htmlgraphDir))
+
+	// Terminal sidecar routes — spawn/stop ttyd processes for the embedded
+	// interactive terminal. Must be registered before the catch-all "/" below.
+	mux.Handle("/api/terminal/start", handleTerminalStart(projectDir))
+	mux.Handle("/api/terminal/stop", handleTerminalStop())
 
 	// Serve embedded dashboard (index.html, css/, js/, components/)
 	mux.Handle("/", http.FileServer(http.FS(dashboardSub())))

@@ -11,6 +11,29 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Prism.js syntax highlighting for OTel span detail code blocks.
+     Dark theme (prism-tomorrow) matches the dashboard palette. Loaded
+     from jsDelivr CDN; see feat-292f87fe for the local-embed follow-up.
+     Language components loaded cover the dominant subset we see in
+     real traces: bash, go, js/ts/jsx, py, json, yaml, css, html, sql,
+     markdown, toml, docker. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-jsx.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markdown.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-toml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js"></script>
 </head>
 <body>
 
@@ -120,6 +143,12 @@
       Plans
     </button>
     <div class="plan-subnav" id="plan-subnav"></div>
+    <button class="nav-btn" id="open-terminal-btn" title="Open interactive Claude terminal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <rect x="2" y="3" width="20" height="16" rx="2"/><polyline points="8 9 12 13 8 17"/><line x1="16" y1="17" x2="16" y2="17"/>
+      </svg>
+      Terminal
+    </button>
   </nav>
 
   <!-- Content -->
@@ -273,6 +302,15 @@
     </aside>
 
   </main>
+</div>
+
+<!-- Terminal overlay — full-screen iframe wrapper for the ttyd sidecar -->
+<div id="terminal-overlay" class="terminal-overlay hidden">
+  <div class="terminal-header">
+    <span id="terminal-title">Claude Terminal</span>
+    <button id="terminal-close" class="terminal-close">&times;</button>
+  </div>
+  <iframe id="terminal-frame" class="terminal-frame" src="about:blank"></iframe>
 </div>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>

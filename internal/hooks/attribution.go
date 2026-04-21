@@ -147,9 +147,14 @@ func claimTraceparent() *agentTraceRecord {
 }
 
 // writeSubagentEnvVars writes HTMLGRAPH_PARENT_EVENT, HTMLGRAPH_AGENT_ID,
-// HTMLGRAPH_AGENT_TYPE, and HTMLGRAPH_CONTRIBUTOR_TYPE to CLAUDE_ENV_FILE so
-// the subagent's hooks know their parent delegation, agent identity, and
-// Agent Trace contributor classification.
+// HTMLGRAPH_AGENT_TYPE, HTMLGRAPH_CONTRIBUTOR_TYPE, and OTEL_RESOURCE_ATTRIBUTES
+// to CLAUDE_ENV_FILE so the subagent's hooks know their parent delegation,
+// agent identity, and Agent Trace contributor classification.
+//
+// OTEL_RESOURCE_ATTRIBUTES is merged with any existing value so the subagent's
+// OTel SDK emits htmlgraph.agent_id on every span — the OTLP receiver uses this
+// to look up pending_subagent_starts and synthesize a placeholder row.
+//
 // When CLAUDE_ENV_FILE is unset (worktree subagents), falls back to a
 // session-scoped temp-file hint so the subagent's hook processes can still
 // resolve the project directory via paths.ReadSessionHint.
@@ -186,7 +191,26 @@ func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir, session
 	if projectDir != "" {
 		lines += "export HTMLGRAPH_PROJECT_DIR=" + projectDir + "\n"
 	}
+	// Merge htmlgraph.agent_id into OTEL_RESOURCE_ATTRIBUTES so the subagent's
+	// OTel SDK emits this attribute on every span. Merge with any existing value
+	// so we don't clobber other resource attributes set by the harness or user.
+	if agentID != "" {
+		otelRA := mergeOTELResourceAttrs(os.Getenv("OTEL_RESOURCE_ATTRIBUTES"), "htmlgraph.agent_id="+agentID)
+		lines += "export OTEL_RESOURCE_ATTRIBUTES=" + otelRA + "\n"
+	}
 	f.WriteString(lines)
+}
+
+// mergeOTELResourceAttrs merges a new key=value pair into an existing
+// OTEL_RESOURCE_ATTRIBUTES value. The OTel spec uses comma-separated
+// key=value pairs. If existing already contains the key, the new value wins
+// (appended; OTel SDKs use last-wins semantics). If existing is empty, the
+// new pair is returned as-is.
+func mergeOTELResourceAttrs(existing, newPair string) string {
+	if existing == "" {
+		return newPair
+	}
+	return existing + "," + newPair
 }
 
 // writeSessionProjectDirHint persists projectDir to a session-scoped temp file
