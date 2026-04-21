@@ -35,7 +35,10 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 		return env
 	}
 
-	endpoint := otelEndpointFromEnv()
+	// Pass the project dir so both launcher and serve-child derive the same
+	// per-project port. htmlgraphProjectDir is empty when not in a worktree;
+	// LoadConfigFromEnv falls back to HTMLGRAPH_PROJECT_DIR env var in that case.
+	endpoint := otelEndpointFromEnv(htmlgraphProjectDir)
 	// User-set values always win — only add our default if missing.
 	env = addIfUnset(env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 	env = addIfUnset(env, "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "1")
@@ -54,8 +57,11 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 // honoring the same HTMLGRAPH_OTEL_BIND and HTMLGRAPH_OTEL_HTTP_PORT vars
 // that the receiver's LoadConfigFromEnv reads. Keeps launcher and receiver
 // symmetric without needing to duplicate the defaults.
-func otelEndpointFromEnv() string {
-	cfg := otelreceiver.LoadConfigFromEnv("")
+//
+// projectDir is passed through to LoadConfigFromEnv so the port derived
+// from the project directory hash matches the port the serve-child binds.
+func otelEndpointFromEnv(projectDir string) string {
+	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
 	host := cfg.BindHost
 	if host == "" || host == "0.0.0.0" {
 		// "Listen on all interfaces" maps to "export to loopback" for the

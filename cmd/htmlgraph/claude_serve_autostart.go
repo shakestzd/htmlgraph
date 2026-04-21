@@ -48,7 +48,7 @@ func ensureServeForOtel(projectDir string) {
 	if isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
 		return
 	}
-	cfg := otelreceiver.LoadConfigFromEnv("")
+	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
 	host := cfg.BindHost
 	if host == "" || host == "0.0.0.0" {
 		host = "127.0.0.1"
@@ -138,7 +138,7 @@ func MaybeShowOtelNotice(projectDir string) {
 		return // notice already shown on a previous launch
 	}
 
-	cfg := otelreceiver.LoadConfigFromEnv("")
+	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
 	host := cfg.BindHost
 	if host == "" || host == "0.0.0.0" {
 		host = "127.0.0.1"

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,18 +38,38 @@ type Config struct {
 }
 
 // LoadConfigFromEnv reads HTMLGRAPH_OTEL_* env vars and returns a
-// Config with sensible defaults. Calling with no env set yields a
-// disabled receiver.
+// Config with sensible defaults. Calling with no env set yields an
+// enabled receiver (default-on). Set HTMLGRAPH_OTEL_ENABLED=0 to opt out.
+//
+// projectDir is used to derive a deterministic per-project OTLP port
+// (range 4318..5317). Pass "" to use the base port 4318.
+// HTMLGRAPH_PROJECT_DIR is checked as a fallback when projectDir is "".
 //
 // Recognized vars:
-//   HTMLGRAPH_OTEL_ENABLED    (0/1 or true/false; default 0)
+//   HTMLGRAPH_OTEL_ENABLED    (0/false/no/off to disable; default on)
 //   HTMLGRAPH_OTEL_BIND       (default 127.0.0.1)
-//   HTMLGRAPH_OTEL_HTTP_PORT  (default 4318; set 0 to disable)
-func LoadConfigFromEnv(dbPath string) Config {
+//   HTMLGRAPH_OTEL_HTTP_PORT  (explicit override; wins over project hash)
+func LoadConfigFromEnv(dbPath string, projectDir string) Config {
+	raw := os.Getenv("HTMLGRAPH_OTEL_ENABLED")
+	enabled := !isExplicitlyDisabled(raw)
+
+	// Determine the OTLP HTTP port. Explicit env var always wins; otherwise
+	// derive from the project directory for per-project isolation.
+	var httpPort int
+	if portStr := os.Getenv("HTMLGRAPH_OTEL_HTTP_PORT"); portStr != "" {
+		httpPort = parseIntDefault(portStr, 4318)
+	} else {
+		dir := projectDir
+		if dir == "" {
+			dir = os.Getenv("HTMLGRAPH_PROJECT_DIR")
+		}
+		httpPort = PortForProject(dir)
+	}
+
 	c := Config{
-		Enabled:  parseBool(os.Getenv("HTMLGRAPH_OTEL_ENABLED")),
+		Enabled:  enabled,
 		BindHost: envOr("HTMLGRAPH_OTEL_BIND", "127.0.0.1"),
-		HTTPPort: parseIntDefault(os.Getenv("HTMLGRAPH_OTEL_HTTP_PORT"), 4318),
+		HTTPPort: httpPort,
 		DBPath:   dbPath,
 	}
 	return c
@@ -174,6 +195,17 @@ func (r *Receiver) Stop(ctx context.Context) error {
 	}
 	r.started = false
 	return firstErr
+}
+
+// isExplicitlyDisabled reports whether a value explicitly opts OUT of OTel
+// (for the default-on policy). Empty / unset values default to on.
+// Defined locally to avoid import cycles with cmd/htmlgraph.
+func isExplicitlyDisabled(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "0", "false", "no", "off":
+		return true
+	}
+	return false
 }
 
 func parseBool(s string) bool {

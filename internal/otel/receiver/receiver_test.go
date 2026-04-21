@@ -176,26 +176,108 @@ func TestReceiver_Burst(t *testing.T) {
 // TestLoadConfigFromEnv walks the env-var surface to ensure defaults
 // and overrides behave as documented.
 func TestLoadConfigFromEnv(t *testing.T) {
-	// Default: disabled.
+	// Default: enabled (default-on semantics).
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
-	cfg := receiver.LoadConfigFromEnv("/tmp/x")
-	if cfg.Enabled {
-		t.Error("default Enabled should be false")
+	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "")
+	t.Setenv("HTMLGRAPH_OTEL_BIND", "")
+	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
+	cfg := receiver.LoadConfigFromEnv("/tmp/x", "")
+	if !cfg.Enabled {
+		t.Error("default Enabled should be true (default-on)")
 	}
 	if cfg.HTTPPort != 4318 {
-		t.Errorf("default HTTPPort = %d, want 4318", cfg.HTTPPort)
+		t.Errorf("default HTTPPort (no project dir) = %d, want 4318", cfg.HTTPPort)
 	}
 	if cfg.BindHost != "127.0.0.1" {
 		t.Errorf("default BindHost = %q", cfg.BindHost)
 	}
 
-	// Enabled + custom port.
+	// Explicit HTMLGRAPH_OTEL_ENABLED=0 → disabled.
+	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "0")
+	cfg = receiver.LoadConfigFromEnv("/tmp/x", "")
+	if cfg.Enabled {
+		t.Error("HTMLGRAPH_OTEL_ENABLED=0 should set Enabled=false")
+	}
+
+	// Custom port via env var wins over project hash.
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "14318")
 	t.Setenv("HTMLGRAPH_OTEL_BIND", "0.0.0.0")
-	cfg = receiver.LoadConfigFromEnv("/tmp/x")
+	cfg = receiver.LoadConfigFromEnv("/tmp/x", "/some/project")
 	if !cfg.Enabled || cfg.HTTPPort != 14318 || cfg.BindHost != "0.0.0.0" {
 		t.Errorf("envs not applied: %+v", cfg)
+	}
+}
+
+// TestLoadConfigFromEnv_PerProjectPort verifies different project dirs yield
+// different HTTPPort values when no explicit env override is set.
+func TestLoadConfigFromEnv_PerProjectPort(t *testing.T) {
+	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "")
+	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
+	t.Setenv("HTMLGRAPH_OTEL_BIND", "")
+	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
+
+	cfg1 := receiver.LoadConfigFromEnv("", "/home/user/project-alpha")
+	cfg2 := receiver.LoadConfigFromEnv("", "/home/user/project-beta")
+	if cfg1.HTTPPort == cfg2.HTTPPort {
+		t.Errorf("different project dirs should yield different ports, both got %d", cfg1.HTTPPort)
+	}
+}
+
+// TestLoadConfigFromEnv_EnvOverride verifies HTMLGRAPH_OTEL_HTTP_PORT wins
+// over the project-hash-derived port.
+func TestLoadConfigFromEnv_EnvOverride(t *testing.T) {
+	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "5000")
+	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
+
+	cfg := receiver.LoadConfigFromEnv("", "/home/user/any-project")
+	if cfg.HTTPPort != 5000 {
+		t.Errorf("HTMLGRAPH_OTEL_HTTP_PORT=5000 should win, got %d", cfg.HTTPPort)
+	}
+
+	t.Cleanup(func() { t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "") })
+}
+
+// TestPortForProject_Deterministic verifies same input → same output.
+func TestPortForProject_Deterministic(t *testing.T) {
+	dir := "/home/user/my-project"
+	p1 := receiver.PortForProject(dir)
+	p2 := receiver.PortForProject(dir)
+	if p1 != p2 {
+		t.Errorf("PortForProject not deterministic: %d != %d", p1, p2)
+	}
+}
+
+// TestPortForProject_DifferentProjectsDifferentPorts verifies 10 distinct
+// project dirs produce 10 distinct ports (probabilistic — acceptable for 1000 slots).
+func TestPortForProject_DifferentProjectsDifferentPorts(t *testing.T) {
+	dirs := []string{
+		"/home/alice/alpha",
+		"/home/alice/beta",
+		"/home/alice/gamma",
+		"/home/bob/alpha",
+		"/home/bob/beta",
+		"/projects/foo",
+		"/projects/bar",
+		"/projects/baz",
+		"/work/qux",
+		"/work/quux",
+	}
+	seen := make(map[int]string)
+	for _, d := range dirs {
+		p := receiver.PortForProject(d)
+		if prev, ok := seen[p]; ok {
+			t.Errorf("port collision %d: %q and %q", p, prev, d)
+		}
+		seen[p] = d
+	}
+}
+
+// TestPortForProject_EmptyDir verifies empty string returns the base port.
+func TestPortForProject_EmptyDir(t *testing.T) {
+	p := receiver.PortForProject("")
+	if p != 4318 {
+		t.Errorf("empty dir should return 4318, got %d", p)
 	}
 }
 

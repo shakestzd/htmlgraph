@@ -72,6 +72,9 @@ func clearOtelEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
 		"HTMLGRAPH_OTEL_ENABLED",
+		"HTMLGRAPH_OTEL_HTTP_PORT",
+		"HTMLGRAPH_OTEL_BIND",
+		"HTMLGRAPH_PROJECT_DIR",
 		"CLAUDE_CODE_ENABLE_TELEMETRY",
 		"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA",
 		"OTEL_METRICS_EXPORTER",
@@ -105,6 +108,8 @@ func assertEnvEmptyOrUnset(t *testing.T, env []string, key string) {
 func TestBuildClaudeLaunchEnv_InjectsWhenEnabled(t *testing.T) {
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	// Clear any parent values so we test our defaults.
+	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "")
+	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 	t.Setenv("OTEL_METRICS_EXPORTER", "")
 	t.Setenv("OTEL_LOGS_EXPORTER", "")
 	t.Setenv("OTEL_TRACES_EXPORTER", "")
@@ -130,6 +135,7 @@ func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
 	// If the user already set OTEL_EXPORTER_OTLP_ENDPOINT or changed the
 	// exporter, we must not clobber those choices.
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
+	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://custom.example.com:4318")
 	t.Setenv("OTEL_METRICS_EXPORTER", "console")
 	t.Setenv("OTEL_LOG_TOOL_DETAILS", "0")
