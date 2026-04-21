@@ -39,8 +39,10 @@ func runStatusline(sessionID string) error {
 		return statuslineFromSession(dir, sessionID)
 	}
 
-	// Fallback: scan HTML files for any in-progress item.
-	return statuslineFromHTML(dir)
+	// No session ID: return nothing. The global HTML scan has no session context and
+	// would leak cross-session state (e.g. show a bug from session B when session A
+	// is calling). An empty statusline is correct when no session is scoped.
+	return nil
 }
 
 func statuslineFromSession(dir, sessionID string) error {
