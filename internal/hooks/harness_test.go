@@ -136,6 +136,10 @@ func TestParseCodexUserPrompt(t *testing.T) {
 }
 
 func TestParseCodexEventSetsAgentID(t *testing.T) {
+	// Explicitly clear HTMLGRAPH_PARENT_AGENT so this test is not affected by
+	// whatever the shell environment has set (e.g., "claude-code" in dev sessions).
+	t.Setenv("HTMLGRAPH_PARENT_AGENT", "")
+
 	ev, err := parseCodexEvent([]byte(codexSessionStartJSON))
 	if err != nil {
 		t.Fatalf("parseCodexEvent: %v", err)
@@ -143,6 +147,55 @@ func TestParseCodexEventSetsAgentID(t *testing.T) {
 
 	if ev.AgentID != "codex" {
 		t.Errorf("AgentID = %q, want codex", ev.AgentID)
+	}
+}
+
+// TestParseCodexEventAgentIDHardening covers the fix for bug-bfe41623:
+// parseCodexEvent must NOT override AgentID with "codex" when
+// HTMLGRAPH_PARENT_AGENT identifies a different harness.
+func TestParseCodexEventAgentIDHardening(t *testing.T) {
+	tests := []struct {
+		name           string
+		parentAgentEnv string // value to set in HTMLGRAPH_PARENT_AGENT ("" = clear/unset)
+		wantAgentID    string
+	}{
+		{
+			name:           "codex harness no parent agent env → AgentID=codex",
+			parentAgentEnv: "",
+			wantAgentID:    "codex",
+		},
+		{
+			name:           "codex harness HTMLGRAPH_PARENT_AGENT=codex → AgentID=codex",
+			parentAgentEnv: "codex",
+			wantAgentID:    "codex",
+		},
+		{
+			name:           "routed through codex parser but HTMLGRAPH_PARENT_AGENT=claude-code → AgentID=claude-code",
+			parentAgentEnv: "claude-code",
+			wantAgentID:    "claude-code",
+		},
+		{
+			name:           "routed through codex parser but HTMLGRAPH_PARENT_AGENT=gemini → AgentID=gemini",
+			parentAgentEnv: "gemini",
+			wantAgentID:    "gemini",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Always set (or clear) the env var so the test is not affected by
+			// whatever value happens to be inherited from the shell (e.g. "claude-code"
+			// in a live dev session, which is what triggered bug-bfe41623).
+			t.Setenv("HTMLGRAPH_PARENT_AGENT", tt.parentAgentEnv)
+
+			ev, err := parseCodexEvent([]byte(codexSessionStartJSON))
+			if err != nil {
+				t.Fatalf("parseCodexEvent: %v", err)
+			}
+			if ev.AgentID != tt.wantAgentID {
+				t.Errorf("AgentID = %q, want %q", ev.AgentID, tt.wantAgentID)
+			}
+		})
 	}
 }
 
