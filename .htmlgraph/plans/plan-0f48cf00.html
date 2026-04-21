@@ -287,7 +287,7 @@ textarea::placeholder{color:var(--text-muted)}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v1 · 7 slices · Created 2026-04-21</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 7 slices · Created 2026-04-21</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -312,8 +312,8 @@ textarea::placeholder{color:var(--text-muted)}
     <div data-node="3" data-name="Extract internal/worktree primitive" data-status="pending" data-deps="" data-files="3"></div>
     <div data-node="4" data-name="Frontend launcher modal" data-status="pending" data-deps="1" data-files="3"></div>
     <div data-node="5" data-name="Multi-pane shell (floating windows)" data-status="pending" data-deps="1,2,4" data-files="3"></div>
-    <div data-node="6" data-name="Parallel-launch hardening" data-status="pending" data-deps="1" data-files="2"></div>
-    <div data-node="7" data-name="Agent-matrix parity for worktree + work-item" data-status="pending" data-deps="3" data-files="4"></div>
+    <div data-node="6" data-name="Parallel-launch integration test + stress harness" data-status="pending" data-deps="1,2" data-files="2"></div>
+    <div data-node="7" data-name="Agent-matrix parity for worktree + work-item" data-status="pending" data-deps="1,3" data-files="4"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -342,9 +342,11 @@ textarea::placeholder{color:var(--text-muted)}
 <li data-markdown>Backend stays generic PTY spawner — no agent-specific logic in internal/terminal</li>
 <li data-markdown>Frontend stays vanilla JS — no new framework/bundler introduced for cockpit alone</li>
 <li data-markdown>Dev mode launchers must use --plugin-dir via removeMarketplaceHtmlgraph() (already enforced) — cockpit must not drop that guard</li>
-<li data-markdown>bug-6ab963d3 (OTel SQLITE_BUSY + parallel-launch races) is a prerequisite for reliable multi-pane operation; cockpit can ship but will amplify the bug until it lands</li>
+<li data-markdown>bug-6ab963d3 and bug-d2d3fb3f are resolved via the checkServeLock PID-file pattern in claude_serve_autostart.go:173–215; do NOT add duplicate serialization at the terminal-handler layer.</li>
 <li data-markdown>feat-af47836b (logical session splitting) must land before multi-pane attribution is clean; cockpit ships alongside but leans on it for correctness</li>
 <li data-markdown>Cockpit endpoints are localhost-bound; any remote-exposure story is deferred (ttyd --credential is available when we need it)</li>
+<li data-markdown>Multi-project / global-serve mode (parent/child architecture in serve.go + serve_parent.go) is out of scope for v1; cockpit targets single-project mode only. Verify after landing that terminal routes propagate correctly through buildSingleProjectMux on the child side.</li>
+<li data-markdown>Backend session-reaper goroutine in internal/terminal/terminal.go:108–113 removes entries on ttyd exit; frontend must have a liveness signal (see q-liveness-signal) to avoid dead-iframe UX.</li>
 </ul>
 
     <div class="approval-row">
@@ -371,15 +373,20 @@ textarea::placeholder{color:var(--text-muted)}
     <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Extend POST /api/terminal/start to accept {agent, mode, cwd, work_item} and compute the correct shell command from those fields. Agent values: claude, codex, gemini, yolo. Mode values: normal, dev, auto. When body is {} or fields are omitted, fall back to the MVP defaults (claude, dev, server-start projectDir) so no existing integrations break. Session struct gains agent, mode, and cwd fields alongside the existing cmd, port, and workItem fields. waitForPort stays inline but is called with the per-request port.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Introduce a StartRequest struct (not positional parameters) so future field additions remain backward-compatible. Fields: Agent string, Mode string, CWD string, WorkItem string. When fields are zero-valued, fall back to MVP defaults (claude, dev, server-start projectDir). Extend POST /api/terminal/start to decode StartRequest and compute the correct shell command via a pure function buildShellCmd(agent, mode, workItem string) string — this function is easy to unit-test and switches on agent to choose between claude/codex/gemini/yolo invocations. Session struct gains Agent, Mode, and CWD fields alongside existing Cmd, Port, and WorkItem fields. waitForPort stays inline but is called with the per-request port.
+
+Shell command builder notes: (1) agent=claude emits `htmlgraph claude [--dev]` with dev-mode guard via removeMarketplaceHtmlgraph; (2) agent=codex/gemini emits `htmlgraph codex`/`htmlgraph gemini` so HTMLGRAPH_AGENT env injection flows; (3) agent=yolo has a nested-process concern — see q-yolo-mode-shape for whether to emit `htmlgraph yolo` wrapper or `claude --permission-mode bypassPermissions` directly; (4) when work_item is set, buildShellCmd prepends `htmlgraph feature start &lt;id&gt;;` for all agents to ensure attribution.
+
+Add concrete done_when: JSON body {} (no fields) preserves MVP behavior — spawns `htmlgraph claude --dev` with cmd.Dir = projectDir, keyed the same way as today.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">All subsequent cockpit slices depend on the ability to spawn different agent types with different CWDs from a single endpoint. Without this generalization the frontend launcher modal has nowhere to send its parameters and every new agent would require a new route.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/terminal/terminal.go, cmd/htmlgraph/terminal_handlers.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">POST /api/terminal/start with {&#34;agent&#34;:&#34;codex&#34;,&#34;mode&#34;:&#34;dev&#34;,&#34;cwd&#34;:&#34;/tmp/test&#34;,&#34;work_item&#34;:&#34;feat-abc&#34;} spawns htmlgraph codex --dev in /tmp/test</li><li data-markdown="">POST /api/terminal/start with {} still spawns htmlgraph claude --dev in the server-start projectDir (backward compat)</li><li data-markdown="">Session struct fields agent, mode, cwd are persisted in the in-memory map and returned in subsequent list calls</li><li data-markdown="">htmlgraph yolo agent value emits htmlgraph yolo shell command with work_item forwarded</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">POST /api/terminal/start with {&#34;agent&#34;:&#34;codex&#34;,&#34;mode&#34;:&#34;dev&#34;,&#34;cwd&#34;:&#34;/tmp/test&#34;,&#34;work_item&#34;:&#34;feat-abc&#34;} spawns htmlgraph codex --dev in /tmp/test</li><li data-markdown="">POST /api/terminal/start with {} still spawns htmlgraph claude --dev in the server-start projectDir (backward compat)</li><li data-markdown="">JSON body {} (no fields) produces identical behavior to the pre-cockpit MVP — cmd.Dir = projectDir, same map key scheme</li><li data-markdown="">Session struct fields Agent, Mode, CWD are persisted in the in-memory map and returned in subsequent list calls</li><li data-markdown="">htmlgraph yolo agent value behavior is governed by q-yolo-mode-shape answer</li><li data-markdown="">buildShellCmd is a pure function covered by unit tests for all agent x mode combinations</li><li data-markdown="">When work_item is set, all agent types prepend htmlgraph feature start &lt;id&gt; attribution step</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestBuildShellCommand covers all agent x mode combinations and verifies correct command string
 Unit: TestManagerStartBackwardCompat verifies empty body still spawns default session
+Unit: TestStartRequestStruct verifies zero-value fallback logic for each field
 Integration: TestTerminalStartEndpoint posts each agent type and asserts the spawned process argv contains the expected launcher
 Regression: Existing MVP POST /api/terminal/start {work_item} flow still returns a valid port
 </div></div>
@@ -398,17 +405,19 @@ Regression: Existing MVP POST /api/terminal/start {work_item} flow still returns
     <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add an id string (UUID v4) field to the session struct and change the in-memory map key from pid (int) to UUID. Add GET /api/terminal/sessions returning a JSON array of {id, agent, mode, cwd, work_item, port, started_at} for all live sessions. Add POST /api/terminal/stop accepting {id} (preferred) or {pid} (back-compat) to kill a session. started_at is set at spawn time (time.Now()). UUID generation uses crypto/rand — no new dependency.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add an id string (UUID v4) field to the session struct and change the in-memory map key from pid (int) to UUID. Add GET /api/terminal/sessions returning a JSON array of {id, agent, mode, cwd, work_item, port, started_at, state} for all live sessions. The state field uses values pending | live | exited. Add POST /api/terminal/stop accepting {id} (preferred) or {pid} (back-compat, drop in a later cleanup slice) to kill a session. Add POST /api/terminal/stop-all that kills all live sessions; used by the beforeunload beacon in slice-5 (navigator.sendBeacon body is small, fits the stop-all pattern cleanly). started_at is set at spawn time (time.Now()). UUID generation uses crypto/rand — no new dependency.
 </div></div>
-  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">The floating-window frontend needs a stable, reload-safe identifier per pane that is not a PID (which can be reused by the OS after a process exits). The inventory endpoint lets the dashboard reconstruct its pane list on reload by fetching live sessions and rendering iframes pointing at the live ttyd ports.
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">The floating-window frontend needs a stable, reload-safe identifier per pane that is not a PID (which can be reused by the OS after a process exits). The inventory endpoint lets the dashboard reconstruct its pane list on reload by fetching live sessions and rendering iframes pointing at the live ttyd ports. The state field enables the async spawn model recommended in q-spawn-sync-model.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/terminal/terminal.go, cmd/htmlgraph/terminal_handlers.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">GET /api/terminal/sessions returns all running sessions with correct fields</li><li data-markdown="">POST /api/terminal/stop {&#34;id&#34;:&#34;&lt;uuid&gt;&#34;} kills the correct process</li><li data-markdown="">POST /api/terminal/stop {&#34;pid&#34;:12345} still works for back-compat</li><li data-markdown="">Session IDs survive across multiple start calls without collision (UUID uniqueness)</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">GET /api/terminal/sessions returns all running sessions with correct fields including state (pending/live/exited)</li><li data-markdown="">POST /api/terminal/stop {&#34;id&#34;:&#34;&lt;uuid&gt;&#34;} kills the correct process</li><li data-markdown="">POST /api/terminal/stop {&#34;pid&#34;:12345} still works for back-compat</li><li data-markdown="">POST /api/terminal/stop-all kills all live sessions and is usable as a navigator.sendBeacon target</li><li data-markdown="">Session IDs survive across multiple start calls without collision (UUID uniqueness)</li><li data-markdown="">State transitions: pending on spawn, live when port binds, exited when reaper removes entry</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestGenerateSessionID produces valid UUID v4 strings
-Unit: TestSessionInventoryList returns correct count and fields for N concurrent sessions
+Unit: TestSessionInventoryList returns correct count and fields including state for N concurrent sessions
+Unit: TestSessionStateTransitions verifies pending -&gt; live -&gt; exited state machine
 Integration: TestStopByID starts a session, stops it by UUID, verifies process is gone
 Integration: TestStopByPID back-compat — start session, stop by pid, verify gone
+Integration: TestStopAll starts 3 sessions, calls stop-all, verifies all 3 processes gone
 Regression: Existing stop-by-pid callers continue to function after UUID migration
 </div></div>
   <div class="slice-deps">Dependencies: slices 1</div>
@@ -426,15 +435,33 @@ Regression: Existing stop-by-pid callers continue to function after UUID migrati
     <span class="badge badge-pending" data-badge-for="slice-3">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Create a new package internal/worktree with worktree.go exposing EnsureForFeature(featureID, repoRoot string) (path string, err error) and EnsureForTrack(trackID, repoRoot string) (path string, err error). Move the three inline functions createFeatureWorktree, createTrackWorktree, createAgentWorktree from cmd/htmlgraph/yolo.go into this package. yolo.go becomes a thin caller. excludeHtmlgraphFromWorktree and reindexWorktree lifecycle calls are delegated from the new package. The terminal handler uses EnsureForFeature/EnsureForTrack when the request includes cwd_kind=feature-worktree or cwd_kind=track-worktree.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Create a new package internal/worktree with worktree.go exposing:
+- EnsureForFeature(featureID, repoRoot string, w io.Writer) (path string, err error)
+- EnsureForTrack(trackID, repoRoot string, w io.Writer) (path string, err error)
+- EnsureForAgent(trackID, taskName, repoRoot string, w io.Writer) (path string, err error) — mirrors createAgentWorktree(yolo.go:243) which takes three args (trackID, taskName, projectRoot)
+
+The io.Writer parameter controls progress output: callers pass os.Stdout (yolo CLI path) or io.Discard (library/terminal path) to avoid library noise in server logs.
+
+Move createFeatureWorktree, createTrackWorktree, and createAgentWorktree from cmd/htmlgraph/yolo.go into this package. yolo.go becomes a thin caller.
+
+EnsureForFeature MUST call resolveTrackForFeature internally: if the feature has a parent track, return the track worktree path instead of a feature-specific worktree. This mirrors the parent-track resolution currently in launchYoloDefault (yolo.go:390–408). Without this, features-with-parent-tracks silently get their own feature worktree instead of the expected track worktree, breaking yolo behavior.
+
+excludeHtmlgraphFromWorktree and reindexWorktree lifecycle calls are delegated from the new package. Note: reindexWorktree forks the binary (runs `htmlgraph reindex`) — this is acceptable for a utility that calls itself, but tests must stub or skip the reindex step to avoid subprocess dependency.
+
+The terminal handler uses EnsureForFeature/EnsureForTrack when the request includes cwd_kind=feature-worktree or cwd_kind=track-worktree.
+
+Note on package boundary: see q-worktree-package-boundary for whether internal/worktree vs a cmd/htmlgraph sibling file is the right choice.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Worktree creation logic is duplicated across yolo and, once the cockpit lands, would need to be duplicated again in terminal_handlers.go. Extracting an internal/worktree primitive gives all three callers (yolo, codex/gemini launchers in slice-7, and the cockpit handler) a single tested path with correct HTMLGRAPH_PROJECT_DIR injection and excludeHtmlgraphFromWorktree behavior.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/worktree/worktree.go (new), cmd/htmlgraph/yolo.go, cmd/htmlgraph/terminal_handlers.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">internal/worktree package compiles and exports EnsureForFeature and EnsureForTrack</li><li data-markdown="">cmd/htmlgraph/yolo.go no longer contains inline createFeatureWorktree/createTrackWorktree logic</li><li data-markdown="">POST /api/terminal/start with {&#34;cwd_kind&#34;:&#34;feature-worktree&#34;,&#34;work_item&#34;:&#34;feat-abc&#34;} creates or reuses the worktree at .claude/worktrees/feat-abc</li><li data-markdown="">HTMLGRAPH_PROJECT_DIR env var is set correctly in the spawned TTY to the canonical repo root</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">internal/worktree package compiles and exports EnsureForFeature, EnsureForTrack, and EnsureForAgent</li><li data-markdown="">EnsureForFeature returns track worktree path (not feature worktree) when the feature has a parent track</li><li data-markdown="">cmd/htmlgraph/yolo.go no longer contains inline createFeatureWorktree/createTrackWorktree/createAgentWorktree logic</li><li data-markdown="">POST /api/terminal/start with {&#34;cwd_kind&#34;:&#34;feature-worktree&#34;,&#34;work_item&#34;:&#34;feat-abc&#34;} creates or reuses the worktree at .claude/worktrees/feat-abc</li><li data-markdown="">HTMLGRAPH_PROJECT_DIR env var is set correctly in the spawned TTY to the canonical repo root</li><li data-markdown="">Progress output goes to io.Discard in library path; yolo caller passes os.Stdout</li><li data-markdown="">Tests skip or stub the reindexWorktree subprocess step</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestEnsureForFeature creates worktree on first call and returns existing path on second call
+Unit: TestEnsureForFeatureWithParentTrack verifies parent-track resolution returns track worktree path
 Unit: TestEnsureForTrack same idempotency guarantee
+Unit: TestEnsureForAgent mirrors createAgentWorktree three-arg signature
+Unit: TestProgressWriterDiscard verifies no stdout pollution in library path
 Integration: TestWorktreeEnvInjection spawns a session with cwd_kind=feature-worktree and asserts HTMLGRAPH_PROJECT_DIR points at the main repo
 Regression: htmlgraph yolo --feature &lt;id&gt; still creates worktrees via the new package with identical behavior
 </div></div>
@@ -480,16 +507,25 @@ Regression: Existing bare-click path is fully replaced; no orphaned event listen
   </div>
   
   <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Extend the single-overlay pattern to support N simultaneous floating pane windows. Each pane is an independent div.terminal-pane containing a titlebar (agent label, work item, close button) and an iframe pointing at the live ttyd port. Panes are draggable via the titlebar (mouse events, no library). On dashboard load, call GET /api/terminal/sessions and re-render a pane for each live session (iframe src = http://127.0.0.1:&lt;port&gt;). Closing a pane calls POST /api/terminal/stop and removes the element. A global pane registry (Map keyed by session UUID) tracks open panes and prevents duplicate iframes for the same session. Tile/split layout is explicitly deferred to a future slice — floating windows only for v1.
+
+Lifecycle additions:
+- beforeunload event fires navigator.sendBeacon to POST /api/terminal/stop-all (defined in slice-2) — cleaner than iterating individual PIDs and stays within beacon body limits.
+- Pane count cap: the launcher disables the Create button when ≥6 panes are live; warning text explains the cap.
+- Pane position persistence is NOT implemented; reload cascades new panes from top-left (scope discipline — kick persistence to a future slice if needed).
+- When a ttyd process exits (user Ctrl-C inside the pane), the pane shows an &#34;Ended&#34; state within 5s. Mechanism governed by q-liveness-signal (poll /api/terminal/sessions every N seconds vs SSE).
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">This is the visible cockpit: without multi-pane the whole plan is still a single-session wrapper. Floating windows are chosen over tiling because they require no split-pane JS library and each pane&#39;s position is independently user-controlled. The reload-from-inventory behavior makes the cockpit resilient to browser events without requiring server state to track frontend layout.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/dashboard/index.html, cmd/htmlgraph/dashboard/js/app.js, cmd/htmlgraph/dashboard/css/components.css</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Opening two sessions from the launcher modal renders two independent floating pane windows simultaneously</li><li data-markdown="">Each pane&#39;s iframe displays its own live ttyd session</li><li data-markdown="">Panes are draggable by their titlebars without colliding with each other</li><li data-markdown="">On dashboard reload, GET /api/terminal/sessions re-renders all live panes</li><li data-markdown="">Closing one pane via its close button does not affect other panes</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Opening two sessions from the launcher modal renders two independent floating pane windows simultaneously</li><li data-markdown="">Each pane&#39;s iframe displays its own live ttyd session</li><li data-markdown="">Panes are draggable by their titlebars without colliding with each other</li><li data-markdown="">On dashboard reload, GET /api/terminal/sessions re-renders all live panes</li><li data-markdown="">Closing one pane via its close button does not affect other panes</li><li data-markdown="">Launcher Create button is disabled when ≥6 panes are live with explanatory warning text</li><li data-markdown="">beforeunload fires navigator.sendBeacon to POST /api/terminal/stop-all</li><li data-markdown="">Pane positions are NOT persisted across reloads; new panes cascade from top-left</li><li data-markdown="">When a ttyd process exits for any reason, the dashboard pane shows an &#34;Ended&#34; state within 5s</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestPaneRegistry add/remove/get operations on the UUID-keyed Map
 Unit: TestBuildPaneElement verifies correct iframe src and titlebar text from session data
+Unit: TestPaneCountCap verifies Create button disabled state at ≥6 panes
 Integration: TestMultiPaneRender spawns two sessions and asserts two pane divs exist in the DOM
 Integration: TestReloadRestore mocks GET /api/terminal/sessions and verifies panes are reconstructed
+Integration: TestBeforeUnloadBeacon verifies navigator.sendBeacon target is /api/terminal/stop-all
+Integration: TestExitedPaneState polls GET /api/terminal/sessions and verifies pane transitions to Ended within 5s of ttyd exit
 Regression: Single-pane flow from pre-cockpit MVP still works end-to-end via the new multi-pane path
 </div></div>
   <div class="slice-deps">Dependencies: slices 1,2,4</div>
@@ -501,24 +537,28 @@ Regression: Single-pane flow from pre-cockpit MVP still works end-to-end via the
 <div class="slice-card" data-slice="6" data-slice-name="slice-6" data-status="pending">
   <div class="slice-header">
     <span class="slice-num">#6</span>
-    <span class="slice-name">Parallel-launch hardening</span>
+    <span class="slice-name">Parallel-launch integration test &#43; stress harness</span>
     <span class="badge badge-revision">M</span>
-    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-revision">Med</span>
     <span class="badge badge-pending" data-badge-for="slice-6">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Audit and mitigate the two known races that multi-pane spawning amplifies. For bug-6ab963d3 (ensureServeForOtel lockfile race): add a sync.Mutex in internal/terminal or terminal_handlers.go that serializes concurrent ensureServeForOtel probes so only one goroutine attempts the serve start at a time. For bug-d2d3fb3f (feature start writer contention): add an optional --no-start-feature flag path so the cockpit can spawn a session with a work_item set in the env without racing on the .active-session file. Document mitigations as workarounds with TODO(bug-6ab963d3) and TODO(bug-d2d3fb3f) comments. Shape is conditional on q-prereq-strategy answer.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add an integration test that POSTs 4 concurrent /api/terminal/start requests and verifies the cockpit handles them correctly. This slice tests — not replaces — the existing parallel-launch protection that lives in checkServeLock / writeServeLock in claude_serve_autostart.go:173–215. Those functions already serialise concurrent ensureServeForOtel probes via a PID-file liveness check; the cockpit MUST NOT add a duplicate mutex at the terminal-handler layer (see design.constraints).
+
+Test harness components:
+1. Go integration test (TestParallelLaunch4) that POSTs 4 concurrent requests, asserts all 4 return live ports within 5s, checks debug.log shows zero SQLITE_BUSY entries during the launch window, verifies each ttyd process is reaped cleanly on stop.
+2. Each of the 4 sessions must show a distinct session_id in the sessions table after running one hook event.
+3. Smoke shell script (scripts/stress-launch.sh) that drives the same scenario against a running htmlgraph serve and prints a pass/fail summary — useful for manual regression.
 </div></div>
-  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">The cockpit spawns N sessions in rapid succession, each of which independently calls ensureServeForOtel and (if a work item is set) htmlgraph feature start. Without serialization, the first two sessions will race on the serve lockfile and on the .active-session writer, causing dropped OTel spans and stalled session starts — observable failures in daily dogfooding. Mitigations here let the cockpit ship and be usable before the root-cause bugs are closed.
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">The cockpit amplifies the parallel-launch surface area (4&#43; sessions spawned in rapid succession). The bugs that caused SQLITE_BUSY and feature-start writer contention are resolved, but without a regression test the fix could silently regress. This slice locks in the correct behavior and provides a stress harness for future cockpit development.
 </div></div>
-  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/terminal/terminal.go, cmd/htmlgraph/terminal_handlers.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Spawning 4 sessions in rapid succession from the launcher modal does not produce SQLITE_BUSY errors in debug.log</li><li data-markdown="">All 4 sessions reach a live ttyd port within 5 seconds</li><li data-markdown="">TODO(bug-6ab963d3) and TODO(bug-d2d3fb3f) comments are present at each mitigation site</li><li data-markdown="">Mitigation behavior is conditional on q-prereq-strategy answer (block or ship-alongside)</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/terminal/terminal_test.go, scripts/stress-launch.sh (new)</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">4 concurrent POST /api/terminal/start requests each return a distinct live port within 5s</li><li data-markdown="">debug.log contains zero SQLITE_BUSY entries during the 4-session launch window</li><li data-markdown="">All 4 sessions show distinct session_id values in the sessions table after each runs one hook event</li><li data-markdown="">All 4 ttyd processes are reaped cleanly when POST /api/terminal/stop-all is called</li><li data-markdown="">scripts/stress-launch.sh exits 0 on a healthy server</li></ul></div>
   
-  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestSerializeLaunchMutex verifies concurrent Start calls queue rather than collide
-Integration: TestParallelSpawn4 spawns 4 sessions concurrently and asserts all 4 ports become live
-Regression: Single sequential session spawn still works with the new mutex in place
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Integration: TestParallelLaunch4 — 4 concurrent POSTs, assert ports live within 5s, assert no SQLITE_BUSY in debug.log, assert distinct session_ids, assert reaper cleans up on stop-all
+Shell: scripts/stress-launch.sh — smoke-test against a running server, prints pass/fail per criterion
 </div></div>
-  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="slice-deps">Dependencies: slices 1,2</div>
   <div class="approval-row">
     <label><input type="checkbox" data-section="slice-6" data-action="approve"> Approve slice</label>
     <textarea data-section="slice-6" data-comment-for="slice-6" placeholder="Comments on slice 6..."></textarea>
@@ -533,19 +573,26 @@ Regression: Single sequential session spawn still works with the new mutex in pl
     <span class="badge badge-pending" data-badge-for="slice-7">Pending</span>
   </div>
   
-  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add --track, --feature, and --worktree flags to htmlgraph codex and htmlgraph gemini analogous to the existing flags on htmlgraph yolo. Each flag sets HTMLGRAPH_PROJECT_DIR to the canonical repo root and sets cmd.Dir to the appropriate worktree path using internal/worktree from slice-3. When no worktree flag is given, behavior is unchanged. Also add --work-item flag to both launchers so the cockpit can inject attribution env vars for Codex and Gemini sessions matching what Claude already gets. Update the cockpit&#39;s shell command builder (slice-1) to emit these flags for codex/gemini when cwd_kind=worktree.
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add --track, --feature, and --worktree flags to htmlgraph codex and htmlgraph gemini analogous to the existing flags on htmlgraph yolo. Each flag sets HTMLGRAPH_PROJECT_DIR to the canonical repo root and sets cmd.Dir to the appropriate worktree path using internal/worktree from slice-3. When no worktree flag is given, behavior is unchanged. Also add --work-item flag to both launchers so the cockpit can inject attribution env vars for Codex and Gemini sessions matching what Claude already gets.
+
+Implementation notes:
+- Add WorktreeRoot and HtmlgraphRoot fields to codex and gemini launch-opts structs; when set, swap c.Dir to the worktree path and inject HTMLGRAPH_PROJECT_DIR=&lt;canonical root&gt; via setOrReplaceEnv (same pattern as buildClaudeLaunchEnv in cmd/htmlgraph/claude_env.go).
+- Gemini&#39;s HTMLGRAPH_AGENT=gemini env var injection (gemini.go:240–243) requires the cockpit shell command builder to emit `htmlgraph gemini` (not raw `gemini`) so the injection flows correctly.
+- Update buildShellCmd (slice-1) to emit these flags for codex/gemini when cwd_kind=worktree and work_item is set, including the `htmlgraph feature start &lt;id&gt;` attribution prefix for all three agents.
+- Add --track, --feature, --work-item CLI flags to both codex.go and gemini.go. Verify effort by reading both files before implementation.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Today only the Claude/yolo launchers support worktrees and work-item attribution. Without this slice, a Codex or Gemini pane launched from the cockpit runs in the main repo with no attribution — a second-class experience that defeats the observability goal. Parity means every agent can participate in the lineage graph on equal footing.
 </div></div>
   <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/codex.go, cmd/htmlgraph/gemini.go, cmd/htmlgraph/terminal_handlers.go, internal/worktree/worktree.go</code></div></div>
-  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">htmlgraph codex --feature feat-abc spawns in .claude/worktrees/feat-abc with HTMLGRAPH_PROJECT_DIR set</li><li data-markdown="">htmlgraph gemini --track trk-xyz spawns in the track worktree with HTMLGRAPH_PROJECT_DIR set</li><li data-markdown="">Cockpit POST /api/terminal/start with agent=codex &#43; cwd_kind=feature-worktree emits correct codex command</li><li data-markdown="">Help output for codex and gemini lists the new flags</li></ul></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">htmlgraph codex --feature feat-abc spawns in .claude/worktrees/feat-abc with HTMLGRAPH_PROJECT_DIR set</li><li data-markdown="">htmlgraph gemini --track trk-xyz spawns in the track worktree with HTMLGRAPH_PROJECT_DIR set</li><li data-markdown="">Cockpit POST /api/terminal/start with agent=codex &#43; cwd_kind=feature-worktree emits correct htmlgraph codex command (not raw codex)</li><li data-markdown="">Cockpit POST /api/terminal/start with agent=gemini emits htmlgraph gemini so HTMLGRAPH_AGENT env injection flows</li><li data-markdown="">buildShellCmd prepends htmlgraph feature start &lt;id&gt; for codex and gemini when work_item is set</li><li data-markdown="">Help output for codex and gemini lists the new flags</li></ul></div>
   
   <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestCodexWorktreeFlag verifies --feature flag sets correct cmd.Dir and env
 Unit: TestGeminiWorktreeFlag same for gemini
+Unit: TestBuildShellCmdGeminiEnvInjection verifies shell builder emits htmlgraph gemini not raw gemini
 Integration: TestCockpitCodexWorktree posts agent=codex &#43; cwd_kind=feature-worktree and asserts spawned process is in the worktree path
 Regression: htmlgraph codex and htmlgraph gemini invocations without new flags retain existing behavior exactly
 </div></div>
-  <div class="slice-deps">Dependencies: slices 3</div>
+  <div class="slice-deps">Dependencies: slices 1,3</div>
   <div class="approval-row">
     <label><input type="checkbox" data-section="slice-7" data-action="approve"> Approve slice</label>
     <textarea data-section="slice-7" data-comment-for="slice-7" placeholder="Comments on slice 7..."></textarea>
@@ -626,6 +673,56 @@ Regression: htmlgraph codex and htmlgraph gemini invocations without new flags r
       <textarea data-section="questions" data-question-rationale="q-pane-persistence" placeholder="Rationale for q-pane-persistence..."></textarea>
     </div>
     
+    <div class="question-block" id="q-worktree-package-boundary">
+      <p>Should worktree creation logic live in internal/worktree package or as a cmd/htmlgraph sibling file?</p>
+      
+      
+      <label><input type="radio" name="q-worktree-package-boundary" data-question="q-worktree-package-boundary" value="internal/worktree package — accessible to any future internal consumer, adds import path, correct if cross-package use arrives"> internal/worktree package — accessible to any future internal consumer, adds import path, correct if cross-package use arrives</label>
+      
+      <label class="recommended"><input type="radio" name="q-worktree-package-boundary" data-question="q-worktree-package-boundary" value="cmd/htmlgraph/worktree_helpers.go — sibling file, no new package overhead, promote when a non-cmd caller appears (YAGNI)"> cmd/htmlgraph/worktree_helpers.go — sibling file, no new package overhead, promote when a non-cmd caller appears (YAGNI) <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-worktree-package-boundary" data-question="q-worktree-package-boundary" value="Stay inline in yolo.go — no extraction, duplicate in terminal_handlers.go when needed, maximum duplication"> Stay inline in yolo.go — no extraction, duplicate in terminal_handlers.go when needed, maximum duplication</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-worktree-package-boundary" placeholder="Rationale for q-worktree-package-boundary..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-spawn-sync-model">
+      <p>Should the Start handler block until ttyd binds its port, or return immediately with state=pending?</p>
+      
+      
+      <label><input type="radio" name="q-spawn-sync-model" data-question="q-spawn-sync-model" value="Block until bound — waitForPort stays in handler, simple response contract, degrades under concurrent launches"> Block until bound — waitForPort stays in handler, simple response contract, degrades under concurrent launches</label>
+      
+      <label class="recommended"><input type="radio" name="q-spawn-sync-model" data-question="q-spawn-sync-model" value="Return pending — handler returns {id, state:&#34;pending&#34;} immediately, frontend polls /sessions for state=live, better concurrency"> Return pending — handler returns {id, state:&#34;pending&#34;} immediately, frontend polls /sessions for state=live, better concurrency <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-spawn-sync-model" data-question="q-spawn-sync-model" value="SSE event — handler returns immediately, pushes state-change via SSE endpoint when port binds, lowest frontend polling overhead"> SSE event — handler returns immediately, pushes state-change via SSE endpoint when port binds, lowest frontend polling overhead</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-spawn-sync-model" placeholder="Rationale for q-spawn-sync-model..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-yolo-mode-shape">
+      <p>Should agent=yolo in the cockpit invoke the htmlgraph yolo wrapper or build the equivalent command directly?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-yolo-mode-shape" data-question="q-yolo-mode-shape" value="Same as claude — buildShellCmd emits claude &#43; --permission-mode bypassPermissions &#43; yolo system-prompt, skips wrapper, no nested processes"> Same as claude — buildShellCmd emits claude &#43; --permission-mode bypassPermissions &#43; yolo system-prompt, skips wrapper, no nested processes <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-yolo-mode-shape" data-question="q-yolo-mode-shape" value="Use htmlgraph yolo wrapper — nested process chain, all existing yolo side effects preserved, wrapper changes automatically included"> Use htmlgraph yolo wrapper — nested process chain, all existing yolo side effects preserved, wrapper changes automatically included</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-yolo-mode-shape" placeholder="Rationale for q-yolo-mode-shape..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-liveness-signal">
+      <p>How should the frontend learn that a ttyd pane has exited unexpectedly?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-liveness-signal" data-question="q-liveness-signal" value="Poll inventory — frontend polls GET /api/terminal/sessions every 3–5s, marks panes Ended when session_id disappears, simplest implementation"> Poll inventory — frontend polls GET /api/terminal/sessions every 3–5s, marks panes Ended when session_id disappears, simplest implementation <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-liveness-signal" data-question="q-liveness-signal" value="SSE stream — server pushes state-change events to frontend, lower polling overhead, requires SSE endpoint &#43; EventSource client"> SSE stream — server pushes state-change events to frontend, lower polling overhead, requires SSE endpoint &#43; EventSource client</label>
+      
+      <label><input type="radio" name="q-liveness-signal" data-question="q-liveness-signal" value="WebSocket push — full duplex, lowest latency, highest infrastructure cost, overkill for pane-exit notification"> WebSocket push — full duplex, lowest latency, highest infrastructure cost, overkill for pane-exit notification</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-liveness-signal" placeholder="Rationale for q-liveness-signal..."></textarea>
+    </div>
+    
     <table class="q-table">
       <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
       <tbody id="questionsRecap">
@@ -660,11 +757,233 @@ Regression: htmlgraph codex and htmlgraph gemini invocations without new flags r
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
         
+        <tr data-recap-for="q-worktree-package-boundary">
+          <td>Should worktree creation logic live in internal/worktree package or as a cmd/htmlgraph sibling file?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-spawn-sync-model">
+          <td>Should the Start handler block until ttyd binds its port, or return immediately with state=pending?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-yolo-mode-shape">
+          <td>Should agent=yolo in the cockpit invoke the htmlgraph yolo wrapper or build the equivalent command directly?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-liveness-signal">
+          <td>How should the frontend learn that a ttyd pane has exited unexpectedly?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
       </tbody>
     </table>
   </div>
 </details>
 
+
+
+<details id="critique" class="section-card" data-phase="critique" data-status="pending">
+  <summary><span>Critique</span><span class="badge badge-pending" data-badge-for="critique">Review</span></summary>
+  <div class="section-body">
+
+    
+    <div class="sub-section">
+      <h4>Assumption Verification</h4>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-pending">plausible</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">terminal_handlers.go has no per-request CWD override — all sessions run in server-start projectDir.</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">PLAUSIBLE: terminal_handlers.go:16-20 closes over projectDir at mux-build time via handleTerminalStart(projectDir string) in serve.go:113. The plan correctly states there is no per-request override today; slice-1 adds one. The assumption accurately describes current state.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">UUID generation via crypto/rand adds no new dependency.</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">crypto/rand is stdlib. go.mod shows no uuid library already imported. Verified by reading go.mod.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">ttyd processes outlive the browser tab when no stop signal is sent.</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">The reaper goroutine in internal/terminal/terminal.go:108–113 only removes entries on process exit, not on browser disconnect. Confirmed by reading the reaper implementation.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-approved">verified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">internal/childproc Supervisor pattern is a usable model for terminal Manager.</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">internal/childproc/childproc.go exports a Supervisor with per-session sync.Once and idle reaper — the terminal Manager should mirror this pattern.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">bug-6ab963d3 (OTel SQLITE_BUSY &#43; parallel launch races) is an open prerequisite.</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">FALSIFIED: bug-6ab963d3 has data-status=done. The mitigation is already in place via checkServeLock/writeServeLock in claude_serve_autostart.go:173–215. Slice-6 was revised: mutex proposal dropped, rewritten as integration-test harness that tests the existing guard.</p>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:var(--radius)">
+        <span class="badge badge-blocked">falsified</span>
+        <div>
+          <p style="margin:0;font-size:.9rem">bug-d2d3fb3f (parallel subagents stall on htmlgraph feature start) is an open prerequisite.</p>
+          <p style="margin:4px 0 0;font-size:.8rem;color:var(--text-muted)">FALSIFIED: bug-d2d3fb3f has data-status=done. The --no-start-feature flag proposal and the writer-contention mutex in slice-6 were built on a resolved premise. Both dropped in revision.</p>
+        </div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      
+      <div>
+        <h4>Haiku (design review)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>Slice Assessment</h5>
+<ul>
+  <li><span class="badge badge-warn">S5</span> Effort L is plausible but the scope spans drag, reload, focus, close, liveness-signal, and beforeunload beacon — worth a split if it balloons beyond 2 days of work.</li>
+  <li><span class="badge badge-warn">S3</span> Extracting to internal/worktree adds a new package for what are currently cmd-only callers — see q-worktree-package-boundary. If no non-cmd caller materialises, prefer cmd/htmlgraph/worktree_helpers.go (YAGNI).</li>
+  <li><span class="badge badge-info">S6</span> Rewritten as an integration-test/stress slice. Risk is now test robustness (subprocess isolation, debug.log parsing) not mitigation design.</li>
+</ul>
+<h5>Gaps &amp; Missing Considerations</h5>
+<ul>
+  <li><span class="badge badge-warn">Gap</span> No error UX defined when ttyd binary is missing from PATH or a worktree creation fails mid-spawn. Frontend receives a 500; plan should specify whether the modal shows an inline error or a toast.</li>
+  <li><span class="badge badge-warn">Gap</span> Work-item search in the launcher modal (slice-4) calls GET /api/features?q= but this endpoint may not exist yet. Dependency on a features search API should be noted explicitly.</li>
+  <li><span class="badge badge-info">Gap</span> No mention of dashboard tab title or favicon changes to reflect N active sessions — low priority but worth a future slice note.</li>
+</ul>
+<h5>Alternative Approaches</h5>
+<ul>
+  <li><span class="badge badge-info">Alt</span> Tmux-server-multiplex approach (one tmux server, N windows) considered and rejected for v1: avoids per-session ttyd port allocation but couples the backend to tmux being installed and removes the iframe-per-session model.</li>
+  <li><span class="badge badge-info">Alt</span> Single shared ttyd with multiplexed sessions considered and rejected: ttyd does not natively multiplex; would require tmux or screen as the inner shell, adding complexity.</li>
+</ul>
+</div>
+      </div>
+      
+      
+      <div>
+        <h4>Sonnet (feasibility)</h4>
+        <div style="font-size:.85rem;color:var(--text-dim)"><h5>What Exists to Leverage</h5>
+<ul>
+  <li><span class="badge badge-success">Prior</span> internal/childproc/childproc.go Supervisor pattern — terminal Manager should mirror it for per-session sync.Once + idle reaper.</li>
+  <li><span class="badge badge-success">Prior</span> checkServeLock/writeServeLock in claude_serve_autostart.go:173–215 already handles the parallel-launch race that slice-6 initially proposed mitigating. This is the existing guard being tested by the revised slice-6.</li>
+  <li><span class="badge badge-success">Prior</span> cmd/htmlgraph/claude_env.go:buildClaudeLaunchEnv with setOrReplaceEnv is the canonical model for env composition in cockpit spawn — slice-7 should follow this pattern exactly.</li>
+  <li><span class="badge badge-success">Prior</span> gemini.go:240–243 already injects HTMLGRAPH_AGENT=gemini via env — cockpit shell builder must emit htmlgraph gemini (not raw gemini) to preserve this injection.</li>
+</ul>
+<h5>What the Plan Got Wrong</h5>
+<ul>
+  <li><span class="badge badge-danger">S6</span> Slice-6 mitigations were built on a FALSIFIED premise — both bug-6ab963d3 and bug-d2d3fb3f are data-status=done. The mutex and --no-start-feature flag proposals would have shipped dead code that could conflict with checkServeLock. Rewritten as integration-test slice.</li>
+  <li><span class="badge badge-warn">S3</span> Slice-3 API silently dropped createAgentWorktree (three-arg signature in yolo.go:243) and the parent-track resolution logic in launchYoloDefault (yolo.go:390–408). Both addressed in revision: EnsureForAgent added, EnsureForFeature must call resolveTrackForFeature internally.</li>
+  <li><span class="badge badge-warn">S3</span> fmt.Printf in createFeatureWorktree/createTrackWorktree (yolo.go:164, 203) would become library noise in an internal package. Fixed in revision: io.Writer parameter added (default io.Discard in library path, os.Stdout in yolo caller).</li>
+  <li><span class="badge badge-info">S1</span> Original slice-1 used positional parameters — replaced with StartRequest struct for future-proof backward compatibility.</li>
+</ul>
+<h5>Prior Art &amp; Examples</h5>
+<ul>
+  <li><span class="badge badge-info">File</span> cmd/htmlgraph/claude_env.go:buildClaudeLaunchEnv — env composition with setOrReplaceEnv is the model for cockpit spawn env. Codex and Gemini should follow same pattern.</li>
+  <li><span class="badge badge-info">File</span> cmd/htmlgraph/claude_serve_autostart.go:173–215 — checkServeLock PID-file liveness check is the existing parallel-launch guard. Slice-6 tests this, does not replace it.</li>
+  <li><span class="badge badge-info">File</span> internal/childproc/childproc.go — Supervisor with per-item sync.Once and idle reaper is the reference architecture for terminal Manager design.</li>
+</ul>
+</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Synthesis</h4>
+      <div style="font-size:.85rem;color:var(--text-dim)">Critique surfaced two FALSIFIED assumptions that gutted the original slice-6 (both blocker bugs are resolved; proposed mutex would conflict with existing checkServeLock in claude_serve_autostart.go:173–215). Plan revised in six concrete ways: (1) slice-6 rewritten as a parallel-launch integration-test/stress-harness slice —
+    no mutex, no flag, cites the existing lockfile as what it is testing, deps on slices 1+2;
+(2) slice-3 expanded to include EnsureForAgent (mirrors createAgentWorktree three-arg
+    signature), parent-track resolution inside EnsureForFeature via resolveTrackForFeature,
+    and an io.Writer parameter for progress output (io.Discard in library path, os.Stdout
+    in yolo caller); q-worktree-package-boundary question captures internal-vs-sibling choice;
+(3) slice-1 introduces a StartRequest struct (future-proof field additions) and pure
+    buildShellCmd function; nested-process concern for agent=yolo captured as q-yolo-mode-shape;
+    attribution prefix (htmlgraph feature start &lt;id&gt;) added for all agent types when work_item is set;
+(4) slice-2 returns a state field (pending/live/exited) and adds POST /api/terminal/stop-all;
+    q-spawn-sync-model captures blocking-vs-async choice with recommended return-pending-let-frontend-poll;
+(5) slice-5 adds pane-count cap (≤6 disables Create button), uses stop-all beacon on beforeunload,
+    explicitly documents no position persistence, and adds a 5s Ended-state done_when;
+    q-liveness-signal captures poll-inventory vs sse-stream mechanism choice;
+(6) slice-7 now depends on slice-1 (not just slice-3) and explicitly requires htmlgraph gemini/codex
+    in shell builder so HTMLGRAPH_AGENT env injection flows correctly; buildShellCmd attribution
+    prefix extends to codex and gemini.
+Added 4 new questions (total now 9): q-worktree-package-boundary, q-spawn-sync-model, q-yolo-mode-shape, q-liveness-signal. Added 3 new constraints on checkServeLock non-duplication, single-project-mode scope, and reaper/frontend liveness split responsibility.
+</div>
+    </div>
+    
+
+    
+    <div class="sub-section">
+      <h4>Risk Assessment</h4>
+      <table class="q-table">
+        <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          
+          <tr>
+            <td>Resolved-bug premise in original slice-6 would have shipped a conflicting mutex alongside the existing checkServeLock guard</td>
+            <td><span class="badge badge-blocked">High</span></td>
+            <td>Slice-6 rewritten as integration-test slice; mutex proposal dropped; --no-start-feature flag dropped; checkServeLock cited as the existing guard being tested, not replaced.</td>
+          </tr>
+          
+          <tr>
+            <td>waitForPort blocks HTTP handler up to 3s per request — concurrent pane launches stall under load</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Added q-spawn-sync-model question; recommended return-pending-let-frontend-poll; slice-2 done_when updated to include state=pending/live/exited in /sessions response.</td>
+          </tr>
+          
+          <tr>
+            <td>Slice-3 extraction silently dropped parent-track resolution and createAgentWorktree three-arg signature</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Slice-3 what updated to include EnsureForAgent, internal call to resolveTrackForFeature in EnsureForFeature, and q-worktree-package-boundary question for packaging choice.</td>
+          </tr>
+          
+          <tr>
+            <td>Dead-iframe UX when ttyd exits unexpectedly (user Ctrl-C inside pane)</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Added q-liveness-signal question; slice-5 done_when now includes explicit 5s Ended-state requirement; backend reaper already removes entry, frontend just needs the polling/SSE mechanism.</td>
+          </tr>
+          
+          <tr>
+            <td>fmt.Printf in extracted worktree helpers becomes library noise in server logs</td>
+            <td><span class="badge badge-pending">Low</span></td>
+            <td>Slice-3 what updated to accept io.Writer (default io.Discard for library/terminal path, os.Stdout for yolo caller).</td>
+          </tr>
+          
+          <tr>
+            <td>agent=yolo spawning htmlgraph yolo inside ttyd produces nested process chain with duplicate side effects</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Added q-yolo-mode-shape question; recommended same-as-claude-with-flags to skip the wrapper and avoid nested side effects.</td>
+          </tr>
+          
+          <tr>
+            <td>Gemini HTMLGRAPH_AGENT env injection bypassed if cockpit shell builder emits raw gemini instead of htmlgraph gemini</td>
+            <td><span class="badge badge-revision">Medium</span></td>
+            <td>Slice-7 done_when explicitly requires shell builder to emit htmlgraph gemini; unit test TestBuildShellCmdGeminiEnvInjection added.</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+
+    
+
+  </div>
+</details>
 
 
 
