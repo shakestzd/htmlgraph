@@ -19,7 +19,18 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("creating db directory: %w", err)
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// Embed busy_timeout in the DSN so it is applied on the first connection
+	// open, before any schema queries. This prevents SQLITE_BUSY errors during
+	// startup races when the OTel receiver writer or a hook binary holds the
+	// write lock. ApplyPragmas below re-applies the full set for completeness
+	// (idempotent).
+	// Skip DSN-level pragma for in-memory DBs; the driver will reject it.
+	dsn := dbPath
+	isInMemory := strings.Contains(dbPath, ":memory:")
+	if !isInMemory {
+		dsn = dsn + "?_pragma=busy_timeout(5000)"
+	}
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

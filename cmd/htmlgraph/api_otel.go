@@ -705,7 +705,7 @@ func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 				COALESCE(f.title, '')
 			FROM otel_signals s
 			LEFT JOIN features f ON f.id = s.feature_id
-			WHERE s.session_id = ? AND s.kind = 'log' AND s.canonical = 'assistant_text'
+			WHERE s.session_id = ? AND s.kind = 'log' AND s.canonical IN ('assistant_text', 'user_prompt')
 			ORDER BY s.ts_micros ASC`, sessionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

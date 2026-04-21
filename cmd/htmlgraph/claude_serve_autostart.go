@@ -15,6 +15,12 @@ import (
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
 
+// serveLockPath returns the path of the per-project serve lock file.
+// The lock file stores the PID of a running `htmlgraph serve` process.
+func serveLockPath(projectDir string) string {
+	return filepath.Join(projectDir, ".htmlgraph", ".serve.lock")
+}
+
 // ensureServeForOtel checks whether the OTLP HTTP receiver is already
 // listening, and spawns a detached `htmlgraph serve` if not. Called from
 // launchClaude before exec'ing claude so that OTel signals from the
@@ -54,6 +60,17 @@ func ensureServeForOtel(projectDir string) {
 
 	if probePort(host, port, 200*time.Millisecond) {
 		return // something is already bound — leave it alone
+	}
+
+	// Check the lockfile before spawning. If a serve process is already
+	// running (lock file contains a live PID), skip the spawn to prevent
+	// a second htmlgraph serve from racing to bind port 8080.
+	if skipSpawn, stale := checkServeLock(projectDir); skipSpawn {
+		debugLog("ensureServeForOtel: skipping spawn, serve already running (lockfile)")
+		return
+	} else if stale {
+		// Stale lockfile (process gone) — remove it so future spawns work.
+		_ = os.Remove(serveLockPath(projectDir))
 	}
 
 	if err := spawnDetachedServe(projectDir); err != nil {
@@ -151,6 +168,58 @@ func MaybeShowOtelNotice(projectDir string) {
 	// Write marker so the notice doesn't repeat. Ignore errors — if the
 	// write fails, re-showing the notice next launch is acceptable.
 	_ = os.WriteFile(markerPath, []byte("shown\n"), 0o644)
+}
+
+// checkServeLock reads the per-project serve lock file and checks whether
+// the PID it contains refers to a live process.
+//
+// Returns (skipSpawn=true, stale=false) when the lock exists and is alive.
+// Returns (skipSpawn=false, stale=true) when the lock exists but the PID is dead.
+// Returns (skipSpawn=false, stale=false) when the lock does not exist.
+func checkServeLock(projectDir string) (skipSpawn, stale bool) {
+	data, err := os.ReadFile(serveLockPath(projectDir))
+	if err != nil {
+		return false, false // no lock file
+	}
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil || pid <= 0 {
+		return false, true // malformed — treat as stale
+	}
+	// kill -0 checks process existence without sending a signal.
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false, true // can't find process — stale
+	}
+	if err := proc.Signal(syscall.Signal(0)); err != nil {
+		return false, true // process not alive — stale
+	}
+	return true, false // process alive — skip spawn
+}
+
+// writeServeLock writes the current process PID to the per-project serve
+// lock file. Called by `htmlgraph serve` on startup so concurrent launchers
+// can detect a live serve process and skip spawning a duplicate.
+// The write is best-effort — errors are silently ignored because a missing
+// lock file causes a harmless duplicate-spawn attempt (which then fails to
+// bind and exits cleanly).
+func writeServeLock(projectDir string) {
+	lockPath := serveLockPath(projectDir)
+	_ = os.WriteFile(lockPath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
+}
+
+// removeServeLock removes the per-project serve lock file on graceful
+// shutdown so subsequent launcher invocations don't see a stale lock.
+func removeServeLock(projectDir string) {
+	_ = os.Remove(serveLockPath(projectDir))
+}
+
+// debugLog writes a message to stderr only when HTMLGRAPH_DEBUG is set.
+// Used for low-level operational tracing that should not appear in normal output.
+func debugLog(msg string) {
+	if os.Getenv("HTMLGRAPH_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "htmlgraph [debug]: %s\n", msg)
+	}
 }
 
 // spawnDetachedServe starts `htmlgraph serve` in a new process group so

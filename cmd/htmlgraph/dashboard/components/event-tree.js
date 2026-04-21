@@ -306,20 +306,63 @@ class HgEventTree extends HTMLElement {
   }
 
   // _assistantTextsForTurn returns the assistant_text logs (from
-  // /api/otel/logs) that belong to this turn. Matches by parent_span
-  // pointing to the turn's user-prompt span_id.
+  // /api/otel/logs) that belong to this turn. Uses two-hop matching:
+  // turn (hook event_id) → user_prompt log (span_id) → assistant_text (parent_span).
+  // Falls back to timestamp-window matching if user_prompt log is unavailable.
   _assistantTextsForTurn(turn) {
     var uq = turn.user_query;
     if (!uq || !uq.session_id) return [];
     var logs = this.otelLogsBySession[uq.session_id];
     if (!logs || logs.length === 0) return [];
-    // Match logs where parent_span equals the user-query's span_id or UUID.
-    // The user_query comes from the hook payload, so its event_id (if present)
-    // is the span_id we're matching against.
-    var userSpanId = uq.event_id || '';
-    if (!userSpanId) return [];
+
+    // Find the user_prompt log closest to this turn's timestamp (in the
+    // same session). That log's span_id is the transcript-user-prompt-uuid,
+    // which assistant_text.parent_span points at.
+    var turnTs = uq.timestamp ? Date.parse(uq.timestamp) * 1000 : 0;
+    if (!turnTs) {
+      // Fallback: no timestamp available, cannot match
+      return [];
+    }
+
+    var bestUP = null;
+    var bestDelta = Infinity;
+    var SLOP_MICROS = 60 * 1000 * 1000; // 60 seconds either side
+    for (var i = 0; i < logs.length; i++) {
+      var lg = logs[i];
+      if (lg.canonical !== 'user_prompt') continue;
+      var delta = Math.abs((lg.ts_micros || 0) - turnTs);
+      if (delta < bestDelta && delta <= SLOP_MICROS) {
+        bestDelta = delta;
+        bestUP = lg;
+      }
+    }
+
+    // Primary path: match by the user_prompt log's span_id.
+    if (bestUP && bestUP.span_id) {
+      var promptSpanId = bestUP.span_id;
+      var primary = logs.filter(function(log) {
+        return log.canonical === 'assistant_text' && log.parent_span === promptSpanId;
+      });
+      if (primary.length > 0) return primary;
+      // fall through to timestamp-window fallback
+    }
+
+    // Fallback: timestamp-window match. For turns where no user_prompt
+    // log exists yet (pre-backfill / pre-live-capture), attach any
+    // assistant_text that falls in [turnTs, nextTurnTs) by session.
+    // Compute nextTurnTs from the adjacent turn in this.turns.
+    var nextTs = Infinity;
+    for (var j = 0; j < this.turns.length; j++) {
+      var other = this.turns[j].user_query;
+      if (!other || other.session_id !== uq.session_id) continue;
+      if (!other.timestamp) continue;
+      var otherTs = Date.parse(other.timestamp) * 1000;
+      if (otherTs > turnTs && otherTs < nextTs) nextTs = otherTs;
+    }
     return logs.filter(function(log) {
-      return log.parent_span === userSpanId;
+      if (log.canonical !== 'assistant_text') return false;
+      var ts = log.ts_micros || 0;
+      return ts >= turnTs && ts < nextTs;
     });
   }
 

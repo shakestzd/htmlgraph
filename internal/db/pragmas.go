@@ -6,6 +6,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 )
 
 // Pragmas mirrors the Python PRAGMA_SETTINGS from pragmas.py.
@@ -20,11 +21,39 @@ var Pragmas = map[string]string{
 }
 
 // ApplyPragmas sets all performance PRAGMAs on a database connection.
+// Some PRAGMAs (busy_timeout, cache_size) are best-effort and may not apply
+// to all backing stores (e.g., in-memory SQLite); failures are logged at debug
+// level and don't block the Open. Other PRAGMAs are required.
 func ApplyPragmas(db *sql.DB) error {
-	for pragma, value := range Pragmas {
+	// PRAGMAs that are REQUIRED — fail Open if these don't apply.
+	required := []string{"journal_mode", "synchronous", "foreign_keys", "temp_store", "mmap_size"}
+	// PRAGMAs that are best-effort — failure is logged at debug level
+	// and doesn't block Open (some drivers/backing stores reject these).
+	optional := []string{"busy_timeout", "cache_size"}
+
+	for _, pragma := range required {
+		value, ok := Pragmas[pragma]
+		if !ok {
+			continue
+		}
 		_, err := db.Exec(fmt.Sprintf("PRAGMA %s = %s", pragma, value))
 		if err != nil {
 			return fmt.Errorf("applying PRAGMA %s: %w", pragma, err)
+		}
+	}
+
+	for _, pragma := range optional {
+		value, ok := Pragmas[pragma]
+		if !ok {
+			continue
+		}
+		_, err := db.Exec(fmt.Sprintf("PRAGMA %s = %s", pragma, value))
+		if err != nil {
+			// Best-effort: log at debug, continue. In-memory DBs in tests
+			// may reject busy_timeout / cache_size; that's fine because
+			// they aren't subject to the contention these PRAGMAs protect
+			// against.
+			log.Printf("debug: skipping PRAGMA %s (not supported on this backing): %v", pragma, err)
 		}
 	}
 	return nil

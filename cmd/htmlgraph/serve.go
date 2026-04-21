@@ -108,6 +108,11 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 	mux.Handle("/plans/", planFileHandler(htmlgraphDir))
 	mux.Handle("/api/plans/", planRouter(database, htmlgraphDir))
 
+	// Terminal sidecar routes — spawn/stop ttyd processes for the embedded
+	// interactive terminal. Must be registered before the catch-all "/" below.
+	mux.Handle("/api/terminal/start", handleTerminalStart(projectDir))
+	mux.Handle("/api/terminal/stop", handleTerminalStop())
+
 	// Serve embedded dashboard (index.html, css/, js/, components/)
 	mux.Handle("/", http.FileServer(http.FS(dashboardSub())))
 
