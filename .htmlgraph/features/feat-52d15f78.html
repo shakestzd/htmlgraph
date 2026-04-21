@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Embedded ttyd terminal in dashboard — MVP</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-52d15f78"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-21T09:01:59.212338"
+             data-updated="2026-04-21T09:09:15.817886" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Embedded ttyd terminal in dashboard — MVP</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="c89a0910-ba83-4833-9dee-5364fab28c1a.html" data-relationship="implemented_in" data-since="2026-04-21T09:04:41.821524">session c89a0910-ba83-4833-9dee-5364fab28c1a</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>MVP that lets users open an interactive Claude session from the dashboard, scoped to the current work item. Approach: Go server spawns ttyd on a localhost port running 'htmlgraph claude', returns the port, frontend iframes it. Minimal surface: POST /api/terminal/start (spawn ttyd, return port+pid), POST /api/terminal/stop (kill pid), a dashboard 'Terminal' button that opens a modal iframe. If the call includes a work item ID, run 'htmlgraph feature start ' in the same shell before 'htmlgraph claude' to scope the session.</p>
+        </section>
+    </article>
+</body>
+</html>

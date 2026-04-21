@@ -86,6 +86,8 @@ CODEX.md
 .htmlgraph/.error-spikes.json
 .htmlgraph/active-auto-spikes.json
 .htmlgraph/drift-queue.json
+.htmlgraph/.otlp-port
+.htmlgraph/.serve.lock
 
 # HtmlGraph obsolete/generated analytics artifacts from older builds
 .htmlgraph/cigs/
@@ -138,6 +140,7 @@ archive/
 packages/go-plugin/hooks/bin/
 hooks/bin/
 plugin/hooks/bin/htmlgraph
+/htmlgraph
 
 # Notebook files copied at build time from prototypes/ (do not commit)
 internal/notebook/files/

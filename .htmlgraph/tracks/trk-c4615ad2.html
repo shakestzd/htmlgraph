@@ -13,7 +13,7 @@
              data-status="todo"
              data-priority="high"
              data-created="2026-04-21T00:01:38.30447"
-             data-updated="2026-04-21T02:57:27.717101" data-agent-assigned="claude-code">
+             data-updated="2026-04-21T11:35:28.877572" data-agent-assigned="claude-code">
 
         <header>
             <h1>OTel Integration — telemetry capture, span hierarchy, cost attribution</h1>
@@ -42,6 +42,12 @@
                     <li><a href="feat-e1efb972.html" data-relationship="contains" data-since="2026-04-21T01:07:16.050515">SubagentStart &#43; orphan-span placeholder to eliminate Agent-span arrival flash</a></li>
                     <li><a href="bug-3c4acb55.html" data-relationship="contains" data-since="2026-04-21T01:13:51.261231">Text-only turns not shown in activity feed — assistant text response missing</a></li>
                     <li><a href="bug-049df2a4.html" data-relationship="contains" data-since="2026-04-21T02:57:27.713836">Subagent tool spans occasionally emit with parent_span=interaction instead of parent_span=Agent (TRACEPARENT propagation gap)</a></li>
+                    <li><a href="bug-6ab963d3.html" data-relationship="contains" data-since="2026-04-21T09:58:32.174515">OTel silently drops spans on SQLITE_BUSY &#43; parallel launcher spawns collide on :8080</a></li>
+                    <li><a href="bug-f4b7dbc8.html" data-relationship="contains" data-since="2026-04-21T09:58:32.284187">assistant_text rows fail to render: _assistantTextsForTurn returns 0 despite data present</a></li>
+                    <li><a href="bug-f6575739.html" data-relationship="contains" data-since="2026-04-21T10:56:57.883825">assistant_text parent_span uses transcript parentUuid verbatim — points at tool_result on turns with tool calls</a></li>
+                    <li><a href="feat-28b62b51.html" data-relationship="contains" data-since="2026-04-21T11:12:45.225773">Assistant text: render at top of turn &#43; apply markdown</a></li>
+                    <li><a href="bug-dda7cc2b.html" data-relationship="contains" data-since="2026-04-21T11:35:28.771645">Receiver gate in serve-child uses isTruthy while launcher defaults on — receiver skipped when HTMLGRAPH_OTEL_ENABLED is unset</a></li>
+                    <li><a href="bug-d2ba2a82.html" data-relationship="contains" data-since="2026-04-21T11:35:28.877055">Hardcoded :4318 causes cross-project OTel data leakage when multiple projects are open</a></li>
                 </ul>
             </section>
         </nav>
