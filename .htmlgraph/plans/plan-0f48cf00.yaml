@@ -1,0 +1,284 @@
+meta:
+    id: plan-0f48cf00
+    track_id: trk-cd61bbae
+    title: Local cockpit — parallel AI sessions in the dashboard
+    description: |
+        The local cockpit extends feat-52d15f78 (the ttyd embed MVP that shipped a single hardcoded `htmlgraph claude --dev` iframe) into a full multi-pane session manager embedded in the HtmlGraph dashboard. Users can spawn N concurrent PTY sessions — Claude, Codex, Gemini, or yolo — each scoped to its own CWD or worktree and tied to a specific work item, all from a launcher modal without leaving the browser. The backend remains a thin generic PTY spawner: one endpoint accepts {agent, mode, cwd, work_item} and computes the shell command; no agent-specific logic leaks into internal/terminal. The frontend, staying vanilla JS, owns all launcher UX, pane layout, and inventory reload. Because every spawned session writes its own session_id + project_dir row through the existing observability pipe, the lineage graph gains a natural record of which pane produced which artifacts — making parallel multi-agent work traceable at the session level.
+    created_at: "2026-04-21"
+    status: draft
+    created_by: claude-opus
+    version: 1
+design:
+    problem: |
+        The MVP shipped in feat-52d15f78 puts one iframe in the dashboard that hardcodes `htmlgraph claude --dev` as the shell command. There is no way to open a second session, no way to pick Codex or Gemini as the agent, no way to scope a pane to a feature worktree, and no way to recover live panes after reloading the dashboard tab. The backend endpoint POST /api/terminal/start only accepts {work_item} and closes over the server-start projectDir — meaning all sessions run in the same directory regardless of what the user wants. A user running three parallel yolo agents on different features must leave the dashboard and manage tmux sessions manually, losing the observability lineage that HtmlGraph is designed to provide.
+    goals:
+        - '**N concurrent panes** — dashboard can host ≥4 simultaneous live PTY sessions without collision'
+        - '**Agent-agnostic spawn** — same backend endpoint launches claude, codex, gemini, or htmlgraph yolo by parameter, not by new route'
+        - '**Per-pane scope** — each pane can run in the main repo, a feature worktree, or a track worktree with HTMLGRAPH_PROJECT_DIR routed correctly'
+        - '**Persistent pane inventory** — reloading the dashboard restores visible panes; ttyd processes outlive the browser tab'
+        - '**Work-item attribution preserved** — every spawned session writes distinct session_id + project_dir rows, visible in the lineage graph'
+    constraints:
+        - Backend stays generic PTY spawner — no agent-specific logic in internal/terminal
+        - Frontend stays vanilla JS — no new framework/bundler introduced for cockpit alone
+        - Dev mode launchers must use --plugin-dir via removeMarketplaceHtmlgraph() (already enforced) — cockpit must not drop that guard
+        - bug-6ab963d3 (OTel SQLITE_BUSY + parallel-launch races) is a prerequisite for reliable multi-pane operation; cockpit can ship but will amplify the bug until it lands
+        - feat-af47836b (logical session splitting) must land before multi-pane attribution is clean; cockpit ships alongside but leans on it for correctness
+        - Cockpit endpoints are localhost-bound; any remote-exposure story is deferred (ttyd --credential is available when we need it)
+    approved: false
+    comment: ""
+slices:
+    - id: slice-1
+      num: 1
+      title: Generalize Manager.Start request surface
+      what: |
+        Extend POST /api/terminal/start to accept {agent, mode, cwd, work_item} and compute the correct shell command from those fields. Agent values: claude, codex, gemini, yolo. Mode values: normal, dev, auto. When body is {} or fields are omitted, fall back to the MVP defaults (claude, dev, server-start projectDir) so no existing integrations break. Session struct gains agent, mode, and cwd fields alongside the existing cmd, port, and workItem fields. waitForPort stays inline but is called with the per-request port.
+      why: |
+        All subsequent cockpit slices depend on the ability to spawn different agent types with different CWDs from a single endpoint. Without this generalization the frontend launcher modal has nowhere to send its parameters and every new agent would require a new route.
+      files:
+        - internal/terminal/terminal.go
+        - cmd/htmlgraph/terminal_handlers.go
+      deps: []
+      done_when:
+        - POST /api/terminal/start with {"agent":"codex","mode":"dev","cwd":"/tmp/test","work_item":"feat-abc"} spawns htmlgraph codex --dev in /tmp/test
+        - POST /api/terminal/start with {} still spawns htmlgraph claude --dev in the server-start projectDir (backward compat)
+        - Session struct fields agent, mode, cwd are persisted in the in-memory map and returned in subsequent list calls
+        - htmlgraph yolo agent value emits htmlgraph yolo shell command with work_item forwarded
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestBuildShellCommand covers all agent x mode combinations and verifies correct command string
+        Unit: TestManagerStartBackwardCompat verifies empty body still spawns default session
+        Integration: TestTerminalStartEndpoint posts each agent type and asserts the spawned process argv contains the expected launcher
+        Regression: Existing MVP POST /api/terminal/start {work_item} flow still returns a valid port
+      approved: false
+      comment: ""
+    - id: slice-2
+      num: 2
+      title: UUID-keyed sessions + inventory endpoints
+      what: |
+        Add an id string (UUID v4) field to the session struct and change the in-memory map key from pid (int) to UUID. Add GET /api/terminal/sessions returning a JSON array of {id, agent, mode, cwd, work_item, port, started_at} for all live sessions. Add POST /api/terminal/stop accepting {id} (preferred) or {pid} (back-compat) to kill a session. started_at is set at spawn time (time.Now()). UUID generation uses crypto/rand — no new dependency.
+      why: |
+        The floating-window frontend needs a stable, reload-safe identifier per pane that is not a PID (which can be reused by the OS after a process exits). The inventory endpoint lets the dashboard reconstruct its pane list on reload by fetching live sessions and rendering iframes pointing at the live ttyd ports.
+      files:
+        - internal/terminal/terminal.go
+        - cmd/htmlgraph/terminal_handlers.go
+      deps:
+        - 1
+      done_when:
+        - GET /api/terminal/sessions returns all running sessions with correct fields
+        - POST /api/terminal/stop {"id":"<uuid>"} kills the correct process
+        - POST /api/terminal/stop {"pid":12345} still works for back-compat
+        - Session IDs survive across multiple start calls without collision (UUID uniqueness)
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestGenerateSessionID produces valid UUID v4 strings
+        Unit: TestSessionInventoryList returns correct count and fields for N concurrent sessions
+        Integration: TestStopByID starts a session, stops it by UUID, verifies process is gone
+        Integration: TestStopByPID back-compat — start session, stop by pid, verify gone
+        Regression: Existing stop-by-pid callers continue to function after UUID migration
+      approved: false
+      comment: ""
+    - id: slice-3
+      num: 3
+      title: Extract internal/worktree primitive
+      what: |
+        Create a new package internal/worktree with worktree.go exposing EnsureForFeature(featureID, repoRoot string) (path string, err error) and EnsureForTrack(trackID, repoRoot string) (path string, err error). Move the three inline functions createFeatureWorktree, createTrackWorktree, createAgentWorktree from cmd/htmlgraph/yolo.go into this package. yolo.go becomes a thin caller. excludeHtmlgraphFromWorktree and reindexWorktree lifecycle calls are delegated from the new package. The terminal handler uses EnsureForFeature/EnsureForTrack when the request includes cwd_kind=feature-worktree or cwd_kind=track-worktree.
+      why: |
+        Worktree creation logic is duplicated across yolo and, once the cockpit lands, would need to be duplicated again in terminal_handlers.go. Extracting an internal/worktree primitive gives all three callers (yolo, codex/gemini launchers in slice-7, and the cockpit handler) a single tested path with correct HTMLGRAPH_PROJECT_DIR injection and excludeHtmlgraphFromWorktree behavior.
+      files:
+        - internal/worktree/worktree.go (new)
+        - cmd/htmlgraph/yolo.go
+        - cmd/htmlgraph/terminal_handlers.go
+      deps: []
+      done_when:
+        - internal/worktree package compiles and exports EnsureForFeature and EnsureForTrack
+        - cmd/htmlgraph/yolo.go no longer contains inline createFeatureWorktree/createTrackWorktree logic
+        - POST /api/terminal/start with {"cwd_kind":"feature-worktree","work_item":"feat-abc"} creates or reuses the worktree at .claude/worktrees/feat-abc
+        - HTMLGRAPH_PROJECT_DIR env var is set correctly in the spawned TTY to the canonical repo root
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestEnsureForFeature creates worktree on first call and returns existing path on second call
+        Unit: TestEnsureForTrack same idempotency guarantee
+        Integration: TestWorktreeEnvInjection spawns a session with cwd_kind=feature-worktree and asserts HTMLGRAPH_PROJECT_DIR points at the main repo
+        Regression: htmlgraph yolo --feature <id> still creates worktrees via the new package with identical behavior
+      approved: false
+      comment: ""
+    - id: slice-4
+      num: 4
+      title: Frontend launcher modal
+      what: |
+        Replace the bare Terminal button click handler with a launcher modal that presents four controls: (1) agent picker — radio or select for claude / codex / gemini / yolo; (2) mode picker — normal / dev / auto; (3) work-item search — text input with debounced GET /api/features?q= results shown as a dropdown; (4) CWD toggle — main repo / feature-worktree / track-worktree (disabled when no work item selected). Submit calls POST /api/terminal/start with the assembled JSON body. Cancel closes without spawning. Modal rendered in pure HTML/CSS/JS consistent with existing component style; no new library.
+      why: |
+        Without a launcher UX, every cockpit parameter must be baked into the source code or passed via a raw curl call. The modal is the user-facing control surface for all per-pane configuration and is the prerequisite for multi-pane spawning to be usable by non-developers.
+      files:
+        - cmd/htmlgraph/dashboard/index.html
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/css/components.css
+      deps:
+        - 1
+      done_when:
+        - Clicking the Terminal button opens the launcher modal instead of immediately spawning
+        - All four controls render and are interactive; work-item search returns results
+        - Submit with agent=codex, mode=dev, work_item=feat-abc posts correct JSON to /api/terminal/start
+        - Cancel closes the modal without side effects
+        - Modal is accessible via keyboard (Tab, Enter, Escape)
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestBuildLaunchPayload verifies JS function assembles correct JSON from modal state
+        Integration: TestLauncherModalSubmit triggers POST with correct body when form is filled and submitted
+        Regression: Existing bare-click path is fully replaced; no orphaned event listeners remain
+      approved: false
+      comment: ""
+    - id: slice-5
+      num: 5
+      title: Multi-pane shell (floating windows)
+      what: |
+        Extend the single-overlay pattern to support N simultaneous floating pane windows. Each pane is an independent div.terminal-pane containing a titlebar (agent label, work item, close button) and an iframe pointing at the live ttyd port. Panes are draggable via the titlebar (mouse events, no library). On dashboard load, call GET /api/terminal/sessions and re-render a pane for each live session (iframe src = http://127.0.0.1:<port>). Closing a pane calls POST /api/terminal/stop and removes the element. A global pane registry (Map keyed by session UUID) tracks open panes and prevents duplicate iframes for the same session. Tile/split layout is explicitly deferred to a future slice — floating windows only for v1.
+      why: |
+        This is the visible cockpit: without multi-pane the whole plan is still a single-session wrapper. Floating windows are chosen over tiling because they require no split-pane JS library and each pane's position is independently user-controlled. The reload-from-inventory behavior makes the cockpit resilient to browser events without requiring server state to track frontend layout.
+      files:
+        - cmd/htmlgraph/dashboard/index.html
+        - cmd/htmlgraph/dashboard/js/app.js
+        - cmd/htmlgraph/dashboard/css/components.css
+      deps:
+        - 1
+        - 2
+        - 4
+      done_when:
+        - Opening two sessions from the launcher modal renders two independent floating pane windows simultaneously
+        - Each pane's iframe displays its own live ttyd session
+        - Panes are draggable by their titlebars without colliding with each other
+        - On dashboard reload, GET /api/terminal/sessions re-renders all live panes
+        - Closing one pane via its close button does not affect other panes
+      effort: L
+      risk: Med
+      tests: |
+        Unit: TestPaneRegistry add/remove/get operations on the UUID-keyed Map
+        Unit: TestBuildPaneElement verifies correct iframe src and titlebar text from session data
+        Integration: TestMultiPaneRender spawns two sessions and asserts two pane divs exist in the DOM
+        Integration: TestReloadRestore mocks GET /api/terminal/sessions and verifies panes are reconstructed
+        Regression: Single-pane flow from pre-cockpit MVP still works end-to-end via the new multi-pane path
+      approved: false
+      comment: ""
+    - id: slice-6
+      num: 6
+      title: Parallel-launch hardening
+      what: |
+        Audit and mitigate the two known races that multi-pane spawning amplifies. For bug-6ab963d3 (ensureServeForOtel lockfile race): add a sync.Mutex in internal/terminal or terminal_handlers.go that serializes concurrent ensureServeForOtel probes so only one goroutine attempts the serve start at a time. For bug-d2d3fb3f (feature start writer contention): add an optional --no-start-feature flag path so the cockpit can spawn a session with a work_item set in the env without racing on the .active-session file. Document mitigations as workarounds with TODO(bug-6ab963d3) and TODO(bug-d2d3fb3f) comments. Shape is conditional on q-prereq-strategy answer.
+      why: |
+        The cockpit spawns N sessions in rapid succession, each of which independently calls ensureServeForOtel and (if a work item is set) htmlgraph feature start. Without serialization, the first two sessions will race on the serve lockfile and on the .active-session writer, causing dropped OTel spans and stalled session starts — observable failures in daily dogfooding. Mitigations here let the cockpit ship and be usable before the root-cause bugs are closed.
+      files:
+        - internal/terminal/terminal.go
+        - cmd/htmlgraph/terminal_handlers.go
+      deps:
+        - 1
+      done_when:
+        - Spawning 4 sessions in rapid succession from the launcher modal does not produce SQLITE_BUSY errors in debug.log
+        - All 4 sessions reach a live ttyd port within 5 seconds
+        - TODO(bug-6ab963d3) and TODO(bug-d2d3fb3f) comments are present at each mitigation site
+        - Mitigation behavior is conditional on q-prereq-strategy answer (block or ship-alongside)
+      effort: M
+      risk: High
+      tests: |
+        Unit: TestSerializeLaunchMutex verifies concurrent Start calls queue rather than collide
+        Integration: TestParallelSpawn4 spawns 4 sessions concurrently and asserts all 4 ports become live
+        Regression: Single sequential session spawn still works with the new mutex in place
+      approved: false
+      comment: ""
+    - id: slice-7
+      num: 7
+      title: Agent-matrix parity for worktree + work-item
+      what: |
+        Add --track, --feature, and --worktree flags to htmlgraph codex and htmlgraph gemini analogous to the existing flags on htmlgraph yolo. Each flag sets HTMLGRAPH_PROJECT_DIR to the canonical repo root and sets cmd.Dir to the appropriate worktree path using internal/worktree from slice-3. When no worktree flag is given, behavior is unchanged. Also add --work-item flag to both launchers so the cockpit can inject attribution env vars for Codex and Gemini sessions matching what Claude already gets. Update the cockpit's shell command builder (slice-1) to emit these flags for codex/gemini when cwd_kind=worktree.
+      why: |
+        Today only the Claude/yolo launchers support worktrees and work-item attribution. Without this slice, a Codex or Gemini pane launched from the cockpit runs in the main repo with no attribution — a second-class experience that defeats the observability goal. Parity means every agent can participate in the lineage graph on equal footing.
+      files:
+        - cmd/htmlgraph/codex.go
+        - cmd/htmlgraph/gemini.go
+        - cmd/htmlgraph/terminal_handlers.go
+        - internal/worktree/worktree.go
+      deps:
+        - 3
+      done_when:
+        - htmlgraph codex --feature feat-abc spawns in .claude/worktrees/feat-abc with HTMLGRAPH_PROJECT_DIR set
+        - htmlgraph gemini --track trk-xyz spawns in the track worktree with HTMLGRAPH_PROJECT_DIR set
+        - Cockpit POST /api/terminal/start with agent=codex + cwd_kind=feature-worktree emits correct codex command
+        - Help output for codex and gemini lists the new flags
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestCodexWorktreeFlag verifies --feature flag sets correct cmd.Dir and env
+        Unit: TestGeminiWorktreeFlag same for gemini
+        Integration: TestCockpitCodexWorktree posts agent=codex + cwd_kind=feature-worktree and asserts spawned process is in the worktree path
+        Regression: htmlgraph codex and htmlgraph gemini invocations without new flags retain existing behavior exactly
+      approved: false
+      comment: ""
+questions:
+    - id: q-pane-layout
+      text: Floating windows vs tiled/split layout for v1 panes?
+      description: |
+        Should the cockpit v1 pane layout use floating windows (each pane is a freely-positionable overlay div draggable by its titlebar) or a tiled/split layout (panes fill the viewport in a grid or split-pane arrangement)? Floating windows require no new JS library and match the existing single-overlay pattern, but multiple overlapping windows can feel cluttered for 4+ panes. Tiled layouts give a more IDE-like feel but require either a custom resize-handle implementation or a JS split-pane library, both of which add frontend surface area against the no-new-framework constraint.
+      recommended: floating
+      options:
+        - key: floating
+          label: Floating windows — freely-positionable overlay divs draggable by titlebar, no new library, matches current pattern
+        - key: tiled
+          label: Tiled layout — grid or split-pane filling the viewport, IDE-like feel, requires split library or custom resize handles
+        - key: both-selectable
+          label: User-toggleable between floating and tiled modes — maximum flexibility, maximum frontend complexity
+      answer: null
+    - id: q-worktree-default
+      text: Should the launcher default to creating a worktree or running in the main repo?
+      description: |
+        When the launcher modal opens, should the CWD toggle default to creating/attaching a worktree (default-on), default to the main repo (default-off), or show a toggle that defaults off and requires the user to opt in (ask-per-launch-default-off)? This decision intersects with plan-1ad0496b which has a related question about worktree adoption friction. Defaulting to worktree-on reduces the chance of accidental main-repo modifications during parallel agent runs but adds friction for users who just want a quick terminal session without worktree overhead.
+      recommended: ask-per-launch-default-off
+      options:
+        - key: default-on
+          label: Default on — launcher always creates/attaches a worktree, safest for parallel agents, highest friction for simple use
+        - key: default-off
+          label: Default off — launcher defaults to main repo, zero friction but parallel agents can collide on the same working tree
+        - key: ask-per-launch-default-off
+          label: CWD toggle visible but defaults to main repo — user must opt in to worktree, no hidden magic
+      answer: null
+    - id: q-prereq-strategy
+      text: Block on prerequisite bugs landing, or ship alongside with mitigations?
+      description: |
+        Should this plan block on bug-6ab963d3 (OTel SQLITE_BUSY + parallel-launch ensureServeForOtel race) and bug-d2d3fb3f (feature start writer contention) landing before cockpit ships, or should the cockpit ship alongside those bugs with documented mitigations in slice-6? The MVP (feat-52d15f78) is already in daily use, and shipping the cockpit earlier means earlier dogfooding of the parallel-launch behavior that will surface the races more clearly. Blocking delays user value by however long those bugs take to resolve, which is currently unknown.
+      recommended: ship-alongside-with-mitigations
+      options:
+        - key: block-until-fixed
+          label: Block — gate cockpit on bug-6ab963d3 and bug-d2d3fb3f being closed, clean integration but unknown delay
+        - key: ship-alongside-with-mitigations
+          label: Ship alongside — cockpit with mutex and debounce mitigations in slice-6 and TODO markers, earlier value, accepted risk
+        - key: ship-and-lean-on-future-fixes
+          label: Ship now — no mitigations, accept flaky behavior, let root-cause bugs carry the fix, fastest to ship, worst user experience
+      answer: null
+    - id: q-auth-model
+      text: Stay localhost-only, or introduce ttyd credentials now?
+      description: |
+        Should cockpit endpoints and ttyd sessions remain localhost-only forever, or should we introduce ttyd --credential / bearer token authentication now to future-proof the cockpit for remote or Codespaces exposure? Localhost-only is the current security posture for the entire dashboard and requires no changes; introducing credentials now adds implementation surface but means the cockpit would be ready for a remote-access story without a breaking API change. The ttyd --credential flag already exists and is unused today.
+      recommended: localhost-only-v1
+      options:
+        - key: localhost-only-v1
+          label: Localhost only — no auth added, localhost bind is the security boundary, document remote story as a future track
+        - key: bearer-token-now
+          label: Bearer token — add Authorization header support to /api/terminal/* endpoints and pass credentials to ttyd, future-proofs remote access
+        - key: ttyd-credential-now
+          label: ttyd credential — use ttyd --credential user:pass per session, simpler than bearer tokens but per-session credential management is awkward
+      answer: null
+    - id: q-pane-persistence
+      text: Should live panes persist across dashboard reloads or die on tab close?
+      description: |
+        When the user closes the dashboard browser tab or reloads, should live ttyd processes continue running (pane persistence) so the dashboard can reattach on next load, or should closing the dashboard kill all panes? Persistence means ttyd processes are long-lived server-side resources that the user must explicitly stop, which is consistent with how tmux sessions work and matches the use case of long-running yolo agents. Kill-on-unload is simpler and avoids orphaned processes but breaks the multi-agent workflow where a user wants to monitor progress from the dashboard without disrupting running agents.
+      recommended: persist-across-reloads
+      options:
+        - key: persist-across-reloads
+          label: Persist — ttyd processes outlive the browser tab, GET /api/terminal/sessions + pane re-render on reload restores the cockpit state
+        - key: kill-on-beforeunload
+          label: Kill on close — beforeunload fires POST /api/terminal/stop for all panes, clean process hygiene but breaks long-running agent workflows
+        - key: configurable
+          label: Configurable — user preference in dashboard settings for persist vs kill, maximum flexibility, adds settings UI surface
+      answer: null
