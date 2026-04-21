@@ -46,25 +46,111 @@ func extractAssistantText(rec *transcriptRecord) string {
 	return sb.String()
 }
 
-// readLastAssistantRecord scans the transcript JSONL from the END and returns
-// the most recent non-sidechain assistant record that has at least one non-empty
-// text block. Returns nil when none is found (missing file, sidechain-only,
-// thinking-only, or malformed JSONL). Reads line-by-line — never loads the
-// whole file into memory at once, but does need to buffer all lines to scan
-// in reverse order.
-func readLastAssistantRecord(transcriptPath string) (*transcriptRecord, error) {
+// isHumanTextPrompt checks whether a transcript record represents a human text prompt.
+// Returns true if the record is a user type with text content (not a tool_result).
+// Uses the same logic as transcript_user_prompt.extractUserText to determine if
+// content is a real human prompt vs. a tool_result.
+func isHumanTextPrompt(rec *transcriptRecord) bool {
+	if rec == nil || rec.Type != "user" {
+		return false
+	}
+	// Reuse the user_prompt logic: parse message as JSON and check if it's a tool_result.
+	// Build the raw message from rec.Message struct fields to match expected shape.
+	msgData, err := json.Marshal(rec.Message)
+	if err != nil {
+		return false
+	}
+	// Now check using the same logic as extractUserText
+	var msg struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(msgData, &msg); err != nil {
+		return false
+	}
+	if len(msg.Content) == 0 {
+		return false
+	}
+	// Try legacy format: content is a plain string (would be a text prompt).
+	var strContent string
+	if err := json.Unmarshal(msg.Content, &strContent); err == nil {
+		return strings.TrimSpace(strContent) != ""
+	}
+	// Try modern format: content is an array of typed blocks.
+	var blocks []json.RawMessage
+	if err := json.Unmarshal(msg.Content, &blocks); err != nil {
+		return false
+	}
+	// Inspect first block — if it's a tool_result, this is not a human prompt.
+	if len(blocks) > 0 {
+		var first struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(blocks[0], &first) == nil && first.Type == "tool_result" {
+			return false // tool results are not human prompts
+		}
+	}
+	// Check for at least one text block.
+	for _, raw := range blocks {
+		var block struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal(raw, &block); err != nil {
+			continue
+		}
+		if block.Type == "text" && block.Text != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveUserPromptAncestor walks the transcript chain from startParent upwards
+// to find the first ancestor that is a human text prompt (a user record with
+// non-tool-result content). Returns startParent unchanged if no such ancestor
+// is found within 50 hops, or if the chain cannot be walked.
+func resolveUserPromptAncestor(uuidToRecord map[string]*transcriptRecord, startParent string) string {
+	if startParent == "" {
+		return startParent
+	}
+	current := startParent
+	for i := 0; i < 50; i++ {
+		if current == "" {
+			return startParent
+		}
+		rec, ok := uuidToRecord[current]
+		if !ok {
+			return startParent
+		}
+		if rec.Type == "user" && isHumanTextPrompt(rec) {
+			return current
+		}
+		current = rec.ParentUUID
+	}
+	// Max hops reached; return startParent to avoid losing information.
+	return startParent
+}
+
+// readTranscriptWithMap scans the transcript JSONL and returns both:
+//   1. The most recent non-sidechain assistant record with text content
+//   2. A map of all parsed records keyed by UUID for ancestor walking
+//
+// Returns (nil, nil, error) on I/O failure; (nil, map, nil) if no qualifying
+// assistant record found but transcript was readable; (rec, map, nil) on success.
+func readTranscriptWithMap(transcriptPath string) (*transcriptRecord, map[string]*transcriptRecord, error) {
 	f, err := os.Open(transcriptPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil // missing file is not an error
+			return nil, nil, nil // missing file is not an error
 		}
-		return nil, fmt.Errorf("open transcript: %w", err)
+		return nil, nil, fmt.Errorf("open transcript: %w", err)
 	}
 	defer f.Close()
 
-	// Collect all lines in memory so we can walk backwards.
-	// Transcripts rarely exceed a few MB so this is safe.
+	// Collect all lines in memory and build UUID map.
 	var lines []string
+	uuidToRecord := make(map[string]*transcriptRecord)
 	scanner := bufio.NewScanner(f)
 	// Increase buffer for very long lines (large prompts in transcript).
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
@@ -72,10 +158,17 @@ func readLastAssistantRecord(transcriptPath string) (*transcriptRecord, error) {
 		line := scanner.Text()
 		if strings.TrimSpace(line) != "" {
 			lines = append(lines, line)
+			// Try to parse and add to map (best-effort).
+			var rec transcriptRecord
+			if err := json.Unmarshal([]byte(line), &rec); err == nil && rec.UUID != "" {
+				// Store a copy so callers can't modify map contents.
+				recCopy := rec
+				uuidToRecord[rec.UUID] = &recCopy
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan transcript: %w", err)
+		return nil, nil, fmt.Errorf("scan transcript: %w", err)
 	}
 
 	// Walk backwards to find the most recent qualifying record.
@@ -96,9 +189,20 @@ func readLastAssistantRecord(transcriptPath string) (*transcriptRecord, error) {
 		if extractAssistantText(&rec) == "" {
 			continue // thinking-only or empty content
 		}
-		return &rec, nil
+		return &rec, uuidToRecord, nil
 	}
-	return nil, nil
+	return nil, uuidToRecord, nil
+}
+
+// readLastAssistantRecord scans the transcript JSONL from the END and returns
+// the most recent non-sidechain assistant record that has at least one non-empty
+// text block. Returns nil when none is found (missing file, sidechain-only,
+// thinking-only, or malformed JSONL). Reads line-by-line — never loads the
+// whole file into memory at once, but does need to buffer all lines to scan
+// in reverse order.
+func readLastAssistantRecord(transcriptPath string) (*transcriptRecord, error) {
+	rec, _, err := readTranscriptWithMap(transcriptPath)
+	return rec, err
 }
 
 // assistantTextSignalID returns a deterministic signal_id for an assistant_text
@@ -132,7 +236,7 @@ func insertAssistantTextSignal(
 		return
 	}
 
-	rec, err := readLastAssistantRecord(transcriptPath)
+	rec, uuidToRecord, err := readTranscriptWithMap(transcriptPath)
 	if err != nil {
 		debugLog(projectDir, "[assistant-text] read transcript: %v", err)
 		return
@@ -182,6 +286,12 @@ func insertAssistantTextSignal(
 		sessionID, "__root__",
 	).Scan(&featureID)
 
+	// Walk the parent chain to find the ancestor human text prompt.
+	// This handles the case where assistant text follows a tool call chain:
+	// user_prompt → assistant_tool_use → user_tool_result → assistant_text
+	// We want parent_span to be the user_prompt UUID, not user_tool_result.
+	sigParentSpan := resolveUserPromptAncestor(uuidToRecord, rec.ParentUUID)
+
 	// INSERT OR IGNORE ensures idempotency on hook retries — if the same
 	// Stop hook fires twice for the same session, the second insert is a no-op.
 	_, dbErr := database.Exec(`
@@ -192,7 +302,7 @@ func insertAssistantTextSignal(
 			attrs_json, feature_id
 		) VALUES (?, 'claude', ?, ?, ?, 'log', 'assistant_text', 'assistant_turn', ?, ?, ?)`,
 		signalID, sessionID,
-		nullableStr(rec.UUID), nullableStr(rec.ParentUUID),
+		nullableStr(rec.UUID), nullableStr(sigParentSpan),
 		tsMicros,
 		string(attrsJSON),
 		featureID,

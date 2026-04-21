@@ -71,6 +71,47 @@ func makeUserLine(uuid, sessionID, text string) string {
 	return string(b)
 }
 
+// makeAssistantToolUseRecord returns a JSONL line for an assistant record with tool_use.
+func makeAssistantToolUseRecord(uuid, parentUUID, sessionID string) string {
+	rec := map[string]any{
+		"type":        "assistant",
+		"uuid":        uuid,
+		"parentUuid":  parentUUID,
+		"sessionId":   sessionID,
+		"requestId":   "req_" + uuid,
+		"timestamp":   "2026-04-20T10:00:00.000Z",
+		"isSidechain": false,
+		"message": map[string]any{
+			"role":        "assistant",
+			"stop_reason": "tool_use",
+			"content": []map[string]any{
+				{"type": "tool_use", "id": "tool_" + uuid, "name": "test_tool", "input": map[string]any{}},
+			},
+		},
+	}
+	b, _ := json.Marshal(rec)
+	return string(b)
+}
+
+// makeUserToolResultRecord returns a JSONL line for a user record with tool_result.
+func makeUserToolResultRecord(uuid, parentUUID, sessionID, toolUseID string) string {
+	rec := map[string]any{
+		"type":      "user",
+		"uuid":      uuid,
+		"parentUuid": parentUUID,
+		"sessionId": sessionID,
+		"timestamp": "2026-04-20T09:59:00.000Z",
+		"message": map[string]any{
+			"role": "user",
+			"content": []map[string]any{
+				{"type": "tool_result", "tool_use_id": toolUseID, "content": "Tool returned: success"},
+			},
+		},
+	}
+	b, _ := json.Marshal(rec)
+	return string(b)
+}
+
 // writeTempTranscript writes lines to a temp file and returns its path.
 func writeTempTranscript(t *testing.T, lines []string) string {
 	t.Helper()
@@ -343,6 +384,47 @@ func TestInsertAssistantTextSignal_NoTranscriptPath(t *testing.T) {
 	}
 	if count != 0 {
 		t.Errorf("expected 0 rows when transcript_path is empty, got %d", count)
+	}
+}
+
+// TestAssistantText_ParentSpanWalksPastToolResult verifies that when an assistant
+// text reply comes after a tool call, parent_span correctly walks the chain up to
+// find the original human text prompt, not the tool_result.
+//
+// Chain: user_text(A1) → assistant_tool_use(A2) → user_tool_result(A3) → assistant_text(A4)
+// Expected: A4.parent_span = A1 (human prompt), NOT A3 (tool result).
+func TestAssistantText_ParentSpanWalksPastToolResult(t *testing.T) {
+	td := setupTestDB(t)
+	sessionID := "test-sess"
+	projectDir := t.TempDir()
+
+	// Build the 4-record chain.
+	userPromptUUID := "user-1"
+	assistantToolUseUUID := "asst-2"
+	userToolResultUUID := "user-3"
+	assistantTextUUID := "asst-4"
+
+	path := writeTempTranscript(t, []string{
+		makeUserLine(userPromptUUID, sessionID, "Can you call a tool for me?"),
+		makeAssistantToolUseRecord(assistantToolUseUUID, userPromptUUID, sessionID),
+		makeUserToolResultRecord(userToolResultUUID, assistantToolUseUUID, sessionID, "tool_asst-2"),
+		makeTranscriptLine(assistantTextUUID, userToolResultUUID, sessionID, "end_turn", "Tool executed successfully!", false),
+	})
+
+	insertAssistantTextSignal(td.DB, projectDir, sessionID, path)
+
+	var parentSpan string
+	err := td.DB.QueryRow(`
+		SELECT COALESCE(parent_span, '') FROM otel_signals
+		WHERE session_id = ? AND canonical = 'assistant_text'`,
+		sessionID,
+	).Scan(&parentSpan)
+	if err != nil {
+		t.Fatalf("query otel_signals: %v", err)
+	}
+
+	if parentSpan != userPromptUUID {
+		t.Errorf("parent_span = %q, want %q (should walk past tool_result)", parentSpan, userPromptUUID)
 	}
 }
 
