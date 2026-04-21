@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Bundle consecutive same-server MCP tool calls into a collapsible group</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-ebefd886"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-21T00:34:03.845387"
+             data-updated="2026-04-21T00:49:35.063946" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Bundle consecutive same-server MCP tool calls into a collapsible group</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:34:03.846889">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-21T00:42:55.287616">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Like Claude Code TUI: when >=2 consecutive sibling spans share the same mcp_server (e.g. claude-in-chrome), render a single wrapper row with server chip + count + total duration. Collapsed by default. Example: 'claude-in-chrome · 5 tools · 13.2s' then expand reveals individual rows. Single MCP call stays as-is. Implement in event-tree.js via a post-pass over _spansForTurn output or in _indexSpans children groupings. Reuse existing _mcpServerColor for chip. Add a localStorage toggle for per-group expand state.</p>
+        </section>
+    </article>
+</body>
+</html>

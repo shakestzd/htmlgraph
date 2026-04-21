@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/shakestzd/htmlgraph/internal/otel/materialize"
 )
@@ -285,8 +286,9 @@ type spanDetail struct {
 	Prompt         string `json:"prompt,omitempty"`          // Task/Agent: delegation prompt (truncated)
 	SkillName      string `json:"skill_name,omitempty"`      // Skill tool
 	SubagentType   string `json:"subagent_type,omitempty"`   // Agent/Task delegation target
-	MCPServerName  string `json:"mcp_server_name,omitempty"` // MCP tool
-	MCPToolName    string `json:"mcp_tool_name,omitempty"`   // MCP tool
+	MCPServerName  string         `json:"mcp_server_name,omitempty"` // MCP tool
+	MCPToolName    string         `json:"mcp_tool_name,omitempty"`   // MCP tool
+	MCPInput       map[string]any `json:"mcp_input,omitempty"`       // MCP tool: full parsed tool_input
 	TodoCount      int64  `json:"todo_count,omitempty"`      // TodoWrite: count of todos
 	DecisionSrc    string `json:"decision_source,omitempty"` // tool.blocked_on_user
 	Speed          string `json:"speed,omitempty"`           // llm_request: fast|normal
@@ -580,6 +582,14 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 	if d.TodoCount == 0 {
 		if arr, ok := ti["todos"].([]any); ok {
 			d.TodoCount = int64(len(arr))
+		}
+	}
+	// MCP tools: stash the full parsed tool_input so the dashboard can
+	// render each key-value in the detail panel. Only populated for
+	// tools whose name begins with "mcp__".
+	if d.MCPInput == nil {
+		if toolName, ok := logAttrs["tool_name"].(string); ok && strings.HasPrefix(toolName, "mcp__") {
+			d.MCPInput = ti
 		}
 	}
 }

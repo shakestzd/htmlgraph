@@ -33,31 +33,55 @@ func assertEnvNotSet(t *testing.T, env []string, key string) {
 	}
 }
 
-func TestBuildClaudeLaunchEnv_OptOutByDefault(t *testing.T) {
-	// Explicitly clear any gate + OTEL_* parent env so the test is
-	// hermetic regardless of the shell it runs in. (The launcher is
-	// expected to pass through any non-empty user OTEL_* values, so a
-	// shell that already exports them would otherwise leak into the
-	// assertion.)
-	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
-	t.Setenv("CLAUDE_CODE_ENABLE_TELEMETRY", "")
-	t.Setenv("CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "")
-	t.Setenv("OTEL_METRICS_EXPORTER", "")
-	t.Setenv("OTEL_LOGS_EXPORTER", "")
-	t.Setenv("OTEL_TRACES_EXPORTER", "")
-	t.Setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "")
-	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+func TestBuildClaudeLaunchEnv_ExplicitOptOut(t *testing.T) {
+	// Clear parent OTel vars so the test is hermetic.
+	clearOtelEnv(t)
 
+	// "0" explicitly disables — no OTel vars should be injected.
+	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "0")
 	env := buildClaudeLaunchEnv("")
-	// Gate off: every OTel var is either unset or preserves the empty
-	// value from the parent env. Neither state enables telemetry — Claude
-	// Code treats empty CLAUDE_CODE_ENABLE_TELEMETRY as disabled.
 	for _, key := range []string{
 		"CLAUDE_CODE_ENABLE_TELEMETRY",
 		"OTEL_METRICS_EXPORTER",
 		"OTEL_EXPORTER_OTLP_ENDPOINT",
 	} {
 		assertEnvEmptyOrUnset(t, env, key)
+	}
+
+	// Also test other opt-out values.
+	for _, val := range []string{"false", "no", "off"} {
+		t.Setenv("HTMLGRAPH_OTEL_ENABLED", val)
+		env = buildClaudeLaunchEnv("")
+		assertEnvEmptyOrUnset(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY")
+	}
+}
+
+func TestBuildClaudeLaunchEnv_DefaultOn(t *testing.T) {
+	// An unset or empty HTMLGRAPH_OTEL_ENABLED should enable OTel (default-on).
+	clearOtelEnv(t)
+	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "") // explicitly unset
+
+	env := buildClaudeLaunchEnv("")
+	assertEnvContains(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
+	assertEnvContains(t, env, "OTEL_TRACES_EXPORTER", "otlp")
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
+}
+
+// clearOtelEnv clears all OTel-related environment variables for test isolation.
+func clearOtelEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"HTMLGRAPH_OTEL_ENABLED",
+		"CLAUDE_CODE_ENABLE_TELEMETRY",
+		"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA",
+		"OTEL_METRICS_EXPORTER",
+		"OTEL_LOGS_EXPORTER",
+		"OTEL_TRACES_EXPORTER",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_LOG_TOOL_DETAILS",
+	} {
+		t.Setenv(key, "")
 	}
 }
 
@@ -121,7 +145,7 @@ func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
 }
 
 func TestBuildClaudeLaunchEnv_WorktreeProjectDir(t *testing.T) {
-	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
+	clearOtelEnv(t)
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "/old/value")
 	env := buildClaudeLaunchEnv("/worktree/main/.htmlgraph")
 	assertEnvContains(t, env, "HTMLGRAPH_PROJECT_DIR", "/worktree/main/.htmlgraph")
@@ -147,6 +171,27 @@ func TestIsTruthy(t *testing.T) {
 	for _, s := range []string{"", "0", "false", "no", "off", "maybe"} {
 		if isTruthy(s) {
 			t.Errorf("isTruthy(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestIsExplicitlyDisabled(t *testing.T) {
+	// Values that should return true (opt-out).
+	for _, s := range []string{"0", "false", "FALSE", "no", "off"} {
+		if !isExplicitlyDisabled(s) {
+			t.Errorf("isExplicitlyDisabled(%q) = false, want true", s)
+		}
+	}
+	// Values that should return false (not opted out — default-on applies).
+	for _, s := range []string{"", "1", "true", "yes", "random"} {
+		if isExplicitlyDisabled(s) {
+			t.Errorf("isExplicitlyDisabled(%q) = true, want false", s)
+		}
+	}
+	// Whitespace variants of opt-out values should also be recognized.
+	for _, s := range []string{" 0", "false ", "  no  ", "\toff\t"} {
+		if !isExplicitlyDisabled(s) {
+			t.Errorf("isExplicitlyDisabled(%q) = false, want true (whitespace should be trimmed)", s)
 		}
 	}
 }

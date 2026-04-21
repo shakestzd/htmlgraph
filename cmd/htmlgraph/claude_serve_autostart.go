@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,8 +21,8 @@ import (
 // child process have somewhere to land.
 //
 // Gating:
-//   - When HTMLGRAPH_OTEL_ENABLED is not set, the launcher hasn't asked
-//     for OTel, so nothing to guarantee — return nil immediately.
+//   - When HTMLGRAPH_OTEL_ENABLED is explicitly disabled (0/false/no/off),
+//     return immediately — user opted out.
 //   - When the configured OTLP port already accepts a TCP connection,
 //     assume a receiver is live (either htmlgraph serve or a user-run
 //     collector) — return nil. We don't probe further because there's
@@ -33,12 +34,12 @@ import (
 //     an error — a missing receiver is degraded operation, not a fatal
 //     launcher failure.
 //
-// The spawned process inherits HTMLGRAPH_OTEL_ENABLED so its child's
-// serve_child wiring turns on the receiver. Stdout/stderr go to a log
-// file under .htmlgraph/logs so the orphaned server doesn't pollute
-// the user's terminal.
+// The spawned process inherits the parent env so the serve child's
+// receiver wiring picks up HTMLGRAPH_OTEL_* config. Stdout/stderr go to
+// a log file under .htmlgraph/logs so the orphaned server doesn't
+// pollute the user's terminal.
 func ensureServeForOtel(projectDir string) {
-	if !isTruthy(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
+	if isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
 		return
 	}
 	cfg := otelreceiver.LoadConfigFromEnv("")
@@ -89,6 +90,67 @@ func probePort(host string, port int, timeout time.Duration) bool {
 	}
 	_ = conn.Close()
 	return true
+}
+
+// otelNoticeMarkerPath returns the path of the one-time notice marker file.
+func otelNoticeMarkerPath(projectDir string) string {
+	return filepath.Join(projectDir, ".htmlgraph", ".otel-notice-shown")
+}
+
+// MaybeShowOtelNotice prints a one-time notice to STDERR on first launch
+// explaining that HtmlGraph captures Claude Code telemetry via OTel.
+// Subsequent launches are silent (a marker file records that the notice
+// has been shown). Safe to call when .htmlgraph/ doesn't exist — it
+// simply returns without creating the directory or printing anything.
+func MaybeShowOtelNotice(projectDir string) {
+	if projectDir == "" {
+		return
+	}
+	// Respect explicit opt-out — no need to explain what we're not doing.
+	if isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
+		return
+	}
+	// Only print when .htmlgraph/ already exists — don't create it just
+	// to write the marker.
+	htmlgraphDir := filepath.Join(projectDir, ".htmlgraph")
+	if _, err := os.Stat(htmlgraphDir); os.IsNotExist(err) {
+		return
+	}
+	markerPath := otelNoticeMarkerPath(projectDir)
+	if _, err := os.Stat(markerPath); err == nil {
+		return // notice already shown on a previous launch
+	}
+
+	cfg := otelreceiver.LoadConfigFromEnv("")
+	host := cfg.BindHost
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	port := cfg.HTTPPort
+	if port == 0 {
+		port = 4318
+	}
+	endpoint := "http://" + host + ":" + strconv.Itoa(port)
+
+	notice := strings.Join([]string{
+		"",
+		"  htmlgraph: OTel telemetry is on (first-launch notice)",
+		"  -------------------------------------------------------",
+		"  HtmlGraph auto-captures Claude Code activity via OpenTelemetry:",
+		"    tool calls, prompts, costs, token usage, and latencies.",
+		"",
+		"  Data stays 100% local — exported to " + endpoint + ",",
+		"  stored in .htmlgraph/htmlgraph.db.",
+		"",
+		"  Powers: activity feed · per-turn cost badges · span timeline",
+		"  Opt out: set HTMLGRAPH_OTEL_ENABLED=0 before launching.",
+		"",
+	}, "\n")
+	fmt.Fprint(os.Stderr, notice)
+
+	// Write marker so the notice doesn't repeat. Ignore errors — if the
+	// write fails, re-showing the notice next launch is acceptable.
+	_ = os.WriteFile(markerPath, []byte("shown\n"), 0o644)
 }
 
 // spawnDetachedServe starts `htmlgraph serve` in a new process group so

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>SubagentStart &#43; orphan-span placeholder to eliminate Agent-span arrival flash</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-e1efb972"
+             data-type="feature"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-04-21T01:07:16.04904"
+             data-updated="2026-04-21T02:32:51.390317" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>SubagentStart &#43; orphan-span placeholder to eliminate Agent-span arrival flash</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T01:07:16.050515">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="relates_to">
+                <h3>Relates To:</h3>
+                <ul>
+                    <li><a href="bug-73eb8412.html" data-relationship="relates_to" data-since="2026-04-21T01:07:20.854982">Subagent tool calls flash as roots before nesting under Agent span (OTel arrival race)</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-21T01:07:21.539942">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Fix the visible flash where subagent tool calls render as turn-root orphans until the parent Agent/subagent_invocation span arrives ~minutes later. Root cause: OTel emits spans on END; Agent span has long duration and arrives last. Fix design: (1) SubagentStart hook writes a pending_subagent_starts row keyed on agent_id with agent_type, description, cwd, session_id, parent_trace_id. (2) Extend writeSubagentEnvVars in internal/hooks/subagent_start.go to also inject OTEL_RESOURCE_ATTRIBUTES=htmlgraph.agent_id= so every subagent-emitted OTel span carries htmlgraph.agent_id as a resource attribute. (3) In the receiver writer (internal/otel/receiver/writer.go), when a span arrives whose parent_span is not yet in otel_signals, read htmlgraph.agent_id from resource attrs, look up pending_subagent_starts, UPSERT a placeholder otel_signals row keyed by the unknown parent_span with canonical=subagent_invocation, tool_name=Agent, _pending=1, attributes pre-filled from the pending_subagent_starts row. (4) When the real Agent span arrives later (same span_id), the existing UPSERT path fills duration/status/tokens/cost in place and clears _pending. Parallel subagents disambiguate cleanly via agent_id (unique per dispatch). Dashboard sees parent row present from first paint; no flash. Supersedes bug-73eb8412.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -2,7 +2,9 @@ package receiver_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -211,8 +213,8 @@ func TestWriter_DropsSignalWithEmptySessionID(t *testing.T) {
 	w, _ := newWriter(t)
 	ctx := context.Background()
 	batch := []otel.UnifiedSignal{
-		sigFixture("", "p1"),             // dropped — no session
-		sigFixture("sess-F", "p1"),       // kept
+		sigFixture("", "p1"),       // dropped — no session
+		sigFixture("sess-F", "p1"), // kept
 	}
 	n, err := w.WriteBatch(ctx, otel.HarnessClaude, map[string]any{"service.name": "claude-code"}, batch)
 	if err != nil {
@@ -220,5 +222,532 @@ func TestWriter_DropsSignalWithEmptySessionID(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("inserted = %d, want 1 (empty-session dropped)", n)
+	}
+}
+
+// TestWriter_OrphanSpanCreatePlaceholder verifies that when an incoming span's
+// parent_span does not exist in otel_signals, and the resource carries
+// htmlgraph.agent_id matching a pending_subagent_starts row, a placeholder
+// subagent_invocation row is synthesised for the parent_span immediately.
+func TestWriter_OrphanSpanCreatePlaceholder(t *testing.T) {
+	w, dbPath := newWriter(t)
+	ctx := context.Background()
+
+	sessionID := "sess-placeholder-test"
+	agentID := "agent-orphan-abc"
+	parentSpanID := "parent-span-orphan-111"
+
+	// Seed the session row and pending_subagent_starts entry.
+	readDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open readDB: %v", err)
+	}
+	defer readDB.Close()
+
+	if _, err := readDB.Exec(
+		`INSERT OR IGNORE INTO sessions (session_id, agent_assigned, status) VALUES (?, 'claude-code', 'active')`,
+		sessionID,
+	); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	pending := &db.PendingSubagentStart{
+		AgentID:   agentID,
+		AgentType: "haiku-coder",
+		SessionID: sessionID,
+		CWD:       "/tmp/test",
+		CreatedAt: time.Now().UnixMicro(),
+	}
+	if err := db.UpsertPendingSubagentStart(readDB, pending); err != nil {
+		t.Fatalf("UpsertPendingSubagentStart: %v", err)
+	}
+
+	// Build an orphan span: parent_span set but no parent row in otel_signals.
+	orphanSpan := sigFixture(sessionID, "prompt-orphan", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-orphan-child-1"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalToolExecution
+		s.NativeName = "claude_code.tool_execution"
+		s.SpanID = "child-span-orphan-222"
+		s.ParentSpan = parentSpanID // orphan: parent doesn't exist yet
+		s.TraceID = "trace-abc-123"
+	})
+
+	resourceAttrs := map[string]any{
+		"service.name":       "claude-code",
+		"htmlgraph.agent_id": agentID, // triggers placeholder path
+	}
+	n, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{orphanSpan})
+	if err != nil {
+		t.Fatalf("WriteBatch orphan span: %v", err)
+	}
+	// The child span itself should be inserted (n=1).
+	if n != 1 {
+		t.Errorf("inserted = %d, want 1 (child span)", n)
+	}
+
+	// A placeholder row should now exist for parentSpanID.
+	var placeholderCount int
+	if err := w.DB().QueryRow(
+		`SELECT COUNT(*) FROM otel_signals WHERE span_id = ? AND canonical = 'subagent_invocation'`,
+		parentSpanID,
+	).Scan(&placeholderCount); err != nil {
+		t.Fatalf("count placeholder row: %v", err)
+	}
+	if placeholderCount != 1 {
+		t.Errorf("placeholder row count = %d, want 1 (span_id=%q)", placeholderCount, parentSpanID)
+	}
+
+	// Placeholder attrs_json should contain "_pending":true.
+	var attrsJSON string
+	if err := w.DB().QueryRow(
+		`SELECT attrs_json FROM otel_signals WHERE span_id = ? AND canonical = 'subagent_invocation'`,
+		parentSpanID,
+	).Scan(&attrsJSON); err != nil {
+		t.Fatalf("select placeholder attrs_json: %v", err)
+	}
+	if !strings.Contains(attrsJSON, `"_pending":true`) {
+		t.Errorf("placeholder attrs_json missing _pending:true, got: %s", attrsJSON)
+	}
+}
+
+// TestWriter_RealAgentSpanUpgradesPlaceholder verifies that when the real
+// subagent_invocation Agent span arrives after a placeholder was created for
+// the same span_id, the placeholder is upgraded (not duplicated) with real data.
+func TestWriter_RealAgentSpanUpgradesPlaceholder(t *testing.T) {
+	w, dbPath := newWriter(t)
+	ctx := context.Background()
+
+	sessionID := "sess-upgrade-test"
+	agentID := "agent-upgrade-xyz"
+	agentSpanID := "agent-span-real-333" // this will be the placeholder span_id AND real span_id
+
+	// Seed session and pending row.
+	readDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open readDB: %v", err)
+	}
+	defer readDB.Close()
+
+	if _, err := readDB.Exec(
+		`INSERT OR IGNORE INTO sessions (session_id, agent_assigned, status) VALUES (?, 'claude-code', 'active')`,
+		sessionID,
+	); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	pending := &db.PendingSubagentStart{
+		AgentID:   agentID,
+		AgentType: "sonnet-coder",
+		SessionID: sessionID,
+		CWD:       "/tmp/upgrade-test",
+		CreatedAt: time.Now().Add(-30 * time.Second).UnixMicro(), // started 30s ago
+	}
+	if err := db.UpsertPendingSubagentStart(readDB, pending); err != nil {
+		t.Fatalf("UpsertPendingSubagentStart: %v", err)
+	}
+
+	resourceAttrs := map[string]any{
+		"service.name":       "claude-code",
+		"htmlgraph.agent_id": agentID,
+	}
+
+	// Step 1: Send an orphan child span. This triggers placeholder creation for agentSpanID.
+	childSpan := sigFixture(sessionID, "prompt-upgrade", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-child-for-upgrade"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalToolExecution
+		s.NativeName = "claude_code.tool_execution"
+		s.SpanID = "child-span-upgrade-444"
+		s.ParentSpan = agentSpanID // orphan parent
+		s.TraceID = "trace-upgrade-999"
+	})
+
+	if _, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{childSpan}); err != nil {
+		t.Fatalf("WriteBatch child span: %v", err)
+	}
+
+	// Verify placeholder exists.
+	var placeholderCount int
+	if err := w.DB().QueryRow(
+		`SELECT COUNT(*) FROM otel_signals WHERE span_id = ? AND attrs_json LIKE '%"_pending":true%'`,
+		agentSpanID,
+	).Scan(&placeholderCount); err != nil {
+		t.Fatalf("count placeholder: %v", err)
+	}
+	if placeholderCount != 1 {
+		t.Fatalf("expected 1 placeholder row, got %d", placeholderCount)
+	}
+
+	// Step 2: Send the real Agent/subagent_invocation span with the same span_id.
+	realAgentSpan := sigFixture(sessionID, "prompt-upgrade", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-real-agent-upgrade"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalSubagent   // triggers upgrade path
+		s.NativeName = "claude_code.agent_turn"
+		s.SpanID = agentSpanID                     // same span_id as placeholder
+		s.ParentSpan = ""                           // root agent span has no parent
+		s.TraceID = "trace-upgrade-999"
+		s.Model = "claude-sonnet-4-6"
+		s.Tokens = otel.TokenCounts{Input: 500, Output: 1200}
+		s.CostUSD = 0.0123
+		s.CostSource = otel.CostSourceVendor
+		s.DurationMs = 45000
+	})
+
+	n2, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{realAgentSpan})
+	if err != nil {
+		t.Fatalf("WriteBatch real agent span: %v", err)
+	}
+	// Upgrade counts as 1 modification.
+	if n2 != 1 {
+		t.Errorf("upgrade inserted count = %d, want 1", n2)
+	}
+
+	// Total row count for this span_id must be exactly 1 (no duplicate).
+	var totalRows int
+	if err := w.DB().QueryRow(
+		`SELECT COUNT(*) FROM otel_signals WHERE span_id = ?`, agentSpanID,
+	).Scan(&totalRows); err != nil {
+		t.Fatalf("count rows for span_id: %v", err)
+	}
+	if totalRows != 1 {
+		t.Errorf("expected exactly 1 row for span_id=%q, got %d (duplicate!)", agentSpanID, totalRows)
+	}
+
+	// Verify the row now has real data (not placeholder values).
+	var model string
+	var tokensIn, tokensOut int64
+	var attrsJSON string
+	if err := w.DB().QueryRow(
+		`SELECT COALESCE(model,''), COALESCE(tokens_in,0), COALESCE(tokens_out,0), attrs_json
+		 FROM otel_signals WHERE span_id = ?`,
+		agentSpanID,
+	).Scan(&model, &tokensIn, &tokensOut, &attrsJSON); err != nil {
+		t.Fatalf("select upgraded row: %v", err)
+	}
+	if model != "claude-sonnet-4-6" {
+		t.Errorf("model after upgrade = %q, want %q", model, "claude-sonnet-4-6")
+	}
+	if tokensIn != 500 || tokensOut != 1200 {
+		t.Errorf("tokens after upgrade = (%d, %d), want (500, 1200)", tokensIn, tokensOut)
+	}
+	// After upgrade, attrs_json should NOT contain _pending:true.
+	if strings.Contains(attrsJSON, `"_pending":true`) {
+		t.Errorf("upgraded row still contains _pending:true in attrs_json: %s", attrsJSON)
+	}
+}
+
+// TestWriter_ReattributesByAgentIDResourceAttr verifies Strategy A re-attribution:
+// a child span arriving with htmlgraph.agent_id and a wrong parent_span (pointing
+// at the interaction) gets re-parented to the correct Agent span_id.
+func TestWriter_ReattributesByAgentIDResourceAttr(t *testing.T) {
+	w, dbPath := newWriter(t)
+	ctx := context.Background()
+
+	sessionID := "sess-reattrib-a"
+	agentID := "agent-reattrib-aaa"
+	agentSpanID := "agent-span-reattrib-aaa-111"
+	interactionSpanID := "interaction-span-reattrib-aaa-000"
+	traceID := "trace-reattrib-aaa"
+
+	// Seed session.
+	readDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open readDB: %v", err)
+	}
+	defer readDB.Close()
+	if _, err := readDB.Exec(
+		`INSERT OR IGNORE INTO sessions (session_id, agent_assigned, status) VALUES (?, 'claude-code', 'active')`,
+		sessionID,
+	); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	// Seed pending_subagent_starts WITH agent_span_id already set (simulates
+	// that the placeholder was already created by a prior span batch).
+	if _, err := readDB.Exec(`
+		INSERT OR REPLACE INTO pending_subagent_starts
+			(agent_id, agent_type, session_id, created_at, agent_span_id)
+		VALUES (?, 'sonnet-coder', ?, ?, ?)`,
+		agentID, sessionID, time.Now().UnixMicro(), agentSpanID,
+	); err != nil {
+		t.Fatalf("seed pending_subagent_starts: %v", err)
+	}
+
+	// Seed the Agent span row so it exists in otel_signals.
+	if _, err := readDB.Exec(`
+		INSERT OR IGNORE INTO otel_signals
+			(signal_id, harness, session_id, trace_id, span_id, kind, canonical, native, ts_micros, attrs_json)
+		VALUES ('sig-agent-real', 'claude_code', ?, ?, ?, 'span', 'subagent_invocation', 'agent_invocation', ?, '{}')`,
+		sessionID, traceID, agentSpanID, time.Now().Add(-5*time.Second).UnixMicro(),
+	); err != nil {
+		t.Fatalf("seed agent span: %v", err)
+	}
+
+	// Seed the interaction span (this is the wrong parent the mis-parented span points to).
+	if _, err := readDB.Exec(`
+		INSERT OR IGNORE INTO otel_signals
+			(signal_id, harness, session_id, trace_id, span_id, kind, canonical, native, ts_micros, attrs_json)
+		VALUES ('sig-interaction', 'claude_code', ?, ?, ?, 'span', 'interaction', 'interaction', ?, '{}')`,
+		sessionID, traceID, interactionSpanID, time.Now().Add(-10*time.Second).UnixMicro(),
+	); err != nil {
+		t.Fatalf("seed interaction span: %v", err)
+	}
+
+	// Build the mis-parented child span: parent_span points at interaction, not Agent.
+	childSpan := sigFixture(sessionID, "prompt-reattrib-a", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-child-reattrib-a"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalToolExecution
+		s.NativeName = "claude_code.tool_execution"
+		s.SpanID = "child-span-reattrib-a-222"
+		s.ParentSpan = interactionSpanID // WRONG — should be agentSpanID
+		s.TraceID = traceID
+		s.ToolName = "Edit"
+	})
+
+	resourceAttrs := map[string]any{
+		"service.name":       "claude-code",
+		"htmlgraph.agent_id": agentID, // Strategy A trigger
+	}
+	n, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{childSpan})
+	if err != nil {
+		t.Fatalf("WriteBatch: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("inserted = %d, want 1", n)
+	}
+
+	// The inserted row must have parent_span = agentSpanID (re-attributed), not interactionSpanID.
+	var parentSpan string
+	if err := w.DB().QueryRow(
+		`SELECT COALESCE(parent_span,'') FROM otel_signals WHERE signal_id='sig-child-reattrib-a'`,
+	).Scan(&parentSpan); err != nil {
+		t.Fatalf("lookup parent_span: %v", err)
+	}
+	if parentSpan != agentSpanID {
+		t.Errorf("parent_span = %q, want %q (Strategy A re-attribution failed)", parentSpan, agentSpanID)
+	}
+}
+
+// TestWriter_ReattributesByOverlapWindow verifies Strategy B re-attribution:
+// a span without htmlgraph.agent_id, whose parent is an interaction span, gets
+// re-parented to the single Agent span whose window contains its timestamp.
+func TestWriter_ReattributesByOverlapWindow(t *testing.T) {
+	w, dbPath := newWriter(t)
+	ctx := context.Background()
+
+	sessionID := "sess-reattrib-b"
+	agentSpanID := "agent-span-reattrib-bbb-111"
+	interactionSpanID := "interaction-span-reattrib-bbb-000"
+	traceID := "trace-reattrib-bbb"
+
+	// Anchor times: agent started 30s ago and ran for 60s.
+	now := time.Now()
+	agentStart := now.Add(-30 * time.Second)
+	agentDurationMs := int64(60_000) // 60 seconds
+
+	readDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open readDB: %v", err)
+	}
+	defer readDB.Close()
+	if _, err := readDB.Exec(
+		`INSERT OR IGNORE INTO sessions (session_id, agent_assigned, status) VALUES (?, 'claude-code', 'active')`,
+		sessionID,
+	); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	// Seed the Agent span with a known time window.
+	if _, err := readDB.Exec(`
+		INSERT OR IGNORE INTO otel_signals
+			(signal_id, harness, session_id, trace_id, span_id, kind, canonical, native, ts_micros, duration_ms, attrs_json)
+		VALUES ('sig-agent-b', 'claude_code', ?, ?, ?, 'span', 'subagent_invocation', 'agent_invocation', ?, ?, '{}')`,
+		sessionID, traceID, agentSpanID, agentStart.UnixMicro(), agentDurationMs,
+	); err != nil {
+		t.Fatalf("seed agent span: %v", err)
+	}
+
+	// Seed the interaction span (wrong parent pointer).
+	if _, err := readDB.Exec(`
+		INSERT OR IGNORE INTO otel_signals
+			(signal_id, harness, session_id, trace_id, span_id, kind, canonical, native, ts_micros, attrs_json)
+		VALUES ('sig-interaction-b', 'claude_code', ?, ?, ?, 'span', 'interaction', 'interaction', ?, '{}')`,
+		sessionID, traceID, interactionSpanID, now.Add(-60*time.Second).UnixMicro(),
+	); err != nil {
+		t.Fatalf("seed interaction span: %v", err)
+	}
+
+	// Build the mis-parented child span: timestamp falls INSIDE the agent window.
+	childTs := agentStart.Add(5 * time.Second) // 5s after agent start → inside window
+	childSpan := sigFixture(sessionID, "prompt-reattrib-b", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-child-reattrib-b"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalToolExecution
+		s.NativeName = "claude_code.tool_execution"
+		s.SpanID = "child-span-reattrib-b-222"
+		s.ParentSpan = interactionSpanID // WRONG — should be agentSpanID
+		s.TraceID = traceID
+		s.Timestamp = childTs
+		s.ToolName = "Bash"
+	})
+
+	// No htmlgraph.agent_id — Strategy B should kick in.
+	resourceAttrs := map[string]any{
+		"service.name": "claude-code",
+	}
+	n, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{childSpan})
+	if err != nil {
+		t.Fatalf("WriteBatch: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("inserted = %d, want 1", n)
+	}
+
+	// The inserted row must have parent_span = agentSpanID (re-attributed).
+	var parentSpan string
+	if err := w.DB().QueryRow(
+		`SELECT COALESCE(parent_span,'') FROM otel_signals WHERE signal_id='sig-child-reattrib-b'`,
+	).Scan(&parentSpan); err != nil {
+		t.Fatalf("lookup parent_span: %v", err)
+	}
+	if parentSpan != agentSpanID {
+		t.Errorf("parent_span = %q, want %q (Strategy B re-attribution failed)", parentSpan, agentSpanID)
+	}
+}
+
+// TestWriter_DoesNotReattributeWhenAmbiguous verifies that when two Agent spans
+// overlap in time and both could contain the incoming span's timestamp, Strategy B
+// does NOT re-parent (ambiguous case — log warning only).
+func TestWriter_DoesNotReattributeWhenAmbiguous(t *testing.T) {
+	w, dbPath := newWriter(t)
+	ctx := context.Background()
+
+	sessionID := "sess-reattrib-ambig"
+	agentSpanID1 := "agent-span-ambig-111"
+	agentSpanID2 := "agent-span-ambig-222"
+	interactionSpanID := "interaction-span-ambig-000"
+	traceID := "trace-reattrib-ambig"
+
+	now := time.Now()
+	agentStart := now.Add(-30 * time.Second)
+	agentDurationMs := int64(60_000) // both agents span the same wide window
+
+	readDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open readDB: %v", err)
+	}
+	defer readDB.Close()
+	if _, err := readDB.Exec(
+		`INSERT OR IGNORE INTO sessions (session_id, agent_assigned, status) VALUES (?, 'claude-code', 'active')`,
+		sessionID,
+	); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	// Seed TWO overlapping Agent spans, both covering the same broad time window.
+	for i, spanID := range []string{agentSpanID1, agentSpanID2} {
+		if _, err := readDB.Exec(`
+			INSERT OR IGNORE INTO otel_signals
+				(signal_id, harness, session_id, trace_id, span_id, kind, canonical, native, ts_micros, duration_ms, attrs_json)
+			VALUES (?, 'claude_code', ?, ?, ?, 'span', 'subagent_invocation', 'agent_invocation', ?, ?, '{}')`,
+			fmt.Sprintf("sig-agent-ambig-%d", i+1), sessionID, traceID, spanID,
+			agentStart.UnixMicro(), agentDurationMs,
+		); err != nil {
+			t.Fatalf("seed agent span %d: %v", i+1, err)
+		}
+	}
+
+	// Seed the interaction span.
+	if _, err := readDB.Exec(`
+		INSERT OR IGNORE INTO otel_signals
+			(signal_id, harness, session_id, trace_id, span_id, kind, canonical, native, ts_micros, attrs_json)
+		VALUES ('sig-interaction-ambig', 'claude_code', ?, ?, ?, 'span', 'interaction', 'interaction', ?, '{}')`,
+		sessionID, traceID, interactionSpanID, now.Add(-60*time.Second).UnixMicro(),
+	); err != nil {
+		t.Fatalf("seed interaction span: %v", err)
+	}
+
+	// Build a mis-parented child span inside both agent windows.
+	childTs := agentStart.Add(5 * time.Second)
+	childSpan := sigFixture(sessionID, "prompt-ambig", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-child-reattrib-ambig"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalToolExecution
+		s.NativeName = "claude_code.tool_execution"
+		s.SpanID = "child-span-reattrib-ambig-333"
+		s.ParentSpan = interactionSpanID // WRONG, but ambiguous → should NOT be changed
+		s.TraceID = traceID
+		s.Timestamp = childTs
+		s.ToolName = "Bash"
+	})
+
+	// No htmlgraph.agent_id — only Strategy B is attempted.
+	resourceAttrs := map[string]any{
+		"service.name": "claude-code",
+	}
+	n, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{childSpan})
+	if err != nil {
+		t.Fatalf("WriteBatch: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("inserted = %d, want 1", n)
+	}
+
+	// The inserted row must have parent_span = interactionSpanID (unchanged — ambiguous).
+	var parentSpan string
+	if err := w.DB().QueryRow(
+		`SELECT COALESCE(parent_span,'') FROM otel_signals WHERE signal_id='sig-child-reattrib-ambig'`,
+	).Scan(&parentSpan); err != nil {
+		t.Fatalf("lookup parent_span: %v", err)
+	}
+	if parentSpan != interactionSpanID {
+		t.Errorf("parent_span = %q, want %q (ambiguous case should NOT re-parent)", parentSpan, interactionSpanID)
+	}
+}
+
+// TestWriter_OrphanSpanNoAgentIDGracefulDegrade verifies that an orphan span
+// without htmlgraph.agent_id in resource attrs does NOT synthesise a placeholder
+// (graceful degradation for pre-upgrade sessions).
+func TestWriter_OrphanSpanNoAgentIDGracefulDegrade(t *testing.T) {
+	w, _ := newWriter(t)
+	ctx := context.Background()
+
+	sessionID := "sess-no-agent-id"
+	orphanParentSpan := "parent-span-no-agent-999"
+
+	orphanSpan := sigFixture(sessionID, "prompt-no-agent", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-orphan-no-agent"
+		s.Kind = otel.KindSpan
+		s.CanonicalName = otel.CanonicalToolExecution
+		s.NativeName = "claude_code.tool_execution"
+		s.SpanID = "child-span-no-agent-555"
+		s.ParentSpan = orphanParentSpan
+	})
+
+	// No htmlgraph.agent_id in resource attrs — should not create placeholder.
+	resourceAttrs := map[string]any{
+		"service.name": "claude-code",
+		// intentionally omitting htmlgraph.agent_id
+	}
+	n, err := w.WriteBatch(ctx, otel.HarnessClaude, resourceAttrs, []otel.UnifiedSignal{orphanSpan})
+	if err != nil {
+		t.Fatalf("WriteBatch: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("inserted = %d, want 1", n)
+	}
+
+	// No placeholder should be created for the missing parent.
+	var count int
+	if err := w.DB().QueryRow(
+		`SELECT COUNT(*) FROM otel_signals WHERE span_id = ?`, orphanParentSpan,
+	).Scan(&count); err != nil {
+		t.Fatalf("count parent rows: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("placeholder created unexpectedly for no-agent-id orphan: count=%d", count)
 	}
 }

@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,6 +68,24 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	// Write env vars so subagent hooks know their parent and identity.
 	writeSubagentEnvVars(eventID, event.AgentID, agentType, projectDir, sessionID)
+
+	// Register a pending row so the OTLP receiver can synthesize a placeholder
+	// otel_signals row as soon as the first subagent span arrives — eliminating
+	// the visible "flash" where orphan tool-call spans render without a parent.
+	if event.AgentID != "" {
+		pending := &db.PendingSubagentStart{
+			AgentID:       event.AgentID,
+			AgentType:     agentType,
+			SessionID:     sessionID,
+			CWD:           projectDir,
+			ParentAgentID: os.Getenv("HTMLGRAPH_AGENT_ID"),
+			CreatedAt:     time.Now().UnixMicro(),
+		}
+		if err := db.UpsertPendingSubagentStart(database, pending); err != nil {
+			debugLog(projectDir, "[warn] handler=subagent-start session=%s: upsert pending_subagent_starts: %v",
+				sessionID[:minSessionLen(sessionID)], err)
+		}
+	}
 
 	return &HookResult{Continue: true}, nil
 }

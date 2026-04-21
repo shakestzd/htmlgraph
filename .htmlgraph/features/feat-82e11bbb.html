@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Work item attribution on OTel span rows</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-82e11bbb"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-20T21:57:31.391646"
+             data-updated="2026-04-21T00:01:38.617053" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Work item attribution on OTel span rows</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="fc0cc772-048f-443d-8731-3dc84d683a52.html" data-relationship="implemented_in" data-since="2026-04-20T21:57:37.446076">session fc0cc772-048f-443d-8731-3dc84d683a52</a></li>
+                    <li><a href="b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4.html" data-relationship="implemented_in" data-since="2026-04-20T22:05:56.211933">session b6b51c56-c2f2-4913-8b6d-6bc4414a9ab4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:01:38.616978">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Currently every OTel span stands alone in the trace view — you can't tell which work item the tool call belongs to. Hook-sourced events already carry feature_id (resolved via active_work_items table at hook time). OTel signals should inherit the same attribution so the span tree answers 'which bug/feature is this tool call advancing?'.
+
+Implementation plan:
+1. Schema: add feature_id column to otel_signals (idempotent ALTER).
+2. Receiver writer: on each INSERT, look up active_work_items.work_item_id for (session_id, agent_id=__root__) and populate feature_id. Cache within the batch so we don't query once per signal.
+3. API: /api/otel/spans LEFT JOIN features ON features.id = otel_signals.feature_id so each span carries feature_id + feature_title.
+4. Client: on rendered span rows, call this.featureBadge(span.feature_id, span.feature_title). Reuse the same badge styling as hook rows so trace-level attribution looks consistent with activity-tree attribution.
+
+Edge cases: subagents. For Task/Agent spans the work item may differ between parent and child (subagent may claim its own work item via feature start). active_work_items keys on agent_id too, so the right lookup is (session_id, agent_id) where agent_id = span's agent. But OTel doesn't carry agent_id — all signals in one session share session.id. This is an open question the Phase 5 plan should answer (span-based agent attribution). For now: use (session_id, __root__) and accept that subagent-level attribution will light up only after the orchestrator completes the subagent's work item.
+
+Minimum viable: top-level session attribution works. Subagent-level attribution is a follow-up.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -701,8 +701,31 @@ class HgEventTree extends HTMLElement {
       // fall back to hook-derived children so older content still
       // renders.
       var rootSpans = this._spansForTurn(turn);
-      if (rootSpans && rootSpans.length > 0) {
-        html += rootSpans.map(s => this.renderSpan(s, 1)).join('');
+      // Filter out top-level standalone api_request spans. The turn
+      // header already shows per-turn cost/tokens via _turnCostBadge, so
+      // the "api_request" footer row is redundant at the top level.
+      // api_request spans nested INSIDE tool spans are handled by the
+      // _precedingApi/_absorbedInto logic in _indexSpans and are NOT
+      // affected here — this filter is scoped to the turn's direct roots.
+      var filteredRootSpans = (rootSpans || []).filter(function(s) {
+        return s.canonical !== 'api_request' && s.tool_name !== 'api_request';
+      });
+      // Determine the turn's model for badge dedup in child spans.
+      // Walk the (unfiltered) root spans to find the first api_request
+      // that carries a model string — that's the turn-level model.
+      var turnModel = null;
+      (rootSpans || []).forEach(function findModel(s) {
+        if (turnModel) return;
+        if (s.canonical === 'api_request' && s.model) { turnModel = s.model; return; }
+        if (s._precedingApi && s._precedingApi.model) { turnModel = s._precedingApi.model; return; }
+        (s.children || []).forEach(findModel);
+      });
+      var turnModelShort = turnModel ? this._shortModelName(turnModel) : null;
+      // Post-pass: bundle consecutive same-server MCP spans into synthetic
+      // group wrappers so repetitive MCP runs collapse to a single row.
+      var groupedRootSpans = this._groupConsecutiveMcp(filteredRootSpans);
+      if (groupedRootSpans.length > 0) {
+        html += groupedRootSpans.map(s => this.renderSpan(s, 1, 0, uq.feature_id, turnModelShort)).join('');
       } else if (turn.children) {
         html += turn.children.map(c => this.renderEvent(c, 1)).join('');
       }
@@ -757,6 +780,63 @@ class HgEventTree extends HTMLElement {
     return html;
   }
 
+  // _relativizePath strips a project root prefix from an absolute file
+  // path so spans show a compact relative path instead of the full
+  // filesystem location. The full path is preserved in the row's title
+  // attribute as a hover tooltip.
+  //
+  // Strategy (in order):
+  //   1. Strip window.htmlgraphProjectRoot if set.
+  //   2. Find the first occurrence of a common repo-marker segment
+  //      (/cmd/, /internal/, /plugin/, /packages/, /scripts/, /.htmlgraph/)
+  //      and trim everything up to (but not including) that segment.
+  //   3. Return unchanged when the path is not absolute or no marker matches.
+  _relativizePath(path) {
+    if (!path || path.charAt(0) !== '/') return path;
+    // Strategy 1: explicit project root (set from /api/mode projectRoot).
+    var root = window.htmlgraphProjectRoot;
+    if (root) {
+      if (path.startsWith(root + '/')) return path.slice(root.length + 1);
+      if (path === root) return '.';
+    }
+    // Strategy 2: repo-marker heuristic.
+    var markers = ['/cmd/', '/internal/', '/plugin/', '/packages/', '/scripts/', '/.htmlgraph/'];
+    for (var i = 0; i < markers.length; i++) {
+      var idx = path.indexOf(markers[i]);
+      if (idx !== -1) return path.slice(idx + 1); // keep the marker segment itself
+    }
+    return path;
+  }
+
+  // _spanHasDetail returns true when _spanDetailBlock would produce
+  // non-empty output for this span. Used by renderSpan to decide whether
+  // to show the expand chevron.
+  _spanHasDetail(span) {
+    if (!span.tool_name) return false;
+    var d = span.details || {};
+    var tn = span.tool_name;
+    if (tn === 'Bash')        return !!(d.description || d.timeout || d.git_commit_id || d.full_command);
+    if (tn === 'Read')        return !!(d.file_path || d.offset || d.limit);
+    if (tn === 'Edit')        return !!(d.file_path || d.old_string_len || d.new_string_len || d.replace_all ||
+                                        d.old_string || d.new_string);
+    if (tn === 'Write')       return !!(d.file_path || d.content_len || d.content);
+    if (tn === 'NotebookEdit') return !!d.file_path;
+    if (tn === 'Grep')        return !!(d.pattern || d.path || d.output_mode);
+    if (tn === 'Glob')        return !!(d.pattern || d.path);
+    if (tn === 'Task' || tn === 'Agent') return !!(d.subagent_type || d.description || d.prompt);
+    if (tn === 'WebFetch' || tn === 'WebSearch') return !!(d.url || d.query);
+    if (tn === 'Skill')       return !!d.skill_name;
+    if (tn === 'TodoWrite')   return !!d.todo_count;
+    if (tn === 'TaskCreate' || tn === 'TaskUpdate' || tn === 'TaskList' ||
+        tn === 'TaskGet'    || tn === 'TaskStop'   || tn === 'TaskOutput') {
+      return !!(d.description || d.prompt || d.subagent_type);
+    }
+    if (tn.indexOf('mcp__') === 0) return !!(d.mcp_input || d.url || d.query || d.pattern || d.file_path);
+    // Also check for absorbed api_request details.
+    if (span._precedingApi) return true;
+    return false;
+  }
+
   // renderSpan emits a tree row for an OTel span and recursively renders
   // its children. Uses the same tool-chip classes as hook-sourced rows
   // (tool-Bash/Read/Edit/etc.) so Bash is green, Read is blue, Agent is
@@ -771,17 +851,61 @@ class HgEventTree extends HTMLElement {
   //
   // Span IDs are used as toggle keys, namespaced with "span:" so they
   // don't collide with event_id-keyed toggles from the hook-derived tree.
-  renderSpan(span, depth) {
+  //
+  // parentFeatureId — feature_id shown on the parent turn row; when this
+  // span's feature_id matches, we suppress the badge (dedup). Same logic
+  // for parentModel vs. the resolved model badge string.
+  renderSpan(span, depth, subagentDepth = 0, parentFeatureId = null, parentModel = null) {
     if (depth > 5) return '';
     if (!span) return '';
 
+    // Synthetic MCP group: render a summary row collapsing a consecutive run
+    // of same-server MCP tool calls. Collapsed by default; expand reveals
+    // the real child spans each rendered via the normal renderSpan path.
+    if (span.synthetic === 'mcp_group') {
+      var groupToggleKey = 'span:' + span.span_id;
+      var collapsed = JSON.parse(localStorage.getItem('hg-collapsed') || '[]');
+      var isUserExpanded = this.expanded.has(groupToggleKey);
+      // mcp_group rows default to collapsed (the opposite of subagent spans).
+      var isUserCollapsedGroup = collapsed.indexOf(groupToggleKey) !== -1;
+      var isExpGroup = isUserExpanded && !isUserCollapsedGroup;
+      var effectiveDepthGroup = depth + subagentDepth * 2;
+      var padLeftGroup = (effectiveDepthGroup + 1) * 1.25;
+      var bgAlphaGroup = 0.05 + depth * 0.08;
+      var serverColor = this._mcpServerColor(span.mcp_server);
+      var durGroup = span.duration_ms
+        ? (span.duration_ms >= 1000 ? (span.duration_ms / 1000).toFixed(2) + 's' : span.duration_ms + 'ms')
+        : '';
+      var durBdgGroup = durGroup ? '<span class="turn-stats">' + durGroup + '</span>' : '';
+      var htmlGroup = '<div class="event-row depth-' + depth + '"'
+        + ' data-span-id="' + esc(span.span_id) + '"'
+        + ' style="padding-left: ' + padLeftGroup + 'rem; background: rgba(0,0,0,' + bgAlphaGroup + ')">'
+        + '<span class="expand-icon ' + (isExpGroup ? 'expanded' : '') + '" data-toggle="' + esc(groupToggleKey) + '">▶</span>'
+        + '<span class="tool-chip tool-mcp-server" style="background-color: ' + serverColor + '; color: #ffffff" title="MCP server">' + esc(span.mcp_server) + '</span>'
+        + '<span class="tool-chip tool-mcp">' + span.count + ' tools</span>'
+        + '<span class="event-summary"></span>'
+        + durBdgGroup
+        + '</div>';
+      if (isExpGroup && span.children && span.children.length > 0) {
+        htmlGroup += span.children.map(c => this.renderSpan(c, depth + 1, subagentDepth, parentFeatureId, parentModel)).join('');
+      }
+      return htmlGroup;
+    }
+
     var toggleKey = 'span:' + span.span_id;
     var hasChildren = span.children && span.children.length > 0;
+    var hasDetailPanel = this._spanHasDetail(span);
     // Synthetic pending roots default to expanded so the actual tool
     // activity is visible without an extra click — users shouldn't have
     // to discover a placeholder node just to see their own tool calls.
-    var isExp = this.expanded.has(toggleKey) || (span._pending && !this.expanded.has('collapse:' + span.span_id));
-    var expandIcon = hasChildren
+    // Subagent invocation spans (Task/Agent tool calls) also default to
+    // expanded to show their children without requiring interaction.
+    var collapsed = JSON.parse(localStorage.getItem('hg-collapsed') || '[]');
+    var isUserCollapsed = collapsed.indexOf(toggleKey) !== -1;
+    var isExp = this.expanded.has(toggleKey)
+      || (span._pending && !isUserCollapsed)
+      || (this._isSubagentSpan(span) && !isUserCollapsed);
+    var expandIcon = (hasDetailPanel || hasChildren)
       ? '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(toggleKey) + '">\u25B6</span>'
       : '<span class="expand-icon-spacer"></span>';
 
@@ -830,7 +954,10 @@ class HgEventTree extends HTMLElement {
     // Match hook-row visual treatment: same padding ladder, same
     // bg-alpha ladder, same base row class. Span rows no longer look
     // visually distinct from hook rows — the span tree IS the tree now.
-    var padLeft = (depth + 1) * 1.25;
+    // Subagent-rooted children get extra visual nesting: each subagent
+    // boundary adds 2 * 1.25rem to the indent (beyond the per-level step).
+    var effectiveDepth = depth + subagentDepth * 2;
+    var padLeft = (effectiveDepth + 1) * 1.25;
     var bgAlpha = 0.05 + depth * 0.08;
 
     var traceChip = '';
@@ -853,7 +980,10 @@ class HgEventTree extends HTMLElement {
     // active_work_items at ingest time (see writer.go); this lights up
     // only for sessions whose root agent claimed a work item before the
     // signal arrived. Pre-attribution rows stay silent.
-    var featureBdg = (isToolSpan && span.feature_id)
+    // Dedup: suppress the badge when the feature matches the parent turn's
+    // feature (parentFeatureId). Render it only when different — that's the
+    // interesting case (e.g. a subagent grabbing a different work item).
+    var featureBdg = (isToolSpan && span.feature_id && span.feature_id !== parentFeatureId)
       ? this.featureBadge(span.feature_id, span.feature_title)
       : '';
 
@@ -869,7 +999,13 @@ class HgEventTree extends HTMLElement {
     // own color without inflating CSS. The short label ("Opus 4.7",
     // "Sonnet 4.6", "Haiku 4.5") scans far faster than the full
     // "claude-opus-4-7-20251014" id at row scale.
-    var modelBdg = apiModel ? this._modelBadge(apiModel, api ? 'Model for the api_request that decided this tool call' : 'Model') : '';
+    // Dedup: suppress model badge when it matches the parent turn's model
+    // (parentModel). Show only when different (e.g. Haiku subagent inside
+    // an Opus turn).
+    var resolvedModelName = apiModel ? this._shortModelName(apiModel) : '';
+    var modelBdg = (apiModel && resolvedModelName !== parentModel)
+      ? this._modelBadge(apiModel, api ? 'Model for the api_request that decided this tool call' : 'Model')
+      : '';
     var costBdg = (apiCost > 0)
       ? '<span class="badge badge-otel">$' + apiCost.toFixed(4) + '</span>'
       : '';
@@ -888,11 +1024,15 @@ class HgEventTree extends HTMLElement {
     var rangeBdg = this._rangeBadge(span);
 
     // Hover tooltip: for Bash show the full command (since summary is
-    // description); for other tools, show the native span name for
-    // provenance. esc() prevents quote-breakout.
+    // description); for file tools (Read/Edit/Write/NotebookEdit) show the
+    // full absolute path (since the summary was relativized); for other
+    // tools, show the native span name for provenance.
     var rowTitle = '';
     if (span.tool_name === 'Bash' && d.full_command) {
       rowTitle = d.full_command;
+    } else if ((span.tool_name === 'Read' || span.tool_name === 'Edit' ||
+                span.tool_name === 'Write' || span.tool_name === 'NotebookEdit') && d.file_path) {
+      rowTitle = d.file_path;
     } else if (span.native_name) {
       rowTitle = span.native_name;
     }
@@ -926,7 +1066,30 @@ class HgEventTree extends HTMLElement {
       // badges already summarize.
       var detailBlock = this._spanDetailBlock(span, depth + 1);
       if (detailBlock) html += detailBlock;
-      html += span.children.map(c => this.renderSpan(c, depth + 1)).join('');
+      // Track subagent nesting: if this span is a subagent invocation,
+      // increment subagentDepth for children so they render deeper.
+      var nextSubagentDepth = subagentDepth + (this._isSubagentSpan(span) ? 1 : 0);
+      // Propagate feature/model context so children can dedup badges.
+      // If this span introduced a different feature/model, pass it down;
+      // otherwise keep propagating what we received.
+      var childFeatureId = (span.feature_id && span.feature_id !== parentFeatureId)
+        ? span.feature_id : parentFeatureId;
+      var childModel = resolvedModelName || parentModel;
+      // F4: filter infrastructure children before rendering.
+      // 1. Always drop tool_execution — parent duration covers it.
+      // 2. Drop tool_blocked_on_user when auto-approved (config source, or
+      //    missing decision_source). User-visible decisions (user-approve,
+      //    reject, abort) keep their own rows; a dim badge on the parent row
+      //    (via _toolChildRollup) summarises the auto-approved path.
+      var visibleChildren = span.children.filter(function(c) {
+        if (c.canonical === 'tool_execution') return false;
+        if (c.canonical === 'tool_blocked_on_user') {
+          var ds = (c.details || {}).decision_source;
+          if (!ds || ds === 'config' || ds === 'hook') return false;
+        }
+        return true;
+      });
+      html += visibleChildren.map(c => this.renderSpan(c, depth + 1, nextSubagentDepth, childFeatureId, childModel)).join('');
     }
     return html;
   }
@@ -991,16 +1154,33 @@ class HgEventTree extends HTMLElement {
       if (d.prompt)         rows.push(['prompt', d.prompt]);
       if (d.subagent_type)  rows.push(['subagent', d.subagent_type]);
     } else if (span.tool_name && span.tool_name.indexOf('mcp__') === 0) {
-      // MCP tool: show server + tool split + any common args.
+      // MCP tool: show server + tool split, then all mcp_input key-values.
       var mcp = this._parseMCPToolName(span.tool_name);
       if (mcp) {
         rows.push(['server', mcp.serverName]);
         rows.push(['tool', mcp.toolName]);
       }
-      if (d.url)            rows.push(['url', d.url]);
-      if (d.query)          rows.push(['query', d.query]);
-      if (d.pattern)        rows.push(['pattern', d.pattern]);
-      if (d.file_path)      rows.push(['file', d.file_path]);
+      // Render mcp_input key-values. Long/multi-line values become code blocks.
+      if (d.mcp_input && typeof d.mcp_input === 'object') {
+        var mcpKeys = Object.keys(d.mcp_input);
+        for (var mi = 0; mi < mcpKeys.length; mi++) {
+          var mk = mcpKeys[mi];
+          var mv = d.mcp_input[mk];
+          var mvStr = (typeof mv === 'string') ? mv : JSON.stringify(mv, null, 2);
+          if (mvStr.length > 200 || mvStr.indexOf('\n') !== -1) {
+            // Long or multi-line: defer to code block; don't add to rows.
+            // Code blocks are appended after rows below.
+          } else {
+            rows.push([mk, mvStr]);
+          }
+        }
+      } else {
+        // Fallback: legacy detail fields if mcp_input not present.
+        if (d.url)          rows.push(['url', d.url]);
+        if (d.query)        rows.push(['query', d.query]);
+        if (d.pattern)      rows.push(['pattern', d.pattern]);
+        if (d.file_path)    rows.push(['file', d.file_path]);
+      }
     }
     // Preceding api_request: if absorbed, show the details we hid from
     // the top-level tree so expanding the tool reveals the full context.
@@ -1036,6 +1216,18 @@ class HgEventTree extends HTMLElement {
     } else if (span.tool_name === 'Write') {
       if (d.content) {
         codeBlocks += this._codeBlock('content', d.content, d.content_len, d.content_truncated, this._detectLanguage(d.file_path));
+      }
+    } else if (span.tool_name && span.tool_name.indexOf('mcp__') === 0 && d.mcp_input && typeof d.mcp_input === 'object') {
+      // MCP tools: render long/multi-line input values as code blocks.
+      var mcpCodeKeys = Object.keys(d.mcp_input);
+      for (var mci = 0; mci < mcpCodeKeys.length; mci++) {
+        var mck = mcpCodeKeys[mci];
+        var mcv = d.mcp_input[mck];
+        var mcvStr = (typeof mcv === 'string') ? mcv : JSON.stringify(mcv, null, 2);
+        if (mcvStr.length > 200 || mcvStr.indexOf('\n') !== -1) {
+          var mcLang = (typeof mcv !== 'string') ? 'json' : '';
+          codeBlocks += this._codeBlock(mck, mcvStr, mcvStr.length, false, mcLang);
+        }
       }
     }
 
@@ -1221,6 +1413,70 @@ class HgEventTree extends HTMLElement {
     };
   }
 
+  // _mcpServerOf returns the MCP server name for an MCP span, or null
+  // for non-MCP spans. Used by _groupConsecutiveMcp to identify runs.
+  _mcpServerOf(span) {
+    if (!span || span.synthetic) return null;
+    var parsed = this._parseMCPToolName(span.tool_name);
+    return parsed ? parsed.serverName : null;
+  }
+
+  // _groupConsecutiveMcp rewrites a children array so that runs of ≥2
+  // consecutive sibling spans from the same MCP server are collapsed into
+  // a single synthetic "mcp_group" wrapper. Single-span runs and non-MCP
+  // spans pass through unchanged. Applies recursively to each child's own
+  // children (real children inside a group stay ungrouped — they already
+  // live inside a synthetic wrapper and rarely have their own MCP runs).
+  _groupConsecutiveMcp(children) {
+    var self = this;
+    if (!children || children.length === 0) return children;
+    var result = [];
+    var i = 0;
+    while (i < children.length) {
+      var server = self._mcpServerOf(children[i]);
+      if (!server) {
+        // Non-MCP span: recurse into its own children then pass through.
+        var child = children[i];
+        if (child.children && child.children.length > 0) {
+          child = Object.assign({}, child, { children: self._groupConsecutiveMcp(child.children) });
+        }
+        result.push(child);
+        i++;
+        continue;
+      }
+      // Start an MCP run — collect consecutive siblings with same server.
+      var run = [children[i]];
+      i++;
+      while (i < children.length && self._mcpServerOf(children[i]) === server) {
+        run.push(children[i]);
+        i++;
+      }
+      if (run.length === 1) {
+        // Single MCP call — no grouping; recurse into its children.
+        var sole = run[0];
+        if (sole.children && sole.children.length > 0) {
+          sole = Object.assign({}, sole, { children: self._groupConsecutiveMcp(sole.children) });
+        }
+        result.push(sole);
+      } else {
+        // Multi-span run — synthesize a group wrapper.
+        var totalMs = run.reduce(function(acc, s) { return acc + (s.duration_ms || 0); }, 0);
+        result.push({
+          synthetic: 'mcp_group',
+          span_id: 'mcpgrp-' + run[0].span_id + '-' + run[run.length - 1].span_id,
+          mcp_server: server,
+          tool_name: 'mcp_group',
+          canonical: 'mcp_group',
+          duration_ms: totalMs,
+          start_ts_micros: run[0].start_ts_micros || run[0].ts_micros,
+          children: run,
+          count: run.length,
+        });
+      }
+    }
+    return result;
+  }
+
   // _mcpServerColor returns a deterministic color for a given MCP
   // server name so multiple tools from the same server share a color.
   // Hash the name to an HSL hue, keep saturation+lightness constant so
@@ -1256,6 +1512,16 @@ class HgEventTree extends HTMLElement {
     return '';
   }
 
+  // _isSubagentSpan detects whether a span represents a subagent invocation
+  // (Task or Agent tool call). Used to apply extra visual nesting depth
+  // to subagent-rooted child spans.
+  _isSubagentSpan(span) {
+    if (!span) return false;
+    if (span.canonical === 'subagent_invocation') return true;
+    var name = span.tool_name || span.name || '';
+    return name === 'Task' || name === 'Agent';
+  }
+
   // _spanCanonicalLabel returns a short human label for non-tool spans.
   // Maps claude_code.interaction → "interaction", claude_code.llm_request
   // → "api_request", tool.execution → "exec", tool.blocked_on_user →
@@ -1289,7 +1555,7 @@ class HgEventTree extends HTMLElement {
       return d.description || d.full_command || d.bash_command || '';
     }
     if (span.tool_name === 'Read' || span.tool_name === 'Edit' || span.tool_name === 'Write' || span.tool_name === 'NotebookEdit') {
-      return d.file_path || '';
+      return this._relativizePath(d.file_path || '');
     }
     if (span.tool_name === 'Grep' || span.tool_name === 'Glob') {
       return d.pattern || '';

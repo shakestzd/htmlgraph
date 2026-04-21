@@ -429,6 +429,10 @@ func launchClaude(opts LaunchOpts) error {
 		return fmt.Errorf("claude not found in PATH: %w", err)
 	}
 
+	// Show the one-time OTel first-launch notice before starting the
+	// server so users see the explanation before any server output.
+	MaybeShowOtelNotice(opts.ProjectRoot)
+
 	// When OTel is enabled, the spawned claude will export to
 	// 127.0.0.1:4318 (our OTLP receiver). If htmlgraph serve isn't
 	// already running, signals drop silently. Auto-start a detached

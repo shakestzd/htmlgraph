@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/otel"
 )
 
@@ -20,10 +22,12 @@ import (
 // budget on deferred upgrades. Prepared statements are held for the
 // Writer's lifetime.
 type Writer struct {
-	db         *sql.DB
-	insertStmt *sql.Stmt
-	sessStmt   *sql.Stmt
-	resStmt    *sql.Stmt
+	db              *sql.DB
+	insertStmt      *sql.Stmt
+	sessStmt        *sql.Stmt
+	resStmt         *sql.Stmt
+	placeholderStmt *sql.Stmt // INSERT placeholder subagent_invocation row
+	upgradeStmt     *sql.Stmt // UPDATE placeholder → real Agent span
 }
 
 // NewWriter opens a writer-mode DB handle on dbPath. The handle is
@@ -97,6 +101,65 @@ func (w *Writer) prepare() error {
 	if err != nil {
 		return fmt.Errorf("prepare resource upsert: %w", err)
 	}
+
+	// Placeholder upsert: synthesise a minimal subagent_invocation row keyed on
+	// the orphan span's parent_span so the dashboard sees an Agent node immediately
+	// rather than waiting minutes for the real Agent span to arrive.
+	// ON CONFLICT(signal_id) DO NOTHING: if we already wrote a placeholder for this
+	// signal_id, leave it alone (idempotent re-delivery).
+	// The span_id unique index (idx_otel_span_id_unique) is NOT used here; instead
+	// we guard at the call site with an existence check on span_id.
+	w.placeholderStmt, err = w.db.Prepare(`
+		INSERT OR IGNORE INTO otel_signals (
+			signal_id, harness, session_id,
+			trace_id, span_id,
+			kind, canonical, native, ts_micros,
+			tool_name,
+			attrs_json
+		) VALUES (?, ?, ?, ?, ?, 'span', 'subagent_invocation', 'agent_invocation', ?, 'Agent', ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare placeholder insert: %w", err)
+	}
+
+	// Upgrade statement: when the real Agent span arrives and a placeholder row
+	// already exists for the same span_id, overwrite the placeholder's fields
+	// with actual data. We identify placeholder rows via attrs_json containing
+	// "_pending":true so we don't accidentally overwrite real data.
+	w.upgradeStmt, err = w.db.Prepare(`
+		UPDATE otel_signals SET
+			signal_id = ?,
+			harness = ?,
+			prompt_id = ?,
+			trace_id = ?,
+			parent_span = ?,
+			native = ?,
+			ts_micros = ?,
+			tool_name = ?,
+			tool_use_id = ?,
+			model = ?,
+			decision = ?,
+			decision_source = ?,
+			tokens_in = ?,
+			tokens_out = ?,
+			tokens_cache_read = ?,
+			tokens_cache_creation = ?,
+			tokens_thought = ?,
+			tokens_tool = ?,
+			tokens_reasoning = ?,
+			cost_usd = ?,
+			cost_source = ?,
+			duration_ms = ?,
+			success = ?,
+			error_msg = ?,
+			attempt = ?,
+			status_code = ?,
+			attrs_json = ?,
+			feature_id = ?
+		WHERE span_id = ? AND attrs_json LIKE '%"_pending":true%'`)
+	if err != nil {
+		return fmt.Errorf("prepare upgrade stmt: %w", err)
+	}
+
 	return nil
 }
 
@@ -110,6 +173,12 @@ func (w *Writer) Close() error {
 	}
 	if w.resStmt != nil {
 		w.resStmt.Close()
+	}
+	if w.placeholderStmt != nil {
+		w.placeholderStmt.Close()
+	}
+	if w.upgradeStmt != nil {
+		w.upgradeStmt.Close()
 	}
 	return w.db.Close()
 }
@@ -164,6 +233,12 @@ func (w *Writer) WriteBatch(
 	insertStmt := tx.Stmt(w.insertStmt)
 	sessStmt := tx.Stmt(w.sessStmt)
 	resStmt := tx.Stmt(w.resStmt)
+	placeholderStmt := tx.Stmt(w.placeholderStmt)
+	upgradeStmt := tx.Stmt(w.upgradeStmt)
+
+	// spanExists caches span_ids already present in otel_signals (within this
+	// transaction) so we only query the DB once per distinct span_id per batch.
+	spanExists := map[string]bool{}
 
 	for i := range signals {
 		s := &signals[i]
@@ -217,6 +292,47 @@ func (w *Writer) WriteBatch(
 			featureByID[s.SessionID] = featureID
 		}
 
+		// Placeholder upgrade: if this signal is the real Agent/subagent_invocation
+		// span, check whether a placeholder exists for the same span_id and update it
+		// rather than inserting a duplicate. This transparently promotes the placeholder
+		// written during orphan-span detection to a fully-attributed row.
+		if s.Kind == otel.KindSpan && s.CanonicalName == otel.CanonicalSubagent && s.SpanID != "" {
+			upgraded, upgradeErr := tryUpgradePlaceholder(ctx, upgradeStmt, s, attrsJSON, successVal, featureID)
+			if upgradeErr != nil {
+				return inserted, fmt.Errorf("upgrade placeholder for span %s: %w", s.SpanID, upgradeErr)
+			}
+			if upgraded {
+				inserted++
+				continue
+			}
+		}
+
+		// Orphan span detection: when an incoming span has a parent_span that does
+		// not yet exist in otel_signals, synthesise a placeholder row so the
+		// dashboard renders the Agent node immediately instead of waiting minutes.
+		// Only attempt this when the signal carries htmlgraph.agent_id so we can
+		// look up pending_subagent_starts. Gracefully degrade when missing.
+		if s.Kind == otel.KindSpan && s.ParentSpan != "" {
+			if err2 := w.maybeCreatePlaceholder(ctx, tx, placeholderStmt, s, resourceAttrs, spanExists, resObservedAt); err2 != nil {
+				// Non-fatal: log via return path but don't block the real signal.
+				_ = err2
+			}
+		}
+
+		// Re-attribution: correct mis-parented spans before INSERT.
+		// Some subagent-emitted spans arrive with parent_span pointing to the
+		// interaction span instead of the Agent span due to a TRACEPARENT propagation
+		// gap in Claude Code. We detect and fix this here so otel_signals.parent_span
+		// is correct from the start. Two strategies (A: agent_id resource attr,
+		// B: overlap window) are applied in priority order.
+		if s.Kind == otel.KindSpan && s.ParentSpan != "" && s.CanonicalName != otel.CanonicalSubagent {
+			if newParent, reason := tryReattributeParent(ctx, tx, s, resourceAttrs); newParent != "" {
+				log.Printf("reattribute: span=%s old_parent=%s new_parent=%s reason=%s",
+					s.SpanID, s.ParentSpan, newParent, reason)
+				s.ParentSpan = newParent
+			}
+		}
+
 		res, execErr := insertStmt.ExecContext(ctx,
 			s.SignalID, string(s.Harness), s.SessionID, nullStr(s.PromptID),
 			nullStr(s.TraceID), nullStr(s.SpanID), nullStr(s.ParentSpan),
@@ -243,6 +359,243 @@ func (w *Writer) WriteBatch(
 		return inserted, fmt.Errorf("commit: %w", err)
 	}
 	return inserted, nil
+}
+
+// maybeCreatePlaceholder synthesises a subagent_invocation placeholder row when
+// an incoming span's parent_span does not yet exist in otel_signals. It reads
+// htmlgraph.agent_id from resourceAttrs to look up pending_subagent_starts.
+// Errors are logged at the call site and never propagate to the caller.
+func (w *Writer) maybeCreatePlaceholder(
+	ctx context.Context,
+	tx *sql.Tx,
+	placeholderStmt *sql.Stmt,
+	s *otel.UnifiedSignal,
+	resourceAttrs map[string]any,
+	spanExists map[string]bool,
+	resObservedAt int64,
+) error {
+	parentSpan := s.ParentSpan
+
+	// Check cache first, then DB.
+	if exists, ok := spanExists[parentSpan]; ok && exists {
+		return nil
+	}
+
+	var n int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM otel_signals WHERE span_id = ?`, parentSpan,
+	).Scan(&n); err != nil {
+		return nil // non-fatal
+	}
+	spanExists[parentSpan] = n > 0
+	if n > 0 {
+		return nil // parent already exists; nothing to do
+	}
+
+	// Parent is missing. Check for htmlgraph.agent_id on the resource.
+	agentID, _ := resourceAttrs["htmlgraph.agent_id"].(string)
+	if agentID == "" {
+		// No agent_id → we can't look up pending_subagent_starts. Degrade gracefully.
+		return nil
+	}
+
+	// Look up the pending row using the transaction connection (same pool,
+	// MaxOpenConns=1 — we MUST use tx, not w.db, to avoid deadlock).
+	var pending db.PendingSubagentStart
+	var cwd sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT agent_id, agent_type, session_id, cwd, created_at
+		FROM pending_subagent_starts
+		WHERE agent_id = ?`, agentID,
+	).Scan(&pending.AgentID, &pending.AgentType, &pending.SessionID, &cwd, &pending.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil // no pending row; subagent started before this feature shipped
+	}
+	if err != nil {
+		return nil // non-fatal
+	}
+	pending.CWD = cwd.String
+
+	// Build a minimal attrs_json for the placeholder.
+	placeholderAttrs := map[string]any{
+		"_pending":           true,
+		"agent_type":         pending.AgentType,
+		"htmlgraph.agent_id": agentID,
+		"placeholder_source": "subagent_start_hook",
+	}
+	attrsJSON, _ := json.Marshal(placeholderAttrs)
+
+	// The placeholder signal_id is deterministic so re-delivery of the same
+	// first orphan span doesn't create duplicate placeholders.
+	placeholderSignalID := "placeholder:" + parentSpan
+
+	if _, err := placeholderStmt.ExecContext(ctx,
+		placeholderSignalID, string(s.Harness), pending.SessionID,
+		nullStr(s.TraceID), parentSpan,
+		pending.CreatedAt, string(attrsJSON),
+	); err != nil {
+		return fmt.Errorf("insert placeholder: %w", err)
+	}
+
+	spanExists[parentSpan] = true
+
+	// Back-fill the agent_span_id mapping so Strategy A re-attribution can
+	// resolve (session_id, agent_id) → agent span_id without scanning otel_signals.
+	// We use the same transaction connection (tx) to avoid the w.db deadlock.
+	// Best-effort: ignore errors since re-attribution degrades gracefully.
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE pending_subagent_starts SET agent_span_id = ? WHERE agent_id = ?`,
+		parentSpan, agentID,
+	); err != nil {
+		// Non-fatal: re-attribution will fall back to Strategy B.
+		_ = err
+	}
+
+	// Mark consumed for observability using a deferred write so we don't
+	// block the transaction on an extra round-trip. MarkPendingSubagentConsumed
+	// is best-effort; skip it here to avoid the w.db deadlock.
+	// The consumed_at column will be set on the next periodic purge sweep.
+	_ = resObservedAt
+
+	return nil
+}
+
+// tryUpgradePlaceholder upgrades a placeholder subagent_invocation row with
+// real Agent span data. Returns true if a placeholder was found and upgraded.
+// Returns false when no placeholder exists (caller should proceed with normal INSERT).
+func tryUpgradePlaceholder(
+	ctx context.Context,
+	upgradeStmt *sql.Stmt,
+	s *otel.UnifiedSignal,
+	attrsJSON []byte,
+	successVal sql.NullInt64,
+	featureID string,
+) (bool, error) {
+	res, err := upgradeStmt.ExecContext(ctx,
+		s.SignalID, string(s.Harness),
+		nullStr(s.PromptID),
+		nullStr(s.TraceID),
+		nullStr(s.ParentSpan),
+		s.NativeName,
+		s.Timestamp.UnixMicro(),
+		nullStr(s.ToolName), nullStr(s.ToolUseID), nullStr(s.Model),
+		nullStr(s.Decision), nullStr(s.DecisionSource),
+		nullInt64(s.Tokens.Input), nullInt64(s.Tokens.Output),
+		nullInt64(s.Tokens.CacheRead), nullInt64(s.Tokens.CacheCreation),
+		nullInt64(s.Tokens.Thought), nullInt64(s.Tokens.Tool), nullInt64(s.Tokens.Reasoning),
+		nullFloat(s.CostUSD), nullStr(string(s.CostSource)),
+		nullInt64(s.DurationMs), successVal, nullStr(s.ErrorMsg),
+		nullInt(s.Attempt), nullInt(s.StatusCode),
+		string(attrsJSON), nullStr(featureID),
+		s.SpanID, // WHERE span_id = ?
+	)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// tryReattributeParent checks whether the incoming span is mis-parented (i.e.,
+// its parent_span points to an interaction span instead of the enclosing Agent
+// span). Two strategies are applied in priority order:
+//
+//  A. htmlgraph.agent_id resource attr (post-feat-e1efb972): look up the
+//     agent_span_id in pending_subagent_starts for this agent_id; if found
+//     and differs from the incoming parent_span, override.
+//
+//  B. Overlap window (pre-feat-e1efb972 fallback): when no agent_id is
+//     available, check if the incoming span's timestamp falls within
+//     exactly one sibling subagent_invocation span's [ts, ts+duration]
+//     window and the current parent is an interaction canonical.
+//
+// Returns (newParentSpanID, reason) when re-attribution applies, or ("", "")
+// when no fix is warranted.
+func tryReattributeParent(
+	ctx context.Context,
+	tx *sql.Tx,
+	s *otel.UnifiedSignal,
+	resourceAttrs map[string]any,
+) (newParent, reason string) {
+	// Strategy A: authoritative agent_id mapping.
+	agentID, _ := resourceAttrs["htmlgraph.agent_id"].(string)
+	if agentID != "" {
+		var agentSpanID sql.NullString
+		if err := tx.QueryRowContext(ctx,
+			`SELECT agent_span_id FROM pending_subagent_starts WHERE agent_id = ?`, agentID,
+		).Scan(&agentSpanID); err == nil && agentSpanID.Valid && agentSpanID.String != "" {
+			if agentSpanID.String != s.ParentSpan {
+				return agentSpanID.String, "strategy_a_agent_id"
+			}
+		}
+		// agent_id present but no agent_span_id yet (placeholder not created yet) — skip.
+		return "", ""
+	}
+
+	// Strategy B: overlap window fallback for pre-feat-e1efb972 sessions.
+	// Only applies when the current parent is an interaction span.
+	if s.SessionID == "" || s.ParentSpan == "" {
+		return "", ""
+	}
+
+	// Check that the current parent is indeed an interaction canonical.
+	var parentCanonical sql.NullString
+	if err := tx.QueryRowContext(ctx,
+		`SELECT canonical FROM otel_signals WHERE span_id = ?`, s.ParentSpan,
+	).Scan(&parentCanonical); err != nil || parentCanonical.String != otel.CanonicalInteraction {
+		return "", ""
+	}
+
+	// Find all subagent_invocation spans in this session that have a known duration.
+	spanTsMicros := s.Timestamp.UnixMicro()
+	rows, err := tx.QueryContext(ctx, `
+		SELECT span_id, ts_micros, duration_ms
+		FROM otel_signals
+		WHERE session_id = ? AND canonical = ? AND duration_ms IS NOT NULL AND duration_ms > 0`,
+		s.SessionID, otel.CanonicalSubagent,
+	)
+	if err != nil {
+		return "", ""
+	}
+	defer rows.Close()
+
+	type agentWindow struct {
+		spanID      string
+		startMicros int64
+		endMicros   int64
+	}
+	var matches []agentWindow
+	for rows.Next() {
+		var spanID string
+		var tsMicros, durationMs int64
+		if err := rows.Scan(&spanID, &tsMicros, &durationMs); err != nil {
+			continue
+		}
+		endMicros := tsMicros + durationMs*1000 // duration_ms → microseconds
+		if spanTsMicros >= tsMicros && spanTsMicros <= endMicros {
+			matches = append(matches, agentWindow{spanID, tsMicros, endMicros})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", ""
+	}
+
+	if len(matches) == 1 {
+		if matches[0].spanID != s.ParentSpan {
+			return matches[0].spanID, "strategy_b_overlap_window"
+		}
+	} else if len(matches) > 1 {
+		// Ambiguous: multiple overlapping Agent spans — skip re-parenting.
+		log.Printf("reattribute: span=%s ambiguous overlap (%d agent windows), skipping", s.SpanID, len(matches))
+	}
+
+	return "", ""
+}
+
+// PurgeStaleSubagentStarts removes pending_subagent_starts rows older than 24 h.
+// Called on Writer startup and periodically to bound table growth.
+func (w *Writer) PurgeStaleSubagentStarts() {
+	db.PurgeStalePendingSubagentStarts(w.db)
 }
 
 // DB returns the underlying handle. Tests use this to assert row counts

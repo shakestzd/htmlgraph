@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Render OTel spans as primary turn children (Phase 5)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-4b4be3ec"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-20T22:32:34.337205"
+             data-updated="2026-04-21T00:01:38.412189" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Render OTel spans as primary turn children (Phase 5)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="fc0cc772-048f-443d-8731-3dc84d683a52.html" data-relationship="implemented_in" data-since="2026-04-20T22:32:39.007359">session fc0cc772-048f-443d-8731-3dc84d683a52</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-21T00:01:38.412114">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Currently each turn in the activity feed renders TWO child subtrees: hook-derived rows (from agent_events via renderEvent) and OTel-derived rows (from otel_signals via renderSpan, visually distinct with blue border). Now that OTel gives correct hierarchy (subagent tool calls nest natively, no tracer.go custom logic needed), we can collapse to a single tree per turn.
+
+Change: in renderTurn, when _spansForTurn(turn) returns non-empty, render ONLY the span tree and skip hook-derived children. Span rows lose their distinct .event-row-otel-span styling and use the same .event-row class + bg treatment as hook rows so provenance fades. Fall back to hook rendering only when no OTel data exists (pre-OTel sessions).
+
+Follow-ons (separate work items):
+- Delete hook-side tracer.go / attribution.go filesystem queue once 1+ month of clean span data is trusted.
+- Trim internal/hooks/tooluse_shared.go parent-event fallback chain — not needed when OTel drives hierarchy.</p>
+        </section>
+    </article>
+</body>
+</html>

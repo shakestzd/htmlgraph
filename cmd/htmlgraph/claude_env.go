@@ -13,12 +13,11 @@ import (
 // inherits the user's shell env) and layers HtmlGraph-specific overrides
 // on top:
 //
-//   1. HTMLGRAPH_PROJECT_DIR — set when the launcher runs inside a
-//      worktree, so hooks resolve to the main .htmlgraph/ directory.
-//   2. OTel exporter vars — when HTMLGRAPH_OTEL_ENABLED=1 in the parent
-//      env, we wire Claude's OTLP exporter at our receiver so every turn
-//      captures spans/logs/metrics into otel_signals. User-set OTel vars
-//      win: we never clobber an explicit OTEL_* choice.
+//  1. HTMLGRAPH_PROJECT_DIR — set when the launcher runs inside a
+//     worktree, so hooks resolve to the main .htmlgraph/ directory.
+//  2. OTel exporter vars — enabled by default (default-on). Set
+//     HTMLGRAPH_OTEL_ENABLED=0 to opt out. User-set OTel vars win:
+//     we never clobber an explicit OTEL_* choice.
 //
 // htmlgraphProjectDir is the empty string when no override is needed
 // (not in a worktree). Pass it explicitly rather than deriving it from
@@ -30,11 +29,9 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 		env = setOrReplaceEnv(env, "HTMLGRAPH_PROJECT_DIR", htmlgraphProjectDir)
 	}
 
-	// Gate OTel injection on the same env var that controls the receiver
-	// in `htmlgraph serve` (Phase 1). Keeping one toggle avoids split-brain
-	// where the receiver is running but the launcher doesn't point Claude
-	// at it, or vice versa.
-	if !isTruthy(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
+	// OTel injection is default-on. Opt out by setting HTMLGRAPH_OTEL_ENABLED=0
+	// (or false/no/off). An unset or empty value means "on".
+	if isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
 		return env
 	}
 
@@ -116,6 +113,16 @@ func setOrReplaceEnv(env []string, key, value string) []string {
 func isTruthy(s string) bool {
 	switch s {
 	case "1", "true", "TRUE", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// isExplicitlyDisabled reports whether a value explicitly opts OUT of OTel
+// (for the default-on launcher policy). Empty / unset values default to on.
+func isExplicitlyDisabled(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "0", "false", "no", "off":
 		return true
 	}
 	return false
