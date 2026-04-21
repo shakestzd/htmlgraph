@@ -677,6 +677,71 @@ func pullInt(raw map[string]any, key string) int64 {
 }
 
 
+// otelLogsHandler returns assistant_text logs for rendering in the
+// dashboard event tree. These are text-only turn responses captured from
+// the transcript at the Stop hook.
+//
+// GET /api/otel/logs?session_id=<id>
+//   200 { "logs": [...] } — empty array if none exist
+//   400 when session_id is missing
+func otelLogsHandler(database *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		sessionID := r.URL.Query().Get("session_id")
+		if sessionID == "" {
+			http.Error(w, "session_id required", http.StatusBadRequest)
+			return
+		}
+		rows, err := database.Query(`
+			SELECT s.signal_id,
+				COALESCE(s.trace_id, ''), COALESCE(s.span_id, ''), COALESCE(s.parent_span, ''),
+				s.canonical,
+				s.ts_micros,
+				COALESCE(s.attrs_json, '{}'),
+				COALESCE(s.feature_id, ''),
+				COALESCE(f.title, '')
+			FROM otel_signals s
+			LEFT JOIN features f ON f.id = s.feature_id
+			WHERE s.session_id = ? AND s.kind = 'log' AND s.canonical = 'assistant_text'
+			ORDER BY s.ts_micros ASC`, sessionID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type logJSON struct {
+			SignalID     string `json:"signal_id"`
+			TraceID      string `json:"trace_id"`
+			SpanID       string `json:"span_id"`
+			ParentSpan   string `json:"parent_span"`
+			Canonical    string `json:"canonical"`
+			TsMicros     int64  `json:"ts_micros"`
+			AttrsJSON    string `json:"attrs_json"`
+			FeatureID    string `json:"feature_id,omitempty"`
+			FeatureTitle string `json:"feature_title,omitempty"`
+		}
+		out := []logJSON{}
+		for rows.Next() {
+			var l logJSON
+			if err := rows.Scan(
+				&l.SignalID, &l.TraceID, &l.SpanID, &l.ParentSpan,
+				&l.Canonical, &l.TsMicros, &l.AttrsJSON,
+				&l.FeatureID, &l.FeatureTitle,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			out = append(out, l)
+		}
+
+		respondJSON(w, map[string]any{"logs": out})
+	}
+}
+
 // readMaterializedRollup fetches the row from otel_session_rollup.
 // Returns (zero, false, nil) when no row exists, so the caller can
 // fall back to a live aggregation.

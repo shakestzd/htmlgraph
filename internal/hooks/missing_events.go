@@ -83,6 +83,13 @@ func Stop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 	if sessionID != "" {
 		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 		insertAssistantTextSignal(database, projectDir, sessionID, event.TranscriptPath)
+		// Backfill any user prompts missed by the live UserPromptSubmit hook path.
+		// Non-fatal: errors are logged to debug.log and never block the Stop response.
+		if n, err := backfillMissedUserPrompts(database, projectDir, sessionID, event.TranscriptPath); err != nil {
+			debugLog(projectDir, "[user-prompt-backfill] stop hook: %v", err)
+		} else if n > 0 {
+			debugLog(projectDir, "[user-prompt-backfill] stop: %d prompts recovered (session=%s)", n, sessionID[:minSessionLen(sessionID)])
+		}
 	}
 
 	return recordSimpleEvent(models.EventEnd, "Stop", summary, "recorded", event, database)

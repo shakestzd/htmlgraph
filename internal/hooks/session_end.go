@@ -73,6 +73,25 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 	// Clean up the session-scoped project dir hint file now that this session is ending.
 	paths.CleanupSessionHint(sessionID)
 
+	// Backfill any user prompts missed by the live UserPromptSubmit hook path.
+	// transcript_path may come from the current event or from the sessions table
+	// (written by SessionStart or Stop). Non-fatal: errors are logged only.
+	backfillTranscriptPath := event.TranscriptPath
+	if backfillTranscriptPath == "" {
+		var storedPath sql.NullString
+		_ = database.QueryRow(`SELECT transcript_path FROM sessions WHERE session_id = ?`, sessionID).Scan(&storedPath)
+		if storedPath.Valid {
+			backfillTranscriptPath = storedPath.String
+		}
+	}
+	if backfillTranscriptPath != "" {
+		if n, err := backfillMissedUserPrompts(database, projectDir, sessionID, backfillTranscriptPath); err != nil {
+			debugLog(projectDir, "[user-prompt-backfill] session-end: %v", err)
+		} else if n > 0 {
+			debugLog(projectDir, "[user-prompt-backfill] session-end: %d prompts recovered (session=%s)", n, sessionID[:minLen(sessionID, 8)])
+		}
+	}
+
 	// Materialize OTel rollup (no-op if no signals received for this session).
 	// Non-fatal: errors are logged but do not block SessionEnd completion.
 	if err := materialize.Materialize(database, projectDir, sessionID); err != nil {

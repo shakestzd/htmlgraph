@@ -8,12 +8,13 @@ class HgEventTree extends HTMLElement {
     this.expanded = new Set(JSON.parse(localStorage.getItem('hg-expanded') || '[]'));
     this._filterDebounce = null;
     // OTel data cache, keyed by session_id. Populated from /api/otel/prompts,
-    // /api/otel/rollup, and /api/otel/spans after turns load. Absent when
-    // the receiver is disabled or no signals have arrived — rendering
+    // /api/otel/rollup, /api/otel/spans, and /api/otel/logs after turns load.
+    // Absent when the receiver is disabled or no signals have arrived — rendering
     // degrades silently to the non-OTel path.
     this.otelPromptsBySession = {};
     this.otelRollupBySession = {};
     this.otelSpansBySession = {};
+    this.otelLogsBySession = {};
   }
 
   connectedCallback() {
@@ -113,6 +114,13 @@ class HgEventTree extends HTMLElement {
         if (sResp.ok) {
           var sBody = await sResp.json();
           self.otelSpansBySession[sid] = self._indexSpans(sBody.spans || []);
+        }
+      } catch(_) {}
+      try {
+        var lResp = await fetch(buildProjectUrl('otel/logs', 'session_id=' + encodeURIComponent(sid)));
+        if (lResp.ok) {
+          var lBody = await lResp.json();
+          self.otelLogsBySession[sid] = lBody.logs || [];
         }
       } catch(_) {}
     }));
@@ -295,6 +303,24 @@ class HgEventTree extends HTMLElement {
       }
     });
     return flat;
+  }
+
+  // _assistantTextsForTurn returns the assistant_text logs (from
+  // /api/otel/logs) that belong to this turn. Matches by parent_span
+  // pointing to the turn's user-prompt span_id.
+  _assistantTextsForTurn(turn) {
+    var uq = turn.user_query;
+    if (!uq || !uq.session_id) return [];
+    var logs = this.otelLogsBySession[uq.session_id];
+    if (!logs || logs.length === 0) return [];
+    // Match logs where parent_span equals the user-query's span_id or UUID.
+    // The user_query comes from the hook payload, so its event_id (if present)
+    // is the span_id we're matching against.
+    var userSpanId = uq.event_id || '';
+    if (!userSpanId) return [];
+    return logs.filter(function(log) {
+      return log.parent_span === userSpanId;
+    });
   }
 
   // _otelForTurn returns the OTel prompt breakdown nearest (by wall-clock)
@@ -729,9 +755,66 @@ class HgEventTree extends HTMLElement {
       } else if (turn.children) {
         html += turn.children.map(c => this.renderEvent(c, 1)).join('');
       }
+      // Render assistant_text logs (text-only turn responses).
+      var assistantTexts = this._assistantTextsForTurn(turn);
+      if (assistantTexts.length > 0) {
+        html += assistantTexts.map(log => this.renderAssistantText(log, uq.feature_id)).join('');
+      }
     }
 
     html += '</div>';
+    return html;
+  }
+
+  // renderAssistantText renders a single assistant_text log as a depth-1
+  // row showing the assistant's text response. Collapsed by default, expandable.
+  renderAssistantText(log, parentFeatureId) {
+    var logId = log.signal_id || 'atxt-' + Math.random().toString(36).slice(2);
+    var isExp = this.expanded.has(logId);
+
+    // Parse attrs_json to extract text, stop_reason, etc.
+    var attrs = {};
+    try {
+      attrs = JSON.parse(log.attrs_json || '{}');
+    } catch(_) {}
+
+    var text = attrs.text || '';
+    var stopReason = attrs.stop_reason || 'end_turn';
+    var previewLen = 180;
+    var preview = text.length > previewLen
+      ? text.substring(0, previewLen) + '…'
+      : text;
+
+    var expandIcon = '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(logId) + '">▶</span>';
+
+    var stopReasonBadge = '';
+    if (stopReason && stopReason !== 'end_turn') {
+      stopReasonBadge = '<span class="badge badge-stop-reason" style="background-color: #f59e0b;">'
+        + esc(stopReason) + '</span>';
+    }
+
+    var featureBdg = this.featureBadge(log.feature_id || '', log.feature_title || '');
+
+    var html = '<div class="event-row depth-1 assistant-text-row"'
+      + ' data-event-id="' + esc(logId) + '"'
+      + ' data-timestamp="' + esc((attrs.timestamp || log.ts_micros || 0)) + '"'
+      + ' style="padding-left: 2.5rem">'
+      + expandIcon
+      + '<span class="badge badge-assistant" style="background-color: #9ca3af;">assistant</span>'
+      + '<span class="event-summary">' + esc(preview) + '</span>'
+      + stopReasonBadge
+      + featureBdg
+      + '</div>';
+
+    if (isExp) {
+      html += '<div class="event-row depth-2 assistant-text-detail"'
+        + ' style="padding-left: 3.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem;">'
+        + '<pre style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
+        + esc(text)
+        + '</pre>'
+        + '</div>';
+    }
+
     return html;
   }
 
