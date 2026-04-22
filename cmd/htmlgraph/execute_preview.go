@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -85,7 +86,7 @@ func runExecutePreview(id, format string) error {
 }
 
 func buildExecutePreview(dir, trackID string) (*executePreview, error) {
-	trackPath := resolveNodePath(dir, trackID)
+	trackPath := resolveTrackPath(dir, trackID)
 	if trackPath == "" {
 		return nil, workitem.ErrNotFoundOnDisk("track", trackID)
 	}
@@ -95,34 +96,31 @@ func buildExecutePreview(dir, trackID string) (*executePreview, error) {
 	}
 
 	preview := &executePreview{Track: trackNode}
-
-	// Walk every edge from the track and categorize linked nodes by id prefix.
 	seen := make(map[string]bool)
+
+	// 1. Direct edges from the track — features, bugs, spikes, plans.
 	for _, edges := range trackNode.Edges {
 		for _, edge := range edges {
-			if seen[edge.TargetID] {
-				continue
-			}
-			seen[edge.TargetID] = true
-			path := resolveNodePath(dir, edge.TargetID)
-			if path == "" {
-				continue
-			}
-			node, err := htmlparse.ParseFile(path)
-			if err != nil {
-				continue
-			}
-			switch {
-			case strings.HasPrefix(edge.TargetID, "feat-"):
-				preview.Features = append(preview.Features, node)
-			case strings.HasPrefix(edge.TargetID, "bug-"):
-				preview.Bugs = append(preview.Bugs, node)
-			case strings.HasPrefix(edge.TargetID, "plan-"):
-				preview.Plans = append(preview.Plans, node)
-			case strings.HasPrefix(edge.TargetID, "spike-"):
-				preview.Spikes = append(preview.Spikes, node)
+			addLinkedNode(dir, edge.TargetID, preview, seen)
+		}
+	}
+
+	// 2. Indirect plans — plans commonly link back to a feature or track via
+	//    data-feature-id, or a feature's planned_in edges point to a plan.
+	//    Walk linked features' planned_in targets and scan plans/ for any
+	//    plan whose data-feature-id matches the track or a linked feature.
+	for _, feat := range preview.Features {
+		for _, edges := range feat.Edges {
+			for _, edge := range edges {
+				if strings.HasPrefix(edge.TargetID, "plan-") {
+					addLinkedNode(dir, edge.TargetID, preview, seen)
+				}
 			}
 		}
+	}
+	discoverPlansByFeatureID(dir, trackID, preview, seen)
+	for _, feat := range preview.Features {
+		discoverPlansByFeatureID(dir, feat.ID, preview, seen)
 	}
 
 	sort.Slice(preview.Features, func(i, j int) bool { return preview.Features[i].ID < preview.Features[j].ID })
@@ -134,27 +132,103 @@ func buildExecutePreview(dir, trackID string) (*executePreview, error) {
 	return preview, nil
 }
 
-// currentGitState resolves git state for the caller's current working directory.
-// The orchestrator calling execute-preview wants to know "where am I in git?",
-// so probes run in the caller's cwd (typically a worktree) rather than in the
-// shared htmlgraph project root. On any failure returns a zero-valued struct.
-func currentGitState(htmlgraphDir string) executeGitState {
-	state := executeGitState{}
-	cwd, err := os.Getwd()
-	if err != nil {
-		// Fall back to the htmlgraph project root when cwd is unavailable.
-		cwd = filepath.Dir(htmlgraphDir)
+// resolveTrackPath mirrors runTrackShowWithFormat's track-path lookup: flat
+// tracks/<id>.html first, then the directory-backed tracks/<id>/index.html
+// fallback. resolveNodePath only handles the flat form, so execute-preview
+// needs its own resolver to avoid regressing directory-backed tracks.
+func resolveTrackPath(htmlgraphDir, id string) string {
+	flat := filepath.Join(htmlgraphDir, "tracks", id+".html")
+	if _, err := os.Stat(flat); err == nil {
+		return flat
 	}
-	state.WorktreePath = cwd
+	indexed := filepath.Join(htmlgraphDir, "tracks", id, "index.html")
+	if _, err := os.Stat(indexed); err == nil {
+		return indexed
+	}
+	return ""
+}
 
-	if branch, err := gitOutputIn(cwd, "rev-parse", "--abbrev-ref", "HEAD"); err == nil {
+// addLinkedNode resolves a node path, parses the HTML, and appends it to the
+// correct preview bucket based on the canonical id prefix. Spikes use spk-
+// (matching internal/models/enums.go and history.go). Idempotent via seen.
+func addLinkedNode(htmlgraphDir, id string, p *executePreview, seen map[string]bool) {
+	if id == "" || seen[id] {
+		return
+	}
+	seen[id] = true
+	path := resolveNodePath(htmlgraphDir, id)
+	if path == "" {
+		if strings.HasPrefix(id, "trk-") {
+			path = resolveTrackPath(htmlgraphDir, id)
+		}
+		if path == "" {
+			return
+		}
+	}
+	node, err := htmlparse.ParseFile(path)
+	if err != nil {
+		return
+	}
+	switch {
+	case strings.HasPrefix(id, "feat-"):
+		p.Features = append(p.Features, node)
+	case strings.HasPrefix(id, "bug-"):
+		p.Bugs = append(p.Bugs, node)
+	case strings.HasPrefix(id, "plan-"):
+		p.Plans = append(p.Plans, node)
+	case strings.HasPrefix(id, "spk-"):
+		p.Spikes = append(p.Spikes, node)
+	}
+}
+
+// discoverPlansByFeatureID scans .htmlgraph/plans/*.html for any plan whose
+// data-feature-id attribute matches sourceID, and adds matching plans to the
+// preview. Mirrors findExistingPlanForSource in plan_cmds.go but collects
+// all hits rather than returning the first.
+func discoverPlansByFeatureID(htmlgraphDir, sourceID string, p *executePreview, seen map[string]bool) {
+	plansDir := filepath.Join(htmlgraphDir, "plans")
+	entries, err := os.ReadDir(plansDir)
+	if err != nil {
+		return
+	}
+	needle := []byte(fmt.Sprintf(`data-feature-id="%s"`, sourceID))
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".html") {
+			continue
+		}
+		planID := strings.TrimSuffix(e.Name(), ".html")
+		if seen[planID] {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(plansDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		if !bytes.Contains(data, needle) {
+			continue
+		}
+		addLinkedNode(htmlgraphDir, planID, p, seen)
+	}
+}
+
+// currentGitState resolves git state for the caller's current working directory
+// when it belongs to the same repository as the HtmlGraph project. If the
+// caller is inside a nested/submodule repo (different git-common-dir), probes
+// run against the HtmlGraph project root instead so the preview never reports
+// branch/ahead/behind for an unrelated repository. Mirrors the same guard as
+// `htmlgraph history` (see resolveHistoryRoot in history.go).
+func currentGitState(htmlgraphDir string) executeGitState {
+	repoRoot := resolveGitProbeRoot(htmlgraphDir)
+	state := executeGitState{WorktreePath: repoRoot}
+
+	if branch, err := gitOutputIn(repoRoot, "rev-parse", "--abbrev-ref", "HEAD"); err == nil {
 		state.Branch = branch
 	}
-	if sha, err := gitOutputIn(cwd, "rev-parse", "HEAD"); err == nil {
+	if sha, err := gitOutputIn(repoRoot, "rev-parse", "HEAD"); err == nil {
 		state.HeadSHA = sha
 	}
 	// --left-right main...HEAD with --count emits "<behind>\t<ahead>".
-	if counts, err := gitOutputIn(cwd, "rev-list", "--left-right", "--count", "main...HEAD"); err == nil {
+	if counts, err := gitOutputIn(repoRoot, "rev-list", "--left-right", "--count", "main...HEAD"); err == nil {
 		parts := strings.Fields(counts)
 		if len(parts) == 2 {
 			if behind, err := strconv.Atoi(parts[0]); err == nil {
@@ -166,6 +240,20 @@ func currentGitState(htmlgraphDir string) executeGitState {
 		}
 	}
 	return state
+}
+
+// resolveGitProbeRoot picks the repo root for git probes. Prefers the caller's
+// cwd when it shares a git-common-dir with the HtmlGraph project (linked
+// worktree — branch-local state is correct). Otherwise falls back to the
+// project owner so nested/submodule CWDs don't leak unrelated repo state.
+// Reuses resolveHistoryRoot which already implements this check.
+func resolveGitProbeRoot(htmlgraphDir string) string {
+	owner := filepath.Dir(htmlgraphDir)
+	root, err := resolveHistoryRoot(owner)
+	if err != nil {
+		return owner
+	}
+	return root
 }
 
 // gitOutputIn runs a git sub-command with cwd set to repoRoot, returning
