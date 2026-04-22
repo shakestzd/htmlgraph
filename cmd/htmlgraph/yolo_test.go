@@ -1,14 +1,15 @@
 package main
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
 
-// TestCreateTrackWorktree_CreatesNewBranch tests that createTrackWorktree creates a new branch with the correct name.
-func TestCreateTrackWorktree_CreatesNewBranch(t *testing.T) {
+// TestEnsureForTrack_CreatesNewBranch tests that EnsureForTrack creates a new branch with the correct name.
+func TestEnsureForTrack_CreatesNewBranch(t *testing.T) {
 	// Set up a temp git repo
 	tmpDir := t.TempDir()
 	initCmd := exec.Command("git", "init")
@@ -22,13 +23,12 @@ func TestCreateTrackWorktree_CreatesNewBranch(t *testing.T) {
 		t.Fatalf("failed to create initial commit: %v", err)
 	}
 
-	// Call createTrackWorktree
+	// Call EnsureForTrack
 	trackID := "trk-abc123"
-	worktreePath, cleanup, err := createTrackWorktree(trackID, tmpDir)
+	worktreePath, err := EnsureForTrack(trackID, tmpDir, io.Discard)
 	if err != nil {
-		t.Fatalf("createTrackWorktree failed: %v", err)
+		t.Fatalf("EnsureForTrack failed: %v", err)
 	}
-	defer cleanup()
 
 	// Assert: worktree path is .claude/worktrees/trk-abc123
 	expectedPath := filepath.Join(tmpDir, ".claude", "worktrees", trackID)
@@ -53,8 +53,8 @@ func TestCreateTrackWorktree_CreatesNewBranch(t *testing.T) {
 	}
 }
 
-// TestCreateTrackWorktree_ReusesExisting tests that createTrackWorktree reuses an existing worktree.
-func TestCreateTrackWorktree_ReusesExisting(t *testing.T) {
+// TestEnsureForTrack_ReusesExisting tests that EnsureForTrack reuses an existing worktree.
+func TestEnsureForTrack_ReusesExisting(t *testing.T) {
 	tmpDir := t.TempDir()
 	initCmd := exec.Command("git", "init")
 	initCmd.Dir = tmpDir
@@ -70,18 +70,16 @@ func TestCreateTrackWorktree_ReusesExisting(t *testing.T) {
 	trackID := "trk-xyz789"
 
 	// Create worktree first time
-	worktreePath1, cleanup1, err := createTrackWorktree(trackID, tmpDir)
+	worktreePath1, err := EnsureForTrack(trackID, tmpDir, io.Discard)
 	if err != nil {
-		t.Fatalf("first createTrackWorktree failed: %v", err)
+		t.Fatalf("first EnsureForTrack failed: %v", err)
 	}
-	defer cleanup1()
 
 	// Create worktree second time (should reuse)
-	worktreePath2, cleanup2, err := createTrackWorktree(trackID, tmpDir)
+	worktreePath2, err := EnsureForTrack(trackID, tmpDir, io.Discard)
 	if err != nil {
-		t.Fatalf("second createTrackWorktree failed: %v", err)
+		t.Fatalf("second EnsureForTrack failed: %v", err)
 	}
-	defer cleanup2()
 
 	// Assert: both calls return the same path
 	if worktreePath1 != worktreePath2 {

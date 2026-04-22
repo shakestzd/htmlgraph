@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,18 +37,17 @@ func setupAgentGitRepo(t *testing.T) string {
 	return dir
 }
 
-func TestCreateAgentWorktree_BranchesFromTrackBranch(t *testing.T) {
+func TestEnsureForAgent_BranchesFromTrackBranch(t *testing.T) {
 	dir := setupAgentGitRepo(t)
 
 	// Create a track branch first (not via worktree, just as a branch)
 	exec.Command("git", "-C", dir, "branch", "track-abc").Run()
 
 	// Now create agent worktree branching from track-abc
-	path, agentCleanup, err := createAgentWorktree("track-abc", "task1", dir)
+	path, err := EnsureForAgent("track-abc", "task1", dir, io.Discard)
 	if err != nil {
-		t.Fatalf("createAgentWorktree: %v", err)
+		t.Fatalf("EnsureForAgent: %v", err)
 	}
-	defer agentCleanup()
 
 	// Verify path
 	expected := filepath.Join(dir, ".claude", "worktrees", "track-abc", "agent-task1")
@@ -63,17 +63,16 @@ func TestCreateAgentWorktree_BranchesFromTrackBranch(t *testing.T) {
 	}
 }
 
-func TestCreateAgentWorktree_PathNamingConvention(t *testing.T) {
+func TestEnsureForAgent_PathNamingConvention(t *testing.T) {
 	dir := setupAgentGitRepo(t)
 
 	// Create a track branch
 	exec.Command("git", "-C", dir, "branch", "mytrack").Run()
 
-	path, cleanup, err := createAgentWorktree("mytrack", "my-task", dir)
+	path, err := EnsureForAgent("mytrack", "my-task", dir, io.Discard)
 	if err != nil {
-		t.Fatalf("createAgentWorktree: %v", err)
+		t.Fatalf("EnsureForAgent: %v", err)
 	}
-	defer cleanup()
 
 	// Check the worktree path follows naming convention
 	if !strings.Contains(path, "mytrack") || !strings.Contains(path, "agent-my-task") {
@@ -81,35 +80,33 @@ func TestCreateAgentWorktree_PathNamingConvention(t *testing.T) {
 	}
 }
 
-func TestCreateAgentWorktree_FailsWithoutTrackBranch(t *testing.T) {
+func TestEnsureForAgent_FailsWithoutTrackBranch(t *testing.T) {
 	dir := setupAgentGitRepo(t)
 
 	// Don't create track branch — agent should fail
-	_, _, err := createAgentWorktree("nonexistent-track", "task1", dir)
+	_, err := EnsureForAgent("nonexistent-track", "task1", dir, io.Discard)
 	if err == nil {
 		t.Error("expected error when track branch doesn't exist")
 	}
 }
 
-func TestCreateAgentWorktree_ReusesExistingPath(t *testing.T) {
+func TestEnsureForAgent_ReusesExistingPath(t *testing.T) {
 	dir := setupAgentGitRepo(t)
 
 	// Create a track branch
 	exec.Command("git", "-C", dir, "branch", "track-reuse").Run()
 
 	// Create agent worktree
-	path1, cleanup1, err := createAgentWorktree("track-reuse", "task1", dir)
+	path1, err := EnsureForAgent("track-reuse", "task1", dir, io.Discard)
 	if err != nil {
-		t.Fatalf("first createAgentWorktree: %v", err)
+		t.Fatalf("first EnsureForAgent: %v", err)
 	}
-	defer cleanup1()
 
 	// Try to create the same agent worktree again
-	path2, cleanup2, err := createAgentWorktree("track-reuse", "task1", dir)
+	path2, err := EnsureForAgent("track-reuse", "task1", dir, io.Discard)
 	if err != nil {
-		t.Fatalf("second createAgentWorktree: %v", err)
+		t.Fatalf("second EnsureForAgent: %v", err)
 	}
-	defer cleanup2()
 
 	if path1 != path2 {
 		t.Errorf("reused worktree paths don't match: %s vs %s", path1, path2)
@@ -123,11 +120,10 @@ func TestMergeAgentToTrack(t *testing.T) {
 	exec.Command("git", "-C", dir, "branch", "merge-track").Run()
 
 	// Create agent worktree
-	agentPath, agentCleanup, err := createAgentWorktree("merge-track", "task1", dir)
+	agentPath, err := EnsureForAgent("merge-track", "task1", dir, io.Discard)
 	if err != nil {
-		t.Fatalf("createAgentWorktree: %v", err)
+		t.Fatalf("EnsureForAgent: %v", err)
 	}
-	defer agentCleanup()
 
 	// Make a change in the agent worktree
 	testFile := filepath.Join(agentPath, "test.txt")
