@@ -13,23 +13,34 @@ import (
 )
 
 func planShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var format string
+	cmd := &cobra.Command{
 		Use:   "show <plan-id>",
 		Short: "Show plan details (warns on YAML/HTML drift)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			rawID := args[0]
-			if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
-				resolved, err := resolveID(htmlgraphDir, rawID)
-				if err == nil && strings.HasPrefix(resolved, "plan-") {
-					yamlPath := filepath.Join(htmlgraphDir, "plans", resolved+".yaml")
-					htmlPath := filepath.Join(htmlgraphDir, "plans", resolved+".html")
-					checkPlanDrift(yamlPath, htmlPath, os.Stderr)
-				}
-			}
-			return runWiShow(rawID)
+			return runPlanShowWithFormat(args[0], format)
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "text", "Output format: json or text")
+	return cmd
+}
+
+// runPlanShowWithFormat shows a plan in the requested format (text or json),
+// checking for YAML/HTML drift in text mode.
+func runPlanShowWithFormat(rawID, format string) error {
+	if format != "json" {
+		// Only check drift for human-readable output (avoids confusing stderr noise in JSON mode).
+		if htmlgraphDir, err := findHtmlgraphDir(); err == nil {
+			resolved, err := resolveID(htmlgraphDir, rawID)
+			if err == nil && strings.HasPrefix(resolved, "plan-") {
+				yamlPath := filepath.Join(htmlgraphDir, "plans", resolved+".yaml")
+				htmlPath := filepath.Join(htmlgraphDir, "plans", resolved+".html")
+				checkPlanDrift(yamlPath, htmlPath, os.Stderr)
+			}
+		}
+	}
+	return runWiShowWithFormat(rawID, format)
 }
 
 var (
