@@ -175,7 +175,7 @@ slices:
       deps:
         - 1
       done_when:
-        - 'PRECONDITION: at least one real Copilot session captured locally and committed under internal/ingest/testdata/copilot/ (redacted). The fixture in /home/vscode/.copilot/session-state/869d1f67.../ from the user''s working session is the seed candidate'
+        - 'PRECONDITION: at least one real Copilot session captured locally and committed under internal/ingest/testdata/copilot/ (redacted). The fixture in <user-home>/.copilot/session-state/<session-id>/ from the user''s working session is the seed candidate'
         - 'PRECONDITION: Copilot session-state format documented — files present, JSON shape, message ordering. The plan asserts ''likely JSON files including plan.md, messages, tool calls'' but this is unverified'
         - DiscoverCopilotSessions() returns sessions from ~/.copilot/session-state/
         - Parser handles real Copilot session-state with format-version sniff and warning on unknown formats
@@ -486,7 +486,7 @@ critique:
           evidence: File exists, scans ~/.gemini/tmp/<slug>/chats/, structurally similar pattern is reusable for codex/copilot
         - id: A6
           status: verified
-          text: .codex/config.toml exists at /workspaces/htmlgraph/.codex/config.toml
+          text: .codex/config.toml exists at <repo-root>/.codex/config.toml
           evidence: Confirmed by feasibility critic; current contents are sandbox_mode=danger-full-access, approval_policy=on-request. Slice 6 must add [features] codex_hooks=true without disturbing existing keys
         - id: A7
           status: plausible
