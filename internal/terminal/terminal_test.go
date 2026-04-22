@@ -51,7 +51,7 @@ func TestStartRequestZeroValue(t *testing.T) {
 	}
 
 	// CWD falls back to defaultDir when req.CWD is empty.
-	defaultDir := "/tmp/test-project"
+	defaultDir := "/mock/test-project"
 	cwd := req.CWD
 	if cwd == "" {
 		cwd = defaultDir

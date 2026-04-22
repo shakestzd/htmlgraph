@@ -80,7 +80,7 @@ func TestTerminalStartHandler_CustomAgent(t *testing.T) {
 	mock := &mockTerminalStarter{returnPort: 8888, returnPid: 5678}
 	handler := handleTerminalStart("/srv/project", mock)
 
-	body := `{"agent":"codex","mode":"dev","cwd":"/tmp/test","work_item":"feat-abc"}`
+	body := `{"agent":"codex","mode":"dev","cwd":"/mock/test","work_item":"feat-abc"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/terminal/start", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -95,8 +95,8 @@ func TestTerminalStartHandler_CustomAgent(t *testing.T) {
 	if mock.lastReq.Mode != "dev" {
 		t.Errorf("mode: got %q, want dev", mock.lastReq.Mode)
 	}
-	if mock.lastReq.CWD != "/tmp/test" {
-		t.Errorf("cwd: got %q, want /tmp/test", mock.lastReq.CWD)
+	if mock.lastReq.CWD != "/mock/test" {
+		t.Errorf("cwd: got %q, want /mock/test", mock.lastReq.CWD)
 	}
 	if mock.lastReq.WorkItem != "feat-abc" {
 		t.Errorf("work_item: got %q, want feat-abc", mock.lastReq.WorkItem)
