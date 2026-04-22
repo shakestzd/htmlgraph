@@ -450,17 +450,13 @@ Status categories: **ready** (pending, no blockedBy) | **in_progress** | **block
 ## Cleanup After Completion
 
 ```bash
-# Prune all merged worktrees
-git worktree prune
+# Prune merged worktrees and confirm clean state in one call
+git worktree prune && git worktree list
 
-# Remove a specific worktree
-git worktree remove <path>
+# Remove a specific worktree and its branch (chain to avoid leaving orphans)
+git worktree remove <path> && git branch -D worktree-agent-XXXX
 
-# Remove stale branches
-git branch -D worktree-agent-XXXX
-
-# Confirm clean state + run quality gates
-git worktree list
+# Final quality gates
 go build ./... && go vet ./... && go test ./...
 ```
 
