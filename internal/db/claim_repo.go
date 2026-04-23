@@ -101,6 +101,84 @@ func ClaimItem(db *sql.DB, claim *models.Claim, leaseDuration time.Duration) err
 	return nil
 }
 
+// ClaimItemOrRenew creates a new claim or renews the lease on an existing one.
+// If an active claim already exists for the same (work_item_id, claimed_by_agent_id),
+// the lease is refreshed in-place (no duplicate row). Otherwise a new claim is inserted.
+// This is idempotent: calling it N times on the same item/agent is safe and always
+// results in exactly one live claim row with a fresh lease.
+func ClaimItemOrRenew(db *sql.DB, claim *models.Claim, leaseDuration time.Duration) error {
+	if _, err := ReapExpiredClaims(db); err != nil {
+		return fmt.Errorf("reap before claim: %w", err)
+	}
+
+	now := time.Now().UTC()
+	newExpiry := now.Add(leaseDuration)
+	activeList := activeStatusList()
+
+	// Try to renew an existing active claim first.
+	renewQuery := fmt.Sprintf(`
+		UPDATE claims
+		SET last_heartbeat_at = ?, lease_expires_at = ?, updated_at = ?
+		WHERE work_item_id = ?
+		  AND claimed_by_agent_id = ?
+		  AND status IN (%s)`, activeList)
+
+	result, err := db.Exec(renewQuery,
+		now.Format(time.RFC3339), newExpiry.Format(time.RFC3339),
+		now.Format(time.RFC3339),
+		claim.WorkItemID, claim.ClaimedByAgentID,
+	)
+	if err != nil {
+		return fmt.Errorf("renew claim for %s/%s: %w", claim.WorkItemID, claim.ClaimedByAgentID, err)
+	}
+	if rows, _ := result.RowsAffected(); rows > 0 {
+		// Existing live claim refreshed — done.
+		return nil
+	}
+
+	// No live claim exists — insert a fresh one.
+	claim.LeasedAt = now
+	claim.LeaseExpiresAt = newExpiry
+	claim.LastHeartbeatAt = now
+	claim.CreatedAt = now
+	claim.UpdatedAt = now
+
+	if claim.Status == "" {
+		claim.Status = models.ClaimProposed
+	}
+	if claim.OwnerAgent == "" {
+		claim.OwnerAgent = "claude-code"
+	}
+
+	ensureFeatureRow(db, claim.WorkItemID)
+	ensureSessionRow(db, claim.OwnerSessionID, claim.OwnerAgent)
+
+	_, err = db.Exec(`
+		INSERT INTO claims (
+			claim_id, work_item_id, track_id, owner_session_id, owner_agent,
+			claimed_by_agent_id,
+			status, intended_output, write_scope,
+			leased_at, lease_expires_at, last_heartbeat_at,
+			dependencies, progress_notes, blocker_reason,
+			created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		claim.ClaimID, claim.WorkItemID, nullStr(claim.TrackID),
+		claim.OwnerSessionID, claim.OwnerAgent,
+		claim.ClaimedByAgentID,
+		string(claim.Status), nullStr(claim.IntendedOutput),
+		nullJSON(claim.WriteScope),
+		now.Format(time.RFC3339), newExpiry.Format(time.RFC3339),
+		now.Format(time.RFC3339),
+		nullJSON(claim.Dependencies), nullStr(claim.ProgressNotes),
+		nullStr(claim.BlockerReason),
+		now.Format(time.RFC3339), now.Format(time.RFC3339),
+	)
+	if err != nil {
+		return fmt.Errorf("insert claim %s: %w", claim.ClaimID, err)
+	}
+	return nil
+}
+
 // HeartbeatClaim renews the lease on an active claim owned by sessionID.
 // Updates last_heartbeat_at and extends lease_expires_at by leaseDuration.
 func HeartbeatClaim(db *sql.DB, claimID, sessionID string, leaseDuration time.Duration) error {

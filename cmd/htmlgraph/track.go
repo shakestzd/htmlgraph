@@ -40,19 +40,26 @@ func trackCmdWithExtras() *cobra.Command {
 // trackShowCmd shows a single track by ID.
 func trackShowCmd() *cobra.Command {
 	var deep bool
+	var format string
 	cmd := &cobra.Command{
 		Use:   "show <id>",
 		Short: "Show track details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runTrackShow(args[0], deep)
+			return runTrackShowWithFormat(args[0], deep, format)
 		},
 	}
 	cmd.Flags().BoolVar(&deep, "deep", false, "Show all linked items with steps and edges")
+	cmd.Flags().StringVar(&format, "format", "text", "Output format: json or text")
 	return cmd
 }
 
 func runTrackShow(id string, deep bool) error {
+	return runTrackShowWithFormat(id, deep, "text")
+}
+
+// runTrackShowWithFormat shows a track in the requested format (text or json).
+func runTrackShowWithFormat(id string, deep bool, format string) error {
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err
@@ -73,12 +80,17 @@ func runTrackShow(id string, deep bool) error {
 		return fmt.Errorf("parse %s: %w", path, err)
 	}
 
-	if deep {
-		printTrackDeep(node, dir)
-	} else {
-		printTrackDetail(node, dir)
+	switch format {
+	case "json":
+		return printNodeDetailJSON(node)
+	default:
+		if deep {
+			printTrackDeep(node, dir)
+		} else {
+			printTrackDetail(node, dir)
+		}
+		return nil
 	}
-	return nil
 }
 
 // topoSortFeatures returns features sorted by dependency order using blocked_by

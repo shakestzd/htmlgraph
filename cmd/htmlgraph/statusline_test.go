@@ -175,7 +175,7 @@ func TestWriteStatuslineCache_ClearsOnComplete(t *testing.T) {
 	cacheDir := t.TempDir()
 	t.Setenv("HTMLGRAPH_CACHE_DIR", cacheDir)
 
-	hgDir := "/tmp/test-clear/.htmlgraph"
+	hgDir := filepath.Join(t.TempDir(), ".htmlgraph")
 	cachePath := statuslineCachePath(hgDir)
 	os.WriteFile(cachePath, []byte("old data"), 0o644)
 
@@ -192,7 +192,7 @@ func TestReadStatuslineCache_ReadsFile(t *testing.T) {
 	cacheDir := t.TempDir()
 	t.Setenv("HTMLGRAPH_CACHE_DIR", cacheDir)
 
-	hgDir := "/tmp/test-project/.htmlgraph"
+	hgDir := filepath.Join(t.TempDir(), ".htmlgraph")
 	// Write to the project-scoped path.
 	cachePath := statuslineCachePath(hgDir)
 	os.WriteFile(cachePath, []byte("test content"), 0o644)
@@ -206,9 +206,65 @@ func TestReadStatuslineCache_ReadsFile(t *testing.T) {
 func TestReadStatuslineCache_EmptyOnMissing(t *testing.T) {
 	t.Setenv("HTMLGRAPH_CACHE_DIR", t.TempDir())
 
-	got := ReadStatuslineCache("/tmp/nonexistent/.htmlgraph")
+	got := ReadStatuslineCache(filepath.Join(t.TempDir(), "nonexistent", ".htmlgraph"))
 	if got != "" {
 		t.Errorf("expected empty for missing cache, got %q", got)
+	}
+}
+
+// TestRunStatuslineEmptySession verifies that runStatusline with an empty session ID
+// returns nil and produces no output, even when in-progress work items exist on disk.
+// This prevents cross-session state leakage (bug-33476dbf).
+func TestRunStatuslineEmptySession(t *testing.T) {
+	tmpDir := t.TempDir()
+	htmlgraphDir := filepath.Join(tmpDir, ".htmlgraph")
+	// Create the standard subdirectories so workitem.Open succeeds if it were called.
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		if err := os.MkdirAll(filepath.Join(htmlgraphDir, sub), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", sub, err)
+		}
+	}
+
+	// Write a synthetic in-progress feature HTML so statuslineFromHTML *would* return
+	// output if it were invoked.
+	featureHTML := `<!DOCTYPE html><html><head>
+<meta name="id" content="feat-leak1">
+<meta name="type" content="feature">
+<meta name="status" content="in-progress">
+<meta name="title" content="Leaked Feature">
+</head><body></body></html>`
+	featurePath := filepath.Join(htmlgraphDir, "features", "feat-leak1.html")
+	if err := os.WriteFile(featurePath, []byte(featureHTML), 0o644); err != nil {
+		t.Fatalf("write feature: %v", err)
+	}
+
+	// Point the project directory at tmpDir so findHtmlgraphDir can resolve it.
+	oldProjectDir := projectDirFlag
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = oldProjectDir }()
+
+	// Capture stdout to ensure nothing is printed.
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+
+	gotErr := runStatusline("") // empty session
+
+	w.Close()
+	os.Stdout = origStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if gotErr != nil {
+		t.Errorf("runStatusline(\"\") returned error: %v", gotErr)
+	}
+	if output != "" {
+		t.Errorf("runStatusline(\"\") should produce no output, got %q", output)
 	}
 }
 
@@ -216,8 +272,8 @@ func TestStatuslineCacheProjectIsolation(t *testing.T) {
 	cacheDir := t.TempDir()
 	t.Setenv("HTMLGRAPH_CACHE_DIR", cacheDir)
 
-	dirA := "/tmp/project-a/.htmlgraph"
-	dirB := "/tmp/project-b/.htmlgraph"
+	dirA := filepath.Join(t.TempDir(), "project-a", ".htmlgraph")
+	dirB := filepath.Join(t.TempDir(), "project-b", ".htmlgraph")
 
 	// Write cache for project A.
 	pathA := statuslineCachePath(dirA)

@@ -846,6 +846,193 @@ func TestFeatureStart_DifferentFeatures(t *testing.T) {
 	}
 }
 
+// TestFeatureStart_ClaimWrittenOnFirstStart verifies that a claim row is written
+// to the claims table on the very first call to feature start (bug-0d55d8e4).
+func TestFeatureStart_ClaimWrittenOnFirstStart(t *testing.T) {
+	const sessionID = "test-session-claim-first-start"
+	const agentID = dbpkg.AgentRootSentinel
+
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	if err := testCreate("feature", "Claim First Start", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 1 {
+		t.Fatalf("expected 1 feature file, got %d", len(featFiles))
+	}
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+	featID := featNode.ID
+
+	if err := wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID); err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	var count int
+	database.QueryRow(
+		`SELECT COUNT(*) FROM claims WHERE work_item_id = ? AND claimed_by_agent_id = ? AND status IN ('proposed','claimed','in_progress','blocked','handoff_pending')`,
+		featID, agentID,
+	).Scan(&count)
+	if count != 1 {
+		t.Errorf("want 1 live claim row after first start, got %d", count)
+	}
+}
+
+// TestFeatureStart_ClaimRenewedOnRepeatStart verifies that calling feature start
+// twice on the same item with the same (session, agent) does not create a
+// duplicate live claim row — the existing claim's lease is renewed instead
+// (bug-0d55d8e4 fix: ClaimItemOrRenew is idempotent).
+func TestFeatureStart_ClaimRenewedOnRepeatStart(t *testing.T) {
+	const sessionID = "test-session-claim-repeat-start"
+	const agentID = dbpkg.AgentRootSentinel
+
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	if err := testCreate("feature", "Claim Repeat Start", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 1 {
+		t.Fatalf("expected 1 feature file, got %d", len(featFiles))
+	}
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+	featID := featNode.ID
+
+	// First start.
+	if err := wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID); err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+
+	// Second start — same item, same agent (short-circuit path in active_work_items,
+	// but ClaimItemOrRenew must still run to refresh/ensure the live claim row).
+	if err := wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID); err != nil {
+		t.Fatalf("second start: %v", err)
+	}
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	// Must have exactly one live claim row (no duplicates) after two starts.
+	var count int
+	database.QueryRow(
+		`SELECT COUNT(*) FROM claims WHERE work_item_id = ? AND claimed_by_agent_id = ? AND status IN ('proposed','claimed','in_progress','blocked','handoff_pending')`,
+		featID, agentID,
+	).Scan(&count)
+	if count != 1 {
+		t.Errorf("want 1 live claim row after repeat start, got %d (no duplicates)", count)
+	}
+}
+
+// TestFeatureStart_ClaimWrittenAfterExpiry verifies that feature start writes a
+// fresh live claim row when the previous claim has expired, even if
+// active_work_items still shows the item as active for this (session, agent).
+// This is the core scenario of bug-0d55d8e4: the short-circuit on
+// active_work_items was preventing the claim re-write when the claim expired.
+func TestFeatureStart_ClaimWrittenAfterExpiry(t *testing.T) {
+	const sessionID = "test-session-claim-after-expiry"
+	const agentID = dbpkg.AgentRootSentinel
+
+	tmpDir, hgDir := testHgDirWithDB(t, sessionID)
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+	t.Setenv("HTMLGRAPH_SESSION_ID", sessionID)
+	t.Setenv("HTMLGRAPH_CACHE_DIR", tmpDir)
+
+	trackID := testSetupTrack(t, hgDir)
+
+	if err := testCreate("feature", "Claim After Expiry", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	if len(featFiles) != 1 {
+		t.Fatalf("expected 1 feature file, got %d", len(featFiles))
+	}
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+	featID := featNode.ID
+
+	// First start — writes claim and active_work_items.
+	if err := wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID); err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	// Manually expire the claim by back-dating its lease.
+	pastTime := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	_, err = database.Exec(
+		`UPDATE claims SET lease_expires_at = ?, last_heartbeat_at = ? WHERE work_item_id = ? AND claimed_by_agent_id = ?`,
+		pastTime, pastTime, featID, agentID,
+	)
+	if err != nil {
+		t.Fatalf("expire claim: %v", err)
+	}
+
+	// Verify claim is now expired (sanity check).
+	var liveCount int
+	database.QueryRow(
+		`SELECT COUNT(*) FROM claims WHERE work_item_id = ? AND claimed_by_agent_id = ? AND status IN ('proposed','claimed','in_progress','blocked','handoff_pending')`,
+		featID, agentID,
+	).Scan(&liveCount)
+	// NOTE: The claim is expired by timestamp but not yet reaped by status.
+	// ReapExpiredClaims runs at the start of ClaimItemOrRenew.
+
+	// active_work_items still shows the item as active (tables are diverged).
+	gotActive := dbpkg.GetActiveWorkItem(database, sessionID, agentID)
+	if gotActive != featID {
+		t.Fatalf("precondition: active_work_items should still show %q, got %q", featID, gotActive)
+	}
+
+	// Close DB — wiSetStatusWithAgent opens its own connection.
+	database.Close()
+
+	// Second start — active_work_items shows short-circuit condition, but the
+	// prior claim is expired. ClaimItemOrRenew must write a fresh claim.
+	if err := wiSetStatusWithAgent("feature", featID, "in-progress", sessionID, agentID); err != nil {
+		t.Fatalf("second start after expiry: %v", err)
+	}
+
+	database2, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err != nil {
+		t.Fatalf("open db2: %v", err)
+	}
+	defer database2.Close()
+
+	// Must have exactly one live claim row after re-start.
+	var liveClaims int
+	database2.QueryRow(
+		`SELECT COUNT(*) FROM claims WHERE work_item_id = ? AND claimed_by_agent_id = ? AND status IN ('proposed','claimed','in_progress','blocked','handoff_pending')`,
+		featID, agentID,
+	).Scan(&liveClaims)
+	if liveClaims != 1 {
+		t.Errorf("want 1 live claim row after re-start post-expiry, got %d", liveClaims)
+	}
+}
+
 // TestRunWiSetStatus_ConcurrentAgents proves that N goroutines with distinct
 // agentIDs can each claim different features on the same session without
 // contention, error, or loss.

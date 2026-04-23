@@ -1,6 +1,6 @@
 // Package terminal manages ttyd sidecar processes for the embedded terminal
 // feature. Each Start call spawns a new ttyd process on a free localhost port
-// running htmlgraph claude in the given project directory. Stop signals the
+// running the selected agent in the given project directory. Stop signals the
 // process; StopAll is called on graceful server shutdown.
 package terminal
 
@@ -14,11 +14,32 @@ import (
 	"time"
 )
 
+// StartRequest holds the parameters for starting a terminal session.
+// Zero-valued fields fall back to MVP defaults: agent=claude, mode=dev,
+// cwd=server projectDir, workItem=empty.
+type StartRequest struct {
+	// Agent selects which AI tool to run (claude, codex, gemini, yolo).
+	// Defaults to "claude" when empty.
+	Agent string
+	// Mode controls launch flags (dev, normal, auto).
+	// Defaults to "dev" when empty.
+	Mode string
+	// CWD is the working directory for the session.
+	// Defaults to the server's project directory when empty.
+	CWD string
+	// WorkItem, when non-empty, prepends "htmlgraph feature start <id>; "
+	// to the shell command for attribution.
+	WorkItem string
+}
+
 // session tracks a running ttyd process.
 type session struct {
 	cmd      *exec.Cmd
 	port     int
 	workItem string
+	agent    string
+	mode     string
+	cwd      string
 }
 
 // Manager owns the lifecycle of ttyd sidecar processes.
@@ -64,10 +85,58 @@ func waitForPort(port int, timeout time.Duration) error {
 	return fmt.Errorf("ttyd did not bind %s within %s", addr, timeout)
 }
 
-// Start spawns a ttyd process on a free port running htmlgraph claude (or,
-// when workItem is non-empty, first starting the given work item). Returns
-// the port and pid on success.
-func (m *Manager) Start(projectDir, workItem string) (port int, pid int, err error) {
+// buildShellCmd constructs the shell one-liner that ttyd will run inside bash -lc.
+//
+// Rules:
+//   - agent=claude (default) → htmlgraph claude [--dev]
+//   - agent=codex → htmlgraph codex [--dev]
+//   - agent=gemini → htmlgraph gemini [--dev]
+//   - agent=yolo → claude --permission-mode bypassPermissions (no htmlgraph yolo wrapper)
+//   - mode=dev (default) → --dev flag appended (not applicable to yolo)
+//   - mode=normal → no flag
+//   - workItem non-empty → prepends "htmlgraph feature start <id>; " for ALL agents
+func buildShellCmd(agent, mode, workItem string) string {
+	if agent == "" {
+		agent = "claude"
+	}
+	if mode == "" {
+		mode = "dev"
+	}
+
+	var base string
+	switch agent {
+	case "yolo":
+		// yolo uses claude directly with bypassPermissions; no htmlgraph wrapper.
+		base = "claude --permission-mode bypassPermissions"
+	default:
+		base = "htmlgraph " + agent
+		if mode == "dev" {
+			base += " --dev"
+		}
+	}
+
+	if workItem != "" {
+		return "htmlgraph feature start " + workItem + " >/dev/null 2>&1; " + base
+	}
+	return base
+}
+
+// Start spawns a ttyd process on a free port running the agent described by req.
+// Zero-valued fields in req fall back to MVP defaults (agent=claude, mode=dev,
+// cwd=defaultDir). Returns the port and pid on success.
+func (m *Manager) Start(req StartRequest, defaultDir string) (port int, pid int, err error) {
+	// Apply defaults for zero-valued fields.
+	if req.Agent == "" {
+		req.Agent = "claude"
+	}
+	if req.Mode == "" {
+		req.Mode = "dev"
+	}
+	workDir := defaultDir
+	if req.CWD != "" {
+		workDir = req.CWD
+	}
+
 	// Ensure ttyd is available before doing anything else.
 	if _, err = exec.LookPath("ttyd"); err != nil {
 		return 0, 0, fmt.Errorf("ttyd not found on PATH — install with: brew install ttyd")
@@ -78,27 +147,30 @@ func (m *Manager) Start(projectDir, workItem string) (port int, pid int, err err
 		return 0, 0, fmt.Errorf("could not find free port: %w", err)
 	}
 
-	// Build the shell one-liner that ttyd will run inside bash -lc.
-	shellCmd := "htmlgraph claude --dev"
-	if workItem != "" {
-		shellCmd = "htmlgraph feature start " + workItem + " >/dev/null 2>&1; htmlgraph claude --dev"
-	}
+	shellCmd := buildShellCmd(req.Agent, req.Mode, req.WorkItem)
 
 	cmd := exec.Command(
 		"ttyd",
 		"-p", strconv.Itoa(port),
-		"-W",              // writable (allows input)
+		"-W",               // writable (allows input)
 		"-i", "127.0.0.1", // bind to localhost only
 		"bash", "-lc", shellCmd,
 	)
-	cmd.Dir = projectDir
+	cmd.Dir = workDir
 
 	if err = cmd.Start(); err != nil {
 		return 0, 0, fmt.Errorf("failed to start ttyd: %w", err)
 	}
 
 	pid = cmd.Process.Pid
-	s := &session{cmd: cmd, port: port, workItem: workItem}
+	s := &session{
+		cmd:      cmd,
+		port:     port,
+		workItem: req.WorkItem,
+		agent:    req.Agent,
+		mode:     req.Mode,
+		cwd:      workDir,
+	}
 
 	m.mu.Lock()
 	m.sessions[pid] = s

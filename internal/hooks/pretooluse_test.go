@@ -215,7 +215,7 @@ func TestCheckSubagentWorkItemGuard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := checkSubagentWorkItemGuard(tt.tool, tt.isSubagent, tt.hasWorkItem)
+			result := checkSubagentWorkItemGuard(tt.tool, tt.isSubagent, tt.hasWorkItem, "sess-abc123", true, "feat-xyz", "feat-xyz")
 			if tt.blocked && result == "" {
 				t.Errorf("expected block for tool=%s isSubagent=%v hasWorkItem=%v, got allow",
 					tt.tool, tt.isSubagent, tt.hasWorkItem)
@@ -223,6 +223,83 @@ func TestCheckSubagentWorkItemGuard(t *testing.T) {
 			if !tt.blocked && result != "" {
 				t.Errorf("expected allow for tool=%s isSubagent=%v hasWorkItem=%v, got block: %s",
 					tt.tool, tt.isSubagent, tt.hasWorkItem, result)
+			}
+		})
+	}
+}
+
+func TestCheckSubagentWorkItemGuard_DiagnosticFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		sessionID   string
+		isYoloMode  bool
+		isSubagent  bool
+		featureID   string
+		claimedItem string
+		wantSession string // expected session prefix in message
+		wantFeature string
+		wantClaim   string
+	}{
+		{
+			name:        "all fields populated",
+			sessionID:   "abcdef1234567890",
+			isYoloMode:  true,
+			isSubagent:  true,
+			featureID:   "feat-aabbccdd",
+			claimedItem: "",
+			wantSession: "abcdef12",
+			wantFeature: "feat-aabbccdd",
+			wantClaim:   "none",
+		},
+		{
+			name:        "no feature no claim",
+			sessionID:   "short",
+			isYoloMode:  false,
+			isSubagent:  true,
+			featureID:   "",
+			claimedItem: "",
+			wantSession: "short",
+			wantFeature: "none",
+			wantClaim:   "none",
+		},
+		{
+			name:        "claim present no feature",
+			sessionID:   "sess-00001111",
+			isYoloMode:  true,
+			isSubagent:  true,
+			featureID:   "",
+			claimedItem: "bug-99887766",
+			wantSession: "sess-000",
+			wantFeature: "none",
+			wantClaim:   "bug-99887766",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := checkSubagentWorkItemGuard("Write", tt.isSubagent, false, tt.sessionID, tt.isYoloMode, tt.featureID, tt.claimedItem)
+			if result == "" {
+				t.Fatal("expected block message, got empty string")
+			}
+			for _, field := range []string{tt.wantSession, tt.wantFeature, tt.wantClaim} {
+				if !strings.Contains(result, field) {
+					t.Errorf("block message missing %q\nfull message:\n%s", field, result)
+				}
+			}
+			// Verify yolo and subagent booleans appear.
+			yoloStr := "yolo=false"
+			if tt.isYoloMode {
+				yoloStr = "yolo=true"
+			}
+			subagentStr := "subagent=false"
+			if tt.isSubagent {
+				subagentStr = "subagent=true"
+			}
+			if !strings.Contains(result, yoloStr) {
+				t.Errorf("block message missing %q\nfull message:\n%s", yoloStr, result)
+			}
+			if !strings.Contains(result, subagentStr) {
+				t.Errorf("block message missing %q\nfull message:\n%s", subagentStr, result)
 			}
 		})
 	}

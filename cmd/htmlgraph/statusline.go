@@ -39,8 +39,10 @@ func runStatusline(sessionID string) error {
 		return statuslineFromSession(dir, sessionID)
 	}
 
-	// Fallback: scan HTML files for any in-progress item.
-	return statuslineFromHTML(dir)
+	// No session ID: return nothing. The global HTML scan has no session context and
+	// would leak cross-session state (e.g. show a bug from session B when session A
+	// is calling). An empty statusline is correct when no session is scoped.
+	return nil
 }
 
 func statuslineFromSession(dir, sessionID string) error {
@@ -148,29 +150,6 @@ func resolveTrackContext(database *sql.DB, dir, featureID string) string {
 	return fmt.Sprintf("%s %s [%d/%d]", iconFor("track"), title, done, total)
 }
 
-func statuslineFromHTML(dir string) error {
-	p, err := workitem.Open(dir, "claude-code")
-	if err != nil {
-		return nil
-	}
-	defer p.Close()
-
-	for _, typeName := range []string{"bug", "feature"} {
-		col := collectionFor(p, typeName)
-		nodes, err := col.List()
-		if err != nil {
-			continue
-		}
-		for _, n := range nodes {
-			if n.Status == "in-progress" {
-				fmt.Printf("%s %s\n", iconFor(typeName), truncate(n.Title, 30))
-				return nil
-			}
-		}
-	}
-
-	return nil
-}
 
 func iconFor(typeName string) string {
 	switch typeName {

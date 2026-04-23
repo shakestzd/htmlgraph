@@ -40,10 +40,10 @@
 
         <section data-content>
             <h3>Description</h3>
-            <p>Discovered during the parallel-sessions investigation on 2026-04-11. The current htmlgraph session_id (8d53982f-66f2-415b-a645-1886eb8ae438) appears in /Users/shakes/DevProjects/shakestzd/.htmlgraph/htmlgraph.db with 902 events but 0 messages, when it should only exist in /Users/shakes/DevProjects/htmlgraph/.htmlgraph/htmlgraph.db.
+            <p>Discovered during the parallel-sessions investigation on 2026-04-11. The current htmlgraph session_id (8d53982f-66f2-415b-a645-1886eb8ae438) appears in <sibling-repo-root>/.htmlgraph/htmlgraph.db with 902 events but 0 messages, when it should only exist in <repo-root>/.htmlgraph/htmlgraph.db.
 
 Evidence from shakestzd DB query:
-  8d53982f|/Users/shakes/DevProjects/shakestzd|902|0|2026-04-10T17:14:56Z
+  8d53982f|<sibling-repo-root>|902|0|2026-04-10T17:14:56Z
 
 The row has project_dir correctly set to shakestzd, created_at is 2026-04-10T17:14:56Z (several hours into this session), 902 events but ZERO messages. That pattern (events without messages) suggests hook-driven event inserts without any JSONL ingest or live-hook SessionStart to seed the messages table.
 

@@ -95,7 +95,7 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		hasAgentClaim = ctx.FeatureID != ""
 	}
 	if ctx.IsYoloMode && !subagentGrace {
-		if warn := checkSubagentWorkItemGuard(event.ToolName, ctx.IsSubagent, hasAgentClaim); warn != "" {
+		if warn := checkSubagentWorkItemGuard(event.ToolName, ctx.IsSubagent, hasAgentClaim, ctx.SessionID, ctx.IsYoloMode, ctx.FeatureID, ctx.ClaimedItem); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
 	}
@@ -499,7 +499,7 @@ func checkProjectDivergence(event *CloudEvent, database *sql.DB, sessionID strin
 //
 // Subagents ignore prompt-based instructions to register work items before
 // writing code. Enforcing at the hook layer is the reliable alternative.
-func checkSubagentWorkItemGuard(toolName string, isSubagent, hasWorkItem bool) string {
+func checkSubagentWorkItemGuard(toolName string, isSubagent, hasWorkItem bool, sessionID string, isYoloMode bool, featureID, claimedItem string) string {
 	if !isSubagent {
 		return ""
 	}
@@ -511,8 +511,27 @@ func checkSubagentWorkItemGuard(toolName string, isSubagent, hasWorkItem bool) s
 	if hasWorkItem {
 		return ""
 	}
-	return "No active work item. Run: htmlgraph feature start <id> or " +
-		"htmlgraph feature create \"description\" --track <trk-id> before writing code."
+
+	sess := sessionID
+	if len(sess) > 8 {
+		sess = sess[:8]
+	}
+	feat := featureID
+	if feat == "" {
+		feat = "none"
+	}
+	claim := claimedItem
+	if claim == "" {
+		claim = "none"
+	}
+	return fmt.Sprintf(
+		"Write blocked: no claimed work item.\n"+
+			"  session=%s yolo=%v subagent=%v\n"+
+			"  feature=%s  claim=%s\n"+
+			"To unblock: htmlgraph feature start <id>  (or: htmlgraph feature create \"...\" --track <trk-id>)",
+		sess, isYoloMode, isSubagent,
+		feat, claim,
+	)
 }
 
 // isWriteTool returns true for tools that can modify the filesystem or execute

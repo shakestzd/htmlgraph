@@ -14,6 +14,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/models"
 	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/internal/worktree"
 )
 
 // ActiveSessionData is the JSON structure written to .htmlgraph/.active-session
@@ -134,6 +135,16 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 
 	now := time.Now().UTC()
 	shortID := sessionID[:minSessionLen(sessionID)]
+
+	// Repair stale worktree .git gitdir pointer before any git operations.
+	// When a worktree is created on one machine (e.g. macOS) and opened on
+	// another (e.g. Linux devcontainer), the absolute path in the .git file
+	// becomes stale. Repair it now so all downstream git commands succeed.
+	if event.CWD != "" && event.CWD != projectDir {
+		if err := worktree.RepairGitdirFromRepoRoot(event.CWD, projectDir); err != nil {
+			debugLog(projectDir, "[session-start] worktree gitdir repair failed (cwd=%s): %v", event.CWD, err)
+		}
+	}
 
 	// Launch headCommit in a goroutine — I/O-bound, no data dependency with writeEnvVars.
 	commitCh := make(chan string, 1)

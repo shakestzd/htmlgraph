@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // Harness identifies the AI coding harness that invoked this hook.
@@ -110,14 +111,24 @@ func detectHarness(payload []byte) Harness {
 // representation. Codex uses a flat JSON structure with top-level fields like
 // "hook_event_name", "cwd", and "session_id". We map those into the CloudEvent
 // fields that downstream handlers read.
+//
+// Hardening: if HTMLGRAPH_PARENT_AGENT is set to a value other than "codex"
+// (e.g. "claude-code"), we use that as AgentID rather than hard-coding "codex".
+// This prevents misclassification when a stale env or mis-routed payload reaches
+// this parser for a non-Codex harness.
 func parseCodexEvent(raw []byte) (*CloudEvent, error) {
 	var p codexPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, fmt.Errorf("parseCodexEvent: %w", err)
 	}
 
+	agentID := "codex"
+	if parent := strings.TrimSpace(os.Getenv("HTMLGRAPH_PARENT_AGENT")); parent != "" && parent != "codex" {
+		agentID = parent
+	}
+
 	ev := &CloudEvent{
-		AgentID:        "codex",
+		AgentID:        agentID,
 		SessionID:      p.SessionID,
 		CWD:            p.CWD,
 		PermissionMode: p.PermissionMode,

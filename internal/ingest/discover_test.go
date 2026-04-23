@@ -76,8 +76,8 @@ func TestDecodeProjectPath(t *testing.T) {
 		expected string
 	}{
 		{
-			encoded:  "-Users-shakes-DevProjects-htmlgraph",
-			expected: "/Users/shakes/DevProjects/htmlgraph",
+			encoded:  "-Users-testuser-DevProjects-htmlgraph",
+			expected: "/Users/testuser/DevProjects/htmlgraph",
 		},
 		{
 			encoded:  "-Users-alice-code-myapp",
@@ -95,8 +95,8 @@ func TestDecodeProjectPath(t *testing.T) {
 		// in Claude's encoding — "foo-bar" encodes as "-foo-bar" just like
 		// "/foo/bar" would, so the decode is a best-effort reconstruction.
 		{
-			encoded:  "-Users-shakes-DevProjects-my-project",
-			expected: "/Users/shakes/DevProjects/my/project",
+			encoded:  "-Users-testuser-DevProjects-my-project",
+			expected: "/Users/testuser/DevProjects/my/project",
 		},
 	}
 
