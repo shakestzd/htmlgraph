@@ -87,8 +87,10 @@ EOF
 fi
 chmod +x "$HOME/.claude/omp-claude-wrapper.sh"
 
-echo "==> Installing Claude Code Oh My Posh theme..."
-[ -f "$HOME/.claude.omp.json" ] || cp "$(dirname "$0")/claude.omp.json" "$HOME/.claude.omp.json"
+echo "==> Linking Claude Code Oh My Posh theme..."
+# Source of truth lives in .devcontainer/ (tracked in git); symlink into HOME so
+# it survives container rebuilds without needing to re-copy each time.
+ln -sf "$(dirname "$0")/claude.omp.json" "$HOME/.claude.omp.json"
 
 echo "==> Installing oh-my-zsh..."
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
