@@ -25,6 +25,7 @@
     "source=htmlgraph-copilot-home,target=/home/vscode/.copilot,type=volume",
     "source=htmlgraph-local-bin,target=/home/vscode/.local,type=volume"
   ],
+  "appPort": ["8088:8088"],
   "forwardPorts": [
     8080
   ],
