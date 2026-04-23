@@ -11,6 +11,23 @@ import (
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
 
+// effectiveProjectDir resolves the project dir for OTel port derivation.
+// Priority: explicit arg → CLAUDE_PROJECT_DIR → HTMLGRAPH_PROJECT_DIR → os.Getwd.
+func effectiveProjectDir(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	for _, k := range []string{"CLAUDE_PROJECT_DIR", "HTMLGRAPH_PROJECT_DIR"} {
+		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+			return v
+		}
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		return cwd
+	}
+	return ""
+}
+
 // buildClaudeLaunchEnv returns the environment vector for a spawned
 // `claude` process. It always starts from os.Environ() (so the child
 // inherits the user's shell env) and layers HtmlGraph-specific overrides
@@ -28,8 +45,11 @@ import (
 func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 	env := os.Environ()
 
-	if htmlgraphProjectDir != "" {
-		env = setOrReplaceEnv(env, "HTMLGRAPH_PROJECT_DIR", htmlgraphProjectDir)
+	// Resolve an effective projectDir for OTel port derivation.
+	// Priority chain: explicit arg → CLAUDE_PROJECT_DIR → HTMLGRAPH_PROJECT_DIR → os.Getwd.
+	projectDir := effectiveProjectDir(htmlgraphProjectDir)
+	if projectDir != "" {
+		env = setOrReplaceEnv(env, "HTMLGRAPH_PROJECT_DIR", projectDir)
 	}
 
 	// OTel injection is default-on. Opt out by setting HTMLGRAPH_OTEL_ENABLED=0
@@ -38,10 +58,10 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 		return env
 	}
 
-	// Pass the project dir so both launcher and serve-child derive the same
-	// per-project port. htmlgraphProjectDir is empty when not in a worktree;
-	// LoadConfigFromEnv falls back to HTMLGRAPH_PROJECT_DIR env var in that case.
-	endpoint := otelEndpointFromEnv(htmlgraphProjectDir)
+	// Pass the resolved project dir so both launcher and serve-child derive the same
+	// per-project port. This ensures the OTLP endpoint points to the same hash-based
+	// port the serve-child is listening on.
+	endpoint := otelEndpointFromEnv(projectDir)
 	// User-set values always win — only add our default if missing.
 	env = addIfUnset(env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 	env = addIfUnset(env, "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "1")
