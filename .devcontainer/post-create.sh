@@ -46,6 +46,17 @@ if ! command -v oh-my-posh >/dev/null 2>&1; then
   curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$HOME/.local/bin"
 fi
 
+echo "==> Installing ttyd (required by the dashboard terminal launcher)..."
+if ! command -v ttyd >/dev/null 2>&1; then
+  mkdir -p "$HOME/.local/bin"
+  TTYD_VERSION=$(curl -sfL https://api.github.com/repos/tsl0922/ttyd/releases/latest 2>/dev/null \
+    | grep -oE '"tag_name": "[^"]+"' | head -1 | cut -d'"' -f4)
+  TTYD_VERSION=${TTYD_VERSION:-1.7.7}
+  curl -fL -o "$HOME/.local/bin/ttyd" \
+    "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.$(uname -m)"
+  chmod +x "$HOME/.local/bin/ttyd"
+fi
+
 echo "==> Ensuring \$HOME/.local/bin is on PATH in shell rc files..."
 for _rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
   if [ -f "$_rc" ] && ! grep -q '.local/bin' "$_rc"; then
@@ -90,7 +101,10 @@ chmod +x "$HOME/.claude/omp-claude-wrapper.sh"
 echo "==> Linking Claude Code Oh My Posh theme..."
 # Source of truth lives in .devcontainer/ (tracked in git); symlink into HOME so
 # it survives container rebuilds without needing to re-copy each time.
-ln -sf "$(dirname "$0")/claude.omp.json" "$HOME/.claude.omp.json"
+# Use an absolute path — a relative `$(dirname "$0")` symlink resolves from
+# $HOME (the symlink's own dir), landing at $HOME/.devcontainer/... which is
+# not the repo file.
+ln -sf "$(cd "$(dirname "$0")" && pwd)/claude.omp.json" "$HOME/.claude.omp.json"
 
 echo "==> Installing oh-my-zsh..."
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
