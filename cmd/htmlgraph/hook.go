@@ -94,6 +94,8 @@ func hookSubcmd(
 				}
 				database, err := db.Open(hooks.DBPath(projectDir))
 				if err != nil {
+					hooks.LogError(use, event.SessionID,
+						fmt.Sprintf("db.Open failed: %v", err))
 					return fallback, nil
 				}
 				defer database.Close()
@@ -125,6 +127,8 @@ func hookSubcmdWithProject(
 				}
 				database, err := db.Open(hooks.DBPath(projectDir))
 				if err != nil {
+					hooks.LogError(use, event.SessionID,
+						fmt.Sprintf("db.Open failed: %v", err))
 					return fallback, nil
 				}
 				defer database.Close()
@@ -153,6 +157,8 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 				}
 				database, err := db.Open(hooks.DBPath(projectDir))
 				if err != nil {
+					hooks.LogError("track-event", event.SessionID,
+						fmt.Sprintf("db.Open failed: %v", err))
 					return fallback, nil
 				}
 				defer database.Close()
