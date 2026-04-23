@@ -10,6 +10,8 @@ import (
 )
 
 // Pragmas mirrors the Python PRAGMA_SETTINGS from pragmas.py.
+// journal_mode is intentionally omitted here; BuildPragmas sets it based on
+// filesystem type detection (WAL on safe native fs, DELETE on unsafe/unknown).
 var Pragmas = map[string]string{
 	"journal_mode": "WAL",
 	"synchronous":  "NORMAL",
@@ -20,11 +22,26 @@ var Pragmas = map[string]string{
 	"mmap_size":    "0",
 }
 
+// BuildPragmas returns a pragma map with journal_mode resolved for the given
+// database path. On filesystems where WAL-mode mmap is unsafe (virtiofs, FUSE,
+// 9p, overlayfs, NFS, SMB), journal_mode is set to DELETE to avoid SIGBUS
+// crashes. On safelisted native filesystems it stays WAL.
+func BuildPragmas(dbPath string) map[string]string {
+	p := make(map[string]string, len(Pragmas))
+	for k, v := range Pragmas {
+		p[k] = v
+	}
+	if isUnsafeForMmap(dbPath) {
+		p["journal_mode"] = "DELETE"
+	}
+	return p
+}
+
 // ApplyPragmas sets all performance PRAGMAs on a database connection.
 // Some PRAGMAs (busy_timeout, cache_size) are best-effort and may not apply
 // to all backing stores (e.g., in-memory SQLite); failures are logged at debug
 // level and don't block the Open. Other PRAGMAs are required.
-func ApplyPragmas(db *sql.DB) error {
+func ApplyPragmas(db *sql.DB, pragmas map[string]string) error {
 	// PRAGMAs that are REQUIRED — fail Open if these don't apply.
 	required := []string{"journal_mode", "synchronous", "foreign_keys", "temp_store", "mmap_size"}
 	// PRAGMAs that are best-effort — failure is logged at debug level
@@ -32,7 +49,7 @@ func ApplyPragmas(db *sql.DB) error {
 	optional := []string{"busy_timeout", "cache_size"}
 
 	for _, pragma := range required {
-		value, ok := Pragmas[pragma]
+		value, ok := pragmas[pragma]
 		if !ok {
 			continue
 		}
@@ -43,7 +60,7 @@ func ApplyPragmas(db *sql.DB) error {
 	}
 
 	for _, pragma := range optional {
-		value, ok := Pragmas[pragma]
+		value, ok := pragmas[pragma]
 		if !ok {
 			continue
 		}

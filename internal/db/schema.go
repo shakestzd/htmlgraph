@@ -35,7 +35,7 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	if err := ApplyPragmas(db); err != nil {
+	if err := ApplyPragmas(db, BuildPragmas(dbPath)); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("applying pragmas: %w", err)
 	}
