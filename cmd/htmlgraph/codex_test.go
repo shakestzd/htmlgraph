@@ -457,3 +457,27 @@ func TestRemoveCodexHtmlgraphRegistrationsNonexistentFile(t *testing.T) {
 		t.Errorf("expected removed=false for non-existent file, got true")
 	}
 }
+
+// TestCodexFlagsParseWorktree verifies that the --feature and --track flags are
+// registered on the codex command and recognized during flag parsing.
+func TestCodexFlagsParseWorktree(t *testing.T) {
+	cmd := codexCmd()
+	// Verify that the flags exist by looking them up.
+	featureFlag := cmd.Flags().Lookup("feature")
+	if featureFlag == nil {
+		t.Fatal("codexCmd missing --feature flag")
+	}
+	trackFlag := cmd.Flags().Lookup("track")
+	if trackFlag == nil {
+		t.Fatal("codexCmd missing --track flag")
+	}
+	worktreeFlag := cmd.Flags().Lookup("worktree")
+	if worktreeFlag == nil {
+		t.Fatal("codexCmd missing --worktree flag")
+	}
+	workItemFlag := cmd.Flags().Lookup("work-item")
+	if workItemFlag == nil {
+		t.Fatal("codexCmd missing --work-item flag")
+	}
+}
+

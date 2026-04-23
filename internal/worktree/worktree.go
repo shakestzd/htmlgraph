@@ -19,21 +19,63 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 )
 
-// skipReindexEnv is an explicit override for the reindex subprocess. When
-// set to any non-empty value, reindexWorktree becomes a no-op. Useful for
-// benchmarks or adhoc scripts; tests rely on the auto-detection below
-// instead.
-const skipReindexEnv = "HTMLGRAPH_WORKTREE_SKIP_REINDEX"
+// RepairGitdirIfStale checks whether the current directory is a linked git
+// worktree whose .git file points at a nonexistent gitdir path, and rewrites
+// it to the correct location under mainRepoRoot when so. This recovers
+// worktrees created on one host (e.g. macOS at /Users/.../project/.git/…)
+// that are now being used on another host (e.g. a Linux Codespace at
+// /workspaces/project/.git/…).
+//
+// Returns (true, nil) when a repair was performed, (false, nil) when the
+// gitdir is already valid or CWD is not a linked worktree, and (false, err)
+// on unexpected I/O errors.
+//
+// Use this at CLI entry when HTMLGRAPH_PROJECT_DIR is known — the helper is
+// intentionally conservative: it only rewrites when it can locate both the
+// stale gitdir reference AND the expected correct path under the provided
+// mainRepoRoot. Anything ambiguous is left alone.
+func RepairGitdirIfStale(worktreeDir, mainRepoRoot string) (bool, error) {
+	gitFile := filepath.Join(worktreeDir, ".git")
+	info, err := os.Stat(gitFile)
+	if os.IsNotExist(err) || (err == nil && info.IsDir()) {
+		// Not a linked worktree (either no .git at all, or the main repo's .git directory).
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("stat %s: %w", gitFile, err)
+	}
 
-// isGoTestBinary reports whether the current process is a go-test binary,
-// detected by the conventional ".test" suffix that go test produces.
-// Centralizes the test-mode skip so any package using this worktree code
-// from within `go test` automatically skips the reindex subprocess — no
-// per-test-helper setup required. Keeps the "testing" import out of
-// production code.
-func isGoTestBinary() bool {
-	return strings.HasSuffix(os.Args[0], ".test") ||
-		strings.Contains(filepath.Base(os.Args[0]), ".test.")
+	raw, err := os.ReadFile(gitFile)
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", gitFile, err)
+	}
+	line := strings.TrimSpace(string(raw))
+	if !strings.HasPrefix(line, "gitdir: ") {
+		return false, nil
+	}
+	gitdir := strings.TrimPrefix(line, "gitdir: ")
+
+	if _, err := os.Stat(gitdir); err == nil {
+		return false, nil // already valid
+	}
+
+	worktreeName := filepath.Base(worktreeDir)
+	correctGitdir := filepath.Join(mainRepoRoot, ".git", "worktrees", worktreeName)
+	if _, err := os.Stat(correctGitdir); err != nil {
+		return false, fmt.Errorf("expected gitdir %q not present under mainRepoRoot: %w", correctGitdir, err)
+	}
+
+	// Also rewrite the main repo's gitdir pointer back at the worktree path,
+	// which git uses for reverse lookups.
+	mainGitdirFile := filepath.Join(correctGitdir, "gitdir")
+	if _, err := os.Stat(mainGitdirFile); err == nil {
+		_ = os.WriteFile(mainGitdirFile, []byte(filepath.Join(worktreeDir, ".git")+"\n"), 0644)
+	}
+
+	if err := os.WriteFile(gitFile, []byte("gitdir: "+correctGitdir+"\n"), 0644); err != nil {
+		return false, fmt.Errorf("rewrite %s: %w", gitFile, err)
+	}
+	return true, nil
 }
 
 // EnsureForFeature ensures a git worktree exists for the given feature and returns its path.
@@ -177,23 +219,19 @@ func excludeHtmlgraphFromWorktree(worktreePath string, w io.Writer) {
 	}
 }
 
+// reindexWorktreeFn is the function called by reindexWorktree. Swap to a
+// no-op in tests to skip the subprocess fork. Defaults to the real impl.
+var reindexWorktreeFn = runReindexSubprocess
+
 // reindexWorktree runs `htmlgraph reindex` in the given worktree directory so
 // the worktree's SQLite cache is current before Claude launches. Best-effort:
 // failures are written to w but do not abort.
-//
-// Auto-skipped when:
-//   - the process is a go-test binary (any test file in any package),
-//   - or HTMLGRAPH_WORKTREE_SKIP_REINDEX is explicitly set.
-//
-// Under `go test`, os.Executable() returns the test binary path; invoking
-// it with `reindex` would recursively re-run tests. The auto-detection
-// covers every consumer test — not just internal/worktree — without
-// requiring per-test-helper env plumbing.
 func reindexWorktree(worktreeDir string, w io.Writer) {
-	if isGoTestBinary() || os.Getenv(skipReindexEnv) != "" {
-		return
-	}
+	reindexWorktreeFn(worktreeDir, w)
+}
 
+// runReindexSubprocess is the real implementation of reindexWorktree.
+func runReindexSubprocess(worktreeDir string, w io.Writer) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
