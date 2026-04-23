@@ -13,10 +13,10 @@ import (
 )
 
 // setupGitRepo creates a temp git repo with an initial commit and returns its path.
+// (The post-creation reindex subprocess is auto-skipped under go test via
+// isGoTestBinary in worktree.go — no explicit env-var setup needed here.)
 func setupGitRepo(t *testing.T) string {
 	t.Helper()
-	// Avoid the reindex subprocess fork that runs after worktree creation.
-	t.Setenv("HTMLGRAPH_WORKTREE_SKIP_REINDEX", "1")
 	dir := t.TempDir()
 
 	cmds := [][]string{

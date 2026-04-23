@@ -19,11 +19,22 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 )
 
-// skipReindexEnv, when set to any non-empty value, disables the reindex
-// subprocess that otherwise runs after a worktree is created. Tests set this
-// to avoid forking the htmlgraph binary during unit runs. Using an env var
-// keeps the production code free of the testing import.
+// skipReindexEnv is an explicit override for the reindex subprocess. When
+// set to any non-empty value, reindexWorktree becomes a no-op. Useful for
+// benchmarks or adhoc scripts; tests rely on the auto-detection below
+// instead.
 const skipReindexEnv = "HTMLGRAPH_WORKTREE_SKIP_REINDEX"
+
+// isGoTestBinary reports whether the current process is a go-test binary,
+// detected by the conventional ".test" suffix that go test produces.
+// Centralizes the test-mode skip so any package using this worktree code
+// from within `go test` automatically skips the reindex subprocess — no
+// per-test-helper setup required. Keeps the "testing" import out of
+// production code.
+func isGoTestBinary() bool {
+	return strings.HasSuffix(os.Args[0], ".test") ||
+		strings.Contains(filepath.Base(os.Args[0]), ".test.")
+}
 
 // EnsureForFeature ensures a git worktree exists for the given feature and returns its path.
 // When the feature belongs to a parent track, the track worktree is created/reused instead.
@@ -169,10 +180,17 @@ func excludeHtmlgraphFromWorktree(worktreePath string, w io.Writer) {
 // reindexWorktree runs `htmlgraph reindex` in the given worktree directory so
 // the worktree's SQLite cache is current before Claude launches. Best-effort:
 // failures are written to w but do not abort.
-// Skipped when HTMLGRAPH_WORKTREE_SKIP_REINDEX is set — tests use this to
-// avoid subprocess forks during unit runs.
+//
+// Auto-skipped when:
+//   - the process is a go-test binary (any test file in any package),
+//   - or HTMLGRAPH_WORKTREE_SKIP_REINDEX is explicitly set.
+//
+// Under `go test`, os.Executable() returns the test binary path; invoking
+// it with `reindex` would recursively re-run tests. The auto-detection
+// covers every consumer test — not just internal/worktree — without
+// requiring per-test-helper env plumbing.
 func reindexWorktree(worktreeDir string, w io.Writer) {
-	if os.Getenv(skipReindexEnv) != "" {
+	if isGoTestBinary() || os.Getenv(skipReindexEnv) != "" {
 		return
 	}
 
