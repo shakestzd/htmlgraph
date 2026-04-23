@@ -408,13 +408,10 @@
       "Bash(echo \".htmlgraph/tracks/trk-cd61bbae.html\")",
       "Bash(jq 'del\\(.statusLine\\)' /workspaces/htmlgraph/.claude/settings.local.json)",
       "Bash(mv /tmp/settings.local.new.json /workspaces/htmlgraph/.claude/settings.local.json)",
-      "Bash(perl -ne 'while \\(m{\\(/Users/[^/\\\\s]+/|/home/\\(?!runner/\\)[^/\\\\s]+/|/workspaces/[^/\\\\s]+/|/private/var/folders/\\)}g\\) { print \"$.: $1\\\\n\" }')"
+      "Bash(perl -ne 'while \\(m{\\(/Users/[^/\\\\s]+/|/home/\\(?!runner/\\)[^/\\\\s]+/|/workspaces/[^/\\\\s]+/|/private/var/folders/\\)}g\\) { print \"$.: $1\\\\n\" }')",
+      "Bash(perl -ne 'while \\(m{\\(/Users/[^/\\\\s]+/|/home/\\(?!runner/\\)[^/\\\\s]+/|/workspaces/[^/\\\\s]+/|/private/var/folders/\\)}g\\) { print ARGV . \":\" . $. . \": \" . $1 . \"\\\\n\" }')",
+      "Bash(perl -ne 'while \\(m{\\(/Users/[^/\\\\s]+/|/home/\\(?!runner/\\)[^/\\\\s]+/|/workspaces/[^/\\\\s]+/|/private/var/folders/\\)}g\\) { print \"$.: $1\\\\n\" }' /workspaces/htmlgraph/.devcontainer/claude.omp.json)"
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "/Users/shakes/.claude/omp-claude-wrapper.sh",
-    "padding": 0
   },
   "enabledPlugins": {
     "playwright@claude-plugins-official": true
