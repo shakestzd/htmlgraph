@@ -18,15 +18,17 @@ import (
 
 func serveCmd() *cobra.Command {
 	var port int
+	var bind string
 
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start HTTP dashboard server with SSE event stream",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runServer(port)
+			return runServer(bind, port)
 		},
 	}
 	cmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
+	cmd.Flags().StringVar(&bind, "bind", "127.0.0.1", "Bind address (use 0.0.0.0 when publishing port from a container)")
 	return cmd
 }
 
@@ -39,8 +41,8 @@ func serveCmd() *cobra.Command {
 // serve_parent.go — kept here so the cobra command definition above does
 // not need to import a different package or refer to a free-standing
 // function.
-func runServer(port int) error {
-	return runParentServer(port)
+func runServer(bind string, port int) error {
+	return runParentServer(bind, port)
 }
 
 // buildSingleProjectMux constructs the HTTP routes for a single-project

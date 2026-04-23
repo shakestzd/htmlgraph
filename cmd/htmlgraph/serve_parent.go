@@ -148,7 +148,7 @@ func autoDetectCurrentProject() *registry.Entry {
 //     then print doorway + deep-link URLs.
 //  4. Plumb SIGINT/SIGTERM through http.Server.RegisterOnShutdown to
 //     SIGTERM all children cleanly before exit.
-func runParentServer(port int) error {
+func runParentServer(bind string, port int) error {
 	sup := childproc.NewSupervisor(childproc.Options{})
 	reaperCtx, stopReaper := context.WithCancel(context.Background())
 	defer stopReaper()
@@ -156,7 +156,7 @@ func runParentServer(port int) error {
 
 	mux := buildParentMux(sup)
 
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	addr := fmt.Sprintf("%s:%d", bind, port)
 
 	// Auto-detect & print URLs.
 	entry := autoDetectCurrentProject()
