@@ -48,11 +48,19 @@ func RepairGitdir(worktreePath, mainGitDir string) error {
 		return nil
 	}
 
-	// Compute the correct gitdir: <mainGitDir>/worktrees/<worktree-basename>.
-	// The worktree basename may include subdirectory segments for agent worktrees
-	// (e.g. .claude/worktrees/trk-xxx/agent-yyy). Git names the worktrees entry
-	// after the directory basename only, so we use filepath.Base.
-	worktreeName := filepath.Base(worktreePath)
+	// Compute the correct gitdir: <mainGitDir>/worktrees/<name>.
+	//
+	// Important — preserve git's own disambiguated name. When two worktrees
+	// share a basename (e.g. two `agent-task` worktrees on different tracks),
+	// git names the later admin dir `agent-task1`, `agent-task2`, etc. The
+	// stale .git pointer on the current machine still carries that correct
+	// name — we just need a new *prefix*. Taking `filepath.Base(worktreePath)`
+	// instead would rewrite the second worktree to point at the first one's
+	// admin dir, silently corrupting branch metadata for both.
+	//
+	// So: derive the admin-dir basename from the existing (stale) gitdir,
+	// and only swap out the leading path.
+	worktreeName := filepath.Base(currentGitdir)
 	correctGitdir := filepath.Join(mainGitDir, "worktrees", worktreeName)
 
 	// Verify the computed path actually exists before writing.

@@ -14,11 +14,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 )
+
+// skipReindexEnv, when set to any non-empty value, disables the reindex
+// subprocess that otherwise runs after a worktree is created. Tests set this
+// to avoid forking the htmlgraph binary during unit runs. Using an env var
+// keeps the production code free of the testing import.
+const skipReindexEnv = "HTMLGRAPH_WORKTREE_SKIP_REINDEX"
 
 // EnsureForFeature ensures a git worktree exists for the given feature and returns its path.
 // When the feature belongs to a parent track, the track worktree is created/reused instead.
@@ -164,9 +169,10 @@ func excludeHtmlgraphFromWorktree(worktreePath string, w io.Writer) {
 // reindexWorktree runs `htmlgraph reindex` in the given worktree directory so
 // the worktree's SQLite cache is current before Claude launches. Best-effort:
 // failures are written to w but do not abort.
-// Skipped when running under `go test` to avoid subprocess forks in unit tests.
+// Skipped when HTMLGRAPH_WORKTREE_SKIP_REINDEX is set — tests use this to
+// avoid subprocess forks during unit runs.
 func reindexWorktree(worktreeDir string, w io.Writer) {
-	if testing.Testing() {
+	if os.Getenv(skipReindexEnv) != "" {
 		return
 	}
 

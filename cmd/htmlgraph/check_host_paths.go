@@ -122,7 +122,12 @@ func loadHostPathAllowlist(path string) (map[string]bool, error) {
 }
 
 // fullScopeFiles collects all scannable files under .htmlgraph/ and .claude/.
-// Skips .htmlgraph/htmlgraph.db (binary) and .claude/settings.local.json (ephemeral).
+// Skips:
+//   - .htmlgraph/htmlgraph.db (binary)
+//   - .claude/settings.local.json (ephemeral)
+//   - .claude/worktrees/ entirely — linked-worktree .git files legitimately
+//     carry absolute gitdir: paths by design (git requires them). Scanning
+//     them produces noisy false positives on every developer's machine.
 func fullScopeFiles(repoRoot string) ([]string, error) {
 	var files []string
 	for _, dir := range []string{".htmlgraph", ".claude"} {
@@ -133,6 +138,13 @@ func fullScopeFiles(repoRoot string) ([]string, error) {
 		err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil // skip unreadable entries
+			}
+			rel, relErr := filepath.Rel(repoRoot, path)
+			if relErr == nil && strings.HasPrefix(rel, filepath.Join(".claude", "worktrees")+string(filepath.Separator)) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
 			}
 			if info.IsDir() {
 				return nil

@@ -247,10 +247,16 @@ func currentGitState(htmlgraphDir string) executeGitState {
 // worktree — branch-local state is correct). Otherwise falls back to the
 // project owner so nested/submodule CWDs don't leak unrelated repo state.
 // Reuses resolveHistoryRoot which already implements this check.
+//
+// On error from resolveHistoryRoot (permission error, missing git, etc.) we
+// silently fall back to the project owner rather than aborting — execute-
+// preview must stay non-fatal — but emit a stderr diagnostic so confused
+// ahead/behind counts have a visible trail for debugging.
 func resolveGitProbeRoot(htmlgraphDir string) string {
 	owner := filepath.Dir(htmlgraphDir)
 	root, err := resolveHistoryRoot(owner)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "execute-preview: resolveHistoryRoot(%s) failed, falling back to project owner: %v\n", owner, err)
 		return owner
 	}
 	return root

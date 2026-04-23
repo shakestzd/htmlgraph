@@ -158,3 +158,69 @@ func TestRepairGitdirFromRepoRoot(t *testing.T) {
 		t.Errorf("repaired gitdir %q does not exist: %v", repairedGitdir, err)
 	}
 }
+
+// TestRepairGitdirBasenameCollision guards against the bug where repair
+// derives the admin-dir name from filepath.Base(worktreePath) instead of the
+// existing gitdir pointer. Two worktrees can share a basename (git
+// disambiguates the admin dir with a numeric suffix, e.g. agent-task vs
+// agent-task1); using the worktree path's basename would silently rewrite
+// the second worktree's .git to point at the first worktree's admin dir.
+//
+// Reproduces the review finding on PR #54: both agent-task worktrees live
+// in directories named `agent-task` but git named the admin dirs
+// `agent-task` and `agent-task1`. Repair must preserve the existing admin
+// name (read from the stale gitdir).
+func TestRepairGitdirBasenameCollision(t *testing.T) {
+	dir := setupGitRepo(t)
+	mainGitDir := filepath.Join(dir, ".git")
+
+	// Simulate two worktrees whose paths have the same basename but whose
+	// admin dirs are disambiguated by git (agent-task, agent-task1). In a
+	// real setup, git writes those two admin dirs itself; we fabricate them
+	// here so the test is self-contained.
+	wt1 := filepath.Join(dir, "trackA", "agent-task")
+	wt2 := filepath.Join(dir, "trackB", "agent-task")
+	for _, p := range []string{wt1, wt2} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", p, err)
+		}
+	}
+	adminA := filepath.Join(mainGitDir, "worktrees", "agent-task")
+	adminB := filepath.Join(mainGitDir, "worktrees", "agent-task1")
+	for _, p := range []string{adminA, adminB} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatalf("mkdir admin %s: %v", p, err)
+		}
+	}
+
+	// Both worktrees carry stale cross-machine paths but the suffix of each
+	// stale pointer still carries the correct admin-dir name.
+	stale1 := "/old/machine/.git/worktrees/agent-task"
+	stale2 := "/old/machine/.git/worktrees/agent-task1"
+	if err := os.WriteFile(filepath.Join(wt1, ".git"), []byte("gitdir: "+stale1+"\n"), 0o644); err != nil {
+		t.Fatalf("write wt1 .git: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(wt2, ".git"), []byte("gitdir: "+stale2+"\n"), 0o644); err != nil {
+		t.Fatalf("write wt2 .git: %v", err)
+	}
+
+	if err := worktree.RepairGitdir(wt1, mainGitDir); err != nil {
+		t.Fatalf("repair wt1: %v", err)
+	}
+	if err := worktree.RepairGitdir(wt2, mainGitDir); err != nil {
+		t.Fatalf("repair wt2: %v", err)
+	}
+
+	got1, _ := os.ReadFile(filepath.Join(wt1, ".git"))
+	got2, _ := os.ReadFile(filepath.Join(wt2, ".git"))
+	want1 := "gitdir: " + adminA + "\n"
+	want2 := "gitdir: " + adminB + "\n"
+
+	if string(got1) != want1 {
+		t.Errorf("wt1 repaired to %q, want %q", got1, want1)
+	}
+	if string(got2) != want2 {
+		t.Errorf("wt2 repaired to %q, want %q — "+
+			"basename-collision regression (review comment on PR #54)", got2, want2)
+	}
+}
