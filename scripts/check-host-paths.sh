@@ -64,6 +64,9 @@ elif [[ "$STAGED_ONLY" -eq 1 ]]; then
     while IFS= read -r f; do
         # Only include files matching our scope
         if [[ "$f" == .htmlgraph/* || "$f" == .claude/* ]]; then
+            # Skip files that are intentionally machine-specific (matches full-scan exclusions)
+            [[ "$(basename "$f")" == "htmlgraph.db" ]] && continue
+            [[ "$(basename "$f")" == "settings.local.json" ]] && continue
             FILES_TO_SCAN+=("$REPO_ROOT/$f")
         fi
     done < <(git -C "$REPO_ROOT" diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)

@@ -1,23 +1,23 @@
 {
   "permissions": {
     "allow": [
-      "Write(//workspaces/htmlgraph/**)",
-      "Edit(//workspaces/htmlgraph/**)",
-      "NotebookEdit(//workspaces/htmlgraph/**)",
+      "Write(**)",
+      "Edit(**)",
+      "NotebookEdit(**)",
       "Bash(cd packages/go*)",
       "Bash(go build:*)",
       "Bash(go test:*)",
       "Bash(go vet:*)"
     ],
     "deny": [
-      "Write(//workspaces/htmlgraph/.htmlgraph/**)",
-      "Edit(//workspaces/htmlgraph/.htmlgraph/**)",
-      "NotebookEdit(//workspaces/htmlgraph/.htmlgraph/**)"
+      "Write(.htmlgraph/**)",
+      "Edit(.htmlgraph/**)",
+      "NotebookEdit(.htmlgraph/**)"
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "/home/vscode/.claude/omp-claude-wrapper.sh",
+    "command": "sh -c '$HOME/.claude/omp-claude-wrapper.sh'",
     "padding": 0
   },
   "plansDirectory": ".htmlgraph/plans/",

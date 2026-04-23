@@ -398,7 +398,17 @@
       "Bash(ps -p 30084 -o pid,ppid,command)",
       "Bash(ps -p 30160 -o pid,state,wchan,pcpu,etime,command)",
       "Bash(ps -p 30160 -o pid,state)",
-      "Bash(ps -p 39529 -o pid,command)"
+      "Bash(ps -p 39529 -o pid,command)",
+      "WebFetch(domain:www.langchain.com)",
+      "Bash(command -v socat)",
+      "Bash(command -v ncat)",
+      "Bash(ip -4 addr show)",
+      "Bash(ip route *)",
+      "Bash(git ls-files *)",
+      "Bash(echo \".htmlgraph/tracks/trk-cd61bbae.html\")",
+      "Bash(jq 'del\\(.statusLine\\)' /workspaces/htmlgraph/.claude/settings.local.json)",
+      "Bash(mv /tmp/settings.local.new.json /workspaces/htmlgraph/.claude/settings.local.json)",
+      "Bash(perl -ne 'while \\(m{\\(/Users/[^/\\\\s]+/|/home/\\(?!runner/\\)[^/\\\\s]+/|/workspaces/[^/\\\\s]+/|/private/var/folders/\\)}g\\) { print \"$.: $1\\\\n\" }')"
     ]
   },
   "statusLine": {
