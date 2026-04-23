@@ -324,6 +324,97 @@ func TestSubagentStart_WritesOTELResourceAttributes(t *testing.T) {
 	}
 }
 
+// TestSubagentStart_PreservesClaudeCodeAgentIdentity is the regression test for
+// bug-1b095c09: when HTMLGRAPH_PARENT_AGENT=codex leaks from a parent shell and
+// CLAUDE_CODE_ENTRYPOINT is set (real Claude Code session), the handler must
+// store the agent_id and agent_type from the raw payload unchanged.
+// Before the fix, parseCodexEvent was invoked (because Claude Code's payload
+// contains hook_event_name), which hardcoded AgentID="codex" and defaulted
+// AgentType="general-purpose", stomping htmlgraph:* agent attribution.
+func TestSubagentStart_PreservesClaudeCodeAgentIdentity(t *testing.T) {
+	database, projectDir := setupLifecycleDB(t)
+	parentSessionID := "parent-session-1b095c09"
+	subagentID := "task-uuid-xyz"
+	agentType := "htmlgraph:researcher"
+
+	// Simulate leaked Codex env — must NOT override the payload's agent_id.
+	t.Setenv("HTMLGRAPH_PARENT_AGENT", "codex")
+	// Simulate real Claude Code hook environment.
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
+
+	t.Setenv("HTMLGRAPH_PROJECT_DIR", projectDir)
+	t.Setenv("HTMLGRAPH_SESSION_ID", parentSessionID)
+	t.Setenv("HTMLGRAPH_AGENT_ID", "claude-code")
+	t.Setenv("HTMLGRAPH_PARENT_EVENT", "")
+	t.Setenv("CLAUDE_ENV_FILE", "")
+
+	if err := db.InsertSession(database, &models.Session{
+		SessionID:     parentSessionID,
+		AgentAssigned: "claude-code",
+		Status:        "active",
+	}); err != nil {
+		t.Fatalf("InsertSession parent: %v", err)
+	}
+
+	// The CloudEvent that SubagentStart receives after ParseEventForHarness.
+	// With the fix, HarnessClaude is selected (CLAUDE_CODE_ENTRYPOINT wins),
+	// so agent_id and agent_type come through unchanged from the raw payload.
+	event := &CloudEvent{
+		SessionID: parentSessionID,
+		CWD:       projectDir,
+		AgentID:   subagentID,
+		AgentType: agentType,
+	}
+	if _, err := SubagentStart(event, database); err != nil {
+		t.Fatalf("SubagentStart: %v", err)
+	}
+
+	// The stored sessions row must use the payload's agent_id, not "codex".
+	childSess, err := db.GetSession(database, subagentID)
+	if err != nil || childSess == nil {
+		t.Fatalf("GetSession(subagentID=%q): sess=%v err=%v", subagentID, childSess, err)
+	}
+	if childSess.AgentAssigned != agentType {
+		t.Errorf("sessions.agent_assigned = %q, want %q (not 'codex' or 'general-purpose')",
+			childSess.AgentAssigned, agentType)
+	}
+	if childSess.ParentSessionID != parentSessionID {
+		t.Errorf("sessions.parent_session_id = %q, want %q", childSess.ParentSessionID, parentSessionID)
+	}
+	if !childSess.IsSubagent {
+		t.Error("sessions.is_subagent = false, want true")
+	}
+
+	// The agent_events row must also preserve the real agent_id.
+	var storedAgentID, storedSubagentType string
+	err = database.QueryRow(
+		`SELECT agent_id, subagent_type FROM agent_events WHERE agent_id = ? LIMIT 1`, subagentID,
+	).Scan(&storedAgentID, &storedSubagentType)
+	if err != nil {
+		t.Fatalf("query agent_events: %v", err)
+	}
+	if storedAgentID != subagentID {
+		t.Errorf("agent_events.agent_id = %q, want %q (must not be clobbered to 'codex')",
+			storedAgentID, subagentID)
+	}
+	if storedSubagentType != agentType {
+		t.Errorf("agent_events.subagent_type = %q, want %q (must not default to 'general-purpose')",
+			storedSubagentType, agentType)
+	}
+
+	// Lineage trace must also preserve the real agent_type.
+	trace, err := db.GetLineageBySession(database, subagentID)
+	if err != nil {
+		t.Fatalf("GetLineageBySession: %v", err)
+	}
+	if trace == nil {
+		t.Fatal("expected lineage trace, got nil")
+	}
+	if trace.AgentName != agentType {
+		t.Errorf("lineage.agent_name = %q, want %q", trace.AgentName, agentType)
+	}
+}
+
 // TestSubagentStop_MissingTraceIsNonFatal asserts a stop event with no
 // matching start row does not return an error (log-and-continue semantics).
 func TestSubagentStop_MissingTraceIsNonFatal(t *testing.T) {
