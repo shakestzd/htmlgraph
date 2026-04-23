@@ -17,7 +17,7 @@ var Pragmas = map[string]string{
 	"busy_timeout": "5000",
 	"cache_size":   "-64000",
 	"temp_store":   "MEMORY",
-	"mmap_size":    "268435456",
+	"mmap_size":    "0",
 }
 
 // ApplyPragmas sets all performance PRAGMAs on a database connection.
