@@ -13,7 +13,8 @@ var sliceCardTmpl = template.Must(
 // dependencies, and approval status.
 type SliceCard struct {
 	Num         int
-	ID          string // feature ID like "feat-abc123"
+	ID          string // YAML slice id like "auth-init" (displayed in slice card)
+	FeatureID   string // generated feature ID like "feat-abc123" (for Related Features lookup)
 	Title       string
 	Description string   // Legacy: flat description text (used when What is empty)
 	What        string   // Structured: what to implement

@@ -309,11 +309,13 @@ textarea::placeholder{color:var(--text-muted)}
     <span class="related-label">Features</span>
     <div class="related-feature-list">
       {{range .RelatedFeatures}}
+      {{if (hasPrefix .ID "feat-")}}
       <a href="#" class="related-feature" data-id="{{.ID}}">
         <span class="related-feature-id">{{.ID}}</span>
         <span class="related-feature-title">{{.Title}}</span>
         <span class="badge badge-{{.StatusClass}}">{{.Status}}</span>
       </a>
+      {{end}}
       {{end}}
     </div>
   </div>
