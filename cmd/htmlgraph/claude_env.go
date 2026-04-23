@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
@@ -46,10 +49,19 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 	env = addIfUnset(env, "OTEL_LOGS_EXPORTER", "otlp")
 	env = addIfUnset(env, "OTEL_TRACES_EXPORTER", "otlp")
 	env = addIfUnset(env, "OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-	env = addIfUnset(env, "OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)
+	// The launcher's computed endpoint must win because it's derived from the same
+	// HTMLGRAPH_OTEL_* config the receiver reads in LoadConfigFromEnv. Inherited env
+	// values from a parent session whose hash resolved to a different port would silently
+	// drop spans. Users who need to point Claude Code at a non-htmlgraph receiver can
+	// steer via HTMLGRAPH_OTEL_HTTP_PORT / HTMLGRAPH_OTEL_BIND.
+	env = setOrReplaceEnv(env, "OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)
 	// Tool details include bash commands, skill names, MCP tool names —
 	// non-sensitive by default. Turn off by setting to "0" before launch.
 	env = addIfUnset(env, "OTEL_LOG_TOOL_DETAILS", "1")
+
+	// Probe receiver reachability — print a warning if unreachable. Does not block launch.
+	probeReceiverReachability(endpoint)
+
 	return env
 }
 
@@ -132,4 +144,30 @@ func isExplicitlyDisabled(v string) bool {
 		return true
 	}
 	return false
+}
+
+// probeReceiverReachability attempts a 1-second TCP dial to the OTLP endpoint.
+// If the dial fails, prints a warning to stderr. Does not block launch.
+// If the endpoint is malformed, silently skips the probe.
+func probeReceiverReachability(endpoint string) {
+	// Parse endpoint to extract host:port. Expect format "http://host:port" or "https://host:port".
+	var hostport string
+	if strings.HasPrefix(endpoint, "http://") {
+		hostport = strings.TrimPrefix(endpoint, "http://")
+	} else if strings.HasPrefix(endpoint, "https://") {
+		hostport = strings.TrimPrefix(endpoint, "https://")
+	} else {
+		// Malformed endpoint — skip probe silently. The launcher isn't responsible
+		// for validating user overrides.
+		return
+	}
+
+	conn, err := net.DialTimeout("tcp", hostport, 1*time.Second)
+	if err == nil {
+		conn.Close()
+		return // Reachable — no warning needed.
+	}
+
+	// Print warning to stderr. One line only, no logging noise.
+	fmt.Fprintf(os.Stderr, "htmlgraph: warning: OTel receiver at %s is not reachable — Claude Code spans will be dropped. Start htmlgraph serve or HTMLGRAPH_OTEL_HTTP_PORT is wrong.\n", hostport)
 }

@@ -132,8 +132,11 @@ func TestBuildClaudeLaunchEnv_InjectsWhenEnabled(t *testing.T) {
 }
 
 func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
-	// If the user already set OTEL_EXPORTER_OTLP_ENDPOINT or changed the
-	// exporter, we must not clobber those choices.
+	// The launcher respects user overrides for OTEL_METRICS_EXPORTER and
+	// OTEL_LOG_TOOL_DETAILS via addIfUnset. However, OTEL_EXPORTER_OTLP_ENDPOINT
+	// is NOT user-overrideable — it's always set by the launcher to match the
+	// receiver's per-project port. Users who need a custom receiver should
+	// steer via HTMLGRAPH_OTEL_HTTP_PORT / HTMLGRAPH_OTEL_BIND.
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://custom.example.com:4318")
@@ -142,11 +145,12 @@ func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
 
 	env := buildClaudeLaunchEnv("")
 
-	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "https://custom.example.com:4318")
+	// OTEL_EXPORTER_OTLP_ENDPOINT is overridden by the launcher — no custom values.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
+	// But other OTEL_* vars respect user overrides.
 	assertEnvContains(t, env, "OTEL_METRICS_EXPORTER", "console")
 	assertEnvContains(t, env, "OTEL_LOG_TOOL_DETAILS", "0")
-	// But flags that control telemetry activation can be added by us if
-	// unset — user is allowed to rely on the launcher to turn things on.
+	// Telemetry activation flags can be added by us if unset.
 	assertEnvContains(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 }
 
@@ -200,4 +204,18 @@ func TestIsExplicitlyDisabled(t *testing.T) {
 			t.Errorf("isExplicitlyDisabled(%q) = false, want true (whitespace should be trimmed)", s)
 		}
 	}
+}
+
+func TestBuildClaudeLaunchEnv_OverridesStaleOTELEndpoint(t *testing.T) {
+	// When the parent env has OTEL_EXPORTER_OTLP_ENDPOINT from a prior
+	// session (with a different port), the launcher's computed endpoint
+	// should override it. This ensures spans aren't silently dropped.
+	clearOtelEnv(t)
+	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
+	// Simulate a stale port from a prior session with a different hash.
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9999")
+
+	env := buildClaudeLaunchEnv("")
+	// The computed endpoint (default 4318) should override the inherited 9999.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 }
