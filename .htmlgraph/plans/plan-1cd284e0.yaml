@@ -5,9 +5,9 @@ meta:
     description: |
         Move the OTLP receiver out of htmlgraph serve into per-session collector subprocesses that append OTel signals to session-scoped NDJSON files, and build an NDJSON-to-SQLite indexer in serve to preserve existing dashboard APIs. Retires the shared-port shared-writer model that causes parallel-session merging (bug-e8b8900b), SQLITE_BUSY cascades on the OTel write path (bug-08681166 class), and serve-restart span drops. Establishes the NDJSON-canonical + SQLite-derived pattern without committing to full SQLite removal (deferred to follow-on plans).
     created_at: "2026-04-24"
-    status: draft
+    status: todo
     created_by: claude-opus
-    version: 1
+    version: 3
 design:
     problem: |
         The OTLP receiver is embedded inside htmlgraph serve and writes to the shared .htmlgraph/htmlgraph.db SQLite file on a project-hashed port (4318 + FNV32a(projectDir) % 1000, internal/otel/receiver/port.go:11). This creates four recurring failure modes. (1) Parallel htmlgraph claude terminals in the same project share one port and one writer; Claude Code's span tagging is the only thing distinguishing their sessions, and bug-e8b8900b documents session merging from this. (2) The receiver competes with hook processes for SQLite writes, producing SQLITE_BUSY cascades — bug-08681166 (in-progress), and the already-resolved bug-6ab963d3 and bug-59b98285, all describe the same contention class. (3) Restarting serve drops in-flight spans because Claude Code's OTel SDK has no durable retry against a closed port (claude_serve_autostart.go:93 logs a warning and accepts the loss). (4) Session identity is authoritative only in Claude Code — HTMLGRAPH_SESSION_ID leaks from parent shells into subprocesses (internal/hooks/runner.go:187), misattributing hook events in subagent contexts.
