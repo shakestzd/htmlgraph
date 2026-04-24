@@ -846,8 +846,8 @@ class HgEventTree extends HTMLElement {
       + ' data-timestamp="' + esc((attrs.timestamp || log.ts_micros || 0)) + '"'
       + ' style="padding-left: 2.5rem">'
       + expandIcon
-      + '<span class="badge badge-assistant" style="background-color: #9ca3af;">assistant</span>'
-      + '<span class="event-summary">' + esc(preview) + '</span>'
+      + '<span class="assistant-label">assistant</span>'
+      + '<span class="event-summary assistant-preview">' + esc(preview) + '</span>'
       + stopReasonBadge
       + featureBdg
       + '</div>';

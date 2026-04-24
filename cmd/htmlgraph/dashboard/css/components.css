@@ -558,6 +558,57 @@
   color: #aaa;
 }
 
+/* ── Assistant text row — activity feed ───────────────────────────
+   A collapsed/expandable row showing the assistant's text response
+   between a UserQuery anchor and its tool-call children. Uses a
+   subtle purple left border (--graph-agent palette) to distinguish
+   it from tool rows without reading as an error state. The label is
+   a plain dim text tag — not a pill/badge — so it recedes behind the
+   preview text rather than dominating it. */
+.assistant-text-row {
+  border-left-color: rgba(139, 92, 246, 0.35) !important; /* purple, low opacity */
+  background: rgba(139, 92, 246, 0.03) !important;
+}
+.assistant-text-row:hover {
+  background: rgba(139, 92, 246, 0.07) !important;
+}
+[data-theme="light"] .assistant-text-row {
+  border-left-color: rgba(109, 40, 217, 0.3) !important;
+  background: rgba(109, 40, 217, 0.03) !important;
+}
+[data-theme="light"] .assistant-text-row:hover {
+  background: rgba(109, 40, 217, 0.06) !important;
+}
+
+/* Dim inline text label — replaces the saturated ASSISTANT pill */
+.assistant-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(139, 92, 246, 0.7);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 0.35rem;
+}
+[data-theme="light"] .assistant-label {
+  color: rgba(109, 40, 217, 0.65);
+}
+
+/* Preview text — slightly dimmer than primary text, single-line with ellipsis.
+   The JS already truncates to 180 chars; CSS just prevents overflow in narrow
+   viewports. min-width:0 is required for text-overflow to work inside flex. */
+.assistant-preview {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
 /* Feature badge */
 .badge-feature {
   font-size: 0.6rem;
