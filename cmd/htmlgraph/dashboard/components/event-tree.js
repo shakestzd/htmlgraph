@@ -187,12 +187,65 @@ class HgEventTree extends HTMLElement {
     // turn (the final response) has no following tool and stays as its
     // own row. Done BEFORE reverse so "preceding" means chronologically
     // earlier.
+    //
+    // Guard for Task/Agent spans: when two subagents run concurrently, the
+    // OTel receiver's re-attribution (strategy B: overlap window) is skipped
+    // as "ambiguous", leaving each subagent's api_request spans parented to
+    // the same orchestrator interaction span as the Task/Agent spans. If a
+    // subagent's api_request appears chronologically just before an
+    // orchestrator Task span, the naive sequential absorption would pair
+    // the wrong api_request (subagent's model) with the Task row.
+    //
+    // Fix: before the absorption pass, identify the orchestrator model for
+    // each parent span by looking for the model used in api_requests that
+    // precede non-delegation (Bash/Read/Edit/…) tool spans — those api_requests
+    // are definitively from the orchestrator. Then, when absorbing into a
+    // Task/Agent span, skip if the candidate api_request's model doesn't match
+    // the orchestrator model, and instead search backwards for the nearest
+    // api_request with the right model.
     Object.values(byId).forEach(function(parent) {
       if (!parent.children || parent.children.length < 2) return;
       var kids = parent.children;
+
+      // Determine the orchestrator model for this parent span. Scan all
+      // consecutive (api_request, non-delegation tool) pairs — the first
+      // one we find is definitively from the orchestrator.
+      var orchModel = '';
+      for (var k = 0; k < kids.length - 1; k++) {
+        var kCur = kids[k], kNxt = kids[k + 1];
+        if (kCur.canonical === 'api_request' && kCur.model && kNxt.tool_name &&
+            kNxt.tool_name !== 'Task' && kNxt.tool_name !== 'Agent') {
+          orchModel = kCur.model;
+          break;
+        }
+      }
+
       for (var i = 0; i < kids.length - 1; i++) {
         var cur = kids[i], nxt = kids[i + 1];
         if (cur.canonical === 'api_request' && nxt.tool_name) {
+          // For Task/Agent spans: guard against mis-attributed concurrent
+          // subagent api_requests. When orchModel is known and the candidate
+          // api_request has a different model, search backwards for the
+          // nearest orchestrator api_request and use that instead.
+          if ((nxt.tool_name === 'Task' || nxt.tool_name === 'Agent') &&
+              orchModel && cur.model && cur.model !== orchModel) {
+            var fallback = null;
+            for (var j = i - 1; j >= 0; j--) {
+              var cand = kids[j];
+              if (cand.canonical === 'api_request' && cand.model === orchModel && !cand._absorbedInto) {
+                fallback = cand;
+                break;
+              }
+            }
+            if (fallback) {
+              nxt._precedingApi = fallback;
+              fallback._absorbedInto = nxt.span_id;
+            }
+            // Leave the mis-attributed api_request un-absorbed — it will be
+            // filtered from the rendered tree by filteredRootSpans (api_request
+            // canonicals are not rendered as top-level rows).
+            continue;
+          }
           nxt._precedingApi = cur;
           cur._absorbedInto = nxt.span_id;
         }
