@@ -1,7 +1,10 @@
 {
   "name": "htmlgraph-dev",
   "containerEnv": {
-    "TZ": "America/New_York"
+    "TZ": "America/New_York",
+    "TERM": "xterm-256color",
+    "COLORTERM": "truecolor",
+    "LANG": "C.UTF-8"
   },
   "build": {
     "dockerfile": "Dockerfile",
@@ -25,7 +28,7 @@
     "source=htmlgraph-copilot-home,target=/home/vscode/.copilot,type=volume",
     "source=htmlgraph-local-bin,target=/home/vscode/.local,type=volume"
   ],
-  "appPort": ["8088:8088"],
+  "appPort": ["8088:8088", "2222:2222"],
   "forwardPorts": [
     8080
   ],
