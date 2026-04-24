@@ -18,12 +18,16 @@ design:
         - '**Launcher-owned session identity** — htmlgraph mints the session ULID and binds it to every emitted event, replacing Claude Code''s span-tagged session.id as the authority.'
         - '**Zero dashboard regression** — every /api/otel/* endpoint keeps returning the same data shape; the NDJSON→SQLite indexer preserves all existing query paths.'
     constraints:
-        - 'Keep SQLite as the dashboard read index for this plan. Removing it entirely is a future phase that depends on answers we do not yet have for six genuine-SQL sites: yolo-guard LIKE scans (yolo_guard.go:539–704), DSL graph traversal (internal/graph/dsl.go), feature_files self-join overlap (feature_files_repo.go:86), claims CAS and lease expiry (claim_repo.go), OTel span re-parenting transactions (writer.go:553), and dashboard sessions list 5-table correlated subqueries (api.go:116–146).'
+        - 'Keep SQLite as the dashboard read index for this plan. Removing it entirely is a future phase that depends on answers we do not yet have for six genuine-SQL sites: yolo-guard LIKE scans (yolo_guard.go:539-704), DSL graph traversal (internal/graph/dsl.go), feature_files self-join overlap (feature_files_repo.go:86), claims CAS and lease expiry (claim_repo.go), OTel span re-parenting transactions (writer.go:553), and dashboard sessions list 5-table correlated subqueries (api.go:116-146).'
         - Reuse the existing syscall.Flock pattern (session_html.go:147, materialize.go:241) for NDJSON atomicity on oversize writes. Do not introduce a new lock primitive.
         - PIPE_BUF atomicity is 4096 bytes on Linux and 512 bytes on macOS. Some transcript_assistant.go:267 payloads exceed 4KB. Plan must name an explicit size-overflow strategy, not assume single-syscall atomicity.
-        - Serve auto-spawn must continue to work for semantic ops and the dashboard — only the OTLP receive-side is removed from serve. The existing checkServeLock/writeServeLock/spawnDetachedServe pattern (claude_serve_autostart.go:179–255) is reused for the dashboard path.
+        - Serve auto-spawn must continue to work for semantic ops and the dashboard — only the OTLP receive-side is removed from serve. The existing checkServeLock/writeServeLock/spawnDetachedServe pattern (claude_serve_autostart.go:179-255) is reused for the dashboard path.
         - Dashboard is an SPA (plugin/static/dashboard/js/app.js, 3435 lines) with substantial client-side aggregation already. The indexer preserves current API response shapes; no frontend rewrite is in scope.
         - Launcher currently detaches subprocesses via Setpgid:true and uses PID lockfiles. Collector subprocess reuses these mechanisms. Linux-only PDEATHSIG is not required if SIGTERM-on-exit is wired reliably at layered levels (SessionEnd hook + deferred launcher SIGTERM + idle timeout).
+        - '**Platform scope: Linux and macOS only.** Setpgid:true, PID-lockfile semantics, and file-locking patterns used throughout this plan are POSIX-specific. Windows support is explicitly deferred to a separate future plan; existing htmlgraph Windows coverage (if any) is neither extended nor regressed.'
+        - '**fsnotify is not currently a dependency** (verified 2026-04-24 against go.mod). Q2 recommendation of fsnotify-with-polling-fallback adds it; the polling-only alternative avoids the new dependency. Either path is acceptable — the choice is a pure latency/dependency tradeoff with no other architectural consequence.'
+        - '**Retention archives use stdlib archive/tar + compress/gzip** (.tar.gz), not .tar.zst. zstd is not currently a dependency and stdlib gzip is adequate for append-only event logs; this avoids introducing a new compression dependency for slice 7.'
+        - '**The SignalSink abstraction is asymmetric by design.** The SQLite sink carries all placeholder/upgrade span re-parenting logic (writer.go:300-336) because that logic requires cross-table DB queries. The NDJSON sink appends raw signals only; the indexer (slice 5) re-runs the upgrade logic when replaying NDJSON into SQLite. Slice 1 must treat the two sinks as implementing the same interface but with intentionally different capabilities beyond raw append.'
     approved: false
     comment: ""
 slices:
@@ -31,65 +35,74 @@ slices:
       num: 1
       title: Extract SignalSink interface; add NDJSONSink implementation
       what: |
-        Refactor internal/otel/receiver/writer.go to depend on a SignalSink interface with WriteBatch(ctx, *otel.UnifiedSignalBatch) error. Keep the current SQLite-backed writer as the first concrete implementation under internal/otel/sink/sqlite/. Add internal/otel/sink/ndjson/ that opens .htmlgraph/sessions/<sid>/events.ndjson (layout per Q1) in O_APPEND mode, serializes each UnifiedSignal as one JSON line, and handles payloads larger than PIPE_BUF according to the strategy chosen in Q4. Both sinks implement the same interface and are swappable at construction time. internal/otel/receiver/receiver.go's New() accepts a SignalSink rather than opening a *sql.DB directly.
+        Refactor internal/otel/receiver/writer.go to depend on a SignalSink interface. The interface method signature matches the existing Writer's WriteBatch exactly: WriteBatch(ctx context.Context, harness otel.Harness, resourceAttrs map[string]any, signals []otel.UnifiedSignal) error. Keep the current SQLite-backed writer as the first concrete implementation under internal/otel/sink/sqlite/, preserving its placeholder/upgrade span re-parenting logic (writer.go:300-336) intact — that logic requires cross-table DB queries and stays with the SQLite implementation. Add internal/otel/sink/ndjson/ that opens .htmlgraph/sessions/<sid>/events.ndjson (layout per Q1) in O_APPEND mode and serializes each UnifiedSignal as one JSON line. NDJSONSink does NOT implement placeholder/upgrade — it is append-only over raw signals; the indexer (slice 5) re-runs upgrade logic when replaying. Oversize payloads are handled per the strategy chosen in Q4. Both sinks are constructable behind the same interface; internal/otel/receiver/receiver.go's New() accepts a SignalSink rather than opening a *sql.DB directly. The existing http.go:162 call site is updated to pass the selected sink.
       why: |
-        Today writer.go is deeply SQLite-coupled: five prepared statements, BEGIN IMMEDIATE transactions, cross-table FK resolution against pending_subagent_starts and active_work_items. Without an interface boundary, a per-session collector cannot choose between sinks and cannot be tested without a real SQLite file. This interface extraction is the prerequisite that unblocks every downstream slice. Supports goal "Eliminate OTel writer collisions" by making sink selection explicit.
+        Today writer.go is deeply SQLite-coupled: five prepared statements, BEGIN IMMEDIATE transactions, cross-table FK resolution against pending_subagent_starts and active_work_items. Without an interface boundary, a per-session collector cannot choose between sinks and cannot be tested without a real SQLite file. This interface extraction is the prerequisite that unblocks every downstream slice. Supports goal Eliminate OTel writer collisions by making sink selection explicit. The asymmetric-capability design (SQLite sink carries upgrade logic, NDJSON sink does not) is load-bearing: without it, the indexer in slice 5 would have no place to re-run span re-parenting during replay.
       files:
         - internal/otel/receiver/writer.go
         - internal/otel/receiver/receiver.go
+        - internal/otel/receiver/http.go
         - internal/otel/sink/sink.go
         - internal/otel/sink/sqlite/sqlite.go
         - internal/otel/sink/ndjson/ndjson.go
         - internal/otel/sink/ndjson/overflow.go
       deps: []
       done_when:
-        - SignalSink interface exists with WriteBatch(ctx, *otel.UnifiedSignalBatch) error; both sqlite and ndjson sinks implement it and pass the same parameterized test suite.
-        - internal/otel/receiver/receiver.go constructor accepts a SignalSink, not a *sql.DB.
-        - 'NDJSONSink correctly applies the oversize strategy chosen in Q4: if truncate+sidecar, the main line stays under PIPE_BUF and the .overflow/<signal-id> sidecar contains the full payload.'
+        - SignalSink interface exists with method WriteBatch(ctx context.Context, harness otel.Harness, resourceAttrs map[string]any, signals []otel.UnifiedSignal) error. Both sqlite and ndjson sinks implement it.
+        - SQLite sink preserves existing placeholder/upgrade span re-parenting logic — orphan-span unit tests in internal/otel/receiver pass unchanged.
+        - 'NDJSON sink is raw-append only: it writes one JSON line per UnifiedSignal and does not query any external state. A unit test asserts NDJSON sink does not open a DB connection.'
+        - internal/otel/receiver/receiver.go constructor accepts a SignalSink, not a *sql.DB; http.go:162 call site is updated to pass the configured sink.
+        - 'NDJSON sink correctly applies the oversize strategy chosen in Q4. If flock-all-writes (recommended): every append acquires syscall.Flock(LOCK_EX) on the session NDJSON file using the same pattern as session_html.go:147.'
         - go build ./... && go vet ./... && go test ./internal/otel/... all green.
       effort: M
       risk: Low
       tests: |
         Unit: internal/otel/sink/sink_test.go parameterized over sinkFactory — write
           a mixed batch of spans/metrics/logs, read back via sink-specific inspector,
-          assert UnifiedSignal round-trip with every field preserved.
-        Unit: internal/otel/sink/ndjson/overflow_test.go — log signal with
-          attrs.text = strings.Repeat("x", 10000); assert main line < PIPE_BUF
-          AND overflow sidecar exists with full text (or per Q4 alternative).
+          assert UnifiedSignal round-trip. Asymmetric tests: orphan-span/placeholder
+          cases run only against the SQLite sink.
+        Unit: internal/otel/sink/ndjson/ndjson_test.go — assert NDJSON sink opens no
+          DB connection, appends one line per signal, flock acquired on each write
+          (per Q4 flock-all-writes).
         Integration: internal/otel/receiver/receiver_test.go boots a Receiver
-          wired to NDJSONSink, posts a known OTLP protobuf batch, asserts
-          events.ndjson on disk contains the expected signal lines.
+          wired to NDJSONSink, posts a known OTLP protobuf batch via http.go path,
+          asserts events.ndjson on disk contains the expected signal lines in
+          arrival order.
         Regression: existing internal/otel/receiver tests pass unchanged against
-          the SQLite sink path.
+          the SQLite sink path, including orphan-span re-parenting coverage.
       approved: false
       comment: ""
     - id: slice-2
       num: 2
       title: htmlgraph otel-collect subcommand
       what: |
-        New CLI subcommand `htmlgraph otel-collect --session-id <sid> --project-dir <path> --listen :0`. On start, constructs a receiver.Receiver wired to NDJSONSink rooted at .htmlgraph/sessions/<sid>/, chooses an ephemeral port via net.Listen(":0"), prints the chosen port to stdout in a single line `listen=127.0.0.1:<port>`, then blocks on Receiver.Start(ctx). Handles SIGTERM gracefully: flush pending batch (bounded ≤3s), close sink, exit 0. Emits a collector_start NDJSON line on boot: {"type":"collector_start","htmlgraph_sid":"<sid>","pid":<pid>, "port":<port>,"ts":<ns>} so the indexer can correlate collector lifetime with session events.
+        New CLI subcommand htmlgraph otel-collect --session-id <sid> --project-dir <path> --listen :0. On start, constructs a receiver.Receiver wired to NDJSONSink rooted at .htmlgraph/sessions/<sid>/, chooses an ephemeral port via net.Listen(:0), and prints the chosen address on stdout using the existing serve_child.go:70 handshake convention: htmlgraph-otel-ready port=<port> as a single line (no prefix/suffix writes). All internal logging routes to stderr so the stdout handshake line is never mingled with diagnostics. Handles SIGTERM gracefully: flush pending batch (bounded 3s or less), close sink, exit 0. Implements the Q3 layered-all-three safety net third layer: if HTMLGRAPH_OTEL_IDLE_TIMEOUT (default 5 minutes) elapses with no incoming OTLP traffic, the collector self-exits 0 after flushing. Emits a collector_start NDJSON line on boot. Registered as a cobra subcommand in cmd/htmlgraph/main.go:248-273.
       why: |
-        The collector must run as a separate process to achieve lifecycle independence from serve. Printing the chosen port on stdout is the simplest contract between launcher and collector — no advertisement protocol, no lockfile scan. SIGTERM drain is the only shutdown path that preserves in-flight spans. Forcing the launcher to pass session-id via flag closes the HTMLGRAPH_SESSION_ID env-leak misattribution at runner.go:187. Supports goal "Launcher-owned session identity".
+        The collector must run as a separate process to achieve lifecycle independence from serve. Reusing the existing htmlgraph-*-ready port=<N> handshake from serve_child.go:70 means launcher port-capture code (slice 3) follows an already-proven pattern rather than inventing a new one. SIGTERM drain is the only shutdown path that preserves in-flight spans. Forcing the launcher to pass session-id via flag closes the HTMLGRAPH_SESSION_ID env-leak misattribution at runner.go:187. The idle-timeout is the third layer of Q3 defense-in-depth policy and lives in the collector itself rather than in any hook, because only the collector can observe its own OTLP traffic silence. Supports goal Launcher-owned session identity.
       files:
         - cmd/htmlgraph/otel_collect.go
         - cmd/htmlgraph/main.go
       deps:
         - 1
       done_when:
-        - '`htmlgraph otel-collect --session-id 01HK... --project-dir /tmp/proj --listen :0` prints a single `listen=127.0.0.1:<port>` line on stdout within 200ms of start.'
+        - htmlgraph otel-collect --session-id 01HK... --project-dir /tmp/proj --listen :0 prints a single htmlgraph-otel-ready port=<port> line on stdout within 500ms of start; all logging routes to stderr.
         - POSTing an OTLP protobuf to the printed port produces a corresponding NDJSON line in .htmlgraph/sessions/01HK.../events.ndjson within 500ms.
-        - SIGTERM drains the pending batch and exits 0 within 3s; SIGKILL accepted without corrupting NDJSON beyond the last partial line (tolerable by indexer's checkpoint logic).
+        - SIGTERM drains the pending batch and exits 0 within 3s; SIGKILL accepted without corrupting NDJSON beyond the last partial line.
+        - HTMLGRAPH_OTEL_IDLE_TIMEOUT (default 5m) with no OTLP traffic triggers graceful self-exit 0 after flushing; overridable via env var for tests.
         - collector_start event is the first line of the NDJSON file and contains htmlgraph_sid, pid, port, ts.
       effort: S
       risk: Low
       tests: |
         Unit: cmd/htmlgraph/otel_collect_test.go — spawn subprocess via
-          exec.Command, read port line, POST OTLP protobuf, kill SIGTERM, assert
-          NDJSON contents.
+          exec.Command, read port line (expect htmlgraph-otel-ready port=<N>
+          format), POST OTLP protobuf, kill SIGTERM, assert NDJSON contents and
+          that nothing was written to stdout except the one handshake line.
+        Unit: idle-timeout — spawn with HTMLGRAPH_OTEL_IDLE_TIMEOUT=200ms, no
+          OTLP traffic, assert collector exits 0 within 500ms.
         Integration: parallel launch — spawn 3 otel-collect processes with
           different session IDs in the same project, assert each gets a distinct
           port and writes to its own NDJSON file with no cross-contamination.
-        Regression: `htmlgraph --help` output includes otel-collect; no other
+        Regression: htmlgraph --help output includes otel-collect; no other
           subcommand is affected.
       approved: false
       comment: ""
@@ -97,9 +110,9 @@ slices:
       num: 3
       title: Launcher spawns per-session collector child
       what: |
-        In cmd/htmlgraph/claude.go:launchClaude, before buildClaudeLaunchEnv: (1) generate a ULID for HTMLGRAPH_SESSION_ID; (2) exec `htmlgraph otel-collect --session-id <sid> --project-dir <root> --listen :0` as a child with Setpgid:true, matching claude_serve_autostart.go:255; (3) scan stdout for the `listen=` line with a 3s timeout; abort launch with a clear error if the collector fails to bind; (4) set OTEL_EXPORTER_OTLP_ENDPOINT=http://<address> and HTMLGRAPH_SESSION_ID=<sid> in the launch env, replacing the current static port derivation at claude_env.go:77; (5) register a deferred SIGTERM to the collector PID on launchClaude return, with the collector PID written to .htmlgraph/sessions/<sid>/.collector-pid so SessionEnd hook can also target it (slice 7). The existing MaybeShowOtelNotice and ensureServeForOtel calls stay intact for this slice — slice 6 renames and re-scopes them.
+        In cmd/htmlgraph/claude.go:launchClaude, before buildClaudeLaunchEnv: (1) generate a ULID for HTMLGRAPH_SESSION_ID; (2) exec htmlgraph otel-collect --session-id <sid> --project-dir <root> --listen :0 as a child with Setpgid:true, matching claude_serve_autostart.go:255. The child stdout is captured via a dedicated pipe separate from Claude Code stdout (which remains wired to os.Stdout at claude.go:444-448) — no mingling. (3) Scan the collector stdout for the htmlgraph-otel-ready port=<N> handshake line with a 3s timeout; abort launch with a clear error if the collector fails to bind. (4) Set OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:<port> and HTMLGRAPH_SESSION_ID=<sid> in the launch env, replacing the current static port derivation at claude_env.go:77. (5) Register a deferred SIGTERM to the collector PID on launchClaude return, with the collector PID written to .htmlgraph/sessions/<sid>/.collector-pid (using the existing PID-lockfile pattern from claude_serve_autostart.go:179-215) so SessionEnd hook can also target it (slice 7). The existing MaybeShowOtelNotice and ensureServeForOtel calls stay intact for this slice — slice 6 renames and re-scopes them.
       why: |
-        The launcher is the only process that lives exactly as long as one Claude Code session. Spawning the collector here is what makes "session ID owned by the launcher" a code-level fact, not just documentation. Capturing the ephemeral port from child stdout is the irreversible step — once claude-code is exec'd with a given OTel endpoint, it cannot be reconfigured at runtime. Fail-fast on bind failure prevents orphaned claude-code processes exporting telemetry to nowhere. Directly addresses the parallel-terminal merging root cause (bug-e8b8900b).
+        The launcher is the only process that lives exactly as long as one Claude Code session. Spawning the collector here is what makes session ID owned by the launcher a code-level fact, not just documentation. Reusing the serve_child.go:70 handshake format gives the launcher one parsing convention for both children. Capturing the ephemeral port from child stdout is the irreversible step — once claude-code is exec'd with a given OTel endpoint, it cannot be reconfigured at runtime. Fail-fast on bind failure prevents orphaned claude-code processes exporting telemetry to nowhere. Directly addresses the parallel-terminal merging root cause (bug-e8b8900b).
       files:
         - cmd/htmlgraph/claude.go
         - cmd/htmlgraph/claude_env.go
@@ -107,23 +120,25 @@ slices:
       deps:
         - 2
       done_when:
-        - htmlgraph claude launches a detached otel-collect child, reads its port from stdout with ≤3s timeout, sets OTEL_EXPORTER_OTLP_ENDPOINT to the child's address, and propagates HTMLGRAPH_SESSION_ID to the Claude Code process.
+        - htmlgraph claude launches a detached otel-collect child with Setpgid:true, reads its port from a dedicated stdout pipe with 3s timeout or less, sets OTEL_EXPORTER_OTLP_ENDPOINT to the child address, and propagates HTMLGRAPH_SESSION_ID to Claude Code.
         - Running htmlgraph claude in three terminals in the same project produces three distinct otel-collect children on three distinct ports writing to three distinct NDJSON files with no cross-session events mixed.
-        - Collector bind failure (e.g. no ports available) aborts launchClaude with a non-zero exit and a clear error message; no orphaned claude-code process is exec'd.
-        - Deferred SIGTERM fires on clean launcher exit; launcher SIGKILL leaves the collector as an orphan (accepted per Q3's layered policy — SessionEnd hook is primary, launcher defer is secondary).
-        - The collector PID is written to .htmlgraph/sessions/<sid>/.collector-pid within 500ms of spawn.
+        - Collector bind failure aborts launchClaude with non-zero exit and a clear error message; no orphaned claude-code process is exec'd.
+        - Deferred SIGTERM fires on clean launcher exit; launcher SIGKILL leaves the collector as an orphan (accepted per Q3 layered policy — SessionEnd hook is primary, launcher defer is secondary, idle timeout is tertiary).
+        - The collector PID is written to .htmlgraph/sessions/<sid>/.collector-pid within 500ms of spawn using the existing PID-lockfile writer pattern.
       effort: M
       risk: Med
       tests: |
         Integration: e2e launcher test — invoke htmlgraph claude with
           noninteractive args; post-exit inspect .htmlgraph/sessions/<sid>/events.ndjson
           contains the collector_start event.
-        Integration: parallel launch — 3 concurrent `htmlgraph claude` invocations
+        Integration: parallel launch — 3 concurrent htmlgraph claude invocations
           in the same project directory; assert 3 distinct session-ids, 3 distinct
           collector PIDs, 3 distinct ports, and no overlap in NDJSON file contents.
-        Integration: bind failure — simulate exhausted port range (mock
-          net.Listen to fail); assert htmlgraph claude aborts with exit code ≠ 0
-          and no Claude Code process is spawned.
+        Integration: bind failure — simulate exhausted port range; assert htmlgraph
+          claude aborts with exit code not equal to 0 and no Claude Code process is spawned.
+        Integration: stdout separation — spawn launcher with a noisy child (write
+          extra bytes to stderr); assert launcher scanner still finds the
+          handshake line reliably.
         Regression: existing claude.go launch paths (yolo, dev, --resume,
           --tmux) continue to work without functional change.
       approved: false
@@ -132,9 +147,9 @@ slices:
       num: 4
       title: Session-start Rosetta event + env-leak fix
       what: |
-        Emit a session_start NDJSON line containing both the launcher-minted htmlgraph_sid and Claude Code's own session_id (read from the SessionStart hook payload) as the correlation record that maps `claude --resume <id>` back to an htmlgraph session: {"type":"session_start","htmlgraph_sid":"<launcher ULID>", "claude_session_id":"<from hook>","project_dir":"<path>","ts":<ns>}. Additionally, close the HTMLGRAPH_SESSION_ID env-leak into subagent shells at internal/hooks/runner.go:187 by stripping the env var at the Task-spawn boundary — use the Codex/Gemini mitigation pattern already present at runner.go:206 as the template.
+        Emit a session_start NDJSON line containing both the launcher-minted htmlgraph_sid and Claude Code own session_id (read from the SessionStart hook payload) as the correlation record that maps claude --resume <id> back to an htmlgraph session. Additionally, close the HTMLGRAPH_SESSION_ID env-leak into Claude-path subagent shells at internal/hooks/runner.go:187. The existing partial mitigation at runner.go:206-215 strips the leak for Codex and Gemini agents but explicitly falls through for Claude; this slice extends the same stripping logic to the Claude Task-spawn boundary.
       why: |
-        Without the Rosetta event, `claude --resume <id>` creates a new collector and a new NDJSON file with no link back to the prior transcript — the dashboard loses the ability to show a continuous session history across resume points. The env-leak fix is a small real bug that becomes trivially closable once the launcher is the session-id authority. Supports goal "Launcher-owned session identity" and enables the "zero dashboard regression" goal across resume flows.
+        Without the Rosetta event, claude --resume <id> creates a new collector and a new NDJSON file with no link back to the prior transcript — the dashboard loses the ability to show a continuous session history across resume points. The env-leak fix is a small real bug that becomes trivially closable once the launcher is the session-id authority. The Codex/Gemini mitigation at runner.go:206-215 is the exact template; this slice change is extending that mitigation scope, not inventing a new pattern. Supports goal Launcher-owned session identity and enables zero dashboard regression across resume flows.
       files:
         - internal/hooks/session_start.go
         - internal/hooks/runner.go
@@ -142,32 +157,35 @@ slices:
       deps:
         - 3
       done_when:
-        - Every new session's events.ndjson contains a session_start event with both htmlgraph_sid and claude_session_id populated (within the first 10 lines).
-        - Running `htmlgraph claude --resume <prior-claude-id>` produces a session_start event whose claude_session_id equals the resume argument.
-        - HTMLGRAPH_SESSION_ID does not leak into Task-spawned subagent shells; subagent collectors receive their parent session ID only via explicit flag propagation, not env inheritance — verified by a test that spawns a subagent and inspects its env.
+        - Every new session events.ndjson contains a session_start event with both htmlgraph_sid and claude_session_id populated (within the first 10 lines).
+        - Running htmlgraph claude --resume <prior-claude-id> produces a session_start event whose claude_session_id equals the resume argument.
+        - HTMLGRAPH_SESSION_ID does not leak into Task-spawned subagent shells for the Claude harness; the Codex/Gemini stripping at runner.go:206-215 is extended to cover Claude with identical semantics.
+        - Unit test exercises all three harnesses (Claude, Codex, Gemini) and asserts HTMLGRAPH_SESSION_ID is absent from every subagent env.
       effort: S
       risk: Low
       tests: |
         Unit: internal/hooks/session_start_test.go — invoke with synthetic
           payload, assert the emitted NDJSON line shape and contents.
+        Unit: internal/hooks/runner_test.go — extend existing Codex/Gemini env
+          stripping test to assert the same stripping for Claude.
         Integration: resume flow — launch, capture sid, exit, relaunch with
-          --resume <captured-sid>, assert second session's session_start event
+          --resume <captured-sid>, assert second session session_start event
           contains the original claude_session_id.
         Regression: subagent attribution tests relevant to feat-82e11bbb still
-          pass; no new env-leak cases introduced as verified by
-          runner_test.go env-capture assertions.
+          pass; no new env-leak cases introduced.
       approved: false
       comment: ""
     - id: slice-5
       num: 5
-      title: NDJSON→SQLite indexer loop inside serve
+      title: NDJSON to SQLite indexer loop inside serve
       what: |
-        New internal/otel/indexer/ package that watches .htmlgraph/sessions/*/events.ndjson files (fsnotify on Linux, polling every 500ms on macOS per Q2), tails each file, parses one JSON line at a time, and applies it to SQLite through the SQLite SignalSink from slice 1. Maintains a per-file checkpoint in .htmlgraph/sessions/<sid>/.index-offset (written atomically via write-to-temp-then-rename after each successful batch commit). On indexer boot, replays from last checkpoint to end-of-file for every session directory. Mount the indexer in cmd/htmlgraph/serve_child.go alongside the existing autoIngestLoop, feature-flagged via HTMLGRAPH_INDEXER=1 if Q5 selects parallel-validation rollout, or unconditionally on if Q5 selects cutover.
+        New internal/otel/indexer/ package that watches .htmlgraph/sessions/*/events.ndjson files (per Q2), tails each file, parses one JSON line at a time, and applies it to SQLite through the SQLite SignalSink from slice 1. The indexer re-runs the placeholder/ upgrade span re-parenting logic (relocated from writer.go:300-336 into internal/otel/indexer/upgrade.go) when applying NDJSON batches — NDJSONSink has no DB access, so the upgrade pass must happen here, during apply-to-SQLite, not at sink time. Maintains a per-file checkpoint in .htmlgraph/sessions/<sid>/.index-offset (written atomically via write-to-temp-then-rename after each successful batch commit; on corrupted/truncated checkpoint read, falls back to offset 0 and replays the whole file — INSERT OR IGNORE makes this idempotent). On indexer boot, replays from last checkpoint to end-of-file for every session directory. Mount the indexer in cmd/htmlgraph/serve_child.go alongside the existing autoIngestLoop; feature-flagged via HTMLGRAPH_INDEXER=1 if Q5 selects parallel-validation rollout, or unconditionally on if Q5 selects cutover.
       why: |
-        With collectors writing NDJSON instead of SQLite directly, every /api/otel/* endpoint (backed by otel_signals, otel_resource_attrs, otel_session_rollup) would break on day one. The indexer is the bridge: NDJSON is canonical, SQLite becomes derived and rebuildable. Checkpoint files are what make "rebuild by deleting htmlgraph.db and restarting serve" a single-command recovery — serve replays every NDJSON from offset 0 and repopulates the index. Directly supports goal "Zero dashboard regression".
+        With collectors writing NDJSON instead of SQLite directly, every /api/otel/* endpoint (backed by otel_signals, otel_resource_attrs, otel_session_rollup) would break on day one. The indexer is the bridge: NDJSON is canonical, SQLite becomes derived and rebuildable. Relocating the upgrade/placeholder logic here is mandatory — it requires cross-table DB queries (pending_subagent_starts, etc.) that cannot live in the append-only NDJSON sink. Checkpoint files are what make rebuild by deleting htmlgraph.db and restarting serve a single-command recovery. Checkpoint truncate-to-zero fallback is safe because INSERT OR IGNORE on otel_signals.signal_id (verified writer.go:71) guarantees duplicate inserts never overwrite data. Directly supports goal Zero dashboard regression.
       files:
         - internal/otel/indexer/indexer.go
         - internal/otel/indexer/checkpoint.go
+        - internal/otel/indexer/upgrade.go
         - internal/otel/indexer/watch_linux.go
         - internal/otel/indexer/watch_fallback.go
         - cmd/htmlgraph/serve_child.go
@@ -175,25 +193,33 @@ slices:
         - 1
       done_when:
         - Indexer starts inside htmlgraph serve, tails every .htmlgraph/sessions/*/events.ndjson, applies new NDJSON lines to SQLite, and advances .index-offset atomically after each committed batch.
+        - Placeholder/upgrade span re-parenting runs during indexer apply-batch; orphan-span test parity with pre-refactor writer — the indexer correctly resolves pending_subagent_starts staging rows.
         - Killing serve mid-replay and restarting resumes from the last checkpointed offset with zero duplicate rows (INSERT OR IGNORE semantics preserved by the SQLite sink).
+        - 'Corrupted checkpoint file: indexer falls back to offset 0, replays full NDJSON, and emerges with correct SQLite state (no duplicates, no missing signals).'
         - 'Full-rebuild test: delete htmlgraph.db, restart serve, assert otel_signals row count equals total parseable NDJSON line count across all sessions.'
-        - Indexer lag is ≤ 5s at 100 signals/s of synthetic single-session load, measured by NDJSON append-time vs. first SQLite visibility.
-        - Every /api/otel/* endpoint returns a byte-identical payload (modulo timestamps) for a fixture session whether populated via direct SQLite writer (pre-change) or via indexer (post-change).
+        - Indexer lag is 5s or less at 100 signals/s of synthetic single-session load; 15s or less at 500 signals/s burst load.
+        - Every /api/otel/* endpoint returns byte-identical payloads (modulo timestamps) for a fixture session whether populated via direct SQLite writer (pre-change) or via indexer (post-change).
       effort: L
       risk: Med
       tests: |
         Unit: internal/otel/indexer/checkpoint_test.go — write offset, simulate
-          crash mid-write (truncate), recover, assert offset falls back to the
-          previous good value rather than partial-write garbage.
+          crash mid-write (truncate), recover, assert offset falls back to 0
+          rather than partial-write garbage; asserts subsequent replay produces
+          correct row count with INSERT OR IGNORE dedup.
+        Unit: internal/otel/indexer/upgrade_test.go — lift existing
+          placeholder/upgrade tests from writer_test.go to run against the
+          indexer apply-batch path; assert orphan-span resolution parity.
         Unit: internal/otel/indexer/indexer_replay_test.go — given a prewritten
           NDJSON file, run the indexer, assert every line is applied to SQLite
           in order, duplicates are ignored.
         Integration: collector + indexer — spawn a collector, POST 1000 OTLP
-          signals, wait for indexer catch-up, assert
-          SELECT COUNT(*) FROM otel_signals = 1000.
+          signals, wait for indexer catch-up, assert SELECT COUNT(*) FROM
+          otel_signals = 1000.
         Integration: crash-recovery — spawn collector + indexer, kill indexer
           after 500 signals, POST 500 more signals, restart indexer, assert
           final count = 1000 with no duplicates.
+        Integration: burst load — 500 signals/s for 30s, assert lag stays 15s
+          or less and no line is dropped.
         Regression: /api/otel/rollup, /api/otel/cost, /api/otel/spans,
           /api/otel/logs, /api/otel/prompts return the same shape for a
           fixture session under both write paths.
@@ -203,22 +229,27 @@ slices:
       num: 6
       title: Strip OTLP receiver from serve; rename ensureServeForOtel
       what: |
-        Remove receiver.New/Start calls from cmd/htmlgraph/serve_child.go. The embedded OTLP endpoint on the project-hashed port is deleted. Rename claude_serve_autostart.go:ensureServeForOtel to ensureServeForDashboard and change its semantics — serve is no longer auto-spawned for telemetry reasons. It is only auto-spawned when (a) a CLI command requires semantic-op execution or (b) the user explicitly opens the dashboard. Keep the PID-lockfile and TCP-probe pattern (checkServeLock, writeServeLock, spawnDetachedServe) intact for the dashboard path. Delete internal/otel/receiver/port.go and its FNV-hash port derivation — no more shared port per project.
+        Remove receiver.New/Start calls from cmd/htmlgraph/serve_child.go (lines 99-121 region). The embedded OTLP endpoint on the project-hashed port is deleted. Update the dependent sites identified by feasibility audit: claude_serve_autostart.go:51,141 (ensureServeForOtel + MaybeShowOtelNotice LoadConfigFromEnv calls), claude_env.go:96 (otelEndpointFromEnv), and internal/otel/receiver/port.go (deleted outright). Rename ensureServeForOtel to ensureServeForDashboard with revised semantics: serve is no longer auto-spawned for telemetry reasons. It is only auto-spawned when (a) a CLI command requires semantic-op execution or (b) the user explicitly opens the dashboard. Keep the PID-lockfile and TCP-probe pattern (checkServeLock, writeServeLock, spawnDetachedServe) intact for the dashboard path. Rework MaybeShowOtelNotice to display a generic telemetry-status message (derived from the presence/absence of active .collector-pid files in .htmlgraph/sessions/) rather than referencing a specific endpoint. Update receiver tests (writer_test.go, receiver_test.go) to construct receivers in-process with NDJSONSink rather than via the old serve mount.
       why: |
-        This is the slice that actually shuts the contention class down: once the OTLP receiver is gone from serve and collectors are the only ingest path, bug-08681166 (busy_timeout lost) stops reaching OTel writes entirely. The rename clarifies serve's role as a reader plus semantic-op singleton, not a telemetry endpoint. Deleting port.go eliminates the multi-project-collision history documented in bug-d2ba2a82. Directly supports goals "Eliminate OTel writer collisions" and "Lifecycle independence from serve".
+        This is the slice that actually shuts the contention class down: once the OTLP receiver is gone from serve and collectors are the only ingest path, bug-08681166 (busy_timeout lost) stops reaching OTel writes entirely. The rename clarifies serve role as a reader plus semantic-op singleton, not a telemetry endpoint. Deleting port.go eliminates the multi-project-collision history documented in bug-d2ba2a82. Directly supports goals Eliminate OTel writer collisions and Lifecycle independence from serve. The MaybeShowOtelNotice rework is necessary because the static port derivation that notice referenced no longer exists — the user-facing message must instead describe per-session collectors.
       files:
         - cmd/htmlgraph/serve.go
         - cmd/htmlgraph/serve_child.go
         - cmd/htmlgraph/claude_serve_autostart.go
+        - cmd/htmlgraph/claude_env.go
         - cmd/htmlgraph/claude.go
         - internal/otel/receiver/port.go
+        - internal/otel/receiver/writer_test.go
+        - internal/otel/receiver/receiver_test.go
       deps:
         - 3
         - 5
       done_when:
-        - htmlgraph serve no longer binds any OTLP port; scanning running processes for listeners in range 4318–5317 shows only otel-collect children, never serve.
+        - htmlgraph serve no longer binds any OTLP port; scanning running processes for listeners in range 4318-5317 shows only otel-collect children, never serve.
         - ensureServeForDashboard auto-spawns serve only when a semantic op or dashboard request requires it; launching htmlgraph claude with the dashboard already running does NOT re-probe any OTLP port.
-        - internal/otel/receiver/port.go is deleted; no import references remain in the codebase.
+        - internal/otel/receiver/port.go is deleted; no import references remain in the codebase (verified via go build).
+        - claude_env.go:96 otelEndpointFromEnv is removed or reworked to read from active collector-pid files rather than a project-hashed port.
+        - MaybeShowOtelNotice shows a message that does not reference a fixed port; instead it describes per-session collector behavior.
         - The specific SQLITE_BUSY cascade symptom of bug-08681166 (OTel writer colliding with hook writers) cannot reproduce because no OTel writer lives inside serve.
       effort: M
       risk: Med
@@ -226,23 +257,24 @@ slices:
         Unit: internal/otel/receiver/receiver_test.go adjusted to construct
           the Receiver in-process with NDJSONSink, not via the old serve mount.
         Integration: serve startup probe — after htmlgraph serve boots, assert
-          no TCP listener exists on any port in range 4318–5317; every
+          no TCP listener exists on any port in range 4318-5317; every
           /api/otel/* endpoint still serves data sourced from indexer-populated
           SQLite.
         Integration: concurrent-claude — run 3 parallel htmlgraph claude
           sessions; assert 3 distinct otel-collect listeners during the
           sessions and zero persist after all three exit cleanly.
         Regression: existing OTel-related dashboard tests continue to pass;
-          the first-launch OTel notice is still shown at the correct time.
+          the first-launch OTel notice is still shown at the correct time
+          with its updated per-session messaging.
       approved: false
       comment: ""
     - id: slice-7
       num: 7
       title: 'Session cleanup: graceful drain + retention hygiene'
       what: |
-        Two pieces. (1) On SessionEnd hook, read .htmlgraph/sessions/<sid>/.collector-pid (written by slice 3), send SIGTERM, wait up to 3s for clean drain, fall back to SIGKILL if needed. This is Q3's "primary" layer. (2) Retention job in a new internal/otel/retention/ package: on serve startup and every 24h thereafter, walk session directories, detect sessions whose sessions.status = 'done' is older than HTMLGRAPH_SESSION_RETAIN_DAYS (default 30), archive events.ndjson into .htmlgraph/archive/<yyyy-mm>/<sid>.tar.zst, delete the live session dir (but preserve the indexer-populated SQLite rows — those age out via existing cleanup commands). Dry-run mode via HTMLGRAPH_RETENTION_DRYRUN=1 logs intended actions without moving files.
+        Two pieces. (1) On SessionEnd hook, read .htmlgraph/sessions/<sid>/.collector-pid (written by slice 3), send SIGTERM, wait up to 3s for clean drain, fall back to SIGKILL if needed. This is Q3 primary layer; the collector own idle-timeout (slice 2) is the tertiary safety net; the launcher deferred SIGTERM (slice 3) is the secondary fallback. (2) Retention job in a new internal/otel/retention/ package: on serve startup and every 24h thereafter, walk session directories, detect sessions whose sessions.status = done is older than HTMLGRAPH_SESSION_RETAIN_DAYS (default 30), archive events.ndjson into .htmlgraph/archive/<yyyy-mm>/<sid>.tar.gz using stdlib archive/tar + compress/gzip (not .tar.zst — zstd is not a current dependency), and delete the live session dir (indexer-populated SQLite rows age out via existing cleanup commands, unchanged). Dry-run mode via HTMLGRAPH_RETENTION_DRYRUN=1 logs intended actions without moving files. Also adds htmlgraph session restore <sid> that extracts .tar.gz back into .htmlgraph/sessions/ so the indexer picks it up on next replay.
       why: |
-        Without SessionEnd SIGTERM, collectors either persist past session lifetime (waiting for a launcher SIGTERM that may never fire after launcher SIGKILL), or get reaped by OS cleanup with spans still in their batch buffer — losing them. Without retention, .htmlgraph/sessions/ grows unbounded over months. Restoring an archived session is supported so lineage queries over historical transcripts still work. This slice closes the correctness gap named in Q3 and the operational gap noted in the design doc.
+        Without SessionEnd SIGTERM, collectors either persist past session lifetime (waiting for a launcher SIGTERM that may never fire after launcher SIGKILL), or get reaped by OS cleanup with spans still in their batch buffer — losing them. Without retention, .htmlgraph/sessions/ grows unbounded over months. Using stdlib gzip (rather than zstd) keeps the retention pipeline dependency-free — compression ratio on NDJSON log files is secondary to minimizing new dependencies at this scale. Restoring an archived session is supported so lineage queries over historical transcripts still work. This slice closes the correctness gaps named in Q3 (primary + secondary drain layers) and the operational gaps noted in the design discussion.
       files:
         - internal/hooks/session_end.go
         - internal/otel/retention/retention.go
@@ -254,19 +286,20 @@ slices:
       done_when:
         - SessionEnd hook reads .collector-pid, sends SIGTERM, waits up to 3s, falls back to SIGKILL; the collector flush completes and the final NDJSON batch has no torn last line.
         - Retention job runs at serve boot and on a 24h timer; HTMLGRAPH_RETENTION_DRYRUN=1 logs intended archive/delete actions without moving files.
-        - A session archived to .htmlgraph/archive/ is restorable via `htmlgraph session restore <sid>`; the indexer picks up the restored NDJSON on next replay without duplicating rows.
+        - Retention archives use .tar.gz format via stdlib archive/tar + compress/gzip; no new go.mod dependency is introduced.
+        - A session archived to .htmlgraph/archive/ is restorable via htmlgraph session restore <sid>; the indexer picks up the restored NDJSON on next replay without duplicating rows.
       effort: M
       risk: Low
       tests: |
         Unit: internal/otel/retention/retention_test.go — construct 10
           synthetic session directories with varying ages, run retention,
-          assert correct archive and deletion behavior, assert live sessions
-          (status != 'done') are untouched.
+          assert correct archive and deletion behavior (producing .tar.gz
+          files), assert live sessions (status != done) are untouched.
         Integration: SessionEnd signal — spawn collector, write 100 signals,
           invoke SessionEnd hook, assert collector exits 0 within 3s and
           the final batch is fully flushed to NDJSON.
-        Integration: restore flow — archive a session, run `htmlgraph session
-          restore <sid>`, assert indexer picks up the restored file and
+        Integration: restore flow — archive a session, run htmlgraph session
+          restore <sid>, assert indexer picks up the restored file and
           otel_signals row count matches pre-archive value.
         Regression: existing session-end flows (transcript sync, feature
           work-on capture) still fire in the correct order relative to the
@@ -277,7 +310,7 @@ questions:
     - id: q-ndjson-file-layout
       text: One NDJSON file per session with all signal types mixed, or separate files per type?
       description: |
-        Every OTLP batch carries a mix of traces, metrics, and logs. Option A writes all of them plus hook observations to one events.ndjson; each line carries a `kind` field (span/metric/log/hook). Simpler to watch (one fsnotify handle per session), simpler to replay in arrival order, but larger files with heterogeneous schemas. Option B splits into otel-spans.ndjson, otel-metrics.ndjson, otel-logs.ndjson, and events.ndjson for hook observations. Cleaner per-type schemas and independent retention, but 3–4 watchers per session and cross-type ordering is lost (matters if a trace and a related metric from the same span need to be applied in deterministic order). Given the OTLP batch is already an atomic unit, Option A preserves batch ordering and is the simpler implementation today. Option B is more future-flexible for differential retention but buys complexity we do not need for the stated goals.
+        Every OTLP batch carries a mix of traces, metrics, and logs. Option A writes all of them plus hook observations to one events.ndjson; each line carries a kind field (span/metric/log/hook). Simpler to watch (one fsnotify handle per session), simpler to replay in arrival order, but larger files with heterogeneous schemas. Option B splits into otel-spans.ndjson, otel-metrics.ndjson, otel-logs.ndjson, and events.ndjson for hook observations. Cleaner per-type schemas and independent retention, but 3-4 watchers per session and cross-type ordering is lost (matters if a trace and a related metric from the same span need to be applied in deterministic order). Given the OTLP batch is already an atomic unit, Option A preserves batch ordering and is the simpler implementation today. Option B is more future-flexible for differential retention but buys complexity we do not need for the stated goals.
       recommended: mixed
       options:
         - key: mixed
@@ -288,20 +321,20 @@ questions:
     - id: q-indexer-trigger
       text: How does the indexer learn that new NDJSON lines exist?
       description: |
-        The indexer must pick up new appends quickly to keep dashboard staleness low. Option A uses fsnotify on Linux (kernel events, sub-millisecond latency) with polling fallback on macOS (fsevents is coarse-grained for append-only files and can coalesce events). Option B is pure polling every 500ms on all platforms — uniform but adds fixed latency and a CPU floor. Option C extends the existing serve autoIngestLoop (serve_child.go) to also drive the indexer — reuses machinery but couples to that loop's cadence (currently ~5s, tuned for session metadata changes, not append events). fsnotify is the observability-standard choice but requires platform branching; polling is simpler and deterministic but wastes cycles when idle.
+        The indexer must pick up new appends quickly to keep dashboard staleness low. Option A uses fsnotify on Linux (kernel events, sub-millisecond latency) with polling fallback on macOS (fsevents is coarse-grained for append-only files and can coalesce events). Option B is pure polling every 500ms on all platforms — uniform but adds fixed latency and a CPU floor. Option C extends the existing serve autoIngestLoop (serve_child.go) to also drive the indexer — reuses machinery but couples to that loop cadence (currently about 5s, tuned for session metadata changes, not append events). fsnotify is the observability-standard choice but requires a new go.mod dependency (verified 2026-04-24: fsnotify is not currently in go.mod). Polling is simpler, deterministic, and dependency-free but wastes cycles when idle.
       recommended: fsnotify-with-polling-fallback
       options:
         - key: fsnotify-with-polling-fallback
-          label: 'A: fsnotify on Linux + polling every 500ms on macOS — native events where available, platform-correct fallback. Recommended.'
+          label: 'A: fsnotify on Linux + polling every 500ms on macOS — native events where available, platform-correct fallback. Adds fsnotify to go.mod. Recommended.'
         - key: polling-only
-          label: 'B: Polling every 500ms on all platforms — simpler, uniform, ~1% CPU when active and zero when no session dirs exist.'
+          label: 'B: Polling every 500ms on all platforms — simpler, uniform, about 1% CPU when active and zero when idle. No new dependency.'
         - key: extend-auto-ingest
           label: 'C: Extend autoIngestLoop to drive the indexer — reuse existing timer machinery, accept its coarser 5s cadence, couple lifecycles.'
       answer: null
     - id: q-session-close-policy
       text: When exactly does a per-session collector exit?
       description: |
-        Three candidate triggers. (a) SessionEnd hook fires and the hook SIGTERMs the collector. (b) Launcher exit triggers a deferred SIGTERM to the collector. (c) Idle timeout inside the collector (e.g., no OTLP traffic for 5 minutes) triggers self-exit. (a) is the most correct — the session ending is the exact moment it is safe to drain and close. But SessionEnd can fail to fire if Claude Code crashes. (b) catches the launcher-crash path but not launcher-killed-9. (c) is a belt-and-suspenders backup but risks early exit during long thinks (though OTel spans should keep flowing during a think). Recommended: all three, layered — (a) primary, (b) fallback, (c) ultimate safety net. Retention (slice 7) sweeps any true orphans.
+        Three candidate triggers. (a) SessionEnd hook fires and the hook SIGTERMs the collector (slice 7). (b) Launcher exit triggers a deferred SIGTERM to the collector (slice 3). (c) Idle timeout inside the collector (no OTLP traffic for HTMLGRAPH_OTEL_IDLE_TIMEOUT, default 5m, slice 2) triggers self-exit. (a) is the most correct — the session ending is the exact moment it is safe to drain and close. But SessionEnd can fail to fire if Claude Code crashes. (b) catches the launcher-crash path but not launcher-killed-9. (c) is a belt-and-suspenders backup but risks early exit during long thinks (though OTel spans should keep flowing during a think). Recommended all three, layered — (a) primary, (b) fallback, (c) ultimate safety net. Retention (slice 7) sweeps any true orphans. Note that all three layers are now scoped into concrete slices (slice 2 for idle timeout, slice 3 for launcher defer, slice 7 for SessionEnd hook).
       recommended: layered-all-three
       options:
         - key: layered-all-three
@@ -312,39 +345,222 @@ questions:
           label: 'C: Idle timeout only — no explicit signaling; collector self-terminates after N seconds of no OTLP traffic. Simplest, but risks dropping late-arriving spans post-session.'
       answer: null
     - id: q-oversize-payload-strategy
-      text: How do we preserve NDJSON line atomicity when a signal's payload exceeds PIPE_BUF?
+      text: How do we preserve NDJSON line atomicity when a signal payload exceeds PIPE_BUF?
       description: |
-        PIPE_BUF is 4096 bytes on Linux ext4/btrfs and 512 bytes on macOS. Some transcript assistant payloads already exceed 4KB (transcript_assistant.go:267). If two processes in the same session both append large lines without coordination, writes can interleave and corrupt the NDJSON. Three strategies. (A) Truncate attrs.text at 3900 bytes in the inline NDJSON line; spill overflow to .htmlgraph/sessions/<sid>/.overflow/<signal-id>.txt — small main file, queryable full text on demand, single watcher. (B) Wrap large writes in syscall.Flock(LOCK_EX) — slower but uniformly correct; reuses the existing session_html.go pattern. (C) Per-process NDJSON files (one per hook PID per session); merge at query time — no interleaving possible, but explodes inode counts and complicates the indexer. (A) is simplest; (B) is the most uniform; (C) has the cleanest per-process semantics but the worst file-count pressure.
-      recommended: truncate-with-overflow-sidecar
+        PIPE_BUF is 4096 bytes on Linux ext4/btrfs and 512 bytes on macOS. Some transcript assistant payloads already exceed 4KB (transcript_assistant.go:267). If two processes in the same session both append large lines without coordination, writes can interleave and corrupt the NDJSON. Three strategies. (A) Wrap every NDJSON append in syscall.Flock(LOCK_EX) — slower per-write but uniformly correct; reuses the existing session_html.go:147 / materialize.go:241 pattern, which is already mandated as a constraint of this plan. (B) Truncate attrs.text at 3900 bytes in the inline NDJSON line; spill overflow to .htmlgraph/sessions/<sid>/.overflow/<signal-id>.txt — small main file, queryable full text on demand, but adds an overflow directory and a join at query time. (C) Per-process NDJSON files (one per hook PID per session); merge at query time — no interleaving possible, but explodes inode counts and complicates the indexer. Recommendation shifted to (A) flock-all-writes during critique — option (B) truncate+sidecar conflicts with the constraint that mandates reusing the existing flock pattern. Flock per-write overhead is acceptable for a local-first dev-scale tool.
+      recommended: flock-all-writes
       options:
-        - key: truncate-with-overflow-sidecar
-          label: 'A: Truncate at 3900 bytes + overflow sidecar per signal — small main file, full content preserved, single watcher. Recommended.'
         - key: flock-all-writes
-          label: 'B: Flock every NDJSON append — uniform correctness, reuses session_html.go pattern, adds a per-append syscall overhead.'
+          label: 'A: Flock every NDJSON append — uniform correctness, reuses session_html.go:147 / materialize.go:241 pattern already mandated by plan constraints, zero new code. Recommended.'
+        - key: truncate-with-overflow-sidecar
+          label: 'B: Truncate at 3900 bytes + overflow sidecar per signal — small main file, full content preserved, single watcher. Conflicts with the reuse existing flock constraint.'
         - key: per-process-files
           label: 'C: Per-process NDJSON files (one per hook PID per session) — no interleaving possible; merge at query time; many more inodes and more indexer complexity.'
       answer: null
     - id: q-rollout-shape
       text: Do we run NDJSON direct-writer and SQLite-indexer in parallel during rollout, or cut over?
       description: |
-        Two rollout shapes. Shape X (parallel-validation): ship slices 1–4 with sinks dual-writing (NDJSON plus direct SQLite) for one release cycle; users can run indexer=off and still see dashboards; compare NDJSON-derived indexer output vs. direct writes to validate parity; then flip indexer=on and remove the direct writer in a follow-up release. Shape Y (cutover): a single release moves everything — collectors write NDJSON only, serve's indexer replays into SQLite, no fallback. Shape Y is what the plan scoping assumes and what simplifies the slice story. Shape X buys a validation window but requires keeping the SQLite sink's direct-write path alive for one release. Given slice 5's checkpoint + replay story makes full rebuild from NDJSON a single command (`rm htmlgraph.db && serve`), the validation window may not be necessary.
+        Two rollout shapes. Shape X (parallel-validation): ship slices 1-4 with sinks dual-writing (NDJSON plus direct SQLite) for one release cycle; users can run indexer=off and still see dashboards; compare NDJSON-derived indexer output vs. direct writes to validate parity; then flip indexer=on and remove the direct writer in a follow-up release. Shape Y (cutover): a single release moves everything — collectors write NDJSON only, serve indexer replays into SQLite, no fallback. Shape Y is what the plan scoping assumes and what simplifies the slice story. Shape X buys a validation window but requires keeping the SQLite sink direct-write path alive for one release. Given slice 5 checkpoint + replay story makes full rebuild from NDJSON a single command (rm htmlgraph.db then serve), the validation window may not be necessary.
       recommended: cutover
       options:
         - key: cutover
-          label: 'A: Single-release cutover — NDJSON is the sole write path from day one; indexer drives SQLite. Simpler scope; relies on slice 5''s test matrix for confidence. Recommended.'
+          label: 'A: Single-release cutover — NDJSON is the sole write path from day one; indexer drives SQLite. Simpler scope; relies on slice 5 test matrix for confidence. Recommended.'
         - key: parallel-validation
           label: 'B: One release of dual-writing (NDJSON + SQLite direct) plus parity checks, then cutover in the next release. Safer for production users, larger scope, two deployment events.'
       answer: null
     - id: q-scope-phase-2
       text: Does this plan also cover hook NDJSON migration and CLI op-queue routing, or only the OTel path?
       description: |
-        The larger architectural move (HTML + NDJSON as the only canonical stores, SQLite entirely gone) requires three additional pieces beyond this plan: (i) observation-only hook handlers migrate to NDJSON append; (ii) hook mutations plus write-capable CLI commands route through a new serve op queue; (iii) the six genuine-SQL sites named in the constraints (yolo-guard LIKE scans, DSL graph traversal, feature_files self-join, claims CAS, OTel span re-parenting, dashboard sessions list correlated subqueries) get alternative implementations. Including them here makes this plan ~15–20 slices spanning multiple quarters. Excluding them focuses this plan on the per-session collector story (7 slices, estimated 500–800 lines) and leaves the larger move to follow-on plans once this plan's delivery provides real-world signal. Recommended scope: only the OTel path here. Hook NDJSON migration, CLI op-queue routing, and SQL-only query remediation become their own plans under trk-c4615ad2. This plan establishes the NDJSON-canonical + SQLite-derived pattern that follow-on plans extend.
+        The larger architectural move (HTML + NDJSON as the only canonical stores, SQLite entirely gone) requires three additional pieces beyond this plan: (i) observation-only hook handlers migrate to NDJSON append; (ii) hook mutations plus write-capable CLI commands route through a new serve op queue; (iii) the six genuine-SQL sites named in the constraints (yolo-guard LIKE scans, DSL graph traversal, feature_files self-join, claims CAS, OTel span re-parenting, dashboard sessions list correlated subqueries) get alternative implementations. Including them here makes this plan about 15-20 slices spanning multiple quarters. Excluding them focuses this plan on the per-session collector story (7 slices, estimated 500-800 lines) and leaves the larger move to follow-on plans once this plan delivery provides real-world signal. Recommended scope: only the OTel path here. Hook NDJSON migration, CLI op-queue routing, and SQL-only query remediation become their own plans under trk-c4615ad2. This plan establishes the NDJSON-canonical + SQLite-derived pattern that follow-on plans extend.
       recommended: otel-only
       options:
         - key: otel-only
-          label: 'A: This plan covers the OTel ingest path only (slices 1–7). Hook NDJSON migration, CLI op-queue routing, and SQL-only query remediation become separate future plans. Recommended.'
+          label: 'A: This plan covers the OTel ingest path only (slices 1-7). Hook NDJSON migration, CLI op-queue routing, and SQL-only query remediation become separate future plans. Recommended.'
         - key: include-hook-ndjson
-          label: 'B: Also include observation-only hook migration (agent_events writes from missing_events.go handlers → NDJSON) in this plan. Adds ~3 slices.'
+          label: 'B: Also include observation-only hook migration (agent_events writes from missing_events.go handlers to NDJSON) in this plan. Adds about 3 slices.'
         - key: full-sqlite-removal
-          label: 'C: Full architectural move — this plan covers everything through complete SQLite removal. Adds ~8–10 slices, multi-quarter delivery.'
+          label: 'C: Full architectural move — this plan covers everything through complete SQLite removal. Adds about 8-10 slices, multi-quarter delivery.'
       answer: null
+    - id: q-indexer-observability
+      text: How does a user see when the indexer stalls, falls behind, or fails to apply NDJSON lines?
+      description: |
+        The indexer is load-bearing for dashboard freshness after slices 5-6. If it stalls (bad NDJSON line, SQLite locked, disk full, goroutine panic), the dashboard silently serves stale data while collectors keep writing. Three observability approaches. (A) Indexer publishes per-file health (last-processed offset, current lag in ms, last error) via a new /api/indexer/status endpoint; dashboard shows a small status indicator tile. Minimal surface area, failure becomes visible. (B) Indexer writes its own lifecycle events to a dedicated .htmlgraph/indexer/events.ndjson that serve exposes via an existing read endpoint — uniform with the NDJSON substrate but adds a meta-NDJSON concept. (C) Rely on stderr logs only; user investigates manually when dashboards look stale. No new code but ignores the failure mode. (A) is the smallest surface that still surfaces the problem; (B) is architecturally cleaner but higher-effort; (C) is a known-bad fallback.
+      recommended: in-memory-status-endpoint
+      options:
+        - key: in-memory-status-endpoint
+          label: 'A: Indexer publishes per-file health via /api/indexer/status; dashboard renders a small status indicator. Smallest-surface observability for a load-bearing component. Recommended.'
+        - key: system-ndjson-log
+          label: 'B: Indexer writes its own lifecycle events to .htmlgraph/indexer/events.ndjson that serve exposes — uniform with the NDJSON substrate, more code.'
+        - key: external-logs-only
+          label: 'C: Stderr logs only; user investigates manually. No new code. Accepts the silent-failure mode.'
+      answer: null
+critique:
+    reviewed_at: "2026-04-24"
+    reviewers:
+        - Haiku (design review)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: falsified
+          text: UnifiedSignalBatch wrapper type exists in internal/otel/
+          evidence: internal/otel/signal.go:113 defines only UnifiedSignal (singular); the actual Writer.WriteBatch signature takes (ctx, harness, resourceAttrs map[string]any, signals []UnifiedSignal). Slice 1 corrected to use this signature.
+        - id: A2
+          status: verified
+          text: Writer is deeply SQLite-coupled with five prepared statements
+          evidence: writer.go:29-31 confirms insertStmt, sessStmt, resStmt, placeholderStmt, upgradeStmt.
+        - id: A3
+          status: verified
+          text: claude_serve_autostart.go:255 uses Setpgid:true for child-process detachment
+          evidence: Exact line match; launcher pattern reusable for collector spawn.
+        - id: A4
+          status: plausible
+          text: Restarting serve drops in-flight spans because Claude Code OTel SDK has no durable retry
+          evidence: claude_serve_autostart.go:93-96 logs a warning about serve not binding; narrative claim is correct but line reference is approximate.
+        - id: A5
+          status: verified
+          text: runner.go:187 has HTMLGRAPH_SESSION_ID env fallback that leaks into subagent shells
+          evidence: runner.go:187 confirmed; runner.go:206-215 shows existing partial mitigation for Codex/Gemini, absent for Claude — slice 4 extends it.
+        - id: A6
+          status: plausible
+          text: transcript_assistant.go:267 payloads can exceed 4KB
+          evidence: transcript_assistant.go:267-280 builds attrsMap with text field; no truncation path visible; actual size depends on content.
+        - id: A7
+          status: falsified
+          text: fsnotify is a current dependency
+          evidence: go.mod grep on 2026-04-24 finds no fsnotify — Q2 choice A adds it; captured in design.constraints.
+        - id: A8
+          status: verified
+          text: INSERT OR IGNORE on otel_signals keyed on signal_id PK gives idempotent replay
+          evidence: writer.go:71 confirms signal_id is PK; duplicates are ignored not overwritten. Slice 5 checkpoint-fallback-to-0 strategy is safe.
+        - id: A9
+          status: plausible
+          text: SessionEnd hook reliably fires on clean session exit
+          evidence: Hook runs but reliability under Claude Code crash paths not empirically tested — layered fallbacks mitigate.
+        - id: A10
+          status: unverified
+          text: fsnotify inotify watcher limits will not be hit at scale
+          evidence: Typical Linux default is about 8192 FDs; dev-scale usage (tens of parallel sessions) is well below. Not load-tested.
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Slice Assessment
+              items:
+                - badge: S1
+                  kind: success
+                  text: SignalSink interface extraction is well-scoped and foundational. Low risk, done_when criteria are testable.
+                - badge: S2
+                  kind: warn
+                  text: Idle-timeout safety net from Q3 needed scoping — added to this slice in revision so all three Q3 layers are now implemented.
+                - badge: S3
+                  kind: warn
+                  text: Launcher changes are the critical path. 3s stdout-scan timeout reasonable. Stdout-capture pattern clarified in revision to reuse serve_child.go:70 format.
+                - badge: S5
+                  kind: danger
+                  text: 'Checkpoint partial-write recovery needs definition. Revision specifies: corrupted checkpoint falls back to offset 0, full replay; INSERT OR IGNORE makes this idempotent (verified A8).'
+                - badge: S6
+                  kind: warn
+                  text: Rename-only change carries low risk; regression test coverage mandatory. File list expanded in revision to include claude_env.go.
+                - badge: S7
+                  kind: warn
+                  text: Retention archive format changed to .tar.gz (stdlib) from .tar.zst in revision — avoids new dependency.
+            - heading: Gaps and Missing Considerations
+              items:
+                - badge: Gap
+                  kind: warn
+                  text: Windows support — Setpgid:true is POSIX-only. Addressed via explicit platform-scope constraint (Linux/macOS only this plan).
+                - badge: Gap
+                  kind: warn
+                  text: Indexer observability — no way for user to learn when indexer stalls. Addressed via new Q7 (q-indexer-observability).
+                - badge: Gap
+                  kind: info
+                  text: Spans emitted during launcher handshake window — before endpoint is set — may be dropped by Claude Code SDK. Accepted as a tolerable gap; retry behavior depends on upstream SDK.
+                - badge: Gap
+                  kind: info
+                  text: Schema evolution on UnifiedSignal JSON format — if v2 adds fields, indexer replay of old NDJSON should tolerate unknown fields. Implicitly handled by JSON field-ignoring semantics; not elevated to a question.
+            - heading: Alternative Approaches
+              items:
+                - badge: Alt
+                  kind: info
+                  text: Single-process multi-session receiver (keep receiver in serve, multiplex by session-id tag) would avoid subprocess complexity but keep shared-contention problem. Explicitly rejected — loses lifecycle independence.
+                - badge: Alt
+                  kind: info
+                  text: Indexer as separate process (not inside serve) would decouple dashboard uptime from indexer. Deferred — serve-embedded is simpler for phase 1.
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: What Exists to Leverage
+              items:
+                - badge: Reuse
+                  kind: success
+                  text: syscall.Flock pattern at session_html.go:147 and materialize.go:241 is proven; Q4 revision aligns with this reuse-mandate.
+                - badge: Reuse
+                  kind: success
+                  text: serve_child.go:70 handshake format htmlgraph-*-ready port=<N> — otel-collect adopts in revision.
+                - badge: Reuse
+                  kind: success
+                  text: checkServeLock/writeServeLock pattern at claude_serve_autostart.go:179-215 reusable for .collector-pid management in slices 3/7.
+                - badge: Reuse
+                  kind: success
+                  text: runner.go:206-215 Codex/Gemini env-stripping is the template for slice 4 Claude-path extension.
+            - heading: What the Plan Gets Wrong
+              items:
+                - badge: Fix
+                  kind: danger
+                  text: UnifiedSignalBatch wrapper type does not exist. Slice 1 interface signature corrected in revision to match existing WriteBatch(ctx, harness, resourceAttrs, []UnifiedSignal) error.
+                - badge: Fix
+                  kind: danger
+                  text: Placeholder/upgrade span re-parenting logic cannot live in NDJSONSink — it requires cross-table DB queries. Revision explicitly relocates this logic to the indexer (slice 5, new internal/otel/indexer/upgrade.go); documents asymmetric-by-design SignalSink in constraints.
+                - badge: Fix
+                  kind: warn
+                  text: fsnotify not in go.mod — Q2 description updated to note this tradeoff; option B (polling-only) avoids the new dependency.
+                - badge: Fix
+                  kind: warn
+                  text: .tar.zst requires a new compression dependency not in go.mod. Revision switches slice 7 to stdlib archive/tar + compress/gzip (.tar.gz).
+                - badge: Fix
+                  kind: warn
+                  text: claude_env.go:96 otelEndpointFromEnv uses the deleted port derivation. Slice 6 file list and done_when expanded to cover this site.
+                - badge: Fix
+                  kind: warn
+                  text: MaybeShowOtelNotice at claude_serve_autostart.go:122 references the static port. Slice 6 done_when adds message rework to avoid referencing a fixed port.
+            - heading: Prior Art and Examples
+              items:
+                - badge: Prior
+                  kind: info
+                  text: bug-6ab963d3 (done) fixed OTel SQLITE_BUSY via retry; this plan eliminates the root cause by removing the OTel writer from serve.
+                - badge: Prior
+                  kind: info
+                  text: bug-08681166 (in-progress) targets busy_timeout pragma propagation; this plan slice 6 eliminates the contention class entirely by removing OTel writes from serve.
+                - badge: Prior
+                  kind: info
+                  text: bug-e8b8900b (done) documented parallel-session merging; slice 3 per-session collector is the root-cause fix.
+                - badge: Prior
+                  kind: info
+                  text: bug-d2ba2a82 (done) documented multi-project port collision; slice 6 deletes port.go, closing the collision class permanently.
+    risks:
+        - risk: UnifiedSignalBatch type does not exist — slice 1 interface signature must use the real 4-argument WriteBatch shape
+          severity: High
+          mitigation: Revision corrects slice 1 to use WriteBatch(ctx, harness, resourceAttrs, []UnifiedSignal) error matching the existing writer method.
+        - risk: Placeholder/upgrade span re-parenting logic cannot live in NDJSONSink
+          severity: High
+          mitigation: Revision relocates upgrade logic to indexer (slice 5, new internal/otel/indexer/upgrade.go); documents asymmetric-by-design SignalSink in constraints.
+        - risk: Windows support unaddressed — Setpgid:true and flock are POSIX-only
+          severity: High
+          mitigation: 'Revision adds explicit constraint: Linux/macOS only; Windows deferred to separate future plan.'
+        - risk: NDJSON partial-corruption (disk full, truncated line mid-append) — indexer behavior under-specified
+          severity: Medium
+          mitigation: Revision specifies slice 5 checkpoint fallback to offset 0 on corrupted read; INSERT OR IGNORE (verified A8) makes full replay idempotent.
+        - risk: fsnotify is a new dependency
+          severity: Low
+          mitigation: Revision updates Q2 description and constraints to make this tradeoff visible; polling-only option avoids the dependency.
+        - risk: .tar.zst compression requires a new dependency
+          severity: Low
+          mitigation: Revision switches slice 7 to .tar.gz via stdlib archive/tar + compress/gzip.
+        - risk: Indexer stall / silent staleness not observable to user
+          severity: Medium
+          mitigation: New Q7 (q-indexer-observability) surfaces the design choice; recommended option adds /api/indexer/status with per-file health.
+        - risk: Burst-load indexer lag may exceed 5s
+          severity: Low
+          mitigation: 'Slice 5 done_when revised: 5s or less at 100 signals/s steady, 15s or less at 500 signals/s burst.'
+    synthesis: |
+        The plan is architecturally sound and addresses the stated contention class directly. Critique surfaced three HIGH-severity feasibility issues (invented type name, misplaced upgrade logic, Windows scope) and four lower-severity dependency/observability gaps, all addressed in this revision by (1) correcting slice 1 interface signature to the real WriteBatch shape, (2) relocating placeholder/upgrade logic to the indexer in slice 5, (3) adding a platform-scope constraint excluding Windows, (4) swapping slice 7 archive format to stdlib gzip, (5) clarifying fsnotify dependency in Q2, (6) switching Q4 recommendation to flock-all-writes for internal consistency, (7) extending the Codex/Gemini env-stripping template in slice 4, (8) adopting the existing serve_child.go:70 handshake format in slices 2-3, (9) expanding slice 6 file list and done_when to cover claude_env.go:96
+            and MaybeShowOtelNotice,
+        (10) adding a new Q7 on indexer observability. No slice was added, removed, or had its scope materially shifted — all changes are refinements within the existing 7-slice structure. Plan is ready for human review.
