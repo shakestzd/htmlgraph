@@ -69,6 +69,7 @@ CODEX.md
 
 # HtmlGraph derived database/index/cache artifacts
 .htmlgraph/*.db*
+.htmlgraph/.db/
 .htmlgraph/*.sqlite*
 .htmlgraph/archive-index/
 *.bloom

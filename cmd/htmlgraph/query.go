@@ -38,7 +38,7 @@ func runQuery(dsl string) error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

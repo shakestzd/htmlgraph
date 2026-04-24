@@ -47,7 +47,7 @@ func runServeChild(port int) error {
 		return fmt.Errorf("locate .htmlgraph: %w", err)
 	}
 
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)

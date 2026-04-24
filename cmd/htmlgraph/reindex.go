@@ -38,7 +38,7 @@ func runReindex(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

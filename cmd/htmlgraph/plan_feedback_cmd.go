@@ -69,7 +69,7 @@ func runPlanFeedback(planID string) error {
 
 // planFeedback is the testable inner implementation.
 func planFeedback(htmlgraphDir, planID string) error {
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	db, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)

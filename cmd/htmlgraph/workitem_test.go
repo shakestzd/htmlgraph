@@ -700,7 +700,7 @@ func testHgDirWithDB(t *testing.T, sessionID string) (tmpDir, hgDir string) {
 	}
 
 	// Open (and migrate) the DB so tables exist, then insert a session row.
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -748,7 +748,7 @@ func TestFeatureStart_Idempotent(t *testing.T) {
 	}
 
 	// Read active_feature_id after first start.
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db after first start: %v", err)
 	}
@@ -827,7 +827,7 @@ func TestFeatureStart_DifferentFeatures(t *testing.T) {
 		t.Fatalf("start A: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -874,7 +874,7 @@ func TestFeatureStart_ClaimWrittenOnFirstStart(t *testing.T) {
 		t.Fatalf("first start: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -927,7 +927,7 @@ func TestFeatureStart_ClaimRenewedOnRepeatStart(t *testing.T) {
 		t.Fatalf("second start: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -976,7 +976,7 @@ func TestFeatureStart_ClaimWrittenAfterExpiry(t *testing.T) {
 		t.Fatalf("first start: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -1016,7 +1016,7 @@ func TestFeatureStart_ClaimWrittenAfterExpiry(t *testing.T) {
 		t.Fatalf("second start after expiry: %v", err)
 	}
 
-	database2, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database2, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db2: %v", err)
 	}
@@ -1101,7 +1101,7 @@ func TestRunWiSetStatus_ConcurrentAgents(t *testing.T) {
 	}
 
 	// Verify all N rows in active_work_items.
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -1178,7 +1178,7 @@ func TestSubagentCanStartFeatureCreatedByDifferentAgent(t *testing.T) {
 
 	// Step 4: Verify both agents' rows exist in active_work_items and point
 	// to the same feature.
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -1265,7 +1265,7 @@ func TestRunWiSetStatus_SubagentsDoNotStompLegacyColumn(t *testing.T) {
 		}
 	}
 
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

@@ -52,7 +52,7 @@ func runGraphCycles() error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -106,7 +106,7 @@ func runGraphPath(fromID, toID string) error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -157,7 +157,7 @@ func runGraphReach(startID string, depth int) error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -204,7 +204,7 @@ func runGraphOrphans() error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -251,7 +251,7 @@ func runGraphHubs(minEdges int) error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -296,7 +296,7 @@ func runGraphBottlenecks() error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -342,7 +342,7 @@ func runGraphSessions(featureID string) error {
 	if err != nil {
 		return err
 	}
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

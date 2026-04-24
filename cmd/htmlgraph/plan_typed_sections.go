@@ -45,7 +45,7 @@ func buildTypedPlanSections(nodePath, htmlgraphDir string) ([]plantmpl.SliceCard
 		features = append(features, featureInfo{num: num, id: edge.TargetID, title: title})
 	}
 
-	database, dbErr := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, dbErr := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if dbErr == nil {
 		defer database.Close()
 	}

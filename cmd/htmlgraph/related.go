@@ -40,7 +40,7 @@ func runRelated(featureID string) error {
 		return err
 	}
 
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)

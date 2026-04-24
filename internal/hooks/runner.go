@@ -157,8 +157,12 @@ func IsHtmlGraphProject(projectDir string) bool {
 }
 
 // DBPath returns the canonical SQLite path for the given project directory.
+// The database lives at .htmlgraph/.db/htmlgraph.db so that in Devcontainer
+// environments the file can be mounted on an ext4-backed Docker named volume
+// (enabling WAL mode) while the canonical HTML store stays on the virtiofs
+// bind mount.
 func DBPath(projectDir string) string {
-	return filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db")
+	return filepath.Join(projectDir, ".htmlgraph", ".db", "htmlgraph.db")
 }
 
 // NormaliseSessionID extracts a UUID from a path-style session_id that Claude

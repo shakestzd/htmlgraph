@@ -185,7 +185,7 @@ func isActionable(f *models.Node, nodeMap map[string]*models.Node) bool {
 // openTrackDB opens the SQLite DB if it exists; returns nil without error when
 // the file is absent (file counts are optional).
 func openTrackDB(htmlgraphDir string) *sql.DB {
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil
 	}

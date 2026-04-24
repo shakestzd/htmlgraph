@@ -61,7 +61,7 @@ func runFinalizeYAML(planID string) error {
 // It takes an explicit htmlgraphDir rather than resolving it from the environment.
 func finalizeYAML(htmlgraphDir, planID string) error {
 	// Read approvals from SQLite.
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	db, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
