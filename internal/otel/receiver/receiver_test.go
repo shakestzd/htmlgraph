@@ -13,6 +13,7 @@ import (
 
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/otel/receiver"
+	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 
 	"google.golang.org/protobuf/proto"
 
@@ -41,12 +42,15 @@ func TestReceiver_EndToEndLifecycle(t *testing.T) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 
+	w, err := receiver.NewWriter(dbPath)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
 	rec, err := receiver.New(receiver.Config{
 		Enabled:  true,
 		BindHost: "127.0.0.1",
 		HTTPPort: port,
-		DBPath:   dbPath,
-	})
+	}, sqls.New(w))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -81,10 +85,8 @@ func TestReceiver_EndToEndLifecycle(t *testing.T) {
 		t.Errorf("status = %d", resp.StatusCode)
 	}
 
-	// Assert signal landed. Use the receiver's own writer handle so we
-	// don't open a second *sql.DB (which would contend with the writer pool).
 	var cost float64
-	err = rec.Writer().DB().QueryRow(
+	err = w.DB().QueryRow(
 		`SELECT cost_usd FROM otel_signals WHERE session_id='sess-e2e'`,
 	).Scan(&cost)
 	if err != nil {
@@ -115,9 +117,13 @@ func TestReceiver_Burst(t *testing.T) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 
+	w, err := receiver.NewWriter(dbPath)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
 	rec, err := receiver.New(receiver.Config{
-		Enabled: true, BindHost: "127.0.0.1", HTTPPort: port, DBPath: dbPath,
-	})
+		Enabled: true, BindHost: "127.0.0.1", HTTPPort: port,
+	}, sqls.New(w))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -163,7 +169,7 @@ func TestReceiver_Burst(t *testing.T) {
 	}
 
 	var count int
-	if err := rec.Writer().DB().QueryRow(
+	if err := w.DB().QueryRow(
 		`SELECT COUNT(*) FROM otel_signals WHERE session_id LIKE 'sess-burst-%'`,
 	).Scan(&count); err != nil {
 		t.Fatalf("count: %v", err)

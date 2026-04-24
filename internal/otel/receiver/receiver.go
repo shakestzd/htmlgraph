@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/otel/adapter"
+	"github.com/shakestzd/htmlgraph/internal/otel/sink"
 )
 
 // Config controls the embedded OTLP receiver that ships inside
@@ -75,18 +76,19 @@ func LoadConfigFromEnv(dbPath string, projectDir string) Config {
 	return c
 }
 
-// Receiver wires the HTTP handler, writer, and adapter registry into
-// a lifecycle object that `htmlgraph serve` can Start/Stop.
+// Receiver wires the HTTP handler, signal sink, and adapter registry
+// into a lifecycle object that `htmlgraph serve` can Start/Stop.
 //
 // Typical usage:
 //
-//	r, err := receiver.New(cfg)
+//	s := sqls.New(writer)
+//	r, err := receiver.New(cfg, s)
 //	if err != nil { ... }
 //	if err := r.Start(ctx); err != nil { ... }
 //	defer r.Stop(ctx)
 type Receiver struct {
 	cfg      Config
-	writer   *Writer
+	sink     sink.SignalSink
 	registry *adapter.Registry
 	handler  *HTTPHandler
 	srv      *http.Server
@@ -95,34 +97,25 @@ type Receiver struct {
 	started bool
 }
 
-// New constructs a Receiver with the default adapter set. Returns an
-// unconfigured Receiver when cfg.Enabled is false — Start will no-op.
-func New(cfg Config) (*Receiver, error) {
-	r := &Receiver{cfg: cfg, registry: adapter.NewRegistry()}
+// New constructs a Receiver with the given SignalSink and the default
+// adapter set. Pass nil for s when cfg.Enabled is false.
+func New(cfg Config, s sink.SignalSink) (*Receiver, error) {
+	r := &Receiver{cfg: cfg, sink: s, registry: adapter.NewRegistry()}
 	r.registry.Register(adapter.NewClaudeAdapter())
-	// Codex and Gemini adapters register in later phases.
 
 	if !cfg.Enabled {
 		return r, nil
 	}
-	if cfg.DBPath == "" {
-		return nil, errors.New("DBPath required when Enabled")
+	if s == nil {
+		return nil, errors.New("SignalSink required when Enabled")
 	}
-	w, err := NewWriter(cfg.DBPath)
-	if err != nil {
-		return nil, fmt.Errorf("otel writer: %w", err)
-	}
-	r.writer = w
-	r.handler = NewHTTPHandler(r.registry, w)
+	r.handler = NewHTTPHandler(r.registry, s)
 	return r, nil
 }
 
 // Registry exposes the adapter registry so tests can register fakes
 // without reconstructing the receiver.
 func (r *Receiver) Registry() *adapter.Registry { return r.registry }
-
-// Writer exposes the writer for integration tests and diagnostics.
-func (r *Receiver) Writer() *Writer { return r.writer }
 
 // Handler exposes the HTTP handler so it can be mounted on an existing
 // mux (preferred) instead of a standalone server (fallback).
@@ -175,8 +168,8 @@ func (r *Receiver) Stop(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started {
-		if r.writer != nil {
-			return r.writer.Close()
+		if r.sink != nil {
+			return r.sink.Close()
 		}
 		return nil
 	}
@@ -188,8 +181,8 @@ func (r *Receiver) Stop(ctx context.Context) error {
 			firstErr = err
 		}
 	}
-	if r.writer != nil {
-		if err := r.writer.Close(); err != nil && firstErr == nil {
+	if r.sink != nil {
+		if err := r.sink.Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
@@ -206,15 +199,6 @@ func isExplicitlyDisabled(v string) bool {
 		return true
 	}
 	return false
-}
-
-func parseBool(s string) bool {
-	switch s {
-	case "1", "true", "TRUE", "yes", "on":
-		return true
-	default:
-		return false
-	}
 }
 
 func envOr(key, def string) string {

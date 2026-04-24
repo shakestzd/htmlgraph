@@ -10,6 +10,7 @@ import (
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
+	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 	"github.com/shakestzd/htmlgraph/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -105,19 +106,20 @@ func runServeChild(port int) error {
 	projectDir := filepath.Dir(htmlgraphDir)
 	otelCfg := otelreceiver.LoadConfigFromEnv(dbPath, projectDir)
 	if otelCfg.Enabled {
-		rec, err := otelreceiver.New(otelCfg)
+		w, err := otelreceiver.NewWriter(dbPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "otel receiver init: %v\n", err)
-		} else if err := rec.Start(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "otel receiver start: %v\n", err)
+			fmt.Fprintf(os.Stderr, "otel writer init: %v\n", err)
 		} else {
-			// Write the bound port to .htmlgraph/.otlp-port for external tools
-			// and diagnostics. Best-effort — failures are silently ignored.
-			portFile := filepath.Join(htmlgraphDir, ".otlp-port")
-			_ = os.WriteFile(portFile, []byte(fmt.Sprintf("%d\n", otelCfg.HTTPPort)), 0o644)
+			rec, err := otelreceiver.New(otelCfg, sqls.New(w))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "otel receiver init: %v\n", err)
+			} else if err := rec.Start(context.Background()); err != nil {
+				fmt.Fprintf(os.Stderr, "otel receiver start: %v\n", err)
+			} else {
+				portFile := filepath.Join(htmlgraphDir, ".otlp-port")
+				_ = os.WriteFile(portFile, []byte(fmt.Sprintf("%d\n", otelCfg.HTTPPort)), 0o644)
+			}
 		}
-		// Receiver runs until process exit; its writer closes when the
-		// process terminates. No explicit Stop needed because Serve blocks.
 	}
 
 	return (&http.Server{Handler: mux}).Serve(ln)

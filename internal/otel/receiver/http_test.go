@@ -12,6 +12,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/otel/adapter"
 	"github.com/shakestzd/htmlgraph/internal/otel/receiver"
+	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 
 	"google.golang.org/protobuf/proto"
 
@@ -54,7 +55,7 @@ func buildTestReceiver(t *testing.T) (*receiver.HTTPHandler, *receiver.Writer, s
 
 	reg := adapter.NewRegistry()
 	reg.Register(adapter.NewClaudeAdapter())
-	h := receiver.NewHTTPHandler(reg, w)
+	h := receiver.NewHTTPHandler(reg, sqls.New(w))
 	return h, w, dbPath
 }
 
@@ -219,7 +220,7 @@ func TestHTTPHandler_RejectsBadContentType(t *testing.T) {
 // HTMLGRAPH_OTEL_ENABLED unset, Start returns nil without binding
 // a port or opening a DB.
 func TestReceiver_DisabledIsNoop(t *testing.T) {
-	r, err := receiver.New(receiver.Config{Enabled: false})
+	r, err := receiver.New(receiver.Config{Enabled: false}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
