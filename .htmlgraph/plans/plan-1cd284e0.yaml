@@ -5,9 +5,9 @@ meta:
     description: |
         Move the OTLP receiver out of htmlgraph serve into per-session collector subprocesses that append OTel signals to session-scoped NDJSON files, and build an NDJSON-to-SQLite indexer in serve to preserve existing dashboard APIs. Retires the shared-port shared-writer model that causes parallel-session merging (bug-e8b8900b), SQLITE_BUSY cascades on the OTel write path (bug-08681166 class), and serve-restart span drops. Establishes the NDJSON-canonical + SQLite-derived pattern without committing to full SQLite removal (deferred to follow-on plans).
     created_at: "2026-04-24"
-    status: todo
+    status: finalized
     created_by: claude-opus
-    version: 3
+    version: 4
 design:
     problem: |
         The OTLP receiver is embedded inside htmlgraph serve and writes to the shared .htmlgraph/htmlgraph.db SQLite file on a project-hashed port (4318 + FNV32a(projectDir) % 1000, internal/otel/receiver/port.go:11). This creates four recurring failure modes. (1) Parallel htmlgraph claude terminals in the same project share one port and one writer; Claude Code's span tagging is the only thing distinguishing their sessions, and bug-e8b8900b documents session merging from this. (2) The receiver competes with hook processes for SQLite writes, producing SQLITE_BUSY cascades — bug-08681166 (in-progress), and the already-resolved bug-6ab963d3 and bug-59b98285, all describe the same contention class. (3) Restarting serve drops in-flight spans because Claude Code's OTel SDK has no durable retry against a closed port (claude_serve_autostart.go:93 logs a warning and accepts the loss). (4) Session identity is authoritative only in Claude Code — HTMLGRAPH_SESSION_ID leaks from parent shells into subprocesses (internal/hooks/runner.go:187), misattributing hook events in subagent contexts.
@@ -32,6 +32,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-3a65c5ca
       num: 1
       title: Extract SignalSink interface; add NDJSONSink implementation
       what: |
@@ -73,6 +74,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-2
+      feature_id: feat-56aa1d48
       num: 2
       title: htmlgraph otel-collect subcommand
       what: |
@@ -107,6 +109,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-3
+      feature_id: feat-4d3a2b5d
       num: 3
       title: Launcher spawns per-session collector child
       what: |
@@ -144,6 +147,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-4
+      feature_id: feat-f0f893a3
       num: 4
       title: Session-start Rosetta event + env-leak fix
       what: |
@@ -176,6 +180,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-5
+      feature_id: feat-b6479241
       num: 5
       title: NDJSON to SQLite indexer loop inside serve
       what: |
@@ -226,6 +231,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-6
+      feature_id: feat-2377191e
       num: 6
       title: Strip OTLP receiver from serve; rename ensureServeForOtel
       what: |
@@ -269,6 +275,7 @@ slices:
       approved: false
       comment: ""
     - id: slice-7
+      feature_id: feat-ed1a1f2c
       num: 7
       title: 'Session cleanup: graceful drain + retention hygiene'
       what: |
