@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Hook runner silently swallows db.Open errors, hiding telemetry-loss incidents</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-ec4d3d8f"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-23T21:34:23.496031"
+             data-updated="2026-04-23T21:51:47.776696" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Hook runner silently swallows db.Open errors, hiding telemetry-loss incidents</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-23T21:34:23.500433">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5d76afd1-7d5b-49f6-8b45-56a9ba4e96c8.html" data-relationship="implemented_in" data-since="2026-04-23T21:46:58.977122">session 5d76afd1-7d5b-49f6-8b45-56a9ba4e96c8</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>cmd/htmlgraph/hook.go hookSubcmd constructors contain 'database, err := db.Open(hooks.DBPath(projectDir)); if err != nil { return fallback, nil }'. When Open fails (e.g., PRAGMA journal_mode=DELETE can't acquire the exclusive lock needed to switch out of WAL mode), the hook returns a fallback result with no log line. Hid the NewWriter-forces-WAL regression for hours: user-prompt hooks completed in 3-4ms with zero events written and zero errors logged. Fix: before returning fallback, debugLog '[error] handler=%s session=%s: db.Open failed: %v'. Apply in every hookSubcmd / hookSubcmdWithProject / hookSubcmdWithTool that calls db.Open. Files: cmd/htmlgraph/hook.go.</p>
+        </section>
+    </article>
+</body>
+</html>
