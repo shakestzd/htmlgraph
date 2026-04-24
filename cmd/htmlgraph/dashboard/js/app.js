@@ -1317,7 +1317,7 @@ function detectMode() {
     // Inside a project (single mode served by a child under /p/<id>/)
     // — label the header with the project name returned by /api/mode.
     // Also expose projectRoot so the event-tree component can relativize
-    // absolute paths (e.g. strip /Users/shakes/DevProjects/htmlgraph/ prefix).
+    // absolute paths (e.g. strip project root prefix from file paths).
     if (data.mode === 'single' && data.projectName) {
       window.htmlgraphProjectName = data.projectName;
       window.htmlgraphProjectRoot = data.projectRoot || null;
