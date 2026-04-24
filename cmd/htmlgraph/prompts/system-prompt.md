@@ -32,6 +32,8 @@ htmlgraph feature create "title" --plan <plan-id> --description "what you're imp
 htmlgraph feature create "title" --standalone "<reason>" --description "what you're implementing"
 htmlgraph feature start <new-id>
 ```
+Do not embed absolute host paths (`/workspaces/…`, `/home/…`, `/Users/…`, `/tmp/…`, `/private/var/…`) in `--description` / `--body` text — they fail the `check-host-paths` pre-commit gate. Use relative paths or basenames. Enforced at creation time; bypass with `--allow-host-paths` if legitimately needed.
+
 The CIGS guidance (injected per-turn) lists open work items — pick from those.
 
 **When delegating to subagents, always include the work item ID in the prompt** (e.g., "Feature: feat-123"). The subagent must run `htmlgraph feature start <id>` to claim the work before writing code.

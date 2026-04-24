@@ -576,7 +576,7 @@ func TestSetDescription_AllKinds(t *testing.T) {
 			}
 
 			// Call the generalized runSetDescription with the kind.
-			if err := runSetDescription(tc.kind, node.ID, "updated description text", "", "", ""); err != nil {
+			if err := runSetDescription(tc.kind, node.ID, "updated description text", "", "", "", false); err != nil {
 				t.Fatalf("runSetDescription(%s): %v", tc.kind, err)
 			}
 

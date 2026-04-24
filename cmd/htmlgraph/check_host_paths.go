@@ -41,6 +41,36 @@ func (v hostPathViolation) String() string {
 	return fmt.Sprintf("%s:%d: %s", v.file, v.line, v.matched)
 }
 
+// validateDescriptionForHostPaths checks description text for host-local absolute
+// path patterns before writing it to a work-item file. Call this at creation time
+// and on set-description so that violations are caught immediately rather than at
+// the pre-commit gate (which runs the full test suite first — ~4.5 min wasted).
+//
+// When allowHostPaths is true the check is skipped entirely (--allow-host-paths
+// bypass flag). Returns a descriptive error on violation.
+func validateDescriptionForHostPaths(description string, allowHostPaths bool) error {
+	if allowHostPaths || description == "" {
+		return nil
+	}
+	matches := hostPathPattern.FindAllString(description, -1)
+	var violations []string
+	for _, m := range matches {
+		if ciAllowPattern.MatchString(m) {
+			continue
+		}
+		violations = append(violations, m)
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"description contains host-local absolute path(s): %s\n"+
+			"  Replace with a relative path or basename.\n"+
+			"  To bypass this check, re-run with --allow-host-paths.",
+		strings.Join(violations, ", "),
+	)
+}
+
 // checkHostPathsCmd returns the cobra sub-command wired into `htmlgraph check`.
 func checkHostPathsCmd() *cobra.Command {
 	var stagedOnly bool

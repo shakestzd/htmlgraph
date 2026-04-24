@@ -3,8 +3,82 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// --- validateDescriptionForHostPaths tests -----------------------------------
+
+// TestValidateDescriptionForHostPaths_Clean passes on clean descriptions.
+func TestValidateDescriptionForHostPaths_Clean(t *testing.T) {
+	cases := []string{
+		"",
+		"implement the feature",
+		"see ./cmd/main.go for details",
+		"relative/path/to/file.go",
+		"screenshot.png shows the result",
+	}
+	for _, desc := range cases {
+		if err := validateDescriptionForHostPaths(desc, false); err != nil {
+			t.Errorf("expected no error for %q, got: %v", desc, err)
+		}
+	}
+}
+
+// TestValidateDescriptionForHostPaths_RejectsWorkspaces rejects /workspaces/ paths.
+func TestValidateDescriptionForHostPaths_RejectsWorkspaces(t *testing.T) {
+	desc := "see /workspaces/htmlgraph/Screenshot_2025.png for context"
+	err := validateDescriptionForHostPaths(desc, false)
+	if err == nil {
+		t.Fatal("expected error for /workspaces/ path, got nil")
+	}
+	if !strings.Contains(err.Error(), "/workspaces/htmlgraph/") {
+		t.Errorf("error should mention the offending path; got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "--allow-host-paths") {
+		t.Errorf("error should mention --allow-host-paths bypass; got: %v", err)
+	}
+}
+
+// TestValidateDescriptionForHostPaths_RejectsHomePath rejects /home/ paths.
+func TestValidateDescriptionForHostPaths_RejectsHomePath(t *testing.T) {
+	desc := "config lives at /home/vscode/.config/tool.yaml"
+	err := validateDescriptionForHostPaths(desc, false)
+	if err == nil {
+		t.Fatal("expected error for /home/ path, got nil")
+	}
+	if !strings.Contains(err.Error(), "/home/vscode/") {
+		t.Errorf("error should mention the offending path; got: %v", err)
+	}
+}
+
+// TestValidateDescriptionForHostPaths_RejectsUsersPaths rejects /Users/ paths.
+func TestValidateDescriptionForHostPaths_RejectsUsersPaths(t *testing.T) {
+	desc := "file at /Users/alice/projects/htmlgraph/main.go"
+	err := validateDescriptionForHostPaths(desc, false)
+	if err == nil {
+		t.Fatal("expected error for /Users/ path, got nil")
+	}
+	if !strings.Contains(err.Error(), "/Users/alice/") {
+		t.Errorf("error should mention the offending path; got: %v", err)
+	}
+}
+
+// TestValidateDescriptionForHostPaths_AllowHostPathsBypass passes with --allow-host-paths.
+func TestValidateDescriptionForHostPaths_AllowHostPathsBypass(t *testing.T) {
+	desc := "/workspaces/htmlgraph/foo.png embedded here"
+	if err := validateDescriptionForHostPaths(desc, true); err != nil {
+		t.Errorf("expected no error when allowHostPaths=true, got: %v", err)
+	}
+}
+
+// TestValidateDescriptionForHostPaths_CIRunnerAllowed passes for /home/runner/ (CI).
+func TestValidateDescriptionForHostPaths_CIRunnerAllowed(t *testing.T) {
+	desc := "artifact at /home/runner/work/htmlgraph/htmlgraph/out.tar.gz"
+	if err := validateDescriptionForHostPaths(desc, false); err != nil {
+		t.Errorf("expected /home/runner/ to be allowed, got: %v", err)
+	}
+}
 
 // TestScanFileForHostPaths_BadSample verifies that the bad-path fixture is flagged.
 func TestScanFileForHostPaths_BadSample(t *testing.T) {
