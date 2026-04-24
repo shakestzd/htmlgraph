@@ -451,3 +451,23 @@ func TestOtelSpansHandler_ConcurrentSubagentModelAttribution(t *testing.T) {
 		t.Errorf("haiku api_request parent_span = %q, want orch-root (mis-parented scenario)", haikuSpan.ParentSpan)
 	}
 }
+
+// JS coverage gap (bug-1e5166ea): the _indexSpans second-pass fix that attaches
+// _modelRef to Task/Agent spans when the orchestrator dispatches N Tasks in one LLM
+// turn lives entirely in event-tree.js. There is no JS test runner in this project,
+// so the following scenario is untested at the automated level:
+//
+//   children = [api_request(Opus), Task#1, Task#2, ...]
+//
+// After the first-pass absorption, Task#1 gets _precedingApi = api_request(Opus) and
+// Task#2..N get neither _precedingApi nor _modelRef. The second pass walks backward
+// through the original kids list and attaches _modelRef = api_request(Opus) to each
+// orphan Task. The renderer then uses _modelRef.model for the model pill (read-only)
+// while leaving cost/tokens blank on those rows to avoid double-counting.
+//
+// The Go-side invariant we CAN assert is that the server returns Task spans with no
+// model field of their own (see TestOtelSpansHandler_ParallelSubagentAttribution above)
+// so the client is forced to derive the model from the api_request reference — the
+// fix only matters when that derivation reaches Task#2..N. The Go test verifies the
+// input shape is correct; the rendering logic itself requires a browser or JS runtime
+// to validate end-to-end.

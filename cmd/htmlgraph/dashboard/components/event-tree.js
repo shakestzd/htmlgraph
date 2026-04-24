@@ -252,6 +252,39 @@ class HgEventTree extends HTMLElement {
       }
       // Drop absorbed api_requests from the child list in place.
       parent.children = kids.filter(function(c) { return !c._absorbedInto; });
+
+      // Second pass: shared model reference for Task/Agent spans that
+      // ended up with no _precedingApi. This happens when the orchestrator
+      // dispatches N Tasks in a single LLM turn — ONE api_request precedes
+      // all N Tasks, but exclusive-ownership absorption attaches it only to
+      // Task #1. Tasks #2..N would otherwise render with no model pill.
+      //
+      // Fix: for each Task/Agent with no _precedingApi, walk backward to
+      // find the nearest api_request whose model matches orchModel (or any
+      // api_request when orchModel is unknown). Attach it as _modelRef —
+      // a read-only reference used by the renderer for the model pill ONLY.
+      // _modelRef is NOT used for cost/token accounting (the absorbing span
+      // already counts those via _precedingApi; sharing would double-count).
+      var updatedKids = parent.children;
+      for (var m = 0; m < updatedKids.length; m++) {
+        var mSpan = updatedKids[m];
+        if ((mSpan.tool_name === 'Task' || mSpan.tool_name === 'Agent') && !mSpan._precedingApi) {
+          // Walk the original kids array backward from the pre-absorption
+          // position to find the nearest qualifying api_request. We search
+          // all kids (including absorbed ones) so we can cross the absorption
+          // boundary — i.e. find the api_request that was absorbed by Task #1.
+          var modelRef = null;
+          for (var n = kids.length - 1; n >= 0; n--) {
+            var nCand = kids[n];
+            if (nCand.canonical !== 'api_request') continue;
+            if (orchModel && nCand.model && nCand.model !== orchModel) continue;
+            if (!orchModel && !nCand.model) continue;
+            modelRef = nCand;
+            break;
+          }
+          if (modelRef) mSpan._modelRef = modelRef;
+        }
+      }
     });
 
     // Reverse every children array so the most recent span renders first,
@@ -1275,6 +1308,14 @@ class HgEventTree extends HTMLElement {
     var api = (isToolSpan && span._precedingApi) ? span._precedingApi : null;
     var apiModel = (api && api.model) || span.model;
     var apiCost = api ? api.cost_usd : span.cost_usd;
+    // Fallback model source for Task/Agent rows that share an api_request
+    // with a sibling (N Tasks dispatched in one LLM turn). _modelRef is
+    // read-only — used for the model pill ONLY, never for cost/tokens (to
+    // avoid double-counting the tokens already attributed to the absorbing
+    // sibling Task via its _precedingApi).
+    if (!apiModel && isToolSpan && span._modelRef && span._modelRef.model) {
+      apiModel = span._modelRef.model;
+    }
 
     // Compact, color-coded model badge. Inline-styled so each family
     // (Opus/Sonnet/Haiku, plus generic for OpenAI/Google) gets its
