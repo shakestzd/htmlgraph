@@ -1,0 +1,49 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+// TestTerminalGate_UnsetEnvReturns404 verifies that when HTMLGRAPH_TERMINAL is
+// not set the four /api/terminal/* routes are not registered and return 404.
+func TestTerminalGate_UnsetEnvReturns404(t *testing.T) {
+	// Ensure the env var is unset for this test.
+	t.Setenv("HTMLGRAPH_TERMINAL", "")
+
+	mux := buildSingleProjectMux(nil, t.TempDir())
+
+	endpoints := []string{
+		"/api/terminal/sessions",
+		"/api/terminal/start",
+		"/api/terminal/stop",
+		"/api/terminal/stop-all",
+	}
+	for _, path := range endpoints {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("HTMLGRAPH_TERMINAL unset: %s returned %d, want 404", path, rec.Code)
+		}
+	}
+}
+
+// TestTerminalGate_SetEnvRegistersRoutes verifies that when HTMLGRAPH_TERMINAL
+// is set (to any non-empty value) the /api/terminal/sessions route is registered
+// and does not return 404. (Other routes require a running ttyd process and are
+// not probed here.)
+func TestTerminalGate_SetEnvRegistersRoutes(t *testing.T) {
+	t.Setenv("HTMLGRAPH_TERMINAL", "1")
+
+	mux := buildSingleProjectMux(nil, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/terminal/sessions", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusNotFound {
+		t.Errorf("HTMLGRAPH_TERMINAL=1: /api/terminal/sessions returned 404, route should be registered")
+	}
+}

@@ -1435,6 +1435,9 @@ detectMode().then(function() {
     back.style.cssText = 'margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:12px;display:flex;align-items:center;text-decoration:none;color:var(--text-dim);font-size:.82rem;';
     nav.insertBefore(back, nav.firstChild);
   }
+  // Probe the terminal feature gate once — hide the button if the backend
+  // routes are not registered (HTMLGRAPH_TERMINAL not set).
+  probeTerminalFeature();
   Promise.all([fetchStats(), fetchEvents()]);
 });
 setInterval(function() {
@@ -2653,6 +2656,26 @@ function highlightSession(sessionId) {
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   el.style.outline = '2px solid var(--accent)';
   setTimeout(function() { el.style.outline = ''; }, 2000);
+}
+
+/* ── Terminal feature gate ─────────────────────────────────── */
+
+// probeTerminalFeature checks once at init whether the backend has the
+// terminal routes registered (HTMLGRAPH_TERMINAL env var). On 404 (or
+// any network error) the open-terminal button is hidden so the feature
+// is invisible when not enabled. Called once from the startup sequence.
+function probeTerminalFeature() {
+  fetch(buildProjectUrl('terminal/sessions'))
+    .then(function(r) {
+      if (r.status === 404) {
+        var btn = document.getElementById('open-terminal-btn');
+        if (btn) btn.style.display = 'none';
+      }
+    })
+    .catch(function() {
+      var btn = document.getElementById('open-terminal-btn');
+      if (btn) btn.style.display = 'none';
+    });
 }
 
 /* ── Embedded terminal (ttyd sidecar) ─────────────────────── */
