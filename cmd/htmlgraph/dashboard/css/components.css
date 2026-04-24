@@ -236,6 +236,9 @@
 .depth-2 { border-left-color: rgba(100,116,139,0.15); }
 .depth-3 { border-left-color: rgba(100,116,139,0.10); }
 
+/* Nested children container — hidden until parent is expanded */
+.event-children.collapsed { display: none; }
+
 /* Clickable event rows */
 .clickable-row[data-session] { cursor: pointer; }
 .clickable-row[data-session]:hover { background: rgba(205,255,0,0.06) !important; }

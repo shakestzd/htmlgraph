@@ -1000,8 +1000,11 @@ class HgEventTree extends HTMLElement {
       + statusBdg
       + '</div>';
 
-    if (isExp && evt.children) {
-      html += evt.children.map(c => this.renderEvent(c, depth + 1)).join('');
+    if (evt.children && evt.children.length > 0) {
+      var childVis = isExp ? '' : ' collapsed';
+      html += '<div class="event-children' + childVis + '" data-parent="' + esc(evt.event_id) + '">'
+        + evt.children.map(c => this.renderEvent(c, depth + 1)).join('')
+        + '</div>';
     }
     return html;
   }
