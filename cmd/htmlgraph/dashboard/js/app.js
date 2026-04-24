@@ -1417,6 +1417,11 @@ function renderProjectsLanding(projects) {
 // Startup: detect mode, then either render the landing (at root) or run
 // the single-project startup (under /p/<id>/).
 detectMode().then(function() {
+  // Probe the terminal feature gate once on every page — hide the button if
+  // the backend routes are not registered (HTMLGRAPH_TERMINAL not set to "1").
+  // Runs before the doorway early return so the landing page also hides its
+  // button, since the root server never registers /api/terminal/* either.
+  probeTerminalFeature();
   if (isDoorwayLanding()) {
     // Landing: hide the stats bar (no aggregate data in the doorway).
     var sb = document.getElementById('stats-bar');
@@ -1435,9 +1440,6 @@ detectMode().then(function() {
     back.style.cssText = 'margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:12px;display:flex;align-items:center;text-decoration:none;color:var(--text-dim);font-size:.82rem;';
     nav.insertBefore(back, nav.firstChild);
   }
-  // Probe the terminal feature gate once — hide the button if the backend
-  // routes are not registered (HTMLGRAPH_TERMINAL not set).
-  probeTerminalFeature();
   Promise.all([fetchStats(), fetchEvents()]);
 });
 setInterval(function() {

@@ -112,9 +112,11 @@ func buildSingleProjectMux(database *sql.DB, htmlgraphDir string) *http.ServeMux
 
 	// Terminal sidecar routes — spawn/stop ttyd processes for the embedded
 	// interactive terminal. Must be registered before the catch-all "/" below.
-	// Gated behind HTMLGRAPH_TERMINAL: when unset (the default), these routes
-	// are not registered and return 404. Set HTMLGRAPH_TERMINAL=1 to enable.
-	if os.Getenv("HTMLGRAPH_TERMINAL") != "" {
+	// Gated behind HTMLGRAPH_TERMINAL: the routes are only registered when the
+	// env var is exactly "1". Any other value (including "0", "false", or empty)
+	// leaves the routes unregistered so they return 404. Strict match avoids the
+	// surprise where HTMLGRAPH_TERMINAL=0 would otherwise enable the feature.
+	if os.Getenv("HTMLGRAPH_TERMINAL") == "1" {
 		mux.Handle("/api/terminal/start", handleTerminalStart(projectDir))
 		mux.Handle("/api/terminal/sessions", handleTerminalSessions())
 		mux.Handle("/api/terminal/stop", handleTerminalStop())

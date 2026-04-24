@@ -31,9 +31,9 @@ func TestTerminalGate_UnsetEnvReturns404(t *testing.T) {
 }
 
 // TestTerminalGate_SetEnvRegistersRoutes verifies that when HTMLGRAPH_TERMINAL
-// is set (to any non-empty value) the /api/terminal/sessions route is registered
-// and does not return 404. (Other routes require a running ttyd process and are
-// not probed here.)
+// is set to exactly "1" the /api/terminal/sessions route is registered and does
+// not return 404. (Other routes require a running ttyd process and are not
+// probed here.)
 func TestTerminalGate_SetEnvRegistersRoutes(t *testing.T) {
 	t.Setenv("HTMLGRAPH_TERMINAL", "1")
 
@@ -45,5 +45,27 @@ func TestTerminalGate_SetEnvRegistersRoutes(t *testing.T) {
 
 	if rec.Code == http.StatusNotFound {
 		t.Errorf("HTMLGRAPH_TERMINAL=1: /api/terminal/sessions returned 404, route should be registered")
+	}
+}
+
+// TestTerminalGate_FalsyValuesReturn404 verifies that false-y or non-"1" values
+// for HTMLGRAPH_TERMINAL (notably "0" and "false") do NOT enable the routes.
+// The contract is strict equality with "1"; any other value keeps the gate shut.
+func TestTerminalGate_FalsyValuesReturn404(t *testing.T) {
+	values := []string{"0", "false", "FALSE", "no", "off", "true", "yes"}
+	for _, v := range values {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("HTMLGRAPH_TERMINAL", v)
+
+			mux := buildSingleProjectMux(nil, t.TempDir())
+
+			req := httptest.NewRequest(http.MethodGet, "/api/terminal/sessions", nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("HTMLGRAPH_TERMINAL=%q: /api/terminal/sessions returned %d, want 404 (only exact \"1\" enables)", v, rec.Code)
+			}
+		})
 	}
 }
