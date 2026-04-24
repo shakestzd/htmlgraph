@@ -768,6 +768,19 @@ class HgEventTree extends HTMLElement {
       var assistantTexts = this._assistantTextsForTurn(turn);
       if (assistantTexts.length > 0) {
         html += assistantTexts.map(log => this.renderAssistantText(log, uq.feature_id)).join('');
+      } else {
+        // Fallback: when no OTel-derived assistant_text exists for this turn
+        // (e.g. the otel_signals write was dropped under pre-Option-3 contention),
+        // the Stop hook still recorded the last assistant message in
+        // agent_events.input_summary prefixed with "Agent stopped: ".
+        // Render that row with the same quiet-label + markdown + collapse
+        // treatment as renderAssistantText so the turn doesn't end silently.
+        var stopEvt = (turn.children || []).find(function(c) {
+          return c.tool_name === 'Stop' && c.event_type === 'end';
+        });
+        if (stopEvt) {
+          html += this.renderStopFallback(stopEvt, uq.feature_id);
+        }
       }
 
       // Prefer OTel spans when present — they're the canonical source
@@ -835,8 +848,7 @@ class HgEventTree extends HTMLElement {
 
     var stopReasonBadge = '';
     if (stopReason && stopReason !== 'end_turn') {
-      stopReasonBadge = '<span class="badge badge-stop-reason" style="background-color: #f59e0b;">'
-        + esc(stopReason) + '</span>';
+      stopReasonBadge = '<span class="stop-reason-label">' + esc(stopReason) + '</span>';
     }
 
     var featureBdg = this.featureBadge(log.feature_id || '', log.feature_title || '');
@@ -870,6 +882,71 @@ class HgEventTree extends HTMLElement {
         body = '<div class="assistant-text-body markdown">' + markedHtml + '</div>';
       } else {
         // Fallback to plain pre if marked is not available
+        body = '<pre class="assistant-text-pre" style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
+          + esc(text)
+          + '</pre>';
+      }
+
+      html += '<div class="event-row depth-2 assistant-text-detail"'
+        + ' style="padding-left: 3.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem;">'
+        + body
+        + '</div>';
+    }
+
+    return html;
+  }
+
+  // renderStopFallback renders an agent_events Stop row as an assistant-text
+  // block when no OTel-derived assistant_text log exists for the turn.
+  // Mirrors renderAssistantText — same quiet-label, same preview, same
+  // expand/collapse with markdown body. Strips the "Agent stopped: " prefix
+  // from input_summary and shows the stop_reason quietly when non-default.
+  renderStopFallback(evt, parentFeatureId) {
+    var evtId = evt.event_id || 'stop-' + Math.random().toString(36).slice(2);
+    var isExp = this.expanded.has(evtId);
+
+    var rawSummary = evt.input_summary || '';
+    var prefix = 'Agent stopped: ';
+    var text = rawSummary.startsWith(prefix) ? rawSummary.slice(prefix.length) : rawSummary;
+
+    var stopReason = evt.stop_reason || '';
+    var previewLen = 180;
+    var preview = text.length > previewLen ? text.substring(0, previewLen) + '…' : text;
+
+    var expandIcon = '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(evtId) + '">▶</span>';
+
+    var stopReasonBadge = '';
+    if (stopReason && stopReason !== 'end_turn') {
+      stopReasonBadge = '<span class="stop-reason-label">' + esc(stopReason) + '</span>';
+    }
+
+    var featureBdg = this.featureBadge(evt.feature_id || '', evt.feature_title || '');
+
+    var html = '<div class="event-row depth-1 assistant-text-row"'
+      + ' data-event-id="' + esc(evtId) + '"'
+      + ' data-timestamp="' + esc(evt.timestamp || '') + '"'
+      + ' style="padding-left: 2.5rem">'
+      + expandIcon
+      + '<span class="assistant-label">assistant</span>'
+      + '<span class="event-summary assistant-preview">' + esc(preview) + '</span>'
+      + stopReasonBadge
+      + featureBdg
+      + '</div>';
+
+    if (isExp) {
+      if (window.marked && !window._markedConfigured) {
+        window.marked.setOptions({ breaks: true, gfm: true });
+        window._markedConfigured = true;
+      }
+
+      var body;
+      if (window.marked && typeof window.marked.parse === 'function') {
+        var markedHtml = window.marked.parse(text);
+        if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+          markedHtml = window.DOMPurify.sanitize(markedHtml);
+        }
+        body = '<div class="assistant-text-body markdown">' + markedHtml + '</div>';
+      } else {
         body = '<pre class="assistant-text-pre" style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
           + esc(text)
           + '</pre>';
