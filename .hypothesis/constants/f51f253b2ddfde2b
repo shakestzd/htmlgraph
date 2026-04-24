@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/agents.py
-# hypothesis_version: 6.151.9
-
-[0.0, 20.0, 100, '\n## Available', '\n## Blocked', '\n## In Progress', '\n## Related', '# Project Summary', 'affected_tasks', 'agent_id', 'agent_id required', 'blocked', 'blocked_by', 'blocked_tasks', 'blocks_count', 'by_status', 'completed', 'completion_impact', 'complexity', 'critical', 'direct_dependents', 'done', 'estimated_effort', 'estimated_hours', 'features', 'high', 'high_risk_count', 'high_risk_tasks', 'id', 'impact_score', 'in-progress', 'in_progress', 'level_count', 'low', 'max_parallelism', 'medium', 'next_level', 'node_id', 'orphaned_count', 'orphaned_tasks', 'priority', 'ready_now', 'reason', 'reasons', 'recommendations', 'related', 'risk_factors', 'risk_score', 'score', 'status', 'task', 'task_id', 'tasks', 'title', 'todo', 'total_impact', 'total_ready', 'unlocks', 'unlocks_count', 'very-high']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cigs/patterns.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.8, 0.95, 1.0, 'Bash', 'Edit', 'Glob', 'Grep', 'NotebookEdit', 'Read', 'Task', 'Write', 'anti-pattern', 'assert', 'command', 'copilot', 'count', 'description', 'detector', 'direct_git_commit', 'edit_without_test', 'exploration_sequence', 'file_path', 'gemini', 'git', 'git add', 'git commit', 'git merge', 'git push', 'git rebase', 'jest', 'min_occurrences', 'mocha', 'occurrence_count', 'prompt', 'pytest', 'remediation', 'sessions', 'spawn_', 'spawn_gemini', 'test', 'tool', 'trigger_conditions', 'unittest', 'verify', 'vitest']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/builders/metric.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'MetricBuilder', 'data_points_count', 'efficiency', 'id', 'metric', 'metric_type', 'metric_values', 'metrics', 'percentiles', 'period', 'period_end', 'period_start', 'scope', 'scope_id', 'session', 'sessions_in_period', 'title', 'trend_direction', 'trend_strength', 'weekly']

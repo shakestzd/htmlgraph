@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/main.py
-# hypothesis_version: 6.151.9
-
-[130, '--format', '--quiet', '--verbose', '-q', '-v', 'Command to run', '__main__', 'agent', 'command', 'count', 'cwd', 'func', 'graph_dir', 'htmlgraph', 'store_true']

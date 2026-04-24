@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/track_repository_sqlite.py
-# hypothesis_version: 6.151.9
-
-[' AND ', ' WHERE ', 'SELECT * FROM tracks', 'active', 'blocked', 'cancelled', 'completed', 'content', 'created', 'created_at', 'description', 'done', 'ended', 'features', 'has_plan', 'has_spec', 'id', 'in-progress', 'in_progress', 'medium', 'metadata', 'phases', 'planned', 'priority', 'properties', 'stale', 'status', 'title', 'todo', 'track', 'type', 'updated', 'updated_at']

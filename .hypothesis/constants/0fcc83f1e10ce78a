@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/subnode.py
-# hypothesis_version: 6.151.9
-
-[100, '.progress-fill', '[data-phase]', '[data-requirement]', '[data-task]', '\\(\\d+/\\d+ tasks\\)', 'checked', 'data-', 'data-status', 'data-verified', 'done', 'input[type=checkbox]', 'percent', 'status', 'style', 'summary', 'todo', 'total', 'true', 'utf-8']

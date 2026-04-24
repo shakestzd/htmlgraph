@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/track_repository_htmlfile.py
-# hypothesis_version: 6.151.9
-
-['*.html', '../styles.css', 'active', 'created', 'features', 'has_plan', 'has_spec', 'id', 'medium', 'priority', 'properties', 'status', 'title', 'todo', 'track', 'type', 'updated']

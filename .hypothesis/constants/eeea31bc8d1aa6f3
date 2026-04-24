@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/planning/recommendations.py
-# hypothesis_version: 6.151.9
-
-['affected_tasks', 'completion_impact', 'direct_dependents', 'estimated_hours', 'id', 'node_id', 'priority', 'reasons', 'score', 'title', 'total_impact', 'unlocks', 'unlocks_count']

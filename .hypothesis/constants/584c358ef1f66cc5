@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/skill_scout/work_patterns.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'Agent', 'Bash', 'Edit', 'Glob', 'Grep', 'MultiEdit', 'Read', 'Task', 'WebFetch', 'WebSearch', 'Write', 'delegation', 'file_operations', 'search', 'testing', 'version_control', 'web', 'web_browsing']

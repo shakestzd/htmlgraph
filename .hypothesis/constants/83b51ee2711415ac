@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/builders/insight.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'InsightBuilder', 'efficiency_score', 'error_recovery_rate', 'health', 'id', 'insight', 'insight_type', 'insights', 'issues_detected', 'overall_health_score', 'patterns_matched', 'recommendations', 'retry_rate', 'session_id', 'title', 'tool_diversity']

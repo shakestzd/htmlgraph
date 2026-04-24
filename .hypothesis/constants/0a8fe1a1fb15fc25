@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/builders/base.py
-# hypothesis_version: 6.151.9
-
-['BaseBuilder', 'BuilderT', 'FeatureCreate', 'SDK.create', 'action', 'blocked_by', 'blocks', 'collection', 'content', 'create', 'edges', 'feature', 'handoff_notes', 'handoff_reason', 'handoff_required', 'handoff_timestamp', 'id', 'isoformat', 'medium', 'node', 'node_id', 'node_type', 'priority', 'properties', 's', 'session_manager', 'status', 'steps', 'title', 'todo', 'tool_call', 'track_id', 'type']

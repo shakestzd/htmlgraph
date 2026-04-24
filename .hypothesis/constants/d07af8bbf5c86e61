@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/pragmas.py
-# hypothesis_version: 6.151.9
-
-[-64000, 5000, 268435456, 'MEMORY', 'NORMAL', 'PRAGMA optimize', 'WAL', 'busy_timeout', 'cache_size', 'foreign_keys', 'journal_mode', 'mmap_size', 'ok', 'synchronous', 'temp_store']

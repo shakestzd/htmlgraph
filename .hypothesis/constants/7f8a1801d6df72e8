@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawners/claude.py
-# hypothesis_version: 6.151.9
-
-[300, '--', '--output-format', '--permission-mode', '--resume', '--verbose', '-p', 'bypassPermissions', 'claude', 'error', 'input_tokens', 'is_error', 'json', 'output_tokens', 'partial_stderr', 'partial_stdout', 'result', 'text', 'type', 'usage']

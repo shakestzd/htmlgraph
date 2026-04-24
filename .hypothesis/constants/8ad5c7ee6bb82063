@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/edge_index.py
-# hypothesis_version: 6.151.9
-
-['both', 'edge_count', 'incoming', 'nodes_with_incoming', 'nodes_with_outgoing', 'outgoing', 'relationships']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/events.py
-# hypothesis_version: 6.151.9
-
-['*.jsonl', 'events', 'failed', 'index.sqlite', 'inserted', 'session_id', 'sessions', 'skipped', 'written']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/presence.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.3, 0.5, 1.0, 1.2, 2.0, 404, 500, 1011, '+00:00', ',', '/api/presence', '/ws/events', '/ws/presence', '?', 'Agent not found', 'Z', 'agent_id', 'agents', 'context', 'cost_tokens', 'data', 'event', 'event_id', 'event_type', 'input_summary', 'live_event_id', 'model', 'output_summary', 'parent_event_id', 'presence_state', 'presence_update', 'session_id', 'spawner_event', 'spawner_type', 'static', 'status', 'timestamp', 'tool_name', 'type', 'unknown']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/collections/base.py
-# hypothesis_version: 6.151.9
-
-[2.0, 'BaseCollection', 'CollectionT', 'Node | None', 'SDK.mark_done', '_', '_bugs_graph', '_graph', 'active', 'agent_assigned', 'all', 'assign', 'batch_delete', 'batch_update', 'blocked', 'bugs', 'claim', 'collection', 'complete', 'complete_all', 'create', 'critical', 'data-assignee=', 'data-status=', 'delete', 'done', 'edit', 'end', 'ended', 'failed_ids', 'features', 'filter', 'finish', 'get', 'high', 'in-progress', 'list[Node]', 'low', 'mark_as_done', 'mark_complete', 'mark_done', 'medium', 'node', 'node_id', 'node_type', 'nodes', 'priority', 'release', 'session_manager', 'set_done', 'spikes', 'stale', 'start', 'status', 'success_count', 'title', 'todo', 'tool_call', 'track_id', 'unknown', 'update', 'update_status', 'warnings', 'where']

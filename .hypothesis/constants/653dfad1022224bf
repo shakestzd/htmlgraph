@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/activity.py
-# hypothesis_version: 6.151.9
-
-[0.6, 1.0, 100, '...', 'UserQuery', 'agent', 'attribution_reason', 'bug', 'child_activity', 'continued_from', 'drift_score', 'duration_seconds', 'ended_at', 'event', 'event_id', 'feature_id', 'file_paths', 'implemented-by', 'implemented-in', 'index.sqlite', 'indicators', 'is_drifting', 'is_primary', 'no_recent_activity', 'payload', 'prompt', 'prompt_length', 'reason', 'reasons', 'repetitive_pattern', 'session_id', 'start_commit', 'started_at', 'status', 'success', 'summary', 'system_overhead', 'timestamp', 'tool', 'tool_breakdown', 'tool_count']

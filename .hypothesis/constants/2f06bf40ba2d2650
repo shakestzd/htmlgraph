@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/context.py
-# hypothesis_version: 6.151.9
-
-[1.0, 'CLAUDE_MODEL', 'CLAUDE_SESSION_ID', 'HTMLGRAPH_AGENT_ID', 'HTMLGRAPH_MODEL', 'HTMLGRAPH_SESSION_ID', 'HookContext', 'agent_id', 'claude-code', 'htmlgraph.db', 'model', 'model_name', 'sessionId', 'session_id', 'unknown']

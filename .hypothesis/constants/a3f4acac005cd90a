@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/pydantic_models.py
-# hypothesis_version: 6.151.9
-
-[100, 200, 500, 1000, 2000, 5000, 'Activity summary', 'Agent name', 'Archive description', 'Archive title', 'Collection name', 'Feature ID to claim', 'Feature ID to start', 'Feature description', 'Feature title', 'Handoff notes', 'Items to archive', 'List of blockers', 'Mark as failed', 'Output format', 'Plan content', 'Plan title', 'Session ID to end', 'Session title', 'Spec content', 'Spec title', 'Spike findings', 'Spike priority', 'Spike title', 'Track ID', 'Track ID to delete', 'Track description', 'Track priority', 'Track title', 'active', 'description', 'ended', 'feature_id', 'features', 'findings', 'forbid', 'high', 'html', 'low', 'markdown', 'medium', 'notes', 'recommend', 'session_id', 'summary', 'title', 'tool', 'track_id']

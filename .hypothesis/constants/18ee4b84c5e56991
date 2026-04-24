@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/model_detection.py
-# hypothesis_version: 6.151.9
-
-[1.0, '-', '.htmlgraph', 'ANTHROPIC_MODEL', 'Agent', 'CLAUDE_MODEL', 'Claude', 'HTMLGRAPH_AGENT', 'HTMLGRAPH_MODEL', 'Haiku 4.5', 'Opus 4.6', 'Sonnet 4.5', 'Task', 'claude-', 'claude-code', 'claude-haiku', 'claude-opus', 'claude-opus-4-6', 'claude-sonnet', 'haiku', 'htmlgraph.db', 'input', 'model', 'name', 'normalize_model_name', 'opus', 'sonnet', 'tool_input', 'tool_name']

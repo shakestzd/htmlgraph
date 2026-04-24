@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/collections/task_delegation.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'agent_type', 'average_duration', 'by_agent_type', 'by_status', 'cost_usd', 'duration_seconds', 'pending', 'result_summary', 'status', 'task-delegation', 'task-delegations', 'task_description', 'timestamp_start', 'tokens_used', 'total_cost', 'total_delegations', 'total_tokens', 'unknown']

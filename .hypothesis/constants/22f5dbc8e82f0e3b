@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/docs/__init__.py
-# hypothesis_version: 6.151.9
-
-['DOC_VERSIONS', 'DocTemplateEngine', 'DocVersion', 'DocsMetadata', 'MIGRATIONS', 'MigrationScript', 'check_docs_version', 'claude', 'get_agents_md', 'get_migration', 'is_compatible', 'sync_docs_to_file']

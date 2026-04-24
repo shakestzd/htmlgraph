@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models/base.py
-# hypothesis_version: 6.151.9
-
-[0.0, 100, '\n        </section>', ', ', '../styles.css', '.html', 'Node', '[ ]', '[x]', 'active', 'adaptive', 'admin', 'architectural', 'attributes', 'before', 'blocked', 'blocked_by', 'blocks', 'bug-fix', 'caused_by', 'conversation-init', 'corrective', 'cost_usd', 'critical', 'documentation', 'done', 'edges', 'ended', 'general', 'high', 'implemented-in', 'implements', 'in-progress', 'investigation', 'low', 'maintenance', 'medium', 'node', 'node_id', 'peak_tokens', 'perfective', 'planning', 'populate_by_name', 'preventive', 'properties', 'related', 'relates_to', 'review', 'risk', 'session-init', 'session_ids', 'sessions', 'spawned_from', 'spike', 'spike-investigation', 'stale', 'status', 'steps', 'technical', 'title', 'todo', 'tokens_used', 'transition', 'unit', 'value', '⏳', '✅', '🔄 Handoff:']

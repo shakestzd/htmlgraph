@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/session_summary.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1.0, 5.0, 100.0, 100, '--show-toplevel', '.htmlgraph', '1', 'CLAUDE_PROJECT_DIR', 'CLAUDE_SESSION_ID', 'Stop', 'additionalContext', 'anti-pattern', 'cigs', 'command', 'continue', 'costs', 'cwd', 'efficiency_score', 'file_path', 'git', 'good-pattern', 'hookEventName', 'hookSpecificOutput', 'optimal_tokens', 'patterns', 'prompt', 'python', 'rev-parse', 'session-summaries', 'session_id', 'src', 'timestamp', 'tool', 'total_tokens', 'violations', 'w', 'waste_percentage', 'waste_tokens', '✅ OK', '🚨 TRIGGERED']

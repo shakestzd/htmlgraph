@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/cigs_pretool_enforcer.py
-# hypothesis_version: 6.151.9
-
-['.htmlgraph', '1', 'AskUserQuestion', 'Bash', 'Delete', 'Edit', 'Glob', 'Grep', 'HTMLGRAPH_SESSION_ID', 'NotebookEdit', 'PreToolUse', 'Read', 'Task', 'TodoWrite', 'Write', '__main__', '_fallback_session_id', 'additionalContext', 'allow', 'command', 'deny', 'git diff', 'git log', 'git status', 'hookEventName', 'hookSpecificOutput', 'htmlgraph ', 'import htmlgraph', 'input', 'name', 'permissionDecision', 'strict', 'tool_input', 'tool_name', 'uv run htmlgraph ']

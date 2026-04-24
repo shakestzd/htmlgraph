@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/sync_routes.py
-# hypothesis_version: 6.151.9
-
-[200, 400, 404, 503, 1000, '/ack', '/api/sync', '/git/config', '/git/history', '/git/init', '/git/pull', '/git/push', '/git/start', '/git/status', '/git/stop', '/pull', '/push', '/status', 'config', 'history', 'main', 'message', 'origin', 'success', 'sync']

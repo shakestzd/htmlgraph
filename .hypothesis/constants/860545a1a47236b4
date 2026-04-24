@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/builders/pattern.py
-# hypothesis_version: 6.151.9
-
-['PatternBuilder', 'detection_count', 'first_detected', 'id', 'last_detected', 'neutral', 'pattern', 'pattern_type', 'patterns', 'recommendation', 'sequence', 'success_rate', 'title']

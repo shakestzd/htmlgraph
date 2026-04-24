@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/graph/algorithms.py
-# hypothesis_version: 6.151.9
-
-[5.0, 100, '-->', '-.->|blocked|', 'blocked_by', 'both', 'by_priority', 'by_status', 'by_type', 'completion_rate', 'done', 'edge_count', 'edges', 'graph TD', 'htmlgraph_subgraph_', 'total']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/auto_help.py
-# hypothesis_version: 6.151.9
-
-['.', 'AutoHelpWrapper', 'assign', 'batch_delete', 'batch_update', 'bugs', 'chores', 'claim', 'create', 'edit', 'enable_auto_help', 'epics', 'features', 'get', 'insights', 'mark_done', 'metrics', 'patterns', 'phases', 'release', 'sessions', 'show_help_on_error', 'spikes', 'todos', 'tracks', 'where']

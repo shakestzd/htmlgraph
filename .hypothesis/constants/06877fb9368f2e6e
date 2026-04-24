@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cigs/pattern_storage.py
-# hypothesis_version: 6.151.9
-
-['.json.tmp', 'anti-pattern', 'anti_patterns', 'cigs', 'correct_approach', 'description', 'example_sequence', 'good-pattern', 'good_patterns', 'id', 'name', 'occurrence_count', 'occurrences', 'pattern_type', 'patterns', 'patterns.json', 'sessions_affected', 'summary', 'timestamp', 'total_anti_patterns', 'total_detections', 'total_good_patterns', 'trigger_conditions', 'utf-8', 'w']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/server.py
-# hypothesis_version: 6.151.9
-
-[8080, '*.jsonl', '../styles.css', '0.0.0.0', '127.0.0.1', 'auto_port', 'events', 'graph_dir', 'host', 'httpserver', 'index.sqlite', 'localhost', 'original_port', 'port', 'static_dir', 'styles.css', 'watch', 'watcher']

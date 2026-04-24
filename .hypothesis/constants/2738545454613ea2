@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/collections/todo.py
-# hypothesis_version: 6.151.9
-
-[0.0, '*.html', 'agent', 'avg_duration_seconds', 'completed', 'completed-at', 'completed-by', 'completion_rate', 'content', 'created', 'duration', 'feature-id', 'id', 'in_progress', 'pending', 'priority', 'session-id', 'session_manager', 'started-at', 'status', 'todo', 'todo-active-form', 'todo-content', 'todos', 'total', 'type', 'updated']

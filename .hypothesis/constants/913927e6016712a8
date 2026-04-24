@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/feature_repository_sqlite.py
-# hypothesis_version: 6.151.9
-
-[' AND ', ',', '?', 'agent', 'agent_assigned', 'assigned_to', 'completed', 'completed_at', 'created', 'created_at', 'depends_on', 'description', 'edges', 'feature', 'id', 'medium', 'metadata', 'priority', 'properties', 'relationship', 'since', 'status', 'steps', 'steps_completed', 'steps_total', 'tags', 'target_id', 'title', 'todo', 'track_id', 'type', 'updated', 'updated_at', 'updated_at = ?']

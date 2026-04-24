@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/context_analytics.py
-# hypothesis_version: 6.151.9
-
-[0.0, 100, '-', 'All Sessions', 'by_feature', 'by_session', 'by_tool', 'cost', 'cost_by_feature', 'cost_usd', 'entity_id', 'entity_title', 'entity_type', 'feature', 'features_count', 'id', 'output_tokens', 'peak_tokens', 'percent_of_total', 'project', 'session', 'sessions', 'sessions_count', 'title', 'tokens', 'tokens_used', 'total', 'total_cost', 'total_output_tokens', 'total_tokens', 'track', 'work_type']

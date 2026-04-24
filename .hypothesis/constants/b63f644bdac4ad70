@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/shared_cache_memory.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1000, 1024, 3600, '*', 'MemorySharedCache', 'access_time', 'avg_load_ms', 'blocking:*', 'capacity', 'critical_path:*', 'dependency:*', 'evictions', 'feature:list:*', 'hit_rate', 'hits', 'key_info', 'keys', 'load_count', 'lru_order', 'memory_bytes', 'misses', 'priority:*', 'recommendation:*', 'size', 'stats', 'total_load_time_ms', 'track:list:*', 'ttl_remaining']

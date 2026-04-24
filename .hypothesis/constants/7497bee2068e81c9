@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/filter_service_standard.py
-# hypothesis_version: 6.151.9
-
-['<', '<=', '>', '>=', 'any_of', 'assigned_to', 'contains', 'created_after', 'created_at', 'created_before', 'critical', 'custom predicate', 'ends with', 'high', 'in', 'is', 'is not', 'low', 'medium', 'none_of', 'not in', 'priority', 'priority_gte', 'priority_lte', 'range', 'starts with', 'status', 'status_is', 'text_contains', 'text_starts_with', 'updated_after', 'updated_at', 'updated_before']

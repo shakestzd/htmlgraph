@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawners/base.py
-# hypothesis_version: 6.151.9
-
-[200, '0', 'SDK', 'SDK | None', 'assistant', 'details', 'duration', 'error', 'executing', 'message', 'model', 'nesting_depth', 'parent_activity', 'phase', 'progress', 'prompt', 'response', 'role', 'spawner', 'spawner_complete', 'spawner_message', 'spawner_phase', 'spawner_start', 'spawner_tool_use', 'success', 'tokens', 'tool_name', 'unknown']

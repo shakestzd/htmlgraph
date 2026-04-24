@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/offline.py
-# hypothesis_version: 6.151.9
-
-['Untitled', 'agent_id', 'conflict', 'conflict_count', 'conflict_type', 'conflicts', 'create', 'critical', 'description', 'event_id', 'feature', 'high', 'last_write_wins', 'local', 'local_event_id', 'local_only', 'local_timestamp', 'low', 'medium', 'merge_strategy', 'merged_events', 'no_changes', 'operation', 'payload', 'pending', 'pending_review', 'priority', 'priority_based', 'remote', 'remote_event_id', 'remote_timestamp', 'resolution_strategy', 'resolved', 'resource_id', 'resource_type', 'status', 'success', 'synced', 'synced_events', 'timestamp', 'title', 'todo', 'total_conflicts', 'type', 'update', 'user_choice', 'winner']

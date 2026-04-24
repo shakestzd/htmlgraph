@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/headless_spawner.py
-# hypothesis_version: 6.151.9
-
-[120, 300, 'AIResult', 'HeadlessSpawner', 'bypassPermissions', 'json', 'stream-json']

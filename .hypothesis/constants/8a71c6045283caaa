@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/reactive.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1000, 5000, '*events', '*features', '*sessions', 'Active Sessions', 'Agent Workload', 'Blocked Features', 'Cost Trends', 'Features by Status', 'Recent Activity', 'active_sessions', 'agent_workload', 'blocked_features', 'cost_trends', 'description', 'execution_time_ms', 'features_by_status', 'last_execution', 'name', 'queries', 'query_id', 'query_update', 'recent_activity', 'row_count', 'rows', 'subscribers', 'timestamp', 'type']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/event_log.py
-# hypothesis_version: 6.151.9
-
-[-250, 1024, '*.jsonl', '+00:00', 'Actual token usage', 'Context drift score', 'Event timestamp', 'Session identifier', 'Session status', 'WorkType enum value', 'Z', 'a', 'event_id', 'feature_id', 'file_paths', 'ignore', 'json', 'r', 'rb', 'session_id', 'timestamp', 'tool', 'utf-8']

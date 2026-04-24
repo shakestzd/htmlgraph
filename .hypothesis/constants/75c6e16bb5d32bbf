@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/git_commands.py
-# hypothesis_version: 6.151.9
-
-[' -D ', ' -a ', ' -d ', '-D ', '-a ', '-d ', 'add', 'branch', 'checkout', 'cherry-pick', 'clean', 'commit', 'describe', 'diff', 'fetch', 'git', 'log', 'ls-files', 'ls-remote', 'merge', 'mv', 'pull', 'push', 'read', 'rebase', 'reflog', 'remote', 'reset', 'restore', 'rev-parse', 'rm', 'show', 'stash', 'status', 'switch', 'tag', 'unknown', 'write']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestrator_mode.py
-# hypothesis_version: 6.151.9
-
-['%Y-%m-%d %H:%M:%S', '+00:00', '.htmlgraph', 'OrchestratorMode', 'Z', 'activated_at', 'already_enabled', 'auto_activated', 'disable_prompt_count', 'disable_scope', 'disabled_at', 'disabled_by_user', 'enabled', 'enforcement_level', 'guidance', 'last_violation_at', 'session', 'session_id', 'still_disabled', 'strict', 'task', 'task_scope_complete', 'timestamp', 'tool', 'violation_history', 'violations']

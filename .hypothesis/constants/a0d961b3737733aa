@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/ingest/claude_code.py
-# hypothesis_version: 6.151.9
-
-[200, 500, '*.jsonl', '-', '...[truncated]', 'Unknown', 'UserQuery', 'claude-code', 'claude-code-ingest', 'created', 'ended', 'events', 'message_content', 'sess', 'sessions', 'source', 'tool_input', 'tool_use', 'transcript_uuid', 'updated', 'user']

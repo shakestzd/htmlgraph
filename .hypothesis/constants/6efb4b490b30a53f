@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/graph/networkx_manager.py
-# hypothesis_version: 6.151.9
-
-['--show-toplevel', '.htmlgraph', 'CLAUDE_PROJECT_DIR', 'blocked_by', 'blocks', 'blocks_count', 'can_start', 'degree', 'done', 'feature', 'from_node_id', 'git', 'htmlgraph.db', 'id', 'medium', 'priority', 'relationship_type', 'rev-parse', 'status', 'title', 'to_node_id', 'todo', 'track_id', 'type']

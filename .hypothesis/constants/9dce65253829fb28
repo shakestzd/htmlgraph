@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/telemetry.py
-# hypothesis_version: 6.151.9
-
-['SENTRY_DSN', 'Sentry configured', 'htmlgraph', 'service.name']

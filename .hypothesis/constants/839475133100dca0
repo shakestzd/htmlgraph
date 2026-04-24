@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawners/codex.py
-# hypothesis_version: 6.151.9
-
-[100, 120, 200, 500, '--cd', '--full-auto', '--image', '--json', '--model', '--oss', '--output-schema', '--sandbox', '...', 'CLI not found', 'Command failed', 'Running Codex CLI', 'SDK', 'agent_message', 'cmd', 'codex', 'codex_command', 'codex_completion', 'codex_file_change', 'codex_message', 'codex_spawn_start', 'command', 'command_execution', 'content', 'error', 'event_id', 'events', 'exec', 'executing', 'file_change', 'gpt-4', 'item', 'item.completed', 'item.started', 'line_number', 'model', 'parse_errors', 'partial_stderr', 'partial_stdout', 'path', 'processing', 'prompt_length', 'sandbox', 'spawner_complete', 'spawner_phase', 'spawner_start', 'subprocess.codex', 'text', 'text_length', 'turn.completed', 'type', 'unknown', 'usage']

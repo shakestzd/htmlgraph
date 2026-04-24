@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/path_query.py
-# hypothesis_version: 6.151.9
-
-['*', '+', '.', '?', '\\s+AND\\s+', 'attr', 'incoming', 'label', 'outgoing', 'quant', 'rel', 'val', 'where']

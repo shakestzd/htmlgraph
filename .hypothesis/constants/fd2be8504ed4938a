@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sync/git_sync.py
-# hypothesis_version: 6.151.9
-
-[300, '--abort', '--diff-filter=U', '--name-only', '--ours', '--porcelain', '--theirs', '-C', '-m', '.', '.db', '.htmlgraph', '.jsonl', 'Merged successfully', 'No changes to push', 'abort_on_conflict', 'add', 'auto_merge', 'branch', 'checkout', 'commit', 'config', 'conflict', 'conflict: keep local', 'conflict_strategy', 'conflicts', 'diff', 'error', 'fetch', 'files_changed', 'git', 'idle', 'last_pull', 'last_push', 'main', 'merge', 'message', 'operation', 'origin', 'ours', 'pull', 'pull_interval', 'pulling', 'push', 'push_interval', 'pushing', 'remote', 'stash', 'status', 'success', 'sync_path', 'theirs', 'timestamp']

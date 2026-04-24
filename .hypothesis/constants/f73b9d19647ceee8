@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/reflection.py
-# hypothesis_version: 6.151.9
-
-[' | ', '---', 'Check session log', 'Recommended next', 'active', 'activity_log', 'anti_pattern', 'anti_patterns', 'blocked', 'blocker', 'category', 'description', 'detail', 'done', 'edges', 'failure', 'findings', 'id', 'injected_at', 'item_count', 'items', 'priority', 'reasons', 'recommendation', 'sequence', 'source_id', 'spike', 'started_at', 'success', 'summary', 'title', 'tool', 'updated', '•', '⚠️', '❌', '💡', '🔍', '🚫']

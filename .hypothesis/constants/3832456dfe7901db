@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/bootstrap.py
-# hypothesis_version: 6.151.9
-
-['%Y-%m-%d %H:%M:%S', '--show-toplevel', '.htmlgraph', '.venv', 'CLAUDE_PROJECT_DIR', 'Lib', 'bootstrap_pythonpath', 'get_graph_dir', 'git', 'init_logger', 'lib', 'python', 'resolve_project_dir', 'rev-parse', 'site-packages', 'src']

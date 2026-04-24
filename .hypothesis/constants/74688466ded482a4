@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/lifecycle.py
-# hypothesis_version: 6.151.9
-
-[120, 'Session ended', 'Session started', 'SessionEnd', 'SessionHandoff', 'SessionStart', '_orphans', 'active', 'blockers', 'ended', 'error_type', 'error_types', 'first_error', 'handoff_notes', 'kept', 'kept_active', 'last_error', 'message', 'missing', 'moved', 'recommended_context', 'recommended_next', 'scanned', 'sess', 'session', 'stale', 'staled', 'staled_active', 'total_errors']

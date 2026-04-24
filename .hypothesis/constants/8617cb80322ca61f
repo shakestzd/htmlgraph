@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_hooks.py
-# hypothesis_version: 6.151.9
-
-['a', 'branch', 'commit', 'dirty', 'ended', 'hash', 'hostname', 'is_monorepo', 'monorepo_project', 'path', 'pid', 'remote', 'repo_hash_value', 'start_time', 'unknown']

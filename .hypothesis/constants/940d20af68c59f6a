@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/shared_cache.py
-# hypothesis_version: 6.151.9
-
-[1000, 3600, 'SharedCache', '_instance', 'all', 'prefix', 'resource', 'single']

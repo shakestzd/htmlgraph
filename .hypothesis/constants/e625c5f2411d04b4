@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/skill_scout/recommender.py
-# hypothesis_version: 6.151.9
-
-['*', 'Django', 'FastAPI', 'Next.js', 'Phoenix', 'React', 'code-review', 'commit-commands', 'feature-dev', 'figma', 'frameworks', 'go', 'gopls-lsp', 'has_ci', 'has_docker', 'has_tests', 'hookify', 'htmlgraph', 'javascript', 'languages', 'pr-review-toolkit', 'pyright-lsp', 'python', 'rust', 'rust-lsp', 'sentry', 'shakestzd/htmlgraph', 'typescript-lsp', 'vercel']

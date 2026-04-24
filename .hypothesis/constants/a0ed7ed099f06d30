@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/planning/worktree.py
-# hypothesis_version: 6.151.9
-
-['--abort', '--force', '--merged', '--no-ff', '--oneline', '--porcelain', '--quiet', '--show-current', '--show-toplevel', '--verify', '-D', '-b', '-d', '-m', 'add', 'branch', 'checkout', 'detached', 'feat-', 'feature', 'git', 'log', 'main', 'merge', 'origin/main..HEAD', 'prune', 'pytest', 'remove', 'rev-parse', 'run', 'show-ref', 'status', 'task-', 'uv', 'worktree', 'worktrees']

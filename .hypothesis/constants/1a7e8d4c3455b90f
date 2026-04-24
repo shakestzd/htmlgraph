@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/__init__.py
-# hypothesis_version: 6.151.9
-
-[8080, '--active', '--blockers', '--my-work', '--output-format', '--port', '--query-status', '--query-type', '--status', '--summary', '--track', '--type', '.htmlgraph', 'ArchiveCreateCommand', 'ArchiveListCommand', 'BrowseCommand', 'ClaudeCommand', 'FeatureClaimCommand', 'FeatureCreateCommand', 'FeatureListCommand', 'FeatureStartCommand', 'IngestCodexCommand', 'IngestCopilotCommand', 'IngestCursorCommand', 'IngestGeminiCommand', 'IngestSessionCommand', 'SessionEndCommand', 'SessionListCommand', 'SessionReportCommand', 'SessionStartCommand', 'SnapshotCommand', 'TrackDeleteCommand', 'TrackListCommand', 'TrackNewCommand', 'TrackPlanCommand', 'TrackSpecCommand', 'WipResetCommand', 'WipShowCommand', 'browse', 'graph_dir', 'json', 'refs', 'register_commands', 'snapshot', 'store_true', 'text']

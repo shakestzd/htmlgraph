@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/dependency_models.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'circular', 'critical', 'deep_chain', 'healthy', 'high', 'low', 'medium', 'orphan', 'spof', 'todo', 'warning']

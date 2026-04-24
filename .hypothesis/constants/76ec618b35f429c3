@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/cross_session.py
-# hypothesis_version: 6.151.9
-
-[3600, '+00:00', '--format=%aI', '--show-toplevel', '-1', 'HEAD', 'Z', 'author_email', 'author_name', 'beginning', 'branch', 'commit_hash', 'commit_message', 'commits', 'date', 'deletions', 'event_count', 'events', 'feature_id', 'features', 'files_changed', 'git', 'hash', 'hash_short', 'insertions', 'log', 'payload', 'rev-parse', 'session_id', 'sessions', 'subject', 'timestamp', 'work_type', 'work_types', '|']

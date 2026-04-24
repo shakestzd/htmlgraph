@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repo_hash.py
-# hypothesis_version: 6.151.9
-
-['%Y-%m-%dT%H:%M:%SZ', '**/package.json', '**/pyproject.toml', '+', '--abbrev-ref', '--format=%ci', '--get', '--porcelain', '--short=7', '-1', '-C', '.', '.git', 'HEAD', 'T', 'branch', 'commit', 'config', 'dirty', 'get-url', 'git', 'last_commit_date', 'log', 'origin', 'package.json', 'pyproject.toml', 'remote', 'remote.origin.url', 'rev-parse', 'status', 'workspaces', '|']

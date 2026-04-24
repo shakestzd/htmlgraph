@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/post_tool_use_failure.py
-# hypothesis_version: 6.151.9
-
-[100, 500, '1', 'No error message', '__main__', 'a', 'continue', 'created', 'error', 'error-tracker', 'exception', 'failed', 'keys', 'message', 'name', 'occurrences', 'raw_input', 'result', 'session_id', 'spike_id', 'technical', 'timestamp', 'tool', 'tool_name', 'tool_response', 'ts', 'unknown', 'w']

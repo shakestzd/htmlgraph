@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_registry.py
-# hypothesis_version: 6.151.9
-
-[0.1, '*.json', '.index.json', '1.0', 'active', 'active_sessions', 'archive', 'created', 'instance', 'instance_id', 'last_activity', 'repo', 'session_id', 'status', 'updated_at', 'version', 'w']

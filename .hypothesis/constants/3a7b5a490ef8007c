@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/cost_analyzer.py
-# hypothesis_version: 6.151.9
-
-[0.0, 4.5e-06, 0.3, 1.0, 1.2, 2.5, 100, '.htmlgraph', 'by_subagent_type', 'by_tool_type', 'child_events', 'cost_tokens', 'delegations', 'event_id', 'htmlgraph.db', 'parent_event_id', 'session_id', 'subagent_type', 'timestamp', 'tool_count', 'tool_name', 'total_cost_tokens', 'total_cost_usd', 'total_delegations', 'unknown']

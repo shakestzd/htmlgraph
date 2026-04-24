@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/planning/__init__.py
-# hypothesis_version: 6.151.9
-
-['AcceptanceCriterion', 'ExecutionPlan', 'FileConflict', 'Phase', 'Plan', 'PlanBuilder', 'PlanTask', 'Requirement', 'Spec', 'Task', 'Track', 'Wave', 'WorktreeInfo', 'WorktreeManager']

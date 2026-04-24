@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/builders/bug.py
-# hypothesis_version: 6.151.9
-
-['BugBuilder', 'actual_behavior', 'affected_version', 'agent_assigned', 'bug', 'environment', 'expected_behavior', 'repro_steps', 'severity']

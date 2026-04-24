@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/installer.py
-# hypothesis_version: 6.151.9
-
-[493, '.backup', '.git', '.htmlgraph', 'backup_existing', 'chain_existing', 'enabled', 'enabled_hooks', 'hooks', 'hooks-config.json', 'installed', 'is_symlink', 'our_hook', 'post-checkout', 'post-commit', 'post-merge', 'pre-push', 'symlink_target', 'unknown', 'use_symlinks', 'utf-8', 'versioned', 'w']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/cache.py
-# hypothesis_version: 6.151.9
-
-[30.0, 120, 300, ':', 'activity_feed', 'avg_ms', 'count', 'default', 'events', 'hits', 'htmlgraph', 'metrics', 'orchestration', 'sessions', 'spawners', 'stats', 'total_ms']

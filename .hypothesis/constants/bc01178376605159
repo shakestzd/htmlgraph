@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/find_api.py
-# hypothesis_version: 6.151.9
-
-['.', '__', 'blocked_by', 'contains', 'endswith', 'exact', 'gt', 'gte', 'icontains', 'iendswith', 'iexact', 'in', 'iregex', 'isnull', 'istartswith', 'lt', 'lte', 'not_in', 'outgoing', 'regex', 'startswith', 'type']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/initialization.py
-# hypothesis_version: 6.151.9
-
-['# HtmlGraph', '--git-dir', '.git', '.gitignore', '.gitkeep', '.htmlgraph', 'a', 'archive-index', 'archives', 'auto_spikes', 'bugs', 'chores', 'cigs', 'claude', 'config.json', 'dashboard.html', 'default_agent', 'detect_drift', 'drift-queue.json', 'enabled', 'epics', 'errors', 'events', 'features', 'git', 'hooks', 'hooks-config.json', 'htmlgraph.db', 'index.html', 'index.sqlite', 'insights', 'logs', 'metrics', 'patterns', 'post-checkout.sh', 'post-commit.sh', 'post-merge.sh', 'pre-push.sh', 'project_name', 'rev-parse', 'sessions', 'spikes', 'task-delegations', 'todos', 'track_events', 'tracks', 'utf-8']

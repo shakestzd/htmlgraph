@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/base.py
-# hypothesis_version: 6.151.9
-
-['\n--- Traceback ---\n', '%Y%m%d-%H%M%S', 'ID', 'Priority', 'Status', '__rich__', 'blue', 'bold magenta', 'center', 'cyan', 'dim', 'green', 'json', 'left', 'model_dump', 'plain', 'refs', 'right', 'text', 'to_dict', 'w', 'white', 'yellow']

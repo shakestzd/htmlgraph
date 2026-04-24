@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/subagent_stop.py
-# hypothesis_version: 6.151.9
-
-[2000, ' (heuristic)', '1', 'HTMLGRAPH_SESSION_ID', 'SubagentStop', '__main__', 'additionalContext', 'agent_id', 'child_spike_count', 'completed', 'completion_time', 'continue', 'cwd', 'hookEventName', 'hookSpecificOutput', 'status']

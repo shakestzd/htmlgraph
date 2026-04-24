@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/base.py
-# hypothesis_version: 6.151.9
-
-['CLAUDE_AGENT_NAME', 'SDK', 'agent', 'agents', 'bugs', 'cli', 'cli-session', 'dismissed', 'features', 'htmlgraph.db', 'insights', 'metrics', 'patterns', 'show_count', 'task-delegations', 'todos']

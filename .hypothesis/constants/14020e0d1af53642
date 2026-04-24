@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/subagent_start.py
-# hypothesis_version: 6.151.9
-
-[2.0, 'agent_id', 'agent_type', 'continue', 'session_id']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/docs/template_engine.py
-# hypothesis_version: 6.151.9
-
-['%Y-%m-%d %H:%M', 'agents.md.j2', 'analytics', 'base_agents.md.j2', 'claude', 'cli', 'custom_workflows', 'docs', 'features_enabled', 'format_date', 'generated_at', 'highlight_code', 'mcp', 'platform', 'python', 'sdk_version', 'sessions', 'templates', 'tracks']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py
-# hypothesis_version: 6.151.9
-
-[1.0, 30.0, '%Y-%m-%d %H:%M:%S', '...', '.htmlgraph', '/metrics', '/static', '0', '0.00MB', '0.00s', '0.1.0', 'avg_ms', 'count', 'format_bytes', 'format_duration', 'format_number', 'format_timestamp', 'hits', 'htmlgraph.db', 'static', 'strftime', 'templates', 'total_ms', 'truncate']

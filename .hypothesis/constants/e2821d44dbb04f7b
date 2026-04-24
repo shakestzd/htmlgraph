@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/ingest/copilot.py
-# hypothesis_version: 6.151.9
-
-[200, ' | ', '*.jsonl', '+00:00', '.copilot', ': ', 'Z', 'agent.message', 'content', 'copilot', 'copilotVersion', 'data', 'done', 'id', 'name', 'newModel', 'parentId', 'session-state', 'session.error', 'session.model_change', 'session.start', 'sessionId', 'startTime', 'timestamp', 'tool.call', 'toolName', 'type', 'unknown', 'user.message', 'utf-8']

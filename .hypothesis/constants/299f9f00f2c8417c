@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/skill_scout.py
-# hypothesis_version: 6.151.9
-
-[', ', '--graph-dir', '--json', '--limit', '--marketplace', '--path', '-g', '.', '.htmlgraph', 'Description', 'Graph directory', 'Name', 'Output as JSON', 'Plugin', 'Reasons', 'Repo', 'Score', 'Search keyword', 'audit', 'category', 'cyan', 'description', 'dim', 'dismissed', 'json_output', 'limit', 'marketplace', 'none detected', 'path', 'plugin_name', 'query', 'reasons', 'recommendations', 'repo', 'right', 'score', 'skills-dismiss', 'skills-install', 'skills-search', 'store_true', 'yellow']

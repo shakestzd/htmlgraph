@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/discovery.py
-# hypothesis_version: 6.151.9
-
-['.htmlgraph', 'CLAUDE_AGENT_NAME', 'HTMLGRAPH_DIR', 'auto_discover_agent', 'cli', 'find_project_root']

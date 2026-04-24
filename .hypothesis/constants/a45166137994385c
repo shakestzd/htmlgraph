@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/config.py
-# hypothesis_version: 6.151.9
-
-[100, 1000, 3600, '.env', '.htmlgraph', 'HTMLGRAPH_', 'INFO', 'archives', 'archives_dir', 'auto_sync', 'cache_enabled', 'cache_ttl_seconds', 'case_sensitive', 'color_output', 'debug', 'env_file', 'env_prefix', 'extra', 'features', 'features_dir', 'graph_dir', 'htmlgraph.db', 'ignore', 'index.sqlite', 'log_file', 'log_level', 'max_query_results', 'max_sessions', 'sessions', 'sessions_dir', 'spikes', 'spikes_dir', 'tracks', 'tracks_dir', 'verbose']

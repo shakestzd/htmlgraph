@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/constants.py
-# hypothesis_version: 6.151.9
-
-[100, 1000, 3600, '.env', '.htmlgraph', 'CLAUDE_AGENT_NAME', 'ERROR_MESSAGES', 'HTMLGRAPH_', 'INFO', 'PRIORITIES', 'SDKSettings', 'STATUSES', 'WORK_TYPES', '_PYDANTIC_AVAILABLE', 'abandoned', 'active', 'agent_required', 'agents', 'archived', 'archives', 'bug', 'bugs', 'chore', 'chores', 'critical', 'default_settings', 'done', 'epic', 'epics', 'feature', 'features', 'high', 'htmlgraph.db', 'htmlgraph_not_found', 'ignore', 'index.sqlite', 'insight', 'insights', 'invalid_collection', 'low', 'medium', 'metric', 'metrics', 'node_not_found', 'pattern', 'patterns', 'phase', 'phases', 'session_not_found', 'sessions', 'spike', 'spikes', 'task', 'task-delegations', 'task_delegations', 'todo', 'todos', 'tracks']

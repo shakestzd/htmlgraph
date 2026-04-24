@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/transcripts.py
-# hypothesis_version: 6.151.9
-
-['Unknown', 'UserQuery', 'duration_seconds', 'entry_count', 'error', 'git_branch', 'has_thinking_traces', 'imported', 'message_content', 'skipped', 'source', 'synced_at', 'thinking', 'tool_breakdown', 'tool_calls', 'tool_input', 'tool_use', 'total_entries', 'transcript', 'transcript_id', 'transcript_not_found', 'transcript_path', 'transcript_uuid', 'user', 'user_messages']

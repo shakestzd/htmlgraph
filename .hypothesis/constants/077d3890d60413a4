@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/concurrent_sessions.py
-# hypothesis_version: 6.151.9
-
-[3600, '%Y-%m-%d %H:%M:%S', '+00:00', '...', 'No query recorded', 'No recent query', 'Unknown', 'Z', 'agent_id', 'id', 'just now', 'last_user_query', 'last_user_query_at', 'total_events', 'unknown']

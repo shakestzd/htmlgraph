@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawner_event_tracker.py
-# hypothesis_version: 6.151.9
-
-[0.0, 200, 'completed', 'cost', 'delegation_event_id', 'duration', 'error', 'event_id', 'failed', 'generic', 'orchestrator', 'output_summary', 'parent_phase_event', 'phase_count', 'phase_event_id', 'phase_events', 'phase_name', 'response', 'running', 'session_id', 'spawned_agent', 'spawner_type', 'start_time', 'status', 'success', 'tokens', 'tool', 'tool_call', 'tool_input', 'tool_name', 'total_duration']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/transcript.py
-# hypothesis_version: 6.151.9
-
-['*.jsonl', '-', '.claude', '/', 'assistant', 'clear_cache', 'content', 'get_transcript_path', 'id', 'message', 'parentUuid', 'projects', 'sessionId', 'subagents', 'tool_result', 'tool_use', 'type', 'user', 'utf-8', 'uuid']

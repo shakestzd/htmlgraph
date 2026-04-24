@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/task_enforcer.py
-# hypothesis_version: 6.151.9
-
-[200, '.save()', '0', 'HTMLGRAPH_SESSION_ID', 'PreToolUse', 'Task', 'Unnamed task', 'additionalContext', 'claude-code', 'continue', 'description', 'haiku', 'hookEventName', 'hookSpecificOutput', 'htmlgraph', 'nesting_depth', 'opus', 'prompt', 'prompt_preview', 'report results', 'save findings', 'sdk', 'sonnet', 'spike', 'subagent_type', 'track results', 'unknown', 'updatedInput']

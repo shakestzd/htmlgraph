@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/snapshot.py
-# hypothesis_version: 6.151.9
-
-[100, '=', '@', '[dim]-[/dim]', 'active', 'agent_assigned', 'all', 'assigned_to', 'blocked', 'blockers', 'bug', 'bugs', 'chore', 'chores', 'conversation', 'critical', 'cyan', 'dim', 'done', 'epic', 'epics', 'feature', 'features', 'green', 'handoff', 'high', 'id', 'in-progress', 'item_count', 'json', 'low', 'medium', 'my_work', 'output_format', 'priority', 'red', 'ref', 'refs', 'session', 'snapshot', 'spike', 'spikes', 'status', 'summary', 'title', 'todo', 'track', 'track_id', 'tracks', 'transition', 'type', 'white', 'yellow', '─', '═', '●', '✓', '✗', '⟳']

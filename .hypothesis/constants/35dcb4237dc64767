@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/graph/mixins.py
-# hypothesis_version: 6.151.9
-
-[0.0, 100, 'N/A', 'avg_query_time_ms', 'cache_enabled', 'cache_hit_rate', 'cache_hits', 'cached_queries', 'compilation_hit_rate', 'compiled_queries', 'compiled_query_hits', 'nodes_loaded', 'query_count', 'total_query_time_ms']

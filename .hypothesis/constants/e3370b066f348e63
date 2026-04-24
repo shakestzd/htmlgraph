@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/builders/track.py
-# hypothesis_version: 6.151.9
-
-[100, '%Y-%m-%d', '(', 'abandoned', 'acceptance_criteria', 'active', 'blocked', 'completed', 'context', 'critical', 'done', 'feat', 'h)', 'high', 'in-progress', 'index.html', 'low', 'medium', 'must-have', 'overview', 'plan.html', 'planned', 'requirements', 'spec.html', 'task', 'todo', 'track', 'tracks', 'utf-8', '⏳', '○', '✅']

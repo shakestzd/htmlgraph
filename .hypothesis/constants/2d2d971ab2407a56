@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/wip.py
-# hypothesis_version: 6.151.9
-
-[3600, 86400, ' ← stale?', '+00:00', '--graph-dir', '-g', '?', 'Graph directory', 'No items in progress', 'Untitled', 'WIP command', 'Z', 'age', 'bug-', 'bugs', 'created_at', 'feat-', 'feature', 'features', 'green', 'id', 'in_progress', 'item_id', 'items', 'new_status', 'previous_status', 'red', 'reset', 'show', 'spike', 'spikes', 'spk-', 'stale', 'status', 'title', 'todo', 'type', 'updated_at', 'wip', 'wip_command', 'wip_count', 'wip_limit']

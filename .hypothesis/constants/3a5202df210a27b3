@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/filter_service.py
-# hypothesis_version: 6.151.9
-
-['!=', '<', '<=', '==', '>', '>=', 'Filter', 'and', 'contains', 'ends_with', 'in', 'not', 'not_in', 'or', 'starts_with']

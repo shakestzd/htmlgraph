@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/ids.py
-# hypothesis_version: 6.151.9
-
-['.', 'agent', 'agt', 'bug', 'chore', 'chr', 'epc', 'epic', 'event', 'evt', 'feat', 'feature', 'hash', 'hierarchy', 'index must be >= 1', 'is_legacy', 'node_type', 'phase', 'phs', 'plan', 'prefix', 'sess', 'session', 'spec', 'spike', 'spk', 'track', 'trk']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawners/gemini.py
-# hypothesis_version: 6.151.9
-
-[100, 120, 500, '--output-format', '--yolo', '-m', '-p', '...', 'CLI not found', 'Running Gemini CLI', 'SDK', 'assistant', 'cmd', 'content', 'content_length', 'event_id', 'events', 'executing', 'gemini', 'gemini-default', 'gemini_completion', 'gemini_message', 'gemini_spawn_start', 'gemini_tool_call', 'gemini_tool_result', 'message', 'model', 'models', 'parameters', 'partial_stderr', 'partial_stdout', 'processing', 'prompt_length', 'response', 'result', 'role', 'spawner_complete', 'spawner_phase', 'spawner_start', 'stats', 'status', 'stdout', 'stream-json', 'subprocess.gemini', 'success', 'tokens', 'tool_id', 'tool_name', 'tool_result', 'tool_use', 'total', 'type', 'unknown', 'unknown_tool']
