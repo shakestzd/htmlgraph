@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
 
 // effectiveProjectDir resolves the project dir for OTel port derivation.
@@ -42,7 +40,10 @@ func effectiveProjectDir(explicit string) string {
 // htmlgraphProjectDir is the empty string when no override is needed
 // (not in a worktree). Pass it explicitly rather than deriving it from
 // opts so the helper stays easy to unit-test.
-func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
+//
+// overrides supplies optional per-session collector port and session ID.
+// Pass nil or a zero-value struct to use defaults.
+func buildClaudeLaunchEnv(htmlgraphProjectDir string, overrides *otelEnvOverrides) []string {
 	env := os.Environ()
 
 	// Resolve an effective projectDir for OTel port derivation.
@@ -52,16 +53,28 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 		env = setOrReplaceEnv(env, "HTMLGRAPH_PROJECT_DIR", projectDir)
 	}
 
+	// Inject session ID when provided by the collector spawn path.
+	if overrides != nil && overrides.SessionID != "" {
+		env = setOrReplaceEnv(env, "HTMLGRAPH_SESSION_ID", overrides.SessionID)
+	}
+
 	// OTel injection is default-on. Opt out by setting HTMLGRAPH_OTEL_ENABLED=0
 	// (or false/no/off). An unset or empty value means "on".
 	if isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
 		return env
 	}
 
-	// Pass the resolved project dir so both launcher and serve-child derive the same
-	// per-project port. This ensures the OTLP endpoint points to the same hash-based
-	// port the serve-child is listening on.
-	endpoint := otelEndpointFromEnv(projectDir)
+	// When a per-session collector is running, point the exporter at its
+	// ephemeral port. Without a collector, the embedded receiver has been
+	// removed from serve — skip OTel endpoint injection entirely so
+	// telemetry isn't sent to a dead port.
+	var endpoint string
+	if overrides != nil && overrides.CollectorPort > 0 {
+		endpoint = "http://127.0.0.1:" + strconv.Itoa(overrides.CollectorPort)
+	} else {
+		return env // no collector, no embedded receiver — skip OTel injection
+	}
+
 	// User-set values always win — only add our default if missing.
 	env = addIfUnset(env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 	env = addIfUnset(env, "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "1")
@@ -83,29 +96,6 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string) []string {
 	probeReceiverReachability(endpoint)
 
 	return env
-}
-
-// otelEndpointFromEnv derives the OTLP HTTP endpoint to point Claude at,
-// honoring the same HTMLGRAPH_OTEL_BIND and HTMLGRAPH_OTEL_HTTP_PORT vars
-// that the receiver's LoadConfigFromEnv reads. Keeps launcher and receiver
-// symmetric without needing to duplicate the defaults.
-//
-// projectDir is passed through to LoadConfigFromEnv so the port derived
-// from the project directory hash matches the port the serve-child binds.
-func otelEndpointFromEnv(projectDir string) string {
-	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
-	host := cfg.BindHost
-	if host == "" || host == "0.0.0.0" {
-		// "Listen on all interfaces" maps to "export to loopback" for the
-		// outbound direction — a child on the same host should never send
-		// to 0.0.0.0.
-		host = "127.0.0.1"
-	}
-	port := cfg.HTTPPort
-	if port == 0 {
-		port = 4318
-	}
-	return "http://" + host + ":" + strconv.Itoa(port)
 }
 
 // addIfUnset appends key=value to env only when key is not already set

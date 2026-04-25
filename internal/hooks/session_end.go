@@ -4,6 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
@@ -92,6 +97,13 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 		}
 	}
 
+	// Signal the per-session OTel collector to drain and exit (Q3 primary layer)
+	// BEFORE materializing — the indexer needs the final signals in SQLite first.
+	signalCollector(projectDir, sessionID)
+
+	// Wait briefly for the indexer to catch up with the final NDJSON writes.
+	waitForIndexerCatchUp(projectDir, sessionID)
+
 	// Materialize OTel rollup (no-op if no signals received for this session).
 	// Non-fatal: errors are logged but do not block SessionEnd completion.
 	if err := materialize.Materialize(database, projectDir, sessionID); err != nil {
@@ -99,6 +111,80 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 	}
 
 	return &HookResult{Continue: true}, nil
+}
+
+// waitForIndexerCatchUp polls until .index-offset reaches events.ndjson size,
+// or 2s elapses. Best-effort — if the indexer is behind, materialize will
+// use whatever signals have been indexed so far.
+func waitForIndexerCatchUp(projectDir, sessionID string) {
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID)
+	ndjsonPath := filepath.Join(sessDir, "events.ndjson")
+	offsetPath := filepath.Join(sessDir, ".index-offset")
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		info, err := os.Stat(ndjsonPath)
+		if err != nil {
+			return
+		}
+		data, err := os.ReadFile(offsetPath)
+		if err == nil {
+			if off, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64); err == nil && off >= info.Size() {
+				return
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// signalCollector reads the .collector-pid file for this session, sends SIGTERM,
+// waits up to 3 seconds for a clean drain, then falls back to SIGKILL.
+// All errors are silently logged — the collector PID file is best-effort.
+func signalCollector(projectDir, sessionID string) {
+	pidPath := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID, ".collector-pid")
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		// No PID file — collector was never spawned or already cleaned up.
+		return
+	}
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil || pid <= 0 {
+		debugLog(projectDir, "[session-end] collector-pid: invalid pid %q for session %s", pidStr, sessionID[:minLen(sessionID, 8)])
+		return
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		// Process not found (already exited).
+		return
+	}
+
+	// Send SIGTERM to request graceful drain.
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		// ESRCH means process already gone — clean up PID file to prevent
+		// stale PID reuse on later end/resume paths.
+		_ = os.Remove(pidPath)
+		return
+	}
+	debugLog(projectDir, "[session-end] sent SIGTERM to collector pid=%d (session=%s)", pid, sessionID[:minLen(sessionID, 8)])
+
+	// Poll for up to 3s using kill(pid, 0) — we can't Wait() on a non-child.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := proc.Signal(syscall.Signal(0)); err != nil {
+			break // process exited
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	// If still alive after 3s, escalate to SIGKILL.
+	if err := proc.Signal(syscall.Signal(0)); err == nil {
+		debugLog(projectDir, "[session-end] collector drain timeout — sending SIGKILL pid=%d", pid)
+		_ = proc.Signal(syscall.SIGKILL)
+	}
+
+	// Remove the PID file so future SessionEnd calls don't attempt to re-signal.
+	_ = os.Remove(pidPath)
 }
 
 // SessionResume handles the SessionResume Claude Code hook event.
