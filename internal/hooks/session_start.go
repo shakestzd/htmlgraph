@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/internal/otel"
+	"github.com/shakestzd/htmlgraph/internal/otel/sink/ndjson"
 	"github.com/shakestzd/htmlgraph/internal/paths"
 	"github.com/shakestzd/htmlgraph/internal/worktree"
 )
@@ -154,6 +157,10 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 
 	// Propagate session ID to downstream hooks while git is running.
 	writeEnvVars(sessionID, projectDir)
+
+	// Emit the Rosetta correlation event: maps launcher-minted HTMLGRAPH_SESSION_ID
+	// to Claude Code's own session_id so the dashboard can follow --resume flows.
+	emitRosettaEvent(projectDir, os.Getenv("HTMLGRAPH_SESSION_ID"), event.SessionID)
 
 	// Wait for git result — upsertSession needs the commit hash.
 	startCommit := <-commitCh
@@ -512,6 +519,49 @@ func buildSessionStartAttribution(database *sql.DB) string {
 	lines = append(lines, "", compactCLIRef)
 
 	return joinLines(lines)
+}
+
+// emitRosettaEvent writes a session_start NDJSON line correlating the
+// launcher-minted HTMLGRAPH_SESSION_ID with Claude Code's own session_id.
+// This is the "Rosetta stone" record that lets the dashboard map a
+// `claude --resume <id>` back to the originating htmlgraph session.
+//
+// The event is written only when HTMLGRAPH_SESSION_ID is set (i.e. the
+// session was started via `htmlgraph claude`). If it is unset, or if the
+// session directory cannot be created, the function returns silently.
+func emitRosettaEvent(projectDir, htmlgraphSID, claudeSessionID string) {
+	if htmlgraphSID == "" {
+		return // not a launcher-managed session; skip silently
+	}
+
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions", htmlgraphSID)
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		debugLog(projectDir, "[session-start] rosetta: mkdir session dir: %v", err)
+		return
+	}
+
+	snk, err := ndjson.New(projectDir, htmlgraphSID)
+	if err != nil {
+		debugLog(projectDir, "[session-start] rosetta: create ndjson sink: %v", err)
+		return
+	}
+
+	sig := otel.UnifiedSignal{
+		Harness:       "htmlgraph",
+		SignalID:      "session-start-" + htmlgraphSID,
+		Kind:          otel.Kind("session_start"),
+		CanonicalName: otel.CanonicalSessionStart,
+		NativeName:    "session_start",
+		Timestamp:     time.Now().UTC(),
+		SessionID:     htmlgraphSID,
+		RawAttrs: map[string]any{
+			"htmlgraph_sid":    htmlgraphSID,
+			"claude_session_id": claudeSessionID,
+		},
+	}
+	if err := snk.WriteBatch(context.Background(), "htmlgraph", nil, []otel.UnifiedSignal{sig}); err != nil {
+		debugLog(projectDir, "[session-start] rosetta: write event: %v", err)
+	}
 }
 
 // ensure db package is referenced (used via db.nullStr in other files).

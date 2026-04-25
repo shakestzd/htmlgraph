@@ -199,22 +199,27 @@ func EnvSessionID(eventSessionID string) string {
 }
 
 // resolveSessionIDWithHarness resolves the session ID using harness-aware logic.
-// For non-Claude harnesses (Codex, Gemini), it prefers the CloudEvent.SessionID
-// from the payload and avoids env var fallback, since those can leak from a
-// parent Claude orchestrator shell. For Claude, it uses the standard fallback
-// chain (event, env, file).
+// All harnesses prefer the CloudEvent.SessionID from the payload and avoid env
+// var fallback when the payload carries a session_id. This prevents
+// HTMLGRAPH_SESSION_ID leaking from a parent Claude orchestrator shell into
+// Task-spawned subagent hook invocations (bug fixed for Claude here; Codex and
+// Gemini already had this protection).
 func resolveSessionIDWithHarness(event *CloudEvent) string {
-	// For Codex/Gemini, always trust the payload's session_id and don't
-	// fall back to env vars which may have leaked from parent Claude shell.
+	// For all harnesses: if the payload carries a session_id, trust it and
+	// don't fall back to env vars which may have leaked from parent Claude shell.
+	if sid := agent.NormaliseSessionID(event.SessionID); sid != "" {
+		return sid
+	}
+
+	// Payload session_id is absent — only allowed for CLI commands that call
+	// SessionStart without a real CloudEvent (no hook invocation).
+	// Codex/Gemini subagents never reach here (their payloads always carry
+	// session_id); Claude CLI commands may.
 	if event.AgentID == "codex" || event.AgentID == "gemini" {
-		if sid := agent.NormaliseSessionID(event.SessionID); sid != "" {
-			return sid
-		}
-		// If the harness-specific session_id is missing (unusual), still try env
-		// but only as last resort — this avoids using stale parent env.
+		// Harness-specific session_id is missing (unusual); don't leak env.
 		return ""
 	}
 
-	// Claude: use standard fallback chain (event → env → file).
-	return EnvSessionID(event.SessionID)
+	// Claude only: fall back to env → file for CLI commands without a payload.
+	return EnvSessionID("")
 }
