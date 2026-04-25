@@ -42,30 +42,25 @@ type Config struct {
 // Config with sensible defaults. Calling with no env set yields an
 // enabled receiver (default-on). Set HTMLGRAPH_OTEL_ENABLED=0 to opt out.
 //
-// projectDir is used to derive a deterministic per-project OTLP port
-// (range 4318..5317). Pass "" to use the base port 4318.
-// HTMLGRAPH_PROJECT_DIR is checked as a fallback when projectDir is "".
+// projectDir is ignored — it was previously used to derive a
+// per-project port hash, but per-session collectors now handle OTLP
+// ingest with ephemeral ports. The parameter is kept for API
+// compatibility; pass "" or any value.
 //
 // Recognized vars:
-//   HTMLGRAPH_OTEL_ENABLED    (0/false/no/off to disable; default on)
-//   HTMLGRAPH_OTEL_BIND       (default 127.0.0.1)
-//   HTMLGRAPH_OTEL_HTTP_PORT  (explicit override; wins over project hash)
+//
+//	HTMLGRAPH_OTEL_ENABLED    (0/false/no/off to disable; default on)
+//	HTMLGRAPH_OTEL_BIND       (default 127.0.0.1)
+//	HTMLGRAPH_OTEL_HTTP_PORT  (explicit override; default 4318)
 func LoadConfigFromEnv(dbPath string, projectDir string) Config {
 	raw := os.Getenv("HTMLGRAPH_OTEL_ENABLED")
 	enabled := !isExplicitlyDisabled(raw)
 
 	// Determine the OTLP HTTP port. Explicit env var always wins; otherwise
-	// derive from the project directory for per-project isolation.
-	var httpPort int
-	if portStr := os.Getenv("HTMLGRAPH_OTEL_HTTP_PORT"); portStr != "" {
-		httpPort = parseIntDefault(portStr, 4318)
-	} else {
-		dir := projectDir
-		if dir == "" {
-			dir = os.Getenv("HTMLGRAPH_PROJECT_DIR")
-		}
-		httpPort = PortForProject(dir)
-	}
+	// fall back to the OTel default (4318). The project-hashed port
+	// derivation has been removed — per-session collectors use ephemeral
+	// ports and the serve process no longer embeds a receiver.
+	httpPort := parseIntDefault(os.Getenv("HTMLGRAPH_OTEL_HTTP_PORT"), 4318)
 
 	c := Config{
 		Enabled:  enabled,

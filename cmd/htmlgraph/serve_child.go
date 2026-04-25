@@ -112,31 +112,6 @@ func runServeChild(port int) error {
 		startAITitleBackfill(context.Background(), database, htmlgraphDir)
 	})
 
-	// Embedded OTLP receiver (default-on). Opt out with HTMLGRAPH_OTEL_ENABLED=0.
-	// Port is derived deterministically from the project dir so each project
-	// child binds a distinct port (range 4318..5317). Explicit
-	// HTMLGRAPH_OTEL_HTTP_PORT wins over the hash-derived port.
-	// Failures here are logged and non-fatal — the dashboard must stay up
-	// even if the receiver can't bind.
-	projectDir := filepath.Dir(htmlgraphDir)
-	otelCfg := otelreceiver.LoadConfigFromEnv(dbPath, projectDir)
-	if otelCfg.Enabled {
-		w, err := otelreceiver.NewWriter(dbPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "otel writer init: %v\n", err)
-		} else {
-			rec, err := otelreceiver.New(otelCfg, sqls.New(w))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "otel receiver init: %v\n", err)
-			} else if err := rec.Start(context.Background()); err != nil {
-				fmt.Fprintf(os.Stderr, "otel receiver start: %v\n", err)
-			} else {
-				portFile := filepath.Join(htmlgraphDir, ".otlp-port")
-				_ = os.WriteFile(portFile, []byte(fmt.Sprintf("%d\n", otelCfg.HTTPPort)), 0o644)
-			}
-		}
-	}
-
 	return (&http.Server{Handler: mux}).Serve(ln)
 }
 

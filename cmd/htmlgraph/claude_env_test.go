@@ -2,11 +2,8 @@ package main
 
 import (
 	"os"
-	"strconv"
 	"strings"
 	"testing"
-
-	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
 
 // assertEnvContains asserts the env slice contains "key=want". Returns the
@@ -68,11 +65,9 @@ func TestBuildClaudeLaunchEnv_DefaultOn(t *testing.T) {
 	env := buildClaudeLaunchEnv("", nil)
 	assertEnvContains(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 	assertEnvContains(t, env, "OTEL_TRACES_EXPORTER", "otlp")
-	// The endpoint should be derived from cwd (since no explicit projectDir or env vars are set).
-	// Verify it's set and contains the port for the current working directory.
-	expectedPort := otelreceiver.PortForProject(effectiveProjectDir(""))
-	expectedEndpoint := "http://127.0.0.1:" + strconv.Itoa(expectedPort)
-	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", expectedEndpoint)
+	// The endpoint defaults to 4318 — per-session collectors handle OTLP ingest
+	// with ephemeral ports; the fallback endpoint is the OTel default.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 }
 
 // clearOtelEnv clears all OTel-related environment variables for test isolation.
@@ -137,32 +132,29 @@ func TestBuildClaudeLaunchEnv_InjectsWhenEnabled(t *testing.T) {
 	assertEnvContains(t, env, "OTEL_LOGS_EXPORTER", "otlp")
 	assertEnvContains(t, env, "OTEL_TRACES_EXPORTER", "otlp")
 	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-	// Endpoint is derived from cwd fallback (since no explicit projectDir or env vars are set).
-	expectedPort := otelreceiver.PortForProject(effectiveProjectDir(""))
-	expectedEndpoint := "http://127.0.0.1:" + strconv.Itoa(expectedPort)
-	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", expectedEndpoint)
+	// Fallback endpoint uses the OTel default port 4318.
+	// Per-session collectors use ephemeral ports; this is only the fallback.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 	assertEnvContains(t, env, "OTEL_LOG_TOOL_DETAILS", "1")
 }
 
 func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
 	// The launcher respects user overrides for OTEL_METRICS_EXPORTER and
 	// OTEL_LOG_TOOL_DETAILS via addIfUnset. However, OTEL_EXPORTER_OTLP_ENDPOINT
-	// is NOT user-overrideable — it's always set by the launcher to match the
-	// receiver's per-project port. Users who need a custom receiver should
-	// steer via HTMLGRAPH_OTEL_HTTP_PORT / HTMLGRAPH_OTEL_BIND.
+	// is NOT user-overrideable — it's always set by the launcher. Users who need
+	// a custom receiver should steer via HTMLGRAPH_OTEL_HTTP_PORT / HTMLGRAPH_OTEL_BIND.
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://custom.example.com:4318")
 	t.Setenv("OTEL_METRICS_EXPORTER", "console")
 	t.Setenv("OTEL_LOG_TOOL_DETAILS", "0")
 
 	env := buildClaudeLaunchEnv("", nil)
 
-	// OTEL_EXPORTER_OTLP_ENDPOINT is overridden by the launcher — derived from cwd fallback.
-	expectedPort := otelreceiver.PortForProject(effectiveProjectDir(""))
-	expectedEndpoint := "http://127.0.0.1:" + strconv.Itoa(expectedPort)
-	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", expectedEndpoint)
+	// OTEL_EXPORTER_OTLP_ENDPOINT is overridden by the launcher — falls back to 4318.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 	// But other OTEL_* vars respect user overrides.
 	assertEnvContains(t, env, "OTEL_METRICS_EXPORTER", "console")
 	assertEnvContains(t, env, "OTEL_LOG_TOOL_DETAILS", "0")
@@ -224,25 +216,24 @@ func TestIsExplicitlyDisabled(t *testing.T) {
 
 func TestBuildClaudeLaunchEnv_OverridesStaleOTELEndpoint(t *testing.T) {
 	// When the parent env has OTEL_EXPORTER_OTLP_ENDPOINT from a prior
-	// session (with a different port), the launcher's computed endpoint
-	// should override it. This ensures spans aren't silently dropped.
+	// session with a stale port, the launcher's computed endpoint should
+	// override it. This ensures spans aren't silently dropped.
 	clearOtelEnv(t)
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
-	// Simulate a stale port from a prior session with a different hash.
+	// Simulate a stale port from a prior session.
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9999")
 
 	env := buildClaudeLaunchEnv("", nil)
-	// The computed endpoint should override the inherited 9999. It's derived from cwd fallback.
-	expectedPort := otelreceiver.PortForProject(effectiveProjectDir(""))
-	expectedEndpoint := "http://127.0.0.1:" + strconv.Itoa(expectedPort)
-	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", expectedEndpoint)
+	// The computed endpoint should override the inherited 9999.
+	// Fallback is 4318 (the OTel default).
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 }
 
 func TestBuildClaudeLaunchEnv_ResolvesFromCLAUDEProjectDir(t *testing.T) {
 	// When htmlgraphProjectDir arg is empty (non-worktree case), the launcher
 	// should resolve the effective projectDir from CLAUDE_PROJECT_DIR env var
-	// and derive the OTLP port hash from it, not the base port 4318.
-	// This is the key regression test for bug-e5c2df6d.
+	// and inject HTMLGRAPH_PROJECT_DIR. The OTLP endpoint is always the OTel
+	// default 4318 (per-session collectors use ephemeral ports).
 	clearOtelEnv(t)
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	t.Setenv("CLAUDE_PROJECT_DIR", "/workspaces/htmlgraph")
@@ -252,31 +243,13 @@ func TestBuildClaudeLaunchEnv_ResolvesFromCLAUDEProjectDir(t *testing.T) {
 	// HTMLGRAPH_PROJECT_DIR should be set to the resolved projectDir.
 	assertEnvContains(t, env, "HTMLGRAPH_PROJECT_DIR", "/workspaces/htmlgraph")
 
-	// OTLP endpoint should use the hashed port, not the base port 4318.
-	// We verify it's NOT 4318 (the bug symptom) and matches what the receiver
-	// would compute for the same path.
-	prefix := "OTEL_EXPORTER_OTLP_ENDPOINT="
-	for _, kv := range env {
-		if strings.HasPrefix(kv, prefix) {
-			got := strings.TrimPrefix(kv, prefix)
-			// The endpoint must not be the base port — that's the bug symptom.
-			if got == "http://127.0.0.1:4318" {
-				t.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT = %q; bug-e5c2df6d: should use hashed port, not base 4318", got)
-			}
-			// Verify it contains the hashed port from the same projectDir.
-			expectedPort := otelreceiver.PortForProject("/workspaces/htmlgraph")
-			expectedEndpoint := "http://127.0.0.1:" + strconv.Itoa(expectedPort)
-			if got != expectedEndpoint {
-				t.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT = %q, want %q", got, expectedEndpoint)
-			}
-			return
-		}
-	}
-	t.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT not set")
+	// OTLP endpoint defaults to 4318 — per-session collectors use ephemeral ports.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 }
 
 func TestBuildClaudeLaunchEnv_ResolvesFromHTMLGRAPHProjectDirEnv(t *testing.T) {
 	// Test the second priority in the resolution chain: HTMLGRAPH_PROJECT_DIR env var.
+	// The endpoint is always 4318 (no per-project hash).
 	clearOtelEnv(t)
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	t.Setenv("CLAUDE_PROJECT_DIR", "") // empty first priority
@@ -284,17 +257,8 @@ func TestBuildClaudeLaunchEnv_ResolvesFromHTMLGRAPHProjectDirEnv(t *testing.T) {
 
 	env := buildClaudeLaunchEnv("", nil)
 
-	// Should resolve from HTMLGRAPH_PROJECT_DIR and derive the hashed port.
-	prefix := "OTEL_EXPORTER_OTLP_ENDPOINT="
-	for _, kv := range env {
-		if strings.HasPrefix(kv, prefix) {
-			got := strings.TrimPrefix(kv, prefix)
-			if got == "http://127.0.0.1:4318" {
-				t.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT = %q; should use hashed port from HTMLGRAPH_PROJECT_DIR env", got)
-			}
-			return
-		}
-	}
+	// Should resolve from HTMLGRAPH_PROJECT_DIR env var and use default port 4318.
+	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
 }
 
 func TestEffectiveProjectDir(t *testing.T) {
