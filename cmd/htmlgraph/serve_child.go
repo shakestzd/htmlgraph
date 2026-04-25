@@ -12,6 +12,7 @@ import (
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/otel/indexer"
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
+	"github.com/shakestzd/htmlgraph/internal/otel/retention"
 	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 	"github.com/shakestzd/htmlgraph/internal/registry"
 	"github.com/spf13/cobra"
@@ -111,6 +112,10 @@ func runServeChild(port int) error {
 	go autoIngestLoop(database, htmlgraphDir, func() {
 		startAITitleBackfill(context.Background(), database, htmlgraphDir)
 	})
+
+	// Retention job: archive sessions older than HTMLGRAPH_SESSION_RETAIN_DAYS
+	// (default 30) at startup and every 24h. Dry-run via HTMLGRAPH_RETENTION_DRYRUN=1.
+	retention.StartLoop(context.Background(), database, htmlgraphDir)
 
 	return (&http.Server{Handler: mux}).Serve(ln)
 }

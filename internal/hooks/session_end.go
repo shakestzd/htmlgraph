@@ -4,6 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
@@ -98,7 +103,63 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 		debugLog(projectDir, "[error] handler=session-end session=%s: materialize otel: %v", sessionID[:minLen(sessionID, 8)], err)
 	}
 
+	// Signal the per-session OTel collector to drain and exit (Q3 primary layer).
+	// The launcher's deferred SIGTERM is the secondary fallback. Non-fatal.
+	signalCollector(projectDir, sessionID)
+
 	return &HookResult{Continue: true}, nil
+}
+
+// signalCollector reads the .collector-pid file for this session, sends SIGTERM,
+// waits up to 3 seconds for a clean drain, then falls back to SIGKILL.
+// All errors are silently logged — the collector PID file is best-effort.
+func signalCollector(projectDir, sessionID string) {
+	pidPath := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID, ".collector-pid")
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		// No PID file — collector was never spawned or already cleaned up.
+		return
+	}
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil || pid <= 0 {
+		debugLog(projectDir, "[session-end] collector-pid: invalid pid %q for session %s", pidStr, sessionID[:minLen(sessionID, 8)])
+		return
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		// Process not found (already exited).
+		return
+	}
+
+	// Send SIGTERM to request graceful drain.
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		// ESRCH means process already gone — not an error.
+		return
+	}
+	debugLog(projectDir, "[session-end] sent SIGTERM to collector pid=%d (session=%s)", pid, sessionID[:minLen(sessionID, 8)])
+
+	// Wait up to 3s for clean exit.
+	done := make(chan error, 1)
+	go func() {
+		_, err := proc.Wait()
+		done <- err
+	}()
+
+	select {
+	case <-done:
+		// Collector exited cleanly.
+	case <-time.After(3 * time.Second):
+		// Drain timeout — escalate to SIGKILL.
+		debugLog(projectDir, "[session-end] collector drain timeout — sending SIGKILL pid=%d", pid)
+		_ = proc.Signal(syscall.SIGKILL)
+		// Reap the zombie after kill.
+		go func() { _, _ = proc.Wait() }()
+	}
+
+	// Remove the PID file so future SessionEnd calls don't attempt to re-signal.
+	_ = os.Remove(pidPath)
 }
 
 // SessionResume handles the SessionResume Claude Code hook event.
