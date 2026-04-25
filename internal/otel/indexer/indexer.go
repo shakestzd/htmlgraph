@@ -173,33 +173,35 @@ func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]otel.Unif
 
 	var signals []otel.UnifiedSignal
 	scanner := bufio.NewScanner(f)
-	currentOffset := offset
+	committedOffset := offset
 
 	for scanner.Scan() {
 		lineBytes := scanner.Bytes()
-		// Advance offset by line length + newline byte.
-		currentOffset += int64(len(lineBytes)) + 1
+		lineLen := int64(len(lineBytes)) + 1 // +1 for newline
 
 		if len(lineBytes) == 0 {
+			committedOffset += lineLen
 			continue
 		}
 
 		sig, err := parseLine(lineBytes)
 		if err != nil {
 			log.Printf("indexer: skip malformed line in %s at offset ~%d: %v",
-				ndjsonPath, currentOffset, err)
+				ndjsonPath, committedOffset+lineLen, err)
+			committedOffset += lineLen
 			continue
 		}
 		if sig == nil {
-			// Skipped kind (collector_start, unknown).
+			committedOffset += lineLen
 			continue
 		}
 		signals = append(signals, *sig)
+		committedOffset += lineLen
 	}
 	if err := scanner.Err(); err != nil {
-		return signals, currentOffset, err
+		return signals, committedOffset, err
 	}
-	return signals, currentOffset, nil
+	return signals, committedOffset, nil
 }
 
 // updateSize records the current file size without touching LastIndexedAt.

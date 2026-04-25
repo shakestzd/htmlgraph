@@ -85,10 +85,17 @@ func readCollectorHandshake(scanner *bufio.Scanner) (int, error) {
 	}
 }
 
+// otelEnvOverrides holds optional overrides for OTel env vars set by
+// the launcher. Zero-value fields mean "use the default derivation".
+type otelEnvOverrides struct {
+	CollectorPort int
+	SessionID     string
+	Cleanup       func() // called on launcher exit to SIGTERM the collector
+}
+
 // spawnSessionCollector generates a session ID, spawns a per-session
-// collector, writes the PID file, and registers a deferred cleanup.
-// Returns overrides for buildClaudeLaunchEnv. On failure, logs a warning
-// and returns zero-value overrides (fallback to serve-based receiver).
+// collector, writes the PID file, and returns a cleanup function.
+// On failure, logs a warning and returns zero-value overrides.
 func spawnSessionCollector(projectDir string) otelEnvOverrides {
 	sessionID := generateOtelSessionID()
 
@@ -105,58 +112,30 @@ func spawnSessionCollector(projectDir string) otelEnvOverrides {
 	}
 
 	writeCollectorPID(projectDir, sessionID, proc.Pid)
-
-	// Register cleanup: on launcher exit, SIGTERM the collector and wait
-	// briefly for it to drain. If it doesn't exit in 3s, force kill.
-	registerCollectorCleanup(proc)
+	cleanup := registerCollectorCleanup(proc)
 
 	return otelEnvOverrides{
 		CollectorPort: port,
 		SessionID:     sessionID,
+		Cleanup:       cleanup,
 	}
 }
 
-// registerCollectorCleanup arranges for the collector process to be
-// cleanly shut down when the launcher exits. Uses a goroutine that
-// blocks on a channel closed by the caller's deferred function.
-//
-// NOTE: This uses a runtime finalizer-like pattern. The actual defer
-// is registered in launchClaude via the returned otelEnvOverrides.
-// For safety, we also register an atexit-style cleanup here. The
-// cleanup is idempotent: SIGTERM on an already-exited process is a
-// harmless no-op.
-func registerCollectorCleanup(proc *os.Process) {
-	// Spawn a goroutine that will reap the child if it exits on its own
-	// (idle timeout). This prevents zombie accumulation.
+// registerCollectorCleanup spawns a reaper goroutine for the collector
+// child so it doesn't become a zombie if it exits on its own (idle
+// timeout). Returns a cleanup function that sends SIGTERM and waits.
+func registerCollectorCleanup(proc *os.Process) func() {
 	go func() { _, _ = proc.Wait() }()
 
-	// The actual SIGTERM is sent from launchClaude's flow — see the
-	// deferred block inserted after spawnSessionCollector returns.
-	// We store the process for the deferred cleanup registered by
-	// the caller.
-	collectorProcess = proc
-}
-
-// collectorProcess holds the spawned collector for deferred cleanup.
-// Set by registerCollectorCleanup, consumed by cleanupCollector.
-var collectorProcess *os.Process
-
-// cleanupCollector sends SIGTERM to the collector and waits up to 3s
-// for a clean exit. Called as a deferred function from launchClaude.
-func cleanupCollector() {
-	proc := collectorProcess
-	if proc == nil {
-		return
-	}
-	_ = proc.Signal(syscall.SIGTERM)
-	done := make(chan struct{})
-	go func() {
-		_, _ = proc.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
+	return func() {
+		_ = proc.Signal(syscall.SIGTERM)
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) {
+			if err := proc.Signal(syscall.Signal(0)); err != nil {
+				return // process exited
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
 		_ = proc.Kill()
 	}
 }

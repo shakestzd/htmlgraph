@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
 
 // effectiveProjectDir resolves the project dir for OTel port derivation.
@@ -26,18 +24,6 @@ func effectiveProjectDir(explicit string) string {
 		return cwd
 	}
 	return ""
-}
-
-// otelEnvOverrides holds optional overrides for OTel env vars set by
-// the launcher. Zero-value fields mean "use the default derivation".
-type otelEnvOverrides struct {
-	// CollectorPort, when > 0, overrides the OTLP endpoint port with the
-	// per-session collector's ephemeral port instead of the serve-derived
-	// hash-based port.
-	CollectorPort int
-	// SessionID, when non-empty, is injected as HTMLGRAPH_SESSION_ID so
-	// hooks and downstream tooling can correlate spans to this session.
-	SessionID string
 }
 
 // buildClaudeLaunchEnv returns the environment vector for a spawned
@@ -79,12 +65,14 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string, overrides *otelEnvOverride
 	}
 
 	// When a per-session collector is running, point the exporter at its
-	// ephemeral port. Otherwise, fall through to the serve-derived port.
+	// ephemeral port. Without a collector, the embedded receiver has been
+	// removed from serve — skip OTel endpoint injection entirely so
+	// telemetry isn't sent to a dead port.
 	var endpoint string
 	if overrides != nil && overrides.CollectorPort > 0 {
 		endpoint = "http://127.0.0.1:" + strconv.Itoa(overrides.CollectorPort)
 	} else {
-		endpoint = otelEndpointFromEnv(projectDir)
+		return env // no collector, no embedded receiver — skip OTel injection
 	}
 
 	// User-set values always win — only add our default if missing.
@@ -108,29 +96,6 @@ func buildClaudeLaunchEnv(htmlgraphProjectDir string, overrides *otelEnvOverride
 	probeReceiverReachability(endpoint)
 
 	return env
-}
-
-// otelEndpointFromEnv derives the OTLP HTTP endpoint to point Claude at,
-// honoring the same HTMLGRAPH_OTEL_BIND and HTMLGRAPH_OTEL_HTTP_PORT vars
-// that the receiver's LoadConfigFromEnv reads. Keeps launcher and receiver
-// symmetric without needing to duplicate the defaults.
-//
-// projectDir is passed through to LoadConfigFromEnv so the port derived
-// from the project directory hash matches the port the serve-child binds.
-func otelEndpointFromEnv(projectDir string) string {
-	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
-	host := cfg.BindHost
-	if host == "" || host == "0.0.0.0" {
-		// "Listen on all interfaces" maps to "export to loopback" for the
-		// outbound direction — a child on the same host should never send
-		// to 0.0.0.0.
-		host = "127.0.0.1"
-	}
-	port := cfg.HTTPPort
-	if port == 0 {
-		port = 4318
-	}
-	return "http://" + host + ":" + strconv.Itoa(port)
 }
 
 // addIfUnset appends key=value to env only when key is not already set

@@ -46,7 +46,7 @@ func New(projectDir, sessionID string) (*Sink, error) {
 // An exclusive flock is held for the duration of the write so concurrent
 // processes (e.g. a collector child and the indexer) don't interleave lines.
 // Empty batches are a no-op.
-func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, _ map[string]any, signals []otel.UnifiedSignal) error {
+func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, resourceAttrs map[string]any, signals []otel.UnifiedSignal) error {
 	if len(signals) == 0 {
 		return nil
 	}
@@ -66,7 +66,7 @@ func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, _ map[string]
 	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck
 
 	for i := range signals {
-		line, err := marshalLine(harness, &signals[i])
+		line, err := marshalLine(harness, resourceAttrs, &signals[i])
 		if err != nil {
 			return fmt.Errorf("ndjson marshal signal %s: %w", signals[i].SignalID, err)
 		}
@@ -102,44 +102,68 @@ type signalLine struct {
 	SpanID     string `json:"span_id,omitempty"`
 	ParentSpan string `json:"parent_span,omitempty"`
 
-	ToolName string `json:"tool_name,omitempty"`
-	Model    string `json:"model,omitempty"`
+	ToolName       string `json:"tool_name,omitempty"`
+	ToolUseID      string `json:"tool_use_id,omitempty"`
+	Model          string `json:"model,omitempty"`
+	Decision       string `json:"decision,omitempty"`
+	DecisionSource string `json:"decision_source,omitempty"`
 
-	TokensInput  int64 `json:"tokens_input,omitempty"`
-	TokensOutput int64 `json:"tokens_output,omitempty"`
+	TokensInput         int64 `json:"tokens_input,omitempty"`
+	TokensOutput        int64 `json:"tokens_output,omitempty"`
+	TokensCacheRead     int64 `json:"tokens_cache_read,omitempty"`
+	TokensCacheCreation int64 `json:"tokens_cache_creation,omitempty"`
+	TokensThought       int64 `json:"tokens_thought,omitempty"`
+	TokensTool          int64 `json:"tokens_tool,omitempty"`
+	TokensReasoning     int64 `json:"tokens_reasoning,omitempty"`
 
-	CostUSD float64 `json:"cost_usd,omitempty"`
+	CostUSD    float64 `json:"cost_usd,omitempty"`
+	CostSource string  `json:"cost_source,omitempty"`
 
 	DurationMs int64   `json:"duration_ms,omitempty"`
 	Success    *bool   `json:"success,omitempty"`
 	ErrorMsg   string  `json:"error_msg,omitempty"`
+	Attempt    int     `json:"attempt,omitempty"`
+	StatusCode int     `json:"status_code,omitempty"`
 
-	Attrs map[string]any `json:"attrs,omitempty"`
+	ResourceAttrs map[string]any `json:"resource_attrs,omitempty"`
+	Attrs         map[string]any `json:"attrs,omitempty"`
 }
 
 // marshalLine converts a UnifiedSignal into a JSON byte slice for NDJSON output.
-func marshalLine(harness otel.Harness, s *otel.UnifiedSignal) ([]byte, error) {
+func marshalLine(harness otel.Harness, resourceAttrs map[string]any, s *otel.UnifiedSignal) ([]byte, error) {
 	line := signalLine{
-		Kind:          string(s.Kind),
-		Harness:       string(harness),
-		TS:            s.Timestamp.UTC().Format(time.RFC3339Nano),
-		SignalID:      s.SignalID,
-		SessionID:     s.SessionID,
-		PromptID:      s.PromptID,
-		CanonicalName: s.CanonicalName,
-		NativeName:    s.NativeName,
-		TraceID:       s.TraceID,
-		SpanID:        s.SpanID,
-		ParentSpan:    s.ParentSpan,
-		ToolName:      s.ToolName,
-		Model:         s.Model,
-		TokensInput:   s.Tokens.Input,
-		TokensOutput:  s.Tokens.Output,
-		CostUSD:       s.CostUSD,
-		DurationMs:    s.DurationMs,
-		Success:       s.Success,
-		ErrorMsg:      s.ErrorMsg,
-		Attrs:         s.RawAttrs,
+		Kind:                string(s.Kind),
+		Harness:             string(harness),
+		TS:                  s.Timestamp.UTC().Format(time.RFC3339Nano),
+		SignalID:            s.SignalID,
+		SessionID:           s.SessionID,
+		PromptID:            s.PromptID,
+		CanonicalName:       s.CanonicalName,
+		NativeName:          s.NativeName,
+		TraceID:             s.TraceID,
+		SpanID:              s.SpanID,
+		ParentSpan:          s.ParentSpan,
+		ToolName:            s.ToolName,
+		ToolUseID:           s.ToolUseID,
+		Model:               s.Model,
+		Decision:            s.Decision,
+		DecisionSource:      s.DecisionSource,
+		TokensInput:         s.Tokens.Input,
+		TokensOutput:        s.Tokens.Output,
+		TokensCacheRead:     s.Tokens.CacheRead,
+		TokensCacheCreation: s.Tokens.CacheCreation,
+		TokensThought:       s.Tokens.Thought,
+		TokensTool:          s.Tokens.Tool,
+		TokensReasoning:     s.Tokens.Reasoning,
+		CostUSD:             s.CostUSD,
+		CostSource:          string(s.CostSource),
+		DurationMs:          s.DurationMs,
+		Success:             s.Success,
+		ErrorMsg:            s.ErrorMsg,
+		Attempt:             s.Attempt,
+		StatusCode:          s.StatusCode,
+		ResourceAttrs:       resourceAttrs,
+		Attrs:               s.RawAttrs,
 	}
 	return json.Marshal(line)
 }

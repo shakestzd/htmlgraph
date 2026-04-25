@@ -2,6 +2,7 @@ package retention_test
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -54,6 +55,10 @@ func makeSessionDir(t *testing.T, htmlgraphDir, sessionID, content string) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "events.ndjson"), []byte(content), 0o644); err != nil {
 		t.Fatalf("write events: %v", err)
+	}
+	offsetStr := fmt.Sprintf("%d", len(content))
+	if err := os.WriteFile(filepath.Join(dir, ".index-offset"), []byte(offsetStr), 0o644); err != nil {
+		t.Fatalf("write index-offset: %v", err)
 	}
 }
 

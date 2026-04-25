@@ -447,7 +447,9 @@ func launchClaude(opts LaunchOpts) error {
 	var envOverrides otelEnvOverrides
 	if opts.ProjectRoot != "" && !isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
 		envOverrides = spawnSessionCollector(opts.ProjectRoot)
-		defer cleanupCollector()
+		if envOverrides.Cleanup != nil {
+			defer envOverrides.Cleanup()
+		}
 	}
 
 	c := exec.Command(claudePath, claudeArgs...)

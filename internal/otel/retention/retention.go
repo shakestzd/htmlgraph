@@ -108,6 +108,10 @@ func archiveSession(htmlgraphDir, sessionID string, completedAt time.Time, dryRu
 		return nil
 	}
 
+	if !indexerCaughtUp(sessDir, eventsFile) {
+		return nil // indexer still processing — skip this cycle
+	}
+
 	month := completedAt.Format("2006-01")
 	archiveDir := filepath.Join(htmlgraphDir, "archive", month)
 	archivePath := filepath.Join(archiveDir, sessionID+".tar.gz")
@@ -173,6 +177,25 @@ func writeTarGz(archivePath, sessionID, eventsFile string) error {
 	}
 
 	return nil
+}
+
+// indexerCaughtUp returns true when the indexer has fully processed the
+// events.ndjson file (offset == file size). Prevents archiving data that
+// hasn't been indexed yet.
+func indexerCaughtUp(sessDir, eventsFile string) bool {
+	offsetData, err := os.ReadFile(filepath.Join(sessDir, ".index-offset"))
+	if err != nil {
+		return false // no checkpoint means indexer hasn't started
+	}
+	offset, err := strconv.ParseInt(string(offsetData), 10, 64)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(eventsFile)
+	if err != nil {
+		return false
+	}
+	return offset >= info.Size()
 }
 
 // retainDaysFromEnv reads HTMLGRAPH_SESSION_RETAIN_DAYS, defaulting to 30.

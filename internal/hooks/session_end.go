@@ -140,22 +140,18 @@ func signalCollector(projectDir, sessionID string) {
 	}
 	debugLog(projectDir, "[session-end] sent SIGTERM to collector pid=%d (session=%s)", pid, sessionID[:minLen(sessionID, 8)])
 
-	// Wait up to 3s for clean exit.
-	done := make(chan error, 1)
-	go func() {
-		_, err := proc.Wait()
-		done <- err
-	}()
-
-	select {
-	case <-done:
-		// Collector exited cleanly.
-	case <-time.After(3 * time.Second):
-		// Drain timeout — escalate to SIGKILL.
+	// Poll for up to 3s using kill(pid, 0) — we can't Wait() on a non-child.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := proc.Signal(syscall.Signal(0)); err != nil {
+			break // process exited
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	// If still alive after 3s, escalate to SIGKILL.
+	if err := proc.Signal(syscall.Signal(0)); err == nil {
 		debugLog(projectDir, "[session-end] collector drain timeout — sending SIGKILL pid=%d", pid)
 		_ = proc.Signal(syscall.SIGKILL)
-		// Reap the zombie after kill.
-		go func() { _, _ = proc.Wait() }()
 	}
 
 	// Remove the PID file so future SessionEnd calls don't attempt to re-signal.
