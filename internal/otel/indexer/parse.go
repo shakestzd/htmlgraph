@@ -1,0 +1,110 @@
+package indexer
+
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/shakestzd/htmlgraph/internal/otel"
+)
+
+// signalLine mirrors the on-disk JSON representation written by ndjson.Sink.
+// Field names must match ndjson.signalLine exactly.
+type signalLine struct {
+	Kind      string `json:"kind"`
+	Harness   string `json:"harness"`
+	TS        string `json:"ts"`
+	SignalID  string `json:"signal_id"`
+	SessionID string `json:"session_id"`
+	PromptID  string `json:"prompt_id,omitempty"`
+
+	CanonicalName string `json:"canonical,omitempty"`
+	NativeName    string `json:"native,omitempty"`
+
+	TraceID    string `json:"trace_id,omitempty"`
+	SpanID     string `json:"span_id,omitempty"`
+	ParentSpan string `json:"parent_span,omitempty"`
+
+	ToolName string `json:"tool_name,omitempty"`
+	Model    string `json:"model,omitempty"`
+
+	TokensInput  int64 `json:"tokens_input,omitempty"`
+	TokensOutput int64 `json:"tokens_output,omitempty"`
+
+	CostUSD float64 `json:"cost_usd,omitempty"`
+
+	DurationMs int64   `json:"duration_ms,omitempty"`
+	Success    *bool   `json:"success,omitempty"`
+	ErrorMsg   string  `json:"error_msg,omitempty"`
+
+	Attrs map[string]any `json:"attrs,omitempty"`
+}
+
+// parseLine decodes one NDJSON line into a UnifiedSignal.
+//
+// Returns:
+//   - (nil, nil) for lines that should be skipped (collector_start, unknown kind).
+//   - (nil, err) for malformed JSON.
+//   - (*UnifiedSignal, nil) on success.
+func parseLine(data []byte) (*otel.UnifiedSignal, error) {
+	var sl signalLine
+	if err := json.Unmarshal(data, &sl); err != nil {
+		return nil, fmt.Errorf("json unmarshal: %w", err)
+	}
+
+	kind := toKind(sl.Kind)
+	if kind == "" {
+		// collector_start, unknown, or future kinds — skip silently.
+		return nil, nil
+	}
+
+	ts, err := time.Parse(time.RFC3339Nano, sl.TS)
+	if err != nil {
+		// Try RFC3339 as fallback (no nanoseconds).
+		ts, err = time.Parse(time.RFC3339, sl.TS)
+		if err != nil {
+			return nil, fmt.Errorf("parse ts %q: %w", sl.TS, err)
+		}
+	}
+
+	sig := &otel.UnifiedSignal{
+		Kind:          kind,
+		Harness:       otel.Harness(sl.Harness),
+		Timestamp:     ts,
+		SignalID:      sl.SignalID,
+		SessionID:     sl.SessionID,
+		PromptID:      sl.PromptID,
+		CanonicalName: sl.CanonicalName,
+		NativeName:    sl.NativeName,
+		TraceID:       sl.TraceID,
+		SpanID:        sl.SpanID,
+		ParentSpan:    sl.ParentSpan,
+		ToolName:      sl.ToolName,
+		Model:         sl.Model,
+		Tokens: otel.TokenCounts{
+			Input:  sl.TokensInput,
+			Output: sl.TokensOutput,
+		},
+		CostUSD:    sl.CostUSD,
+		DurationMs: sl.DurationMs,
+		Success:    sl.Success,
+		ErrorMsg:   sl.ErrorMsg,
+		RawAttrs:   sl.Attrs,
+	}
+	return sig, nil
+}
+
+// toKind maps a raw kind string to otel.Kind.
+// Returns "" for non-signal kinds (collector_start, empty, unknown).
+func toKind(s string) otel.Kind {
+	switch s {
+	case "span":
+		return otel.KindSpan
+	case "metric":
+		return otel.KindMetric
+	case "log":
+		return otel.KindLog
+	default:
+		return ""
+	}
+}

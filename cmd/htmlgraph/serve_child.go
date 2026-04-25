@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/otel/indexer"
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 	"github.com/shakestzd/htmlgraph/internal/registry"
@@ -56,6 +58,19 @@ func runServeChild(port int) error {
 	// database is closed when the process exits; no defer Close — Serve blocks.
 
 	mux := buildSingleProjectMux(database, htmlgraphDir)
+
+	// NDJSON→SQLite indexer (unconditional per Q5 cutover decision).
+	// A dedicated Writer is opened for the indexer so it does not contend
+	// with the OTLP receiver's Writer (each has MaxOpenConns=1).
+	if idxWriter, err := otelreceiver.NewWriter(dbPath); err != nil {
+		fmt.Fprintf(os.Stderr, "indexer writer init: %v\n", err)
+	} else {
+		idxr := indexer.New(htmlgraphDir, sqls.New(idxWriter))
+		ctx := context.Background()
+		go idxr.Start(ctx)
+		// /api/indexer/status — per-file health for observability (Q7).
+		mux.Handle("/api/indexer/status", indexerStatusHandler(idxr))
+	}
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
@@ -123,4 +138,16 @@ func runServeChild(port int) error {
 	}
 
 	return (&http.Server{Handler: mux}).Serve(ln)
+}
+
+// indexerStatusHandler returns an HTTP handler for GET /api/indexer/status.
+// The response body is a JSON object with per-session file health metrics.
+func indexerStatusHandler(idxr *indexer.Indexer) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		status := idxr.Status()
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]any{"files": status}); err != nil {
+			http.Error(w, "encode error", http.StatusInternalServerError)
+		}
+	})
 }

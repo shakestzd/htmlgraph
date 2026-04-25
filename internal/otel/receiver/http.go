@@ -156,7 +156,7 @@ func (h *HTTPHandler) persist(ctx context.Context, decoded []otlp.Decoded) error
 			// observability-of-observability counter could surface this.
 			continue
 		}
-		signals := h.convertAll(a, d)
+		signals := ConvertAll(a, d)
 		if len(signals) == 0 {
 			continue
 		}
@@ -167,10 +167,10 @@ func (h *HTTPHandler) persist(ctx context.Context, decoded []otlp.Decoded) error
 	return nil
 }
 
-// convertAll runs every signal in the decoded batch through the
+// ConvertAll runs every signal in the decoded batch through the
 // adapter and assigns a stable SignalID. The resulting slice is ready
-// for writer.WriteBatch.
-func (h *HTTPHandler) convertAll(a adapter.Adapter, d otlp.Decoded) []otel.UnifiedSignal {
+// for SignalSink.WriteBatch.
+func ConvertAll(a adapter.Adapter, d otlp.Decoded) []otel.UnifiedSignal {
 	out := make([]otel.UnifiedSignal, 0, len(d.Metrics)+len(d.Logs)+len(d.Spans))
 
 	for _, sm := range d.Metrics {

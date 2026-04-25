@@ -249,6 +249,7 @@ func buildRoot() *cobra.Command {
 	root.AddCommand(versionCmd())
 	root.AddCommand(statuslineCmd())
 	root.AddCommand(serveChildCmd())
+	root.AddCommand(otelCollectCmd())
 	root.AddCommand(hookCmd())
 	root.AddCommand(claudeCmd())
 	root.AddCommand(codexCmd())
