@@ -66,7 +66,7 @@ func runServeChild(port int) error {
 	if idxWriter, err := otelreceiver.NewWriter(dbPath); err != nil {
 		fmt.Fprintf(os.Stderr, "indexer writer init: %v\n", err)
 	} else {
-		idxr := indexer.New(htmlgraphDir, sqls.New(idxWriter))
+		idxr := indexer.New(htmlgraphDir, sqls.New(idxWriter)).WithDB(database)
 		ctx := context.Background()
 		go idxr.Start(ctx)
 		// /api/indexer/status — per-file health for observability (Q7).
