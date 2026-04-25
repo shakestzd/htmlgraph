@@ -431,7 +431,11 @@ func checkYoloRoborevGuard(event *CloudEvent, yolo bool) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	out, err := exec.CommandContext(ctx, "roborev", "list", "--open", "--json").Output()
+	roborevCmd := exec.CommandContext(ctx, "roborev", "list", "--open", "--json")
+	if event.CWD != "" {
+		roborevCmd.Dir = event.CWD
+	}
+	out, err := roborevCmd.Output()
 	if err != nil {
 		return "" // fail-open: not installed, daemon down, timeout, etc.
 	}
