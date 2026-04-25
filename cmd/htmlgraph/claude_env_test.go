@@ -43,7 +43,7 @@ func TestBuildClaudeLaunchEnv_ExplicitOptOut(t *testing.T) {
 
 	// "0" explicitly disables — no OTel vars should be injected.
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "0")
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 	for _, key := range []string{
 		"CLAUDE_CODE_ENABLE_TELEMETRY",
 		"OTEL_METRICS_EXPORTER",
@@ -55,7 +55,7 @@ func TestBuildClaudeLaunchEnv_ExplicitOptOut(t *testing.T) {
 	// Also test other opt-out values.
 	for _, val := range []string{"false", "no", "off"} {
 		t.Setenv("HTMLGRAPH_OTEL_ENABLED", val)
-		env = buildClaudeLaunchEnv("")
+		env = buildClaudeLaunchEnv("", nil)
 		assertEnvEmptyOrUnset(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY")
 	}
 }
@@ -65,7 +65,7 @@ func TestBuildClaudeLaunchEnv_DefaultOn(t *testing.T) {
 	clearOtelEnv(t)
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "") // explicitly unset
 
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 	assertEnvContains(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 	assertEnvContains(t, env, "OTEL_TRACES_EXPORTER", "otlp")
 	// The endpoint should be derived from cwd (since no explicit projectDir or env vars are set).
@@ -129,7 +129,7 @@ func TestBuildClaudeLaunchEnv_InjectsWhenEnabled(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_ENABLE_TELEMETRY", "")
 	t.Setenv("CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "")
 
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 
 	assertEnvContains(t, env, "CLAUDE_CODE_ENABLE_TELEMETRY", "1")
 	assertEnvContains(t, env, "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "1")
@@ -157,7 +157,7 @@ func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
 	t.Setenv("OTEL_METRICS_EXPORTER", "console")
 	t.Setenv("OTEL_LOG_TOOL_DETAILS", "0")
 
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 
 	// OTEL_EXPORTER_OTLP_ENDPOINT is overridden by the launcher — derived from cwd fallback.
 	expectedPort := otelreceiver.PortForProject(effectiveProjectDir(""))
@@ -173,7 +173,7 @@ func TestBuildClaudeLaunchEnv_RespectsUserOverrides(t *testing.T) {
 func TestBuildClaudeLaunchEnv_WorktreeProjectDir(t *testing.T) {
 	clearOtelEnv(t)
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "/old/value")
-	env := buildClaudeLaunchEnv("/worktree/main/.htmlgraph")
+	env := buildClaudeLaunchEnv("/worktree/main/.htmlgraph", nil)
 	assertEnvContains(t, env, "HTMLGRAPH_PROJECT_DIR", "/worktree/main/.htmlgraph")
 }
 
@@ -182,7 +182,7 @@ func TestBuildClaudeLaunchEnv_EndpointFromCustomHostPort(t *testing.T) {
 	t.Setenv("HTMLGRAPH_OTEL_BIND", "0.0.0.0")
 	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "14318")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 	// 0.0.0.0 bind host maps to 127.0.0.1 for the outbound direction —
 	// child processes should never send to 0.0.0.0.
 	assertEnvContains(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:14318")
@@ -231,7 +231,7 @@ func TestBuildClaudeLaunchEnv_OverridesStaleOTELEndpoint(t *testing.T) {
 	// Simulate a stale port from a prior session with a different hash.
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9999")
 
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 	// The computed endpoint should override the inherited 9999. It's derived from cwd fallback.
 	expectedPort := otelreceiver.PortForProject(effectiveProjectDir(""))
 	expectedEndpoint := "http://127.0.0.1:" + strconv.Itoa(expectedPort)
@@ -247,7 +247,7 @@ func TestBuildClaudeLaunchEnv_ResolvesFromCLAUDEProjectDir(t *testing.T) {
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "1")
 	t.Setenv("CLAUDE_PROJECT_DIR", "/workspaces/htmlgraph")
 
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 
 	// HTMLGRAPH_PROJECT_DIR should be set to the resolved projectDir.
 	assertEnvContains(t, env, "HTMLGRAPH_PROJECT_DIR", "/workspaces/htmlgraph")
@@ -282,7 +282,7 @@ func TestBuildClaudeLaunchEnv_ResolvesFromHTMLGRAPHProjectDirEnv(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "") // empty first priority
 	t.Setenv("HTMLGRAPH_PROJECT_DIR", "/workspaces/htmlgraph")
 
-	env := buildClaudeLaunchEnv("")
+	env := buildClaudeLaunchEnv("", nil)
 
 	// Should resolve from HTMLGRAPH_PROJECT_DIR and derive the hashed port.
 	prefix := "OTEL_EXPORTER_OTLP_ENDPOINT="

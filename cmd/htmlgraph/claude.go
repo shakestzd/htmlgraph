@@ -441,6 +441,16 @@ func launchClaude(opts LaunchOpts) error {
 	// claude_serve_autostart.go for the probe + spawn logic.
 	ensureServeForOtel(opts.ProjectRoot)
 
+	// Generate a per-session ID and spawn a per-session OTel collector.
+	// The collector writes NDJSON to .htmlgraph/sessions/<sid>/ and
+	// exposes an ephemeral OTLP HTTP port. Non-fatal: on failure, the
+	// existing serve-based receiver is used as fallback.
+	var envOverrides otelEnvOverrides
+	if opts.ProjectRoot != "" && !isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
+		envOverrides = spawnSessionCollector(opts.ProjectRoot)
+		defer cleanupCollector()
+	}
+
 	c := exec.Command(claudePath, claudeArgs...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
@@ -456,7 +466,7 @@ func launchClaude(opts LaunchOpts) error {
 	if opts.HtmlgraphRoot != "" && opts.HtmlgraphRoot != opts.ProjectRoot {
 		worktreeOverride = opts.HtmlgraphRoot
 	}
-	c.Env = buildClaudeLaunchEnv(worktreeOverride)
+	c.Env = buildClaudeLaunchEnv(worktreeOverride, &envOverrides)
 
 	// Set working directory to project root so Claude starts in the right place,
 	// even if this command is run from a subdirectory like packages/go.
