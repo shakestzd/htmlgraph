@@ -15,6 +15,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/otel/retention"
 	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 	"github.com/shakestzd/htmlgraph/internal/registry"
+	"github.com/shakestzd/htmlgraph/internal/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +52,13 @@ func runServeChild(port int) error {
 		return fmt.Errorf("locate .htmlgraph: %w", err)
 	}
 
-	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
+	dbPath, err := storage.CanonicalDBPath(filepath.Dir(htmlgraphDir))
+	if err != nil {
+		return fmt.Errorf("resolve db path: %w", err)
+	}
+	if err := storage.EnsureDBDir(dbPath); err != nil {
+		return fmt.Errorf("ensure db dir: %w", err)
+	}
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)

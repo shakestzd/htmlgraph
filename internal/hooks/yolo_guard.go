@@ -15,6 +15,7 @@ import (
 
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/paths"
+	"github.com/shakestzd/htmlgraph/internal/storage"
 )
 
 // mergeInProgressFn is injected for testing. In production, it checks the real
@@ -44,7 +45,11 @@ func isYoloFromDB(htmlgraphDir, sessionID string) bool {
 	if sessionID == "" {
 		return false
 	}
-	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
+	projectDir := filepath.Dir(htmlgraphDir)
+	dbPath, err := storage.CanonicalDBPath(projectDir)
+	if err != nil {
+		return false
+	}
 	// Use lightweight read-only open — no pragmas, no migrations.
 	database, err := sql.Open("sqlite", dbPath+"?mode=ro&_busy_timeout=5000")
 	if err != nil {
