@@ -173,6 +173,7 @@ func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]otel.Unif
 
 	var signals []otel.UnifiedSignal
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	committedOffset := offset
 
 	for scanner.Scan() {

@@ -97,15 +97,15 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 		}
 	}
 
+	// Signal the per-session OTel collector to drain and exit (Q3 primary layer)
+	// BEFORE materializing — the indexer needs the final signals in SQLite first.
+	signalCollector(projectDir, sessionID)
+
 	// Materialize OTel rollup (no-op if no signals received for this session).
 	// Non-fatal: errors are logged but do not block SessionEnd completion.
 	if err := materialize.Materialize(database, projectDir, sessionID); err != nil {
 		debugLog(projectDir, "[error] handler=session-end session=%s: materialize otel: %v", sessionID[:minLen(sessionID, 8)], err)
 	}
-
-	// Signal the per-session OTel collector to drain and exit (Q3 primary layer).
-	// The launcher's deferred SIGTERM is the secondary fallback. Non-fatal.
-	signalCollector(projectDir, sessionID)
 
 	return &HookResult{Continue: true}, nil
 }
@@ -135,7 +135,9 @@ func signalCollector(projectDir, sessionID string) {
 
 	// Send SIGTERM to request graceful drain.
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		// ESRCH means process already gone — not an error.
+		// ESRCH means process already gone — clean up PID file to prevent
+		// stale PID reuse on later end/resume paths.
+		_ = os.Remove(pidPath)
 		return
 	}
 	debugLog(projectDir, "[session-end] sent SIGTERM to collector pid=%d (session=%s)", pid, sessionID[:minLen(sessionID, 8)])
