@@ -75,15 +75,35 @@ func DetectHarness(payload []byte) Harness {
 	return detectHarness(payload)
 }
 
-// detectHarness examines the raw payload bytes and returns the harness that
-// sent them. The detection rules are:
+// detectHarness examines the raw payload bytes and the process environment to
+// determine the harness that sent them. The detection rules are:
 //
-//   - HarnessCodex:  top-level "hook_event_name" field is present (Codex's
-//     unique field; Claude's CloudEvent does not have this field at the top level).
-//   - HarnessGemini: top-level "invocation_id" field is present AND
-//     "hook_event_name" is absent (Gemini's unique identifier).
-//   - HarnessClaude: default fallback when no discriminating field is found.
+//   - HarnessClaude: CLAUDE_CODE_ENTRYPOINT env var is set (Claude Code sets this
+//     in every hook invocation; Codex and Gemini do not). This takes priority over
+//     payload-based detection because Claude Code also sends "hook_event_name" in
+//     its payloads, which previously caused false Codex classification.
+//   - HarnessCodex:  CLAUDE_CODE_ENTRYPOINT is absent AND top-level
+//     "hook_event_name" field is present (Codex's discriminator when not inside
+//     a Claude Code session).
+//   - HarnessGemini: CLAUDE_CODE_ENTRYPOINT is absent AND top-level
+//     "invocation_id" field is present AND "hook_event_name" is absent.
+//   - HarnessClaude: default fallback when no discriminating signal is found.
 func detectHarness(payload []byte) Harness {
+	return detectHarnessWithEnv(payload, os.Getenv)
+}
+
+// detectHarnessWithEnv is the testable core of detectHarness. getenv is
+// injected so tests can control environment without os.Setenv races.
+func detectHarnessWithEnv(payload []byte, getenv func(string) string) Harness {
+	// CLAUDE_CODE_ENTRYPOINT is set by Claude Code in every hook invocation.
+	// Its presence is the most reliable signal that hooks are running inside
+	// Claude Code — even when the payload also contains "hook_event_name"
+	// (which Claude Code sends for all events, contra the previous assumption
+	// that "hook_event_name" was Codex-exclusive).
+	if getenv("CLAUDE_CODE_ENTRYPOINT") != "" {
+		return HarnessClaude
+	}
+
 	if len(payload) == 0 {
 		return HarnessClaude
 	}
@@ -94,7 +114,7 @@ func detectHarness(payload []byte) Harness {
 		return HarnessClaude
 	}
 
-	// Codex: presence of "hook_event_name" is the definitive signal.
+	// Codex: presence of "hook_event_name" when not inside Claude Code.
 	if _, ok := top["hook_event_name"]; ok {
 		return HarnessCodex
 	}

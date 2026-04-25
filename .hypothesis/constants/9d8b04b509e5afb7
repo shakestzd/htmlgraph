@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/cost_monitor.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.8, 0.9, 2.0, 3.0, 4.0, 10.0, 15.0, 75.0, 100, 1000000, '.htmlgraph', 'Claude Haiku', 'Claude Opus', 'Claude Sonnet', 'acknowledged', 'agent_id', 'alert_id', 'alert_type', 'breach', 'budget_usd', 'budget_warning', 'by_model', 'by_tool', 'config', 'cost', 'cost_breakdown', 'cost_budget', 'cost_models.json', 'cost_per_minute', 'cost_usd', 'critical', 'current_cost_usd', 'defaults', 'event', 'event_id', 'htmlgraph.db', 'input_cost_per_mtok', 'input_tokens', 'insufficient_data', 'lookback_minutes', 'message', 'model', 'model_count', 'models', 'name', 'output_cost_per_mtok', 'output_tokens', 'predicted_cost_usd', 'prediction_available', 'reason', 'recent_cost_usd', 'sample_count', 'session_id', 'severity', 'subagent_type', 'timestamp', 'tool_name', 'total_cost', 'total_cost_usd', 'total_tokens', 'updated_at', 'warning', 'zero_time_span']

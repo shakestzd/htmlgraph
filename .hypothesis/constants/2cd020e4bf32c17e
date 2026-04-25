@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/agent_registry.py
-# hypothesis_version: 6.151.9
-
-['1.0', 'Claude', 'Codex', 'Gemini', 'active', 'agents', 'agents.json', 'api-design', 'architecture', 'capabilities', 'claude', 'code-generation', 'code-review', 'codex', 'css', 'data-analysis', 'debugging', 'documentation', 'gemini', 'high', 'html', 'id', 'javascript', 'low', 'max_parallel_tasks', 'medium', 'metadata', 'name', 'preferred_complexity', 'python', 'refactoring', 'testing', 'typescript', 'updated', 'version', 'very-high', 'w']

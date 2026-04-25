@@ -18,7 +18,10 @@ func TestPlanFeedback_OutputStructure(t *testing.T) {
 		t.Fatalf("mkdir plans: %v", err)
 	}
 
-	dbPath := filepath.Join(dir, "htmlgraph.db")
+	if err := os.MkdirAll(filepath.Join(dir, ".db"), 0o755); err != nil {
+		t.Fatalf("mkdir .db: %v", err)
+	}
+	dbPath := filepath.Join(dir, ".db", "htmlgraph.db")
 	db, err := dbpkg.Open(dbPath)
 	if err != nil {
 		t.Fatalf("open db: %v", err)

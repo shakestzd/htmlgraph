@@ -13,6 +13,7 @@ import (
 
 	"github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/otel/receiver"
+	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 
 	"google.golang.org/protobuf/proto"
 
@@ -41,12 +42,15 @@ func TestReceiver_EndToEndLifecycle(t *testing.T) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 
+	w, err := receiver.NewWriter(dbPath)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
 	rec, err := receiver.New(receiver.Config{
 		Enabled:  true,
 		BindHost: "127.0.0.1",
 		HTTPPort: port,
-		DBPath:   dbPath,
-	})
+	}, sqls.New(w))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -81,10 +85,8 @@ func TestReceiver_EndToEndLifecycle(t *testing.T) {
 		t.Errorf("status = %d", resp.StatusCode)
 	}
 
-	// Assert signal landed. Use the receiver's own writer handle so we
-	// don't open a second *sql.DB (which would contend with the writer pool).
 	var cost float64
-	err = rec.Writer().DB().QueryRow(
+	err = w.DB().QueryRow(
 		`SELECT cost_usd FROM otel_signals WHERE session_id='sess-e2e'`,
 	).Scan(&cost)
 	if err != nil {
@@ -115,9 +117,13 @@ func TestReceiver_Burst(t *testing.T) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 
+	w, err := receiver.NewWriter(dbPath)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
 	rec, err := receiver.New(receiver.Config{
-		Enabled: true, BindHost: "127.0.0.1", HTTPPort: port, DBPath: dbPath,
-	})
+		Enabled: true, BindHost: "127.0.0.1", HTTPPort: port,
+	}, sqls.New(w))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -163,7 +169,7 @@ func TestReceiver_Burst(t *testing.T) {
 	}
 
 	var count int
-	if err := rec.Writer().DB().QueryRow(
+	if err := w.DB().QueryRow(
 		`SELECT COUNT(*) FROM otel_signals WHERE session_id LIKE 'sess-burst-%'`,
 	).Scan(&count); err != nil {
 		t.Fatalf("count: %v", err)
@@ -209,23 +215,23 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	}
 }
 
-// TestLoadConfigFromEnv_PerProjectPort verifies different project dirs yield
-// different HTTPPort values when no explicit env override is set.
-func TestLoadConfigFromEnv_PerProjectPort(t *testing.T) {
+// TestLoadConfigFromEnv_DefaultPort verifies that when no explicit port env is
+// set, LoadConfigFromEnv returns the OTel default port 4318. The per-project
+// hash-based port derivation has been removed — per-session collectors use
+// ephemeral ports.
+func TestLoadConfigFromEnv_DefaultPort(t *testing.T) {
 	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "")
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
 	t.Setenv("HTMLGRAPH_OTEL_BIND", "")
-	t.Setenv("HTMLGRAPH_PROJECT_DIR", "")
 
-	cfg1 := receiver.LoadConfigFromEnv("", "/home/user/project-alpha")
-	cfg2 := receiver.LoadConfigFromEnv("", "/home/user/project-beta")
-	if cfg1.HTTPPort == cfg2.HTTPPort {
-		t.Errorf("different project dirs should yield different ports, both got %d", cfg1.HTTPPort)
+	cfg := receiver.LoadConfigFromEnv("", "/home/user/project-alpha")
+	if cfg.HTTPPort != 4318 {
+		t.Errorf("default port should be 4318, got %d", cfg.HTTPPort)
 	}
 }
 
 // TestLoadConfigFromEnv_EnvOverride verifies HTMLGRAPH_OTEL_HTTP_PORT wins
-// over the project-hash-derived port.
+// over the default port.
 func TestLoadConfigFromEnv_EnvOverride(t *testing.T) {
 	t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "5000")
 	t.Setenv("HTMLGRAPH_OTEL_ENABLED", "")
@@ -236,49 +242,6 @@ func TestLoadConfigFromEnv_EnvOverride(t *testing.T) {
 	}
 
 	t.Cleanup(func() { t.Setenv("HTMLGRAPH_OTEL_HTTP_PORT", "") })
-}
-
-// TestPortForProject_Deterministic verifies same input → same output.
-func TestPortForProject_Deterministic(t *testing.T) {
-	dir := "/home/user/my-project"
-	p1 := receiver.PortForProject(dir)
-	p2 := receiver.PortForProject(dir)
-	if p1 != p2 {
-		t.Errorf("PortForProject not deterministic: %d != %d", p1, p2)
-	}
-}
-
-// TestPortForProject_DifferentProjectsDifferentPorts verifies 10 distinct
-// project dirs produce 10 distinct ports (probabilistic — acceptable for 1000 slots).
-func TestPortForProject_DifferentProjectsDifferentPorts(t *testing.T) {
-	dirs := []string{
-		"/home/alice/alpha",
-		"/home/alice/beta",
-		"/home/alice/gamma",
-		"/home/bob/alpha",
-		"/home/bob/beta",
-		"/projects/foo",
-		"/projects/bar",
-		"/projects/baz",
-		"/work/qux",
-		"/work/quux",
-	}
-	seen := make(map[int]string)
-	for _, d := range dirs {
-		p := receiver.PortForProject(d)
-		if prev, ok := seen[p]; ok {
-			t.Errorf("port collision %d: %q and %q", p, prev, d)
-		}
-		seen[p] = d
-	}
-}
-
-// TestPortForProject_EmptyDir verifies empty string returns the base port.
-func TestPortForProject_EmptyDir(t *testing.T) {
-	p := receiver.PortForProject("")
-	if p != 4318 {
-		t.Errorf("empty dir should return 4318, got %d", p)
-	}
 }
 
 // makeClaudeLogPayload builds a marshalled LogsData byte slice that

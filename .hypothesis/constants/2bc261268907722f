@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/attribute_index.py
-# hypothesis_version: 6.151.9
-
-['is_built', 'priorities', 'statuses', 'total_nodes_by_type', 'types']

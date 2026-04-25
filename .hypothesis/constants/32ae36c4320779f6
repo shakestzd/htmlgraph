@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/archive/bloom.py
-# hypothesis_version: 6.151.9
-
-[0.01, 1000, 'BloomFilter', 'actual_fpr', 'big', 'bit_array', 'bit_count', 'bytes_used', 'description', 'expected_items', 'false_positive_rate', 'hash_count', 'id', 'items_added', 'target_fpr', 'title', 'using_mmh3', 'utilization', 'w']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models/__init__.py
-# hypothesis_version: 6.151.9
-
-['ActivityEntry', 'AggregatedMetric', 'Chore', 'ContextSnapshot', 'Edge', 'ErrorEntry', 'Graph', 'MaintenanceType', 'Node', 'Pattern', 'RelationshipType', 'Session', 'SessionInsight', 'Spike', 'SpikeType', 'Step', 'Todo', 'WorkType', 'utc_now']

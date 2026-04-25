@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/oplog_sync.py
-# hypothesis_version: 6.151.9
-
-[200, 1000, '+00:00', 'BEGIN IMMEDIATE', 'T', 'Z', 'actor', 'cnt', 'conflict_id', 'consumer_id', 'created_at', 'degraded', 'entity_id', 'entity_type', 'entry_id', 'field_mask', 'idempotency_key', 'lag', 'last_acked_seq', 'last_seen_seq', 'last_write_wins', 'max_seq', 'ok', 'op', 'payload', 'policy', 'resolved', 'seq', 'session_id', 'sync_applied', 'sync_conflict', 'sync_lag', 'ts', 'updated_at', 'winner_entry_id']

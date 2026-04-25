@@ -46,7 +46,7 @@ func runStatusline(sessionID string) error {
 }
 
 func statuslineFromSession(dir, sessionID string) error {
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return nil
 	}
@@ -239,7 +239,7 @@ func buildCacheLine(htmlgraphDir, featureID string) string {
 	}
 
 	// Attempt track context via DB.
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Sprintf("%s %s", iconFor(featureType), truncate(featureTitle, 30))

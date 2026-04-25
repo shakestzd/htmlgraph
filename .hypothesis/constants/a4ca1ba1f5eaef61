@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/__init__.py
-# hypothesis_version: 6.151.9
-
-['.htmlgraph', 'AGENT_ALIASES', 'BaseSDK', 'CLAUDE_AGENT_NAME', 'SDK', 'SDKSettings', 'auto_discover_agent', 'bugs', 'claude', 'claude-code', 'claude-haiku', 'claude-opus', 'claude-sonnet', 'cli', 'codex', 'copilot', 'dashboard', 'dismissed', 'features', 'find_project_root', 'gemini', 'gemini-cli', 'github-copilot', 'haiku', 'htmlgraph.db', 'normalize_agent_name', 'openai-codex', 'opus', 'phoenix', 'phoenix-dashboard', 'show_count', 'sonnet']

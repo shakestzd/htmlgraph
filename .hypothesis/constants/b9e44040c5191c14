@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/orchestrator.py
-# hypothesis_version: 6.151.9
-
-['.htmlgraph', '1', '<file>', '<pattern>', 'AskUserQuestion', 'Bash', 'Edit', 'Glob', 'Grep', 'NotebookEdit', 'PreToolUse', 'Read', 'Task', 'TodoWrite', 'Write', 'active', 'additionalContext', 'allow', 'allowed', 'build', 'command', 'compile', 'continue', 'deny', 'exploration-blocked', 'file_path', 'git', 'git-readonly', 'git-write-violation', 'guidance', 'hookEventName', 'hookSpecificOutput', 'htmlgraph ', 'htmlgraph.db', 'import htmlgraph', 'input', 'make', 'name', 'orchestrator-core', 'orchestrator-hook', 'pattern', 'permissionDecision', 'pytest', 'sdk-command', 'sdk-inline', 'session_id', 'strict', 'test', 'test-build-violation', 'timestamp', 'tool', 'tool_call', 'tool_input', 'tool_name', 'unknown', 'uv run htmlgraph ']

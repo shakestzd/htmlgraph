@@ -82,7 +82,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	}
 
 	// Attribution rate from git_commits table.
-	if database, dbErr := dbpkg.Open(filepath.Join(dir, "htmlgraph.db")); dbErr == nil {
+	if database, dbErr := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db")); dbErr == nil {
 		defer database.Close()
 		total, attributed := dbpkg.CommitAttributionRate(database)
 		if total > 0 {

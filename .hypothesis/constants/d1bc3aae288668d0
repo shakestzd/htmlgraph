@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_recording.py
-# hypothesis_version: 6.151.9
-
-[100, 200, '%Y-%m-%d %H:%M:%S', '.', '...', 'Agent', 'Bash', 'Edit', 'Glob', 'Grep', 'Read', 'Task', 'TodoWrite', 'UserQuery', 'WebFetch', 'WebSearch', 'Write', 'claude-code', 'command', 'content', 'delegation', 'description', 'error', 'event', 'extract_file_paths', 'feature_id', 'file_path', 'file_paths', 'filepath', 'format_tool_summary', 'handoff', 'is_error', 'model', 'old_string', 'output', 'path', 'pattern', 'prompt', 'query', 'subagent_type', 'success', 'summary', 'task_id', 'task_input_keys', 'temperature', 'timestamp', 'todos', 'tool', 'tool_call', 'tool_input_keys', 'unknown', 'url']

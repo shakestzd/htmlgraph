@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/refs.py
-# hypothesis_version: 6.151.9
-
-['*.html', '-', 'b', 'bug', 'bugs', 'c', 'chore', 'chores', 'chr', 'd', 'e', 'epc', 'epic', 'epics', 'f', 'feat', 'feature', 'features', 'p', 'phase', 'phases', 'phs', 'refs', 'refs.json', 'regenerated_at', 's', 'spike', 'spikes', 'spk', 't', 'todo', 'todos', 'track', 'tracks', 'trk', 'utf-8', 'version', 'w']

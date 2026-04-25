@@ -40,7 +40,7 @@ func runRelated(featureID string) error {
 		return err
 	}
 
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
@@ -81,21 +81,30 @@ func runRelated(featureID string) error {
 // with optional structured sections. kind identifies the work item type (e.g. "feature").
 func setDescriptionCmd(kind string) *cobra.Command {
 	var acceptance, testStrategy, expectedBehavior string
+	var allowHostPaths bool
 	cmd := &cobra.Command{
 		Use:   "set-description <id> <text>",
 		Short: "Set or update a " + kind + "'s description with optional structured sections",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runSetDescription(kind, args[0], args[1], acceptance, testStrategy, expectedBehavior)
+			return runSetDescription(kind, args[0], args[1], acceptance, testStrategy, expectedBehavior, allowHostPaths)
 		},
 	}
 	cmd.Flags().StringVar(&acceptance, "acceptance", "", "Acceptance criteria")
 	cmd.Flags().StringVar(&testStrategy, "test-strategy", "", "Test strategy")
 	cmd.Flags().StringVar(&expectedBehavior, "expected-behavior", "", "Expected behavior")
+	cmd.Flags().BoolVar(&allowHostPaths, "allow-host-paths", false, "bypass host-local path check in description text")
 	return cmd
 }
 
-func runSetDescription(kind, id, text, acceptance, testStrategy, expectedBehavior string) error {
+func runSetDescription(kind, id, text, acceptance, testStrategy, expectedBehavior string, allowHostPaths bool) error {
+	// Validate all text inputs for host-local paths before writing.
+	for _, s := range []string{text, acceptance, testStrategy, expectedBehavior} {
+		if err := validateDescriptionForHostPaths(s, allowHostPaths); err != nil {
+			return err
+		}
+	}
+
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err

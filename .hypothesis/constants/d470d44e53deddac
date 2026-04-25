@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/learning.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.2, 0.3, 0.5, 0.7, 0.8, 1.0, 10.0, 100, '(\\d+)\\s+error', '(\\d+)\\s+failed', '(\\d+)\\s+passed', '(\\d+)\\s+skipped', ', ', 'Bash', 'Edit', 'Glob', 'Grep', 'Low tool diversity', 'Read', 'Task', 'activity_log', 'anti-pattern', 'anti_patterns', 'command', 'context_rebuilds', 'count', 'description', 'detection_count', 'efficiency', 'error_count', 'error_recovery', 'errors', 'failed', 'first_detected', 'is_parallel', 'issues', 'last_detected', 'neutral', 'optimal', 'output', 'parallel_count', 'parent_activity_id', 'passed', 'pattern_ids', 'pattern_type', 'payload', 'py.test', 'pytest', 'recommendations', 'retry_rate', 'sequence', 'session_id', 'skipped', 'stdout', 'success', 'summary', 'test_runs', 'test_summary', 'timestamp', 'tool', 'tool_diversity', '⚠️ Issues: ']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/collections/wisp.py
-# hypothesis_version: 6.151.9
-
-[5.0, 3600, '%Y-%m-%d %H:%M:%S', 'DELETE FROM wisps', 'agent_id', 'category', 'created_at', 'expires_at', 'general', 'htmlgraph.db', 'id', 'message', 'unknown']

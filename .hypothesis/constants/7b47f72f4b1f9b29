@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/session/info.py
-# hypothesis_version: 6.151.9
-
-['--oneline', '_parent_session', 'active_work', 'agent', 'agent_assigned', 'analytics', 'auto_generated', 'bottlenecks', 'bugs', 'chores', 'conversation-init', 'created', 'epics', 'event_count', 'features', 'git', 'git_log', 'id', 'in-progress', 'log', 'parallel', 'priority', 'recommendations', 'session-init', 'sessions', 'spike', 'spike_subtype', 'spikes', 'started', 'status', 'steps', 'steps_completed', 'steps_total', 'title', 'transition', 'type', 'unknown']

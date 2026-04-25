@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/constants.py
-# hypothesis_version: 6.151.9
-
-['AskUserQuestion', 'DRIFT_QUEUE_FILE', 'Glob', 'Grep', 'NEVER_BLOCK_TOOLS', 'Read', 'Skill', 'Task', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TodoRead', 'TodoWrite', 'WebFetch', 'WebSearch', 'drift-queue.json']

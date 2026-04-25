@@ -187,18 +187,104 @@ class HgEventTree extends HTMLElement {
     // turn (the final response) has no following tool and stays as its
     // own row. Done BEFORE reverse so "preceding" means chronologically
     // earlier.
+    //
+    // Guard for Task/Agent spans: when two subagents run concurrently, the
+    // OTel receiver's re-attribution (strategy B: overlap window) is skipped
+    // as "ambiguous", leaving each subagent's api_request spans parented to
+    // the same orchestrator interaction span as the Task/Agent spans. If a
+    // subagent's api_request appears chronologically just before an
+    // orchestrator Task span, the naive sequential absorption would pair
+    // the wrong api_request (subagent's model) with the Task row.
+    //
+    // Fix: before the absorption pass, identify the orchestrator model for
+    // each parent span by looking for the model used in api_requests that
+    // precede non-delegation (Bash/Read/Edit/…) tool spans — those api_requests
+    // are definitively from the orchestrator. Then, when absorbing into a
+    // Task/Agent span, skip if the candidate api_request's model doesn't match
+    // the orchestrator model, and instead search backwards for the nearest
+    // api_request with the right model.
     Object.values(byId).forEach(function(parent) {
       if (!parent.children || parent.children.length < 2) return;
       var kids = parent.children;
+
+      // Determine the orchestrator model for this parent span. Scan all
+      // consecutive (api_request, non-delegation tool) pairs — the first
+      // one we find is definitively from the orchestrator.
+      var orchModel = '';
+      for (var k = 0; k < kids.length - 1; k++) {
+        var kCur = kids[k], kNxt = kids[k + 1];
+        if (kCur.canonical === 'api_request' && kCur.model && kNxt.tool_name &&
+            kNxt.tool_name !== 'Task' && kNxt.tool_name !== 'Agent') {
+          orchModel = kCur.model;
+          break;
+        }
+      }
+
       for (var i = 0; i < kids.length - 1; i++) {
         var cur = kids[i], nxt = kids[i + 1];
         if (cur.canonical === 'api_request' && nxt.tool_name) {
+          // For Task/Agent spans: guard against mis-attributed concurrent
+          // subagent api_requests. When orchModel is known and the candidate
+          // api_request has a different model, search backwards for the
+          // nearest orchestrator api_request and use that instead.
+          if ((nxt.tool_name === 'Task' || nxt.tool_name === 'Agent') &&
+              orchModel && cur.model && cur.model !== orchModel) {
+            var fallback = null;
+            for (var j = i - 1; j >= 0; j--) {
+              var cand = kids[j];
+              if (cand.canonical === 'api_request' && cand.model === orchModel && !cand._absorbedInto) {
+                fallback = cand;
+                break;
+              }
+            }
+            if (fallback) {
+              nxt._precedingApi = fallback;
+              fallback._absorbedInto = nxt.span_id;
+            }
+            // Leave the mis-attributed api_request un-absorbed — it will be
+            // filtered from the rendered tree by filteredRootSpans (api_request
+            // canonicals are not rendered as top-level rows).
+            continue;
+          }
           nxt._precedingApi = cur;
           cur._absorbedInto = nxt.span_id;
         }
       }
       // Drop absorbed api_requests from the child list in place.
       parent.children = kids.filter(function(c) { return !c._absorbedInto; });
+
+      // Second pass: shared model reference for Task/Agent spans that
+      // ended up with no _precedingApi. This happens when the orchestrator
+      // dispatches N Tasks in a single LLM turn — ONE api_request precedes
+      // all N Tasks, but exclusive-ownership absorption attaches it only to
+      // Task #1. Tasks #2..N would otherwise render with no model pill.
+      //
+      // Fix: for each Task/Agent with no _precedingApi, walk backward to
+      // find the nearest api_request whose model matches orchModel (or any
+      // api_request when orchModel is unknown). Attach it as _modelRef —
+      // a read-only reference used by the renderer for the model pill ONLY.
+      // _modelRef is NOT used for cost/token accounting (the absorbing span
+      // already counts those via _precedingApi; sharing would double-count).
+      var updatedKids = parent.children;
+      for (var m = 0; m < updatedKids.length; m++) {
+        var mSpan = updatedKids[m];
+        if ((mSpan.tool_name === 'Task' || mSpan.tool_name === 'Agent') && !mSpan._precedingApi) {
+          // Walk the original kids array backward from the pre-absorption
+          // position to find the nearest qualifying api_request. We search
+          // all kids (including absorbed ones) so we can cross the absorption
+          // boundary — i.e. find the api_request that was absorbed by Task #1.
+          var modelRef = null;
+          for (var n = kids.length - 1; n >= 0; n--) {
+            var nCand = kids[n];
+            if (nCand.canonical !== 'api_request') continue;
+            if (orchModel && nCand.model && nCand.model !== orchModel) continue;
+            if (!orchModel && !nCand.model) continue;
+            modelRef = nCand;
+            break;
+          }
+          if (modelRef) mSpan._modelRef = modelRef;
+        }
+      }
     });
 
     // Reverse every children array so the most recent span renders first,
@@ -768,6 +854,19 @@ class HgEventTree extends HTMLElement {
       var assistantTexts = this._assistantTextsForTurn(turn);
       if (assistantTexts.length > 0) {
         html += assistantTexts.map(log => this.renderAssistantText(log, uq.feature_id)).join('');
+      } else {
+        // Fallback: when no OTel-derived assistant_text exists for this turn
+        // (e.g. the otel_signals write was dropped under pre-Option-3 contention),
+        // the Stop hook still recorded the last assistant message in
+        // agent_events.input_summary prefixed with "Agent stopped: ".
+        // Render that row with the same quiet-label + markdown + collapse
+        // treatment as renderAssistantText so the turn doesn't end silently.
+        var stopEvt = (turn.children || []).find(function(c) {
+          return c.tool_name === 'Stop' && c.event_type === 'end';
+        });
+        if (stopEvt) {
+          html += this.renderStopFallback(stopEvt, uq.feature_id);
+        }
       }
 
       // Prefer OTel spans when present — they're the canonical source
@@ -835,8 +934,7 @@ class HgEventTree extends HTMLElement {
 
     var stopReasonBadge = '';
     if (stopReason && stopReason !== 'end_turn') {
-      stopReasonBadge = '<span class="badge badge-stop-reason" style="background-color: #f59e0b;">'
-        + esc(stopReason) + '</span>';
+      stopReasonBadge = '<span class="stop-reason-label">' + esc(stopReason) + '</span>';
     }
 
     var featureBdg = this.featureBadge(log.feature_id || '', log.feature_title || '');
@@ -846,8 +944,8 @@ class HgEventTree extends HTMLElement {
       + ' data-timestamp="' + esc((attrs.timestamp || log.ts_micros || 0)) + '"'
       + ' style="padding-left: 2.5rem">'
       + expandIcon
-      + '<span class="badge badge-assistant" style="background-color: #9ca3af;">assistant</span>'
-      + '<span class="event-summary">' + esc(preview) + '</span>'
+      + '<span class="assistant-label">assistant</span>'
+      + '<span class="event-summary assistant-preview">' + esc(preview) + '</span>'
       + stopReasonBadge
       + featureBdg
       + '</div>';
@@ -870,6 +968,71 @@ class HgEventTree extends HTMLElement {
         body = '<div class="assistant-text-body markdown">' + markedHtml + '</div>';
       } else {
         // Fallback to plain pre if marked is not available
+        body = '<pre class="assistant-text-pre" style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
+          + esc(text)
+          + '</pre>';
+      }
+
+      html += '<div class="event-row depth-2 assistant-text-detail"'
+        + ' style="padding-left: 3.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem;">'
+        + body
+        + '</div>';
+    }
+
+    return html;
+  }
+
+  // renderStopFallback renders an agent_events Stop row as an assistant-text
+  // block when no OTel-derived assistant_text log exists for the turn.
+  // Mirrors renderAssistantText — same quiet-label, same preview, same
+  // expand/collapse with markdown body. Strips the "Agent stopped: " prefix
+  // from input_summary and shows the stop_reason quietly when non-default.
+  renderStopFallback(evt, parentFeatureId) {
+    var evtId = evt.event_id || 'stop-' + Math.random().toString(36).slice(2);
+    var isExp = this.expanded.has(evtId);
+
+    var rawSummary = evt.input_summary || '';
+    var prefix = 'Agent stopped: ';
+    var text = rawSummary.startsWith(prefix) ? rawSummary.slice(prefix.length) : rawSummary;
+
+    var stopReason = evt.stop_reason || '';
+    var previewLen = 180;
+    var preview = text.length > previewLen ? text.substring(0, previewLen) + '…' : text;
+
+    var expandIcon = '<span class="expand-icon ' + (isExp ? 'expanded' : '') + '" data-toggle="' + esc(evtId) + '">▶</span>';
+
+    var stopReasonBadge = '';
+    if (stopReason && stopReason !== 'end_turn') {
+      stopReasonBadge = '<span class="stop-reason-label">' + esc(stopReason) + '</span>';
+    }
+
+    var featureBdg = this.featureBadge(evt.feature_id || '', evt.feature_title || '');
+
+    var html = '<div class="event-row depth-1 assistant-text-row"'
+      + ' data-event-id="' + esc(evtId) + '"'
+      + ' data-timestamp="' + esc(evt.timestamp || '') + '"'
+      + ' style="padding-left: 2.5rem">'
+      + expandIcon
+      + '<span class="assistant-label">assistant</span>'
+      + '<span class="event-summary assistant-preview">' + esc(preview) + '</span>'
+      + stopReasonBadge
+      + featureBdg
+      + '</div>';
+
+    if (isExp) {
+      if (window.marked && !window._markedConfigured) {
+        window.marked.setOptions({ breaks: true, gfm: true });
+        window._markedConfigured = true;
+      }
+
+      var body;
+      if (window.marked && typeof window.marked.parse === 'function') {
+        var markedHtml = window.marked.parse(text);
+        if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+          markedHtml = window.DOMPurify.sanitize(markedHtml);
+        }
+        body = '<div class="assistant-text-body markdown">' + markedHtml + '</div>';
+      } else {
         body = '<pre class="assistant-text-pre" style="white-space: pre-wrap; word-wrap: break-word; max-width: 80ch; font-size: 0.9em; line-height: 1.4; margin: 0;">'
           + esc(text)
           + '</pre>';
@@ -923,8 +1086,11 @@ class HgEventTree extends HTMLElement {
       + statusBdg
       + '</div>';
 
-    if (isExp && evt.children) {
-      html += evt.children.map(c => this.renderEvent(c, depth + 1)).join('');
+    if (evt.children && evt.children.length > 0) {
+      var childVis = isExp ? '' : ' collapsed';
+      html += '<div class="event-children' + childVis + '" data-parent="' + esc(evt.event_id) + '">'
+        + evt.children.map(c => this.renderEvent(c, depth + 1)).join('')
+        + '</div>';
     }
     return html;
   }
@@ -1142,6 +1308,14 @@ class HgEventTree extends HTMLElement {
     var api = (isToolSpan && span._precedingApi) ? span._precedingApi : null;
     var apiModel = (api && api.model) || span.model;
     var apiCost = api ? api.cost_usd : span.cost_usd;
+    // Fallback model source for Task/Agent rows that share an api_request
+    // with a sibling (N Tasks dispatched in one LLM turn). _modelRef is
+    // read-only — used for the model pill ONLY, never for cost/tokens (to
+    // avoid double-counting the tokens already attributed to the absorbing
+    // sibling Task via its _precedingApi).
+    if (!apiModel && isToolSpan && span._modelRef && span._modelRef.model) {
+      apiModel = span._modelRef.model;
+    }
 
     // Compact, color-coded model badge. Inline-styled so each family
     // (Opus/Sonnet/Haiku, plus generic for OpenAI/Google) gets its

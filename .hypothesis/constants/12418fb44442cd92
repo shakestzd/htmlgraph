@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/query_builder.py
-# hypothesis_version: 6.151.9
-
-['all', 'bugs', 'contains', 'created', 'desc', 'done', 'eq', 'features', 'gt', 'high', 'in', 'in-progress', 'lt', 'ne', 'not_in', 'priority', 'spikes', 'status', 'tags', 'todo', 'track_id']

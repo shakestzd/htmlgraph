@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/session_handler.py
-# hypothesis_version: 6.151.9
-
-[100, '*', ',', '--short', '.', '...', '1', ':', 'Accept', 'CLAUDE_SESSION_ID', 'HEAD', 'Query recorded', 'Session ended', 'SessionEnd', 'SessionStart', 'User-Agent', 'UserQuery', 'Version:', 'agent', 'application/json', 'blockers', 'check_version_status', 'continue', 'debug', 'error', 'event', 'external_session_id', 'features', 'full_prompt_length', 'git', 'git_branch', 'handle_session_end', 'handle_session_start', 'handoff_notes', 'hookSpecificOutput', 'htmlgraph', 'in-progress', 'info', 'init_or_get_session', 'installed', 'is_outdated', 'latest', 'parent-activity.json', 'partial', 'pip', 'prompt', 'query_length', 'recommended_next', 'rev-parse', 'sessionContext', 'session_id', 'show', 'status', 'success', 'unknown', 'user_query', 'version', 'versionInfo', 'warning']

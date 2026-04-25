@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cigs/posttool_analyzer.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1.0, '.htmlgraph', 'PostToolUse', 'Task', 'additionalContext', 'compliance_rate', 'hookEventName', 'hookSpecificOutput', 'spawn_', 'total_violations', 'total_waste_tokens', 'violations_by_type']

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Enforce host-path check in work-item description at creation time; surface guidance in system prompt</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-5143700e"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-24T05:57:42.414596"
+             data-updated="2026-04-24T06:17:52.1448" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Enforce host-path check in work-item description at creation time; surface guidance in system prompt</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="cb5d73c7-d3c1-4598-9768-a07cf69db974.html" data-relationship="implemented_in" data-since="2026-04-24T05:58:19.292593">session cb5d73c7-d3c1-4598-9768-a07cf69db974</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>After a 30-minute commit-loop where pre-commit's check-host-paths rejected a bug commit because the description passed to 'htmlgraph bug create' embedded an absolute host path, enforce validation at creation time. Changes: (1) in 'htmlgraph bug|feature|spike create' (and set-description), reject descriptions containing host-local absolute paths (workspaces, home, Users, tmp, private/var prefixes) unless --allow-host-paths is passed — same rule set as scripts/check-host-paths.sh. Emit a clear error pointing at the offending string and suggesting relative-path/basename. (2) add one-line guidance to the system prompt at cmd/htmlgraph/prompts/system-prompt.md under the work-item creation section: 'Do not embed absolute host paths in descriptions — use relative paths or basenames. Enforced at creation.' Lane: Go CLI + embedded system prompt only, no plugin asset changes.</p>
+        </section>
+    </article>
+</body>
+</html>

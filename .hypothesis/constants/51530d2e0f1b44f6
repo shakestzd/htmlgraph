@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/routes/testing.py
-# hypothesis_version: 6.151.9
-
-[0.0, 500, '/api/test-event', 'agent_id', 'event_id', 'feature_id', 'input_summary', 'message', 'model', 'ok', 'parent_event_id', 'recorded', 'session_id', 'status', 'test-session', 'timestamp', 'tool_call', 'tool_name']

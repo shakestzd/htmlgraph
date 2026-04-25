@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/file_watcher.py
-# hypothesis_version: 6.151.9
-
-[0.5, '*.html', '.html', 'bug-*.html', 'bugs', 'chore-*.html', 'chores', 'feat-*.html', 'feature-*.html', 'features', 'insi-*.html', 'insight-*.html', 'insights', 'metr-*.html', 'metric-*.html', 'metrics', 'patt-*.html', 'pattern-*.html', 'patterns', 'sess-*.html', 'session-*.html', 'sessions', 'spike-*.html', 'spikes', 'spk-*.html', 'track-*.html', 'tracks', 'trk-*.html']

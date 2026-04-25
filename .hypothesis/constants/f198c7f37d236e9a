@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/queries.py
-# hypothesis_version: 6.151.9
-
-[' AND session_id = ?', ' AND timestamp <= ?', ' AND timestamp >= ?', ' LIMIT ?', 'blocked', 'bug', 'cancelled', 'check_point', 'chore', 'completion', 'critical', 'delegation', 'done', 'end', 'epic', 'error', 'feature', 'high', 'in_progress', 'low', 'medium', 'spike', 'start', 'task', 'todo', 'tool_call', 'tool_result']

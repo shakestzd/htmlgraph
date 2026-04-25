@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/graph/core.py
-# hypothesis_version: 6.151.9
-
-[0.0, 5.0, 100, 1000, '*.html', '../styles.css', '1', 'HTMLGRAPH_EAGER_LOAD', 'auto_compiled_count', 'blocked_by', 'both', 'cache_hits', 'cache_misses', 'compiled_queries', 'compiled_query_hits', 'incoming', 'index.html', 'last_reload_time_ms', 'outgoing', 'query_count', 'reload_count', 'single_reload_count', 'slowest_query_ms', 'total_query_time_ms']

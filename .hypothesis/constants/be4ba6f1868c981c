@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/skill_scout/github_search.py
-# hypothesis_version: 6.151.9
-
-[100, '--filename', '--json', '--limit', '.claude-plugin', '/', '2022-11-28', 'Accept', 'Authorization', 'GITHUB_TOKEN', 'X-GitHub-Api-Version', 'code', 'description', 'filename:plugin.json', 'full_name', 'gh', 'html_url', 'items', 'name', 'nameWithOwner', 'path', 'plugin.json', 'repository', 'search', 'url']

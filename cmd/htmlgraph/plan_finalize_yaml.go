@@ -60,58 +60,73 @@ func runFinalizeYAML(planID string) error {
 // finalizeYAML is the testable inner implementation of runFinalizeYAML.
 // It takes an explicit htmlgraphDir rather than resolving it from the environment.
 func finalizeYAML(htmlgraphDir, planID string) error {
-	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
-	plan, err := planyaml.Load(planPath)
-	if err != nil {
-		return fmt.Errorf("load plan: %w", err)
-	}
-
 	// Read approvals from SQLite.
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	db, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
 	defer db.Close()
 
-	approvals := map[string]bool{}
-	rows, err := db.Query(
-		"SELECT section, value FROM plan_feedback WHERE plan_id = ? AND action = 'approve'",
-		planID,
-	)
+	featIDs, _, err := finalizeYAMLWithDB(db, htmlgraphDir, planID)
 	if err != nil {
-		return fmt.Errorf("query approvals: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var section, value string
-		rows.Scan(&section, &value)
-		approvals[section] = strings.EqualFold(value, "true")
+		return err
 	}
 
-	// Read question answers from SQLite.
-	answers := map[string]string{}
-	answerRows, err := db.Query(
-		"SELECT question_id, value FROM plan_feedback WHERE plan_id = ? AND action = 'answer'",
-		planID,
-	)
+	// Print summary via CLI path (load plan again for summary context).
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, loadErr := planyaml.Load(planPath)
+	if loadErr != nil {
+		return nil // summary is optional; creation already succeeded
+	}
+	answers := loadPlanAnswers(db, planID)
+	var rejectedTitles []string
+	approvals := loadPlanApprovals(db, planID)
+	for _, s := range plan.Slices {
+		if !approvals[fmt.Sprintf("slice-%d", s.Num)] {
+			rejectedTitles = append(rejectedTitles, s.Title)
+		}
+	}
+	var track *models.Node
+	if plan.Meta.TrackID != "" {
+		p, pErr := workitem.Open(htmlgraphDir, agentForClaim())
+		if pErr == nil {
+			defer p.Close()
+			track, _ = p.Tracks.Get(plan.Meta.TrackID)
+		}
+	}
+	printFinalizeYAMLSummary(plan, track, answers, featIDs, rejectedTitles)
+	return nil
+}
+
+// finalizeFailure records a slice number and error for feature creation failures.
+type finalizeFailure struct {
+	SliceNum int    `json:"slice_num"`
+	Title    string `json:"title"`
+	Error    string `json:"error"`
+}
+
+// finalizeYAMLWithDB creates a track and features from approved slices using a
+// caller-supplied database connection. It returns the IDs of created features
+// and any per-slice failures. Partial success is not an error — callers should
+// inspect both return values.
+func finalizeYAMLWithDB(db *sql.DB, htmlgraphDir, planID string) (createdIDs []string, failures []finalizeFailure, err error) {
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
 	if err != nil {
-		return fmt.Errorf("query answers: %w", err)
+		return nil, nil, fmt.Errorf("load plan: %w", err)
 	}
-	defer answerRows.Close()
-	for answerRows.Next() {
-		var qID, value string
-		answerRows.Scan(&qID, &value)
-		answers[qID] = value
-	}
+
+	approvals := loadPlanApprovals(db, planID)
+	answers := loadPlanAnswers(db, planID)
 
 	// Read accepted amendments from SQLite.
-	amendRows, err := db.Query(
+	amendRows, qErr := db.Query(
 		"SELECT value FROM plan_feedback WHERE plan_id = ? AND section = 'amendment' AND action = 'accepted'",
 		planID,
 	)
-	if err != nil {
-		return fmt.Errorf("query amendments: %w", err)
+	if qErr != nil {
+		return nil, nil, fmt.Errorf("query amendments: %w", qErr)
 	}
 	defer amendRows.Close()
 
@@ -127,39 +142,17 @@ func finalizeYAML(htmlgraphDir, planID string) error {
 
 	// Apply accepted amendments to plan slices in memory.
 	applyAmendments(plan, amendments)
-	if len(amendments) > 0 {
-		fmt.Printf("Applied %d amendment(s) to plan\n", len(amendments))
-	}
 
 	// Open project for work item creation.
-	p, err := workitem.Open(htmlgraphDir, agentForClaim())
-	if err != nil {
-		return fmt.Errorf("open project: %w", err)
+	p, pErr := workitem.Open(htmlgraphDir, agentForClaim())
+	if pErr != nil {
+		return nil, nil, fmt.Errorf("open project: %w", pErr)
 	}
 	defer p.Close()
 
-	// Idempotent re-finalize: plan already finalized — look up existing track+features
-	// via planned_in edges and emit the full dispatch summary without creating new nodes.
+	// Idempotent re-finalize: plan already finalized — look up existing features.
 	if plan.Meta.Status == "finalized" {
-		trackID := plan.Meta.TrackID
-		if trackID == "" {
-			trackID = findTrackForPlan(p, planID)
-		}
-		var existingTrack *models.Node
-		if trackID != "" {
-			existingTrack, _ = p.Tracks.Get(trackID)
-		}
-		// Use planned_in edges (feature → plan) to find existing features.
-		// This works even when part_of/contains edges were not written on first run.
-		featIDs := findFeaturesForPlan(db, planID)
-		var rejectedOnRefinalize []string
-		for _, s := range plan.Slices {
-			if !s.Approved {
-				rejectedOnRefinalize = append(rejectedOnRefinalize, s.Title)
-			}
-		}
-		printFinalizeYAMLSummary(plan, existingTrack, answers, featIDs, rejectedOnRefinalize)
-		return nil
+		return findFeaturesForPlan(db, planID), nil, nil
 	}
 
 	// Reuse existing track when meta.track_id references a valid track;
@@ -169,15 +162,13 @@ func finalizeYAML(htmlgraphDir, planID string) error {
 		existing, getErr := p.Tracks.Get(plan.Meta.TrackID)
 		if getErr == nil && existing != nil {
 			track = existing
-			fmt.Printf("Using existing track: %s  %s\n", track.ID, track.Title)
 		}
 	}
 	if track == nil {
 		track, err = p.Tracks.Create(plan.Meta.Title)
 		if err != nil {
-			return fmt.Errorf("create track: %w", err)
+			return nil, nil, fmt.Errorf("create track: %w", err)
 		}
-		fmt.Printf("Created track: %s  %s\n", track.ID, track.Title)
 	}
 
 	// Create features for approved slices, embedding design decisions.
@@ -186,20 +177,22 @@ func finalizeYAML(htmlgraphDir, planID string) error {
 		title string
 	}
 	numToFeat := map[int]createdFeat{}
-	var rejectedTitles []string
 	for _, s := range plan.Slices {
 		approved := approvals[fmt.Sprintf("slice-%d", s.Num)]
 		if !approved {
-			rejectedTitles = append(rejectedTitles, s.Title)
 			continue
 		}
 		content := buildFeatureContent(s.What, plan.Questions, answers)
-		feat, err := p.Features.Create(s.Title,
+		feat, featErr := p.Features.Create(s.Title,
 			workitem.FeatWithTrack(track.ID),
 			workitem.FeatWithContent(content),
 		)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "  Error creating feature for slice %d: %v\n", s.Num, err)
+		if featErr != nil {
+			failures = append(failures, finalizeFailure{
+				SliceNum: s.Num,
+				Title:    s.Title,
+				Error:    featErr.Error(),
+			})
 			continue
 		}
 		numToFeat[s.Num] = createdFeat{id: feat.ID, title: feat.Title}
@@ -248,23 +241,61 @@ func finalizeYAML(htmlgraphDir, planID string) error {
 	for i := range plan.Slices {
 		plan.Slices[i].Approved = approvals[fmt.Sprintf("slice-%d", plan.Slices[i].Num)]
 	}
-	if err := planyaml.Save(planPath, plan); err != nil {
-		return fmt.Errorf("save plan: %w", err)
+	if saveErr := planyaml.Save(planPath, plan); saveErr != nil {
+		return nil, failures, fmt.Errorf("save plan: %w", saveErr)
 	}
 
-	if err := commitPlanChange(planPath, fmt.Sprintf("plan(%s): finalize — %d slices approved", planID, len(numToFeat))); err != nil {
-		return fmt.Errorf("autocommit finalize-yaml: %w", err)
+	if commitErr := commitPlanChange(planPath, fmt.Sprintf("plan(%s): finalize — %d slices approved", planID, len(numToFeat))); commitErr != nil {
+		return nil, failures, fmt.Errorf("autocommit finalize-yaml: %w", commitErr)
 	}
 
-	// Build feat IDs list in slice order for summary.
-	var featIDs []string
+	// Build feat IDs list in slice order.
 	for _, s := range plan.Slices {
 		if cf, ok := numToFeat[s.Num]; ok {
-			featIDs = append(featIDs, cf.id)
+			createdIDs = append(createdIDs, cf.id)
 		}
 	}
-	printFinalizeYAMLSummary(plan, track, answers, featIDs, rejectedTitles)
-	return nil
+	return createdIDs, failures, nil
+}
+
+// loadPlanApprovals reads approve actions from plan_feedback and returns a map
+// from section key (e.g. "slice-1") to approved state.
+func loadPlanApprovals(db *sql.DB, planID string) map[string]bool {
+	approvals := map[string]bool{}
+	rows, err := db.Query(
+		"SELECT section, value FROM plan_feedback WHERE plan_id = ? AND action = 'approve'",
+		planID,
+	)
+	if err != nil {
+		return approvals
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var section, value string
+		rows.Scan(&section, &value)
+		approvals[section] = strings.EqualFold(value, "true")
+	}
+	return approvals
+}
+
+// loadPlanAnswers reads answer actions from plan_feedback and returns a map
+// from question ID to the selected option key.
+func loadPlanAnswers(db *sql.DB, planID string) map[string]string {
+	answers := map[string]string{}
+	rows, err := db.Query(
+		"SELECT question_id, value FROM plan_feedback WHERE plan_id = ? AND action = 'answer'",
+		planID,
+	)
+	if err != nil {
+		return answers
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var qID, value string
+		rows.Scan(&qID, &value)
+		answers[qID] = value
+	}
+	return answers
 }
 
 // buildFeatureContent constructs a feature description from a slice's "what" field

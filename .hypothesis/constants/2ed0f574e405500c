@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/archive/manager.py
-# hypothesis_version: 6.151.9
-
-[1024, '*.bloom', '*.html', '-', '.html', 'ArchiveConfig', 'archive', 'archive-index', 'archive_count', 'archive_file', 'archive_files', 'archived_count', 'archives', 'archives.db', 'article', 'bloom_count', 'bloom_size_kb', 'bug', 'cancelled', 'chore', 'config.json', 'content', 'created', 'db_size_mb', 'description', 'description_snippet', 'details', 'done', 'dry_run', 'entity_count', 'entity_id', 'entity_type', 'epic', 'feature', 'fts_size_mb', 'id', 'insight', 'metric', 'month', 'obsolete', 'pattern', 'phase', 'quarter', 'rank', 'session', 'spike', 'status', 'title', 'title_snippet', 'total_size_mb', 'track', 'type', 'updated', 'w', 'would_archive', 'year']

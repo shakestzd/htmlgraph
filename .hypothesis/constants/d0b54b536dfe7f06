@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/task_coordination.py
-# hypothesis_version: 6.151.9
-
-[120, 'SDK', 'attempts', 'completed', 'description', 'error', 'findings', 'general-purpose', 'needs-review', 'prompt', 'spike_id', 'subagent_type', 'success', 'task_id', 'title', 'validated', 'validation_results']

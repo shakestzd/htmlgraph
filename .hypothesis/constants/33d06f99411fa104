@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/mixins/attribution.py
-# hypothesis_version: 6.151.9
-
-['by_subagent', 'created_at', 'error', 'event_id', 'input_summary', 'is_error', 'orchestrator', 'subagent_type', 'success', 'summary', 'task_id', 'timestamp', 'tool', 'tool_name', 'total_events']

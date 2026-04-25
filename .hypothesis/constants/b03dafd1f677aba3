@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/report.py
-# hypothesis_version: 6.151.9
-
-[4.5, 1000000, '%H:%M:%S', '--detail', '--graph-dir', '--output', '--report-format', '--session', '-g', '-o', '.', '/', '< 1 minute', '</div>\n', '??:??:??', 'Bash', 'Edit', 'Graph directory', 'No database found', 'Read', 'Session not found', 'Write', 'agent_assigned', 'api_key', 'auth', 'basic', 'completed', 'completed_at', 'cost_tokens', 'created_at', 'detail', 'duration', 'error', 'failed', 'full', 'green', 'html', 'htmlgraph.db', 'input_summary', 'key', 'latest', 'markdown', 'output', 'output_summary', 'password', 'pending', 'pytest', 'red', 'report', 'report_format', 'secret', 'session', 'session-report.html', 'session-report.md', 'session_id', 'status', 'subagent_type', 'success', 'terminal', 'test', 'timestamp', 'today', 'token', 'tool_name', 'total_tokens_used', 'unknown', 'yellow', '─', '○', '✓', '✗']

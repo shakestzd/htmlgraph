@@ -13,6 +13,7 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/otel"
 	"github.com/shakestzd/htmlgraph/internal/otel/adapter"
 	"github.com/shakestzd/htmlgraph/internal/otel/otlp"
+	"github.com/shakestzd/htmlgraph/internal/otel/sink"
 
 	// TracesData/MetricsData/LogsData are wire-compatible wrappers with
 	// identical field numbers to ExportTraceServiceRequest etc. We use
@@ -39,16 +40,16 @@ import (
 // so since we silently drop. Future work: surface drop counts.
 type HTTPHandler struct {
 	Registry *adapter.Registry
-	Writer   *Writer
+	Sink     sink.SignalSink
 	Logger   *log.Logger
 }
 
 // NewHTTPHandler constructs a handler with a default stdlib logger.
-// Callers wire the registry + writer and mount the three routes.
-func NewHTTPHandler(reg *adapter.Registry, w *Writer) *HTTPHandler {
+// Callers wire the registry + sink and mount the three routes.
+func NewHTTPHandler(reg *adapter.Registry, s sink.SignalSink) *HTTPHandler {
 	return &HTTPHandler{
 		Registry: reg,
-		Writer:   w,
+		Sink:     s,
 		Logger:   log.Default(),
 	}
 }
@@ -155,21 +156,21 @@ func (h *HTTPHandler) persist(ctx context.Context, decoded []otlp.Decoded) error
 			// observability-of-observability counter could surface this.
 			continue
 		}
-		signals := h.convertAll(a, d)
+		signals := ConvertAll(a, d)
 		if len(signals) == 0 {
 			continue
 		}
-		if _, err := h.Writer.WriteBatch(ctx, a.Name(), d.Resource.Attrs, signals); err != nil {
+		if err := h.Sink.WriteBatch(ctx, a.Name(), d.Resource.Attrs, signals); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// convertAll runs every signal in the decoded batch through the
+// ConvertAll runs every signal in the decoded batch through the
 // adapter and assigns a stable SignalID. The resulting slice is ready
-// for writer.WriteBatch.
-func (h *HTTPHandler) convertAll(a adapter.Adapter, d otlp.Decoded) []otel.UnifiedSignal {
+// for SignalSink.WriteBatch.
+func ConvertAll(a adapter.Adapter, d otlp.Decoded) []otel.UnifiedSignal {
 	out := make([]otel.UnifiedSignal, 0, len(d.Metrics)+len(d.Logs)+len(d.Spans))
 
 	for _, sm := range d.Metrics {

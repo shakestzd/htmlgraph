@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models/analytics.py
-# hypothesis_version: 6.151.9
-
-[0.0, '\n        </section>', '"', '&quot;', '../styles.css', 'Todo', '[ ]', '[x]', '[~]', 'activeForm', 'agent', 'aggregated-metric', 'anomaly', 'bug-', 'bugs', 'chore-', 'chores', 'completed', 'content', 'context_usage', 'daily', 'declining', 'efficiency', 'epic-', 'epics', 'feat-', 'feature', 'feature-', 'features', 'health', 'improving', 'in_progress', 'insi-', 'insight-', 'insights', 'monthly', 'pending', 'recommendation', 'session', 'session-insight', 'spike-', 'spikes', 'spk-', 'stable', 'status', 'tool_distribution', 'track', 'track-', 'tracks', 'trk-', 'type', 'weekly', '⏳', '✅', '🔄']

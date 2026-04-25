@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/ingest/gemini.py
-# hypothesis_version: 6.151.9
-
-[200, ' | ', '+00:00', '.config', '.gemini', ': ', 'Ingested session %s', 'Z', 'content', 'done', 'gemini', 'id', 'lastUpdated', 'messages', 'model', 'name', 'projectHash', 'sessionId', 'startTime', 'thoughts', 'timestamp', 'tmp', 'tokens', 'toolCalls', 'type', 'unknown', 'user', 'utf-8']

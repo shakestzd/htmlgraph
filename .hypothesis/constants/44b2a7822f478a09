@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cigs/reporter.py
-# hypothesis_version: 6.151.9
-
-[0.3, 0.5, 0.8, 1.0, 100, '#0f3460', '#16213e', '#1a1a2e', '#4caf50', '#b0b0b0', '#e0e0e0', '#e94560', '#f44336', '#ff9800', '%Y-%m-%d %H:%M:%S', '</body></html>', '<body>', 'Moderate Compliance', 'No', 'accent_primary', 'accent_secondary', 'bg_primary', 'bg_secondary', 'compliance_rate', 'demo-session', 'direct_cost_estimate', 'error', 'savings_percentage', 'savings_potential', 'status-error', 'status-good', 'status-warning', 'success', 'text_primary', 'text_secondary', 'total_violations', 'total_waste_tokens', 'utf-8', 'warning', '⚠️']

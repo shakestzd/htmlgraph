@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/__init__.py
-# hypothesis_version: 6.151.9
-
-['AIResult', 'BaseSpawner', 'BudgetMode', 'ClaudeSpawner', 'CodexSpawner', 'ComplexityLevel', 'CopilotSpawner', 'GeminiSpawner', 'HeadlessSpawner', 'ModelSelection', 'SpawnerEventTracker', 'TaskType', 'delegate_with_id', 'generate_task_id', 'get_fallback_chain', 'parallel_delegate', 'save_task_results', 'select_model', 'validate_and_save']

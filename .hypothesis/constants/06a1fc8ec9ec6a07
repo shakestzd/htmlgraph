@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sessions/handoff.py
-# hypothesis_version: 6.151.9
-
-[120, 3600, '*.json', '*.md', '*.txt', '--diff-filter=AMR', '--name-only', '--no-merges', '--oneline', '--pretty=format:', '--show-toplevel', 'Blockers:', 'Context to Load:', 'Next Focus:', 'Recent Commits:', '__pycache__/*', '_db', 'blockers', 'ended', 'git', 'hand', 'handoff_notes', 'hash', 'log', 'message', 'recommended_context', 'recommended_next', 'rev-parse', 'sessions', '═']

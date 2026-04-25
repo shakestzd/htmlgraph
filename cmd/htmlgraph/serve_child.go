@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,7 +10,10 @@ import (
 	"path/filepath"
 
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/otel/indexer"
 	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
+	"github.com/shakestzd/htmlgraph/internal/otel/retention"
+	sqls "github.com/shakestzd/htmlgraph/internal/otel/sink/sqlite"
 	"github.com/shakestzd/htmlgraph/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +51,7 @@ func runServeChild(port int) error {
 		return fmt.Errorf("locate .htmlgraph: %w", err)
 	}
 
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
@@ -55,6 +59,19 @@ func runServeChild(port int) error {
 	// database is closed when the process exits; no defer Close — Serve blocks.
 
 	mux := buildSingleProjectMux(database, htmlgraphDir)
+
+	// NDJSON→SQLite indexer (unconditional per Q5 cutover decision).
+	// A dedicated Writer is opened for the indexer so it does not contend
+	// with the OTLP receiver's Writer (each has MaxOpenConns=1).
+	if idxWriter, err := otelreceiver.NewWriter(dbPath); err != nil {
+		fmt.Fprintf(os.Stderr, "indexer writer init: %v\n", err)
+	} else {
+		idxr := indexer.New(htmlgraphDir, sqls.New(idxWriter))
+		ctx := context.Background()
+		go idxr.Start(ctx)
+		// /api/indexer/status — per-file health for observability (Q7).
+		mux.Handle("/api/indexer/status", indexerStatusHandler(idxr))
+	}
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
@@ -96,29 +113,21 @@ func runServeChild(port int) error {
 		startAITitleBackfill(context.Background(), database, htmlgraphDir)
 	})
 
-	// Embedded OTLP receiver (default-on). Opt out with HTMLGRAPH_OTEL_ENABLED=0.
-	// Port is derived deterministically from the project dir so each project
-	// child binds a distinct port (range 4318..5317). Explicit
-	// HTMLGRAPH_OTEL_HTTP_PORT wins over the hash-derived port.
-	// Failures here are logged and non-fatal — the dashboard must stay up
-	// even if the receiver can't bind.
-	projectDir := filepath.Dir(htmlgraphDir)
-	otelCfg := otelreceiver.LoadConfigFromEnv(dbPath, projectDir)
-	if otelCfg.Enabled {
-		rec, err := otelreceiver.New(otelCfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "otel receiver init: %v\n", err)
-		} else if err := rec.Start(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "otel receiver start: %v\n", err)
-		} else {
-			// Write the bound port to .htmlgraph/.otlp-port for external tools
-			// and diagnostics. Best-effort — failures are silently ignored.
-			portFile := filepath.Join(htmlgraphDir, ".otlp-port")
-			_ = os.WriteFile(portFile, []byte(fmt.Sprintf("%d\n", otelCfg.HTTPPort)), 0o644)
-		}
-		// Receiver runs until process exit; its writer closes when the
-		// process terminates. No explicit Stop needed because Serve blocks.
-	}
+	// Retention job: archive sessions older than HTMLGRAPH_SESSION_RETAIN_DAYS
+	// (default 30) at startup and every 24h. Dry-run via HTMLGRAPH_RETENTION_DRYRUN=1.
+	retention.StartLoop(context.Background(), database, htmlgraphDir)
 
 	return (&http.Server{Handler: mux}).Serve(ln)
+}
+
+// indexerStatusHandler returns an HTTP handler for GET /api/indexer/status.
+// The response body is a JSON object with per-session file health metrics.
+func indexerStatusHandler(idxr *indexer.Indexer) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		status := idxr.Status()
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]any{"files": status}); err != nil {
+			http.Error(w, "encode error", http.StatusInternalServerError)
+		}
+	})
 }

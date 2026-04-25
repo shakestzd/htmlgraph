@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/planning/parallel.py
-# hypothesis_version: 6.151.9
-
-['all_passed', 'avg_health_score', 'avoid', 'blocked_tasks', 'can_parallelize', 'conflicts', 'dispatch', 'failed', 'files_modified', 'guidelines', 'level_count', 'max_parallelism', 'next_level', 'parallel_speedup', 'patterns', 'prompts', 'ready_now', 'ready_tasks', 'reason', 'recommendation', 'recommendations', 'speedup_factor', 'successful', 'task_count', 'todo', 'total_agents', 'total_anti_patterns', 'total_ready', 'validation', 'warnings']

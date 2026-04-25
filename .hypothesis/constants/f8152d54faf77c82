@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/orchestrator_reflector.py
-# hypothesis_version: 6.151.9
-
-[' git ', '...', '1', 'Bash', 'PostToolUse', '\\bpytest\\b', '\\bpython3\\s+', '\\bpython\\s+-c\\b', '\\bpython\\s+-m\\s+\\w+', '\\buv\\s+run\\b', 'additionalContext', 'cat ', 'command', 'continue', 'find ', 'git ', 'grep ', 'hookEventName', 'hookSpecificOutput', 'ls ', 'tool_input', 'tool_name']

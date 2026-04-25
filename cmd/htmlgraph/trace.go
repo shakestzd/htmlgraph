@@ -70,7 +70,7 @@ func runTrace(arg string, jsonOut bool) error {
 		if err != nil {
 			return err
 		}
-		database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+		database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 		if err != nil {
 			return fmt.Errorf("open database: %w", err)
 		}
@@ -106,7 +106,7 @@ func runTraceCommit(sha string, jsonOut bool) error {
 		return err
 	}
 
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -183,7 +183,7 @@ func runTraceFile(filePath string, jsonOut bool) error {
 		return err
 	}
 
-	database, err := dbpkg.Open(filepath.Join(dir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(dir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

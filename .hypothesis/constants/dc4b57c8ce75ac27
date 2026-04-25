@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/task_validator.py
-# hypothesis_version: 6.151.9
-
-['*', '.htmlgraph', 'PostToolUse', 'Task', '\\.htmlgraph/spikes/', '\\.save\\(\\)', 'additionalContext', 'continue', 'events', 'findings.*saved', 'hookEventName', 'hookSpecificOutput', 'htmlgraph', 'output', 'result', 'saved.*findings', 'saved.*spike', 'sdk\\.spikes', 'sessions', 'spike.*saved', 'spikes', 'spk-[a-f0-9]{8}', 'systemMessage', 'text mentions saving']

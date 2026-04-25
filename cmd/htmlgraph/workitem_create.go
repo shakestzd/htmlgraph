@@ -23,6 +23,7 @@ type wiCreateOpts struct {
 	start            bool
 	noLink           bool
 	causedBy         string // explicit caused_by feature ID for bugs
+	allowHostPaths   bool   // bypass host-path validation in description
 }
 
 func wiCreateCmd(typeName, _ string) *cobra.Command {
@@ -43,6 +44,7 @@ func wiCreateCmd(typeName, _ string) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.noLink, "no-link", false, "skip auto-linking (e.g. bug to active feature)")
 	cmd.Flags().StringVar(&opts.files, "files", "", "comma-separated affected file paths")
 	cmd.Flags().StringVar(&opts.steps, "steps", "", "comma-separated implementation steps")
+	cmd.Flags().BoolVar(&opts.allowHostPaths, "allow-host-paths", false, "bypass host-local path check in --description")
 	if typeName == "bug" {
 		cmd.Flags().StringVar(&opts.causedBy, "caused-by", "", "feature ID that caused this bug")
 	}
@@ -82,6 +84,10 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 		if planNode.TrackID != "" {
 			o.trackID = planNode.TrackID
 		}
+	}
+
+	if err := validateDescriptionForHostPaths(o.description, o.allowHostPaths); err != nil {
+		return err
 	}
 
 	if err := warnMissingFields(typeName, o); err != nil {

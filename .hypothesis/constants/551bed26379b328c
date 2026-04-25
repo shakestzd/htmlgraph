@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/ingest/opencode.py
-# hypothesis_version: 6.151.9
-
-[1000.0, 200, ' | ', '*.json', '*/*.json', '.config', '.local', ': ', 'additions', 'agent', 'assistant', 'created', 'deletions', 'directory', 'done', 'files', 'id', 'message', 'model', 'modelID', 'opencode', 'projectID', 'providerID', 'role', 'session', 'sessionID', 'share', 'storage', 'summary', 'time', 'title', 'unknown', 'updated', 'user', 'utf-8', 'version']

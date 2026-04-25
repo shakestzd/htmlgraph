@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/bootstrap.py
-# hypothesis_version: 6.151.9
-
-['--version', '.gitignore', '.htmlgraph', '1.0', 'Pipfile', 'bootstrapped', 'claude', 'config.json', 'directories', 'directories_created', 'events', 'features', 'files', 'files_created', 'graph_dir', 'has_claude', 'htmlgraph.db', 'logs', 'logs/errors', 'message', 'multi', 'next_steps', 'node', 'package.json', 'plugin_installed', 'project_type', 'pyproject.toml', 'python', 'requirements.txt', 'sessions', 'setup.py', 'spikes', 'success', 'tracks', 'unknown', 'version', 'y', 'yes']

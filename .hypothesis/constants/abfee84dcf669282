@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/websocket.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1.2, 2.0, 50.0, 100.0, 1000.0, 1008, 'active_sessions', 'agent_id', 'batch', 'completion', 'connected_clients', 'connection_time_ms', 'cost_tokens', 'count', 'error', 'event', 'event_id', 'event_type', 'events', 'feature_id', 'input_summary', 'model', 'output_summary', 'parent_event_id', 'session_id', 'status', 'timestamp', 'tool_call', 'tool_name', 'total_bytes_sent', 'total_connections', 'total_events_sent', 'type', 'unknown', 'uptime_seconds', 'utf-8']

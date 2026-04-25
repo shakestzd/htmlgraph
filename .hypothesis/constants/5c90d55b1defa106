@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/presence.py
-# hypothesis_version: 6.151.9
-
-[300, 'AgentPresence', 'active', 'agent_id', 'cost_tokens', 'current_feature_id', 'event_type', 'feature_id', 'idle', 'last_activity', 'last_tool_name', 'offline', 'presence', 'presence_update', 'session_id', 'status', 'timestamp', 'tool_name', 'total_cost_tokens', 'total_tools_executed', 'type']

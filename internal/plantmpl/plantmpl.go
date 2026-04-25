@@ -13,6 +13,7 @@ import (
 	"embed"
 	"html/template"
 	"io"
+	"strings"
 	texttemplate "text/template"
 )
 
@@ -53,6 +54,7 @@ var planPageTmpl = texttemplate.Must(
 	texttemplate.New("plan_page.gohtml").Funcs(texttemplate.FuncMap{
 		"renderZone":   renderZone,
 		"renderSlices": renderSlices,
+		"hasPrefix":    strings.HasPrefix,
 	}).ParseFS(templateFS, "templates/plan_page.gohtml"),
 )
 

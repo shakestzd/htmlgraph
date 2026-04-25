@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/ingest/codex.py
-# hypothesis_version: 6.151.9
-
-[200, ' | ', '*.json', '+00:00', '.codex', ': ', 'Z', 'arguments', 'assistant', 'codex', 'content', 'done', 'duration_ms', 'function_call', 'function_call_output', 'id', 'instructions', 'items', 'message', 'name', 'output', 'raw', 'reasoning', 'role', 'session', 'sessions', 'summary', 'text', 'timestamp', 'type', 'unknown', 'user', 'utf-8', '{}']

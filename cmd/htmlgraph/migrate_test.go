@@ -23,7 +23,7 @@ func setupMigrateEnv(t *testing.T, orphanIDs ...string) string {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestExistingSessionHTMLSet(t *testing.T) {
 func TestBuildParseResultFromSQLite(t *testing.T) {
 	htmlgraphDir := setupMigrateEnv(t, "sess-build-001")
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestBuildParseResultFromSQLite(t *testing.T) {
 func TestMigrateOneSession_RendersFromSQLite(t *testing.T) {
 	htmlgraphDir := setupMigrateEnv(t, "sess-migrate-001")
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestMigrateOneSession_RendersFromSQLite(t *testing.T) {
 func TestMigrateSessions_Idempotent(t *testing.T) {
 	htmlgraphDir := setupMigrateEnv(t, "sess-idem-001")
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestSelectOrphanSessions(t *testing.T) {
 		t.Fatalf("write existing: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

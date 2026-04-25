@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/pattern_learning.py
-# hypothesis_version: 6.151.9
-
-[0.0, 100, ' AND session_id = ?', '## Anti-Patterns\n\n', '## Recommendations\n\n', ',', '->', '.htmlgraph', '?', 'Read', 'anti-pattern', 'avg_duration', 'avg_duration_seconds', 'completions', 'description', 'errors', 'frequency', 'htmlgraph.db', 'impact_score', 'insight_id', 'insight_type', 'last_seen', 'optimization', 'pattern_id', 'patterns', 'recommendation', 'sequence', 'session_id', 'sessions', 'success_rate', 'timestamp', 'title', 'tool_name', 'tool_sequence', 'user_feedback', 'w']

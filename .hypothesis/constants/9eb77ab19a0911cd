@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/work/orchestration.py
-# hypothesis_version: 6.151.9
-
-['--continue', '--dev', '--format', '--graph-dir', '--init', '--level', '-g', '-l', 'Activated at', 'Circuit breaker', 'Claude Code launched', 'Config file', 'Exploration calls', 'Graph directory', 'Guidance mode', 'Level', 'Mode', 'New value', 'Normal', 'Orchestrator command', 'Output format', 'Status', 'Strict enforcement', 'TRIGGERED', 'Violation count', 'Violation decay', 'Violations', 'Violations reset', 'activated_at', 'claude', 'config-reset', 'config-set', 'config-show', 'continue_session', 'dev', 'disable', 'enable', 'enabled', 'enforcement_level', 'format', 'guidance', 'init', 'json', 'key', 'level', 'message', 'not enabled', 'orchestrator', 'orchestrator_command', 'path', 'quiet', 'reset-violations', 'set-level', 'status', 'store_true', 'strict', 'success', 'text', 'value', 'violations']

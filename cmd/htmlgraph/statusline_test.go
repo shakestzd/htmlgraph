@@ -24,7 +24,7 @@ func TestStatuslineCmd(t *testing.T) {
 	os.Chdir(tmpDir)
 
 	// Create and populate test database
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	db, err := dbpkg.Open(dbPath)
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/planning/queue.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'agent_assigned', 'blocked', 'blocked_by', 'blocks', 'blocks_count', 'bugs', 'chores', 'cli', 'complexity', 'edges', 'effort', 'epics', 'estimated_effort', 'features', 'id', 'in-progress', 'priority', 'score', 'spikes', 'status', 'task_id', 'title', 'todo', 'type']

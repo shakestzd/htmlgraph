@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/graph/queries.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1000, '# Graph Summary', 'both', 'by_status', 'cache_hits', 'cache_misses', 'compiled_queries', 'compiled_query_hits', 'critical', 'done', 'high', 'outgoing', 'query_count', 'slowest_query_ms', 'total_query_time_ms']

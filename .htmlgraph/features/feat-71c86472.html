@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Widen check-host-paths.sh full-repo scan scope; add test-fixture allowlist rules</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-71c86472"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-24T14:13:47.568265"
+             data-updated="2026-04-24T14:15:25.05681" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Widen check-host-paths.sh full-repo scan scope; add test-fixture allowlist rules</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="cb5d73c7-d3c1-4598-9768-a07cf69db974.html" data-relationship="implemented_in" data-since="2026-04-24T14:15:25.056548">session cb5d73c7-d3c1-4598-9768-a07cf69db974</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>check-host-paths.sh currently scans only .htmlgraph/ and .claude/ in full-scan mode. That leaves ~90% of the tracked tree unscanned (cmd/, internal/, docs/, plugin/, packages/, scripts/). Extend the scan scope to cover the whole repo, with a pattern-based allowlist for legitimate cases: testdata/ directories, *_test.go explicit fake-path test tables, docs/archive/ historical reports, .devcontainer/ config files that legitimately reference container mounts, and scripts/check-host-paths.sh itself (the pattern appears in its own regex/comments). Keep the existing file-path allowlist (scripts/host-paths-allowlist.txt) working alongside the new pattern rules. Goal: a CI-callable full scan that fails on genuine leaks and stays quiet on intentional fake paths in fixtures and archived docs.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -338,17 +338,24 @@ func runWiDelete(id string) error {
 }
 
 func wiAddStepCmd(typeName string) *cobra.Command {
-	return &cobra.Command{
+	var allowHostPaths bool
+	cmd := &cobra.Command{
 		Use:   "add-step <id> <description>",
 		Short: "Add an implementation step to a " + typeName,
 		Args:  cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runWiAddStep(typeName, args[0], args[1])
+			return runWiAddStep(typeName, args[0], args[1], allowHostPaths)
 		},
 	}
+	cmd.Flags().BoolVar(&allowHostPaths, "allow-host-paths", false, "bypass host-local path check in step description")
+	return cmd
 }
 
-func runWiAddStep(typeName, id, description string) error {
+func runWiAddStep(typeName, id, description string, allowHostPaths bool) error {
+	if err := validateDescriptionForHostPaths(description, allowHostPaths); err != nil {
+		return err
+	}
+
 	dir, err := findHtmlgraphDir()
 	if err != nil {
 		return err

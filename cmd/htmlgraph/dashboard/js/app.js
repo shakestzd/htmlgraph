@@ -1317,7 +1317,7 @@ function detectMode() {
     // Inside a project (single mode served by a child under /p/<id>/)
     // — label the header with the project name returned by /api/mode.
     // Also expose projectRoot so the event-tree component can relativize
-    // absolute paths (e.g. strip /Users/shakes/DevProjects/htmlgraph/ prefix).
+    // absolute paths (e.g. strip project root prefix from file paths).
     if (data.mode === 'single' && data.projectName) {
       window.htmlgraphProjectName = data.projectName;
       window.htmlgraphProjectRoot = data.projectRoot || null;
@@ -1417,6 +1417,11 @@ function renderProjectsLanding(projects) {
 // Startup: detect mode, then either render the landing (at root) or run
 // the single-project startup (under /p/<id>/).
 detectMode().then(function() {
+  // Probe the terminal feature gate once on every page — hide the button if
+  // the backend routes are not registered (HTMLGRAPH_TERMINAL not set to "1").
+  // Runs before the doorway early return so the landing page also hides its
+  // button, since the root server never registers /api/terminal/* either.
+  probeTerminalFeature();
   if (isDoorwayLanding()) {
     // Landing: hide the stats bar (no aggregate data in the doorway).
     var sb = document.getElementById('stats-bar');
@@ -2653,6 +2658,26 @@ function highlightSession(sessionId) {
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   el.style.outline = '2px solid var(--accent)';
   setTimeout(function() { el.style.outline = ''; }, 2000);
+}
+
+/* ── Terminal feature gate ─────────────────────────────────── */
+
+// probeTerminalFeature checks once at init whether the backend has the
+// terminal routes registered (HTMLGRAPH_TERMINAL env var). On 404 (or
+// any network error) the open-terminal button is hidden so the feature
+// is invisible when not enabled. Called once from the startup sequence.
+function probeTerminalFeature() {
+  fetch(buildProjectUrl('terminal/sessions'))
+    .then(function(r) {
+      if (r.status === 404) {
+        var btn = document.getElementById('open-terminal-btn');
+        if (btn) btn.style.display = 'none';
+      }
+    })
+    .catch(function() {
+      var btn = document.getElementById('open-terminal-btn');
+      if (btn) btn.style.display = 'none';
+    });
 }
 
 /* ── Embedded terminal (ttyd sidecar) ─────────────────────── */

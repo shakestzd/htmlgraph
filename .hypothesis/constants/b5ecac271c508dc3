@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/drift.py
-# hypothesis_version: 6.151.9
-
-[0.7, 0.85, '.claude', 'CLAUDE_PLUGIN_ROOT', 'CLAUDE_PROJECT_DIR', 'activities', 'add_to_drift_queue', 'classification', 'config', 'cooldown_minutes', 'drift-config.json', 'drift_detection', 'drift_score', 'enabled', 'feature_id', 'file_paths', 'last_classification', 'load_drift_config', 'load_drift_queue', 'max_age_hours', 'process_on_stop', 'process_on_threshold', 'queue', 'save_drift_queue', 'summary', 'timestamp', 'tool', 'use_haiku_agent', 'w', 'warning_threshold']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cigs/__init__.py
-# hypothesis_version: 6.151.9
-
-['AutonomyLevel', 'AutonomyRecommender', 'CIGSPostToolAnalyzer', 'CostMetrics', 'CostPrediction', 'CostReporter', 'DetectionResult', 'OperationContext', 'PatternDetector', 'PatternRecord', 'TokenCost', 'ToolCategory', 'ViolationRecord', 'ViolationTracker', 'ViolationType', 'classify_operation', 'detect_patterns', 'estimate_costs']

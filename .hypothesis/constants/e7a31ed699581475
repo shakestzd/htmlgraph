@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/posttooluse.py
-# hypothesis_version: 6.151.9
-
-['.create(', '.htmlgraph', '.save()', '1', 'Agent', 'Debugging resources:', 'HTMLGRAPH_HOOK_TYPE', 'PostToolUse', 'Task', '__main__', 'additionalContext', 'continue', 'error', 'hookEventName', 'hookSpecificOutput', 'htmlgraph', 'input', 'name', 'result', 'spike', 'stderr', 'success', 'systemMessage', 'tool_input', 'tool_name', 'tool_response']

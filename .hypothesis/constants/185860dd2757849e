@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/broadcast.py
-# hypothesis_version: 6.151.9
-
-['agent_id', 'broadcast_event', 'change_type', 'comment_added', 'event_type', 'feature', 'feature_created', 'feature_deleted', 'feature_updated', 'link_added', 'link_type', 'linked_feature_id', 'new_status', 'old_status', 'payload', 'resource_id', 'resource_type', 'session_id', 'spike', 'spike_updated', 'status', 'status_changed', 'timestamp', 'track', 'track_updated', 'type']

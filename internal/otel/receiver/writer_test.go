@@ -2,6 +2,7 @@ package receiver_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -705,6 +706,49 @@ func TestWriter_DoesNotReattributeWhenAmbiguous(t *testing.T) {
 	}
 	if parentSpan != interactionSpanID {
 		t.Errorf("parent_span = %q, want %q (ambiguous case should NOT re-parent)", parentSpan, interactionSpanID)
+	}
+}
+
+// TestNewWriter_DoesNotForceWAL verifies that NewWriter does not hardcode
+// journal_mode=WAL in its DSN. On filesystems where BuildPragmas resolves to
+// DELETE (e.g. overlayfs, virtiofs, tmpfs — common in CI and devcontainers),
+// the DB file must remain in DELETE mode after NewWriter returns. If someone
+// re-introduces _pragma=journal_mode(WAL) in the DSN this test will fail.
+func TestNewWriter_DoesNotForceWAL(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "wal_check.db")
+
+	// db.Open creates the schema and runs ApplyPragmas (which may set DELETE).
+	readDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	readDB.Close()
+
+	// Open NewWriter — the bug was that this call hardcoded WAL in the DSN,
+	// permanently switching the file to WAL even when BuildPragmas said DELETE.
+	w, err := receiver.NewWriter(dbPath)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+	w.Close()
+
+	// Read journal_mode from a fresh connection (independent of the writer).
+	probe, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("probe open: %v", err)
+	}
+	defer probe.Close()
+
+	var mode string
+	if err := probe.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil {
+		t.Fatalf("PRAGMA journal_mode: %v", err)
+	}
+
+	// The expected mode is whatever BuildPragmas resolves to for this path.
+	want := db.BuildPragmas(dbPath)["journal_mode"]
+	if mode != strings.ToLower(want) {
+		t.Errorf("journal_mode = %q after NewWriter, want %q (BuildPragmas decision); "+
+			"NewWriter must not hardcode WAL in its DSN", mode, strings.ToLower(want))
 	}
 }
 

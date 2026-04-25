@@ -118,7 +118,7 @@ func runPurgeSpikes(cmd *cobra.Command, dryRun bool) error {
 // runFullReindex opens the SQLite db and performs a full reindex of all HTML
 // files in the given htmlgraphDir.
 func runFullReindex(htmlgraphDir string, cmd *cobra.Command) error {
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

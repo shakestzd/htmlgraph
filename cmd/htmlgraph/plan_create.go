@@ -223,18 +223,19 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 			}
 			filesStr := strings.Join(s.Files, ", ")
 			page.Slices = append(page.Slices, plantmpl.SliceCard{
-				Num:      s.Num,
-				ID:       s.ID,
-				Title:    s.Title,
-				What:     s.What,
-				Why:      s.Why,
-				DoneWhen: s.DoneWhen,
-				Tests:    s.Tests,
-				Effort:   s.Effort,
-				Risk:     s.Risk,
-				Deps:     depsStr,
-				Files:    filesStr,
-				Status:   "pending",
+				Num:       s.Num,
+				ID:        s.ID,
+				FeatureID: s.FeatureID,
+				Title:     s.Title,
+				What:      s.What,
+				Why:       s.Why,
+				DoneWhen:  s.DoneWhen,
+				Tests:     s.Tests,
+				Effort:    s.Effort,
+				Risk:      s.Risk,
+				Deps:      depsStr,
+				Files:     filesStr,
+				Status:    "pending",
 			})
 			page.Graph.Nodes = append(page.Graph.Nodes, plantmpl.GraphNode{
 				Num:    s.Num,

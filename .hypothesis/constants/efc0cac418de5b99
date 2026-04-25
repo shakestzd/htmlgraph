@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/analytics.py
-# hypothesis_version: 6.151.9
-
-[0.0, '*.html', 'agent', 'analytics-ops', 'ended_at', 'estimated_effort', 'feature', 'id', 'maintenance', 'maintenance_burden', 'parallel_suggestions', 'primary_work_type', 'priority', 'reasons', 'recent_sessions', 'recommendation_count', 'score', 'session_id', 'session_types', 'sessions', 'spike', 'started_at', 'status', 'title', 'total_events', 'total_sessions', 'transition_metrics', 'unknown', 'unlocks', 'work_breakdown', 'work_distribution']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/constants.py
-# hypothesis_version: 6.151.9
-
-['-Bash', '-Explore', '-Plan', '-debugger', '-general-purpose', '-htmlgraph:debugger', '-researcher', '-test-runner', 'AskUserQuestion', 'Bash', 'DRIFT_QUEUE_FILE', 'Explore', 'Glob', 'Grep', 'NEVER_BLOCK_TOOLS', 'Plan', 'Read', 'SUBAGENT_SUFFIXES', 'SUBAGENT_TYPES', 'Skill', 'Task', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TodoRead', 'TodoWrite', 'WebFetch', 'WebSearch', 'debugger', 'drift-queue.json', 'general-purpose', 'htmlgraph:debugger', 'htmlgraph:opus-coder', 'htmlgraph:researcher', 'researcher', 'test-runner']

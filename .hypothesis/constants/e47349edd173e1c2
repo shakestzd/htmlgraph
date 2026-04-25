@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/db_helpers.py
-# hypothesis_version: 6.151.9
-
-['*.json', '--show-toplevel', '.htmlgraph', 'HTMLGRAPH_SESSION_ID', 'active', 'get_db', 'get_db_from_config', 'git', 'htmlgraph.db', 'registry', 'resolve_project_path', 'rev-parse', 'sess-([a-f0-9]+)', 'sess-*.html', 'session_id', 'sessions', 'status', 'system']

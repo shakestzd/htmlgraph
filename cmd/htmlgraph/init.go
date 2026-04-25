@@ -33,7 +33,7 @@ func runInit(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	dbPath := filepath.Join(graphDir, "htmlgraph.db")
+	dbPath := filepath.Join(graphDir, ".db", "htmlgraph.db")
 	if err := initDatabase(dbPath); err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func runInit(_ *cobra.Command, _ []string) error {
 	fmt.Println("  .htmlgraph/spikes/")
 	fmt.Println("  .htmlgraph/tracks/")
 	fmt.Println("  .htmlgraph/sessions/")
-	fmt.Println("  .htmlgraph/htmlgraph.db")
+	fmt.Println("  .htmlgraph/.db/htmlgraph.db")
 	fmt.Println("  .htmlgraph/refs.json")
 	fmt.Println("  .htmlgraph/styles.css")
 	fmt.Println()

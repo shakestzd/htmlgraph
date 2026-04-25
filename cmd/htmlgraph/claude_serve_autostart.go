@@ -11,8 +11,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	otelreceiver "github.com/shakestzd/htmlgraph/internal/otel/receiver"
 )
 
 // serveLockPath returns the path of the per-project serve lock file.
@@ -21,44 +19,35 @@ func serveLockPath(projectDir string) string {
 	return filepath.Join(projectDir, ".htmlgraph", ".serve.lock")
 }
 
-// ensureServeForOtel checks whether the OTLP HTTP receiver is already
-// listening, and spawns a detached `htmlgraph serve` if not. Called from
-// launchClaude before exec'ing claude so that OTel signals from the
-// child process have somewhere to land.
+// ensureServeForDashboard spawns a detached `htmlgraph serve` if one is not
+// already running. Called from launchClaude before exec'ing claude so that
+// the dashboard (and semantic-ops such as AI-title backfill) are available
+// for the duration of the claude session. Serve is no longer auto-started
+// for telemetry purposes — per-session collectors handle OTLP ingest.
 //
 // Gating:
 //   - When HTMLGRAPH_OTEL_ENABLED is explicitly disabled (0/false/no/off),
-//     return immediately — user opted out.
-//   - When the configured OTLP port already accepts a TCP connection,
-//     assume a receiver is live (either htmlgraph serve or a user-run
-//     collector) — return nil. We don't probe further because there's
-//     no portable way to tell "ours" from "theirs" without sending a
-//     real request, and duplicating a running server would be worse
-//     than leaving an external one in charge.
+//     return immediately — user opted out of the full HtmlGraph stack.
+//   - When the dashboard port (8080) already accepts a TCP connection,
+//     a serve process is assumed live — return nil.
 //   - Otherwise spawn `htmlgraph serve` detached, wait up to 3 seconds
-//     for it to bind, and log a warning if it never does. Never return
-//     an error — a missing receiver is degraded operation, not a fatal
-//     launcher failure.
+//     for it to bind port 8080, and log a warning if it never does. Never
+//     return an error — a missing dashboard is degraded operation, not a
+//     fatal launcher failure.
 //
-// The spawned process inherits the parent env so the serve child's
-// receiver wiring picks up HTMLGRAPH_OTEL_* config. Stdout/stderr go to
-// a log file under .htmlgraph/logs so the orphaned server doesn't
-// pollute the user's terminal.
-func ensureServeForOtel(projectDir string) {
+// Stdout/stderr go to a log file under .htmlgraph/logs so the orphaned
+// server doesn't pollute the user's terminal.
+func ensureServeForDashboard(projectDir string) {
 	if isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
 		return
 	}
-	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
-	host := cfg.BindHost
-	if host == "" || host == "0.0.0.0" {
-		host = "127.0.0.1"
-	}
-	port := cfg.HTTPPort
-	if port == 0 {
-		port = 4318
-	}
 
-	if probePort(host, port, 200*time.Millisecond) {
+	// Probe the dashboard port (8080) rather than the OTLP port — serve
+	// is now a pure reader + dashboard server, not a receiver.
+	const dashboardHost = "127.0.0.1"
+	const dashboardPort = 8080
+
+	if probePort(dashboardHost, dashboardPort, 200*time.Millisecond) {
 		return // something is already bound — leave it alone
 	}
 
@@ -66,7 +55,7 @@ func ensureServeForOtel(projectDir string) {
 	// running (lock file contains a live PID), skip the spawn to prevent
 	// a second htmlgraph serve from racing to bind port 8080.
 	if skipSpawn, stale := checkServeLock(projectDir); skipSpawn {
-		debugLog("ensureServeForOtel: skipping spawn, serve already running (lockfile)")
+		debugLog("ensureServeForDashboard: skipping spawn, serve already running (lockfile)")
 		return
 	} else if stale {
 		// Stale lockfile (process gone) — remove it so future spawns work.
@@ -78,19 +67,17 @@ func ensureServeForOtel(projectDir string) {
 		return
 	}
 
-	// Poll the port for up to 3 seconds. If it binds within that window,
-	// OTel signals from the spawned claude will land correctly. Anything
-	// longer suggests the server hit a problem — warn but continue.
+	// Poll the dashboard port for up to 3 seconds.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	for {
-		if probePort(host, port, 200*time.Millisecond) {
-			fmt.Fprintf(os.Stderr, "htmlgraph: started serve for OTel receiver on %s:%d\n", host, port)
+		if probePort(dashboardHost, dashboardPort, 200*time.Millisecond) {
+			fmt.Fprintf(os.Stderr, "htmlgraph: started serve (dashboard) on %s:%d\n", dashboardHost, dashboardPort)
 			return
 		}
 		select {
 		case <-ctx.Done():
-			fmt.Fprintf(os.Stderr, "htmlgraph: serve did not bind %s:%d within 3s; OTel signals may drop until it comes up\n", host, port)
+			fmt.Fprintf(os.Stderr, "htmlgraph: serve did not bind %s:%d within 3s; dashboard may be unavailable\n", dashboardHost, dashboardPort)
 			return
 		case <-time.After(150 * time.Millisecond):
 		}
@@ -138,17 +125,6 @@ func MaybeShowOtelNotice(projectDir string) {
 		return // notice already shown on a previous launch
 	}
 
-	cfg := otelreceiver.LoadConfigFromEnv("", projectDir)
-	host := cfg.BindHost
-	if host == "" || host == "0.0.0.0" {
-		host = "127.0.0.1"
-	}
-	port := cfg.HTTPPort
-	if port == 0 {
-		port = 4318
-	}
-	endpoint := "http://" + host + ":" + strconv.Itoa(port)
-
 	notice := strings.Join([]string{
 		"",
 		"  htmlgraph: OTel telemetry is on (first-launch notice)",
@@ -156,8 +132,8 @@ func MaybeShowOtelNotice(projectDir string) {
 		"  HtmlGraph auto-captures Claude Code activity via OpenTelemetry:",
 		"    tool calls, prompts, costs, token usage, and latencies.",
 		"",
-		"  Data stays 100% local — exported to " + endpoint + ",",
-		"  stored in .htmlgraph/htmlgraph.db.",
+		"  A per-session OTLP collector is started automatically.",
+		"  Data stays 100% local, stored in .htmlgraph/htmlgraph.db.",
 		"",
 		"  Powers: activity feed · per-turn cost badges · span timeline",
 		"  Opt out: set HTMLGRAPH_OTEL_ENABLED=0 before launching.",

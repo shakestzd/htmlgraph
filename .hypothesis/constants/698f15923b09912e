@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/__init__.py
-# hypothesis_version: 6.151.9
-
-['EventExportResult', 'EventQueryResult', 'EventRebuildResult', 'EventStats', 'HookInstallResult', 'HookListResult', 'HookValidationResult', 'ServerHandle', 'ServerStartResult', 'ServerStatus', 'analyze_project', 'analyze_session', 'create_config_files', 'create_database', 'export_sessions', 'get_event_stats', 'get_server_status', 'initialize_htmlgraph', 'install_git_hooks', 'install_hooks', 'list_hooks', 'query_events', 'rebuild_index', 'start_server', 'stop_server', 'update_gitignore', 'validate_directory', 'validate_hook_config']

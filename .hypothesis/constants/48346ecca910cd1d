@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/validator.py
-# hypothesis_version: 6.151.9
-
-[' | ', '.claude', '.htmlgraph', '.htmlgraph/', 'Bash', 'CREATE_WORK_ITEM', 'DELEGATE_TO_SUBAGENT', 'Delete', 'Edit', 'Glob', 'Grep', 'LSP', 'NotebookEdit', 'Read', 'Task', 'Write', '^cat', '^git diff', '^git status', '^htmlgraph ', '^ls', '^uv run htmlgraph ', 'allow', 'always_allow', 'anti-pattern', 'bash_patterns', 'block', 'code_operations', 'command', 'config', 'decision', 'documentation', 'enforcement', 'file_path', 'git', 'guidance', 'htmlgraph.db', 'id', 'imperative', 'input', 'name', 'optimal', 'params', 'pattern_note', 'pattern_type', 'pattern_warning', 'patterns', 'reason', 'required_action', 'sdk_commands', 'session_id', 'spike', 'strict', 'suggestion', 'timestamp', 'tool', 'tools', 'type', 'unknown']

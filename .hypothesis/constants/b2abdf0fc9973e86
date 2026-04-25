@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/quality_gates.py
-# hypothesis_version: 6.151.9
-
-[200, 500, 1000, 2000, 5000, '"""', "'''", '(?:^|\\s)FIXME\\b', '(?:^|\\s)HACK\\b', '(?:^|\\s)TODO\\b', '(?:^|\\s)WIP\\b', '(?:^|\\s)XXX\\b', 'FIXME', 'HACK', 'TODO', 'WIP', 'XXX', 'agent_assigned', 'agent_type', 'architectural', 'blocked', 'bug', 'chore', 'claude', 'completed', 'critical', 'decision', 'description', 'done', 'feature', 'findings', 'fixme', 'forbid', 'gemini', 'general', 'gpt4', 'haiku', 'high', 'in_progress', 'low', 'medium', 'opus', 'pending', 'refactor', 'research', 'risk', 'sonnet', 'technical', 'test', 'timebox_hours', 'title', 'todo', 'utf-8', 'wip']

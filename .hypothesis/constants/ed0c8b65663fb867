@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestrator_validator.py
-# hypothesis_version: 6.151.9
-
-['.htmlgraph', '.htmlgraph/', 'AskUserQuestion', 'Bash', 'Edit', 'Read', 'Task', 'TodoWrite', 'Write', '\\bgit\\s+add\\b', '\\bgit\\s+branch\\b', '\\bgit\\s+checkout\\b', '\\bgit\\s+commit\\b', '\\bgit\\s+merge\\b', '\\bgit\\s+pull\\b', '\\bgit\\s+push\\b', '\\bgit\\s+rebase\\b', '\\bnpm\\s+test\\b', '\\bpytest\\b', '\\byarn\\s+test\\b', 'allow', 'block', 'command', 'file_path', 'sdk.bugs', 'sdk.chores', 'sdk.features', 'sdk.spikes', 'warn']

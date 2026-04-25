@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/transcript.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1.0, 100, '        </details>', '        </div>', '        <details>', '    </div>', '    </dl>', '    </style>', '    <style>', '%Y-%m-%dT%H:%M:%S', '*.jsonl', '+00:00', '-', '.', '...', '.claude', '/', '/System/Volumes/Data', '<!DOCTYPE html>', '</body>', '</head>', '</html>', '<body>', '<head>', '<html lang="en">', 'Z', '\\', 'agent-', 'assistant', 'content', 'cwd', 'entry', 'entry-assistant', 'entry-result', 'entry-tool', 'entry-user', 'gitBranch', 'input', 'isSidechain', 'message', 'name', 'parallelism_factor', 'parentUuid', 'projects', 'r', 'role', 'sessionId', 'subagent_count', 'system', 'text', 'thinking', 'timestamp', 'tool_result', 'tool_use', 'total_agent_seconds', 'type', 'user', 'utf-8', 'uuid', 'version', 'wall_clock_seconds']

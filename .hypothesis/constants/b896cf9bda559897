@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/session_graph.py
-# hypothesis_version: 6.151.9
-
-['+00:00', 'Z', 'agent_assigned', 'created_at', 'depth', 'event_type', 'feature_id', 'features_worked_on', 'input_summary', 'parent_session_id', 'session_id', 'status', 'timestamp', 'tool_name']

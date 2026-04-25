@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/parallel.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 5.0, '## Steps\n', 'Feature not found', 'agent-', 'agent_assigned', 'all_successful', 'blocked', 'completed', 'completed_at', 'description', 'duration_seconds', 'error', 'failed', 'failed_count', 'feature_id', 'general-purpose', 'healthy_execution', 'linked', 'linked_count', 'max_parallelism', 'medium', 'no_conflicts', 'partial', 'priority', 'prompt', 'ready_now', 'steps', 'subagent_type', 'success', 'tool_count', 'transcript_id', 'unmatched_features', '⏳', '✅']

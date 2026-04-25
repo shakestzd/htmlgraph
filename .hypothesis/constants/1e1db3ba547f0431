@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/cost_alerts_websocket.py
-# hypothesis_version: 6.151.9
-
-[1.0, 5.0, 10.0, 100.0, 1000.0, '1970-01-01T00:00:00Z', 'alert', 'alert_id', 'alert_type', 'alerts', 'breach', 'budget_usd', 'budget_warning', 'by_agent', 'by_model', 'by_subagent_type', 'by_tool', 'cost_alert', 'cost_alerts', 'cost_breakdown', 'cost_trajectory', 'count', 'critical', 'current_cost_usd', 'event_id', 'info', 'message', 'model_overage', 'prediction', 'prediction_available', 'sent_at', 'session_id', 'severity', 'timestamp', 'total_bytes_sent', 'total_cost_usd', 'total_tokens', 'trajectory_overage', 'type', 'warning']

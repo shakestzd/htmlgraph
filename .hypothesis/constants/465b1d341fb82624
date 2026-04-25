@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/session_state.py
-# hypothesis_version: 6.151.9
-
-['*.html', '--porcelain', '.clear_marker', '.compacted', '.test', '1', '1.0', 'CLAUDE_SESSION_ID', 'auto', 'clear', 'compact', 'compact_metadata', 'current.json', 'delegation_enabled', 'environment_vars', 'features', 'git', 'had_compact_marker', 'has_changes', 'is_ended', 'is_post_compact', 'previous_session_id', 'prompt_injected', 'reason', 'resume', 'same_session_id', 'session', 'session_id', 'session_source', 'session_state.json', 'session_valid', 'sessions', 'source', 'startup', 'status', 'status_output', 'timestamp', 'true', 'unknown']

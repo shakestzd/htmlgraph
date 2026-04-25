@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawners/copilot.py
-# hypothesis_version: 6.151.9
-
-[100, 120, 200, 500, '--allow-all-tools', '--allow-tool', '--deny-tool', '-p', 'CLI not found', 'Running Copilot CLI', 'SDK', 'Total usage est', 'Usage by model', 'cmd', 'copilot', 'copilot_result', 'copilot_spawn_start', 'copilot_start', 'event_id', 'executing', 'github-copilot', 'input', 'output', 'partial_stderr', 'partial_stdout', 'processing', 'prompt', 'prompt_length', 'response', 'response_length', 'spawner_complete', 'spawner_phase', 'spawner_start', 'subprocess.copilot', 'type']

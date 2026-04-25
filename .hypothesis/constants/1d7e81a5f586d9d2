@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/live_events.py
-# hypothesis_version: 6.151.9
-
-[200, 500, '.htmlgraph', 'CLAUDE_SESSION_ID', 'assistant', 'completed', 'details', 'done', 'duration_seconds', 'error', 'executing', 'failed', 'in_progress', 'index.sqlite', 'initializing', 'message_length', 'message_preview', 'model', 'phase', 'progress', 'prompt_length', 'prompt_preview', 'responding', 'response_preview', 'role', 'spawner_complete', 'spawner_message', 'spawner_phase', 'spawner_start', 'spawner_tool_use', 'spawner_type', 'started', 'status', 'streaming', 'success', 'timestamp', 'tokens_used', 'tool_input_preview', 'tool_name', 'tool_use']

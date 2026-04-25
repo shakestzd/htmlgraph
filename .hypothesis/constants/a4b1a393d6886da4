@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/help/mixin.py
-# hypothesis_version: 6.151.9
-
-['_', 'active_work', 'agents', 'analytic', 'analytics', 'analyze_project', 'bug', 'bugs', 'chore', 'chores', 'end_session', 'epic', 'epics', 'events', 'export_sessions', 'feature', 'features', 'find_bottlenecks', 'get_parallel_work', 'get_work_queue', 'help', 'hooks', 'insights', 'install_hooks', 'metrics', 'operation', 'operations', 'optimization', 'orchestrate', 'orchestration', 'patterns', 'phases', 'plan', 'planning', 'queue', 'recommend_next_work', 'routing', 'server', 'session', 'session_start', 'sessions', 'spawn_coder', 'spawn_explorer', 'spike', 'spikes', 'start_server', 'start_session', 'strategic', 'subagent', 'subagents', 'track', 'tracks', 'work_next', 'work_queue', 'workflow']

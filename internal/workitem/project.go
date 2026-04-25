@@ -62,7 +62,7 @@ func Open(projectDir, agent string) (*Project, error) {
 		return nil, fmt.Errorf("agent must not be empty")
 	}
 
-	dbPath := filepath.Join(projectDir, "htmlgraph.db")
+	dbPath := filepath.Join(projectDir, ".db", "htmlgraph.db")
 	database, err := dbpkg.Open(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/post_tool_use_handler.py
-# hypothesis_version: 6.151.9
-
-[500, 1000, '+00:00', 'Error', 'Ok', 'Unknown error', 'Z', 'completed', 'error', 'failed', 'message', 'output', 'reason', 'status', 'stderr', 'success', 'timeout']

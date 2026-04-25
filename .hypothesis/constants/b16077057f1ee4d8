@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/critical_path.py
-# hypothesis_version: 6.151.9
-
-[' -> ', ',', '--show-toplevel', '.htmlgraph', '?', 'CLAUDE_PROJECT_DIR', 'Database error: %s', 'blocked_by', 'blocks', 'blocks_count', 'edges', 'feature_id', 'from', 'from_node_id', 'git', 'htmlgraph.db', 'id', 'nodes', 'relationship', 'relationship_type', 'rev-parse', 'status', 'title', 'to', 'to_node_id', 'type']

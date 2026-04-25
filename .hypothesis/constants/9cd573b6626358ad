@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/archive/search.py
-# hypothesis_version: 6.151.9
-
-[100, '*.html', 'ArchiveSearchEngine', 'archive_file', 'archives.db', 'bloom_filtered', 'description_snippet', 'entity_id', 'entity_type', 'filter_rate', 'rank', 'searched_count', 'status', 'title_snippet', 'total_archives']

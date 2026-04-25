@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/.githooks/pre-commit-systematic-check.py
-# hypothesis_version: 6.151.9
-
-['+', '+++', '-', '---', '--cached', '--color=never', '--exclude-dir', '--include', '--show-toplevel', '--unified=0', '-rn', '.ex', '.exs', '.git', '.html', '.htmlgraph', '.js', '.json', '.jsx', '.md', '.mypy_cache', '.py', '.pytest_cache', '.ruff_cache', '.sh', '.toml', '.tox', '.ts', '.tsx', '.txt', '.venv', '.yaml', '.yml', 'COMMIT_EDITMSG', 'False', 'None', 'True', '^(---|\\+\\+\\+|@@|-)', '__main__', '__pycache__', 'and', 'are', 'build', 'but', 'can', 'class', 'cls', 'def', 'diff', 'dist', 'for', 'from', 'get', 'git', 'grep', 'had', 'has', 'import', 'int', 'new', 'node_modules', 'not', 'old', 'replace', 'return', 'rev-parse', 'self', 'set', 'str', 'the', 'use', 'venv', 'was', 'yield']

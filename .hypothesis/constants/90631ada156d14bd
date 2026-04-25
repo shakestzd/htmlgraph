@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/subagent_detection.py
-# hypothesis_version: 6.151.9
-
-[1.0, '.htmlgraph', 'CLAUDE_SESSION_ID', 'CLAUDE_SUBAGENT_ID', 'HTMLGRAPH_SESSION_ID', 'agent_id', 'agent_type', 'claude-code', 'htmlgraph.db', 'is_subagent', 'is_subagent_context', 'main', 'parent_session_id', 'session-state.json']

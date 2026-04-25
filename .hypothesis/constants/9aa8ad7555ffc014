@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/query_builder.py
-# hypothesis_version: 6.151.9
-
-['.', 'and', 'between', 'contains', 'ends_with', 'eq', 'gt', 'gte', 'in', 'is_not_null', 'is_null', 'lt', 'lte', 'matches', 'ne', 'not', 'not_in', 'or', 'starts_with']

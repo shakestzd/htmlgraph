@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk/planning/bottlenecks.py
-# hypothesis_version: 6.151.9
-
-['blocked_tasks', 'blocks_count', 'high_risk_count', 'high_risk_tasks', 'id', 'impact_score', 'orphaned_count', 'orphaned_tasks', 'priority', 'recommendations', 'risk_factors', 'risk_score', 'status', 'title']

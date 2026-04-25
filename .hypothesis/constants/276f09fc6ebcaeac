@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sync/__init__.py
-# hypothesis_version: 6.151.9
-
-['GitSyncManager', 'SyncConfig', 'SyncResult', 'SyncStatus', 'SyncStrategy']

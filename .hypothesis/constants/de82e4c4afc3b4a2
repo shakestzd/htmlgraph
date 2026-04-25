@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/planning/models.py
-# hypothesis_version: 6.151.9
-
-[100, 'Plan: Available', 'Spec: Available', 'abandoned', 'active', 'approved', 'claude-code', 'completed', 'critical', 'draft', 'feature-', 'high', 'in-progress', 'low', 'medium', 'must-have', 'nice-to-have', 'not-started', 'outdated', 'planned', 'review', 'should-have', 'track', '⏳', '▶', '▼', '○', '●', '✅']

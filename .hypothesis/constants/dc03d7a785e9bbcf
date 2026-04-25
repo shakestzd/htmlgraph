@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/repositories/analytics_repository_standard.py
-# hypothesis_version: 6.151.9
-
-[-0.2, 0.0, 0.1, 0.2, 0.25, 0.3, 0.5, 0.6, 0.75, 0.8, 1.0, 1800, 3600, ',', '; ', 'Critical priority', 'High priority', 'No blockers', 'On critical path', 'Ready to work', 'blocking:all_blocked', 'blocking_items', 'completed', 'critical', 'critical_path:path', 'critical_path_length', 'dependencies', 'done', 'estimated_days', 'high', 'id', 'items_remaining', 'low', 'medium', 'priority', 'status', 'status_breakdown', 'title', 'todo', 'unknown', 'worst_case_days']

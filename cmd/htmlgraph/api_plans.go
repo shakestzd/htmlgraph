@@ -381,16 +381,40 @@ func planFinalizeHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc
 			return
 		}
 
-		nextSteps := fmt.Sprintf(
-			"Plan finalized. To create a track and dispatch work:\n  htmlgraph plan finalize %s\n\nOr create features manually:\n  htmlgraph feature create \"<title>\" --track <trk-id>",
-			planID,
-		)
+		// Create track and features from approved slices, mirroring what the CLI
+		// does via `htmlgraph plan finalize-yaml`. Partial failures are logged and
+		// reported in the response — a finalized plan with N/M features created is
+		// better than aborting and leaving the plan in a half-finalized state.
+		createdFeatures, featFailures, featErr := finalizeYAMLWithDB(database, htmlgraphDir, planID)
+		if featErr != nil {
+			log.Printf("warning: finalizeYAMLWithDB failed for %s: %v", planID, featErr)
+		}
+		for _, f := range featFailures {
+			log.Printf("warning: plan %s slice %d (%s): feature creation failed: %s", planID, f.SliceNum, f.Title, f.Error)
+		}
+		if createdFeatures == nil {
+			createdFeatures = []string{}
+		}
+
+		type failureInfo struct {
+			SliceNum int    `json:"slice_num"`
+			Title    string `json:"title"`
+			Error    string `json:"error"`
+		}
+		var failureInfos []failureInfo
+		for _, f := range featFailures {
+			failureInfos = append(failureInfos, failureInfo{SliceNum: f.SliceNum, Title: f.Title, Error: f.Error})
+		}
+		if failureInfos == nil {
+			failureInfos = []failureInfo{}
+		}
 
 		respondJSON(w, map[string]any{
-			"plan_id":    planID,
-			"status":     "finalized",
-			"feedback":   feedback,
-			"next_steps": nextSteps,
+			"plan_id":          planID,
+			"status":           "finalized",
+			"feedback":         feedback,
+			"created_features": createdFeatures,
+			"failures":         failureInfos,
 		})
 	}
 }

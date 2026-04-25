@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/archive/fts.py
-# hypothesis_version: 6.151.9
-
-[1024, ',', '?', 'ArchiveFTS5Index', 'archive_count', 'archive_file', 'content', 'count', 'created', 'db_size_bytes', 'db_size_mb', 'description', 'description_snippet', 'entity_count', 'entity_id', 'entity_type', 'id', 'rank', 'status', 'title', 'title_snippet', 'type', 'updated']

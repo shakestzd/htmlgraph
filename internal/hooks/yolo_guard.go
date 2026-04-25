@@ -42,7 +42,7 @@ func isYoloFromDB(htmlgraphDir, sessionID string) bool {
 	if sessionID == "" {
 		return false
 	}
-	dbPath := filepath.Join(htmlgraphDir, "htmlgraph.db")
+	dbPath := filepath.Join(htmlgraphDir, ".db", "htmlgraph.db")
 	// Use lightweight read-only open — no pragmas, no migrations.
 	database, err := sql.Open("sqlite", dbPath+"?mode=ro&_busy_timeout=5000")
 	if err != nil {

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/extensions.py
-# hypothesis_version: 6.151.9
-
-[100, 1000, ' AND ', ',', '?', 'completed', 'conflicts', 'delegation', 'event_data', 'from_agent = ?', 'pending', 'session_id = ?', 'started', 'task_description', 'to_agent = ?']

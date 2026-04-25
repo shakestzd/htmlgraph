@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics/dependency.py
-# hypothesis_version: 6.151.9
-
-[-0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 20.0, 100.0, 'On critical path', 'blocked', 'critical', 'critical_path', 'dependency_penalty', 'done', 'effort', 'high', 'in-progress', 'low', 'medium', 'priority', 'spof', 'todo', 'transitive_blocking']

@@ -19,10 +19,10 @@ func makeProjectDBWithSchema(t *testing.T, numFeatures, numBugs, numSpikes int) 
 	t.Helper()
 	tmp := t.TempDir()
 	hgDir := filepath.Join(tmp, ".htmlgraph")
-	if err := os.MkdirAll(hgDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(hgDir, ".db"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	dbPath := filepath.Join(hgDir, "htmlgraph.db")
+	dbPath := filepath.Join(hgDir, ".db", "htmlgraph.db")
 
 	// Use modernc.org/sqlite driver registered as "sqlite".
 	db, err := sql.Open("sqlite", dbPath)
@@ -151,7 +151,7 @@ func TestProjectsList_NoMigrations(t *testing.T) {
 	withRegistryAt(t, []registry.Entry{{ProjectDir: realProject, Name: "real"}})
 
 	// Snapshot table set before.
-	dbPath := filepath.Join(realProject, ".htmlgraph", "htmlgraph.db")
+	dbPath := filepath.Join(realProject, ".htmlgraph", ".db", "htmlgraph.db")
 	before := readTableNames(t, dbPath)
 
 	cmd := projectsCmd()

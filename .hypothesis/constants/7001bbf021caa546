@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/deployment_models.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'Build configuration', 'Build metadata', 'DeploymentConfig', 'Error messages', 'Git configuration', 'Git remote name', 'Major version number', 'Minor version number', 'Patch version number', 'Plugin name', 'Project name', 'PyPI configuration', 'PyPI_API_TOKEN', 'SemanticVersion', 'Steps that completed', 'Steps that failed', 'Version to deploy', '[^\\w\\-/.]', '^[A-Z_][A-Z0-9_]*$', '^[a-zA-Z0-9_-]+$', 'after', 'branch', 'build', 'command', 'deployment', 'git', 'git-push', 'hooks', 'local-install', 'main', 'major', 'minor', 'my-project', 'name', 'origin', 'patch', 'plugins', 'post_build', 'post_publish', 'pre_build', 'pre_publish', 'prerelease', 'project', 'project_name', 'pypi', 'pypi-publish', 'pypi_package', 'rb', 'steps', 'token_env_var', 'update-plugins', 'uv build', 'version', '{package}', '{version}']

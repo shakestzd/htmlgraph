@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/scripts/deploy.py
-# hypothesis_version: 6.151.9
-
-['--build-only', '--docs-only', '--dry-run', '--skip-plugins', '--skip-pypi', '?', '__main__', 'deploy-all.sh', 'htmlgraph-deploy', 'pyproject.toml', 'scripts', 'store_true', 'version']

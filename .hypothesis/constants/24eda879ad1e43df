@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/ddl.py
-# hypothesis_version: 6.151.9
-
-['DATETIME', 'INTEGER DEFAULT 0', 'JSON', 'REAL', 'REAL DEFAULT 0.0', 'TEXT', 'TEXT DEFAULT NULL', 'agent', 'agent_assigned', 'assignee', 'blockers', 'child_spike_count', 'claude_task_id', 'completed_at', 'context_drift', 'continued_from', 'cost_budget', 'cost_tokens', 'created_at', 'end_commit', 'feature_id', 'features_worked_on', 'handoff_notes', 'is_subagent', 'last_user_query', 'last_user_query_at', 'metadata', 'model', 'parent_event_id', 'parent_session_id', 'predicted_cost', 'recommended_context', 'recommended_next', 'source', 'status', 'subagent_type', 'tool_input', 'total_events', 'total_tokens_used', 'transcript_id', 'transcript_path', 'transcript_synced', 'updated_at']

@@ -278,3 +278,196 @@ func TestOtelSpansHandler_400ForMissingParam(t *testing.T) {
 		t.Errorf("status = %d, want 400", rec.Code)
 	}
 }
+
+// TestOtelSpansHandler_ConcurrentSubagentModelAttribution verifies that when
+// two subagents run concurrently (haiku-coder and sonnet-coder dispatched by
+// an Opus orchestrator), the /api/otel/spans response exposes each span's OWN
+// model field so the client-side _indexSpans absorption logic can attribute
+// Task/Agent rows to the dispatching orchestrator rather than a concurrent
+// subagent's mis-parented api_request.
+//
+// Regression for bug-5d7220f3: haiku subagent api_requests were leaking into
+// the orchestrator's Task row because the OTel receiver's strategy-B
+// re-attribution is skipped when two subagents run concurrently (ambiguous
+// overlap), leaving haiku's api_requests as siblings of the orchestrator's
+// Task spans in the shared interaction span. The client-side fix uses
+// per-span model fields to detect and reject cross-agent absorptions.
+func TestOtelSpansHandler_ConcurrentSubagentModelAttribution(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "concurrent-subagent.db")
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+
+	sessionID := "sess-concurrent"
+	database.Exec(`INSERT INTO sessions (session_id, agent_assigned) VALUES (?, ?)`, sessionID, "claude-code")
+
+	// Orchestrator interaction span (Opus).
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, tool_name, model, attrs_json
+		) VALUES
+		('orch-interact', 'claude_code', ?, 'span', 'interaction', 'claude_code.interaction',
+			1000, 'trace-A', 'orch-root', '', '', NULL, '{}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed interaction: %v", err)
+	}
+
+	// Orchestrator (Opus) api_request that dispatches both subagents.
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, model, tokens_in, tokens_out, attrs_json
+		) VALUES
+		('orch-api-req', 'claude_code', ?, 'span', 'api_request', 'claude_code.llm_request',
+			1100, 'trace-A', 'orch-api-span', 'orch-root', 'claude-opus-4-7', 5000, 200, '{}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed orch api_request: %v", err)
+	}
+
+	// Orchestrator Bash call (proves Opus is the orchestrator model).
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, tool_name, attrs_json
+		) VALUES
+		('orch-bash', 'claude_code', ?, 'span', 'tool_result', 'claude_code.tool',
+			1200, 'trace-A', 'orch-bash-span', 'orch-root', 'Bash', '{}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed orch bash: %v", err)
+	}
+
+	// Orchestrator api_request that triggers Task dispatch.
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, model, tokens_in, tokens_out, attrs_json
+		) VALUES
+		('orch-api-req-2', 'claude_code', ?, 'span', 'api_request', 'claude_code.llm_request',
+			1300, 'trace-A', 'orch-api-span-2', 'orch-root', 'claude-opus-4-7', 4800, 180, '{}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed orch api_request 2: %v", err)
+	}
+
+	// Haiku subagent's api_request — mis-parented to orch-root (strategy B
+	// ambiguity means re-attribution was skipped). This appears chronologically
+	// between orch-api-req-2 and the Task span, which is the exact scenario
+	// that causes the wrong _precedingApi absorption on the client side.
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, model, tokens_in, tokens_out, attrs_json
+		) VALUES
+		('haiku-api-req', 'claude_code', ?, 'span', 'api_request', 'claude_code.llm_request',
+			1350, 'trace-A', 'haiku-api-span', 'orch-root', 'claude-haiku-4-5', 6, 6, '{}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed haiku api_request: %v", err)
+	}
+
+	// Task span dispatching sonnet-coder — this is what the Opus orchestrator spawns.
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, tool_name, model, attrs_json
+		) VALUES
+		('task-sonnet', 'claude_code', ?, 'span', 'subagent_invocation', 'claude_code.tool',
+			1400, 'trace-A', 'task-sonnet-span', 'orch-root', 'Agent', NULL, '{"subagent_type":"htmlgraph:sonnet-coder"}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed Task sonnet span: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/otel/spans?session_id="+sessionID, nil)
+	rec := httptest.NewRecorder()
+	otelSpansHandler(database).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body struct {
+		Spans []spanJSON `json:"spans"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	// Index spans by signal_id for easy lookup.
+	byID := map[string]spanJSON{}
+	for _, s := range body.Spans {
+		byID[s.SignalID] = s
+	}
+
+	// The orchestrator's api_requests must carry the Opus model.
+	for _, id := range []string{"orch-api-req", "orch-api-req-2"} {
+		s, ok := byID[id]
+		if !ok {
+			t.Errorf("span %s missing from response", id)
+			continue
+		}
+		if s.Model != "claude-opus-4-7" {
+			t.Errorf("span %s model = %q, want claude-opus-4-7", id, s.Model)
+		}
+	}
+
+	// The haiku subagent's api_request must carry the Haiku model, so the
+	// client-side guard can detect and reject it as a mis-attributed span when
+	// it appears between an orchestrator api_request and a Task span.
+	haikuSpan, ok := byID["haiku-api-req"]
+	if !ok {
+		t.Fatal("haiku api_request span missing from response")
+	}
+	if haikuSpan.Model != "claude-haiku-4-5" {
+		t.Errorf("haiku api_request model = %q, want claude-haiku-4-5", haikuSpan.Model)
+	}
+
+	// The Task/Agent span (dispatching sonnet-coder) must have NO model of its
+	// own — the model badge comes from the _precedingApi on the client side, NOT
+	// from this span's model field. If a model were stored here, the client would
+	// show it regardless of the orchestrator-model guard logic.
+	taskSpan, ok := byID["task-sonnet"]
+	if !ok {
+		t.Fatal("Task sonnet span missing from response")
+	}
+	if taskSpan.Model != "" {
+		t.Errorf("Task span model = %q, want empty (model must come from _precedingApi on client)", taskSpan.Model)
+	}
+
+	// The Task span's parent_span must be orch-root so the client-side _indexSpans
+	// places it in the same children array as orch-api-req-2. The client guard
+	// then uses orchModel (derived from Bash→orch-api-req-1 pairing) to reject
+	// haiku-api-req as _precedingApi for this Task span.
+	if taskSpan.ParentSpan != "orch-root" {
+		t.Errorf("Task span parent_span = %q, want orch-root", taskSpan.ParentSpan)
+	}
+	// haiku-api-req must also be parented to orch-root (the mis-parented scenario).
+	if haikuSpan.ParentSpan != "orch-root" {
+		t.Errorf("haiku api_request parent_span = %q, want orch-root (mis-parented scenario)", haikuSpan.ParentSpan)
+	}
+}
+
+// JS coverage gap (bug-1e5166ea): the _indexSpans second-pass fix that attaches
+// _modelRef to Task/Agent spans when the orchestrator dispatches N Tasks in one LLM
+// turn lives entirely in event-tree.js. There is no JS test runner in this project,
+// so the following scenario is untested at the automated level:
+//
+//   children = [api_request(Opus), Task#1, Task#2, ...]
+//
+// After the first-pass absorption, Task#1 gets _precedingApi = api_request(Opus) and
+// Task#2..N get neither _precedingApi nor _modelRef. The second pass walks backward
+// through the original kids list and attaches _modelRef = api_request(Opus) to each
+// orphan Task. The renderer then uses _modelRef.model for the model pill (read-only)
+// while leaving cost/tokens blank on those rows to avoid double-counting.
+//
+// The Go-side invariant we CAN assert is that the server returns Task spans with no
+// model field of their own (see TestOtelSpansHandler_ParallelSubagentAttribution above)
+// so the client is forced to derive the model from the api_request reference — the
+// fix only matters when that derivation reaches Task#2..N. The Go test verifies the
+// input shape is correct; the rendering logic itself requires a browser or JS runtime
+// to validate end-to-end.

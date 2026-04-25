@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ func sessionCmd() *cobra.Command {
 	cmd.AddCommand(sessionStartCmd())
 	cmd.AddCommand(sessionEndCmd())
 	cmd.AddCommand(sessionShowCmd())
+	cmd.AddCommand(sessionRestoreCmd())
 	return cmd
 }
 
@@ -192,7 +194,7 @@ func runSessionEnd(sessionID string) error {
 
 // openDB is a shared helper to open the SQLite DB from the .htmlgraph dir.
 func openDB(htmlgraphDir string) (*sql.DB, error) {
-	db, err := dbpkg.Open(htmlgraphDir + "/htmlgraph.db")
+	db, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}

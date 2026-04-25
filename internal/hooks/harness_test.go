@@ -49,47 +49,125 @@ const geminiSessionStartJSON = `{
 	"model": "gemini-2.5-pro"
 }`
 
+// noClaudeEnv is a getenv stub that has no CLAUDE_CODE_ENTRYPOINT, simulating
+// a Codex or Gemini process environment (where Claude Code is not running).
+func noClaudeEnv(key string) string { return "" }
+
+// claudeEnv is a getenv stub that reports CLAUDE_CODE_ENTRYPOINT=cli, simulating
+// a real Claude Code hook invocation environment.
+func claudeEnv(key string) string {
+	if key == "CLAUDE_CODE_ENTRYPOINT" {
+		return "cli"
+	}
+	return ""
+}
+
 // --- detectHarness tests ---
 
+// Tests below use detectHarnessWithEnv with explicit env stubs so that the
+// result is deterministic regardless of whether CLAUDE_CODE_ENTRYPOINT happens
+// to be set in the surrounding test process (e.g. when tests run inside Claude Code).
+
 func TestDetectHarnessFromCodexPayload(t *testing.T) {
-	got := detectHarness([]byte(codexSessionStartJSON))
+	got := detectHarnessWithEnv([]byte(codexSessionStartJSON), noClaudeEnv)
 	if got != HarnessCodex {
-		t.Errorf("detectHarness(codex session-start) = %v, want HarnessCodex", got)
+		t.Errorf("detectHarnessWithEnv(codex session-start, noClaudeEnv) = %v, want HarnessCodex", got)
 	}
 }
 
 func TestDetectHarnessFromCodexUserPromptPayload(t *testing.T) {
-	got := detectHarness([]byte(codexUserPromptJSON))
+	got := detectHarnessWithEnv([]byte(codexUserPromptJSON), noClaudeEnv)
 	if got != HarnessCodex {
-		t.Errorf("detectHarness(codex user-prompt) = %v, want HarnessCodex", got)
+		t.Errorf("detectHarnessWithEnv(codex user-prompt, noClaudeEnv) = %v, want HarnessCodex", got)
 	}
 }
 
 func TestDetectHarnessFromClaudePayload(t *testing.T) {
-	got := detectHarness([]byte(claudeSessionStartJSON))
+	got := detectHarnessWithEnv([]byte(claudeSessionStartJSON), claudeEnv)
 	if got != HarnessClaude {
-		t.Errorf("detectHarness(claude session-start) = %v, want HarnessClaude", got)
+		t.Errorf("detectHarnessWithEnv(claude session-start, claudeEnv) = %v, want HarnessClaude", got)
 	}
 }
 
 func TestDetectHarnessFromGeminiPayload(t *testing.T) {
-	got := detectHarness([]byte(geminiSessionStartJSON))
+	got := detectHarnessWithEnv([]byte(geminiSessionStartJSON), noClaudeEnv)
 	if got != HarnessGemini {
-		t.Errorf("detectHarness(gemini session-start) = %v, want HarnessGemini", got)
+		t.Errorf("detectHarnessWithEnv(gemini session-start, noClaudeEnv) = %v, want HarnessGemini", got)
 	}
 }
 
 func TestDetectHarnessEmptyPayload(t *testing.T) {
-	got := detectHarness([]byte{})
+	got := detectHarnessWithEnv([]byte{}, noClaudeEnv)
 	if got != HarnessClaude {
-		t.Errorf("detectHarness(empty) = %v, want HarnessClaude (default)", got)
+		t.Errorf("detectHarnessWithEnv(empty, noClaudeEnv) = %v, want HarnessClaude (default)", got)
 	}
 }
 
 func TestDetectHarnessInvalidJSON(t *testing.T) {
-	got := detectHarness([]byte("not-json"))
+	got := detectHarnessWithEnv([]byte("not-json"), noClaudeEnv)
 	if got != HarnessClaude {
-		t.Errorf("detectHarness(invalid json) = %v, want HarnessClaude (fallback)", got)
+		t.Errorf("detectHarnessWithEnv(invalid json, noClaudeEnv) = %v, want HarnessClaude (fallback)", got)
+	}
+}
+
+// TestDetectHarness_ClaudeCodeEntrypointWins asserts the fix for bug-1b095c09:
+// when CLAUDE_CODE_ENTRYPOINT is set, the harness is always Claude regardless
+// of whether the payload contains "hook_event_name" (which Claude Code sends
+// for ALL events, previously causing false Codex classification).
+func TestDetectHarness_ClaudeCodeEntrypointWins(t *testing.T) {
+	// Claude Code SubagentStart payload — has hook_event_name like all Claude Code events.
+	claudeSubagentStartJSON := `{
+		"session_id": "db130bce-c0b4-4378-bfc6-759f6306849c",
+		"cwd": "/workspaces/htmlgraph",
+		"hook_event_name": "SubagentStart",
+		"agent_id": "af0d03b76bfb578de",
+		"agent_type": "htmlgraph:researcher"
+	}`
+
+	// With CLAUDE_CODE_ENTRYPOINT set → must be HarnessClaude.
+	got := detectHarnessWithEnv([]byte(claudeSubagentStartJSON), claudeEnv)
+	if got != HarnessClaude {
+		t.Errorf("detectHarnessWithEnv(claude subagent-start, claudeEnv) = %v, want HarnessClaude; "+
+			"CLAUDE_CODE_ENTRYPOINT must take priority over hook_event_name presence", got)
+	}
+
+	// Without CLAUDE_CODE_ENTRYPOINT → hook_event_name causes Codex classification
+	// (expected legacy behaviour when running without Claude Code env).
+	got2 := detectHarnessWithEnv([]byte(claudeSubagentStartJSON), noClaudeEnv)
+	if got2 != HarnessCodex {
+		t.Errorf("detectHarnessWithEnv(subagent-start, noClaudeEnv) = %v, want HarnessCodex (hook_event_name present)", got2)
+	}
+}
+
+// TestDetectHarness_AgentIDPreservedThroughClaudeHarness asserts that when
+// CLAUDE_CODE_ENTRYPOINT is set (Claude Code environment), ParseEventForHarness
+// uses the Claude path and preserves the raw payload's agent_id and agent_type
+// unchanged — it must NOT clobber them to "codex"/"general-purpose".
+func TestDetectHarness_AgentIDPreservedThroughClaudeHarness(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
+
+	payload := []byte(`{
+		"session_id": "db130bce-c0b4-4378-bfc6-759f6306849c",
+		"cwd": "/workspaces/htmlgraph",
+		"hook_event_name": "SubagentStart",
+		"agent_id": "task-uuid-xyz",
+		"agent_type": "htmlgraph:sonnet-coder"
+	}`)
+
+	harness := DetectHarness(payload)
+	if harness != HarnessClaude {
+		t.Fatalf("DetectHarness = %v, want HarnessClaude when CLAUDE_CODE_ENTRYPOINT is set", harness)
+	}
+
+	ev, err := ParseEventForHarness(harness, payload)
+	if err != nil {
+		t.Fatalf("ParseEventForHarness: %v", err)
+	}
+	if ev.AgentID != "task-uuid-xyz" {
+		t.Errorf("AgentID = %q, want %q; CLAUDE_CODE_ENTRYPOINT must prevent Codex parser from clobbering to 'codex'", ev.AgentID, "task-uuid-xyz")
+	}
+	if ev.AgentType != "htmlgraph:sonnet-coder" {
+		t.Errorf("AgentType = %q, want %q", ev.AgentType, "htmlgraph:sonnet-coder")
 	}
 }
 

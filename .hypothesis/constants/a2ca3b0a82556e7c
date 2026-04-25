@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/edge_sync.py
-# hypothesis_version: 6.151.9
-
-['*.html', '-', 'bugs', 'feature', 'features', 'outgoing', 'relationship', 'spikes', 'target_id', 'to_node_id']

@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cigs/messaging.py
-# hypothesis_version: 6.151.9
-
-[0.75, 0.9, '\n\n**Impact:**', '\n\n**Session Stats:**', '\n**Metrics:**', 'Bash', 'Edit', 'Glob', 'Grep', 'NotebookEdit', 'Read', 'Write', 'blocking', 'commanding', 'direct_exploration', 'direct_git', 'direct_testing', 'exploration_sequence', 'includes_cost', 'includes_suggestion', 'informative', 'prefix', 'strict', 'tone', 'urgent', '⚠️ FINAL WARNING', '💡 GUIDANCE', '🔴 IMPERATIVE', '🚨 CIRCUIT BREAKER']

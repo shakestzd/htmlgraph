@@ -49,7 +49,7 @@ func runIngestGemini(project string, all, force bool) error {
 	}
 	printProjectHeaderIfDifferent(htmlgraphDir)
 
-	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, "htmlgraph.db"))
+	database, err := dbpkg.Open(filepath.Join(htmlgraphDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

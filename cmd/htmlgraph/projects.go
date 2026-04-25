@@ -49,7 +49,7 @@ func projectsListCmd() *cobra.Command {
 				hgDir := filepath.Join(e.ProjectDir, ".htmlgraph")
 				if _, statErr := os.Stat(hgDir); statErr == nil {
 					status = "exists"
-					dbPath := filepath.Join(hgDir, "htmlgraph.db")
+					dbPath := filepath.Join(hgDir, ".db", "htmlgraph.db")
 					if db, openErr := registry.OpenReadOnly(dbPath); openErr == nil {
 						items = countItems(db)
 						db.Close()

@@ -251,7 +251,10 @@ func setupHTMLGraphDir(t *testing.T) (string, *sql.DB) {
 		t.Fatalf("mkdir sessions: %v", err)
 	}
 
-	database, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	if err := os.MkdirAll(filepath.Join(hgDir, ".db"), 0o755); err != nil {
+		t.Fatalf("mkdir .db: %v", err)
+	}
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -303,7 +306,7 @@ func TestRunCleanupGhostSessions_NeverDeletesHTMLBacked(t *testing.T) {
 	}
 
 	// Verify the row still exists.
-	db2, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	db2, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("reopen db: %v", err)
 	}
@@ -333,7 +336,7 @@ func TestRunCleanupGhostSessions_DeletesTrueGhosts(t *testing.T) {
 		t.Fatalf("runCleanupGhostSessions: %v", err)
 	}
 
-	db2, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	db2, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("reopen db: %v", err)
 	}
@@ -375,7 +378,7 @@ func TestRunCleanupGhostSessions_DryRunNoDelete(t *testing.T) {
 	}
 
 	// Row must still exist.
-	db2, err := dbpkg.Open(filepath.Join(hgDir, "htmlgraph.db"))
+	db2, err := dbpkg.Open(filepath.Join(hgDir, ".db", "htmlgraph.db"))
 	if err != nil {
 		t.Fatalf("reopen db: %v", err)
 	}

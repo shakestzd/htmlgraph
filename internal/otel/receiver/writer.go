@@ -40,10 +40,12 @@ type Writer struct {
 // a single writer. The caller must Close the writer on shutdown so the
 // prepared statements release.
 func NewWriter(dbPath string) (*Writer, error) {
-	// file: URL parameters configure WAL + busy timeout at open time.
-	// These are idempotent with schema.go's ApplyPragmas, which ran
-	// already via the read-pool Open.
-	dsn := dbPath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
+	// Per-connection pragmas only — journal_mode is intentionally absent.
+	// BuildPragmas (via ApplyPragmas on the read-pool Open) is the sole
+	// source of truth for journal_mode; on unsafe filesystems it resolves
+	// to DELETE. Setting WAL here would permanently override that decision
+	// for the lifetime of the DB file, breaking all subsequent connections.
+	dsn := dbPath + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open writer: %w", err)

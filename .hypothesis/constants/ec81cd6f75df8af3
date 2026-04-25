@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models/context.py
-# hypothesis_version: 6.151.9
-
-[0.0, 100, 200000, 'ContextSnapshot', 'cache_create', 'cache_read', 'context_window', 'context_window_size', 'cost', 'current_usage', 'feature', 'in', 'input_tokens', 'minimal', 'out', 'output_tokens', 'total_cost_usd', 'total_in', 'total_input_tokens', 'total_out', 'total_output_tokens', 'trigger', 'ts', 'window', '✓', '✗']

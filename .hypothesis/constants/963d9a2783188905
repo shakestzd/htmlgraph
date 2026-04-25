@@ -1,4 +1,0 @@
-# file: /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/skill_scout/project_analyzer.py
-# hypothesis_version: 6.151.9
-
-['.circleci', '.github', '.gitlab-ci.yml', '.htmlgraph', '@angular/core', 'Angular', 'CMakeLists.txt', 'Cargo.toml', 'Django', 'Dockerfile', 'Ecto', 'FastAPI', 'Flask', 'Gemfile', 'Jenkinsfile', 'Next.js', 'Nuxt.js', 'Phoenix', 'React', 'Svelte', 'TypeScript', 'Vue', '__tests__', 'build.gradle', 'build.gradle.kts', 'composer.json', 'cpp', 'dart', 'dependencies', 'devDependencies', 'django', 'docker-compose.yaml', 'docker-compose.yml', 'ecto', 'elixir', 'fastapi', 'flask', 'go', 'go.mod', 'java', 'javascript', 'mix.exs', 'next', 'nuxt', 'package.json', 'peerDependencies', 'phoenix', 'php', 'pnpm-lock.yaml', 'pom.xml', 'pubspec.yaml', 'pyproject.toml', 'pytest', 'python', 'react', 'replace', 'requirements.txt', 'ruby', 'rust', 'setup.cfg', 'setup.py', 'spec', 'svelte', 'test', 'tests', 'typescript', 'utf-8', 'vue', 'workflows', 'yarn.lock']

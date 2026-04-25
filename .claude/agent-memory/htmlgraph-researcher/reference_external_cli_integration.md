@@ -6,7 +6,7 @@ type: reference
 
 # External CLI Integration
 
-All three CLIs are installed at `/Users/shakes/.nvm/versions/node/v22.20.0/bin/`.
+All three CLIs are installed at `$HOME/.nvm/versions/node/v22.20.0/bin/`.
 
 ## Codex CLI
 
@@ -60,7 +60,7 @@ codex exec "<prompt>" \
 - `plugin/skills/orchestrator-directives-skill/SKILL.md`: implementation tasks (priority 2 after Gemini)
 - `orchestrator-directives-skill/reference.md`: multiple examples with `--full-auto --json -m gpt-4.1-mini`
 
-**Known issue:** Stale symlink error at start (`failed to stat skills entry /Users/shakes/.codex/skills/htmlgraph-tracker`) — non-fatal, doesn't affect execution.
+**Known issue:** Stale symlink error at start (`failed to stat skills entry $HOME/.codex/skills/htmlgraph-tracker`) — non-fatal, doesn't affect execution.
 
 ---
 
