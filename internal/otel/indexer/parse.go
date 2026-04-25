@@ -47,16 +47,23 @@ type signalLine struct {
 	Attempt    int     `json:"attempt,omitempty"`
 	StatusCode int     `json:"status_code,omitempty"`
 
-	Attrs map[string]any `json:"attrs,omitempty"`
+	ResourceAttrs map[string]any `json:"resource_attrs,omitempty"`
+	Attrs         map[string]any `json:"attrs,omitempty"`
 }
 
-// parseLine decodes one NDJSON line into a UnifiedSignal.
+// parsedSignal bundles a decoded signal with its resource attributes.
+type parsedSignal struct {
+	Signal        otel.UnifiedSignal
+	ResourceAttrs map[string]any
+}
+
+// parseLine decodes one NDJSON line into a parsedSignal.
 //
 // Returns:
 //   - (nil, nil) for lines that should be skipped (collector_start, unknown kind).
 //   - (nil, err) for malformed JSON.
-//   - (*UnifiedSignal, nil) on success.
-func parseLine(data []byte) (*otel.UnifiedSignal, error) {
+//   - (*parsedSignal, nil) on success.
+func parseLine(data []byte) (*parsedSignal, error) {
 	var sl signalLine
 	if err := json.Unmarshal(data, &sl); err != nil {
 		return nil, fmt.Errorf("json unmarshal: %w", err)
@@ -75,42 +82,44 @@ func parseLine(data []byte) (*otel.UnifiedSignal, error) {
 		}
 	}
 
-	sig := &otel.UnifiedSignal{
-		Kind:           kind,
-		Harness:        otel.Harness(sl.Harness),
-		Timestamp:      ts,
-		SignalID:       sl.SignalID,
-		SessionID:      sl.SessionID,
-		PromptID:       sl.PromptID,
-		CanonicalName:  sl.CanonicalName,
-		NativeName:     sl.NativeName,
-		TraceID:        sl.TraceID,
-		SpanID:         sl.SpanID,
-		ParentSpan:     sl.ParentSpan,
-		ToolName:       sl.ToolName,
-		ToolUseID:      sl.ToolUseID,
-		Model:          sl.Model,
-		Decision:       sl.Decision,
-		DecisionSource: sl.DecisionSource,
-		Tokens: otel.TokenCounts{
-			Input:         sl.TokensInput,
-			Output:        sl.TokensOutput,
-			CacheRead:     sl.TokensCacheRead,
-			CacheCreation: sl.TokensCacheCreation,
-			Thought:       sl.TokensThought,
-			Tool:          sl.TokensTool,
-			Reasoning:     sl.TokensReasoning,
+	return &parsedSignal{
+		Signal: otel.UnifiedSignal{
+			Kind:           kind,
+			Harness:        otel.Harness(sl.Harness),
+			Timestamp:      ts,
+			SignalID:       sl.SignalID,
+			SessionID:      sl.SessionID,
+			PromptID:       sl.PromptID,
+			CanonicalName:  sl.CanonicalName,
+			NativeName:     sl.NativeName,
+			TraceID:        sl.TraceID,
+			SpanID:         sl.SpanID,
+			ParentSpan:     sl.ParentSpan,
+			ToolName:       sl.ToolName,
+			ToolUseID:      sl.ToolUseID,
+			Model:          sl.Model,
+			Decision:       sl.Decision,
+			DecisionSource: sl.DecisionSource,
+			Tokens: otel.TokenCounts{
+				Input:         sl.TokensInput,
+				Output:        sl.TokensOutput,
+				CacheRead:     sl.TokensCacheRead,
+				CacheCreation: sl.TokensCacheCreation,
+				Thought:       sl.TokensThought,
+				Tool:          sl.TokensTool,
+				Reasoning:     sl.TokensReasoning,
+			},
+			CostUSD:    sl.CostUSD,
+			CostSource: otel.CostSource(sl.CostSource),
+			DurationMs: sl.DurationMs,
+			Success:    sl.Success,
+			ErrorMsg:   sl.ErrorMsg,
+			Attempt:    sl.Attempt,
+			StatusCode: sl.StatusCode,
+			RawAttrs:   sl.Attrs,
 		},
-		CostUSD:    sl.CostUSD,
-		CostSource: otel.CostSource(sl.CostSource),
-		DurationMs: sl.DurationMs,
-		Success:    sl.Success,
-		ErrorMsg:   sl.ErrorMsg,
-		Attempt:    sl.Attempt,
-		StatusCode: sl.StatusCode,
-		RawAttrs:   sl.Attrs,
-	}
-	return sig, nil
+		ResourceAttrs: sl.ResourceAttrs,
+	}, nil
 }
 
 // toKind maps a raw kind string to otel.Kind.

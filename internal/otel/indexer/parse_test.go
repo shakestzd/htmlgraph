@@ -20,60 +20,60 @@ func TestParseLine_ValidSpan(t *testing.T) {
 		t.Fatal("parseLine returned nil for valid line")
 	}
 
-	if sig.Kind != otel.KindSpan {
-		t.Errorf("Kind: got %q, want %q", sig.Kind, otel.KindSpan)
+	if sig.Signal.Kind != otel.KindSpan {
+		t.Errorf("Kind: got %q, want %q", sig.Signal.Kind, otel.KindSpan)
 	}
-	if sig.Harness != otel.HarnessClaude {
-		t.Errorf("Harness: got %q, want %q", sig.Harness, otel.HarnessClaude)
+	if sig.Signal.Harness != otel.HarnessClaude {
+		t.Errorf("Harness: got %q, want %q", sig.Signal.Harness, otel.HarnessClaude)
 	}
 	want := time.Date(2026, 4, 24, 19, 0, 0, 123456789, time.UTC)
-	if !sig.Timestamp.Equal(want) {
-		t.Errorf("Timestamp: got %v, want %v", sig.Timestamp, want)
+	if !sig.Signal.Timestamp.Equal(want) {
+		t.Errorf("Timestamp: got %v, want %v", sig.Signal.Timestamp, want)
 	}
-	if sig.SignalID != "sig-abc" {
-		t.Errorf("SignalID: got %q", sig.SignalID)
+	if sig.Signal.SignalID != "sig-abc" {
+		t.Errorf("SignalID: got %q", sig.Signal.SignalID)
 	}
-	if sig.SessionID != "ses-123" {
-		t.Errorf("SessionID: got %q", sig.SessionID)
+	if sig.Signal.SessionID != "ses-123" {
+		t.Errorf("SessionID: got %q", sig.Signal.SessionID)
 	}
-	if sig.PromptID != "p-456" {
-		t.Errorf("PromptID: got %q", sig.PromptID)
+	if sig.Signal.PromptID != "p-456" {
+		t.Errorf("PromptID: got %q", sig.Signal.PromptID)
 	}
-	if sig.CanonicalName != "api_request" {
-		t.Errorf("CanonicalName: got %q", sig.CanonicalName)
+	if sig.Signal.CanonicalName != "api_request" {
+		t.Errorf("CanonicalName: got %q", sig.Signal.CanonicalName)
 	}
-	if sig.NativeName != "claude_code.api_request" {
-		t.Errorf("NativeName: got %q", sig.NativeName)
+	if sig.Signal.NativeName != "claude_code.api_request" {
+		t.Errorf("NativeName: got %q", sig.Signal.NativeName)
 	}
-	if sig.TraceID != "tr-abc" {
-		t.Errorf("TraceID: got %q", sig.TraceID)
+	if sig.Signal.TraceID != "tr-abc" {
+		t.Errorf("TraceID: got %q", sig.Signal.TraceID)
 	}
-	if sig.SpanID != "sp-abc" {
-		t.Errorf("SpanID: got %q", sig.SpanID)
+	if sig.Signal.SpanID != "sp-abc" {
+		t.Errorf("SpanID: got %q", sig.Signal.SpanID)
 	}
-	if sig.ParentSpan != "sp-par" {
-		t.Errorf("ParentSpan: got %q", sig.ParentSpan)
+	if sig.Signal.ParentSpan != "sp-par" {
+		t.Errorf("ParentSpan: got %q", sig.Signal.ParentSpan)
 	}
-	if sig.ToolName != "Bash" {
-		t.Errorf("ToolName: got %q", sig.ToolName)
+	if sig.Signal.ToolName != "Bash" {
+		t.Errorf("ToolName: got %q", sig.Signal.ToolName)
 	}
-	if sig.Model != "claude-3-5" {
-		t.Errorf("Model: got %q", sig.Model)
+	if sig.Signal.Model != "claude-3-5" {
+		t.Errorf("Model: got %q", sig.Signal.Model)
 	}
-	if sig.Tokens.Input != 100 {
-		t.Errorf("Tokens.Input: got %d", sig.Tokens.Input)
+	if sig.Signal.Tokens.Input != 100 {
+		t.Errorf("Tokens.Input: got %d", sig.Signal.Tokens.Input)
 	}
-	if sig.Tokens.Output != 50 {
-		t.Errorf("Tokens.Output: got %d", sig.Tokens.Output)
+	if sig.Signal.Tokens.Output != 50 {
+		t.Errorf("Tokens.Output: got %d", sig.Signal.Tokens.Output)
 	}
-	if sig.CostUSD != 0.001 {
-		t.Errorf("CostUSD: got %f", sig.CostUSD)
+	if sig.Signal.CostUSD != 0.001 {
+		t.Errorf("CostUSD: got %f", sig.Signal.CostUSD)
 	}
-	if sig.DurationMs != 500 {
-		t.Errorf("DurationMs: got %d", sig.DurationMs)
+	if sig.Signal.DurationMs != 500 {
+		t.Errorf("DurationMs: got %d", sig.Signal.DurationMs)
 	}
-	if sig.Success == nil || *sig.Success != successVal {
-		t.Errorf("Success: got %v", sig.Success)
+	if sig.Signal.Success == nil || *sig.Signal.Success != successVal {
+		t.Errorf("Success: got %v", sig.Signal.Success)
 	}
 }
 
@@ -111,11 +111,11 @@ func TestParseLine_MetricKind(t *testing.T) {
 	if sig == nil {
 		t.Fatal("parseLine returned nil for metric")
 	}
-	if sig.Kind != otel.KindMetric {
-		t.Errorf("Kind: got %q, want %q", sig.Kind, otel.KindMetric)
+	if sig.Signal.Kind != otel.KindMetric {
+		t.Errorf("Kind: got %q, want %q", sig.Signal.Kind, otel.KindMetric)
 	}
-	if sig.Harness != otel.HarnessCodex {
-		t.Errorf("Harness: got %q, want %q", sig.Harness, otel.HarnessCodex)
+	if sig.Signal.Harness != otel.HarnessCodex {
+		t.Errorf("Harness: got %q, want %q", sig.Signal.Harness, otel.HarnessCodex)
 	}
 }
 
@@ -129,8 +129,8 @@ func TestParseLine_LogKind(t *testing.T) {
 	if sig == nil {
 		t.Fatal("parseLine returned nil for log")
 	}
-	if sig.Kind != otel.KindLog {
-		t.Errorf("Kind: got %q, want %q", sig.Kind, otel.KindLog)
+	if sig.Signal.Kind != otel.KindLog {
+		t.Errorf("Kind: got %q, want %q", sig.Signal.Kind, otel.KindLog)
 	}
 }
 
@@ -156,10 +156,10 @@ func TestParseLine_SuccessFalse(t *testing.T) {
 	if sig == nil {
 		t.Fatal("parseLine returned nil")
 	}
-	if sig.Success == nil {
+	if sig.Signal.Success == nil {
 		t.Fatal("Success should not be nil")
 	}
-	if *sig.Success != false {
-		t.Errorf("Success: got %v, want false", *sig.Success)
+	if *sig.Signal.Success != false {
+		t.Errorf("Success: got %v, want false", *sig.Signal.Success)
 	}
 }

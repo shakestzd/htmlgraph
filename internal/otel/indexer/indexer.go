@@ -136,15 +136,15 @@ func (idx *Indexer) processSession(ctx context.Context, sessionID string) error 
 		return nil // no new data
 	}
 
-	signals, newOffset, err := idx.readNewSignals(ndjsonPath, offset)
+	parsed, newOffset, err := idx.readNewSignals(ndjsonPath, offset)
 	if err != nil {
 		return err
 	}
-	if len(signals) == 0 {
+	if len(parsed) == 0 {
 		return writeCheckpoint(checkpointPath, newOffset)
 	}
 
-	if err := idx.snk.WriteBatch(ctx, otel.HarnessClaude, nil, signals); err != nil {
+	if err := idx.writeParsedBatch(ctx, parsed); err != nil {
 		return err
 	}
 
@@ -156,9 +156,11 @@ func (idx *Indexer) processSession(ctx context.Context, sessionID string) error 
 	return nil
 }
 
-// readNewSignals opens ndjsonPath, seeks to offset, reads and parses lines.
-// Returns the parsed signals and the new file offset after the last processed line.
-func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]otel.UnifiedSignal, int64, error) {
+// readNewSignals opens ndjsonPath, seeks to offset, reads complete
+// newline-terminated lines, and parses them. Incomplete trailing data
+// (no newline at EOF) is left uncheckpointed so the next poll retries
+// once the writer finishes the line.
+func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]parsedSignal, int64, error) {
 	f, err := os.Open(ndjsonPath)
 	if err != nil {
 		return nil, offset, err
@@ -171,43 +173,85 @@ func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]otel.Unif
 		}
 	}
 
-	var signals []otel.UnifiedSignal
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	reader := bufio.NewReaderSize(f, 64*1024)
+	var result []parsedSignal
 	committedOffset := offset
 
-	for scanner.Scan() {
-		lineBytes := scanner.Bytes()
-		lineLen := int64(len(lineBytes)) + 1
-
-		if len(lineBytes) == 0 {
-			committedOffset += lineLen
-			continue
-		}
-
-		sig, err := parseLine(lineBytes)
+	for {
+		line, err := readLine(reader)
 		if err != nil {
-			log.Printf("indexer: skip malformed line in %s at offset ~%d: %v",
-				ndjsonPath, committedOffset+lineLen, err)
+			break
+		}
+		lineLen := int64(len(line)) + 1
+		if len(line) == 0 {
 			committedOffset += lineLen
 			continue
 		}
-		if sig == nil {
+		p, parseErr := parseLine(line)
+		if parseErr != nil {
+			log.Printf("indexer: skip malformed line at offset ~%d: %v",
+				committedOffset, parseErr)
 			committedOffset += lineLen
 			continue
 		}
-		signals = append(signals, *sig)
+		if p == nil {
+			committedOffset += lineLen
+			continue
+		}
+		result = append(result, *p)
 		committedOffset += lineLen
 	}
-	if err := scanner.Err(); err != nil {
-		if err == bufio.ErrTooLong {
-			log.Printf("indexer: line exceeds 4MB in %s at offset ~%d — skipping",
-				ndjsonPath, committedOffset)
-			return signals, committedOffset, nil
+	return result, committedOffset, nil
+}
+
+// writeParsedBatch writes parsed signals to the sink, passing through
+// each signal's resource attributes so placeholder/re-attribution logic
+// in the SQLite writer functions correctly.
+func (idx *Indexer) writeParsedBatch(ctx context.Context, parsed []parsedSignal) error {
+	for _, p := range parsed {
+		h := p.Signal.Harness
+		if h == "" {
+			h = otel.HarnessClaude
 		}
-		return signals, committedOffset, err
+		signals := []otel.UnifiedSignal{p.Signal}
+		if err := idx.snk.WriteBatch(ctx, h, p.ResourceAttrs, signals); err != nil {
+			return err
+		}
 	}
-	return signals, committedOffset, nil
+	return nil
+}
+
+const maxLineSize = 4 * 1024 * 1024
+
+// readLine reads until the next newline, returning the line content
+// without the newline. Returns io.EOF when no more complete lines
+// exist. Lines exceeding maxLineSize are skipped with a log warning.
+func readLine(r *bufio.Reader) ([]byte, error) {
+	var buf []byte
+	for {
+		chunk, isPrefix, err := r.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, chunk...)
+		if !isPrefix {
+			return buf, nil
+		}
+		if len(buf) > maxLineSize {
+			skipToNewline(r)
+			log.Printf("indexer: line exceeds %d bytes — skipped", maxLineSize)
+			return buf[:0], nil // return empty so caller advances offset
+		}
+	}
+}
+
+func skipToNewline(r *bufio.Reader) {
+	for {
+		_, isPrefix, err := r.ReadLine()
+		if err != nil || !isPrefix {
+			return
+		}
+	}
 }
 
 // updateSize records the current file size without touching LastIndexedAt.

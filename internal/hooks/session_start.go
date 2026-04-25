@@ -549,7 +549,7 @@ func emitRosettaEvent(projectDir, htmlgraphSID, claudeSessionID string) {
 	sig := otel.UnifiedSignal{
 		Harness:       "htmlgraph",
 		SignalID:      "session-start-" + htmlgraphSID,
-		Kind:          otel.Kind("session_start"),
+		Kind:          otel.KindLog,
 		CanonicalName: otel.CanonicalSessionStart,
 		NativeName:    "session_start",
 		Timestamp:     time.Now().UTC(),

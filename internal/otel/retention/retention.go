@@ -145,7 +145,13 @@ func writeTarGz(archivePath, sessionID, eventsFile string) error {
 	if err != nil {
 		return fmt.Errorf("create archive file: %w", err)
 	}
-	defer f.Close()
+	success := false
+	defer func() {
+		if !success {
+			f.Close()
+			os.Remove(archivePath)
+		}
+	}()
 
 	gz := gzip.NewWriter(f)
 	tw := tar.NewWriter(gz)
@@ -180,6 +186,10 @@ func writeTarGz(archivePath, sessionID, eventsFile string) error {
 	if err := gz.Close(); err != nil {
 		return fmt.Errorf("finalize gzip: %w", err)
 	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close archive file: %w", err)
+	}
+	success = true
 	return nil
 }
 

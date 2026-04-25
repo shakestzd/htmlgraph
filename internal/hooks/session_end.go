@@ -101,6 +101,9 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 	// BEFORE materializing — the indexer needs the final signals in SQLite first.
 	signalCollector(projectDir, sessionID)
 
+	// Wait briefly for the indexer to catch up with the final NDJSON writes.
+	waitForIndexerCatchUp(projectDir, sessionID)
+
 	// Materialize OTel rollup (no-op if no signals received for this session).
 	// Non-fatal: errors are logged but do not block SessionEnd completion.
 	if err := materialize.Materialize(database, projectDir, sessionID); err != nil {
@@ -108,6 +111,30 @@ func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookRe
 	}
 
 	return &HookResult{Continue: true}, nil
+}
+
+// waitForIndexerCatchUp polls until .index-offset reaches events.ndjson size,
+// or 2s elapses. Best-effort — if the indexer is behind, materialize will
+// use whatever signals have been indexed so far.
+func waitForIndexerCatchUp(projectDir, sessionID string) {
+	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID)
+	ndjsonPath := filepath.Join(sessDir, "events.ndjson")
+	offsetPath := filepath.Join(sessDir, ".index-offset")
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		info, err := os.Stat(ndjsonPath)
+		if err != nil {
+			return
+		}
+		data, err := os.ReadFile(offsetPath)
+		if err == nil {
+			if off, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64); err == nil && off >= info.Size() {
+				return
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // signalCollector reads the .collector-pid file for this session, sends SIGTERM,
