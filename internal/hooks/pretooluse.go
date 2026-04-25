@@ -161,6 +161,9 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		if warn := checkYoloBudgetGuard(event, ctx.IsYoloMode); warn != "" {
 			return &HookResult{Decision: "block", Reason: warn}, nil
 		}
+		if warn := checkYoloRoborevGuard(event, ctx.IsYoloMode); warn != "" {
+			return &HookResult{Decision: "block", Reason: warn}, nil
+		}
 
 		// Warn (not block) when the orchestrator writes directly instead of
 		// delegating to a subagent (bug-06627817).
