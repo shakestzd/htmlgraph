@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -147,10 +148,7 @@ func writeTarGz(archivePath, sessionID, eventsFile string) error {
 	defer f.Close()
 
 	gz := gzip.NewWriter(f)
-	defer gz.Close()
-
 	tw := tar.NewWriter(gz)
-	defer tw.Close()
 
 	src, err := os.Open(eventsFile)
 	if err != nil {
@@ -176,6 +174,12 @@ func writeTarGz(archivePath, sessionID, eventsFile string) error {
 		return fmt.Errorf("copy events data: %w", err)
 	}
 
+	if err := tw.Close(); err != nil {
+		return fmt.Errorf("finalize tar: %w", err)
+	}
+	if err := gz.Close(); err != nil {
+		return fmt.Errorf("finalize gzip: %w", err)
+	}
 	return nil
 }
 
@@ -269,8 +273,10 @@ func extractTarGz(archivePath, destDir string) error {
 			return fmt.Errorf("read tar entry: %w", err)
 		}
 
-		// Sanitize path to prevent directory traversal.
 		target := filepath.Join(destDir, filepath.Clean("/"+hdr.Name))
+		if !strings.HasPrefix(target, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("tar entry %q escapes destination directory", hdr.Name)
+		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return fmt.Errorf("mkdir for %s: %w", hdr.Name, err)
 		}

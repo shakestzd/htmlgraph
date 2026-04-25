@@ -173,12 +173,12 @@ func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]otel.Unif
 
 	var signals []otel.UnifiedSignal
 	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	committedOffset := offset
 
 	for scanner.Scan() {
 		lineBytes := scanner.Bytes()
-		lineLen := int64(len(lineBytes)) + 1 // +1 for newline
+		lineLen := int64(len(lineBytes)) + 1
 
 		if len(lineBytes) == 0 {
 			committedOffset += lineLen
@@ -200,6 +200,11 @@ func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]otel.Unif
 		committedOffset += lineLen
 	}
 	if err := scanner.Err(); err != nil {
+		if err == bufio.ErrTooLong {
+			log.Printf("indexer: line exceeds 4MB in %s at offset ~%d — skipping",
+				ndjsonPath, committedOffset)
+			return signals, committedOffset, nil
+		}
 		return signals, committedOffset, err
 	}
 	return signals, committedOffset, nil

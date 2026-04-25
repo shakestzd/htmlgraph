@@ -37,6 +37,8 @@ func (h *collectorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.lastActivity.Store(time.Now().UnixMilli())
 
+	const maxBodySize = 4 * 1024 * 1024 // 4MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "read body failed", http.StatusBadRequest)
