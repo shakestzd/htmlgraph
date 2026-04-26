@@ -40,14 +40,18 @@ func Make(s string, maxLen int) string {
 	}
 
 	// Build slug character by character.
+	// Only ASCII alphanumerics (r <= 0x7F) are kept so that byte-truncation later
+	// can never split a multi-byte UTF-8 rune and produce invalid UTF-8.
+	// Non-ASCII runes are treated as separators, collapsed to a single hyphen.
 	var b strings.Builder
 	prevHyphen := false
 	for _, r := range strings.ToLower(s) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+		isASCIIAlnum := r <= 0x7F && (unicode.IsLetter(r) || unicode.IsDigit(r))
+		if isASCIIAlnum {
 			b.WriteRune(r)
 			prevHyphen = false
 		} else {
-			// Collapse any run of separators (spaces, punctuation, etc.) to one hyphen.
+			// Non-alphanumeric or non-ASCII: collapse any run to one hyphen.
 			if !prevHyphen && b.Len() > 0 {
 				b.WriteRune('-')
 				prevHyphen = true

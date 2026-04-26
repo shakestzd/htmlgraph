@@ -253,16 +253,30 @@ func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, res
 			}
 			workDir = worktreePath
 		} else if featureID != "" {
-			worktreePath, wtErr := EnsureForFeature(featureID, projectRoot, os.Stdout)
-			if wtErr != nil {
-				return wtErr
+			// Resolve the parent track so features use the titled track worktree.
+			parentTrackID := resolveTrackForFeature(featureID, projectRoot)
+			if parentTrackID != "" {
+				parentTitle := resolveTrackTitle(parentTrackID, "", projectRoot)
+				worktreePath, wtErr := EnsureForTrackWithTitle(parentTitle, parentTrackID, projectRoot, os.Stdout)
+				if wtErr != nil {
+					return wtErr
+				}
+				workDir = worktreePath
+			} else {
+				worktreePath, wtErr := EnsureForFeature(featureID, projectRoot, os.Stdout)
+				if wtErr != nil {
+					return wtErr
+				}
+				workDir = worktreePath
 			}
-			workDir = worktreePath
 		}
 	}
 
 	sessionName := name
-	if sessionName == "" {
+	// Only synthesize a default name for new sessions. When resuming an existing
+	// session, skip default-name generation so we don't rename or conflict with
+	// the resumed session. The user can still override with an explicit --name.
+	if sessionName == "" && resumeID == "" {
 		sessionName = yoloDefaultName(trackID, featureID, projectRoot)
 	}
 	yoloPrompt := buildYoloSystemPrompt(id, kind)
@@ -338,11 +352,22 @@ func launchYoloDev(trackID, featureID string, noWorktree bool, resumeID, name st
 			}
 			workDir = worktreePath
 		} else if featureID != "" {
-			worktreePath, wtErr := EnsureForFeature(featureID, projectRoot, os.Stdout)
-			if wtErr != nil {
-				return wtErr
+			// Resolve the parent track so features use the titled track worktree.
+			parentTrackID := resolveTrackForFeature(featureID, projectRoot)
+			if parentTrackID != "" {
+				parentTitle := resolveTrackTitle(parentTrackID, "", projectRoot)
+				worktreePath, wtErr := EnsureForTrackWithTitle(parentTitle, parentTrackID, projectRoot, os.Stdout)
+				if wtErr != nil {
+					return wtErr
+				}
+				workDir = worktreePath
+			} else {
+				worktreePath, wtErr := EnsureForFeature(featureID, projectRoot, os.Stdout)
+				if wtErr != nil {
+					return wtErr
+				}
+				workDir = worktreePath
 			}
-			workDir = worktreePath
 		}
 	}
 
@@ -350,7 +375,10 @@ func launchYoloDev(trackID, featureID string, noWorktree bool, resumeID, name st
 	removeMarketplaceHtmlgraph()
 
 	sessionName := name
-	if sessionName == "" {
+	// Only synthesize a default name for new sessions. When resuming an existing
+	// session, skip default-name generation so we don't rename or conflict with
+	// the resumed session. The user can still override with an explicit --name.
+	if sessionName == "" && resumeID == "" {
 		sessionName = yoloDefaultName(trackID, featureID, projectRoot)
 	}
 	yoloPrompt := buildYoloSystemPrompt(id, kind)

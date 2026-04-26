@@ -385,7 +385,10 @@ func launchClaudeDefault(extraArgs []string, resumeID, name string) error {
 	cleanupStaleDev(projectRoot)
 	ensurePluginOnLaunch()
 	sessionName := name
-	if sessionName == "" {
+	// Only synthesize a default name for new sessions. When resuming an existing
+	// session, skip default-name generation so we don't rename or conflict with
+	// the resumed session. The user can still override with an explicit --name.
+	if sessionName == "" && resumeID == "" {
 		sessionName = defaultSessionName(projectRoot)
 	}
 	fmt.Println("Launching Claude Code (default mode)...")

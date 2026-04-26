@@ -2,6 +2,7 @@ package slug_test
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/shakestzd/htmlgraph/internal/slug"
 )
@@ -85,6 +86,12 @@ func TestMake(t *testing.T) {
 			maxLen: 30,
 			want:   "htmlgraph",
 		},
+		{
+			name:   "non-ASCII title stripped to ASCII words only",
+			input:  "日本語タイトル foo bar baz",
+			maxLen: 20,
+			want:   "foo-bar-baz",
+		},
 	}
 
 	for _, tt := range tests {
@@ -94,6 +101,19 @@ func TestMake(t *testing.T) {
 				t.Errorf("Make(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestMakeNonASCIIValidUTF8 verifies that a title containing non-ASCII runes
+// produces a slug that is valid UTF-8 and does not exceed the byte cap.
+func TestMakeNonASCIIValidUTF8(t *testing.T) {
+	const maxLen = 20
+	result := slug.Make("日本語タイトル foo bar baz", maxLen)
+	if !utf8.ValidString(result) {
+		t.Errorf("Make returned invalid UTF-8: %q", result)
+	}
+	if len(result) > maxLen {
+		t.Errorf("Make result %q exceeds maxLen %d (got %d bytes)", result, maxLen, len(result))
 	}
 }
 
