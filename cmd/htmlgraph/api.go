@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,19 +29,27 @@ func respondJSON(w http.ResponseWriter, v any) {
 func initialStatsHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var totalEvents, totalSessions int
-		database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents)
-		database.QueryRow(`SELECT COUNT(*) FROM sessions`).Scan(&totalSessions)
+		if err := database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query agent_events count: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if err := database.QueryRow(`SELECT COUNT(*) FROM sessions`).Scan(&totalSessions); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query sessions count: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		rows, err := database.Query(
 			`SELECT DISTINCT agent_id FROM agent_events ORDER BY agent_id`)
 		agents := []string{}
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var a string
-				if rows.Scan(&a) == nil {
-					agents = append(agents, a)
-				}
+		if err != nil {
+			http.Error(w, fmt.Sprintf("query agents: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var a string
+			if rows.Scan(&a) == nil {
+				agents = append(agents, a)
 			}
 		}
 
@@ -306,7 +315,10 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 		var total, inProgress, done, todo int
 		var activeSessions, totalEvents int
 
-		database.QueryRow(`SELECT COUNT(*) FROM features`).Scan(&total)
+		if err := database.QueryRow(`SELECT COUNT(*) FROM features`).Scan(&total); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query features count: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		if total == 0 {
 			items := featuresFromHTML(projectDir)
@@ -322,37 +334,61 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 				}
 			}
 		} else {
-			database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='in-progress'`).Scan(&inProgress)
-			database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'`).Scan(&done)
-			database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='todo'`).Scan(&todo)
+			if err := database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='in-progress'`).Scan(&inProgress); err != nil && err != sql.ErrNoRows {
+				http.Error(w, fmt.Sprintf("query in-progress count: %v", err), http.StatusInternalServerError)
+				return
+			}
+			if err := database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'`).Scan(&done); err != nil && err != sql.ErrNoRows {
+				http.Error(w, fmt.Sprintf("query done count: %v", err), http.StatusInternalServerError)
+				return
+			}
+			if err := database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='todo'`).Scan(&todo); err != nil && err != sql.ErrNoRows {
+				http.Error(w, fmt.Sprintf("query todo count: %v", err), http.StatusInternalServerError)
+				return
+			}
 		}
 
-		database.QueryRow(`SELECT COUNT(*) FROM sessions WHERE status='active'`).Scan(&activeSessions)
-		database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents)
+		if err := database.QueryRow(`SELECT COUNT(*) FROM sessions WHERE status='active'`).Scan(&activeSessions); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query active sessions: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if err := database.QueryRow(`SELECT COUNT(*) FROM agent_events`).Scan(&totalEvents); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query total events: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		// Live sessions: active with event in last 5 minutes
 		var liveSessions int
-		database.QueryRow(`
+		if err := database.QueryRow(`
 			SELECT COUNT(DISTINCT s.session_id) FROM sessions s
 			WHERE s.status = 'active' AND s.is_subagent = FALSE
 			  AND EXISTS (SELECT 1 FROM agent_events ae
 			    WHERE ae.session_id = s.session_id
-			      AND ae.timestamp > datetime('now', '-5 minutes'))`).Scan(&liveSessions)
+			      AND ae.timestamp > datetime('now', '-5 minutes'))`).Scan(&liveSessions); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query live sessions: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		// Done today
 		var doneToday int
-		database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'
-			AND updated_at > datetime('now', '-24 hours')`).Scan(&doneToday)
+		if err := database.QueryRow(`SELECT COUNT(*) FROM features WHERE status='done'
+			AND updated_at > datetime('now', '-24 hours')`).Scan(&doneToday); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query done today: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		// Errors today
 		var errorsToday int
-		database.QueryRow(`SELECT COUNT(*) FROM agent_events
+		if err := database.QueryRow(`SELECT COUNT(*) FROM agent_events
 			WHERE event_type = 'error'
-			AND timestamp > datetime('now', '-24 hours')`).Scan(&errorsToday)
+			AND timestamp > datetime('now', '-24 hours')`).Scan(&errorsToday); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query errors today: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		// Cost estimate today (input_tokens * rate + cache * rate + output * rate per model)
 		var costToday float64
-		database.QueryRow(`
+		if err := database.QueryRow(`
 			SELECT COALESCE(SUM(
 				CASE
 					WHEN model LIKE '%opus%' THEN (input_tokens * 15.0 + cache_read_tokens * 1.50 + output_tokens * 75.0) / 1000000.0
@@ -360,7 +396,10 @@ func statsHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 					WHEN model LIKE '%haiku%' THEN (input_tokens * 0.80 + cache_read_tokens * 0.08 + output_tokens * 4.0) / 1000000.0
 					ELSE (input_tokens * 3.0 + cache_read_tokens * 0.30 + output_tokens * 15.0) / 1000000.0
 				END
-			), 0) FROM messages WHERE timestamp > datetime('now', '-24 hours')`).Scan(&costToday)
+			), 0) FROM messages WHERE timestamp > datetime('now', '-24 hours')`).Scan(&costToday); err != nil && err != sql.ErrNoRows {
+			http.Error(w, fmt.Sprintf("query cost today: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		launchMode := ""
 		launchTimestamp := ""

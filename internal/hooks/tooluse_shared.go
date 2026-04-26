@@ -59,11 +59,17 @@ type toolUseContext struct {
 // Returns nil when no active session is found, indicating the caller should
 // skip all DB operations.
 //
+// trustParentEnvVar should be true only in PostToolUse, where
+// HTMLGRAPH_PARENT_PROMPT_EVENT was set by the paired PreToolUse for this
+// specific tool call. PreToolUse passes false so it always re-resolves the
+// parent from the DB, preventing stale env-var values from a prior tool call
+// from leaking into the next prompt's tool calls.
+//
 // Item 1 (feat-8b6fdf86): replaces 3 separate queries (GetSession,
 // GetActiveFeatureID, HasActiveClaimByAgent) with a single SQL join via
 // db.GetToolUseContext. The YOLO conditional queries remain separate since
 // they only run in YOLO mode.
-func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext {
+func resolveToolUseContext(event *CloudEvent, database *sql.DB, trustParentEnvVar bool) *toolUseContext {
 	start := time.Now()
 
 	sessionID := resolveSessionIDWithHarness(event)
@@ -105,7 +111,7 @@ func resolveToolUseContext(event *CloudEvent, database *sql.DB) *toolUseContext 
 	projectDir := ResolveProjectDir(event.CWD, event.SessionID)
 	hgDir := filepath.Join(projectDir, ".htmlgraph")
 	yolo := isYoloFromEvent(event, hgDir)
-	parentEventID := resolveParentEventID(database, sessionID, agentID, isSubagent)
+	parentEventID := resolveParentEventID(database, sessionID, agentID, isSubagent, trustParentEnvVar)
 
 	LogTimed(projectDir, "pretooluse", map[string]string{
 		"phase":   "resolve-context",
@@ -179,27 +185,38 @@ func resolveEventAgentType(event *CloudEvent) string {
 
 // resolveParentEventID finds the parent event using a multi-step fallback that
 // mirrors the Python event_tracker.py logic:
-//  1. Env var HTMLGRAPH_PARENT_PROMPT_EVENT (written by PreToolUse at tool-call time)
+//  1. Env var HTMLGRAPH_PARENT_PROMPT_EVENT (only when trustEnvVar=true, i.e. PostToolUse)
 //  2. Env var HTMLGRAPH_PARENT_EVENT (written by SubagentStart when CLAUDE_ENV_FILE set)
 //  3. Per-subagent hint file parent_event_id (written when CLAUDE_ENV_FILE unset)
 //  4. For subagents: task_delegation row matching our agent_id (Method 0.5)
 //  5. Most recent UserQuery in this session (orchestrator default)
-func resolveParentEventID(database *sql.DB, sessionID, agentID string, isSubagent bool) string {
+//
+// trustEnvVar must be true only in PostToolUse, where the env var was set by the
+// paired PreToolUse for this specific tool call. PreToolUse must pass false so it
+// always re-resolves from the DB — this prevents stale values from a prior tool
+// call being parented to the wrong prompt (the value persists in the process
+// environment across tool calls until the next UserPromptSubmit).
+func resolveParentEventID(database *sql.DB, sessionID, agentID string, isSubagent bool, trustEnvVar bool) string {
 	// HTMLGRAPH_PARENT_PROMPT_EVENT is written to CLAUDE_ENV_FILE by PreToolUse at
-	// the moment the tool starts (before the tool executes). Reading it here — in
-	// both PreToolUse and PostToolUse — eliminates the race where a new UserQuery
-	// arrives while a long-running tool is executing. Without this, the
-	// LatestEventByTool("UserQuery") fallback at the bottom of this chain would
-	// return the *newer* UserQuery (wrong parent) when PostToolUse fires.
+	// the moment the tool starts (before the tool executes). PostToolUse trusts it
+	// to avoid the race where a new UserQuery arrives while a long-running tool is
+	// executing (the LatestEventByTool fallback would return the wrong UserQuery).
+	//
+	// PreToolUse does NOT trust this env var — it is the authority and always
+	// re-resolves from the DB. This prevents the env var set by tool call N from
+	// leaking into tool call N+1 (it persists in the process environment until the
+	// next UserPromptSubmit hook resets it).
 	//
 	// Validate that the env-var event ID actually exists in the current DB before
 	// returning it. In tests, multiple hook invocations share a process and an
 	// earlier PreToolUse may have set this env var for a different DB instance —
 	// using a stale ID that doesn't exist in the current DB causes FK violations
 	// and silent InsertEvent failures.
-	if v := os.Getenv("HTMLGRAPH_PARENT_PROMPT_EVENT"); v != "" {
-		if db.EventExists(database, v) {
-			return v
+	if trustEnvVar {
+		if v := os.Getenv("HTMLGRAPH_PARENT_PROMPT_EVENT"); v != "" {
+			if db.EventExists(database, v) {
+				return v
+			}
 		}
 	}
 

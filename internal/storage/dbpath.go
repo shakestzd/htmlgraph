@@ -39,6 +39,14 @@ func CanonicalDBPath(projectDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve project dir: %w", err)
 	}
+	// Resolve symlinks so the same checkout reached via different paths
+	// (e.g. macOS /var → /private/var, or a symlinked workspace) hashes
+	// to one cache key. Falling back to the abs path when EvalSymlinks
+	// fails (broken link, permission error) keeps the helper usable on
+	// non-existent dirs that callers will create later (init flow).
+	if resolved, evalErr := filepath.EvalSymlinks(abs); evalErr == nil {
+		abs = resolved
+	}
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return "", fmt.Errorf("locate user cache dir: %w", err)

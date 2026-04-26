@@ -17,7 +17,10 @@ import (
 // It finds the most recent "started" event for this session/tool and marks it completed.
 // Note: env vars don't persist between hook processes, so we query the DB instead.
 func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	ctx := resolveToolUseContext(event, database)
+	// PostToolUse trusts HTMLGRAPH_PARENT_PROMPT_EVENT set by the paired PreToolUse
+	// (trustParentEnvVar=true) to avoid the race where a new UserQuery arrives while
+	// the tool was executing and the LatestEventByTool fallback would return the wrong parent.
+	ctx := resolveToolUseContext(event, database, true)
 	if ctx == nil {
 		return &HookResult{Continue: true}, nil
 	}
