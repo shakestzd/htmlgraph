@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,10 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
+
+// stderr is the writer used for diagnostic output from plan-commit helpers.
+// Tests override it to capture output without racing on the process-global os.Stderr.
+var stderr io.Writer = os.Stderr
 
 // commitPlanChange stages and commits the plan YAML and HTML together as an
 // atomic mutation record. The plan YAML is the source of truth; the HTML is
@@ -39,7 +44,7 @@ func commitPlanChange(planPath, message string) error {
 	if !isGitRepo(planDir) {
 		// Not in a git repo — silent skip. This is normal in tests and in
 		// non-git projects. Log to stderr for diagnosability.
-		fmt.Fprintf(os.Stderr, "autocommit skipped: %s is not inside a git repository\n", planDir)
+		fmt.Fprintf(stderr, "autocommit skipped: %s is not inside a git repository\n", planDir)
 		return nil
 	}
 
@@ -75,7 +80,7 @@ func commitPlanChange(planPath, message string) error {
 		// needs to commit manually. Log a warning and return nil so the calling
 		// command reports success instead of rolling back on a git concern
 		// (Fix 1 of bug-365a84d9). Only staging/filesystem errors above are fatal.
-		fmt.Fprintf(os.Stderr, "autocommit warning: git commit failed (mutation persisted to disk — please commit manually): %s\n", strings.TrimSpace(outStr))
+		fmt.Fprintf(stderr, "autocommit warning: git commit failed (mutation persisted to disk — please commit manually): %s\n", strings.TrimSpace(outStr))
 		return nil
 	}
 	return nil
