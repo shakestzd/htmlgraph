@@ -400,7 +400,8 @@ func checkYoloBashResearchGuard(event *CloudEvent, _ bool, hasResearch bool) str
 	if hasResearch {
 		return ""
 	}
-	if bashCommandTargetsExternalPath(cmd) {
+	projectRoot := ResolveProjectDir(event.CWD, event.SessionID)
+	if bashCommandTargetsExternalPath(cmd, projectRoot) {
 		return "Research is required before modifying files outside the project. " +
 			"Review the target files with Bash (cat, head, stat) before making changes."
 	}
@@ -409,17 +410,29 @@ func checkYoloBashResearchGuard(event *CloudEvent, _ bool, hasResearch bool) str
 }
 
 // bashCommandTargetsExternalPath returns true when the Bash command's first
-// path-like argument starts with a home-directory shorthand (~) or an absolute
-// path that is not plausibly inside the working project tree. This is a
-// best-effort heuristic used to tailor error messages — it does not gate
-// execution and must err on the side of false negatives.
-func bashCommandTargetsExternalPath(cmd string) bool {
+// path-like argument starts with a home-directory shorthand (~) or is an absolute
+// path that falls outside the project root. This is a best-effort heuristic used
+// to tailor error messages — it does not gate execution and must err on the side
+// of false negatives.
+//
+// projectRoot is used to classify absolute paths: paths inside the project root
+// are considered internal (returns false); paths outside are external (returns true).
+// When projectRoot is empty, any absolute path is treated as external.
+func bashCommandTargetsExternalPath(cmd, projectRoot string) bool {
 	// Look for the first argument that looks like a path (starts with ~ or /).
 	for _, field := range strings.Fields(cmd) {
 		if strings.HasPrefix(field, "~/") || strings.HasPrefix(field, "~\\") {
 			return true
 		}
 		if strings.HasPrefix(field, "/") {
+			// Resolve against project root: if the path is inside the project,
+			// it is internal — not an external write.
+			if projectRoot != "" {
+				rel, err := filepath.Rel(projectRoot, field)
+				if err == nil && !strings.HasPrefix(rel, "..") {
+					return false // in-repo absolute path
+				}
+			}
 			return true
 		}
 	}

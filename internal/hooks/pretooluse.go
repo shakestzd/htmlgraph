@@ -381,13 +381,17 @@ func isBashFileWrite(event *CloudEvent) bool {
 // inspection commands (ls, cat, head, tail, stat, find, grep, etc.) are not.
 //
 // Redirect detection:
-//   - `(?:^|\s|;|&&|\|\|)>>?\s*[^&\s]` matches shell output redirects (> and >>)
-//     preceded by a word boundary (start-of-string, whitespace, semicolon, or &&/||).
-//     This correctly handles both `cmd > file` (space before filename) and `cmd >file`.
-//   - Digit-prefixed redirects like `2>/dev/null` are excluded because the
-//     lookback alternatives (^, \s, ;, &&, ||) don't include digits.
-//   - fd-to-fd redirects like `>&2` are excluded because the pattern requires a
-//     non-`&`, non-whitespace character after the optional whitespace.
+//   - `(?:^|\s|;|&&|\|\|)>>?\s*[^&\s]` matches plain shell output redirects
+//     (> and >>) preceded by a word boundary. Handles both `cmd > file` and `cmd >file`.
+//   - `1>>?\s*[^\s]` matches explicit fd-1 (stdout) redirects: `1>file`, `1>>file`.
+//     We target fd 1 specifically to avoid false-positives on benign `2>/dev/null`
+//     patterns (the existing exclusion for `2>/dev/null`-shape stderr redirects is
+//     preserved since we don't add a generic `[0-9]+>` pattern).
+//   - `&>>?\s*[^\s]` matches `&>file` and `&>>file` (stdout+stderr combined redirect).
+//     Excludes fd-to-fd `>&N` because the `&` must immediately precede `>`.
+//   - fd-to-fd redirects like `>&2` are excluded because the existing pattern requires
+//     a non-`&`, non-whitespace character after the redirect operator.
+//   - `find ... -delete` is a destructive option that removes matching files.
 var bashFileWritePattern = regexp.MustCompile(
 	`(?:` +
 		// In-place editors
@@ -399,6 +403,14 @@ var bashFileWritePattern = regexp.MustCompile(
 		`|` +
 		// Shell output redirects (both > and >>), handling spaces around >
 		`(?:^|\s|;|&&|\|\|)>>?\s*[^&\s]` +
+		`|` +
+		// Explicit fd-1 (stdout) redirects: 1>file, 1>>file
+		// We use fd 1 specifically to avoid matching benign 2>/dev/null patterns.
+		`1>>?\s*[^\s]` +
+		`|` +
+		// Combined stdout+stderr redirects: &>file and &>>file
+		// Excludes >&N (fd-to-fd) because that form has > after &, not & before >.
+		`&>>?\s*[^\s]` +
 		`|` +
 		// File removal / relocation / creation
 		`\brm\s` +
@@ -432,6 +444,9 @@ var bashFileWritePattern = regexp.MustCompile(
 		`|` +
 		// Python one-liners that open files for writing
 		`\bpython[23]?\s+-c\s+.*(?:open|write)` +
+		`|` +
+		// find -delete removes matching files
+		`\bfind\b.*\s-delete\b` +
 		`)`,
 )
 

@@ -157,8 +157,10 @@ func TrackWorktreeDirName(trackTitle, trackID string) string {
 
 // EnsureForTrackTitled ensures a git worktree exists for the given track, using a
 // human-readable directory name "<title-slug>-<trackID>" when trackTitle is provided.
-// Only new worktrees use the titled path; if an existing worktree at the legacy bare-ID
-// path is found it is reused unchanged to avoid orphaning running sessions.
+// Only new worktrees use the titled path; if an existing worktree for the track branch
+// is found (at the legacy bare-ID path or any titled path) it is reused unchanged to
+// avoid orphaning running sessions and to prevent git errors when the branch is already
+// checked out.
 // Progress is written to w; pass io.Discard to suppress output.
 func EnsureForTrackTitled(trackTitle, trackID, repoRoot string, w io.Writer) (string, error) {
 	// Check the legacy bare-ID path first — reuse without rename to avoid
@@ -169,12 +171,23 @@ func EnsureForTrackTitled(trackTitle, trackID, repoRoot string, w io.Writer) (st
 		return legacyPath, nil
 	}
 
+	// Scan for any existing worktree already checked out on this track's branch.
+	// This handles the title-rename case: if the track was previously created with
+	// title-1 (giving path "title-1-slug-<trackID>"), a rename to title-2 would
+	// compute a new path and fail because the branch is already checked out.
+	// We scan the worktrees directory for any entry ending in "-<trackID>" or
+	// equal to any titled variant that git already knows about.
+	if existing := findExistingWorktreeForBranch(repoRoot, trackID, w); existing != "" {
+		fmt.Fprintf(w, "  Worktree: %s (reusing existing)\n", existing)
+		return existing, nil
+	}
+
 	// New worktree: use titled path.
 	dirName := TrackWorktreeDirName(trackTitle, trackID)
 	worktreePath := filepath.Join(repoRoot, ".claude", "worktrees", dirName)
 	branchName := trackID // Branch name remains the bare track ID.
 
-	// Check if the titled path already exists (idempotent on second call with title).
+	// Check if the titled path already exists (idempotent on second call with same title).
 	if _, err := os.Stat(worktreePath); err == nil {
 		fmt.Fprintf(w, "  Worktree: %s (reusing existing)\n", worktreePath)
 		return worktreePath, nil
@@ -194,6 +207,33 @@ func EnsureForTrackTitled(trackTitle, trackID, repoRoot string, w io.Writer) (st
 	reindexWorktree(worktreePath, w)
 
 	return worktreePath, nil
+}
+
+// findExistingWorktreeForBranch scans the worktrees directory under repoRoot for any
+// directory that is a git worktree checked out on branchName. Returns the path if
+// found, empty string otherwise. This prevents "branch already checked out" errors
+// when a track title is renamed after the worktree was first created.
+func findExistingWorktreeForBranch(repoRoot, branchName string, w io.Writer) string {
+	worktreesDir := filepath.Join(repoRoot, ".claude", "worktrees")
+	entries, err := os.ReadDir(worktreesDir)
+	if err != nil {
+		return "" // directory doesn't exist yet — no existing worktrees
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		candidate := filepath.Join(worktreesDir, entry.Name())
+		// Check if this directory's git HEAD points at branchName.
+		out, err := exec.Command("git", "-C", candidate, "rev-parse", "--abbrev-ref", "HEAD").Output()
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(string(out)) == branchName {
+			return candidate
+		}
+	}
+	return ""
 }
 
 // EnsureForAgent ensures a git worktree exists for the given agent task and returns its path.

@@ -218,3 +218,80 @@ func TestEnsureForFeatureWriterReceivesProgress(t *testing.T) {
 		t.Errorf("expected writer to receive progress containing feat-progress; got: %q", output)
 	}
 }
+
+// writeTrackHTML writes a minimal track HTML file with the given title.
+func writeTrackHTML(t *testing.T, dir, trackID, title string) {
+	t.Helper()
+	trackDir := filepath.Join(dir, ".htmlgraph", "tracks")
+	if err := os.MkdirAll(trackDir, 0755); err != nil {
+		t.Fatalf("mkdir tracks: %v", err)
+	}
+	html := `<article id="` + trackID + `" data-status="todo">` +
+		`<header><h1>` + title + `</h1></header>` +
+		`<section data-content><p>Description</p></section>` +
+		`</article>`
+	path := filepath.Join(trackDir, trackID+".html")
+	if err := os.WriteFile(path, []byte(html), 0644); err != nil {
+		t.Fatalf("write track HTML: %v", err)
+	}
+}
+
+// TestEnsureForTrackTitled_TitleRenameStability verifies that renaming a track's title
+// does not cause EnsureForTrackTitled to compute a new worktree path (which would fail
+// with "branch already checked out"). The original path is reused regardless of title changes.
+func TestEnsureForTrackTitled_TitleRenameStability(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// First call: create worktree with title-1.
+	path1, err := worktree.EnsureForTrackTitled("My Feature Track", "trk-stable01", dir, io.Discard)
+	if err != nil {
+		t.Fatalf("first EnsureForTrackTitled: %v", err)
+	}
+	if _, err := os.Stat(path1); err != nil {
+		t.Fatalf("worktree should exist at %s: %v", path1, err)
+	}
+
+	// Simulate a title rename: call again with a different title.
+	// This must return the original path, not a new one derived from "Updated Title".
+	path2, err := worktree.EnsureForTrackTitled("Updated Title", "trk-stable01", dir, io.Discard)
+	if err != nil {
+		t.Fatalf("second EnsureForTrackTitled after rename: %v", err)
+	}
+
+	if path1 != path2 {
+		t.Errorf("title rename caused path change: first=%q second=%q", path1, path2)
+	}
+
+	// The new titled path (with updated title slug) must NOT have been created.
+	newPath := filepath.Join(dir, ".claude", "worktrees", "updated-title-trk-stable01")
+	if _, err := os.Stat(newPath); err == nil {
+		t.Errorf("new titled path should NOT be created after title rename: %s", newPath)
+	}
+}
+
+// TestEnsureForTrackTitled_TitleRenameIdempotent verifies that renaming a track
+// title after an EnsureForTrackTitled call does not change the returned path.
+// Path stability matters more than label freshness — once created, the directory
+// name should not change just because the title was edited.
+func TestEnsureForTrackTitled_TitleRenameIdempotent(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Create worktree with title-1.
+	path1, err := worktree.EnsureForTrackTitled("My Original Title", "trk-rename01", dir, io.Discard)
+	if err != nil {
+		t.Fatalf("first EnsureForTrackTitled: %v", err)
+	}
+	if _, err := os.Stat(path1); err != nil {
+		t.Fatalf("worktree should exist at %s: %v", path1, err)
+	}
+
+	// Simulate a title rename by calling again with a different title.
+	path2, err := worktree.EnsureForTrackTitled("Updated Title After Rename", "trk-rename01", dir, io.Discard)
+	if err != nil {
+		t.Fatalf("second EnsureForTrackTitled after rename: %v", err)
+	}
+
+	if path1 != path2 {
+		t.Errorf("title rename must not change worktree path: before=%q after=%q", path1, path2)
+	}
+}

@@ -305,6 +305,55 @@ func TestCheckSubagentWorkItemGuard_DiagnosticFields(t *testing.T) {
 	}
 }
 
+// TestIsBashFileWrite_NewPatterns verifies the write-intent patterns added in
+// the roborev-job-14 fix: explicit fd-1 redirect (1>), combined redirects (&>, &>>),
+// find -delete, and the negative case cat ... 2>/dev/null (must NOT block).
+func TestIsBashFileWrite_NewPatterns(t *testing.T) {
+	mustBlock := []struct {
+		name string
+		cmd  string
+	}{
+		{"explicit fd 1 redirect", "echo x 1>file.txt"},
+		{"explicit fd 1 append", "echo x 1>>file.txt"},
+		{"combined redirect &>", "echo x &>file.txt"},
+		{"combined redirect &>>", "echo x &>>file.txt"},
+		{"find -delete", "find . -name '*.tmp' -delete"},
+		{"find -delete with other flags", "find /tmp -mtime +7 -delete"},
+	}
+	for _, tc := range mustBlock {
+		t.Run(tc.name, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": tc.cmd},
+			}
+			if !isBashFileWrite(event) {
+				t.Errorf("isBashFileWrite should be true for write-intent command %q", tc.cmd)
+			}
+		})
+	}
+
+	mustAllow := []struct {
+		name string
+		cmd  string
+	}{
+		// Benign stderr-only redirect to /dev/null: must not be classified as write.
+		{"cat with stderr devnull", "cat foo 2>/dev/null"},
+		// fd-to-fd redirect: does not write to a file.
+		{"fd-to-fd redirect", "cmd >&2"},
+	}
+	for _, tc := range mustAllow {
+		t.Run(tc.name, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": tc.cmd},
+			}
+			if isBashFileWrite(event) {
+				t.Errorf("isBashFileWrite should be false for command %q", tc.cmd)
+			}
+		})
+	}
+}
+
 func TestCheckBashCwdGuard(t *testing.T) {
 	tests := []struct {
 		name    string

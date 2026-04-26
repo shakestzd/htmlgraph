@@ -203,3 +203,83 @@ func TestEnsureForFeature_DiscardWriter(t *testing.T) {
 		t.Fatalf("EnsureForFeature with Discard: %v", err)
 	}
 }
+
+// writeTrackHTMLWithTitle writes a minimal track HTML file with the given title.
+func writeTrackHTMLWithTitle(t *testing.T, dir, trackID, title string) {
+	t.Helper()
+	trackDir := filepath.Join(dir, ".htmlgraph", "tracks")
+	if err := os.MkdirAll(trackDir, 0755); err != nil {
+		t.Fatalf("mkdir tracks: %v", err)
+	}
+	html := `<article id="` + trackID + `" data-status="todo">` +
+		`<header><h1>` + title + `</h1></header>` +
+		`<section data-content><p>Description</p></section>` +
+		`</article>`
+	path := filepath.Join(trackDir, trackID+".html")
+	if err := os.WriteFile(path, []byte(html), 0644); err != nil {
+		t.Fatalf("write track HTML: %v", err)
+	}
+}
+
+// TestEnsureForTrackWithTitle_FeatureParentTrack verifies that when a feature has a
+// titled parent track, EnsureForTrackWithTitle is used and produces a path containing
+// the track ID (the titled worktree path), not the bare feature worktree path.
+// This covers the yolo.go code path at launchYolo/launchYoloDev where featureID != ""
+// and the feature resolves to a parent track with a title.
+func TestEnsureForTrackWithTitle_FeatureParentTrack(t *testing.T) {
+	dir := setupWorktreeGitRepo(t)
+	trackID := "trk-titled99"
+	featureID := "feat-child99"
+
+	// Create a track with a title.
+	writeTrackHTMLWithTitle(t, dir, trackID, "Titled Parent Track")
+
+	// Create a feature that points to the titled track.
+	featureDir := filepath.Join(dir, ".htmlgraph", "features")
+	if err := os.MkdirAll(featureDir, 0755); err != nil {
+		t.Fatalf("mkdir features: %v", err)
+	}
+	html := `<article id="` + featureID + `" data-track-id="` + trackID + `" data-status="todo">` +
+		`<header><h1>Child Feature</h1></header>` +
+		`<section data-content><p>Description</p></section>` +
+		`</article>`
+	if err := os.WriteFile(filepath.Join(featureDir, featureID+".html"), []byte(html), 0644); err != nil {
+		t.Fatalf("write feature HTML: %v", err)
+	}
+
+	// Resolve the parent track and its title (mirrors the yolo.go logic).
+	parentTrackID := resolveTrackForFeature(featureID, dir)
+	if parentTrackID == "" {
+		t.Fatal("expected resolveTrackForFeature to return a track ID")
+	}
+	if parentTrackID != trackID {
+		t.Fatalf("resolveTrackForFeature: got %q, want %q", parentTrackID, trackID)
+	}
+
+	parentTitle := resolveTrackTitle(parentTrackID, "", dir)
+	if parentTitle == "" {
+		t.Fatal("expected resolveTrackTitle to return the track title")
+	}
+
+	// Call EnsureForTrackWithTitle (the titled path, not bare EnsureForTrack).
+	path, err := EnsureForTrackWithTitle(parentTitle, parentTrackID, dir, io.Discard)
+	if err != nil {
+		t.Fatalf("EnsureForTrackWithTitle: %v", err)
+	}
+
+	// The path must contain the track ID (titled path includes trackID).
+	if !strings.Contains(path, trackID) {
+		t.Errorf("expected titled worktree path to contain track ID %q, got: %q", trackID, path)
+	}
+
+	// The bare feature worktree must NOT exist.
+	featurePath := filepath.Join(dir, ".claude", "worktrees", featureID)
+	if _, err := os.Stat(featurePath); err == nil {
+		t.Error("bare feature worktree should NOT exist when feature has a titled parent track")
+	}
+
+	// The titled track worktree must exist.
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("titled track worktree does not exist at %s: %v", path, err)
+	}
+}

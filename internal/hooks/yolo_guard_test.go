@@ -1031,3 +1031,44 @@ func TestCheckYoloBashResearchGuard_ProjectPathMessage(t *testing.T) {
 		t.Errorf("message for project-file write should suggest Read/Grep/Glob, got: %s", result)
 	}
 }
+
+// TestBashCommandTargetsExternalPath verifies that in-repo absolute paths are
+// classified as internal (not external) and truly external paths remain external.
+func TestBashCommandTargetsExternalPath(t *testing.T) {
+	projectRoot := "/workspaces/htmlgraph"
+
+	tests := []struct {
+		name       string
+		cmd        string
+		wantExternal bool
+	}{
+		// In-repo absolute paths must NOT be classified as external.
+		{"in-repo abs path", "echo x > /workspaces/htmlgraph/foo.txt", false},
+		{"in-repo abs path subdir", "rm /workspaces/htmlgraph/internal/foo.go", false},
+		// System paths are external.
+		{"etc hostname", "echo hi > /etc/hostname", true},
+		// Home-directory paths are external.
+		{"home tilde", "cp file.txt ~/backup/file.txt", true},
+		{"home dotfile", "echo x > ~/.claude/tasks/x", true},
+		// Relative paths are never classified as external.
+		{"relative path", "sed -i 's/x/y/' main.go", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := bashCommandTargetsExternalPath(tt.cmd, projectRoot)
+			if got != tt.wantExternal {
+				t.Errorf("bashCommandTargetsExternalPath(%q, %q) = %v, want %v",
+					tt.cmd, projectRoot, got, tt.wantExternal)
+			}
+		})
+	}
+}
+
+// TestBashCommandTargetsExternalPath_EmptyProjectRoot verifies that any absolute
+// path is treated as external when the project root is unknown.
+func TestBashCommandTargetsExternalPath_EmptyProjectRoot(t *testing.T) {
+	if !bashCommandTargetsExternalPath("echo x > /workspaces/htmlgraph/foo.txt", "") {
+		t.Error("expected external=true for absolute path when projectRoot is empty")
+	}
+}
