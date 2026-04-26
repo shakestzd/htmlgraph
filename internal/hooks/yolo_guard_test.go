@@ -837,3 +837,197 @@ func TestCheckYoloStepsGuard(t *testing.T) {
 		})
 	}
 }
+
+// TestIsBashFileWrite_ReadOnlyCommandsNotBlocked verifies that pure read-only
+// inspection commands are not classified as file writes (bug-d0c8b1e2).
+// These must NOT trigger the research or work-item guards.
+func TestIsBashFileWrite_ReadOnlyCommandsNotBlocked(t *testing.T) {
+	readOnly := []struct {
+		name string
+		cmd  string
+	}{
+		// Directory listing
+		{"ls -la", "ls -la"},
+		{"ls home dir", "ls -la ~/.claude/tasks/foo/"},
+		// File inspection
+		{"cat", "cat ~/.claude/tasks/foo/bar.txt"},
+		{"cat absolute path", "cat /etc/hostname"},
+		{"head", "head -20 file.txt"},
+		{"tail", "tail -20 file.txt"},
+		{"stat", "stat file.txt"},
+		{"file", "file somefile"},
+		{"wc", "wc -l file.txt"},
+		{"du", "du -sh dir/"},
+		// Search and discovery
+		{"find no exec", "find . -name '*.go'"},
+		{"grep", "grep -r pattern dir/"},
+		{"rg", "rg pattern dir/"},
+		// Process / system inspection
+		{"lsof", "lsof -i :8080"},
+		{"tree", "tree dir/"},
+		{"which", "which go"},
+		{"command -v", "command -v go"},
+		{"pwd", "pwd"},
+		{"env", "env"},
+		{"printenv", "printenv PATH"},
+		{"date", "date"},
+		{"uname", "uname -a"},
+		// Git read-only operations
+		{"git status", "git status"},
+		{"git diff", "git diff"},
+		{"git log", "git log --oneline"},
+		{"git show", "git show HEAD"},
+		{"git fetch", "git fetch"},
+		// stderr redirect to /dev/null (must NOT be treated as write)
+		{"stderr redirect", "go build ./... 2>/dev/null"},
+		{"fd redirect", "cmd 2>&1"},
+		// Compound read commands — exact reproducer from bug-d0c8b1e2
+		{"reproducer compound", "ls -la ~/.claude/tasks/d846b50d/ && cat ~/.claude/tasks/d846b50d/output.json"},
+	}
+
+	for _, tc := range readOnly {
+		t.Run(tc.name, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": tc.cmd},
+			}
+			if isBashFileWrite(event) {
+				t.Errorf("isBashFileWrite should be false for read-only command %q", tc.cmd)
+			}
+		})
+	}
+}
+
+// TestIsBashFileWrite_WriteIntentCommandsBlocked verifies that write-intent
+// commands are correctly classified as file writes (bug-d0c8b1e2).
+func TestIsBashFileWrite_WriteIntentCommandsBlocked(t *testing.T) {
+	writeIntent := []struct {
+		name string
+		cmd  string
+	}{
+		// Output redirects — space before file
+		{"redirect space", "echo foo > bar"},
+		{"append redirect space", "echo foo >> bar"},
+		{"redirect absolute space", "echo x > /tmp/y"},
+		// Output redirects — no space before file
+		{"redirect nospace", "echo x >/tmp/y"},
+		// File manipulation
+		{"cp", "cp a b"},
+		{"mv", "mv a b"},
+		{"rm", "rm a"},
+		{"mkdir", "mkdir -p dir/"},
+		{"touch", "touch file.txt"},
+		{"ln", "ln -s src dst"},
+		{"install", "install -m 755 bin /usr/local/bin/"},
+		// Permission changes
+		{"chmod", "chmod 755 file"},
+		{"chown", "chown user file"},
+		// In-place editors
+		{"sed -i", "sed -i 's/x/y/' file"},
+		{"perl -i", "perl -i -pe 's/x/y/' file"},
+		{"awk -i", "awk -i inplace '{print}' file"},
+		// Pipe-to-file writers
+		{"tee", "tee file"},
+		{"tee -a", "tee -a logfile.txt"},
+		{"dd", "dd if=x of=y"},
+		{"patch", "patch -p1 < diff.patch"},
+		// Git write operations
+		{"git add", "git add ."},
+		{"git commit", "git commit -m 'msg'"},
+		{"git push", "git push origin main"},
+		{"git reset", "git reset --hard HEAD"},
+		{"git rm", "git rm file.txt"},
+		{"git mv", "git mv old new"},
+	}
+
+	for _, tc := range writeIntent {
+		t.Run(tc.name, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": tc.cmd},
+			}
+			if !isBashFileWrite(event) {
+				t.Errorf("isBashFileWrite should be true for write-intent command %q", tc.cmd)
+			}
+		})
+	}
+}
+
+// TestCheckYoloBashResearchGuard_ReadOnlyNotBlocked verifies the research guard
+// does NOT block read-only Bash commands (bug-d0c8b1e2 reproducer).
+func TestCheckYoloBashResearchGuard_ReadOnlyNotBlocked(t *testing.T) {
+	readOnly := []struct {
+		name string
+		cmd  string
+	}{
+		{"ls home dir", "ls -la ~/.claude/tasks/foo/"},
+		{"cat absolute path", "cat ~/.claude/tasks/foo/bar.txt"},
+		{"reproducer", "ls -la ~/.claude/tasks/d846b50d/ && cat ~/.claude/tasks/d846b50d/output.json"},
+		{"cat /etc/hostname", "cat /etc/hostname"},
+		{"git status", "git status"},
+		{"git diff", "git diff --stat"},
+	}
+
+	for _, tc := range readOnly {
+		t.Run(tc.name, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": tc.cmd},
+			}
+			// hasResearch=false: even without prior research, read-only commands must pass
+			result := checkYoloBashResearchGuard(event, true, false)
+			if result != "" {
+				t.Errorf("research guard should NOT block read-only command %q, got: %s", tc.cmd, result)
+			}
+		})
+	}
+}
+
+// TestCheckYoloBashResearchGuard_ExternalPathMessage verifies the error message
+// for write commands targeting paths outside the project does NOT suggest
+// Read/Grep/Glob (which can't reach external paths) — bug-d0c8b1e2.
+func TestCheckYoloBashResearchGuard_ExternalPathMessage(t *testing.T) {
+	externalWrites := []struct {
+		name string
+		cmd  string
+	}{
+		{"mv home dir", "mv ~/.config/foo ~/.config/bar"},
+		{"cp to home", "cp file.txt ~/backup/"},
+		{"write to absolute path", "echo x > /tmp/y"},
+		{"rm from home", "rm ~/.claude/tasks/foo/bar.txt"},
+	}
+
+	for _, tc := range externalWrites {
+		t.Run(tc.name, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName:  "Bash",
+				ToolInput: map[string]any{"command": tc.cmd},
+			}
+			result := checkYoloBashResearchGuard(event, true, false)
+			if result == "" {
+				t.Errorf("expected block for write command %q", tc.cmd)
+				return
+			}
+			// Must NOT suggest Read/Grep/Glob for external paths
+			if strings.Contains(result, "Read, Grep, or Glob") {
+				t.Errorf("message for external-path write should not suggest Read/Grep/Glob, got: %s", result)
+			}
+		})
+	}
+}
+
+// TestCheckYoloBashResearchGuard_ProjectPathMessage verifies the error message
+// for write commands targeting project files suggests Read/Grep/Glob.
+func TestCheckYoloBashResearchGuard_ProjectPathMessage(t *testing.T) {
+	event := &CloudEvent{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "sed -i 's/foo/bar/' main.go"},
+	}
+	result := checkYoloBashResearchGuard(event, true, false)
+	if result == "" {
+		t.Fatal("expected block for sed -i on project file")
+	}
+	if !strings.Contains(result, "Read, Grep, or Glob") {
+		t.Errorf("message for project-file write should suggest Read/Grep/Glob, got: %s", result)
+	}
+}

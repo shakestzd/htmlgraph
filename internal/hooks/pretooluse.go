@@ -22,7 +22,10 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		return &HookResult{}, nil
 	}
 
-	ctx := resolveToolUseContext(event, database)
+	// PreToolUse is the authority for parent event resolution — always re-resolve
+	// from the DB (trustParentEnvVar=false) so stale env vars from prior tool calls
+	// do not parent this tool call to the wrong prompt.
+	ctx := resolveToolUseContext(event, database, false)
 	if ctx == nil {
 		return &HookResult{}, nil
 	}
@@ -374,29 +377,60 @@ func isBashFileWrite(event *CloudEvent) bool {
 }
 
 // bashFileWritePattern matches Bash commands that write/modify files.
-// Intentionally conservative — matches known destructive patterns only.
-// The redirect branches use negative lookbehind for digits (to skip 2>/dev/null)
-// and [^&\s] to avoid matching fd-to-fd redirects like 2>&1.
+// Uses a write-intent denylist: known destructive commands are matched; pure
+// inspection commands (ls, cat, head, tail, stat, find, grep, etc.) are not.
+//
+// Redirect detection:
+//   - `(?:^|\s|;|&&|\|\|)>>?\s*[^&\s]` matches shell output redirects (> and >>)
+//     preceded by a word boundary (start-of-string, whitespace, semicolon, or &&/||).
+//     This correctly handles both `cmd > file` (space before filename) and `cmd >file`.
+//   - Digit-prefixed redirects like `2>/dev/null` are excluded because the
+//     lookback alternatives (^, \s, ;, &&, ||) don't include digits.
+//   - fd-to-fd redirects like `>&2` are excluded because the pattern requires a
+//     non-`&`, non-whitespace character after the optional whitespace.
 var bashFileWritePattern = regexp.MustCompile(
 	`(?:` +
+		// In-place editors
 		`\bsed\s+-i` +
 		`|` +
 		`\bperl\s+-[pi]` +
 		`|` +
 		`\bawk\s+-i` +
 		`|` +
-		`(?:^|[^0-9])>[^&\s]\S*` +
+		// Shell output redirects (both > and >>), handling spaces around >
+		`(?:^|\s|;|&&|\|\|)>>?\s*[^&\s]` +
 		`|` +
-		`(?:^|[^0-9])>>[^&\s]\S*` +
-		`|` +
+		// File removal / relocation / creation
 		`\brm\s` +
+		`|` +
+		`\bcp\s` +
 		`|` +
 		`\bmv\s` +
 		`|` +
-		`\bpatch\s` +
+		`\btouch\s` +
+		`|` +
+		`\bmkdir\s` +
+		`|` +
+		`\bln\s` +
+		`|` +
+		`\binstall\s` +
+		`|` +
+		// Permission / ownership changes
+		`\bchmod\s` +
+		`|` +
+		`\bchown\s` +
+		`|` +
+		// Pipe-to-file writers
+		`\btee\s` +
 		`|` +
 		`\bdd\s` +
 		`|` +
+		`\bpatch\s` +
+		`|` +
+		// Git write operations (add/commit/push modify index, history, or remote)
+		`\bgit\s+(?:add|commit|push|reset|rebase|merge|mv|rm|stash|tag|cherry-pick)\b` +
+		`|` +
+		// Python one-liners that open files for writing
 		`\bpython[23]?\s+-c\s+.*(?:open|write)` +
 		`)`,
 )

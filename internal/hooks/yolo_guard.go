@@ -385,6 +385,10 @@ func checkYoloResearchGuard(toolName string, _ bool, hasResearch bool) string {
 
 // checkYoloBashResearchGuard extends the research guard to Bash file-write commands.
 // Always enforced. htmlgraph CLI commands are always exempt.
+//
+// When the write targets a path outside the project tree (e.g. ~/.config/…),
+// the message omits the "use Read/Grep/Glob" suggestion — those tools cannot
+// reach paths outside the project root (bug-d0c8b1e2).
 func checkYoloBashResearchGuard(event *CloudEvent, _ bool, hasResearch bool) string {
 	cmd, _ := event.ToolInput["command"].(string)
 	if bashHtmlGraphCLI.MatchString(cmd) {
@@ -396,8 +400,30 @@ func checkYoloBashResearchGuard(event *CloudEvent, _ bool, hasResearch bool) str
 	if hasResearch {
 		return ""
 	}
+	if bashCommandTargetsExternalPath(cmd) {
+		return "Research is required before modifying files outside the project. " +
+			"Review the target files with Bash (cat, head, stat) before making changes."
+	}
 	return "Research is required before writing code via Bash. " +
 		"Read existing code first: use Read, Grep, or Glob tools."
+}
+
+// bashCommandTargetsExternalPath returns true when the Bash command's first
+// path-like argument starts with a home-directory shorthand (~) or an absolute
+// path that is not plausibly inside the working project tree. This is a
+// best-effort heuristic used to tailor error messages — it does not gate
+// execution and must err on the side of false negatives.
+func bashCommandTargetsExternalPath(cmd string) bool {
+	// Look for the first argument that looks like a path (starts with ~ or /).
+	for _, field := range strings.Fields(cmd) {
+		if strings.HasPrefix(field, "~/") || strings.HasPrefix(field, "~\\") {
+			return true
+		}
+		if strings.HasPrefix(field, "/") {
+			return true
+		}
+	}
+	return false
 }
 
 // checkYoloOrchestratorWriteGuard warns (does not block) when the top-level
