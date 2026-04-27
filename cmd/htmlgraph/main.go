@@ -225,6 +225,10 @@ func buildRoot() *cobra.Command {
 	cleanup.GroupID = "data"
 	root.AddCommand(cleanup)
 
+	cache := cacheCmd()
+	cache.GroupID = "data"
+	root.AddCommand(cache)
+
 	// dev group
 	yolo := yoloCmd()
 	yolo.GroupID = "dev"
@@ -316,6 +320,9 @@ func persistentPreRunE(cmd *cobra.Command, _ []string) error {
 	}
 	projectDir := filepath.Dir(hgDir)
 	storage.WarnIfLegacyDBPresent(projectDir, os.Stderr)
+	if cacheRoot, cerr := storage.CacheRoot(); cerr == nil {
+		storage.OpportunisticPrune(cacheRoot, os.Stderr)
+	}
 	if database, dberr := openDB(hgDir); dberr == nil {
 		_, _ = agent.EnsureSession(database, projectDir)
 		database.Close()
