@@ -31,7 +31,7 @@ func mkProject(t *testing.T, dir string, size int64, mtime time.Time) {
 
 func TestEvict_EmptyCache(t *testing.T) {
 	root := t.TempDir()
-	res, err := storage.Evict(root, 90*24*time.Hour, 1<<30, false)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestEvict_EmptyCache(t *testing.T) {
 
 func TestEvict_MissingCache(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "does-not-exist")
-	res, err := storage.Evict(root, 90*24*time.Hour, 1<<30, false)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30})
 	if err != nil {
 		t.Fatalf("missing cache should not error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestEvict_MaxAge(t *testing.T) {
 	mkProject(t, fresh, 100, time.Now())
 	mkProject(t, old, 100, time.Now().Add(-100*24*time.Hour))
 
-	res, err := storage.Evict(root, 90*24*time.Hour, 10<<30, false)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 10 << 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestEvict_MaxSize(t *testing.T) {
 	mkProject(t, c, 1<<20, time.Now().Add(-1*time.Hour))
 
 	// 1.5 MiB cap with 3x1MiB entries → must evict the two oldest.
-	res, err := storage.Evict(root, 365*24*time.Hour, (1<<20)+(1<<19), false)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 365 * 24 * time.Hour, MaxSize: (1 << 20) + (1 << 19)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestEvict_BothTriggers(t *testing.T) {
 	mkProject(t, fresh, 1<<20, time.Now().Add(-1*time.Hour))
 
 	// max-age evicts old; survivors total 2 MiB. max-size 1.5 MiB then evicts mid.
-	res, err := storage.Evict(root, 90*24*time.Hour, (1<<20)+(1<<19), false)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: (1 << 20) + (1 << 19)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestEvict_DryRunDoesNotDelete(t *testing.T) {
 	old := filepath.Join(root, strings.Repeat("a", 16))
 	mkProject(t, old, 100, time.Now().Add(-100*24*time.Hour))
 
-	res, err := storage.Evict(root, 90*24*time.Hour, 1<<30, true)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestEvict_IgnoresNonHexEntries(t *testing.T) {
 	old := filepath.Join(root, strings.Repeat("a", 16))
 	mkProject(t, old, 100, time.Now().Add(-100*24*time.Hour))
 
-	res, err := storage.Evict(root, 90*24*time.Hour, 1<<30, false)
+	res, err := storage.Evict(root, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestMaybePruneOpportunistic_FirstRunCreatesMarker(t *testing.T) {
 	old := filepath.Join(root, strings.Repeat("a", 16))
 	mkProject(t, old, 100, time.Now().Add(-100*24*time.Hour))
 
-	res, ran, err := storage.MaybePruneOpportunistic(root, 7*24*time.Hour, 90*24*time.Hour, 1<<30)
+	res, ran, err := storage.MaybePruneOpportunistic(root, 7*24*time.Hour, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestMaybePruneOpportunistic_SkipsWhenMarkerFresh(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, ran, err := storage.MaybePruneOpportunistic(root, 7*24*time.Hour, 90*24*time.Hour, 1<<30)
+	_, ran, err := storage.MaybePruneOpportunistic(root, 7*24*time.Hour, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestMaybePruneOpportunistic_RunsWhenMarkerStale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, ran, err := storage.MaybePruneOpportunistic(root, 7*24*time.Hour, 90*24*time.Hour, 1<<30)
+	res, ran, err := storage.MaybePruneOpportunistic(root, 7*24*time.Hour, storage.EvictOptions{MaxAge: 90 * 24 * time.Hour, MaxSize: 1 << 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,6 +289,55 @@ func TestMaybePruneOpportunistic_RunsWhenMarkerStale(t *testing.T) {
 	}
 	if time.Since(info.ModTime()) > time.Minute {
 		t.Errorf("marker mtime should have been refreshed, got age %v", time.Since(info.ModTime()))
+	}
+}
+
+func TestEvict_ProtectedSurvivesAgeSweep(t *testing.T) {
+	root := t.TempDir()
+	old := filepath.Join(root, strings.Repeat("a", 16))
+	mkProject(t, old, 100, time.Now().Add(-100*24*time.Hour))
+
+	res, err := storage.Evict(root, storage.EvictOptions{
+		MaxAge:    90 * 24 * time.Hour,
+		MaxSize:   1 << 30,
+		Protected: []string{old},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Removed) != 0 {
+		t.Errorf("protected dir must not be evicted by age, got %v", res.Removed)
+	}
+	if _, err := os.Stat(old); err != nil {
+		t.Errorf("protected dir must still exist: %v", err)
+	}
+}
+
+func TestEvict_ProtectedSurvivesSizeSweep(t *testing.T) {
+	root := t.TempDir()
+	a := filepath.Join(root, strings.Repeat("a", 16))
+	b := filepath.Join(root, strings.Repeat("b", 16))
+	c := filepath.Join(root, strings.Repeat("c", 16))
+	// a is the LRU and would normally be evicted first.
+	mkProject(t, a, 1<<20, time.Now().Add(-3*time.Hour))
+	mkProject(t, b, 1<<20, time.Now().Add(-2*time.Hour))
+	mkProject(t, c, 1<<20, time.Now().Add(-1*time.Hour))
+
+	res, err := storage.Evict(root, storage.EvictOptions{
+		MaxAge:    365 * 24 * time.Hour,
+		MaxSize:   (1 << 20) + (1 << 19),
+		Protected: []string{a},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(a); err != nil {
+		t.Errorf("protected LRU dir must survive size sweep: %v", err)
+	}
+	for _, p := range res.Removed {
+		if p == a {
+			t.Errorf("protected dir was incorrectly removed: %s", p)
+		}
 	}
 }
 

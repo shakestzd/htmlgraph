@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/storage"
@@ -39,7 +40,13 @@ then by LRU until the surviving total fits in --max-size.`,
 			if err != nil {
 				return err
 			}
-			res, err := storage.Evict(root, maxAge, maxSize, dryRun)
+			opts := storage.EvictOptions{
+				MaxAge:    maxAge,
+				MaxSize:   maxSize,
+				DryRun:    dryRun,
+				Protected: protectedForCacheCmd(),
+			}
+			res, err := storage.Evict(root, opts)
 			if err != nil {
 				return err
 			}
@@ -102,6 +109,22 @@ func printCacheStats(w io.Writer, root string, entries []storage.CacheEntry) err
 		fmt.Fprintf(w, "  %s  %10s  %s ago\n", e.Hash, humanBytes(e.Size), age)
 	}
 	return nil
+}
+
+// protectedForCacheCmd returns the active project's cache dir as a one-element
+// slice for EvictOptions.Protected, so an explicit `htmlgraph cache prune`
+// can never delete the read-index of the very project the operator is in.
+// Returns nil when the project root or its cache path can't be resolved.
+func protectedForCacheCmd() []string {
+	hgDir, err := findHtmlgraphDir()
+	if err != nil {
+		return nil
+	}
+	dbPath, err := storage.CanonicalDBPath(filepath.Dir(hgDir))
+	if err != nil {
+		return nil
+	}
+	return []string{filepath.Dir(dbPath)}
 }
 
 func humanBytes(n int64) string {
