@@ -432,3 +432,34 @@ func TestCleanLegacyDBIfSafe_NoLegacyFiles(t *testing.T) {
 		t.Errorf("expected no output when no legacy files exist, got: %q", buf.String())
 	}
 }
+
+// TestCleanLegacyDBIfSafe_HTMLGRAPH_DB_PATH_PointingAtLegacy verifies that when
+// HTMLGRAPH_DB_PATH is explicitly set to a legacy path (e.g. .htmlgraph/htmlgraph.db),
+// that file is NOT deleted and the .db/ directory is also protected.
+func TestCleanLegacyDBIfSafe_HTMLGRAPH_DB_PATH_PointingAtLegacy(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up the legacy path as the canonical DB via HTMLGRAPH_DB_PATH.
+	legacyDir := filepath.Join(projectDir, ".htmlgraph")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatalf("mkdir .htmlgraph: %v", err)
+	}
+	legacyFile := filepath.Join(legacyDir, "htmlgraph.db")
+	if err := os.WriteFile(legacyFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("write legacy db: %v", err)
+	}
+	t.Setenv("HTMLGRAPH_DB_PATH", legacyFile)
+
+	var buf strings.Builder
+	storage.CleanLegacyDBIfSafe(projectDir, &buf)
+
+	// Legacy file must still exist (not deleted).
+	if _, err := os.Stat(legacyFile); err != nil {
+		t.Errorf("expected legacy file to remain, but got: %v", err)
+	}
+
+	// No output expected (it's the canonical, no warning).
+	if buf.Len() != 0 {
+		t.Errorf("expected no output when HTMLGRAPH_DB_PATH points at legacy file, got: %q", buf.String())
+	}
+}

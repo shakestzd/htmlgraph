@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // DBFileName is the canonical SQLite filename. Use the constant; never
@@ -99,12 +100,29 @@ func CleanLegacyDBIfSafe(projectDir string, w io.Writer) {
 
 	dbDir := filepath.Join(projectDir, ".htmlgraph", ".db")
 
+	// Resolve canonical path for comparison; fallback to abs if EvalSymlinks fails.
+	canonicalResolved := canonicalPath
+	if absPath, absErr := filepath.Abs(canonicalPath); absErr == nil {
+		if resolved, evalErr := filepath.EvalSymlinks(absPath); evalErr == nil {
+			canonicalResolved = resolved
+		} else {
+			canonicalResolved = absPath
+		}
+	}
+
+	var anyLegacySkipped bool
 	for _, p := range LegacyProjectDBPaths(projectDir) {
 		info, statErr := os.Stat(p)
 		if statErr != nil {
 			continue
 		}
 		if canonicalReady {
+			// Guard: if canonical path refers to this same file, skip removal.
+			// (User has explicitly set HTMLGRAPH_DB_PATH to a legacy path.)
+			if legacyResolved := sameFileCheck(p, canonicalResolved); legacyResolved {
+				anyLegacySkipped = true
+				continue
+			}
 			if removeErr := os.Remove(p); removeErr == nil {
 				continue
 			}
@@ -120,9 +138,27 @@ func CleanLegacyDBIfSafe(projectDir string, w io.Writer) {
 			rel, mb, p)
 	}
 
-	// Remove the empty .db/ subdirectory if the canonical DB is ready.
-	if canonicalReady {
-		// os.Remove succeeds only on empty directories; non-empty ones are left alone.
-		_ = os.Remove(dbDir)
+	// Remove the empty .db/ subdirectory if the canonical DB is ready and
+	// the canonical path doesn't reside in .htmlgraph/.db/.
+	if canonicalReady && !anyLegacySkipped {
+		if !strings.HasPrefix(filepath.Clean(canonicalResolved), filepath.Clean(dbDir)) {
+			// os.Remove succeeds only on empty directories; non-empty ones are left alone.
+			_ = os.Remove(dbDir)
+		}
 	}
+}
+
+// sameFileCheck returns true if legacyPath (a project-local path) refers to
+// the same file as canonicalResolved (an already-resolved absolute path).
+// It resolves legacyPath to an absolute, evaluated form and compares cleaned paths.
+func sameFileCheck(legacyPath, canonicalResolved string) bool {
+	absLegacy, absErr := filepath.Abs(legacyPath)
+	if absErr != nil {
+		return false
+	}
+	resolvedLegacy := absLegacy
+	if evalResolved, evalErr := filepath.EvalSymlinks(absLegacy); evalErr == nil {
+		resolvedLegacy = evalResolved
+	}
+	return filepath.Clean(resolvedLegacy) == filepath.Clean(canonicalResolved)
 }
