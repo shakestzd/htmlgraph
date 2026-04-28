@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/shakestzd/htmlgraph/internal/db"
@@ -565,5 +566,104 @@ func TestPlanYAMLEndpoint_MethodNotAllowed(t *testing.T) {
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status: got %d, want 405", w.Code)
+	}
+}
+
+// ---- validSectionRe regex coverage (slice-4) -----------------------------------
+
+func TestValidSectionRe_AcceptsSliceLevel(t *testing.T) {
+	if !validSectionRe.MatchString("slice-3") {
+		t.Error("expected validSectionRe to accept 'slice-3'")
+	}
+	if !validSectionRe.MatchString("slice-1") {
+		t.Error("expected validSectionRe to accept 'slice-1'")
+	}
+	if !validSectionRe.MatchString("slice-99") {
+		t.Error("expected validSectionRe to accept 'slice-99'")
+	}
+}
+
+func TestValidSectionRe_AcceptsSliceQuestion(t *testing.T) {
+	if !validSectionRe.MatchString("slice-3-question-q-error-handling") {
+		t.Error("expected validSectionRe to accept 'slice-3-question-q-error-handling'")
+	}
+	if !validSectionRe.MatchString("slice-1-question-my-question") {
+		t.Error("expected validSectionRe to accept 'slice-1-question-my-question'")
+	}
+}
+
+func TestValidSectionRe_AcceptsSliceQuestion_Underscores(t *testing.T) {
+	// Underscores are normalized to hyphens before the regex check.
+	// 'slice_3_question_q_foo' normalizes to 'slice-3-question-q-foo'.
+	section := "slice_3_question_q_foo"
+	// Apply the same normalization logic as planFeedbackSubmitHandler.
+	if rest, ok := strings.CutPrefix(section, "slice_"); ok {
+		section = "slice-" + rest
+	}
+	// Also normalize remaining underscores in the question part.
+	section = strings.ReplaceAll(section, "_", "-")
+	if !validSectionRe.MatchString(section) {
+		t.Errorf("expected normalized %q to match validSectionRe", section)
+	}
+}
+
+func TestValidSectionRe_RejectsBadFormats(t *testing.T) {
+	bad := []string{
+		"slice-",            // no num
+		"slice-abc",         // non-numeric num
+		"slice-1-question-", // no question ID
+		"slice-1-questionn-foo", // typo: extra 'n'
+		"slice-",
+		"slice",
+	}
+	for _, s := range bad {
+		if validSectionRe.MatchString(s) {
+			t.Errorf("expected validSectionRe to REJECT %q, but it matched", s)
+		}
+	}
+}
+
+// ---- HTTP API integration tests (slice-4) --------------------------------------
+
+// TestAPI_PostFeedback_SliceQuestionSection_Returns200 is the regression test
+// mandated by the plan's done_when: POST /api/plans/<id>/feedback with
+// section='slice-3-question-q-foo' must return 200, NOT 400.
+func TestAPI_PostFeedback_SliceQuestionSection_Returns200(t *testing.T) {
+	database, planID := setupPlanTestDB(t)
+	handler := planFeedbackSubmitHandler(database)
+
+	body, _ := json.Marshal(planFeedbackRequest{
+		Section: "slice-3-question-q-foo",
+		Action:  "answer",
+		Value:   "yes",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/feedback", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("POST feedback with slice-question section: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestAPI_PostFeedback_SliceLevel_Returns200 verifies that section='slice-1' is
+// accepted and stored correctly.
+func TestAPI_PostFeedback_SliceLevel_Returns200(t *testing.T) {
+	database, planID := setupPlanTestDB(t)
+	handler := planFeedbackSubmitHandler(database)
+
+	body, _ := json.Marshal(planFeedbackRequest{
+		Section: "slice-1",
+		Action:  "approve",
+		Value:   "true",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/feedback", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("POST feedback with slice-level section: got %d, want 200; body: %s", w.Code, w.Body.String())
 	}
 }

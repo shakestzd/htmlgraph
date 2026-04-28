@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/planyaml"
+	"github.com/shakestzd/htmlgraph/internal/storage"
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
@@ -278,4 +281,219 @@ func runPlanAddSliceYAML(htmlgraphDir, planID, title, what, why, files, doneWhen
 
 	fmt.Printf("Slice %d added\n", slice.Num)
 	return nil
+}
+
+// ---- slice lifecycle commands (slice-4) ----------------------------------------
+
+// validSliceExecutionStatuses is the canonical set of slice execution status values.
+var validSliceExecutionStatuses = []string{
+	"not_started", "promoted", "in_progress", "done", "blocked", "superseded",
+}
+
+// planApproveSliceCmd sets approval_status=approved for a slice in plan_feedback.
+func planApproveSliceCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "approve-slice <plan-id> <slice-num>",
+		Short: "Set approval_status=approved for a plan slice",
+		Long: `Record an approval for a specific plan slice. The approval is stored in
+SQLite plan_feedback with section='slice-<num>' and action='approve'.
+
+Example:
+  htmlgraph plan approve-slice plan-abc12345 3`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			htmlgraphDir, err := findHtmlgraphDir()
+			if err != nil {
+				return err
+			}
+			return runApproveSlice(htmlgraphDir, args[0], args[1])
+		},
+	}
+}
+
+func runApproveSlice(htmlgraphDir, planID, sliceNumStr string) error {
+	sliceNum, err := parseSliceNum(sliceNumStr)
+	if err != nil {
+		return err
+	}
+	section := fmt.Sprintf("slice-%d", sliceNum)
+	db, err := openPlanDB(htmlgraphDir)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := dbpkg.StorePlanFeedback(db, planID, section, "approve", "true", ""); err != nil {
+		return fmt.Errorf("store approve feedback: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Slice %d approved for plan %s\n", sliceNum, planID)
+	return nil
+}
+
+// planRejectSliceCmd sets approval_status=rejected (or changes_requested) for a slice.
+func planRejectSliceCmd() *cobra.Command {
+	var changesRequested bool
+	cmd := &cobra.Command{
+		Use:   "reject-slice <plan-id> <slice-num>",
+		Short: "Set approval_status=rejected for a plan slice",
+		Long: `Record a rejection for a specific plan slice. By default stores action='reject'.
+Use --changes-requested to store action='changes_requested' instead.
+
+Example:
+  htmlgraph plan reject-slice plan-abc12345 3
+  htmlgraph plan reject-slice plan-abc12345 3 --changes-requested`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			htmlgraphDir, err := findHtmlgraphDir()
+			if err != nil {
+				return err
+			}
+			return runRejectSlice(htmlgraphDir, args[0], args[1], changesRequested)
+		},
+	}
+	cmd.Flags().BoolVar(&changesRequested, "changes-requested", false, "store action=changes_requested instead of reject")
+	return cmd
+}
+
+func runRejectSlice(htmlgraphDir, planID, sliceNumStr string, changesRequested bool) error {
+	sliceNum, err := parseSliceNum(sliceNumStr)
+	if err != nil {
+		return err
+	}
+	section := fmt.Sprintf("slice-%d", sliceNum)
+	action := "reject"
+	if changesRequested {
+		action = "changes_requested"
+	}
+	db, err := openPlanDB(htmlgraphDir)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := dbpkg.StorePlanFeedback(db, planID, section, action, "false", ""); err != nil {
+		return fmt.Errorf("store reject feedback: %w", err)
+	}
+	// Also record the approve=false row so IsPlanFullyApproved sees the disapproval.
+	if err := dbpkg.StorePlanFeedback(db, planID, section, "approve", "false", ""); err != nil {
+		return fmt.Errorf("store approve=false feedback: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Slice %d rejected (action=%s) for plan %s\n", sliceNum, action, planID)
+	return nil
+}
+
+// planAnswerSliceQuestionCmd records the answer to a slice-local question.
+func planAnswerSliceQuestionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "answer-slice-question <plan-id> <slice-num> <question-id> <answer-key>",
+		Short: "Record the answer to a slice-local question in plan_feedback",
+		Long: `Record the answer to a slice-local question. Stored in SQLite plan_feedback
+with section='slice-<num>-question-<question-id>' and action='answer'.
+
+Example:
+  htmlgraph plan answer-slice-question plan-abc12345 3 q-error-handling yes`,
+		Args: cobra.ExactArgs(4),
+		RunE: func(_ *cobra.Command, args []string) error {
+			htmlgraphDir, err := findHtmlgraphDir()
+			if err != nil {
+				return err
+			}
+			return runAnswerSliceQuestion(htmlgraphDir, args[0], args[1], args[2], args[3])
+		},
+	}
+}
+
+func runAnswerSliceQuestion(htmlgraphDir, planID, sliceNumStr, questionID, answerKey string) error {
+	sliceNum, err := parseSliceNum(sliceNumStr)
+	if err != nil {
+		return err
+	}
+	section := fmt.Sprintf("slice-%d-question-%s", sliceNum, questionID)
+	db, err := openPlanDB(htmlgraphDir)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := dbpkg.StorePlanFeedback(db, planID, section, "answer", answerKey, questionID); err != nil {
+		return fmt.Errorf("store answer feedback: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Answer recorded: plan=%s slice=%d question=%s answer=%s\n",
+		planID, sliceNum, questionID, answerKey)
+	return nil
+}
+
+// planSetSliceStatusCmd sets the execution_status for a slice in plan_feedback.
+func planSetSliceStatusCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-slice-status <plan-id> <slice-num> <status>",
+		Short: "Set the execution_status for a plan slice",
+		Long: `Set the execution_status for a specific plan slice. Valid statuses:
+  not_started | promoted | in_progress | done | blocked | superseded
+
+Stored in SQLite plan_feedback with section='slice-<num>' and action='set-status'.
+
+Example:
+  htmlgraph plan set-slice-status plan-abc12345 3 in_progress`,
+		Args: cobra.ExactArgs(3),
+		RunE: func(_ *cobra.Command, args []string) error {
+			htmlgraphDir, err := findHtmlgraphDir()
+			if err != nil {
+				return err
+			}
+			return runSetSliceStatus(htmlgraphDir, args[0], args[1], args[2])
+		},
+	}
+}
+
+func runSetSliceStatus(htmlgraphDir, planID, sliceNumStr, status string) error {
+	if err := validateSliceExecutionStatus(status); err != nil {
+		return err
+	}
+	sliceNum, err := parseSliceNum(sliceNumStr)
+	if err != nil {
+		return err
+	}
+	section := fmt.Sprintf("slice-%d", sliceNum)
+	db, err := openPlanDB(htmlgraphDir)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := dbpkg.StorePlanFeedback(db, planID, section, "set-status", status, ""); err != nil {
+		return fmt.Errorf("store set-status feedback: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Slice %d execution_status → %s for plan %s\n", sliceNum, status, planID)
+	return nil
+}
+
+// validateSliceExecutionStatus returns an error if status is not a valid slice execution status.
+func validateSliceExecutionStatus(status string) error {
+	for _, v := range validSliceExecutionStatuses {
+		if v == status {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid slice execution status %q — valid values: %s",
+		status, strings.Join(validSliceExecutionStatuses, ", "))
+}
+
+// parseSliceNum parses a slice number string and returns the int or an error.
+func parseSliceNum(s string) (int, error) {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 0, fmt.Errorf("slice-num must be a positive integer (got %q)", s)
+	}
+	return n, nil
+}
+
+// openPlanDB resolves the DB path from htmlgraphDir and opens it.
+// The parent of htmlgraphDir is used as the project root for CanonicalDBPath.
+func openPlanDB(htmlgraphDir string) (*sql.DB, error) {
+	dbPath, err := storage.CanonicalDBPath(filepath.Dir(htmlgraphDir))
+	if err != nil {
+		return nil, fmt.Errorf("resolve db path: %w", err)
+	}
+	db, err := dbpkg.Open(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+	return db, nil
 }
