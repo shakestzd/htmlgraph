@@ -12,12 +12,33 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/worktree"
 )
 
-// TestMain disables the reindex subprocess fork (`htmlgraph reindex`) for the
-// whole package so worktree-helper tests don't hang in environments where the
-// fork blocks on missing canonical state. Tracked as bug-bb5b26f6.
+// TestMain is the test suite entry point for the unit test suite. It:
+//  1. Disables the reindex subprocess fork so worktree-helper tests don't hang
+//     in environments where the fork blocks on missing canonical state (bug-bb5b26f6).
+//  2. Redirects XDG base dirs to isolated tempdirs so registry writes from
+//     persistentPreRunE (or any code path calling registry.DefaultPath) never
+//     touch ~/.local/share/htmlgraph/projects.json during test runs (bug-cc41e3d2).
+//  3. Cleans up the binary temp dir created by buildOtelCollectTestBinary.
 func TestMain(m *testing.M) {
 	worktree.SetReindexFnForTest(func(string, io.Writer) {})
-	os.Exit(m.Run())
+
+	// Redirect XDG base dirs to isolated tempdirs.
+	xdgData, err := os.MkdirTemp("", "htmlgraph-test-xdg-data-*")
+	if err == nil {
+		os.Setenv("XDG_DATA_HOME", xdgData)   //nolint:errcheck
+		defer os.RemoveAll(xdgData)
+	}
+	xdgConfig, err2 := os.MkdirTemp("", "htmlgraph-test-xdg-config-*")
+	if err2 == nil {
+		os.Setenv("XDG_CONFIG_HOME", xdgConfig) //nolint:errcheck
+		defer os.RemoveAll(xdgConfig)
+	}
+
+	code := m.Run()
+	if otelCollectTestBinaryTmpDir != "" {
+		_ = os.RemoveAll(otelCollectTestBinaryTmpDir)
+	}
+	os.Exit(code)
 }
 
 // setupWorktreeGitRepo creates a temp git repo with an initial commit and returns its path.
