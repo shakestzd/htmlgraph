@@ -19,7 +19,7 @@ type PlanMeta struct {
 	Title       string `yaml:"title"`
 	Description string `yaml:"description"`
 	CreatedAt   string `yaml:"created_at"`
-	Status      string `yaml:"status"` // draft | review | finalized
+	Status      string `yaml:"status"` // draft | review | finalized | active | completed
 	CreatedBy   string `yaml:"created_by,omitempty"`
 	Version     int    `yaml:"version"`
 }
@@ -35,7 +35,23 @@ type PlanDesign struct {
 }
 
 // PlanSlice is a vertical delivery slice with metadata for effort,
-// risk, dependencies, and human approval.
+// risk, dependencies, and human approval. V2 adds slice-local lifecycle
+// states, questions, and critic revisions so each slice is an independently
+// reviewable executable spec card.
+//
+// Section-naming contract for plan_feedback (load-bearing — slice-4 extends
+// validSectionRe to accept the new pattern):
+//
+//	slice-<num>                        — slice-level approval/state
+//	slice-<num>-question-<question-id> — slice-local question answer
+//
+// Global sections ("design", "questions", existing keys) are unchanged.
+// The UNIQUE(plan_id, section, action, question_id) constraint in
+// internal/db/plan_feedback.go already accommodates these formats; slice-4
+// extends cmd/htmlgraph/api_plans.go validSectionRe to accept the new pattern.
+//
+// Agents should write multiline what/why/tests fields using YAML literal
+// blocks (|) for Markdown-capable content — see the planning skill for examples.
 type PlanSlice struct {
 	ID        string   `yaml:"id"`
 	FeatureID string   `yaml:"feature_id,omitempty"` // populated after plan finalize
@@ -51,6 +67,37 @@ type PlanSlice struct {
 	Tests     string   `yaml:"tests"`
 	Approved  bool     `yaml:"approved"`
 	Comment   string   `yaml:"comment"`
+
+	// V2 lifecycle fields (additive — legacy plans omit these and remain valid).
+	ApprovalStatus  string `yaml:"approval_status,omitempty"`  // pending | approved | rejected | changes_requested
+	ExecutionStatus string `yaml:"execution_status,omitempty"` // not_started | promoted | in_progress | done | blocked | superseded
+
+	// V2 slice-local spec fields.
+	Questions       []SliceQuestion  `yaml:"questions,omitempty"`        // slice-local open questions
+	CriticRevisions []CriticRevision `yaml:"critic_revisions,omitempty"` // critic feedback specific to this slice
+}
+
+// SliceQuestion is an open question scoped to a single slice. Unlike plan-level
+// PlanQuestion, it is lightweight (no options list) — it captures the question
+// text and an optional freeform answer.
+//
+// The section key for plan_feedback responses is:
+//
+//	slice-<num>-question-<id>
+type SliceQuestion struct {
+	ID     string `yaml:"id"`
+	Text   string `yaml:"text"`
+	Answer string `yaml:"answer,omitempty"` // freeform answer; empty = unanswered
+}
+
+// CriticRevision records a critic's feedback item scoped to a specific slice.
+// Source identifies the reviewer (e.g. "haiku", "opus"), Severity is a
+// free-form label (e.g. "HIGH", "LOW", "DANGER"), and Summary is a
+// one-line description of the finding.
+type CriticRevision struct {
+	Source   string `yaml:"source"`
+	Severity string `yaml:"severity"`
+	Summary  string `yaml:"summary"`
 }
 
 // PlanQuestion is an open design question with options and an optional answer.

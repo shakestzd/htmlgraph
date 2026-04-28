@@ -506,3 +506,206 @@ func TestEmptySlicesAndQuestions_Marshal(t *testing.T) {
 		t.Errorf("Expected 'questions: []' in output, got:\n%s", content)
 	}
 }
+
+// ---- v2 slice-card schema tests ----
+
+// v2PlanYAML is a YAML string that exercises all v2 slice-card fields:
+// slice-local questions, critic_revisions, approval_status, execution_status,
+// and plan status='active'.
+const v2PlanYAML = `
+meta:
+  id: plan-v2yaml01
+  title: V2 Schema Parse Test
+  status: active
+  created_at: "2026-04-28"
+  version: 1
+design:
+  problem: Testing v2 schema parsing.
+  goals:
+    - Parse slice-local fields
+  constraints:
+    - Additive only
+  approved: false
+  comment: ""
+slices:
+  - num: 1
+    title: First slice
+    what: |
+      Build the slice-card schema with Markdown support.
+    why: |
+      The v2 model needs independently reviewable slice specs.
+    files:
+      - internal/planyaml/schema.go
+    deps: []
+    done_when:
+      - Tests pass
+    effort: S
+    risk: Low
+    tests: |
+      Unit: struct fields round-trip through YAML
+    approved: false
+    comment: ""
+    approval_status: approved
+    execution_status: done
+    questions:
+      - id: sq-1
+        text: Should we use interface{}?
+        answer: "no"
+    critic_revisions:
+      - source: haiku
+        severity: LOW
+        summary: Minor style nit about variable naming.
+  - num: 2
+    title: Second slice
+    what: Integrate the schema into the validator.
+    why: Validation needs the new fields.
+    files:
+      - internal/planyaml/validate.go
+    deps:
+      - 1
+    done_when:
+      - Validation tests pass
+    effort: M
+    risk: Med
+    tests: Integration test for validator
+    approved: false
+    comment: ""
+    approval_status: pending
+    execution_status: not_started
+    questions: []
+    critic_revisions: []
+questions: []
+`
+
+func TestV2Schema_ParseSliceLocalFields(t *testing.T) {
+	var plan PlanYAML
+	if err := yaml.Unmarshal([]byte(v2PlanYAML), &plan); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	// Meta
+	if plan.Meta.Status != "active" {
+		t.Errorf("Meta.Status = %q, want %q", plan.Meta.Status, "active")
+	}
+
+	// Slice count
+	if len(plan.Slices) != 2 {
+		t.Fatalf("Slices len = %d, want 2", len(plan.Slices))
+	}
+
+	s0 := plan.Slices[0]
+
+	// Lifecycle states
+	if s0.ApprovalStatus != "approved" {
+		t.Errorf("Slices[0].ApprovalStatus = %q, want %q", s0.ApprovalStatus, "approved")
+	}
+	if s0.ExecutionStatus != "done" {
+		t.Errorf("Slices[0].ExecutionStatus = %q, want %q", s0.ExecutionStatus, "done")
+	}
+
+	// Slice-local questions
+	if len(s0.Questions) != 1 {
+		t.Fatalf("Slices[0].Questions len = %d, want 1", len(s0.Questions))
+	}
+	if s0.Questions[0].ID != "sq-1" {
+		t.Errorf("Slices[0].Questions[0].ID = %q, want %q", s0.Questions[0].ID, "sq-1")
+	}
+	if s0.Questions[0].Text != "Should we use interface{}?" {
+		t.Errorf("Slices[0].Questions[0].Text mismatch")
+	}
+
+	// Critic revisions
+	if len(s0.CriticRevisions) != 1 {
+		t.Fatalf("Slices[0].CriticRevisions len = %d, want 1", len(s0.CriticRevisions))
+	}
+	cr := s0.CriticRevisions[0]
+	if cr.Source != "haiku" {
+		t.Errorf("CriticRevisions[0].Source = %q, want %q", cr.Source, "haiku")
+	}
+	if cr.Severity != "LOW" {
+		t.Errorf("CriticRevisions[0].Severity = %q, want %q", cr.Severity, "LOW")
+	}
+	if cr.Summary != "Minor style nit about variable naming." {
+		t.Errorf("CriticRevisions[0].Summary mismatch")
+	}
+
+	s1 := plan.Slices[1]
+	if s1.ApprovalStatus != "pending" {
+		t.Errorf("Slices[1].ApprovalStatus = %q, want %q", s1.ApprovalStatus, "pending")
+	}
+	if s1.ExecutionStatus != "not_started" {
+		t.Errorf("Slices[1].ExecutionStatus = %q, want %q", s1.ExecutionStatus, "not_started")
+	}
+	if len(s1.Questions) != 0 {
+		t.Errorf("Slices[1].Questions len = %d, want 0", len(s1.Questions))
+	}
+	if len(s1.CriticRevisions) != 0 {
+		t.Errorf("Slices[1].CriticRevisions len = %d, want 0", len(s1.CriticRevisions))
+	}
+}
+
+func TestV2Schema_RoundTrip(t *testing.T) {
+	// Verify that v2 fields survive a marshal/unmarshal round-trip.
+	original := &PlanYAML{
+		Meta: PlanMeta{
+			ID:     "plan-v2rt001",
+			Title:  "Round Trip",
+			Status: "active",
+		},
+		Design: PlanDesign{
+			Problem:     "Round trip test.",
+			Goals:       []string{"Goal"},
+			Constraints: []string{"Constraint"},
+		},
+		Slices: []PlanSlice{
+			{
+				Num:             1,
+				Title:           "Slice one",
+				What:            "What",
+				Why:             "Why",
+				Files:           []string{"main.go"},
+				DoneWhen:        []string{"done"},
+				Tests:           "test",
+				Effort:          "S",
+				Risk:            "Low",
+				Deps:            []int{},
+				ApprovalStatus:  "changes_requested",
+				ExecutionStatus: "in_progress",
+				Questions: []SliceQuestion{
+					{ID: "sq-rt", Text: "Round trip question?"},
+				},
+				CriticRevisions: []CriticRevision{
+					{Source: "opus", Severity: "HIGH", Summary: "Critical issue found."},
+				},
+			},
+		},
+		Questions: []PlanQuestion{},
+	}
+
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var loaded PlanYAML
+	if err := yaml.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if len(loaded.Slices) != 1 {
+		t.Fatalf("Slices len = %d, want 1", len(loaded.Slices))
+	}
+	s := loaded.Slices[0]
+	if s.ApprovalStatus != "changes_requested" {
+		t.Errorf("ApprovalStatus = %q, want %q", s.ApprovalStatus, "changes_requested")
+	}
+	if s.ExecutionStatus != "in_progress" {
+		t.Errorf("ExecutionStatus = %q, want %q", s.ExecutionStatus, "in_progress")
+	}
+	if len(s.Questions) != 1 || s.Questions[0].ID != "sq-rt" {
+		t.Errorf("Questions not round-tripped correctly: %+v", s.Questions)
+	}
+	if len(s.CriticRevisions) != 1 || s.CriticRevisions[0].Source != "opus" {
+		t.Errorf("CriticRevisions not round-tripped correctly: %+v", s.CriticRevisions)
+	}
+}
