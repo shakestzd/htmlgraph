@@ -102,11 +102,19 @@ func (s *Sink) periodicSync() {
 }
 
 // flushAndSyncLocked flushes the bufio.Writer and calls Sync on the underlying
-// file. Must be called with s.mu held.
+// file. Must be called with s.mu held. Acquires the cross-process flock for
+// the duration of the actual file write so concurrent processes (e.g. a
+// collector child and the indexer) cannot interleave appends — the flock
+// MUST guard the bufio.Flush, not just the in-memory append, because that's
+// the moment buffered bytes hit the shared file.
 func (s *Sink) flushAndSyncLocked() error {
 	if s.bw == nil || s.f == nil {
 		return nil
 	}
+	if err := syscall.Flock(int(s.f.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("ndjson flock %s for flush: %w", s.path, err)
+	}
+	defer syscall.Flock(int(s.f.Fd()), syscall.LOCK_UN) //nolint:errcheck
 	if err := s.bw.Flush(); err != nil {
 		return fmt.Errorf("ndjson bufio flush: %w", err)
 	}
@@ -117,10 +125,11 @@ func (s *Sink) flushAndSyncLocked() error {
 }
 
 // WriteBatch appends one JSON line per signal to events.ndjson.
-// An exclusive flock is held for the duration of the write so concurrent
-// processes (e.g. a collector child and the indexer) don't interleave lines.
-// Empty batches are a no-op.
-// After every FlushThreshold cumulative events, a flush+sync is triggered.
+// Lines are written to an in-memory bufio.Writer; the cross-process flock
+// is acquired by flushAndSyncLocked at the moment buffered bytes are
+// actually written to the shared file (so concurrent collector + indexer
+// processes can't interleave appends). Empty batches are a no-op. After
+// every FlushThreshold cumulative events, a flush+sync is triggered.
 func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, resourceAttrs map[string]any, signals []otel.UnifiedSignal) error {
 	if len(signals) == 0 {
 		return nil
@@ -132,11 +141,6 @@ func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, resourceAttrs
 	if s.closed {
 		return fmt.Errorf("ndjson sink is closed")
 	}
-
-	if err := syscall.Flock(int(s.f.Fd()), syscall.LOCK_EX); err != nil {
-		return fmt.Errorf("ndjson flock %s: %w", s.path, err)
-	}
-	defer syscall.Flock(int(s.f.Fd()), syscall.LOCK_UN) //nolint:errcheck
 
 	for i := range signals {
 		line, err := marshalLine(harness, resourceAttrs, &signals[i])
