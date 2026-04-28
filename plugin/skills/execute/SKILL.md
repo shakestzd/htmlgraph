@@ -62,6 +62,12 @@ LOOP:
 
 This maximizes parallelism automatically. If 10 of 13 tasks are independent, all 10 run in the first dispatch — no artificial wave boundaries.
 
+Slices promoted via `htmlgraph plan promote-slice` from a still-active plan are dispatched through the same dependency-readiness loop — they appear as features linked to the track via `part_of` edges and are ready to dispatch as soon as their `blocked_by` deps are complete.
+
+### Incremental slice promotion
+
+When a track is executing a v2 plan, slices may be promoted one at a time rather than all at once. Each call to `htmlgraph plan promote-slice <plan-id> <num>` creates a `feat-XXX` linked to the track and marks the slice `execution_status=promoted`. That feature immediately appears in `htmlgraph execute-preview <trk-id>` and enters the dispatch loop. Dep-blocked slices stay in the `blocked` bucket until their dependencies complete, exactly like manually created features. No special handling is required — promoted slices are regular features from the executor's perspective.
+
 ---
 
 ## Step 1: Query Unblocked Tasks

@@ -295,3 +295,238 @@ func assertContainsError(t *testing.T, errs []string, substr string) {
 	}
 	t.Errorf("expected an error containing %q, got: %v", substr, errs)
 }
+
+// ---- v2 slice-card tests ----
+
+// validV2Plan returns a fully-populated valid v2 plan with slice-local
+// questions, critic_revisions, and lifecycle states.
+func validV2Plan() *PlanYAML {
+	return &PlanYAML{
+		Meta: PlanMeta{
+			ID:     "plan-v2test01",
+			Title:  "V2 Slice-Card Test Plan",
+			Status: "active",
+		},
+		Design: PlanDesign{
+			Problem:     "A real problem to solve.",
+			Goals:       []string{"Goal 1"},
+			Constraints: []string{"Constraint 1"},
+		},
+		Slices: []PlanSlice{
+			{
+				Num:             1,
+				What:            "Build the thing.",
+				Why:             "Because it matters.",
+				Files:           []string{"internal/foo/bar.go"},
+				DoneWhen:        []string{"Tests pass"},
+				Tests:           "Unit: it works",
+				Effort:          "S",
+				Risk:            "Low",
+				Deps:            []int{},
+				ApprovalStatus:  "approved",
+				ExecutionStatus: "done",
+				Questions: []SliceQuestion{
+					{
+						ID:   "sq-1",
+						Text: "Should we use interface{}?",
+					},
+				},
+				CriticRevisions: []CriticRevision{
+					{
+						Source:   "haiku",
+						Severity: "LOW",
+						Summary:  "Minor style nit.",
+					},
+				},
+			},
+			{
+				Num:             2,
+				What:            "Integrate the thing.",
+				Why:             "Because end-to-end matters.",
+				Files:           []string{"internal/foo/baz.go"},
+				DoneWhen:        []string{"Integration test passes"},
+				Tests:           "Integration: full flow works",
+				Effort:          "M",
+				Risk:            "Med",
+				Deps:            []int{1},
+				ApprovalStatus:  "pending",
+				ExecutionStatus: "not_started",
+				Questions:       []SliceQuestion{},
+				CriticRevisions: []CriticRevision{},
+			},
+		},
+		Questions: []PlanQuestion{
+			{
+				Text:        "Which approach?",
+				Description: "We need to decide between A and B.",
+				Recommended: "opt-a",
+				Options: []QuestionOption{
+					{Key: "opt-a", Label: "Option A"},
+					{Key: "opt-b", Label: "Option B"},
+				},
+			},
+		},
+	}
+}
+
+func TestValidate_V2Plan_Valid(t *testing.T) {
+	plan := validV2Plan()
+	errs := Validate(plan)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid v2 plan, got: %v", errs)
+	}
+}
+
+func TestValidate_MetaStatusActive(t *testing.T) {
+	plan := validPlan()
+	plan.Meta.Status = "active"
+	errs := Validate(plan)
+	for _, e := range errs {
+		if strings.Contains(e, "meta.status") {
+			t.Errorf("status 'active' should be valid, got error: %s", e)
+		}
+	}
+}
+
+func TestValidate_MetaStatusCompleted(t *testing.T) {
+	plan := validPlan()
+	plan.Meta.Status = "completed"
+	errs := Validate(plan)
+	for _, e := range errs {
+		if strings.Contains(e, "meta.status") {
+			t.Errorf("status 'completed' should be valid, got error: %s", e)
+		}
+	}
+}
+
+func TestValidate_AllMetaStatuses(t *testing.T) {
+	for _, status := range []string{"draft", "review", "finalized", "active", "completed"} {
+		plan := validPlan()
+		plan.Meta.Status = status
+		errs := Validate(plan)
+		for _, e := range errs {
+			if strings.Contains(e, "meta.status") {
+				t.Errorf("status %q should be valid, got error: %s", status, e)
+			}
+		}
+	}
+}
+
+func TestValidate_DuplicateSliceIDs(t *testing.T) {
+	plan := validPlan()
+	plan.Slices[0].ID = "feat-duplicate"
+	plan.Slices[1].ID = "feat-duplicate"
+	errs := Validate(plan)
+	assertContainsError(t, errs, "duplicate")
+}
+
+func TestValidate_DuplicateQuestionIDsWithinSlice(t *testing.T) {
+	plan := validV2Plan()
+	plan.Slices[0].Questions = []SliceQuestion{
+		{ID: "sq-dup", Text: "First question"},
+		{ID: "sq-dup", Text: "Second question"},
+	}
+	errs := Validate(plan)
+	assertContainsError(t, errs, "duplicate")
+}
+
+func TestValidate_CriticRevisionMissingSource(t *testing.T) {
+	plan := validV2Plan()
+	plan.Slices[0].CriticRevisions = []CriticRevision{
+		{Source: "", Severity: "HIGH", Summary: "A summary"},
+	}
+	errs := Validate(plan)
+	assertContainsError(t, errs, "source")
+}
+
+func TestValidate_CriticRevisionMissingSeverity(t *testing.T) {
+	plan := validV2Plan()
+	plan.Slices[0].CriticRevisions = []CriticRevision{
+		{Source: "haiku", Severity: "", Summary: "A summary"},
+	}
+	errs := Validate(plan)
+	assertContainsError(t, errs, "severity")
+}
+
+func TestValidate_CriticRevisionMissingSummary(t *testing.T) {
+	plan := validV2Plan()
+	plan.Slices[0].CriticRevisions = []CriticRevision{
+		{Source: "haiku", Severity: "HIGH", Summary: ""},
+	}
+	errs := Validate(plan)
+	assertContainsError(t, errs, "summary")
+}
+
+func TestValidate_InvalidApprovalStatus(t *testing.T) {
+	plan := validV2Plan()
+	plan.Slices[0].ApprovalStatus = "unknown-status"
+	errs := Validate(plan)
+	assertContainsError(t, errs, "approval_status")
+}
+
+func TestValidate_ValidApprovalStatuses(t *testing.T) {
+	for _, status := range []string{"", "pending", "approved", "rejected", "changes_requested"} {
+		plan := validV2Plan()
+		plan.Slices[0].ApprovalStatus = status
+		errs := Validate(plan)
+		for _, e := range errs {
+			if strings.Contains(e, "approval_status") {
+				t.Errorf("approval_status %q should be valid, got error: %s", status, e)
+			}
+		}
+	}
+}
+
+func TestValidate_InvalidExecutionStatus(t *testing.T) {
+	plan := validV2Plan()
+	plan.Slices[0].ExecutionStatus = "running"
+	errs := Validate(plan)
+	assertContainsError(t, errs, "execution_status")
+}
+
+func TestValidate_ValidExecutionStatuses(t *testing.T) {
+	for _, status := range []string{"", "not_started", "promoted", "in_progress", "done", "blocked", "superseded"} {
+		plan := validV2Plan()
+		plan.Slices[0].ExecutionStatus = status
+		errs := Validate(plan)
+		for _, e := range errs {
+			if strings.Contains(e, "execution_status") {
+				t.Errorf("execution_status %q should be valid, got error: %s", status, e)
+			}
+		}
+	}
+}
+
+func TestValidate_LegacyPlanRegression(t *testing.T) {
+	// A legacy plan (no v2 fields) should still validate without errors.
+	plan := &PlanYAML{
+		Meta: PlanMeta{
+			ID:     "plan-legacy01",
+			Title:  "Legacy Plan",
+			Status: "draft",
+		},
+		Design: PlanDesign{
+			Problem:     "An old problem.",
+			Goals:       []string{"Legacy goal"},
+			Constraints: []string{"Legacy constraint"},
+		},
+		Slices: []PlanSlice{
+			{
+				Num:      1,
+				What:     "Do the legacy thing.",
+				Why:      "Because legacy.",
+				Files:    []string{"internal/legacy/foo.go"},
+				DoneWhen: []string{"It works"},
+				Tests:    "Manual: smoke test",
+				Effort:   "M",
+				Risk:     "High",
+				Deps:     []int{},
+			},
+		},
+		Questions: []PlanQuestion{},
+	}
+	errs := Validate(plan)
+	if len(errs) != 0 {
+		t.Errorf("legacy plan should validate without errors, got: %v", errs)
+	}
+}

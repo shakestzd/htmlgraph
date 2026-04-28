@@ -1,0 +1,246 @@
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"time"
+
+	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
+	"github.com/shakestzd/htmlgraph/internal/models"
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
+	"github.com/shakestzd/htmlgraph/internal/workitem"
+	"github.com/spf13/cobra"
+)
+
+// planPromoteSliceCmd adds the cobra sub-command `plan promote-slice`.
+func planPromoteSliceCmd() *cobra.Command {
+	var waiveDeps bool
+	cmd := &cobra.Command{
+		Use:   "promote-slice <plan-id> <slice-num>",
+		Short: "Promote an approved plan slice to a feature work item",
+		Long: `Promote a single approved slice from a YAML plan into a feature work item
+without finalizing the full plan. The plan remains active/draft.
+
+Rules:
+  1. The slice must be approved (approve=true in plan_feedback).
+  2. All dependency slices must have execution_status=done or superseded,
+     unless --waive-deps is passed.
+  3. If the slice already has a feature_id it is reused (idempotent).
+  4. Edges emitted: feature->track (part_of), feature->plan (planned_in),
+     feature->dep_feature (blocked_by) for each promoted dep.
+  5. execution_status is set to 'promoted' in plan_feedback and YAML.
+
+Example:
+  htmlgraph plan promote-slice plan-abc12345 2
+  htmlgraph plan promote-slice plan-abc12345 2 --waive-deps`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			htmlgraphDir, err := findHtmlgraphDir()
+			if err != nil {
+				return err
+			}
+			sliceNum, err := parseSliceNum(args[1])
+			if err != nil {
+				return err
+			}
+			featID, err := promoteSliceFromYAML(htmlgraphDir, args[0], sliceNum, waiveDeps)
+			if err != nil {
+				return err
+			}
+			fmt.Println(featID)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&waiveDeps, "waive-deps", false, "skip dependency readiness check")
+	return cmd
+}
+
+// promoteSliceFromYAML is the testable implementation of plan promote-slice.
+// It promotes exactly one approved slice, creating (or reusing) a feature.
+func promoteSliceFromYAML(htmlgraphDir, planID string, sliceNum int, waiveDeps bool) (string, error) {
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		return "", fmt.Errorf("load plan: %w", err)
+	}
+
+	// Find the slice.
+	sliceIdx, slice, err := findPlanSlice(plan, sliceNum)
+	if err != nil {
+		return "", err
+	}
+
+	// Open DB.
+	db, err := openPlanDB(htmlgraphDir)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	// Validate approval.
+	approvals, err := dbpkg.GetSliceApprovals(db, planID)
+	if err != nil {
+		return "", fmt.Errorf("read approvals: %w", err)
+	}
+	sectionKey := fmt.Sprintf("slice-%d", sliceNum)
+	// Accept approval from either plan_feedback (CLI-driven) or YAML
+	// approval_status (pre-set in the source). Either source is sufficient;
+	// runApproveSlice keeps both in sync, but a YAML-only seed should also work.
+	if approvals[sectionKey] != "approved" && slice.ApprovalStatus != "approved" {
+		return "", fmt.Errorf("slice %d is not approved (plan_feedback=%q, yaml=%q); run 'htmlgraph plan approve-slice %s %d' first",
+			sliceNum, approvals[sectionKey], slice.ApprovalStatus, planID, sliceNum)
+	}
+
+	// Validate dependency readiness.
+	if !waiveDeps && len(slice.Deps) > 0 {
+		if err := checkDepReadiness(db, plan, planID, slice.Deps); err != nil {
+			return "", err
+		}
+	}
+
+	// Idempotent: if feature_id already set, reuse it.
+	if slice.FeatureID != "" {
+		// Still refresh execution_status='promoted' in case it was lost.
+		// Best-effort: a failure here is not fatal (the feature_id already
+		// proves promotion happened) but operators should see DB write errors.
+		if err := dbpkg.StorePlanFeedback(db, planID, sectionKey, "set_execution_status", "promoted", ""); err != nil {
+			fmt.Fprintf(stderr, "promote-slice: refresh execution_status warning: %v\n", err)
+		}
+		return slice.FeatureID, nil
+	}
+
+	// Open project for work item creation.
+	p, err := workitem.Open(htmlgraphDir, agentForClaim())
+	if err != nil {
+		return "", fmt.Errorf("open project: %w", err)
+	}
+	defer p.Close()
+
+	// Resolve track.
+	if plan.Meta.TrackID == "" {
+		return "", fmt.Errorf("plan %s has no track_id; link a track first", planID)
+	}
+	track, err := p.Tracks.Get(plan.Meta.TrackID)
+	if err != nil {
+		return "", fmt.Errorf("get track %s: %w", plan.Meta.TrackID, err)
+	}
+
+	// Create feature.
+	feat, err := p.Features.Create(slice.Title,
+		workitem.FeatWithTrack(track.ID),
+		workitem.FeatWithContent(slice.What),
+	)
+	if err != nil {
+		return "", fmt.Errorf("create feature: %w", err)
+	}
+
+	// Emit edges.
+	if err := wireTrackEdges(p, feat.ID, track.ID, feat.Title); err != nil {
+		return "", fmt.Errorf("wire track edges: %w", err)
+	}
+	p.Features.AddEdge(feat.ID, models.Edge{ //nolint:errcheck
+		TargetID:     planID,
+		Relationship: models.RelPlannedIn,
+		Title:        planID,
+		Since:        time.Now().UTC(),
+	})
+
+	// blocked_by edges for promoted dep slices that have a feature_id.
+	for _, depNum := range slice.Deps {
+		depSliceIdx := -1
+		for i, s := range plan.Slices {
+			if s.Num == depNum {
+				depSliceIdx = i
+				break
+			}
+		}
+		if depSliceIdx >= 0 && plan.Slices[depSliceIdx].FeatureID != "" {
+			p.Features.AddEdge(feat.ID, models.Edge{ //nolint:errcheck
+				TargetID:     plan.Slices[depSliceIdx].FeatureID,
+				Relationship: "blocked_by",
+				Since:        time.Now().UTC(),
+			})
+		}
+	}
+
+	// Write feature_id back to YAML and set execution_status.
+	plan.Slices[sliceIdx].FeatureID = feat.ID
+	plan.Slices[sliceIdx].ExecutionStatus = "promoted"
+	if err := planyaml.Save(planPath, plan); err != nil {
+		return "", fmt.Errorf("save plan: %w", err)
+	}
+
+	// Persist execution_status to plan_feedback.
+	if err := dbpkg.StorePlanFeedback(db, planID, sectionKey, "set_execution_status", "promoted", ""); err != nil {
+		return "", fmt.Errorf("store execution_status: %w", err)
+	}
+
+	// Auto-commit (non-fatal on failure, matching finalize-yaml behaviour).
+	commitMsg := fmt.Sprintf("plan(%s): promote slice-%d → %s", planID, sliceNum, feat.ID)
+	if err := commitPlanChange(planPath, commitMsg); err != nil {
+		fmt.Fprintf(stderr, "promote-slice: autocommit warning: %v\n", err)
+	}
+
+	return feat.ID, nil
+}
+
+// findPlanSlice returns the index and value of the slice with the given num.
+func findPlanSlice(plan *planyaml.PlanYAML, sliceNum int) (int, planyaml.PlanSlice, error) {
+	for i, s := range plan.Slices {
+		if s.Num == sliceNum {
+			return i, s, nil
+		}
+	}
+	return 0, planyaml.PlanSlice{}, fmt.Errorf("slice %d not found in plan %s", sliceNum, plan.Meta.ID)
+}
+
+// checkDepReadiness returns an error listing any dependency slices whose
+// execution_status is not 'done' or 'superseded'.
+func checkDepReadiness(db *sql.DB, plan *planyaml.PlanYAML, planID string, deps []int) error {
+	statuses, err := getSliceExecutionStatuses(db, planID)
+	if err != nil {
+		return fmt.Errorf("read execution statuses: %w", err)
+	}
+
+	var blocking []string
+	for _, depNum := range deps {
+		key := fmt.Sprintf("slice-%d", depNum)
+		st := statuses[key]
+		if st != "done" && st != "superseded" {
+			// Also accept 'promoted' as a non-blocking state per plan semantics,
+			// but not 'not_started', 'in_progress', 'blocked', or ''.
+			blocking = append(blocking, fmt.Sprintf("%s (status=%q)", key, st))
+		}
+	}
+	if len(blocking) > 0 {
+		return fmt.Errorf("blocking dependency slices not yet done: %s — use --waive-deps to override",
+			strings.Join(blocking, ", "))
+	}
+	return nil
+}
+
+// getSliceExecutionStatuses returns a map of section key (e.g. "slice-1") to
+// the most recent set_execution_status value recorded in plan_feedback.
+func getSliceExecutionStatuses(db *sql.DB, planID string) (map[string]string, error) {
+	rows, err := db.Query(`
+		SELECT section, value
+		FROM plan_feedback
+		WHERE plan_id = ? AND action = 'set_execution_status' AND section LIKE 'slice-%'
+		ORDER BY updated_at ASC`, planID)
+	if err != nil {
+		return nil, fmt.Errorf("query execution statuses (plan=%s): %w", planID, err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var section, value string
+		if err := rows.Scan(&section, &value); err != nil {
+			return nil, fmt.Errorf("scan execution status row: %w", err)
+		}
+		result[section] = value
+	}
+	return result, rows.Err()
+}

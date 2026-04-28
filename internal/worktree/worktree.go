@@ -318,6 +318,15 @@ func excludeHtmlgraphFromWorktree(worktreePath string, w io.Writer) {
 // no-op in tests to skip the subprocess fork. Defaults to the real impl.
 var reindexWorktreeFn = runReindexSubprocess
 
+// SetReindexFnForTest replaces reindexWorktreeFn for the duration of a test.
+// The previous function is returned so callers can restore it via defer.
+// Test-only helper; do not call from production code.
+func SetReindexFnForTest(fn func(worktreeDir string, w io.Writer)) func(string, io.Writer) {
+	prev := reindexWorktreeFn
+	reindexWorktreeFn = fn
+	return prev
+}
+
 // reindexWorktree runs `htmlgraph reindex` in the given worktree directory so
 // the worktree's SQLite cache is current before Claude launches. Best-effort:
 // failures are written to w but do not abort.

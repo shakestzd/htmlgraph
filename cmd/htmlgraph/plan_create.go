@@ -213,30 +213,15 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 	if len(plan.Slices) > 0 {
 		page.Slices = nil
 		page.Graph = &plantmpl.DependencyGraph{}
+		isV2 := false
 		for _, s := range plan.Slices {
-			depsStr := ""
-			for i, d := range s.Deps {
-				if i > 0 {
-					depsStr += ","
-				}
-				depsStr += fmt.Sprintf("%d", d)
+			sc := plantmpl.SliceCardFromPlanSlice(s)
+			page.Slices = append(page.Slices, sc)
+			// Detect v2: any slice with questions or critic_revisions marks the plan as v2.
+			if len(s.Questions) > 0 || len(s.CriticRevisions) > 0 {
+				isV2 = true
 			}
-			filesStr := strings.Join(s.Files, ", ")
-			page.Slices = append(page.Slices, plantmpl.SliceCard{
-				Num:       s.Num,
-				ID:        s.ID,
-				FeatureID: s.FeatureID,
-				Title:     s.Title,
-				What:      s.What,
-				Why:       s.Why,
-				DoneWhen:  s.DoneWhen,
-				Tests:     s.Tests,
-				Effort:    s.Effort,
-				Risk:      s.Risk,
-				Deps:      depsStr,
-				Files:     filesStr,
-				Status:    "pending",
-			})
+			depsStr := sc.Deps
 			page.Graph.Nodes = append(page.Graph.Nodes, plantmpl.GraphNode{
 				Num:    s.Num,
 				Name:   s.Title,
@@ -245,6 +230,7 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 				Status: "pending",
 			})
 		}
+		page.IsV2 = isV2
 	}
 
 	// Map questions to DecisionCards.

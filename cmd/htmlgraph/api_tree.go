@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -49,7 +50,11 @@ func treeHandler(database *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		turns := buildEventTree(database, limit)
+		turns, err := buildEventTree(database, limit)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("query event tree: %v", err), http.StatusInternalServerError)
+			return
+		}
 		respondJSON(w, turns)
 	}
 }
@@ -59,13 +64,19 @@ func treeHandler(database *sql.DB) http.HandlerFunc {
 // timestamp. Mixed databases (sessions partially anchored in OTel, older
 // sessions purely hook-driven) are rendered together rather than the
 // older sessions being silently dropped once any OTel span is present.
-func buildEventTree(database *sql.DB, limit int) []turn {
-	otelTurns := buildEventTreeOtel(database, limit)
-	hookTurns := buildEventTreeHookUnanchored(database, limit)
+func buildEventTree(database *sql.DB, limit int) ([]turn, error) {
+	otelTurns, err := buildEventTreeOtel(database, limit)
+	if err != nil {
+		return nil, err
+	}
+	hookTurns, err := buildEventTreeHookUnanchored(database, limit)
+	if err != nil {
+		return nil, err
+	}
 
 	merged := append(otelTurns, hookTurns...)
 	if len(merged) == 0 {
-		return []turn{}
+		return []turn{}, nil
 	}
 
 	// Sort DESC by timestamp (RFC3339 strings are lexicographically sortable
@@ -79,7 +90,7 @@ func buildEventTree(database *sql.DB, limit int) []turn {
 	if len(merged) > limit {
 		merged = merged[:limit]
 	}
-	return merged
+	return merged, nil
 }
 
 // buildEventTreeOtel builds the turn list using OTel interaction spans as
@@ -87,7 +98,7 @@ func buildEventTree(database *sql.DB, limit int) []turn {
 // trace_id links all child spans. The user_query shape is synthesized to
 // match the fields the frontend event-tree.js expects so no frontend
 // changes are required.
-func buildEventTreeOtel(database *sql.DB, limit int) []turn {
+func buildEventTreeOtel(database *sql.DB, limit int) ([]turn, error) {
 	rows, err := database.Query(`
 		SELECT s.signal_id, s.trace_id, COALESCE(s.span_id, ''),
 		       s.session_id,
@@ -99,7 +110,7 @@ func buildEventTreeOtel(database *sql.DB, limit int) []turn {
 		ORDER BY s.ts_micros DESC
 		LIMIT ?`, limit)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -170,7 +181,7 @@ func buildEventTreeOtel(database *sql.DB, limit int) []turn {
 		})
 	}
 
-	return turns
+	return turns, nil
 }
 
 // buildEventTreeHookUnanchored returns hook-based UserQuery turns that do
@@ -186,7 +197,7 @@ func buildEventTreeOtel(database *sql.DB, limit int) []turn {
 //
 // Buildings before OTel emission and pure hook-only sessions still pass
 // both checks and remain visible in /api/events/tree.
-func buildEventTreeHookUnanchored(database *sql.DB, limit int) []turn {
+func buildEventTreeHookUnanchored(database *sql.DB, limit int) ([]turn, error) {
 	rows, err := database.Query(`
 		SELECT `+eventColumns+`
 		FROM agent_events e
@@ -203,7 +214,7 @@ func buildEventTreeHookUnanchored(database *sql.DB, limit int) []turn {
 		ORDER BY e.timestamp DESC
 		LIMIT ?`, hookOtelDedupWindowMicros, limit)
 	if err != nil {
-		return []turn{}
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -229,9 +240,9 @@ func buildEventTreeHookUnanchored(database *sql.DB, limit int) []turn {
 	}
 
 	if turns == nil {
-		return []turn{}
+		return []turn{}, nil
 	}
-	return turns
+	return turns, nil
 }
 
 // extractPromptText pulls the user prompt string from an interaction span's

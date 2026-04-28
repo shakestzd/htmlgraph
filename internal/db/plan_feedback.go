@@ -117,6 +117,38 @@ func FinalizePlan(db *sql.DB, planID string) error {
 	return nil
 }
 
+// GetSliceApprovals returns a map of section key → approval status string
+// ("approved" or "rejected") for all slice-N keyed feedback rows for the plan.
+// Only sections matching the slice-<num> pattern are returned; legacy design/
+// outline/questions sections are excluded.
+// This is a read-only helper introduced in slice-4 for the approve-slice /
+// reject-slice lifecycle commands.
+func GetSliceApprovals(db *sql.DB, planID string) (map[string]string, error) {
+	rows, err := db.Query(`
+		SELECT section, value
+		FROM plan_feedback
+		WHERE plan_id = ? AND action = 'approve' AND section LIKE 'slice-%'
+		ORDER BY section ASC`, planID)
+	if err != nil {
+		return nil, fmt.Errorf("get slice approvals (plan=%s): %w", planID, err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var section, value string
+		if err := rows.Scan(&section, &value); err != nil {
+			return nil, fmt.Errorf("scan slice approval row: %w", err)
+		}
+		if value == "true" {
+			result[section] = "approved"
+		} else {
+			result[section] = "rejected"
+		}
+	}
+	return result, rows.Err()
+}
+
 // DeletePlanFeedback deletes all feedback entries for a plan.
 func DeletePlanFeedback(db *sql.DB, planID string) error {
 	_, err := db.Exec(`DELETE FROM plan_feedback WHERE plan_id = ?`, planID)

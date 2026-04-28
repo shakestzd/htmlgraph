@@ -35,36 +35,46 @@ This is useful for tactical work. But it has key limitations:
 
 ## CRISPI: a structured alternative
 
-HtmlGraph's plan system produces a YAML document with a strict schema:
+HtmlGraph's plan system produces a YAML document where each slice is a self-contained executable spec card:
 
 ```yaml
 meta:
   id: plan-3a88d8a9
   title: "Session Ingestion Pipeline"
-  track: trk-97f85b3b
-  status: draft
+  track_id: trk-97f85b3b
+  status: active
 
 design:
   problem: "Agent sessions generate tool calls but no persistent record..."
-  goals: [...]
-  constraints: [...]
-  questions:
-    - question: "Should ingestion be real-time or batch?"
-      options: ["Real-time via hooks", "Batch via CLI command"]
-      recommended: 0
-      rationale: "Hooks already capture events..."
+  goals:
+    - "**Durability** — sessions survive process restarts"
+  constraints:
+    - "No new runtime dependencies"
 
 slices:
   - id: slice-1
+    num: 1
     title: "Hook Hierarchy Fix"
     effort: S
-    risk: low
-    what: "Restructure hook registration..."
-    done_when: ["All hooks fire in correct order", "Tests pass"]
-    depends_on: []
+    risk: Low
+    what: |
+      Restructure hook registration in internal/hooks/registry.go so
+      UserPromptSubmit fires before PreToolUse on every invocation.
+    why: |
+      The ingestion pipeline depends on prompt context being available
+      when the first tool call fires. The current ordering drops it.
+    done_when:
+      - "UserPromptSubmit fires before PreToolUse in all observed traces"
+      - "Existing hook tests pass unmodified"
+    tests: |
+      Unit: TestHookOrder — assert prompt hook index < tool hook index
+      Regression: go test ./internal/hooks/... -count=1
+    approval_status: pending
+    execution_status: not_started
+    deps: []
 ```
 
-Every plan has vertical slices with effort estimates, risk levels, dependencies, and concrete acceptance criteria. Design questions present options with recommended choices. Constraints are explicit. The schema is machine-readable, so agents can execute against it and report progress.
+Every slice card has effort estimates, risk levels, dependencies, and concrete acceptance criteria. Questions live inside the slice that needs the answer. Critic revisions are embedded per slice so reviewers see the feedback exactly where it applies. The schema is machine-readable, so agents can implement against it and track progress per slice.
 
 ## Dual-agent critique
 
@@ -108,13 +118,20 @@ Whether you use the Marimo notebook or the embedded dashboard, the review experi
 
 ## From plan to execution
 
-The finalize step is where CRISPI connects to the rest of HtmlGraph. When you finalize a plan:
+The connection between plan and execution is incremental. As slices are approved during review, they are promoted one at a time:
 
-1. The YAML is updated with all feedback, accepted amendments, and approval state
-2. A static HTML archive is generated for the permanent record
-3. The `execute` skill reads the approved slices, resolves their dependency graph, and dispatches all unblocked tasks simultaneously, each in its own git worktree
+```bash
+# Review a slice, then promote it to a feature:
+htmlgraph plan approve-slice plan-3a88d8a9 1
+htmlgraph plan promote-slice plan-3a88d8a9 1
+# → prints feat-7a3c1f0b
+```
 
-The plan becomes a dispatch queue. Each slice maps to a feature work item. Dependencies determine dispatch order. Quality gates run after each merge. The guardrails themselves are static thresholds (file count limits, test requirements, diff review), not plan-aware. But combining structured plans with tracked work items means there's always a clear record of what was intended vs. what was done.
+`promote-slice` creates a `feat-XXX` work item, wires it to the track and plan via typed edges, and checks dependency readiness. The feature immediately enters the execute skill's dependency-driven dispatch loop — no manual sequencing required. Dep-blocked slices wait in the `blocked` bucket until their dependencies complete.
+
+This incremental model means you can start executing approved slices while the rest of the plan is still under review. The plan doesn't need to be fully finalized to make progress. When all slices are done, rejected, or superseded, you close the plan with `htmlgraph plan set-status <id> completed`.
+
+The guardrails are static (file count limits, test requirements, diff review), not plan-aware. But combining structured slice cards with tracked features and linked sessions means there's always a clear record of what was intended, what was approved, and what was actually built.
 
 ## The key distinction
 

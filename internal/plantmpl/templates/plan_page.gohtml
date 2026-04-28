@@ -370,8 +370,8 @@ textarea::placeholder{color:var(--text-muted)}
   </div>
 </details>
 
-<!-- Design Decisions -->
-{{if .Questions}}{{renderZone .Questions}}{{else}}<details id="questions" class="section-card" data-phase="questions" data-status="pending">
+<!-- Design Decisions (hidden for v2 plans — slice cards carry their own questions) -->
+{{if .IsV2}}{{else}}{{if .Questions}}{{renderZone .Questions}}{{else}}<details id="questions" class="section-card" data-phase="questions" data-status="pending">
   <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
   <div class="section-body">
     <table class="q-table">
@@ -381,11 +381,11 @@ textarea::placeholder{color:var(--text-muted)}
       </tbody>
     </table>
   </div>
-</details>{{end}}
+</details>{{end}}{{end}}
 
-{{if .Critique}}
+{{if .IsV2}}{{else}}{{if .Critique}}
 {{renderZone .Critique}}
-{{end}}
+{{end}}{{end}}
 
 {{if .Preview}}
 {{renderZone .Preview}}

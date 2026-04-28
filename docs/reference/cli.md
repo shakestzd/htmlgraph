@@ -52,12 +52,27 @@ Commands for creating, reviewing, and executing structured CRISPI plans.
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `plan create` | `htmlgraph plan create "Title" --track <trk-id>` | Create a new plan |
+| `plan create-yaml` | `htmlgraph plan create-yaml "Title" --track <trk-id>` | Create a v2 YAML plan file |
 | `plan show` | `htmlgraph plan show <id>` | Display plan details |
 | `plan start` | `htmlgraph plan start <id>` | Mark plan as in-progress |
 | `plan complete` | `htmlgraph plan complete <id>` | Mark plan as done |
 | `plan list` | `htmlgraph plan list` | List all plans |
+| `plan list-yaml` | `htmlgraph plan list-yaml` | List all YAML plans sorted by created_at |
 | `plan generate` | `htmlgraph plan generate <trk-id>` | Generate a CRISPI YAML plan for a track |
-| `plan rewrite-yaml` | `htmlgraph plan rewrite-yaml <id>` | Validated update of plan YAML |
+| `plan rewrite-yaml` | `htmlgraph plan rewrite-yaml <id> --file <path>` | Validated atomic update of plan YAML |
+| `plan validate-yaml` | `htmlgraph plan validate-yaml <id>` | Validate a YAML plan's schema |
+
+### v2 Slice Lifecycle
+
+Commands for per-slice review and incremental promotion (v2 plans only).
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `plan approve-slice` | `htmlgraph plan approve-slice <plan-id> <num>` | Set `approval_status=approved` for a slice |
+| `plan reject-slice` | `htmlgraph plan reject-slice <plan-id> <num> [--changes-requested]` | Set `approval_status=rejected` (or `changes_requested`) |
+| `plan answer-slice-question` | `htmlgraph plan answer-slice-question <plan-id> <num> <question-id> <answer-key>` | Record answer to a slice-local question |
+| `plan set-slice-status` | `htmlgraph plan set-slice-status <plan-id> <num> <status>` | Set execution status (`not_started\|promoted\|in_progress\|done\|blocked\|superseded`) |
+| `plan promote-slice` | `htmlgraph plan promote-slice <plan-id> <num> [--waive-deps]` | Promote an approved slice to a feature work item |
 
 ---
 

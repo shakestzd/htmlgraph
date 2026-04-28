@@ -60,6 +60,13 @@ func planCmdWithExtras() *cobra.Command {
 	cmd.AddCommand(planFeedbackCmd())
 	cmd.AddCommand(planSetStatusCmd())
 	cmd.AddCommand(planMigrateOrphansCmd())
+	// slice-4: slice lifecycle commands
+	cmd.AddCommand(planApproveSliceCmd())
+	cmd.AddCommand(planRejectSliceCmd())
+	cmd.AddCommand(planAnswerSliceQuestionCmd())
+	cmd.AddCommand(planSetSliceStatusCmd())
+	// slice-5: incremental slice promotion
+	cmd.AddCommand(planPromoteSliceCmd())
 	return cmd
 }
 

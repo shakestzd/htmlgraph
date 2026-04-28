@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -274,24 +275,15 @@ func TestAutocommitPlan_CommitHookFailureIsNonFatal(t *testing.T) {
 		t.Fatalf("write pre-commit hook: %v", err)
 	}
 
-	// Capture stderr to verify the warning is printed.
-	origStderr := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe: %v", err)
-	}
-	os.Stderr = w
+	// Capture stderr via the package-level seam — no pipe, no race.
+	var buf bytes.Buffer
+	origStderr := stderr
+	stderr = &buf
+	t.Cleanup(func() { stderr = origStderr })
 
 	commitErr := commitPlanChange(planPath, "plan(plan-hook1234): should be non-fatal")
 
-	// Restore stderr before reading — w must be closed first so Read doesn't block.
-	w.Close()
-	os.Stderr = origStderr
-
-	buf := make([]byte, 4096)
-	n, _ := r.Read(buf)
-	r.Close()
-	stderrOutput := string(buf[:n])
+	stderrOutput := buf.String()
 
 	// Assert non-fatal: commitPlanChange must return nil.
 	if commitErr != nil {

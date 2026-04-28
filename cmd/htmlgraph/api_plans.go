@@ -281,9 +281,17 @@ func planStatusHandler(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	}
 }
 
-// validSectionRe matches valid plan feedback section keys.
-// Known sections: design, outline, meta, critique, slice-N, chat, q-* (questions).
-var validSectionRe = regexp.MustCompile(`^(design|outline|meta|critique|chat|slice-\d+|q-[a-z0-9-]+)$`)
+// validSectionRe matches valid plan feedback section keys used by:
+//
+//	design                          — design approvals
+//	outline                         — outline approvals
+//	meta                            — plan metadata actions (e.g. finalize flag)
+//	critique                        — critique section approvals
+//	chat                            — chat session messages
+//	q-<name>                        — question answers (legacy)
+//	slice-<num>                     — slice-level approval (slice-4)
+//	slice-<num>-question-<id>       — slice-local question answer (slice-4)
+var validSectionRe = regexp.MustCompile(`^(design|outline|meta|critique|chat|slice-\d+-question-[a-z0-9-]+|slice-\d+|q-[a-z0-9-]+)$`)
 
 // planFeedbackSubmitHandler stores a feedback entry for a plan section.
 // POST /api/plans/{id}/feedback
@@ -302,12 +310,13 @@ func planFeedbackSubmitHandler(database *sql.DB) http.HandlerFunc {
 		// Normalize underscores to hyphens for slice sections — a common
 		// mistake that used to silently store wrong-format keys that
 		// finalize-yaml couldn't find.
+		// Handles both 'slice_N' and 'slice_N_question_<id>' patterns (slice-4).
 		if rest, ok := strings.CutPrefix(req.Section, "slice_"); ok {
-			req.Section = "slice-" + rest
+			req.Section = "slice-" + strings.ReplaceAll(rest, "_", "-")
 		}
 
 		if !validSectionRe.MatchString(req.Section) {
-			http.Error(w, fmt.Sprintf("invalid section %q — must match: design, outline, meta, critique, chat, slice-N, or q-<name>", req.Section), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("invalid section %q — must match: design, outline, meta, critique, chat, slice-N, slice-N-question-<id>, or q-<name>", req.Section), http.StatusBadRequest)
 			return
 		}
 

@@ -69,7 +69,10 @@ func TestBuildEventTree_SuppressesDuplicateAgentRows(t *testing.T) {
 			"child-"+string(rune('a'+i)), "claude-code", "tool_call", ts, tool, "sess-test", "recorded", "td-1")
 	}
 
-	turns := buildEventTree(database, 50)
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
 	if len(turns) != 1 {
 		t.Fatalf("got %d turns, want 1", len(turns))
 	}
@@ -127,7 +130,10 @@ func TestBuildEventTree_NoDelegation_KeepsAgentRows(t *testing.T) {
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		"tc-agent", "claude-code", "tool_call", ts, "Agent", "sess-test", "recorded", "uq-2")
 
-	turns := buildEventTree(database, 50)
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
 
 	// Find the turn for uq-2.
 	var found *turn
@@ -174,7 +180,10 @@ func TestBuildEventTree_OtelPrimary(t *testing.T) {
 		tsMicros+1000, "trace-abc", "span-tool-1", "span-interaction-1",
 		"Bash", "{}")
 
-	turns := buildEventTree(database, 50)
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
 	if len(turns) != 1 {
 		t.Fatalf("got %d turns, want 1", len(turns))
 	}
@@ -210,7 +219,10 @@ func TestBuildEventTree_OtelFallsBackToHook(t *testing.T) {
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		"uq-hook", "claude-code", "tool_call", ts, "UserQuery", "sess-test", "recorded")
 
-	turns := buildEventTree(database, 50)
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
 	if len(turns) != 1 {
 		t.Fatalf("got %d turns, want 1", len(turns))
 	}
@@ -245,7 +257,10 @@ func TestBuildEventTree_OtelPromptFromTrace(t *testing.T) {
 		"log", "user_prompt", "user_prompt",
 		tsMicros-500, "trace-xyz", "span-prompt-2", `{"prompt":"Hello world"}`)
 
-	turns := buildEventTree(database, 50)
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
 	if len(turns) != 1 {
 		t.Fatalf("got %d turns, want 1", len(turns))
 	}
@@ -321,7 +336,10 @@ func TestBuildEventTree_MixedOtelAndHook(t *testing.T) {
 		"uq-dup-empty-step", "claude-code", "tool_call", dupHookTs.Format(time.RFC3339),
 		"UserQuery", "sess-test", "recorded", "")
 
-	turns := buildEventTree(database, 50)
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
 
 	// Expected: two OTel turns (sig-i1, sig-i2) + one hook-only turn (uq-hook-only).
 	// The empty-step hook row (uq-dup-empty-step) must be deduped.

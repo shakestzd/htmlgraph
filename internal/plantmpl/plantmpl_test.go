@@ -278,3 +278,65 @@ func TestProgressBarRender(t *testing.T) {
 		t.Error("expected progress-bar placeholder")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Slice-3: PlanPage v2 vs legacy section visibility
+// ---------------------------------------------------------------------------
+
+func TestPlanPage_V2_HidesGlobalQuestionsAndCritique(t *testing.T) {
+	// A v2 plan: has slices with Questions — global sections should be suppressed.
+	page := &plantmpl.PlanPage{
+		PlanID: "plan-v2-test",
+		Title:  "V2 Plan",
+		IsV2:   true,
+		Slices: []plantmpl.SliceCard{
+			{
+				Num:   1,
+				ID:    "feat-s1",
+				Title: "Slice 1",
+			},
+		},
+		// Provide a Questions zone — should be hidden for v2
+		Questions: &plantmpl.QuestionsSection{
+			Cards: []plantmpl.DecisionCard{
+				{ID: "q1", Text: "Which approach?"},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := page.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	// For v2, global questions section should not be rendered as the main review flow
+	if strings.Contains(html, `id="questions"`) {
+		t.Error("v2 plan: global questions section should be hidden")
+	}
+}
+
+func TestPlanPage_Legacy_StillRendersGlobalSections(t *testing.T) {
+	// A legacy plan: IsV2 is false — global Questions and Critique should still render.
+	page := &plantmpl.PlanPage{
+		PlanID: "plan-legacy-test",
+		Title:  "Legacy Plan",
+		IsV2:   false,
+		Questions: &plantmpl.QuestionsSection{
+			Cards: []plantmpl.DecisionCard{
+				{ID: "q1", Text: "Which approach?"},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := page.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	// Legacy plan must still render global questions
+	if !strings.Contains(html, `id="questions"`) {
+		t.Error("legacy plan: global questions section should still be rendered")
+	}
+}

@@ -260,3 +260,103 @@ func TestFinalizePlanWrongType(t *testing.T) {
 		t.Errorf("feature status changed unexpectedly: got %q, want in-progress", status)
 	}
 }
+
+// ---- IsPlanFullyApproved regression tests (slice-4) ----------------------------
+
+// TestIsPlanFullyApproved_LegacyOnly_StillPasses verifies that writing feedback rows
+// ONLY for legacy sections (design, questions) and calling IsPlanFullyApproved
+// continues to return true when all legacy sections are approved.
+func TestIsPlanFullyApproved_LegacyOnly_StillPasses(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	// Write legacy section approvals only.
+	legacySections := []string{"design", "outline"}
+	for _, s := range legacySections {
+		if err := db.StorePlanFeedback(database, planID, s, "approve", "true", ""); err != nil {
+			t.Fatalf("StorePlanFeedback %s: %v", s, err)
+		}
+	}
+
+	approved, err := db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved: %v", err)
+	}
+	if !approved {
+		t.Error("expected true when all legacy sections approved — legacy behavior must be preserved")
+	}
+}
+
+// TestIsPlanFullyApproved_MixedLegacyAndV2_StableBehavior writes a V2 slice-local
+// section row (section='slice-1') alongside legacy sections and asserts that
+// IsPlanFullyApproved treats it uniformly — if all sections (legacy + V2) have
+// approve=true, the function returns true.
+func TestIsPlanFullyApproved_MixedLegacyAndV2_StableBehavior(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	// Write legacy + V2 sections, all approved.
+	sections := []string{"design", "outline", "slice-1"}
+	for _, s := range sections {
+		if err := db.StorePlanFeedback(database, planID, s, "approve", "true", ""); err != nil {
+			t.Fatalf("StorePlanFeedback %s: %v", s, err)
+		}
+	}
+
+	approved, err := db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved: %v", err)
+	}
+	if !approved {
+		t.Error("expected true when all legacy + V2 sections approved")
+	}
+
+	// Now add a V2 section with approve=false — should return false.
+	if err := db.StorePlanFeedback(database, planID, "slice-2", "approve", "false", ""); err != nil {
+		t.Fatalf("StorePlanFeedback slice-2: %v", err)
+	}
+
+	approved, err = db.IsPlanFullyApproved(database, planID)
+	if err != nil {
+		t.Fatalf("IsPlanFullyApproved after slice-2 disapprove: %v", err)
+	}
+	if approved {
+		t.Error("expected false when a V2 section (slice-2) is disapproved")
+	}
+}
+
+// ---- GetSliceApprovals tests (slice-4) -----------------------------------------
+
+// TestGetSliceApprovals_ReturnsPerSliceStatus verifies that GetSliceApprovals
+// returns only slice-N keyed rows and maps them to approval status correctly.
+func TestGetSliceApprovals_ReturnsPerSliceStatus(t *testing.T) {
+	database, planID := setupPlanDB(t)
+	defer database.Close()
+
+	// Store mixed sections: design (legacy) and two slices.
+	if err := db.StorePlanFeedback(database, planID, "design", "approve", "true", ""); err != nil {
+		t.Fatalf("store design: %v", err)
+	}
+	if err := db.StorePlanFeedback(database, planID, "slice-1", "approve", "true", ""); err != nil {
+		t.Fatalf("store slice-1: %v", err)
+	}
+	if err := db.StorePlanFeedback(database, planID, "slice-2", "approve", "false", ""); err != nil {
+		t.Fatalf("store slice-2: %v", err)
+	}
+
+	approvals, err := db.GetSliceApprovals(database, planID)
+	if err != nil {
+		t.Fatalf("GetSliceApprovals: %v", err)
+	}
+
+	// Should only contain slice sections, not "design".
+	if _, hasDesign := approvals["design"]; hasDesign {
+		t.Error("GetSliceApprovals should not include legacy 'design' section")
+	}
+	if v, ok := approvals["slice-1"]; !ok || v != "approved" {
+		t.Errorf("slice-1: got %q ok=%v, want approved=true", v, ok)
+	}
+	if v, ok := approvals["slice-2"]; !ok || v != "rejected" {
+		t.Errorf("slice-2: got %q ok=%v, want rejected", v, ok)
+	}
+}

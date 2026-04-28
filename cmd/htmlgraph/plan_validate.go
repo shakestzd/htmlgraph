@@ -79,9 +79,11 @@ func validatePlan(htmlgraphDir, planID string) (planValidation, error) {
 		result.Warnings = append(result.Warnings, msg)
 	}
 
-	// Validate status.
+	// Validate status. v2 lifecycle states 'active' and 'completed' (slice-1)
+	// align with internal/planyaml/validate.go meta.status enum.
 	validStatuses := map[string]bool{
 		"todo": true, "draft": true, "in-progress": true, "done": true, "finalized": true,
+		"active": true, "completed": true,
 	}
 	if !validStatuses[string(node.Status)] {
 		addError(fmt.Sprintf("invalid plan status %q", node.Status))
