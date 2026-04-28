@@ -8,7 +8,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shakestzd/htmlgraph/internal/worktree"
 )
+
+// TestMain disables the reindex subprocess fork (`htmlgraph reindex`) for the
+// whole package so worktree-helper tests don't hang in environments where the
+// fork blocks on missing canonical state. Tracked as bug-bb5b26f6.
+func TestMain(m *testing.M) {
+	worktree.SetReindexFnForTest(func(string, io.Writer) {})
+	os.Exit(m.Run())
+}
 
 // setupWorktreeGitRepo creates a temp git repo with an initial commit and returns its path.
 func setupWorktreeGitRepo(t *testing.T) string {
