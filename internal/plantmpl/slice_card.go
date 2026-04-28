@@ -1,8 +1,12 @@
 package plantmpl
 
 import (
+	"fmt"
 	"html/template"
 	"io"
+	"strings"
+
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 )
 
 var sliceCardTmpl = template.Must(
@@ -26,6 +30,14 @@ type SliceCard struct {
 	Deps        string   // comma-separated slice numbers
 	Files       string   // comma-separated file paths
 	Status      string
+
+	// V2 lifecycle fields (additive — legacy plans omit these and remain valid).
+	ApprovalStatus  string // pending | approved | rejected | changes_requested
+	ExecutionStatus string // not_started | promoted | in_progress | done | blocked | superseded
+
+	// V2 slice-local spec fields.
+	Questions       []planyaml.SliceQuestion  // slice-local open questions
+	CriticRevisions []planyaml.CriticRevision // critic feedback specific to this slice
 }
 
 // HasStructuredContent returns true when the slice has What/Why fields
@@ -83,4 +95,118 @@ func (sc *SliceCard) DepsLabel() string {
 		return "none"
 	}
 	return "slices " + sc.Deps
+}
+
+// ApprovalStatusClass returns the CSS badge class for the approval status.
+func (sc *SliceCard) ApprovalStatusClass() string {
+	switch sc.ApprovalStatus {
+	case "approved":
+		return "badge-approved"
+	case "rejected":
+		return "badge-blocked"
+	case "changes_requested":
+		return "badge-revision"
+	default:
+		return "badge-pending"
+	}
+}
+
+// ApprovalStatusLabel returns the display label for the approval status.
+func (sc *SliceCard) ApprovalStatusLabel() string {
+	switch sc.ApprovalStatus {
+	case "approved":
+		return "Approved"
+	case "rejected":
+		return "Rejected"
+	case "changes_requested":
+		return "Changes Requested"
+	default:
+		return "Pending"
+	}
+}
+
+// ExecutionStatusLabel returns a display label for the execution status.
+func (sc *SliceCard) ExecutionStatusLabel() string {
+	switch sc.ExecutionStatus {
+	case "not_started":
+		return "Not Started"
+	case "promoted":
+		return "Promoted"
+	case "in_progress":
+		return "In Progress"
+	case "done":
+		return "Done"
+	case "blocked":
+		return "Blocked"
+	case "superseded":
+		return "Superseded"
+	default:
+		return sc.ExecutionStatus
+	}
+}
+
+// ExecutionStatusClass returns the CSS badge class for the execution status.
+func (sc *SliceCard) ExecutionStatusClass() string {
+	switch sc.ExecutionStatus {
+	case "done":
+		return "badge-approved"
+	case "in_progress", "promoted":
+		return "badge-revision"
+	case "blocked", "superseded":
+		return "badge-blocked"
+	default:
+		return "badge-pending"
+	}
+}
+
+// CriticSeverityClass returns the CSS badge class for a critic revision severity.
+func (sc *SliceCard) CriticSeverityClass(severity string) string {
+	upper := strings.ToUpper(severity)
+	switch {
+	case upper == "HIGH" || upper == "DANGER":
+		return "badge-blocked"
+	case upper == "MED" || upper == "MEDIUM":
+		return "badge-revision"
+	default:
+		return "badge-pending"
+	}
+}
+
+// SliceQuestionSectionKey returns the plan_feedback section key for a
+// slice-local question, following the contract: slice-<num>-question-<id>.
+func (sc *SliceCard) SliceQuestionSectionKey(questionID string) string {
+	return fmt.Sprintf("slice-%d-question-%s", sc.Num, questionID)
+}
+
+// SliceCardFromPlanSlice maps a planyaml.PlanSlice to a SliceCard.
+// This is the canonical mapping used by enrichPageFromYAML and tests.
+func SliceCardFromPlanSlice(s planyaml.PlanSlice) SliceCard {
+	depsStr := ""
+	for i, d := range s.Deps {
+		if i > 0 {
+			depsStr += ","
+		}
+		depsStr += fmt.Sprintf("%d", d)
+	}
+	filesStr := strings.Join(s.Files, ", ")
+
+	return SliceCard{
+		Num:             s.Num,
+		ID:              s.ID,
+		FeatureID:       s.FeatureID,
+		Title:           s.Title,
+		What:            s.What,
+		Why:             s.Why,
+		DoneWhen:        s.DoneWhen,
+		Tests:           s.Tests,
+		Effort:          s.Effort,
+		Risk:            s.Risk,
+		Deps:            depsStr,
+		Files:           filesStr,
+		Status:          "pending",
+		ApprovalStatus:  s.ApprovalStatus,
+		ExecutionStatus: s.ExecutionStatus,
+		Questions:       s.Questions,
+		CriticRevisions: s.CriticRevisions,
+	}
 }

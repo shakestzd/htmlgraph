@@ -4,7 +4,8 @@
     <span class="slice-name">{{.Title}}</span>
     {{if .Effort}}<span class="badge {{.EffortClass}}">{{.Effort}}</span>{{end}}
     {{if .Risk}}<span class="badge {{.RiskClass}}">{{.Risk}}</span>{{end}}
-    <span class="badge badge-pending" data-badge-for="slice-{{.Num}}">Pending</span>
+    {{if .ExecutionStatus}}<span class="badge {{.ExecutionStatusClass}} slice-exec-badge" title="Execution: {{.ExecutionStatus}}">{{.ExecutionStatusLabel}}</span>{{end}}
+    <span class="badge {{.ApprovalStatusClass}} slice-approval-badge" data-badge-for="slice-{{.Num}}">{{.ApprovalStatusLabel}}</span>
   </div>
   {{if .HasStructuredContent}}
   <div class="slice-field">{{if .What}}<div class="slice-field-label">What</div><div class="slice-field-value slice-md">{{.WhatHTML}}</div>{{end}}</div>
@@ -17,9 +18,39 @@
   {{if .Files}}<div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>{{.Files}}</code></div></div>{{end}}
   {{end}}
   {{if .Tests}}<div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-md slice-tests">{{.TestsHTML}}</div></div>{{end}}
+  {{if .CriticRevisions}}
+  <div class="slice-field slice-critic-revisions">
+    <div class="slice-field-label">Critic Revisions</div>
+    <div class="slice-field-value">
+      {{range .CriticRevisions}}
+      <div class="critic-revision">
+        <span class="badge {{$.CriticSeverityClass .Severity}} critic-revision-badge">{{.Severity}}</span>
+        <span class="critic-revision-source">{{.Source}}</span>
+        <span class="critic-revision-summary">{{.Summary}}</span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+  {{if .Questions}}
+  <div class="slice-field slice-questions">
+    <div class="slice-field-label">Open Questions</div>
+    <div class="slice-field-value">
+      {{range .Questions}}
+      <div class="question-block slice-question-block">
+        <p>{{.Text}}</p>
+        <textarea
+          data-section="{{$.SliceQuestionSectionKey .ID}}"
+          data-comment-for="{{$.SliceQuestionSectionKey .ID}}"
+          placeholder="Answer question {{.ID}}...">{{.Answer}}</textarea>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
   <div class="slice-deps">Dependencies: {{.DepsLabel}}</div>
   <div class="approval-row">
-    <label><input type="checkbox" data-section="slice-{{.Num}}" data-action="approve"> Approve slice</label>
+    <label><input type="checkbox" data-section="slice-{{.Num}}" data-action="approve"{{if eq .ApprovalStatus "approved"}} checked{{end}}> Approve slice</label>
     <textarea data-section="slice-{{.Num}}" data-comment-for="slice-{{.Num}}" placeholder="Comments on slice {{.Num}}..."></textarea>
   </div>
 </div>

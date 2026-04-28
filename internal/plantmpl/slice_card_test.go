@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/shakestzd/htmlgraph/internal/plantmpl"
+	"github.com/shakestzd/htmlgraph/internal/planyaml"
 )
 
 // ---------------------------------------------------------------------------
@@ -583,5 +584,323 @@ func TestMultipleSliceCardsRenderIndependently(t *testing.T) {
 		if !strings.Contains(html, c.ID) {
 			t.Errorf("card %d: missing ID %q", c.Num, c.ID)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Slice-3: v2 fields — approval status, execution status, questions, revisions
+// ---------------------------------------------------------------------------
+
+func TestSliceCard_RendersApprovalStatus_Pending(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:            1,
+		ID:             "feat-test",
+		ApprovalStatus: "pending",
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "Pending") {
+		t.Errorf("ApprovalStatus=pending should show 'Pending' text, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersApprovalStatus_Approved(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:            2,
+		ID:             "feat-test",
+		ApprovalStatus: "approved",
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "Approved") {
+		t.Errorf("ApprovalStatus=approved should show 'Approved' text, got:\n%s", html)
+	}
+	if !strings.Contains(html, "badge-approved") {
+		t.Errorf("ApprovalStatus=approved should use badge-approved class, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersApprovalStatus_Rejected(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:            3,
+		ID:             "feat-test",
+		ApprovalStatus: "rejected",
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "Rejected") {
+		t.Errorf("ApprovalStatus=rejected should show 'Rejected' text, got:\n%s", html)
+	}
+	if !strings.Contains(html, "badge-blocked") {
+		t.Errorf("ApprovalStatus=rejected should use badge-blocked class, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersExecutionStatus(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:             4,
+		ID:              "feat-test",
+		ExecutionStatus: "in_progress",
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "in_progress") && !strings.Contains(html, "In Progress") && !strings.Contains(html, "in-progress") {
+		t.Errorf("ExecutionStatus=in_progress should appear in output, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersSliceLocalQuestions(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num: 5,
+		ID:  "feat-test",
+		Questions: []planyaml.SliceQuestion{
+			{ID: "q-1", Text: "Should we use gRPC or REST?"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "Should we use gRPC or REST?") {
+		t.Errorf("Question text missing from output:\n%s", html)
+	}
+	// The section key for the question must follow the contract: slice-N-question-<id>
+	if !strings.Contains(html, `data-section="slice-5-question-q-1"`) {
+		t.Errorf("expected data-section=\"slice-5-question-q-1\" in output:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersCriticRevisionBadges(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num: 6,
+		ID:  "feat-test",
+		CriticRevisions: []planyaml.CriticRevision{
+			{Source: "feasibility", Severity: "High", Summary: "Consider rate limiting"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "Consider rate limiting") {
+		t.Errorf("CriticRevision summary missing from output:\n%s", html)
+	}
+	if !strings.Contains(html, "feasibility") {
+		t.Errorf("CriticRevision source missing from output:\n%s", html)
+	}
+	// High severity should get a blocked/danger style
+	if !strings.Contains(html, "badge-blocked") && !strings.Contains(html, "severity-high") {
+		t.Errorf("High severity badge should use blocked/danger class, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_ReconcilesExistingApprovalCheckbox(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:            7,
+		ID:             "feat-test",
+		ApprovalStatus: "approved",
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	// There must be exactly ONE approval checkbox (one mechanism, not duplicated).
+	checkboxCount := strings.Count(html, `data-action="approve"`)
+	if checkboxCount != 1 {
+		t.Errorf("expected exactly 1 approve checkbox, got %d in:\n%s", checkboxCount, html)
+	}
+	// The visual status badge must reference the same slice key (data-badge-for=slice-7).
+	if !strings.Contains(html, `data-badge-for="slice-7"`) {
+		t.Errorf("expected badge with data-badge-for=\"slice-7\" in output:\n%s", html)
+	}
+	// When approved, the checkbox should be pre-checked.
+	if !strings.Contains(html, `checked`) {
+		t.Errorf("approved slice should have checked checkbox:\n%s", html)
+	}
+}
+
+func TestSliceCard_LegacyV1NoNewFields(t *testing.T) {
+	// A slice without any v2 fields should render as it did before slice-3.
+	sc := &plantmpl.SliceCard{
+		Num:         1,
+		ID:          "feat-legacy",
+		Title:       "Legacy slice",
+		Description: "Old-style description.",
+	}
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	html := buf.String()
+	// Must contain the slice card
+	if !strings.Contains(html, `class="slice-card"`) {
+		t.Error("legacy slice should still render slice-card class")
+	}
+	// Must contain description
+	if !strings.Contains(html, "Old-style description.") {
+		t.Error("legacy slice should still render description")
+	}
+	// Should not have any critic revision or question UI (no data)
+	if strings.Contains(html, "class=\"critic-revision\"") {
+		t.Error("no CriticRevisions set, should not render critic revision UI")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SliceCard.SliceQuestionSectionKey helper
+// ---------------------------------------------------------------------------
+
+func TestSliceCard_SliceQuestionSectionKey(t *testing.T) {
+	sc := &plantmpl.SliceCard{Num: 3}
+	got := sc.SliceQuestionSectionKey("q-abc")
+	want := "slice-3-question-q-abc"
+	if got != want {
+		t.Errorf("SliceQuestionSectionKey: got %q, want %q", got, want)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SliceCard.ApprovalStatusClass helper
+// ---------------------------------------------------------------------------
+
+func TestSliceCard_ApprovalStatusClass_Approved(t *testing.T) {
+	sc := &plantmpl.SliceCard{ApprovalStatus: "approved"}
+	if got := sc.ApprovalStatusClass(); got != "badge-approved" {
+		t.Errorf("ApprovalStatusClass approved: got %q, want badge-approved", got)
+	}
+}
+
+func TestSliceCard_ApprovalStatusClass_Rejected(t *testing.T) {
+	sc := &plantmpl.SliceCard{ApprovalStatus: "rejected"}
+	if got := sc.ApprovalStatusClass(); got != "badge-blocked" {
+		t.Errorf("ApprovalStatusClass rejected: got %q, want badge-blocked", got)
+	}
+}
+
+func TestSliceCard_ApprovalStatusClass_ChangesRequested(t *testing.T) {
+	sc := &plantmpl.SliceCard{ApprovalStatus: "changes_requested"}
+	if got := sc.ApprovalStatusClass(); got != "badge-revision" {
+		t.Errorf("ApprovalStatusClass changes_requested: got %q, want badge-revision", got)
+	}
+}
+
+func TestSliceCard_ApprovalStatusClass_Pending(t *testing.T) {
+	sc := &plantmpl.SliceCard{ApprovalStatus: "pending"}
+	if got := sc.ApprovalStatusClass(); got != "badge-pending" {
+		t.Errorf("ApprovalStatusClass pending: got %q, want badge-pending", got)
+	}
+}
+
+func TestSliceCard_ApprovalStatusClass_Empty(t *testing.T) {
+	sc := &plantmpl.SliceCard{ApprovalStatus: ""}
+	if got := sc.ApprovalStatusClass(); got != "badge-pending" {
+		t.Errorf("ApprovalStatusClass empty: got %q, want badge-pending", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SliceCard.CriticSeverityClass helper
+// ---------------------------------------------------------------------------
+
+func TestSliceCard_CriticSeverityClass(t *testing.T) {
+	sc := &plantmpl.SliceCard{}
+	tests := []struct {
+		severity string
+		want     string
+	}{
+		{"High", "badge-blocked"},
+		{"HIGH", "badge-blocked"},
+		{"DANGER", "badge-blocked"},
+		{"Med", "badge-revision"},
+		{"Medium", "badge-revision"},
+		{"Low", "badge-pending"},
+		{"low", "badge-pending"},
+		{"", "badge-pending"},
+	}
+	for _, tt := range tests {
+		got := sc.CriticSeverityClass(tt.severity)
+		if got != tt.want {
+			t.Errorf("CriticSeverityClass(%q): got %q, want %q", tt.severity, got, tt.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SliceCardFromPlanSlice mapper
+// ---------------------------------------------------------------------------
+
+func TestSliceCardFromPlanSlice_BasicFields(t *testing.T) {
+	ps := planyaml.PlanSlice{
+		Num:    2,
+		ID:     "feat-xyz",
+		Title:  "Auth slice",
+		What:   "Implement JWT",
+		Why:    "Security",
+		Effort: "M",
+		Risk:   "Low",
+		Deps:   []int{1},
+		Files:  []string{"internal/auth/auth.go"},
+	}
+	sc := plantmpl.SliceCardFromPlanSlice(ps)
+	if sc.Num != 2 {
+		t.Errorf("Num: got %d, want 2", sc.Num)
+	}
+	if sc.ID != "feat-xyz" {
+		t.Errorf("ID: got %q, want feat-xyz", sc.ID)
+	}
+	if sc.What != "Implement JWT" {
+		t.Errorf("What: got %q, want 'Implement JWT'", sc.What)
+	}
+	if sc.Effort != "M" {
+		t.Errorf("Effort: got %q, want M", sc.Effort)
+	}
+	if sc.Deps != "1" {
+		t.Errorf("Deps: got %q, want '1'", sc.Deps)
+	}
+	if sc.Files != "internal/auth/auth.go" {
+		t.Errorf("Files: got %q, want 'internal/auth/auth.go'", sc.Files)
+	}
+}
+
+func TestSliceCardFromPlanSlice_V2Fields(t *testing.T) {
+	ps := planyaml.PlanSlice{
+		Num:             3,
+		ID:              "feat-v2",
+		ApprovalStatus:  "approved",
+		ExecutionStatus: "in_progress",
+		Questions: []planyaml.SliceQuestion{
+			{ID: "q-1", Text: "What DB?"},
+		},
+		CriticRevisions: []planyaml.CriticRevision{
+			{Source: "arch", Severity: "High", Summary: "Add index"},
+		},
+	}
+	sc := plantmpl.SliceCardFromPlanSlice(ps)
+	if sc.ApprovalStatus != "approved" {
+		t.Errorf("ApprovalStatus: got %q, want approved", sc.ApprovalStatus)
+	}
+	if sc.ExecutionStatus != "in_progress" {
+		t.Errorf("ExecutionStatus: got %q, want in_progress", sc.ExecutionStatus)
+	}
+	if len(sc.Questions) != 1 || sc.Questions[0].ID != "q-1" {
+		t.Errorf("Questions not mapped correctly: %+v", sc.Questions)
+	}
+	if len(sc.CriticRevisions) != 1 || sc.CriticRevisions[0].Source != "arch" {
+		t.Errorf("CriticRevisions not mapped correctly: %+v", sc.CriticRevisions)
 	}
 }

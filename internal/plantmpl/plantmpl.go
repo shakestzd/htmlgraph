@@ -156,6 +156,11 @@ type PlanPage struct {
 	Version     int    // monotonic version counter from plan.meta.version; 0 if unset
 	Status      string // "draft", "in-progress", "finalized", etc.
 
+	// IsV2 marks a plan as using the v2 slice-card format where each slice
+	// carries its own questions and critic_revisions. When true, the global
+	// Questions and Critique sections are suppressed in favour of the per-slice UI.
+	IsV2 bool
+
 	// Zone components
 	Graph     *DependencyGraph
 	Design    *DesignSection
