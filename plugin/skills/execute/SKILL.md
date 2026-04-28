@@ -62,6 +62,8 @@ LOOP:
 
 This maximizes parallelism automatically. If 10 of 13 tasks are independent, all 10 run in the first dispatch — no artificial wave boundaries.
 
+Slices promoted via `htmlgraph plan promote-slice` from a still-active plan are dispatched through the same dependency-readiness loop — they appear as features linked to the track via `part_of` edges and are ready to dispatch as soon as their `blocked_by` deps are complete.
+
 ---
 
 ## Step 1: Query Unblocked Tasks
