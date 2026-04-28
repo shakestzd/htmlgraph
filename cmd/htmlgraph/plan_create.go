@@ -230,10 +230,6 @@ func enrichPageFromYAML(htmlgraphDir, planID string, page *plantmpl.PlanPage) {
 				Status: "pending",
 			})
 		}
-		// Also consider meta.status == "active" as a v2 marker.
-		if plan.Meta.Status == "active" {
-			isV2 = true
-		}
 		page.IsV2 = isV2
 	}
 

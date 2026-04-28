@@ -85,9 +85,12 @@ func promoteSliceFromYAML(htmlgraphDir, planID string, sliceNum int, waiveDeps b
 		return "", fmt.Errorf("read approvals: %w", err)
 	}
 	sectionKey := fmt.Sprintf("slice-%d", sliceNum)
-	if approvals[sectionKey] != "approved" {
-		return "", fmt.Errorf("slice %d is not approved (approval_status=%q); run 'htmlgraph plan approve-slice %s %d' first",
-			sliceNum, approvals[sectionKey], planID, sliceNum)
+	// Accept approval from either plan_feedback (CLI-driven) or YAML
+	// approval_status (pre-set in the source). Either source is sufficient;
+	// runApproveSlice keeps both in sync, but a YAML-only seed should also work.
+	if approvals[sectionKey] != "approved" && slice.ApprovalStatus != "approved" {
+		return "", fmt.Errorf("slice %d is not approved (plan_feedback=%q, yaml=%q); run 'htmlgraph plan approve-slice %s %d' first",
+			sliceNum, approvals[sectionKey], slice.ApprovalStatus, planID, sliceNum)
 	}
 
 	// Validate dependency readiness.
@@ -99,8 +102,12 @@ func promoteSliceFromYAML(htmlgraphDir, planID string, sliceNum int, waiveDeps b
 
 	// Idempotent: if feature_id already set, reuse it.
 	if slice.FeatureID != "" {
-		// Still write execution_status='promoted' in case it was lost.
-		_ = dbpkg.StorePlanFeedback(db, planID, sectionKey, "set_execution_status", "promoted", "")
+		// Still refresh execution_status='promoted' in case it was lost.
+		// Best-effort: a failure here is not fatal (the feature_id already
+		// proves promotion happened) but operators should see DB write errors.
+		if err := dbpkg.StorePlanFeedback(db, planID, sectionKey, "set_execution_status", "promoted", ""); err != nil {
+			fmt.Fprintf(stderr, "promote-slice: refresh execution_status warning: %v\n", err)
+		}
 		return slice.FeatureID, nil
 	}
 

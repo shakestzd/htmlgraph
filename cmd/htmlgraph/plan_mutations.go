@@ -13,7 +13,9 @@ import (
 
 // validPlanStatuses is the canonical list of plan statuses, sourced from
 // cmd/htmlgraph/plan_validate.go (validStatuses map) and updatePlanStatus.
-var validPlanStatuses = []string{"todo", "draft", "in-progress", "done", "finalized"}
+// 'active' and 'completed' are v2 lifecycle states (slice-1) that align the
+// CLI vocabulary with internal/planyaml/validate.go meta.status enum.
+var validPlanStatuses = []string{"todo", "draft", "in-progress", "done", "finalized", "active", "completed"}
 
 func planSetStatusCmd() *cobra.Command {
 	return &cobra.Command{

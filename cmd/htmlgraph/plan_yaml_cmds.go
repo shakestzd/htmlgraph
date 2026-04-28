@@ -325,7 +325,30 @@ func runApproveSlice(htmlgraphDir, planID, sliceNumStr string) error {
 	if err := dbpkg.StorePlanFeedback(db, planID, section, "approve", "true", ""); err != nil {
 		return fmt.Errorf("store approve feedback: %w", err)
 	}
+	if err := updateSliceYAMLApproval(htmlgraphDir, planID, sliceNum, "approved"); err != nil {
+		fmt.Fprintf(stderr, "approve-slice: YAML sync warning: %v\n", err)
+	}
 	fmt.Fprintf(os.Stdout, "Slice %d approved for plan %s\n", sliceNum, planID)
+	return nil
+}
+
+// updateSliceYAMLApproval mirrors the plan_feedback approval state into the
+// YAML plan document so the dashboard checkbox and promote/finalize see the
+// same source of truth. Caller treats failures as non-fatal warnings.
+func updateSliceYAMLApproval(htmlgraphDir, planID string, sliceNum int, approval string) error {
+	planPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(planPath)
+	if err != nil {
+		return fmt.Errorf("load plan: %w", err)
+	}
+	idx, _, err := findPlanSlice(plan, sliceNum)
+	if err != nil {
+		return err
+	}
+	plan.Slices[idx].ApprovalStatus = approval
+	if err := planyaml.Save(planPath, plan); err != nil {
+		return fmt.Errorf("save plan: %w", err)
+	}
 	return nil
 }
 
@@ -375,6 +398,13 @@ func runRejectSlice(htmlgraphDir, planID, sliceNumStr string, changesRequested b
 	// Also record the approve=false row so IsPlanFullyApproved sees the disapproval.
 	if err := dbpkg.StorePlanFeedback(db, planID, section, "approve", "false", ""); err != nil {
 		return fmt.Errorf("store approve=false feedback: %w", err)
+	}
+	yamlState := "rejected"
+	if changesRequested {
+		yamlState = "changes_requested"
+	}
+	if err := updateSliceYAMLApproval(htmlgraphDir, planID, sliceNum, yamlState); err != nil {
+		fmt.Fprintf(stderr, "reject-slice: YAML sync warning: %v\n", err)
 	}
 	fmt.Fprintf(os.Stdout, "Slice %d rejected (action=%s) for plan %s\n", sliceNum, action, planID)
 	return nil
@@ -457,8 +487,8 @@ func runSetSliceStatus(htmlgraphDir, planID, sliceNumStr, status string) error {
 		return err
 	}
 	defer db.Close()
-	if err := dbpkg.StorePlanFeedback(db, planID, section, "set-status", status, ""); err != nil {
-		return fmt.Errorf("store set-status feedback: %w", err)
+	if err := dbpkg.StorePlanFeedback(db, planID, section, "set_execution_status", status, ""); err != nil {
+		return fmt.Errorf("store set_execution_status feedback: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, "Slice %d execution_status → %s for plan %s\n", sliceNum, status, planID)
 	return nil

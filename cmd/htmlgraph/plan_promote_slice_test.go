@@ -210,6 +210,52 @@ func TestPromoteSlice_BlockedByPendingDeps_Refuses(t *testing.T) {
 	}
 }
 
+// TestPromoteSlice_DepDoneViaSetSliceStatus_NoWaiveNeeded is a regression test
+// for the action-name mismatch (job-43 HIGH finding): runSetSliceStatus and
+// promoteSliceFromYAML must agree on the plan_feedback action key
+// ('set_execution_status'), so a dep marked done via the documented CLI path
+// unblocks promotion of dependent slices without --waive-deps.
+func TestPromoteSlice_DepDoneViaSetSliceStatus_NoWaiveNeeded(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{"plans", "features", "tracks"} {
+		os.MkdirAll(filepath.Join(dir, sub), 0o755)
+	}
+
+	p, _ := workitem.Open(dir, "test-agent")
+	defer p.Close()
+	track, _ := p.Tracks.Create("Track")
+
+	pID := workitem.GenerateID("plan", "dep done")
+	plan := planyaml.NewPlan(pID, "Dep Done", "")
+	plan.Meta.TrackID = track.ID
+	plan.Meta.Status = "active"
+	plan.Slices = []planyaml.PlanSlice{
+		{ID: workitem.GenerateID("slice", "s1"), Num: 1, Title: "S1", What: "w"},
+		{ID: workitem.GenerateID("slice", "s2"), Num: 2, Title: "S2", What: "w", Deps: []int{1}},
+	}
+	planPath := filepath.Join(dir, "plans", pID+".yaml")
+	planyaml.Save(planPath, plan)
+	os.WriteFile(filepath.Join(dir, "plans", pID+".html"), []byte("<html></html>"), 0o644)
+
+	// Approve slice 2 (the one we'll promote) and mark slice 1's execution
+	// status as 'done' via the same code path the user docs describe.
+	db, _ := openPlanDB(dir)
+	dbpkg.StorePlanFeedback(db, pID, "slice-2", "approve", "true", "")
+	db.Close()
+	if err := runSetSliceStatus(dir, pID, "1", "done"); err != nil {
+		t.Fatalf("runSetSliceStatus: %v", err)
+	}
+
+	// Without --waive-deps: must succeed because slice 1 is done.
+	featID, err := promoteSliceFromYAML(dir, pID, 2, false)
+	if err != nil {
+		t.Fatalf("expected promote to succeed when dep marked done via runSetSliceStatus, got: %v", err)
+	}
+	if !strings.HasPrefix(featID, "feat-") {
+		t.Errorf("featID = %q, want feat- prefix", featID)
+	}
+}
+
 func TestPromoteSlice_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	for _, sub := range []string{"plans", "features", "tracks"} {
