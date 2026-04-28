@@ -15,7 +15,49 @@ import (
 	"io"
 	"strings"
 	texttemplate "text/template"
+
+	"github.com/microcosm-cc/bluemonday"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
+
+// mdParser is a shared goldmark instance with GFM extensions enabled.
+// It allows unsafe HTML so that goldmark renders raw HTML — bluemonday then
+// strips the dangerous bits. This ensures we get proper fenced-code blocks,
+// tables, and strikethrough while still sanitizing XSS vectors.
+var mdParser = goldmark.New(
+	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithRendererOptions(html.WithUnsafe()),
+)
+
+// mdPolicy is the bluemonday policy used to sanitize goldmark output.
+// It permits standard Markdown output elements (headings, lists, code, etc.)
+// while stripping <script>, event handlers, and other XSS vectors.
+var mdPolicy = func() *bluemonday.Policy {
+	p := bluemonday.UGCPolicy()
+	// Allow class attributes on <code> and <pre> (e.g. language-go) for
+	// client-side syntax highlighting if desired.
+	p.AllowAttrs("class").OnElements("code", "pre")
+	return p
+}()
+
+// RenderMd converts a Markdown string to sanitized HTML. It uses goldmark
+// for parsing and bluemonday for sanitization so that headings, lists, code
+// fences, and inline code all render correctly while XSS vectors are removed.
+// Plain-text input is wrapped in a <p> tag by goldmark.
+func RenderMd(src string) template.HTML {
+	if strings.TrimSpace(src) == "" {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := mdParser.Convert([]byte(src), &buf); err != nil {
+		// On parse error, return the source HTML-escaped as a fallback.
+		return template.HTML(template.HTMLEscapeString(src))
+	}
+	safe := mdPolicy.SanitizeBytes(buf.Bytes())
+	return template.HTML(safe)
+}
 
 //go:embed templates/*
 var templateFS embed.FS

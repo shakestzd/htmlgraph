@@ -302,6 +302,175 @@ func TestSliceCardRenderEmptyFilesOmitted(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Markdown rendering tests (slice-2 / feat-33807582)
+// ---------------------------------------------------------------------------
+
+func TestSliceCard_RendersMarkdownHeadings(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-md-h",
+		What: "### Heading\n\ntext",
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if !strings.Contains(html, "<h3>") {
+		t.Errorf("expected <h3> from ### heading, got output:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersMarkdownLists(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-md-list",
+		What: "- item one\n- item two\n- item three",
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if !strings.Contains(html, "<ul>") {
+		t.Errorf("expected <ul> from bullet list, got output:\n%s", html)
+	}
+	if !strings.Contains(html, "<li>") {
+		t.Errorf("expected <li> from bullet list, got output:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersMarkdownCodeFence(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-md-fence",
+		What: "```go\nfunc main() {}\n```",
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if !strings.Contains(html, "<pre>") {
+		t.Errorf("expected <pre> from code fence, got output:\n%s", html)
+	}
+	if !strings.Contains(html, "<code") {
+		t.Errorf("expected <code> from code fence, got output:\n%s", html)
+	}
+}
+
+func TestSliceCard_RendersInlineCode(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-md-inline",
+		What: "Use `myFunc()` to do it.",
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if !strings.Contains(html, "<code>") {
+		t.Errorf("expected <code> from inline code, got output:\n%s", html)
+	}
+	if !strings.Contains(html, "myFunc()") {
+		t.Errorf("expected myFunc() in output, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_StripsScriptTags(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-md-xss",
+		What: `<script>alert(1)</script>`,
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if strings.Contains(html, "<script>") {
+		t.Errorf("unescaped <script> tag must not appear in output:\n%s", html)
+	}
+}
+
+func TestSliceCard_StripsRawHTMLEventHandlers(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-md-evil",
+		What: `<img src=x onerror="alert(1)">`,
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if strings.Contains(html, "onerror=") {
+		t.Errorf("onerror event handler must be stripped from output:\n%s", html)
+	}
+	if strings.Contains(html, "alert(1)") {
+		t.Errorf("event handler payload must be stripped from output:\n%s", html)
+	}
+}
+
+func TestSliceCard_DoneWhenStaysStructuredList(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:      1,
+		ID:       "feat-md-done",
+		What:     "Implement it",
+		DoneWhen: []string{"All tests pass", "Code reviewed"},
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	// done_when items must render as literal <li> text — no Markdown heading etc.
+	if !strings.Contains(html, "All tests pass") {
+		t.Errorf("DoneWhen item 'All tests pass' missing from output:\n%s", html)
+	}
+	if !strings.Contains(html, "Code reviewed") {
+		t.Errorf("DoneWhen item 'Code reviewed' missing from output:\n%s", html)
+	}
+	// The done_when section wraps items in <ul>
+	if !strings.Contains(html, `class="slice-done-list"`) {
+		t.Errorf("expected slice-done-list ul, got:\n%s", html)
+	}
+}
+
+func TestSliceCard_LegacyPlainTextStillRenders(t *testing.T) {
+	sc := &plantmpl.SliceCard{
+		Num:  1,
+		ID:   "feat-legacy",
+		What: "Just text.",
+	}
+
+	var buf bytes.Buffer
+	if err := sc.Render(&buf); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	html := buf.String()
+	if !strings.Contains(html, "Just text.") {
+		t.Errorf("plain text 'Just text.' missing from output:\n%s", html)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // DepsLabel helper
 // ---------------------------------------------------------------------------
 
