@@ -5,7 +5,7 @@ meta:
     description: Adds steps 2 (disaggregate into a logic/issue tree) and 3 (prioritize branches by impact x tractability) of Conn & McLean's Bulletproof Problem Solving on top of the v2 plan system. Today CRISPI maps onto steps 1, 4, 5, 6, 7 but skips 2 and 3 — slice prioritization is by-eye and decomposition is implicit. The tree captures the pre-history of each slice, gives critic agents tree-completeness as a critique target, and gives htmlgraph:execute a real prioritization signal beyond dependency order. Depends on PLAN A's compressed schema landing first.
     created_at: "2026-04-29"
     status: draft
-    version: 6
+    version: 7
 design:
     problem: ""
     goals: []
@@ -87,6 +87,25 @@ slices:
       effort: M
       risk: Low
       tests: TestPromoteSlice_FromTreeLeaf, TestPromoteSlice_NoTreeStillWorks
+      approved: false
+      comment: ""
+    - id: slic-186123ff
+      num: 5
+      title: htmlgraph:execute prioritization by impact x tractability
+      what: Within the unblocked-set of features ready to dispatch, sort by impact * tractability (descending) using the leaf-derived score on the parent slice. Falls back to insertion order when no tree present.
+      why: Today execute dispatches by dependency order only. With tree-derived scores, agents naturally take high-impact + low-effort work first.
+      files:
+        - cmd/htmlgraph/execute.go
+        - internal/execute/dispatcher.go
+      deps:
+        - 4
+      done_when:
+        - Dispatch order respects impact*tractability when present
+        - Plans without trees see no behavior change
+        - Dashboard surfaces the priority score per feature
+      effort: M
+      risk: Low
+      tests: TestExecute_PrioritizesByImpactTractability, TestExecute_NoTreeFallsBack
       approved: false
       comment: ""
 questions: []
