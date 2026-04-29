@@ -128,27 +128,42 @@ func loadLegacyForCanonical(path string) ([]Entry, bool) {
 // deferred to keep the call-site churn small; this godoc is the contract.
 func (r *Registry) Save() error {
 	r.Prune()
-	dir := filepath.Dir(r.path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("registry.Save: mkdir %s: %w", dir, err)
-	}
+	return writeEntriesAtomic(r.path, r.entries)
+}
 
-	data, err := json.MarshalIndent(r.entries, "", "  ")
+// writeEntriesAtomic is the shared atomic write used by Save and the
+// test-only WriteEntriesForTest helper. Keeping the on-disk format in one
+// place ensures the test helper cannot silently drift from production.
+func writeEntriesAtomic(path string, entries []Entry) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("registry: mkdir %s: %w", dir, err)
+	}
+	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
-		return fmt.Errorf("registry.Save: marshal: %w", err)
+		return fmt.Errorf("registry: marshal: %w", err)
 	}
 	data = append(data, '\n')
-
-	tmp := r.path + ".tmp"
+	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return fmt.Errorf("registry.Save: write tmp: %w", err)
+		return fmt.Errorf("registry: write tmp: %w", err)
 	}
-	if err := os.Rename(tmp, r.path); err != nil {
-		// Best-effort cleanup of the tmp file on rename failure.
+	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
-		return fmt.Errorf("registry.Save: rename: %w", err)
+		return fmt.Errorf("registry: rename: %w", err)
 	}
 	return nil
+}
+
+// WriteEntriesForTest writes raw entries to path using the same JSON format
+// Save uses. Tests need this to seed registry files with entries that would
+// be rejected by Upsert (e.g. tempdirs that fail looksLikeRealProject) — and
+// without it, tests hand-rolled the JSON format and risked silently drifting
+// from Save when the schema evolved (PR #62 review issue #7).
+//
+// Production code must go through Upsert+Save. Do NOT call this outside tests.
+func WriteEntriesForTest(path string, entries []Entry) error {
+	return writeEntriesAtomic(path, entries)
 }
 
 // looksLikeRealProject returns true only when dir contains a .htmlgraph/

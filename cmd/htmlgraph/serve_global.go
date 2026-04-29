@@ -78,7 +78,7 @@ func buildGlobalMux() *http.ServeMux {
 // registered project. We exclude it from the landing so the user sees
 // one card per real project, not one card per worktree branch.
 func listRegisteredProjects() []projectSummary {
-	reg, err := registry.Load(registry.DefaultPath())
+	reg, err := registry.Load(defaultRegistryPath())
 	if err != nil {
 		return []projectSummary{}
 	}

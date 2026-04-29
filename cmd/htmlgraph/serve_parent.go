@@ -64,7 +64,7 @@ func proxyHandler(sup *childproc.Supervisor) http.HandlerFunc {
 			return
 		}
 
-		reg, err := registry.Load(registry.DefaultPath())
+		reg, err := registry.Load(defaultRegistryPath())
 		if err != nil {
 			http.Error(w, "load registry: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -115,7 +115,7 @@ func autoDetectCurrentProject() *registry.Entry {
 	projectRoot := filepath.Dir(htmlgraphDir)
 	id := registry.ComputeID(projectRoot)
 
-	regPath := registry.DefaultPath()
+	regPath := defaultRegistryPath()
 	reg, _ := registry.Load(regPath)
 	for _, e := range reg.List() {
 		if e.ID == id {
@@ -161,8 +161,19 @@ func runParentServer(bind string, port int) error {
 	// This runs once at server startup so stale entries from previous test
 	// runs or deleted projects don't accumulate indefinitely. Best-effort:
 	// errors are silently ignored so a broken registry never blocks startup.
-	if reg, err := registry.Load(registry.DefaultPath()); err == nil {
-		_ = reg.Save() // Save calls Prune internally before writing.
+	//
+	// Stat-then-skip: only Save when Prune actually removed entries. The
+	// previous unconditional Save() rewrote the registry on every startup
+	// even when nothing changed, generating gratuitous filesystem churn
+	// (PR #62 review issue #6).
+	//
+	// Uses defaultRegistryPath (the package-level indirection used by every
+	// other registry caller in this binary) so tests can stub the path
+	// once and have all subcommands plus this startup hook agree.
+	if reg, err := registry.Load(defaultRegistryPath()); err == nil {
+		if pruned := reg.Prune(); len(pruned) > 0 {
+			_ = reg.Save()
+		}
 	}
 
 	addr := fmt.Sprintf("%s:%d", bind, port)

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"database/sql"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,13 +61,15 @@ func makeProjectDBWithSchema(t *testing.T, numFeatures, numBugs, numSpikes int) 
 
 // withRegistryAtAndStale sets up a registry with entries that were previously registered
 // but whose .htmlgraph directories may have been deleted (stale). It writes entries directly
-// to bypass Upsert's looksLikeRealProject guard, allowing the tests to verify prune behavior.
+// via registry.WriteEntriesForTest — bypassing Upsert's looksLikeRealProject guard so the
+// tests can verify prune behavior. The on-disk format is sourced from the same atomic-write
+// path Save uses, so this helper cannot drift if the schema evolves.
 func withRegistryAtAndStale(t *testing.T, entries []registry.Entry) string {
 	t.Helper()
 	tmpHome := t.TempDir()
 	regPath := filepath.Join(tmpHome, "projects.json")
 
-	// Manually construct entries with valid timestamps so they can be saved
+	// Manually fill in the metadata Upsert would normally populate.
 	for i := range entries {
 		if entries[i].LastSeen == "" {
 			entries[i].LastSeen = time.Now().UTC().Format(time.RFC3339)
@@ -78,16 +79,7 @@ func withRegistryAtAndStale(t *testing.T, entries []registry.Entry) string {
 		}
 	}
 
-	// Write entries directly to bypass Upsert guard
-	data, err := json.MarshalIndent(entries, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	data = append(data, '\n')
-	if err := os.MkdirAll(filepath.Dir(regPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(regPath, data, 0o644); err != nil {
+	if err := registry.WriteEntriesForTest(regPath, entries); err != nil {
 		t.Fatal(err)
 	}
 

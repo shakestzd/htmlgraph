@@ -321,7 +321,7 @@ func persistentPreRunE(cmd *cobra.Command, _ []string) error {
 		database.Close()
 	}
 	// Registry upsert — silent, cached git remote lookup.
-	if reg, regErr := registry.Load(registry.DefaultPath()); regErr == nil {
+	if reg, regErr := registry.Load(defaultRegistryPath()); regErr == nil {
 		var cachedRemote string
 		for _, e := range reg.List() {
 			if filepath.Clean(e.ProjectDir) == filepath.Clean(projectDir) {
