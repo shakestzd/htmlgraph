@@ -5,7 +5,7 @@ meta:
     description: 'Closes four gaps in the v2 plan system surfaced by an audit of commitPlanChange and section-targeted update flow: (1) approve/reject-slice write YAML but skip git commit, (2) set-slice-status and answer-slice-question are SQLite-only and never reach the YAML, (3) plan render leaves uncommitted HTML drift, (4) no concurrency protection around load-mutate-save. Also delivers the per-slice compression project (questions/critique/feedback embedded in slices instead of plan-level) which is the schema foundation that makes (2) routable.'
     created_at: "2026-04-29"
     status: draft
-    version: 6
+    version: 7
 design:
     problem: ""
     goals: []
@@ -84,6 +84,25 @@ slices:
       effort: M
       risk: Low
       tests: TestAddQuestionYaml_PerSlice, TestSetCritiqueYaml_PerSlice, TestReadFeedbackYaml_PerSlice
+      approved: false
+      comment: ""
+    - id: slic-d37b8b6b
+      num: 5
+      title: Route set-slice-status and answer-slice-question writes into YAML
+      what: Mirror the SQLite write into the corresponding PlanSlice.Feedback / PlanSlice.Answers entry, then call commitPlanChange. Keep the SQLite write as a denormalized read cache for dashboard query speed, or drop it if the YAML-driven indexer can backfill — design decision deferred to Question 2.
+      why: 'Closes Gap #2: the YAML becomes the complete current state for slice operational signal. set-slice-status and answer-slice-question are the two outliers that bypass the commitPlanChange flow today.'
+      files:
+        - cmd/htmlgraph/plan_slice_status.go
+        - cmd/htmlgraph/plan_answer_slice_question.go
+      deps:
+        - 3
+      done_when:
+        - Both verbs write to YAML and commit
+        - Dashboard slice status reflects YAML truth
+        - SQLite path either dropped or kept in sync
+      effort: M
+      risk: Med
+      tests: TestSetSliceStatus_WritesYaml, TestAnswerSliceQuestion_WritesYaml
       approved: false
       comment: ""
 questions: []
