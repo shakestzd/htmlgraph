@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,22 +94,20 @@ type otelEnvOverrides struct {
 	Cleanup       func() // called on launcher exit to SIGTERM the collector
 }
 
-// spawnSessionCollector generates a session ID, spawns a per-session
-// collector, writes the PID file, and returns a cleanup function.
-// On failure, logs a warning and returns zero-value overrides.
-func spawnSessionCollector(projectDir string) otelEnvOverrides {
+// spawnSessionCollectorTo is the testable core of collector spawning.
+// It generates a session ID, spawns the collector at binPath, and returns
+// overrides and a wantExit flag. On spawn failure it always writes a FATAL
+// line to errW; wantExit is true only when HTMLGRAPH_OTEL_STRICT=1.
+// Silent-fail is preserved for soft-precondition failures that occur before
+// spawn (binary path resolution) — those are handled by the caller.
+func spawnSessionCollectorTo(projectDir, binPath string, errW io.Writer) (otelEnvOverrides, bool) {
 	sessionID := generateOtelSessionID()
-
-	binPath, err := os.Executable()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "htmlgraph: warning: per-session collector skipped: %v\n", err)
-		return otelEnvOverrides{}
-	}
 
 	port, proc, err := spawnCollector(binPath, sessionID, projectDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "htmlgraph: warning: per-session collector failed: %v\n", err)
-		return otelEnvOverrides{}
+		fmt.Fprintf(errW, "htmlgraph: FATAL: collector spawn failed after all retries: %v\n", err)
+		wantExit := os.Getenv("HTMLGRAPH_OTEL_STRICT") == "1"
+		return otelEnvOverrides{}, wantExit
 	}
 
 	writeCollectorPID(projectDir, sessionID, proc.Pid)
@@ -118,7 +117,26 @@ func spawnSessionCollector(projectDir string) otelEnvOverrides {
 		CollectorPort: port,
 		SessionID:     sessionID,
 		Cleanup:       cleanup,
+	}, false
+}
+
+// spawnSessionCollector generates a session ID, spawns a per-session
+// collector, writes the PID file, and returns a cleanup function.
+// On spawn failure emits a FATAL line to stderr; exits non-zero when
+// HTMLGRAPH_OTEL_STRICT=1. Silent-fail is preserved when the binary
+// path cannot be resolved (soft precondition).
+func spawnSessionCollector(projectDir string) otelEnvOverrides {
+	binPath, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "htmlgraph: warning: per-session collector skipped: %v\n", err)
+		return otelEnvOverrides{}
 	}
+
+	overrides, wantExit := spawnSessionCollectorTo(projectDir, binPath, os.Stderr)
+	if wantExit {
+		os.Exit(1)
+	}
+	return overrides
 }
 
 // registerCollectorCleanup spawns a reaper goroutine for the collector
