@@ -65,10 +65,21 @@ type Registry struct {
 
 // Load reads the registry from path.  If the file does not exist an empty
 // Registry is returned with no error.  Any other I/O error is propagated.
+//
+// Legacy migration: when path is the canonical XDG-aware DefaultPath() and
+// it does not yet exist, Load also probes the legacy
+// ~/.local/share/htmlgraph/projects.json. If that legacy file exists, its
+// contents are returned and the in-memory Registry retains the canonical
+// path — the next Save persists to the canonical location and the legacy
+// file is left untouched. This avoids "all my projects vanished" reports
+// from users who set XDG_DATA_HOME after first run (PR #62 review).
 func Load(path string) (*Registry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if entries, ok := loadLegacyForCanonical(path); ok {
+				return &Registry{path: path, entries: entries}, nil
+			}
 			return &Registry{path: path}, nil
 		}
 		return nil, fmt.Errorf("registry.Load: %w", err)
@@ -81,9 +92,40 @@ func Load(path string) (*Registry, error) {
 	return &Registry{path: path, entries: entries}, nil
 }
 
+// loadLegacyForCanonical reads the legacy registry file (if it exists and
+// the supplied path matches the current canonical DefaultPath). It returns
+// (entries, true) on a successful migration read; (nil, false) otherwise.
+// Malformed legacy JSON is treated the same as a missing legacy file —
+// the caller falls through to an empty registry rather than blocking startup.
+func loadLegacyForCanonical(path string) ([]Entry, bool) {
+	canonical := canonicalDefaultPath()
+	legacy := legacyDefaultPath()
+	if path != canonical || canonical == legacy {
+		return nil, false
+	}
+	data, err := os.ReadFile(legacy)
+	if err != nil {
+		return nil, false
+	}
+	var entries []Entry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, false
+	}
+	return entries, true
+}
+
 // Save persists the registry to disk using a tempfile + os.Rename so the
-// write is atomic from the reader's perspective. It calls Prune before
-// writing so stale entries are automatically removed on every save.
+// write is atomic from the reader's perspective.
+//
+// SIDE EFFECT: Save also calls Prune() before writing — entries whose
+// project directory no longer contains a .htmlgraph/ subdirectory are
+// dropped from the in-memory slice and never written. Callers expecting
+// "save exactly what I have in memory" semantics will be surprised; if a
+// project dir was temporarily unmounted or symlinked away at save time,
+// its entry disappears with no log line. If you need pure save-without-
+// pruning behaviour, write the JSON yourself or copy this method without
+// the r.Prune() call. Renaming this to SaveAndPrune was considered but
+// deferred to keep the call-site churn small; this godoc is the contract.
 func (r *Registry) Save() error {
 	r.Prune()
 	dir := filepath.Dir(r.path)
@@ -223,16 +265,33 @@ func (r *Registry) DropLinkedWorktrees(resolveMain func(dir string) string) []st
 	return dropped
 }
 
-// DefaultPath returns the canonical registry file path.
-// It honors XDG_DATA_HOME if set, otherwise falls back to
+// DefaultPath returns the canonical registry file path. It honors
+// XDG_DATA_HOME when set, otherwise falls back to the historical
 // ~/.local/share/htmlgraph/projects.json.
+//
+// Legacy migration is handled by Load(): when the canonical path is
+// missing but the legacy file exists, Load reads from legacy and the
+// next Save persists to the canonical path. DefaultPath itself always
+// returns the canonical (write-target) path.
 func DefaultPath() string {
+	return canonicalDefaultPath()
+}
+
+// canonicalDefaultPath returns the XDG-aware path. When XDG_DATA_HOME is
+// unset this collapses to the legacy path, which is correct: the legacy
+// path IS the canonical default in that case.
+func canonicalDefaultPath() string {
 	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
 		return filepath.Join(xdg, "htmlgraph", "projects.json")
 	}
+	return legacyDefaultPath()
+}
+
+// legacyDefaultPath returns the historical pre-XDG path
+// (~/.local/share/htmlgraph/projects.json), independent of XDG_DATA_HOME.
+func legacyDefaultPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		// Fallback that will be visible to the caller.
 		return filepath.Join(".local", "share", "htmlgraph", "projects.json")
 	}
 	return filepath.Join(home, ".local", "share", "htmlgraph", "projects.json")

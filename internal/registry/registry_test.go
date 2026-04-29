@@ -332,6 +332,72 @@ func TestDefaultPath(t *testing.T) {
 	})
 }
 
+// TestLoad_LegacyFallback verifies the migrate-on-save behaviour: when the
+// canonical XDG path is missing but the legacy ~/.local/share path exists,
+// Load reads from legacy and the next Save persists to the canonical path
+// (the legacy file is left untouched as a side-effect-free safety copy).
+func TestLoad_LegacyFallback(t *testing.T) {
+	// Redirect $HOME so legacyDefaultPath() points into a tempdir we control,
+	// and XDG_DATA_HOME so canonicalDefaultPath() points elsewhere. With both
+	// pinned to tempdirs the test never touches the real user home.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	xdg := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", xdg)
+
+	canonical := registry.DefaultPath()
+	legacy := filepath.Join(home, ".local", "share", "htmlgraph", "projects.json")
+	if canonical == legacy {
+		t.Fatalf("canonical %q must differ from legacy %q for this test", canonical, legacy)
+	}
+
+	// Seed the legacy file with a real-looking entry. We bypass Save because
+	// Save would write to canonical via Registry.path; here we want raw JSON
+	// at the legacy location to simulate a pre-XDG install.
+	projectDir := makeRealProject(t)
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatalf("mkdir legacy parent: %v", err)
+	}
+	seed, _ := registry.Load(legacy)
+	seed.Upsert(projectDir, "legacy-proj", "")
+	if err := seed.Save(); err != nil {
+		t.Fatalf("seed legacy save: %v", err)
+	}
+	if _, err := os.Stat(canonical); err == nil {
+		t.Fatalf("canonical %q must not exist before migration", canonical)
+	}
+
+	// Load(canonical) should fall back to legacy and pick up the entry.
+	r, err := registry.Load(canonical)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	entries := r.List()
+	if len(entries) != 1 || entries[0].ProjectDir != projectDir {
+		t.Fatalf("expected legacy entry to surface, got %+v", entries)
+	}
+
+	// Save persists to canonical, not legacy.
+	if err := r.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if _, err := os.Stat(canonical); err != nil {
+		t.Errorf("canonical not created after Save: %v", err)
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		t.Errorf("legacy file vanished after migration save (should be left intact): %v", err)
+	}
+
+	// Subsequent Load(canonical) reads canonical, not legacy.
+	r2, err := registry.Load(canonical)
+	if err != nil {
+		t.Fatalf("post-migration Load: %v", err)
+	}
+	if len(r2.List()) != 1 {
+		t.Errorf("post-migration entries = %d, want 1", len(r2.List()))
+	}
+}
+
 // TestOpenReadOnly_RejectsWrite opens a SQLite DB read-only and asserts that CREATE TABLE fails.
 func TestOpenReadOnly_RejectsWrite(t *testing.T) {
 	dir := t.TempDir()
