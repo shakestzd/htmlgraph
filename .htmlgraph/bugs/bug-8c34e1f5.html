@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Tests pollute real ~/.cache/htmlgraph instead of an isolated cache root</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-8c34e1f5"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-04-27T23:30:07.35473"
+             data-updated="2026-04-28T00:16:08.432088" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Tests pollute real ~/.cache/htmlgraph instead of an isolated cache root</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-27T23:30:07.357887">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="412cdeef-bc20-424f-9b11-e6e716d579a6.html" data-relationship="implemented_in" data-since="2026-04-27T23:32:28.330817">session 412cdeef-bc20-424f-9b11-e6e716d579a6</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-9b767422.html" data-relationship="caused_by" data-since="2026-04-27T23:30:25.104586">Implement htmlgraph cache eviction &#43; cache subcommands</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Many cmd/htmlgraph/*_test.go files create temporary project roots via t.TempDir() and then exercise code paths that resolve storage.CanonicalDBPath(projectDir). CanonicalDBPath hashes the absolute project path and returns /htmlgraph//htmlgraph.db, so each unique tempdir produces a fresh subdirectory under the user's real cache. Across a single 'go test ./cmd/htmlgraph/...' run this can create hundreds of entries. Evidence (2026-04-27): the ~/.cache/htmlgraph cache regrew to 6,022 subdirs / 2.5 GB, with 2,012 new subdirs / 834 MiB added in the four hours immediately after eviction was wired up — the new opportunistic prune fired at 10:21 but didn't evict anything because entries were <90 days and the total dipped under the 1 GiB threshold between bursts. Defeats the eviction policy added in feat-9b767422 entirely, and is the same shape that caused the original 17,843-subdir / 7.3 GB explosion (spk-dfb051a3). Tests that touch CanonicalDBPath should either set HTMLGRAPH_DB_PATH to t.TempDir()/htmlgraph.db (workitem_test, projects_test, plan_feedback_cmd_test, cleanup_test already do) or share a single per-package cache override via TestMain. Surfaced while validating feat-9b767422.</p>
+        </section>
+    </article>
+</body>
+</html>

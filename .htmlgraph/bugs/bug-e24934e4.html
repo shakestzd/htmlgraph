@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Host-path leak: /Users/shakes path in dashboard app.js comment ships inside Go binary via go:embed</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-e24934e4"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-24T14:13:47.517458"
+             data-updated="2026-04-24T14:15:05.037461" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Host-path leak: /Users/shakes path in dashboard app.js comment ships inside Go binary via go:embed</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-24T14:13:47.521654">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="cb5d73c7-d3c1-4598-9768-a07cf69db974.html" data-relationship="implemented_in" data-since="2026-04-24T14:14:18.404502">session cb5d73c7-d3c1-4598-9768-a07cf69db974</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>cmd/htmlgraph/dashboard/js/app.js:1320 contains a comment referencing an absolute macOS path with the developer's username. The dashboard tree is embedded into the Go binary via go:embed, so this path ships to every user of the htmlgraph CLI. Scrub the comment to use a generic placeholder or drop the specific path.</p>
+        </section>
+    </article>
+</body>
+</html>

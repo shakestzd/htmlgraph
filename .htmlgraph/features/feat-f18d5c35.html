@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Update planning skills, docs, and compatibility guidance</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-f18d5c35"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-28T17:30:35.672246"
+             data-updated="2026-04-28T18:47:20.221813" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>Update planning skills, docs, and compatibility guidance</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-04-28T17:30:35.677138">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bd8ae45f-dc5d-4abb-9741-28892ccf7767.html" data-relationship="implemented_in" data-since="2026-04-28T18:42:26.385616">session bd8ae45f-dc5d-4abb-9741-28892ccf7767</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1c14d560.html" data-relationship="planned_in" data-since="2026-04-28T17:30:35.688538">plan-1c14d560</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-6dbc7112.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.72576">feat-6dbc7112</a></li>
+                    <li><a href="feat-58e5975f.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.73137">feat-58e5975f</a></li>
+                    <li><a href="feat-19396f85.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.735803">feat-19396f85</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>### What Changes
+
+Rewrite the HtmlGraph planning skill so agents generate v2 slice-card YAML
+using Markdown-capable multiline fields instead of global questions and
+global critique sections.
+
+Update the workflow to:
+
+1. Research the codebase.
+2. Create slice cards as executable specs.
+3. Use `what: |`, `why: |`, and `tests: |` for Markdown content.
+4. Integrate critique into affected cards as `critic_revisions`.
+5. Ask local questions inside the relevant card.
+6. Pause for slice-level review.
+7. Promote approved slices.
+8. Complete the plan only when all slices are done, rejected, or superseded.
+
+Document the relationship to spec-driven development: the plan is context,
+each slice card is an executable spec, a promoted feature is the
+implementation tracker, and sessions/commits are evidence.
+
+### Critic Revision Badge
+
+`Workflow revised` - agents no longer instruct humans to read a separate
+critique section before any code can happen.
+
+
+## Why
+The code changes will fail in practice if the agent workflow keeps producing
+document-centered plans.
+
+The plugin skill is the operational contract that tells agents how to use
+the system.
+
+
+## Done When
+- The plan skill describes v2 slice-card YAML as the default for new plans.
+- The plan skill instructs agents to use Markdown in `what: |`, `why: |`, and `tests: |`.
+- The skill explicitly says critique findings are integrated into slice cards before review.
+- The skill supports slice-level approval/promotion/execution and treats plan completion as a final bookkeeping step.
+- Generated plugin ports stay in sync through the existing plugin build process.
+- Docs explain how v2 planning relates to spec-driven development and how legacy YAML plans are handled.</p>
+        </section>
+    </article>
+</body>
+</html>

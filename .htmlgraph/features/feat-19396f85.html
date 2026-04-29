@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Promote and execute approved slices incrementally</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-19396f85"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-28T17:30:35.651393"
+             data-updated="2026-04-28T18:41:05.059181" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>Promote and execute approved slices incrementally</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-58e5975f.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.721753">feat-58e5975f</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-04-28T17:30:35.655824">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1c14d560.html" data-relationship="planned_in" data-since="2026-04-28T17:30:35.666243">plan-1c14d560</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bd8ae45f-dc5d-4abb-9741-28892ccf7767.html" data-relationship="implemented_in" data-since="2026-04-28T18:34:41.538359">session bd8ae45f-dc5d-4abb-9741-28892ccf7767</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>### What Changes
+
+Add slice promotion so an approved v2 slice can become a feature work item
+without finalizing the full plan. Provide commands such as:
+
+```bash
+htmlgraph plan promote-slice  
+```
+
+Update `execute-preview` or the execute skill so promoted slices can be
+dispatched by dependency readiness.
+
+Promotion should create or reuse the feature for the slice, write
+`feature_id` back into the YAML plan, emit `planned_in`, `part_of`, and
+dependency edges, and refuse execution when dependencies are not done unless
+explicitly waived.
+
+### Local Question
+
+Should promotion automatically start execution?
+
+Recommended answer: no. Promotion creates the feature; execution is a
+separate action so humans can inspect the generated work item.
+
+### Critic Revision Badge
+
+`Dependency gate added`
+
+
+## Why
+Incremental approval is only useful if it leads to incremental
+implementation.
+
+This slice turns the approved card into the same tracked work item graph
+used by current HtmlGraph execution, while keeping the parent plan open.
+
+
+## Done When
+- Approved slice promotion creates or reuses one feature and records the feature ID on the slice.
+- Promotion wires plan, track, and dependency edges consistently with current finalize behavior.
+- A slice blocked by unfinished dependencies cannot be executed unless the user explicitly waives the block.
+- The full plan can remain active after one or more slices are promoted or done.</p>
+        </section>
+    </article>
+</body>
+</html>

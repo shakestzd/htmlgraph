@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Migrate app.js main activity feed to OTel-primary /api/events/feed endpoint</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-c87a1fd8"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-25T05:00:04.421273"
+             data-updated="2026-04-25T05:17:06.267782" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Migrate app.js main activity feed to OTel-primary /api/events/feed endpoint</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="02edc6c7-3b77-405f-820c-1dc77cc381ea.html" data-relationship="implemented_in" data-since="2026-04-25T05:00:05.786074">session 02edc6c7-3b77-405f-820c-1dc77cc381ea</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-25T05:00:04.426933">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Switch the main dashboard activity feed in app.js from /api/events/recent (hook-based agent_events) to /api/events/feed (OTel-primary with hook fallback). Preserves existing grouping and nesting UI but sources data from OTel spans with proper trace_id/parent_span hierarchy.</p>
+        </section>
+    </article>
+</body>
+</html>

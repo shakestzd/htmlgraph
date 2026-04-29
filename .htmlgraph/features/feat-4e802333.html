@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Default session names &#43; rename/color hints on work start</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-4e802333"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-26T06:43:31.533668"
+             data-updated="2026-04-26T07:35:36.919068" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>Default session names &#43; rename/color hints on work start</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="d73633e1-7ca4-4b0e-b140-f158b0035de5.html" data-relationship="implemented_in" data-since="2026-04-26T06:44:03.55873">session d73633e1-7ca4-4b0e-b140-f158b0035de5</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>All Claude Code launch modes (claude, dev, yolo) get a default session name when --name is not provided: htmlgraph claude/dev defaults to -; yolo defaults to -yolo- (falling back to -yolo-). Add --name flag to claude and dev commands (yolo to also honor --name override). On feature/bug/spike/track start, print a suggested /rename  and /color  line so the user can sync the Claude TUI label to the active work item. Color suggested by type: feature=blue, bug=red, spike=purple, track=green, plan=yellow.</p>
+        </section>
+    </article>
+</body>
+</html>

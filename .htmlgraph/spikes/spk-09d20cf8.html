@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>TUI dashboard prototype</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-09d20cf8"
+             data-type="spike"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-25T22:55:02.28288"
+             data-updated="2026-04-25T22:55:24.550767" data-agent-assigned="claude-code">
+
+        <header>
+            <h1>TUI dashboard prototype</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5e85926c-910a-4822-acef-3718333ec6dc.html" data-relationship="implemented_in" data-since="2026-04-25T22:55:24.550353">session 5e85926c-910a-4822-acef-3718333ec6dc</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false" data-step-id="step-spk-09d20cf8-0">⏳ scaffold htmlgraph tui subcommand wired to bubble tea</li>
+                <li data-completed="false" data-step-id="step-spk-09d20cf8-1">⏳ implement 3-pane shell using bubblelayout with tracks list &#43; detail &#43; event tail</li>
+                <li data-completed="false" data-step-id="step-spk-09d20cf8-2">⏳ subscribe to existing SSE event feed and render last N events in right pane</li>
+                <li data-completed="false" data-step-id="step-spk-09d20cf8-3">⏳ render lineage DAG inline in detail pane using ascii-dag style layout</li>
+                <li data-completed="false" data-step-id="step-spk-09d20cf8-4">⏳ test legibility at 80x24 / 120x40 / fullscreen and write up findings</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Timebox 1 day. Validate that a Bubble Tea 3-pane TUI (tracks/plans list | feature detail with inline ascii-dag lineage | live SSE event tail) renders legibly at 80x24 against the existing SQLite + serve SSE feed. Key unknowns: (1) does a Sugiyama-style DAG render readably in a ~40-col detail pane, (2) does bubblelayout handle the pane math without manual height accounting, (3) can we reuse serve_child SSE in-process or do we open a second subscriber. Out of scope for the spike: write operations, command palette, analytics charts (deferred to v2/v3). Reference TUIs: k9s (drill-down), lazygit (multi-pane), lazyagent (live event stream). Source: research output 2026-04-25.</p>
+        </section>
+    </article>
+</body>
+</html>

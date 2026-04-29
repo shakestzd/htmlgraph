@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Introduce slice-level approval and lifecycle APIs</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-58e5975f"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-28T17:30:35.625254"
+             data-updated="2026-04-28T18:25:00.335812" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>Introduce slice-level approval and lifecycle APIs</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bd8ae45f-dc5d-4abb-9741-28892ccf7767.html" data-relationship="implemented_in" data-since="2026-04-28T18:09:58.775324">session bd8ae45f-dc5d-4abb-9741-28892ccf7767</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-44d8c24f.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.710726">feat-44d8c24f</a></li>
+                    <li><a href="feat-33807582.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.716709">feat-33807582</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-04-28T17:30:35.632696">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1c14d560.html" data-relationship="planned_in" data-since="2026-04-28T17:30:35.645771">plan-1c14d560</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>### What Changes
+
+Add APIs and CLI commands for updating one slice at a time:
+
+- `plan approve-slice`
+- `plan reject-slice`
+- `plan answer-slice-question`
+- `plan set-slice-status`
+
+Store live review state in SQLite during interaction, then reflect durable
+lifecycle state in the YAML plan document on explicit save/promote
+operations.
+
+Lifecycle states should distinguish plan state from slice state:
+
+- plan: `draft | active | completed`
+- slice approval: `pending | approved | rejected | changes_requested`
+- slice execution: `not_started | promoted | in_progress | done | blocked | superseded`
+
+### Local Decision
+
+Plan-level finalization should become "complete plan" and should not be
+required before approved slices can move.
+
+### Critic Revision Badge
+
+`All-or-nothing gate removed`
+
+### Section-Naming Contract
+
+All CLI mutation commands (approve-slice, reject-slice, answer-slice-question, set-slice-status) MUST use the section-naming contract defined in slice-1: section='slice-' for slice-level state, section='slice--question-' for question answers. Existing IsPlanFullyApproved at internal/db/plan_feedback.go:71 must continue to pass after the changes — add a regression test before introducing slice-local sections.
+
+
+## Why
+The current finalization gate turns review into a batch process.
+
+Large plans need incremental approval: a user should be able to approve and
+implement slice 1 while slice 4 still has unanswered questions.
+
+
+## Done When
+- A single slice can be approved/rejected without changing unrelated slices.
+- Slice-local question answers persist and are returned by plan feedback APIs.
+- The plan can remain active while some slices are approved, rejected, pending, or done.
+- Existing `plan_feedback` consumers continue working for legacy YAML plans.
+- Section-naming convention for plan_feedback documented in slice-1 and consumed by slice-4 — slice-local approvals use section='slice-', slice-local question answers use section='slice--question-'
+- validSectionRe at cmd/htmlgraph/api_plans.go:286 extended to accept `slice-\d+-question-[a-z0-9-]+` so the answer-slice-question command is not blocked at the HTTP gate. The existing normalization at api_plans.go:302-306 (underscore-to-hyphen) is mirrored for the new pattern. Regression test added: an HTTP POST to /api/plans//feedback with section='slice-3-question-q-foo' returns 200, not 400.</p>
+        </section>
+    </article>
+</body>
+</html>

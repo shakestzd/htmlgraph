@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>NDJSON to SQLite indexer loop inside serve</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-b6479241"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-24T22:29:21.270392"
+             data-updated="2026-04-25T00:24:03.01689" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>NDJSON to SQLite indexer loop inside serve</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1cd284e0.html" data-relationship="planned_in" data-since="2026-04-24T22:29:21.277136">plan-1cd284e0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-3a65c5ca.html" data-relationship="blocked_by" data-since="2026-04-24T22:29:21.295279">feat-3a65c5ca</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-24T22:29:21.274687">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="c95933d1-92d9-4aed-9abe-be5b24d902e3.html" data-relationship="implemented_in" data-since="2026-04-24T23:58:08.65699">session c95933d1-92d9-4aed-9abe-be5b24d902e3</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>New internal/otel/indexer/ package that watches .htmlgraph/sessions/*/events.ndjson files (per Q2), tails each file, parses one JSON line at a time, and applies it to SQLite through the SQLite SignalSink from slice 1. The indexer re-runs the placeholder/ upgrade span re-parenting logic (relocated from writer.go:300-336 into internal/otel/indexer/upgrade.go) when applying NDJSON batches — NDJSONSink has no DB access, so the upgrade pass must happen here, during apply-to-SQLite, not at sink time. Maintains a per-file checkpoint in .htmlgraph/sessions//.index-offset (written atomically via write-to-temp-then-rename after each successful batch commit; on corrupted/truncated checkpoint read, falls back to offset 0 and replays the whole file — INSERT OR IGNORE makes this idempotent). On indexer boot, replays from last checkpoint to end-of-file for every session directory. Mount the indexer in cmd/htmlgraph/serve_child.go alongside the existing autoIngestLoop; feature-flagged via HTMLGRAPH_INDEXER=1 if Q5 selects parallel-validation rollout, or unconditionally on if Q5 selects cutover.
+
+
+## Why
+With collectors writing NDJSON instead of SQLite directly, every /api/otel/* endpoint (backed by otel_signals, otel_resource_attrs, otel_session_rollup) would break on day one. The indexer is the bridge: NDJSON is canonical, SQLite becomes derived and rebuildable. Relocating the upgrade/placeholder logic here is mandatory — it requires cross-table DB queries (pending_subagent_starts, etc.) that cannot live in the append-only NDJSON sink. Checkpoint files are what make rebuild by deleting htmlgraph.db and restarting serve a single-command recovery. Checkpoint truncate-to-zero fallback is safe because INSERT OR IGNORE on otel_signals.signal_id (verified writer.go:71) guarantees duplicate inserts never overwrite data. Directly supports goal Zero dashboard regression.
+
+
+## Done When
+- Indexer starts inside htmlgraph serve, tails every .htmlgraph/sessions/*/events.ndjson, applies new NDJSON lines to SQLite, and advances .index-offset atomically after each committed batch.
+- Placeholder/upgrade span re-parenting runs during indexer apply-batch; orphan-span test parity with pre-refactor writer — the indexer correctly resolves pending_subagent_starts staging rows.
+- Killing serve mid-replay and restarting resumes from the last checkpointed offset with zero duplicate rows (INSERT OR IGNORE semantics preserved by the SQLite sink).
+- Corrupted checkpoint file: indexer falls back to offset 0, replays full NDJSON, and emerges with correct SQLite state (no duplicates, no missing signals).
+- Full-rebuild test: delete htmlgraph.db, restart serve, assert otel_signals row count equals total parseable NDJSON line count across all sessions.
+- Indexer lag is 5s or less at 100 signals/s of synthetic single-session load; 15s or less at 500 signals/s burst load.
+- Every /api/otel/* endpoint returns byte-identical payloads (modulo timestamps) for a fixture session whether populated via direct SQLite writer (pre-change) or via indexer (post-change).</p>
+        </section>
+    </article>
+</body>
+</html>

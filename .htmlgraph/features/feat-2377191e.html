@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Strip OTLP receiver from serve; rename ensureServeForOtel</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-2377191e"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-24T22:29:21.277777"
+             data-updated="2026-04-25T01:11:42.105329" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Strip OTLP receiver from serve; rename ensureServeForOtel</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-24T22:29:21.282222">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1cd284e0.html" data-relationship="planned_in" data-since="2026-04-24T22:29:21.284775">plan-1cd284e0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-4d3a2b5d.html" data-relationship="blocked_by" data-since="2026-04-24T22:29:21.296013">feat-4d3a2b5d</a></li>
+                    <li><a href="feat-b6479241.html" data-relationship="blocked_by" data-since="2026-04-24T22:29:21.296954">feat-b6479241</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="c95933d1-92d9-4aed-9abe-be5b24d902e3.html" data-relationship="implemented_in" data-since="2026-04-25T00:54:39.563456">session c95933d1-92d9-4aed-9abe-be5b24d902e3</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Remove receiver.New/Start calls from cmd/htmlgraph/serve_child.go (lines 99-121 region). The embedded OTLP endpoint on the project-hashed port is deleted. Update the dependent sites identified by feasibility audit: claude_serve_autostart.go:51,141 (ensureServeForOtel + MaybeShowOtelNotice LoadConfigFromEnv calls), claude_env.go:96 (otelEndpointFromEnv), and internal/otel/receiver/port.go (deleted outright). Rename ensureServeForOtel to ensureServeForDashboard with revised semantics: serve is no longer auto-spawned for telemetry reasons. It is only auto-spawned when (a) a CLI command requires semantic-op execution or (b) the user explicitly opens the dashboard. Keep the PID-lockfile and TCP-probe pattern (checkServeLock, writeServeLock, spawnDetachedServe) intact for the dashboard path. Rework MaybeShowOtelNotice to display a generic telemetry-status message (derived from the presence/absence of active .collector-pid files in .htmlgraph/sessions/) rather than referencing a specific endpoint. Update receiver tests (writer_test.go, receiver_test.go) to construct receivers in-process with NDJSONSink rather than via the old serve mount.
+
+
+## Why
+This is the slice that actually shuts the contention class down: once the OTLP receiver is gone from serve and collectors are the only ingest path, bug-08681166 (busy_timeout lost) stops reaching OTel writes entirely. The rename clarifies serve role as a reader plus semantic-op singleton, not a telemetry endpoint. Deleting port.go eliminates the multi-project-collision history documented in bug-d2ba2a82. Directly supports goals Eliminate OTel writer collisions and Lifecycle independence from serve. The MaybeShowOtelNotice rework is necessary because the static port derivation that notice referenced no longer exists — the user-facing message must instead describe per-session collectors.
+
+
+## Done When
+- htmlgraph serve no longer binds any OTLP port; scanning running processes for listeners in range 4318-5317 shows only otel-collect children, never serve.
+- ensureServeForDashboard auto-spawns serve only when a semantic op or dashboard request requires it; launching htmlgraph claude with the dashboard already running does NOT re-probe any OTLP port.
+- internal/otel/receiver/port.go is deleted; no import references remain in the codebase (verified via go build).
+- claude_env.go:96 otelEndpointFromEnv is removed or reworked to read from active collector-pid files rather than a project-hashed port.
+- MaybeShowOtelNotice shows a message that does not reference a fixed port; instead it describes per-session collector behavior.
+- The specific SQLITE_BUSY cascade symptom of bug-08681166 (OTel writer colliding with hook writers) cannot reproduce because no OTel writer lives inside serve.</p>
+        </section>
+    </article>
+</body>
+</html>

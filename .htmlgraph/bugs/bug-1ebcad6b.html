@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Subagent tool calls not nested under parent Agent span in activity feed</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-1ebcad6b"
+             data-type="bug"
+             data-status="in-progress"
+             data-priority="high"
+             data-created="2026-04-26T12:03:23.90382"
+             data-updated="2026-04-26T16:18:48.237807" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Subagent tool calls not nested under parent Agent span in activity feed</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-26T12:03:23.907943">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bebc2f35-a728-46b6-9ec6-dc5822379ce0.html" data-relationship="implemented_in" data-since="2026-04-26T16:18:06.601715">session bebc2f35-a728-46b6-9ec6-dc5822379ce0</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When the orchestrator spawns a subagent via the Agent tool, the activity feed shows the Agent invocation as a leaf row with the subagent metadata (subagent_type, model, input/output tokens, api duration) but the tool calls the subagent itself made (Read/Bash/Grep/etc.) are not rendered as children of that Agent row. Causal lineage is broken at the dashboard layer. Expected: the Agent row should be expandable to show the subagent's session as a nested turn tree (its prompts, tool calls, results) so the user can drill from 'Research empty live_events feed' down into the Bash and Read calls the researcher actually ran. Actual: the Agent row only shows the spawn-call metadata; the subagent's tool calls either appear flat at top level under a separate session_id with no parent linkage, or are lost. Likely involves: pending_subagent_starts linkage, parent_span propagation in OTel, or the buildEventTreeOtel turn-anchor query not joining child sessions whose parent_session_id matches the spawning turn. Reproducer: spawn an htmlgraph:researcher agent that does several Reads and Bashes, watch the dashboard — the Agent row stays a leaf even though child activity exists in otel_signals/agent_events.</p>
+        </section>
+    </article>
+</body>
+</html>

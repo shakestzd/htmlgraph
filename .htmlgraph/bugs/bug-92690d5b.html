@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>htmlgraph yolo --track fails when branch already exists: &#39;git worktree add failed: exit status 255 / fatal: a branch named trk-xxx already exists&#39;</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-92690d5b"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-24T06:05:18.242701"
+             data-updated="2026-04-24T06:05:28.347969" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>htmlgraph yolo --track fails when branch already exists: &#39;git worktree add failed: exit status 255 / fatal: a branch named trk-xxx already exists&#39;</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-5143700e.html" data-relationship="caused_by" data-since="2026-04-24T06:05:18.247679">feat-5143700e</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-24T06:05:28.34757">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Command: `htmlgraph yolo --track trk-6e10c73c`. Expected: attach to the existing worktree/branch for the track. Actual: fails with `git worktree add failed: exit status 255` because the underlying `git worktree add` is invoked with `new branch 'trk-6e10c73c'` (implicit -b), and the branch already exists from a prior run.
+
+Verbatim output:
+
+```
+htmlgraph yolo --track trk-6e10c73c
+  Update available: v0.55.6-58-g75f8b760 → v0.55.6. Run: htmlgraph plugin install
+git worktree add failed: exit status 255
+Preparing worktree (new branch 'trk-6e10c73c')
+fatal: a branch named 'trk-6e10c73c' already exists
+```
+
+Likely fix site: whatever invokes `git worktree add` in yolo's track-mode setup. Needs to detect an existing branch/worktree for the track and attach to it (`git worktree add  ` without `-b`, or `cd` into the existing worktree) instead of unconditionally creating a new branch. Also surfaces a UX point — the update-available banner prints on every invocation even while the run is failing.</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>PREREQ: Fix stale internal/otel/receiver import in indexer_test</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-605aaaac"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-26T20:02:40.881593"
+             data-updated="2026-04-26T20:06:57.084188" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>PREREQ: Fix stale internal/otel/receiver import in indexer_test</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-8ee8f517.html" data-relationship="planned_in" data-since="2026-04-26T20:02:40.888865">plan-8ee8f517</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-26T20:02:40.88437">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="9db86a91-da81-4149-b443-a3d8bb0fcc63.html" data-relationship="implemented_in" data-since="2026-04-26T20:06:57.083983">session 9db86a91-da81-4149-b443-a3d8bb0fcc63</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>internal/otel/indexer/indexer_test.go:13 imports the deleted internal/otel/receiver package; the test file does not build today (verified: `go build ./internal/otel/indexer/...` fails). Replace setupIndexerDB to use db.Open from internal/db plus an inline minimal WriterCloser implementation (or reuse the existing fakeWriter at indexer_test.go:262 where DB writes aren't required). This must land before any other indexer-touching slice can be tested.
+
+
+## Why
+Hard precondition. Until this builds, slices 1, 2, 4, and 7 cannot have their tests written or run. Caught by the feasibility critic after the orchestrator wrote the original plan.
+
+
+## Done When
+- `go build ./internal/otel/indexer/...` exits 0
+- `go vet ./internal/otel/indexer/...` exits 0
+- `go test ./internal/otel/indexer/...` passes for any tests not requiring downstream slices</p>
+        </section>
+    </article>
+</body>
+</html>

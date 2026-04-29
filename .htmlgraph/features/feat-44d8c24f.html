@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Define the v2 slice-card YAML data model</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-44d8c24f"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-28T17:30:35.552135"
+             data-updated="2026-04-28T17:51:17.202352" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>Define the v2 slice-card YAML data model</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1c14d560.html" data-relationship="planned_in" data-since="2026-04-28T17:30:35.573869">plan-1c14d560</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-04-28T17:30:35.559987">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bd8ae45f-dc5d-4abb-9741-28892ccf7767.html" data-relationship="implemented_in" data-since="2026-04-28T17:38:33.69058">session bd8ae45f-dc5d-4abb-9741-28892ccf7767</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>### What Changes
+
+Extend the existing YAML plan model so each slice is an independently
+reviewable executable spec card. Keep the current fields that already work
+for execution metadata:
+
+- `id`
+- `num`
+- `title`
+- `what`
+- `why`
+- `files`
+- `deps`
+- `done_when`
+- `tests`
+- `effort`
+- `risk`
+- `feature_id`
+
+Treat `what`, `why`, and `tests` as Markdown-capable multiline text. Agents
+should write these fields with YAML literal blocks (`|`) so headings, lists,
+and code fences render predictably in the frontend.
+
+Add slice-local structured fields:
+
+```yaml
+approval_status: pending        # pending | approved | rejected | changes_requested
+execution_status: not_started   # not_started | promoted | in_progress | done | blocked | superseded
+questions:
+  - id: q-error-handling
+    text: "How should this slice report partial failures?"
+    description: |
+      Markdown explanation of the tradeoff.
+    recommended: summary-report
+    options:
+      - key: summary-report
+        label: "Summary report"
+      - key: fail-fast
+        label: "Fail fast"
+    answer: null
+critic_revisions:
+  - id: cr-1
+    source: feasibility
+    severity: High
+    revision: 3
+    summary: "Added skipped-row reporting after critique found silent migration risk."
+    affects:
+      - done_when
+      - tests
+```
+
+### Local Decision
+
+Keep YAML as the source format for v2. Do not introduce JSON sidecars in this
+plan. Use Markdown inside existing multiline YAML fields and add only the
+structured fields needed for slice-local review and execution.
+
+### Critic Revision Badge
+
+`Design revised` - the v2 schema removes global questions/critique as the
+primary review units and makes slice cards the unit of comprehension.
+
+### Section-Naming Contract
+
+Section-naming contract for slice-local data in plan_feedback: `section = "slice-"` for slice-level approvals/answers, and `section = "slice--question-"` for slice-local question responses. Existing global sections ("design", "questions") are unchanged. The `UNIQUE(plan_id, section, action, question_id)` constraint at internal/db/plan_feedback.go:10-29 already accommodates this without a migration.
+
+
+## Why
+The current YAML schema encodes slices, questions, and critique as separate
+top-level collections. That shape drives the document-centered UI.
+
+We do not need a storage migration to fix that first. YAML already supports
+multiline Markdown well when fields use literal blocks. Extending the
+existing schema is lower risk than introducing a parallel JSON model before
+the review UX is proven.
+
+
+## Done When
+- The YAML PlanSlice model includes slice-local questions, critic revisions, approval_status, and execution_status.
+- Validation rejects invalid dependency references, invalid lifecycle states, duplicate slice IDs/question IDs, and critic revisions without a source/severity/summary.
+- The plan skill documents `what: |`, `why: |`, and `tests: |` as Markdown-capable fields.
+- The v2 model can represent all information currently needed by finalize/execute: title, files, deps, tests, feature ID, approvals, and status.
+- Existing YAML validation remains unchanged for current plans.
+- Section-naming convention for plan_feedback documented in slice-1 and consumed by slice-4 — slice-local approvals use section='slice-', slice-local question answers use section='slice--question-'
+- internal/planyaml/validate.go meta.status enum extended to include 'active' alongside the existing 'draft|review|finalized' values; existing plans with the legacy enum continue to validate without errors</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Session cleanup: graceful drain &#43; retention hygiene</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-ed1a1f2c"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-04-24T22:29:21.285899"
+             data-updated="2026-04-25T01:47:47.204545" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Session cleanup: graceful drain &#43; retention hygiene</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="c95933d1-92d9-4aed-9abe-be5b24d902e3.html" data-relationship="implemented_in" data-since="2026-04-25T01:12:09.295428">session c95933d1-92d9-4aed-9abe-be5b24d902e3</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-24T22:29:21.28781">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1cd284e0.html" data-relationship="planned_in" data-since="2026-04-24T22:29:21.29067">plan-1cd284e0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-4d3a2b5d.html" data-relationship="blocked_by" data-since="2026-04-24T22:29:21.299445">feat-4d3a2b5d</a></li>
+                    <li><a href="feat-2377191e.html" data-relationship="blocked_by" data-since="2026-04-24T22:29:21.301683">feat-2377191e</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Two pieces. (1) On SessionEnd hook, read .htmlgraph/sessions//.collector-pid (written by slice 3), send SIGTERM, wait up to 3s for clean drain, fall back to SIGKILL if needed. This is Q3 primary layer; the collector own idle-timeout (slice 2) is the tertiary safety net; the launcher deferred SIGTERM (slice 3) is the secondary fallback. (2) Retention job in a new internal/otel/retention/ package: on serve startup and every 24h thereafter, walk session directories, detect sessions whose sessions.status = done is older than HTMLGRAPH_SESSION_RETAIN_DAYS (default 30), archive events.ndjson into .htmlgraph/archive//.tar.gz using stdlib archive/tar + compress/gzip (not .tar.zst — zstd is not a current dependency), and delete the live session dir (indexer-populated SQLite rows age out via existing cleanup commands, unchanged). Dry-run mode via HTMLGRAPH_RETENTION_DRYRUN=1 logs intended actions without moving files. Also adds htmlgraph session restore  that extracts .tar.gz back into .htmlgraph/sessions/ so the indexer picks it up on next replay.
+
+
+## Why
+Without SessionEnd SIGTERM, collectors either persist past session lifetime (waiting for a launcher SIGTERM that may never fire after launcher SIGKILL), or get reaped by OS cleanup with spans still in their batch buffer — losing them. Without retention, .htmlgraph/sessions/ grows unbounded over months. Using stdlib gzip (rather than zstd) keeps the retention pipeline dependency-free — compression ratio on NDJSON log files is secondary to minimizing new dependencies at this scale. Restoring an archived session is supported so lineage queries over historical transcripts still work. This slice closes the correctness gaps named in Q3 (primary + secondary drain layers) and the operational gaps noted in the design discussion.
+
+
+## Done When
+- SessionEnd hook reads .collector-pid, sends SIGTERM, waits up to 3s, falls back to SIGKILL; the collector flush completes and the final NDJSON batch has no torn last line.
+- Retention job runs at serve boot and on a 24h timer; HTMLGRAPH_RETENTION_DRYRUN=1 logs intended archive/delete actions without moving files.
+- Retention archives use .tar.gz format via stdlib archive/tar + compress/gzip; no new go.mod dependency is introduced.
+- A session archived to .htmlgraph/archive/ is restorable via htmlgraph session restore ; the indexer picks up the restored NDJSON on next replay without duplicating rows.</p>
+        </section>
+    </article>
+</body>
+</html>

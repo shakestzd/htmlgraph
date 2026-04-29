@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Implement htmlgraph cache eviction &#43; cache subcommands</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-9b767422"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="high"
+             data-created="2026-04-27T10:50:56.82481"
+             data-updated="2026-04-28T00:34:25.172326" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Implement htmlgraph cache eviction &#43; cache subcommands</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="spk-dfb051a3.html" data-relationship="caused_by" data-since="2026-04-27T10:50:57.613266">Investigate ~/.cache/htmlgraph layout &#43; design eviction policy</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="412cdeef-bc20-424f-9b11-e6e716d579a6.html" data-relationship="implemented_in" data-since="2026-04-27T10:52:53.179248">session 412cdeef-bc20-424f-9b11-e6e716d579a6</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-27T10:50:56.828513">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-feat-9b767422-0" data-agent="claude-code">✅ Add internal/storage/evict.go with max-age and max-size eviction logic</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-1" data-agent="claude-code">✅ Add cmd/htmlgraph/cache.go with prune (with --dry-run) and stats subcommands</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-2" data-agent="claude-code">✅ Wire opportunistic prune into cmd/htmlgraph/root.go PersistentPreRun (only acts if last-prune marker is older than 7 days)</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-3" data-agent="claude-code">✅ Add unit tests for evict.go covering max-age max-size both-trigger empty-cache missing-cache</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-4" data-agent="claude-code">✅ Run quality gates: go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./...</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-5" data-agent="claude-code">✅ Write failing tests for storage.Evict [task:1]</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-6" data-agent="claude-code">✅ Implement internal/storage/evict.go [task:2]</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-7" data-agent="claude-code">✅ Add cmd/htmlgraph/cache.go with prune&#43;stats subcommands [task:3]</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-8" data-agent="claude-code">✅ Wire opportunistic prune into PersistentPreRunE [task:4]</li>
+                <li data-completed="true" data-step-id="step-feat-9b767422-9" data-agent="claude-code">✅ Quality gates &#43; commit [task:5]</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Spike spk-dfb051a3 found cache keying is sha256(abs(projectDir))[:16] in internal/storage/dbpath.go. One subdir per project holding a SQLite read-index. HTML in .htmlgraph/ is source of truth, so cache is regenerable and eviction is safe. Pre-2026-04-25 the cache was session/spawn keyed and exploded to 17843 subdirs (7.3 GB on one dev machine, killed the dev container with disk-full). New per-project scheme is correct but legacy entries and ephemeral-path entries (yolo worktrees, temp test paths) still accumulate without eviction. Add max-age 90d + max-size 1GB sweep plus operator visibility commands.</p>
+        </section>
+    </article>
+</body>
+</html>

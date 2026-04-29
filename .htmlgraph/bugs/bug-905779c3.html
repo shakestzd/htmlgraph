@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Devcontainer dashboard port collides with host</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-905779c3"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-26T10:40:05.087213"
+             data-updated="2026-04-26T10:40:37.352929" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Devcontainer dashboard port collides with host</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-26T10:40:05.091661">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bebc2f35-a728-46b6-9ec6-dc5822379ce0.html" data-relationship="implemented_in" data-since="2026-04-26T10:40:23.951473">session bebc2f35-a728-46b6-9ec6-dc5822379ce0</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Map devcontainer port 8088 -> container port 8080 in .devcontainer/devcontainer.json so the dashboard is reachable on host:8088 without colliding with anything on host:8080. Drop the now-redundant forwardPorts:[8080] and the portsAttributes block keyed on 8080. Update .devcontainer/README.md and .devcontainer/post-create.sh comment to reference http://localhost:8088.</p>
+        </section>
+    </article>
+</body>
+</html>

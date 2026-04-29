@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Render slice cards as the primary review surface</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-6dbc7112"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-28T17:30:35.597813"
+             data-updated="2026-04-28T18:33:46.436554" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>Render slice cards as the primary review surface</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1c14d560.html" data-relationship="planned_in" data-since="2026-04-28T17:30:35.619883">plan-1c14d560</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="bd8ae45f-dc5d-4abb-9741-28892ccf7767.html" data-relationship="implemented_in" data-since="2026-04-28T18:26:05.644331">session bd8ae45f-dc5d-4abb-9741-28892ccf7767</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-44d8c24f.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.699796">feat-44d8c24f</a></li>
+                    <li><a href="feat-33807582.html" data-relationship="blocked_by" data-since="2026-04-28T17:30:35.705207">feat-33807582</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-04-28T17:30:35.608593">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>### What Changes
+
+Replace the plan review page's document-centered sections with a
+slice-centered layout. Each slice card should render:
+
+- Markdown spec from `what`
+- Markdown rationale from `why`
+- structured `done_when`
+- Markdown test strategy from `tests`
+- files and dependencies
+- slice-local questions
+- critic revision badges
+- approval status
+- execution/promotion status
+
+Keep a compact plan-level overview for goals and cross-cutting constraints,
+but remove global questions and global critique from the main review flow
+for v2 plans.
+
+Reconciliation with existing template: internal/plantmpl/templates/slice_card.gohtml:22-23 already emits `` approval checkboxes that are live in production for slice-level approval. The new approval_status rendering in this slice MUST replace or extend that markup, not add alongside, to avoid two parallel approval state mechanisms. The data-section key 'slice-' for slice-level approvals is already in use and matches the section-naming contract from slice-1, so reuse it directly for the approve-slice action.
+
+### Local Question
+
+Should the UI keep an expandable review-history drawer for raw critic
+output?
+
+Recommended answer: yes, but only as secondary evidence, not as a required
+approval section.
+
+### Critic Revision Badge
+
+`Review UX revised` - critique is shown where it changed the slice, not as
+an appendix.
+
+
+## Why
+The observed failure mode is human review fatigue. Reviewers do not read
+every global section carefully, especially when plans get long.
+
+Putting all slice-relevant context in one card makes approval local and
+concrete.
+
+
+## Done When
+- A v2 plan renders with slice cards as the main content and no mandatory global critique/questions sections.
+- Slice-local questions can be answered from inside the card and persist across refresh.
+- Critic revision badges render on affected slices with severity/source/summary.
+- Markdown inside slice fields renders consistently without YAML block-scalar formatting artifacts.
+- Mobile and desktop layouts keep card text readable without overlap.
+- Existing data-section='slice-' approval checkbox at internal/plantmpl/templates/slice_card.gohtml:22-23 is reconciled — either replaced by the new approval_status rendering or extended to display approval_status alongside the checkbox. No two parallel approval mechanisms remain in the rendered slice card.</p>
+        </section>
+    </article>
+</body>
+</html>

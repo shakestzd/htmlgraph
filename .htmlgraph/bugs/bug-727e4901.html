@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Auto-clean legacy SQLite DB instead of warning forever</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-727e4901"
+             data-type="bug"
+             data-status="done"
+             data-priority="low"
+             data-created="2026-04-28T17:23:05.68197"
+             data-updated="2026-04-28T18:10:03.438432" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Auto-clean legacy SQLite DB instead of warning forever</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-low">Low Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-28T17:23:05.686394">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="8ff7a992-81ab-4d4a-bf1c-df69e93576a6.html" data-relationship="implemented_in" data-since="2026-04-28T17:36:48.165147">session 8ff7a992-81ab-4d4a-bf1c-df69e93576a6</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>internal/storage/dbpath.go WarnIfLegacyDBPresent prints a nag warning on every htmlgraph CLI invocation — visible twice during 'htmlgraph claude --dev' launch. Replace with auto-cleanup: if canonical cache DB exists and is non-empty, silently delete the legacy .htmlgraph/htmlgraph.db (and empty .htmlgraph/.db/ dir). Only warn when canonical DB is missing/empty so the user isn't deleting their only copy. Also fix display rounding: %.0f MB shows 430KB as 0 MB — use %.1f. Leave .corrupt-* files alone (not in LegacyProjectDBPaths). Update tests in internal/storage/dbpath_test.go and any callers in cmd/htmlgraph/main.go.</p>
+        </section>
+    </article>
+</body>
+</html>

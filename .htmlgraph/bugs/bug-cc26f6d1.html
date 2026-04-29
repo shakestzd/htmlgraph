@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Stale doc claim: orchestrator skill says team_name is recorded, but no field/DB write exists</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-cc26f6d1"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-04-26T08:09:35.792433"
+             data-updated="2026-04-26T08:09:35.800458" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>Stale doc claim: orchestrator skill says team_name is recorded, but no field/DB write exists</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-04-26T08:09:35.80021">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>plugin/skills/orchestrator-directives-skill/SKILL.md:964 claims team_name is recorded per agent-teams event. Verified false: CloudEvent struct in internal/hooks/runner.go:59-67 has no TeamName field, and no DB write for team_name exists in internal/hooks/missing_events.go (TeammateIdle/TaskCreated/TaskCompleted handlers L113-256). Attribution is keyed off TeammateName only.
+
+Fix: either (a) remove the team_name line from the skill doc, or (b) wire it up — add TeamName to CloudEvent, parse it in the three team handlers, and persist to agent_events. Option (a) is the minimum; option (b) would unlock per-team analytics if multiple teams ever run in one project.</p>
+        </section>
+    </article>
+</body>
+</html>

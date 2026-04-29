@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Cache eviction must also prune entries whose project path no longer exists</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-cc41e3d2"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-04-28T03:16:12.375341"
+             data-updated="2026-04-28T11:04:33.77584" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Cache eviction must also prune entries whose project path no longer exists</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-28T03:16:12.379373">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="28d472a3-0624-4a3c-b343-dd7e02324101.html" data-relationship="implemented_in" data-since="2026-04-28T10:45:42.916233">session 28d472a3-0624-4a3c-b343-dd7e02324101</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Dashboard /api/projects returned 2042 entries on a single dev machine — 1 real (htmlgraph), 2041 ghosts named '001'/'002' (Go test tempdirs). Root cause is NOT in cache subdirs or any SQL table. The data lives in a JSON registry at the user data dir ($XDG_DATA_HOME/htmlgraph/projects.json or HOME fallback).
+
+Code references (verified):
+- Handler: cmd/htmlgraph/serve_global.go:56 (buildGlobalMux), worker listRegisteredProjects() at :80, reads registry.Load(registry.DefaultPath()).
+- Upsert call sites that pollute the registry: cmd/htmlgraph/serve_parent.go:127 and cmd/htmlgraph/main.go:336 — both fire on every htmlgraph invocation against any directory containing .htmlgraph/.
+- registry.DefaultPath() at internal/registry/registry.go:196.
+- Prune() exists on Registry (filters entries whose project_dir+/.htmlgraph still exists) but is never called automatically.
+
+Evidence the bug recurs without intervention: a backup file projects.json.bak-20260426-071343 exists from a prior manual cleanup someone did two days ago. PR #60 fixed test pollution into the user CACHE (HTMLGRAPH_DB_PATH) but did NOT redirect XDG_DATA_HOME, so the registry kept growing.
+
+Durable fix — 5 layers, all required:
+
+Layer 1 (test isolation): cmd/htmlgraph/testmain_test.go must set XDG_DATA_HOME and XDG_CONFIG_HOME to t.TempDir() in TestMain, alongside the existing HTMLGRAPH_DB_PATH redirection. Verify registry.DefaultPath() honors XDG_DATA_HOME (read the function; if it does not, add support).
+
+Layer 2 (auto-prune at the registry boundary): in internal/registry/registry.go, call r.Prune() immediately before r.Save() inside Upsert(). Also call Prune+Save once on serve startup in cmd/htmlgraph/serve_global.go.
+
+Layer 3 (Upsert input validation): refuse to insert when projectDir is not inside a git repository OR has no .htmlgraph subdir. Add a private looksLikeRealProject(dir string) bool helper that does both stat checks. Test tempdirs are never in a git repo so they get rejected at the write boundary.
+
+Layer 4 (regression test): add internal/registry/registry_test.go::TestNoRegistryPollution that snapshots the registry entry count, runs an htmlgraph operation from t.TempDir(), and asserts the count did not grow. This is the load-bearing artifact — it prevents future call sites from regressing the fix.
+
+Layer 5 (operator escape hatch): cmd/htmlgraph/projects.go (new file) with subcommands 'htmlgraph projects list' (shows id/name/dir/last_seen, optionally with --gone filter) and 'htmlgraph projects prune' (loads, prunes, saves; reports count removed). Wire into the cobra command tree.
+
+Implementation order matters: Layer 1 first so subsequent test runs do not pollute the developer's real registry during development.
+
+Quality gate: go build ./... && go vet ./... && go test ./... must all pass. Layer 4's regression test must pass.
+
+Verify by: htmlgraph projects list (expect 1 entry); go test ./... twice; htmlgraph projects list (expect still 1 entry, no growth).</p>
+        </section>
+    </article>
+</body>
+</html>

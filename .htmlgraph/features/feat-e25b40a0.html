@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Bridge OTel prompt_id into agent_events for stable turn attribution</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-e25b40a0"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-25T04:11:39.065826"
+             data-updated="2026-04-25T04:15:26.164188" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>Bridge OTel prompt_id into agent_events for stable turn attribution</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="02edc6c7-3b77-405f-820c-1dc77cc381ea.html" data-relationship="implemented_in" data-since="2026-04-25T04:12:36.683094">session 02edc6c7-3b77-405f-820c-1dc77cc381ea</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-25T04:11:39.068895">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When NDJSON indexer processes a user_prompt log record, extract prompt_id and write it to the corresponding agent_events UserQuery row. Enables hook-side events to join OTel spans by stable turn identity instead of timestamp proximity</p>
+        </section>
+    </article>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>htmlgraph otel-collect subcommand</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-56aa1d48"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-24T22:29:21.252306"
+             data-updated="2026-04-26T19:49:42.286374" data-agent-assigned="claude-code" data-track-id="trk-c4615ad2">
+
+        <header>
+            <h1>htmlgraph otel-collect subcommand</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-c4615ad2.html" data-relationship="part_of" data-since="2026-04-24T22:29:21.254105">trk-c4615ad2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="c95933d1-92d9-4aed-9abe-be5b24d902e3.html" data-relationship="implemented_in" data-since="2026-04-24T23:57:26.506153">session c95933d1-92d9-4aed-9abe-be5b24d902e3</a></li>
+                    <li><a href="02edc6c7-3b77-405f-820c-1dc77cc381ea.html" data-relationship="implemented_in" data-since="2026-04-25T04:35:12.099782">session 02edc6c7-3b77-405f-820c-1dc77cc381ea</a></li>
+                    <li><a href="7c4712e0-782f-415b-8614-a9affbfd7524.html" data-relationship="implemented_in" data-since="2026-04-26T18:42:03.038335">session 7c4712e0-782f-415b-8614-a9affbfd7524</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-1cd284e0.html" data-relationship="planned_in" data-since="2026-04-24T22:29:21.255542">plan-1cd284e0</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-3a65c5ca.html" data-relationship="blocked_by" data-since="2026-04-24T22:29:21.291529">feat-3a65c5ca</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>New CLI subcommand htmlgraph otel-collect --session-id  --project-dir  --listen :0. On start, constructs a receiver.Receiver wired to NDJSONSink rooted at .htmlgraph/sessions//, chooses an ephemeral port via net.Listen(:0), and prints the chosen address on stdout using the existing serve_child.go:70 handshake convention: htmlgraph-otel-ready port= as a single line (no prefix/suffix writes). All internal logging routes to stderr so the stdout handshake line is never mingled with diagnostics. Handles SIGTERM gracefully: flush pending batch (bounded 3s or less), close sink, exit 0. Implements the Q3 layered-all-three safety net third layer: if HTMLGRAPH_OTEL_IDLE_TIMEOUT (default 5 minutes) elapses with no incoming OTLP traffic, the collector self-exits 0 after flushing. Emits a collector_start NDJSON line on boot. Registered as a cobra subcommand in cmd/htmlgraph/main.go:248-273.
+
+
+## Why
+The collector must run as a separate process to achieve lifecycle independence from serve. Reusing the existing htmlgraph-*-ready port= handshake from serve_child.go:70 means launcher port-capture code (slice 3) follows an already-proven pattern rather than inventing a new one. SIGTERM drain is the only shutdown path that preserves in-flight spans. Forcing the launcher to pass session-id via flag closes the HTMLGRAPH_SESSION_ID env-leak misattribution at runner.go:187. The idle-timeout is the third layer of Q3 defense-in-depth policy and lives in the collector itself rather than in any hook, because only the collector can observe its own OTLP traffic silence. Supports goal Launcher-owned session identity.
+
+
+## Done When
+- htmlgraph otel-collect --session-id 01HK... --project-dir /tmp/proj --listen :0 prints a single htmlgraph-otel-ready port= line on stdout within 500ms of start; all logging routes to stderr.
+- POSTing an OTLP protobuf to the printed port produces a corresponding NDJSON line in .htmlgraph/sessions/01HK.../events.ndjson within 500ms.
+- SIGTERM drains the pending batch and exits 0 within 3s; SIGKILL accepted without corrupting NDJSON beyond the last partial line.
+- HTMLGRAPH_OTEL_IDLE_TIMEOUT (default 5m) with no OTLP traffic triggers graceful self-exit 0 after flushing; overridable via env var for tests.
+- collector_start event is the first line of the NDJSON file and contains htmlgraph_sid, pid, port, ts.</p>
+        </section>
+    </article>
+</body>
+</html>

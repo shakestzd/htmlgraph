@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmlgraph-version" content="1.0">
+    <title>Activity Feed does not render end-of-turn Stop events as final assistant message</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-6a4cc391"
+             data-type="bug"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-04-24T02:13:53.891197"
+             data-updated="2026-04-24T02:26:35.465905" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Activity Feed does not render end-of-turn Stop events as final assistant message</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-04-24T02:13:53.894868">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="5d76afd1-7d5b-49f6-8b45-56a9ba4e96c8.html" data-relationship="implemented_in" data-since="2026-04-24T02:17:01.51955">session 5d76afd1-7d5b-49f6-8b45-56a9ba4e96c8</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>When a turn ends, the Stop hook writes an agent_event with event_type='end', tool_name='Stop', and the full last assistant message in input_summary (verified for turn at 2026-04-24T02:08:32Z — 'Full post-rebuild pipeline validated:' table present verbatim). The Activity Feed currently either skips these events or shows them as a generic 'Agent stopped:' header, so the user sees tool_calls but no trailing assistant message to close the turn. Fix: render Stop events as a trailing assistant-style block matching the mid-turn assistant message treatment from 93d77cbc, with markdown and collapse-preview. Files: cmd/htmlgraph/dashboard/components/event-tree.js (rendering branch for end events), cmd/htmlgraph/dashboard/css/components.css (if new token needed).</p>
+        </section>
+    </article>
+</body>
+</html>
