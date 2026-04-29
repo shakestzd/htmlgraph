@@ -230,13 +230,23 @@ existing default:
    instead of degraded silent mode. Operators running CI or production
    sessions where missing telemetry is itself a failure should set this.
 
-3. **Watchdog respawn**
-   (`startCollectorWatchdog` / `HTMLGRAPH_OTEL_WATCHDOG_INTERVAL`). On
-   by default, 15s polling interval. Detects mid-session collector death
-   and respawns. The new collector listens on a fresh port; OTel traffic
-   between the death and the respawn is lost (the harness keeps writing
-   to the old port). This is an intentional v1 simplification — see ADR
-   forward considerations below.
+3. **Watchdog respawn with port preservation**
+   (`StartWatchdog` / `HTMLGRAPH_OTEL_WATCHDOG_INTERVAL`). On by
+   default, 15s polling interval. Detects mid-session collector death
+   and respawns the collector binding the **same port** as the original
+   spawn, so the harness's OTLP exporter endpoint remains valid across
+   restarts. OTel traffic emitted between the death and the respawn is
+   still lost (the harness keeps retrying against a temporarily dead
+   port), but traffic resumes once the new collector binds. The race
+   window where another process could grab the port between collector
+   exit and respawn is small on a 127.0.0.1 ephemeral range; if the
+   rebind fails, the watchdog logs a FATAL line and stops. The
+   `ProcessCollector` tracks the current process via
+   `atomic.Pointer[*os.Process]` so launcher cleanup terminates the
+   *current* collector (not the original), and per-process reaper
+   goroutines remove `.collector-pid` only when the file's contents
+   still match the reaped PID — making the cleanup race-free across
+   respawns and idle exits.
 
 The status surface (`/api/otel/status` and the `Collector health:` block
 in `htmlgraph status`) lets operators verify all three are working
@@ -245,13 +255,14 @@ is rejected via `isSafeSessionID` before any filesystem access.
 
 ## Future work
 
-- **Zero-gap respawn.** The current watchdog respawn loses telemetry
-  between the time the old collector dies and the time the harness's
-  next OTel request fails. A localhost redirect shim on the original
-  port (a small TCP proxy that forwards to the live collector) would
-  close the gap. Cost is one more goroutine and a port-rebind handshake
-  between watchdog and shim. Worth doing if real-world incidents show
-  the gap matters.
+- **Zero-gap respawn.** The watchdog already preserves the port across
+  respawns, so harness retries land on the new collector once it binds.
+  Telemetry emitted *during* the gap (between old-collector death and
+  new-collector ready) is still lost. A localhost redirect shim on the
+  original port (a small TCP proxy that buffers in-flight requests
+  during the rebind window) would close that residual gap. Cost is one
+  more goroutine plus buffered-write semantics. Worth doing if
+  real-world incidents show the residual gap matters.
 - **Daemon-mode option.** A `htmlgraph daemon --multi-session` mode for
   power users who run many parallel sessions and want a single
   long-lived collector. Would require extending `Lifecycle` with a
@@ -259,12 +270,16 @@ is rejected via `isSafeSessionID` before any filesystem access.
   Probably belongs in a separate plan.
 - **Adapter for Cursor / Aider / others.** Bias toward shipping these as
   separate adapters rather than special-casing the existing ones.
-- **Process-identity check on `.collector-pid`.** The current liveness
-  check uses `kill(pid, 0)`, which is racy under PID reuse. For most
-  desktop usage this is irrelevant, but in long-running CI workers a
-  start-time check (read `/proc/<pid>/stat` field 22, compare to the
-  remembered start-time) would be more robust. The fix is local; it
-  doesn't change any API.
+- **Process-identity check on `.collector-pid`.** The reaper now
+  removes the PID file only when its contents still match the reaped
+  PID, which closes the watchdog-respawn race. The remaining concern
+  is PID reuse: between the time a collector dies and the reaper runs,
+  the kernel could recycle the PID for an unrelated process; a
+  `Signal(0)` probe by `/api/otel/status` would then incorrectly report
+  `alive=true`. For desktop usage this is essentially never seen, but
+  long-running CI workers might benefit from a start-time check (read
+  `/proc/<pid>/stat` field 22 at write-time, compare at probe-time).
+  The fix is local; it doesn't change any API.
 - **TEST-1 escalation path.** The plan originally included a real-
   subprocess respawn integration test gated on `testing.Short()`. That
   test was deferred during this work — see `feat-e195d658` for the

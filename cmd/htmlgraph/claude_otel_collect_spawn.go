@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/otel/collector"
@@ -30,44 +31,35 @@ type otelEnvOverrides struct {
 	Cleanup       func() // called on launcher exit to SIGTERM the collector
 }
 
-// spawnCollectorFn is the package-level spawn function used by
-// retrySpawnCollector. Tests may replace it to inject a fake.
-var spawnCollectorFn = collector.DefaultSpawnFn
+// spawnCollectorFn is the package-level spawn function used by retry and
+// watchdog paths in this shim. Tests may replace it to inject a fake.
+var spawnCollectorFn collector.SpawnFn = collector.DefaultSpawnFn
 
-// spawnCollector starts an otel-collect child process, waits for its
-// handshake line ("htmlgraph-otel-ready port=<N>"), and returns the
-// port and process. Delegates to collector.DefaultSpawnFn.
+// spawnCollector starts an otel-collect child process and waits for its
+// handshake. Delegates to collector.DefaultSpawnFn with auto-port (0).
 //
 // binPath is the path to the htmlgraph binary to invoke. In production
 // callers should pass the result of os.Executable(); tests pass a
 // pre-built test binary.
 func spawnCollector(binPath, sessionID, projectDir string) (int, *os.Process, error) {
-	return collector.DefaultSpawnFn(binPath, sessionID, projectDir)
+	return collector.DefaultSpawnFn(binPath, sessionID, projectDir, 0)
 }
 
 // retrySpawnCollector attempts to spawn the collector up to maxAttempts times.
-// Backoff delays between attempts are: 100ms, 300ms, 700ms (indices 0, 1, 2).
 // spawnFn overrides the package-level spawnCollectorFn when non-nil (for tests).
-// After each non-final failure a warning line is written to warnW.
-// Returns the port, process, number of attempts made, and any final error.
-func retrySpawnCollector(binPath, sessionID, projectDir string, maxAttempts int, spawnFn func(string, string, string) (int, *os.Process, error), warnW io.Writer) (int, *os.Process, int, error) {
+// requestedPort is fixed at 0 (auto-assign) for this shim entry point.
+func retrySpawnCollector(binPath, sessionID, projectDir string, maxAttempts int, spawnFn collector.SpawnFn, warnW io.Writer) (int, *os.Process, int, error) {
 	if spawnFn == nil {
 		spawnFn = spawnCollectorFn
 	}
-	return collector.RetrySpawn(binPath, sessionID, projectDir, maxAttempts, spawnFn, warnW)
+	return collector.RetrySpawn(binPath, sessionID, projectDir, 0, maxAttempts, spawnFn, warnW)
 }
 
-// startCollectorWatchdog launches a goroutine that polls the collector process.
-// On process death it calls retrySpawnCollector and updates the current process.
-// Returns a stop func that terminates the goroutine.
-func startCollectorWatchdog(initialProc *os.Process, binPath, sessionID, projectDir string, warnW io.Writer) func() {
-	return collector.StartWatchdog(initialProc, binPath, sessionID, projectDir, warnW, spawnCollectorFn, "HTMLGRAPH_OTEL_WATCHDOG_INTERVAL")
-}
-
-// registerCollectorCleanup returns a cleanup function that sends SIGTERM,
-// waits up to 3s, then SIGKILLs, and removes the .collector-pid file.
-func registerCollectorCleanup(proc *os.Process, projectDir, sessionID string) func() {
-	return collector.RegisterCleanup(proc, projectDir, sessionID)
+// startCollectorWatchdog launches a goroutine that polls the current process
+// in procPtr. On death it respawns on originalPort and stores the new
+// process. The returned stop func blocks until the goroutine exits.
+func startCollectorWatchdog(procPtr *atomic.Pointer[os.Process], originalPort int, binPath, sessionID, projectDir string, warnW io.Writer) func() {
+	return collector.StartWatchdog(procPtr, originalPort, binPath, sessionID, projectDir, warnW, spawnCollectorFn, "HTMLGRAPH_OTEL_WATCHDOG_INTERVAL")
 }
 
 // writeCollectorPID writes the collector PID to the session directory.
@@ -76,25 +68,23 @@ func writeCollectorPID(projectDir, sessionID string, pid int) {
 	collector.WriteCollectorPID(projectDir, sessionID, pid)
 }
 
-// spawnSessionCollectorTo is the testable core of collector spawning.
-// It generates a session ID, spawns the collector at binPath (with up to 3
-// retry attempts using exponential backoff), and returns overrides and a
-// wantExit flag. On spawn failure it always writes a FATAL line to errW;
-// wantExit is true only when HTMLGRAPH_OTEL_STRICT=1.
+// spawnSessionCollectorTo is the testable core of collector spawning. It
+// constructs a ProcessCollector configured with the package-level
+// spawnCollectorFn (so tests can inject fakes via that variable) and calls
+// Spawn. On spawn failure, returns an empty overrides and wantExit=true
+// when HTMLGRAPH_OTEL_STRICT=1.
 func spawnSessionCollectorTo(projectDir, binPath string, errW io.Writer) (otelEnvOverrides, bool) {
 	sessionID := generateOtelSessionID()
+	pc := collector.NewProcessCollector(collector.ProcessCollectorOpts{
+		Stderr:  errW,
+		SpawnFn: spawnCollectorFn,
+	})
 
-	port, proc, attempts, err := retrySpawnCollector(binPath, sessionID, projectDir, 3, nil, errW)
+	port, cleanup, err := pc.Spawn(binPath, sessionID, projectDir)
 	if err != nil {
-		fmt.Fprintf(errW, "htmlgraph: FATAL: collector spawn failed after %d attempts: %v\n", attempts, err)
 		wantExit := os.Getenv("HTMLGRAPH_OTEL_STRICT") == "1"
 		return otelEnvOverrides{}, wantExit
 	}
-
-	writeCollectorPID(projectDir, sessionID, proc.Pid)
-	stopWatchdog := startCollectorWatchdog(proc, binPath, sessionID, projectDir, errW)
-	baseCleanup := registerCollectorCleanup(proc, projectDir, sessionID)
-	cleanup := func() { stopWatchdog(); baseCleanup() }
 
 	return otelEnvOverrides{
 		CollectorPort: port,
