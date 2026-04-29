@@ -5,7 +5,7 @@ meta:
     description: 'Closes four gaps in the v2 plan system surfaced by an audit of commitPlanChange and section-targeted update flow: (1) approve/reject-slice write YAML but skip git commit, (2) set-slice-status and answer-slice-question are SQLite-only and never reach the YAML, (3) plan render leaves uncommitted HTML drift, (4) no concurrency protection around load-mutate-save. Also delivers the per-slice compression project (questions/critique/feedback embedded in slices instead of plan-level) which is the schema foundation that makes (2) routable.'
     created_at: "2026-04-29"
     status: draft
-    version: 13
+    version: 14
 design:
     problem: ""
     goals: []
@@ -198,4 +198,16 @@ questions:
           label: In-memory mutex (single process)
         - key: both
           label: Both — mutex inside
+      answer: null
+    - id: q-migration-mode-explicit-verb-only-or-aut
+      text: 'Migration mode: explicit verb only, or auto-on-load?'
+      description: Slice 7 introduces htmlgraph plan migrate. Should it be explicit-only (user opts in), or should planyaml.Load auto-migrate when it detects the old shape (writing the migrated YAML back via commitPlanChange)?
+      recommended: explicit
+      options:
+        - key: explicit
+          label: Explicit verb only
+        - key: auto
+          label: Auto-migrate on Load
+        - key: prompt
+          label: Prompt user on first read
       answer: null
