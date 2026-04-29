@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -140,5 +141,51 @@ func TestWriteCollectorPID_CreatesDirectories(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Error("session dir is not a directory")
+	}
+}
+
+// TestSpawnFailLoudStrict verifies that when HTMLGRAPH_OTEL_STRICT=1 and
+// collector spawn fails, spawnSessionCollectorTo emits a FATAL line on the
+// provided stderr writer and returns wantExit=true.
+func TestSpawnFailLoudStrict(t *testing.T) {
+	t.Setenv("HTMLGRAPH_OTEL_STRICT", "1")
+
+	var buf bytes.Buffer
+	projectDir := t.TempDir()
+
+	overrides, wantExit := spawnSessionCollectorTo(projectDir, "/nonexistent/binary", &buf)
+
+	stderr := buf.String()
+	if !strings.Contains(stderr, "htmlgraph: FATAL:") {
+		t.Errorf("expected FATAL line on stderr, got: %q", stderr)
+	}
+	if !wantExit {
+		t.Error("expected wantExit=true when HTMLGRAPH_OTEL_STRICT=1 and spawn fails")
+	}
+	if overrides.CollectorPort != 0 || overrides.SessionID != "" || overrides.Cleanup != nil {
+		t.Errorf("expected zero-value overrides on failure, got: %+v", overrides)
+	}
+}
+
+// TestSpawnQuietByDefault verifies that without HTMLGRAPH_OTEL_STRICT, a
+// failed spawn still emits a FATAL line on stderr but returns wantExit=false
+// and zero-value overrides (degraded mode).
+func TestSpawnQuietByDefault(t *testing.T) {
+	t.Setenv("HTMLGRAPH_OTEL_STRICT", "")
+
+	var buf bytes.Buffer
+	projectDir := t.TempDir()
+
+	overrides, wantExit := spawnSessionCollectorTo(projectDir, "/nonexistent/binary", &buf)
+
+	stderr := buf.String()
+	if !strings.Contains(stderr, "htmlgraph: FATAL:") {
+		t.Errorf("expected FATAL line on stderr even without strict mode, got: %q", stderr)
+	}
+	if wantExit {
+		t.Error("expected wantExit=false when HTMLGRAPH_OTEL_STRICT is not set")
+	}
+	if overrides.CollectorPort != 0 || overrides.SessionID != "" || overrides.Cleanup != nil {
+		t.Errorf("expected zero-value overrides on failure, got: %+v", overrides)
 	}
 }
