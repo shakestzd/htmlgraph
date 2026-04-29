@@ -286,7 +286,7 @@ textarea::placeholder{color:var(--text-muted)}
   <p style="color:var(--text-dim)">Adds steps 2 (disaggregate into a logic/issue tree) and 3 (prioritize branches by impact x tractability) of Conn & McLean's Bulletproof Problem Solving on top of the v2 plan system. Today CRISPI maps onto steps 1, 4, 5, 6, 7 but skips 2 and 3 — slice prioritization is by-eye and decomposition is implicit. The tree captures the pre-history of each slice, gives critic agents tree-completeness as a critique target, and gives htmlgraph:execute a real prioritization signal beyond dependency order. Depends on PLAN A's compressed schema landing first.</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v9 · 5 slices · Created 2026-04-29</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v10 · 5 slices · Created 2026-04-29</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -485,6 +485,19 @@ textarea::placeholder{color:var(--text-muted)}
       <textarea data-section="questions" data-question-rationale="q-tree-mandatory-threshold-at-n-candidate" placeholder="Rationale for q-tree-mandatory-threshold-at-n-candidate..."></textarea>
     </div>
     
+    <div class="question-block" id="q-tree-as-separate-top-level-field-or-fold">
+      <p>Tree as separate top-level field or fold into design?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-tree-as-separate-top-level-field-or-fold" data-question="q-tree-as-separate-top-level-field-or-fold" value="Separate top-level tree:"> Separate top-level tree: <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-tree-as-separate-top-level-field-or-fold" data-question="q-tree-as-separate-top-level-field-or-fold" value="design.tree nested"> design.tree nested</label>
+      
+      <label><input type="radio" name="q-tree-as-separate-top-level-field-or-fold" data-question="q-tree-as-separate-top-level-field-or-fold" value="tree top-level &#43; design.tree pointer"> tree top-level &#43; design.tree pointer</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-tree-as-separate-top-level-field-or-fold" placeholder="Rationale for q-tree-as-separate-top-level-field-or-fold..."></textarea>
+    </div>
+    
     <table class="q-table">
       <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
       <tbody id="questionsRecap">
@@ -497,6 +510,12 @@ textarea::placeholder{color:var(--text-muted)}
         
         <tr data-recap-for="q-tree-mandatory-threshold-at-n-candidate">
           <td>Tree mandatory threshold: at &gt;=N candidate slices?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-tree-as-separate-top-level-field-or-fold">
+          <td>Tree as separate top-level field or fold into design?</td>
           <td class="recap-answer">&mdash;</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
