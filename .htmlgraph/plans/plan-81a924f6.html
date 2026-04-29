@@ -286,7 +286,7 @@ textarea::placeholder{color:var(--text-muted)}
   <p style="color:var(--text-dim)">Closes four gaps in the v2 plan system surfaced by an audit of commitPlanChange and section-targeted update flow: (1) approve/reject-slice write YAML but skip git commit, (2) set-slice-status and answer-slice-question are SQLite-only and never reach the YAML, (3) plan render leaves uncommitted HTML drift, (4) no concurrency protection around load-mutate-save. Also delivers the per-slice compression project (questions/critique/feedback embedded in slices instead of plan-level) which is the schema foundation that makes (2) routable.</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 0 slices · Created 2026-04-29</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v3 · 1 slices · Created 2026-04-29</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -306,6 +306,7 @@ textarea::placeholder{color:var(--text-muted)}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Hotfix: auto-commit on approve-slice and reject-slice" data-status="pending" data-deps="" data-files="2"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -337,7 +338,28 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    
+    <div class="slice-card" data-slice="1" data-slice-name="slic-6989fa43" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">Hotfix: auto-commit on approve-slice and reject-slice</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add commitPlanChange call at the end of runApproveSlice and runRejectSlice in cmd/htmlgraph/plan_*.go so approval state changes land in git as standalone commits with a descriptive message (e.g. &#39;plan: approve slice &lt;num&gt; in &lt;plan-id&gt;&#39;).</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Today both verbs call updateSliceYAMLApproval (which saves YAML) but never call commitPlanChange. Approval changes sit uncommitted on disk until the next mutating verb sweeps them up — breaking the &#39;every change is a commit&#39; invariant and erasing audit trail of who approved what when.</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/plan_approve_slice.go, cmd/htmlgraph/plan_reject_slice.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">git log shows a dedicated commit for each approve/reject call</li><li data-markdown="">Existing approval-related tests still pass</li><li data-markdown="">New test covers the commit-on-approve path</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">TestApproveSlice_CreatesGitCommit, TestRejectSlice_CreatesGitCommit</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
@@ -364,8 +386,8 @@ textarea::placeholder{color:var(--text-muted)}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">2</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">2</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -469,7 +491,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');

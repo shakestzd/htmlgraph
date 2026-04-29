@@ -5,12 +5,30 @@ meta:
     description: 'Closes four gaps in the v2 plan system surfaced by an audit of commitPlanChange and section-targeted update flow: (1) approve/reject-slice write YAML but skip git commit, (2) set-slice-status and answer-slice-question are SQLite-only and never reach the YAML, (3) plan render leaves uncommitted HTML drift, (4) no concurrency protection around load-mutate-save. Also delivers the per-slice compression project (questions/critique/feedback embedded in slices instead of plan-level) which is the schema foundation that makes (2) routable.'
     created_at: "2026-04-29"
     status: draft
-    version: 2
+    version: 3
 design:
     problem: ""
     goals: []
     constraints: []
     approved: false
     comment: ""
-slices: []
+slices:
+    - id: slic-6989fa43
+      num: 1
+      title: 'Hotfix: auto-commit on approve-slice and reject-slice'
+      what: 'Add commitPlanChange call at the end of runApproveSlice and runRejectSlice in cmd/htmlgraph/plan_*.go so approval state changes land in git as standalone commits with a descriptive message (e.g. ''plan: approve slice <num> in <plan-id>'').'
+      why: Today both verbs call updateSliceYAMLApproval (which saves YAML) but never call commitPlanChange. Approval changes sit uncommitted on disk until the next mutating verb sweeps them up — breaking the 'every change is a commit' invariant and erasing audit trail of who approved what when.
+      files:
+        - cmd/htmlgraph/plan_approve_slice.go
+        - cmd/htmlgraph/plan_reject_slice.go
+      deps: []
+      done_when:
+        - git log shows a dedicated commit for each approve/reject call
+        - Existing approval-related tests still pass
+        - New test covers the commit-on-approve path
+      effort: S
+      risk: Low
+      tests: TestApproveSlice_CreatesGitCommit, TestRejectSlice_CreatesGitCommit
+      approved: false
+      comment: ""
 questions: []
