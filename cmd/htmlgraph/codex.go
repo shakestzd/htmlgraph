@@ -597,18 +597,5 @@ func execCodex(opts codexLaunchOpts) error {
 		c.Dir = workDir
 	}
 
-	if err := c.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			// os.Exit bypasses deferred cleanups. Run the collector
-			// cleanup synchronously here; the deferred call is now a
-			// no-op (cleanup is idempotent via sync.Once in the
-			// lifecycle package).
-			if otelCleanup != nil {
-				otelCleanup()
-			}
-			os.Exit(exitErr.ExitCode())
-		}
-		return err
-	}
-	return nil
+	return runHarnessWithCleanup(c, otelCleanup)
 }
