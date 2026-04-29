@@ -19,24 +19,32 @@ import (
 //     persistentPreRunE (or any code path calling registry.DefaultPath) never
 //     touch ~/.local/share/htmlgraph/projects.json during test runs (bug-cc41e3d2).
 //  3. Cleans up the binary temp dir created by buildOtelCollectTestBinary.
+//
+// Cleanup runs explicitly before os.Exit; deferred cleanups would never fire
+// because os.Exit skips deferred functions.
 func TestMain(m *testing.M) {
 	worktree.SetReindexFnForTest(func(string, io.Writer) {})
 
 	// Redirect XDG base dirs to isolated tempdirs.
 	xdgData, err := os.MkdirTemp("", "htmlgraph-test-xdg-data-*")
 	if err == nil {
-		os.Setenv("XDG_DATA_HOME", xdgData)   //nolint:errcheck
-		defer os.RemoveAll(xdgData)
+		os.Setenv("XDG_DATA_HOME", xdgData) //nolint:errcheck
 	}
 	xdgConfig, err2 := os.MkdirTemp("", "htmlgraph-test-xdg-config-*")
 	if err2 == nil {
 		os.Setenv("XDG_CONFIG_HOME", xdgConfig) //nolint:errcheck
-		defer os.RemoveAll(xdgConfig)
 	}
 
 	code := m.Run()
-	if otelCollectTestBinaryTmpDir != "" {
-		_ = os.RemoveAll(otelCollectTestBinaryTmpDir)
+
+	if xdgData != "" {
+		_ = os.RemoveAll(xdgData)
+	}
+	if xdgConfig != "" {
+		_ = os.RemoveAll(xdgConfig)
+	}
+	if otelCollectTestBinary != "" {
+		_ = os.RemoveAll(filepath.Dir(otelCollectTestBinary))
 	}
 	os.Exit(code)
 }
