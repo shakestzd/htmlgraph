@@ -280,20 +280,7 @@ func execGemini(opts geminiLaunchOpts) error {
 	env = buildGeminiOtelEnv(env, otelPort, otelSessionID)
 	c.Env = env
 
-	if err := c.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			// os.Exit bypasses deferred cleanups. Run the collector
-			// cleanup synchronously here; the deferred call is now a
-			// no-op (cleanup is idempotent via sync.Once in the
-			// lifecycle package).
-			if otelCleanup != nil {
-				otelCleanup()
-			}
-			os.Exit(exitErr.ExitCode())
-		}
-		return err
-	}
-	return nil
+	return runHarnessWithCleanup(c, otelCleanup)
 }
 
 // launchGeminiDefault launches Gemini interactively with HtmlGraph env injection.
