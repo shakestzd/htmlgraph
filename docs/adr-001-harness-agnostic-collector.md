@@ -255,11 +255,20 @@ is rejected via `isSafeSessionID` before any filesystem access.
 
 The cleanup function returned by `ProcessCollector.Spawn` is wrapped in
 `sync.Once` so it can be safely invoked multiple times. This matters for
-the launcher pattern — `htmlgraph claude/codex/gemini` register cleanup
-via `defer` for normal/panic returns, but also call cleanup explicitly
-before `os.Exit(exitCode)` on non-zero harness exit (Ctrl-C or harness
-crash), since `os.Exit` bypasses deferred functions. The double-call
-under successful normal returns is harmless under `sync.Once`.
+the launcher pattern — three call sites need to invoke cleanup
+deterministically: deferred (panic / normal return), explicit before
+`os.Exit(exitCode)` on harness non-zero exit (Go's `os.Exit` bypasses
+defers), and from a signal handler when the launcher itself receives
+SIGINT/SIGTERM. The third path is centralized in
+`cmd/htmlgraph/launch_run.go:runHarnessWithCleanup`, which all three
+launchers call instead of `c.Run()`. It registers `signal.Notify` for
+SIGINT/SIGTERM, runs the child concurrently, forwards a received
+signal to the child, runs cleanup once the child reaps, then re-raises
+the signal so the launcher's exit code reflects normal POSIX
+signal-exit semantics (128+signum). Without the signal handler,
+Ctrl-C against the launcher's terminal foreground group would skip
+both deferred and explicit cleanup, leaving collector processes and
+PID files stale until idle timeout.
 
 ## Future work
 

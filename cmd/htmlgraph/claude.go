@@ -527,20 +527,7 @@ func launchClaude(opts LaunchOpts) error {
 		c.Dir = opts.ProjectRoot
 	}
 
-	if err := c.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			// os.Exit bypasses deferred cleanups. Run the collector
-			// cleanup synchronously here; the deferred call is now a
-			// no-op (cleanup is idempotent via sync.Once in the
-			// lifecycle package).
-			if envOverrides.Cleanup != nil {
-				envOverrides.Cleanup()
-			}
-			os.Exit(exitErr.ExitCode())
-		}
-		return err
-	}
-	return nil
+	return runHarnessWithCleanup(c, envOverrides.Cleanup)
 }
 
 // writeLaunchMarker writes .htmlgraph/.launch-mode for hooks to detect the launch mode.
