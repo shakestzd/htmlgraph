@@ -29,7 +29,7 @@ func TestProcessCollector_Spawn_Success(t *testing.T) {
 	var buf bytes.Buffer
 	lc := collector.NewProcessCollector(collector.ProcessCollectorOpts{
 		Stderr: &buf,
-		SpawnFn: func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+		SpawnFn: func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 			return 12345, startSleepProc(t), nil
 		},
 	})
@@ -64,7 +64,7 @@ func TestProcessCollector_Spawn_RetriesOnTransientFailure(t *testing.T) {
 
 	lc := collector.NewProcessCollector(collector.ProcessCollectorOpts{
 		Stderr: &buf,
-		SpawnFn: func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+		SpawnFn: func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 			callCount++
 			if callCount < 3 {
 				return 0, nil, fmt.Errorf("transient error attempt %d", callCount)
@@ -100,7 +100,7 @@ func TestProcessCollector_Spawn_FailsAfterMaxRetries(t *testing.T) {
 
 	lc := collector.NewProcessCollector(collector.ProcessCollectorOpts{
 		Stderr: &buf,
-		SpawnFn: func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+		SpawnFn: func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 			callCount++
 			return 0, nil, fmt.Errorf("persistent failure attempt %d", callCount)
 		},

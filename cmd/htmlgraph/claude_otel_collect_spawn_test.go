@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -201,7 +202,7 @@ func TestRetrySpawn_SucceedsOnThirdAttempt(t *testing.T) {
 	callCount := 0
 	var buf bytes.Buffer
 
-	fakeFn := func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+	fakeFn := func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 		callCount++
 		if callCount < 3 {
 			return 0, nil, fmt.Errorf("transient error attempt %d", callCount)
@@ -237,7 +238,7 @@ func TestRetrySpawn_AllFail(t *testing.T) {
 	callCount := 0
 	var buf bytes.Buffer
 
-	fakeFn := func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+	fakeFn := func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 		callCount++
 		return 0, nil, fmt.Errorf("persistent failure attempt %d", callCount)
 	}
@@ -280,7 +281,7 @@ func TestWatchdog_RespawnsOnDeath(t *testing.T) {
 	spawnCount := 0
 	origFn := spawnCollectorFn
 	t.Cleanup(func() { spawnCollectorFn = origFn })
-	spawnCollectorFn = func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+	spawnCollectorFn = func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 		spawnCount++
 		// Return a fresh long-lived process so the watchdog can update currentProc.
 		newCmd := exec.Command("/bin/sh", "-c", "sleep 60")
@@ -293,7 +294,9 @@ func TestWatchdog_RespawnsOnDeath(t *testing.T) {
 
 	projectDir := t.TempDir()
 	var buf bytes.Buffer
-	stopWatchdog := startCollectorWatchdog(initialProc, "/fake/bin", "test-wd-sid", projectDir, &buf)
+	var procPtr atomic.Pointer[os.Process]
+	procPtr.Store(initialProc)
+	stopWatchdog := startCollectorWatchdog(&procPtr, 8888, "/fake/bin", "test-wd-sid", projectDir, &buf)
 	t.Cleanup(stopWatchdog)
 
 	// Kill the initial process and reap it so it doesn't linger as a zombie.
@@ -333,7 +336,9 @@ func TestWatchdog_StopsCleanlyWhenLive(t *testing.T) {
 	t.Cleanup(func() { _ = cmd.Process.Kill() })
 
 	var buf bytes.Buffer
-	stopWatchdog := startCollectorWatchdog(cmd.Process, "/fake/bin", "test-wd-live", t.TempDir(), &buf)
+	var procPtr atomic.Pointer[os.Process]
+	procPtr.Store(cmd.Process)
+	stopWatchdog := startCollectorWatchdog(&procPtr, 8888, "/fake/bin", "test-wd-live", t.TempDir(), &buf)
 
 	// Stop immediately — process is still alive, so no warnings expected.
 	stopWatchdog()
@@ -369,7 +374,9 @@ func TestWatchdog_IntervalEnvOverride(t *testing.T) {
 	_ = probeCount
 
 	var buf bytes.Buffer
-	stopWatchdog := startCollectorWatchdog(cmd.Process, "/fake/bin", "test-wd-interval", t.TempDir(), &buf)
+	var procPtr atomic.Pointer[os.Process]
+	procPtr.Store(cmd.Process)
+	stopWatchdog := startCollectorWatchdog(&procPtr, 8888, "/fake/bin", "test-wd-interval", t.TempDir(), &buf)
 
 	// Let the watchdog tick several times.
 	time.Sleep(100 * time.Millisecond)
@@ -393,7 +400,7 @@ func TestSpawnSessionCollectorTo_RetriesOnTransientFailure(t *testing.T) {
 	origFn := spawnCollectorFn
 	t.Cleanup(func() { spawnCollectorFn = origFn })
 
-	spawnCollectorFn = func(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+	spawnCollectorFn = func(binPath, sessionID, projectDir string, requestedPort int) (int, *os.Process, error) {
 		callCount++
 		if callCount < 2 {
 			return 0, nil, fmt.Errorf("transient error")
