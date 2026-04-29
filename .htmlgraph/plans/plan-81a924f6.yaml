@@ -5,7 +5,7 @@ meta:
     description: 'Closes four gaps in the v2 plan system surfaced by an audit of commitPlanChange and section-targeted update flow: (1) approve/reject-slice write YAML but skip git commit, (2) set-slice-status and answer-slice-question are SQLite-only and never reach the YAML, (3) plan render leaves uncommitted HTML drift, (4) no concurrency protection around load-mutate-save. Also delivers the per-slice compression project (questions/critique/feedback embedded in slices instead of plan-level) which is the schema foundation that makes (2) routable.'
     created_at: "2026-04-29"
     status: draft
-    version: 10
+    version: 11
 design:
     problem: ""
     goals: []
@@ -162,4 +162,16 @@ slices:
       tests: Visual QA via puppeteer or playwright snapshot of dashboard
       approved: false
       comment: ""
-questions: []
+questions:
+    - id: q-should-set-slice-status-keep-the-sqlite
+      text: Should set-slice-status keep the SQLite denormalization or move fully to YAML?
+      description: Slice 5 routes the YAML write but the SQLite plan_feedback table currently serves dashboard slice-status queries. Keeping it as a read cache means double-write overhead but fast queries; dropping it means YAML is the single source but dashboard rebuilds the index from YAML on read.
+      recommended: keep
+      options:
+        - key: keep
+          label: Keep SQLite as read cache (double-write)
+        - key: drop
+          label: Drop SQLite path (YAML-only)
+        - key: lazy
+          label: Drop on write but lazily rebuild index on read
+      answer: null
