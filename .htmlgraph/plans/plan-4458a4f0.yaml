@@ -5,7 +5,7 @@ meta:
     description: Adds steps 2 (disaggregate into a logic/issue tree) and 3 (prioritize branches by impact x tractability) of Conn & McLean's Bulletproof Problem Solving on top of the v2 plan system. Today CRISPI maps onto steps 1, 4, 5, 6, 7 but skips 2 and 3 — slice prioritization is by-eye and decomposition is implicit. The tree captures the pre-history of each slice, gives critic agents tree-completeness as a critique target, and gives htmlgraph:execute a real prioritization signal beyond dependency order. Depends on PLAN A's compressed schema landing first.
     created_at: "2026-04-29"
     status: draft
-    version: 5
+    version: 6
 design:
     problem: ""
     goals: []
@@ -68,6 +68,25 @@ slices:
       effort: L
       risk: Med
       tests: TestCritiqueTree_FindsMissingBranch, TestCritiqueTree_PassesCompleteTree
+      approved: false
+      comment: ""
+    - id: slic-11e2a9f8
+      num: 4
+      title: Slice tree_leaf back-reference + carry-forward at promotion
+      what: Add TreeLeaf string field to PlanSlice. promote-slice from a tree leaf copies leaf.Notes, leaf.Questions, and impact/tractability into the slice. Approval of a leaf is recorded as approval of the slice it promotes to.
+      why: Closes the loop between tree and slices. Lets execute use the leaf-derived impact x tractability score as a dispatch priority signal. Also depends on PLAN A slice 3 (compressed schema / per-slice Feedback+Answers fields).
+      files:
+        - internal/planyaml/schema.go
+        - cmd/htmlgraph/plan_promote_slice.go
+      deps:
+        - 1
+      done_when:
+        - Leaf->slice promotion carries forward all metadata
+        - tree_leaf back-reference round-trips
+        - Existing promote-slice path works for plans without trees
+      effort: M
+      risk: Low
+      tests: TestPromoteSlice_FromTreeLeaf, TestPromoteSlice_NoTreeStillWorks
       approved: false
       comment: ""
 questions: []
