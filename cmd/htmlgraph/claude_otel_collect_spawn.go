@@ -57,15 +57,9 @@ func retrySpawnCollector(binPath, sessionID, projectDir string, maxAttempts int,
 	return collector.RetrySpawn(binPath, sessionID, projectDir, maxAttempts, spawnFn, warnW)
 }
 
-// watchdogInterval returns the polling interval for the collector watchdog.
-// HTMLGRAPH_OTEL_WATCHDOG_INTERVAL overrides the default of 15s.
-func watchdogInterval() time.Duration {
-	return collector.WatchdogInterval("HTMLGRAPH_OTEL_WATCHDOG_INTERVAL")
-}
-
-// startCollectorWatchdog launches a goroutine that polls the collector process
-// every watchdogInterval(). On process death it calls retrySpawnCollector and
-// updates the current process. Returns a stop func that terminates the goroutine.
+// startCollectorWatchdog launches a goroutine that polls the collector process.
+// On process death it calls retrySpawnCollector and updates the current process.
+// Returns a stop func that terminates the goroutine.
 func startCollectorWatchdog(initialProc *os.Process, binPath, sessionID, projectDir string, warnW io.Writer) func() {
 	return collector.StartWatchdog(initialProc, binPath, sessionID, projectDir, warnW, spawnCollectorFn, "HTMLGRAPH_OTEL_WATCHDOG_INTERVAL")
 }
@@ -74,12 +68,6 @@ func startCollectorWatchdog(initialProc *os.Process, binPath, sessionID, project
 // waits up to 3s, then SIGKILLs, and removes the .collector-pid file.
 func registerCollectorCleanup(proc *os.Process, projectDir, sessionID string) func() {
 	return collector.RegisterCleanup(proc, projectDir, sessionID)
-}
-
-// removeCollectorPID removes the .collector-pid file for a session.
-// Best-effort: missing file or unreadable directory is not an error.
-func removeCollectorPID(projectDir, sessionID string) {
-	collector.RemoveCollectorPID(projectDir, sessionID)
 }
 
 // writeCollectorPID writes the collector PID to the session directory.
