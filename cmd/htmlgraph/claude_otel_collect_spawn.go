@@ -1,16 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"syscall"
 	"time"
+
+	"github.com/shakestzd/htmlgraph/internal/otel/collector"
 )
 
 // generateOtelSessionID produces a hex session ID from a Unix-millisecond
@@ -25,67 +22,6 @@ func generateOtelSessionID() string {
 	return fmt.Sprintf("%012x%016x", ts, entropy)
 }
 
-// spawnCollector starts an otel-collect child process, waits for its
-// handshake line ("htmlgraph-otel-ready port=<N>"), and returns the
-// port and process. The child is started in its own process group
-// (Setpgid) so it can be independently signalled.
-//
-// binPath is the path to the htmlgraph binary to invoke. In production
-// callers should pass the result of os.Executable(); tests pass a
-// pre-built test binary.
-func spawnCollector(binPath, sessionID, projectDir string) (int, *os.Process, error) {
-	cmd := exec.Command(binPath, "otel-collect",
-		"--session-id", sessionID,
-		"--project-dir", projectDir,
-		"--listen", "127.0.0.1:0",
-	)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Stderr = os.Stderr
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return 0, nil, fmt.Errorf("stdout pipe: %w", err)
-	}
-	if err := cmd.Start(); err != nil {
-		return 0, nil, fmt.Errorf("start otel-collect: %w", err)
-	}
-
-	port, err := readCollectorHandshake(bufio.NewScanner(stdout))
-	if err != nil {
-		_ = cmd.Process.Kill()
-		_, _ = cmd.Process.Wait()
-		return 0, nil, err
-	}
-	return port, cmd.Process, nil
-}
-
-// readCollectorHandshake scans stdout for the handshake line within 3s.
-func readCollectorHandshake(scanner *bufio.Scanner) (int, error) {
-	type result struct {
-		port int
-		err  error
-	}
-	ch := make(chan result, 1)
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			var p int
-			if _, err := fmt.Sscanf(line, "htmlgraph-otel-ready port=%d", &p); err == nil {
-				ch <- result{port: p}
-				return
-			}
-		}
-		ch <- result{err: fmt.Errorf("otel-collect: handshake not found (stdout closed)")}
-	}()
-
-	select {
-	case r := <-ch:
-		return r.port, r.err
-	case <-time.After(3 * time.Second):
-		return 0, fmt.Errorf("otel-collect: handshake timeout (3s)")
-	}
-}
-
 // otelEnvOverrides holds optional overrides for OTel env vars set by
 // the launcher. Zero-value fields mean "use the default derivation".
 type otelEnvOverrides struct {
@@ -96,7 +32,18 @@ type otelEnvOverrides struct {
 
 // spawnCollectorFn is the package-level spawn function used by
 // retrySpawnCollector. Tests may replace it to inject a fake.
-var spawnCollectorFn = spawnCollector
+var spawnCollectorFn = collector.DefaultSpawnFn
+
+// spawnCollector starts an otel-collect child process, waits for its
+// handshake line ("htmlgraph-otel-ready port=<N>"), and returns the
+// port and process. Delegates to collector.DefaultSpawnFn.
+//
+// binPath is the path to the htmlgraph binary to invoke. In production
+// callers should pass the result of os.Executable(); tests pass a
+// pre-built test binary.
+func spawnCollector(binPath, sessionID, projectDir string) (int, *os.Process, error) {
+	return collector.DefaultSpawnFn(binPath, sessionID, projectDir)
+}
 
 // retrySpawnCollector attempts to spawn the collector up to maxAttempts times.
 // Backoff delays between attempts are: 100ms, 300ms, 700ms (indices 0, 1, 2).
@@ -107,68 +54,38 @@ func retrySpawnCollector(binPath, sessionID, projectDir string, maxAttempts int,
 	if spawnFn == nil {
 		spawnFn = spawnCollectorFn
 	}
-	backoff := []time.Duration{100 * time.Millisecond, 300 * time.Millisecond, 700 * time.Millisecond}
-	var lastErr error
-	for i := 0; i < maxAttempts; i++ {
-		port, proc, err := spawnFn(binPath, sessionID, projectDir)
-		if err == nil {
-			return port, proc, i + 1, nil
-		}
-		lastErr = err
-		if i < maxAttempts-1 {
-			fmt.Fprintf(warnW, "htmlgraph: warning: collector spawn attempt %d/%d failed: %v\n", i+1, maxAttempts, err)
-			if i < len(backoff) {
-				time.Sleep(backoff[i])
-			}
-		}
-	}
-	return 0, nil, maxAttempts, lastErr
+	return collector.RetrySpawn(binPath, sessionID, projectDir, maxAttempts, spawnFn, warnW)
 }
 
 // watchdogInterval returns the polling interval for the collector watchdog.
 // HTMLGRAPH_OTEL_WATCHDOG_INTERVAL overrides the default of 15s.
 func watchdogInterval() time.Duration {
-	if v := os.Getenv("HTMLGRAPH_OTEL_WATCHDOG_INTERVAL"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d > 0 {
-			return d
-		}
-	}
-	return 15 * time.Second
+	return collector.WatchdogInterval("HTMLGRAPH_OTEL_WATCHDOG_INTERVAL")
 }
 
 // startCollectorWatchdog launches a goroutine that polls the collector process
 // every watchdogInterval(). On process death it calls retrySpawnCollector and
 // updates the current process. Returns a stop func that terminates the goroutine.
 func startCollectorWatchdog(initialProc *os.Process, binPath, sessionID, projectDir string, warnW io.Writer) func() {
-	done := make(chan struct{})
+	return collector.StartWatchdog(initialProc, binPath, sessionID, projectDir, warnW, spawnCollectorFn, "HTMLGRAPH_OTEL_WATCHDOG_INTERVAL")
+}
 
-	go func() {
-		ticker := time.NewTicker(watchdogInterval())
-		defer ticker.Stop()
-		currentProc := initialProc
+// registerCollectorCleanup returns a cleanup function that sends SIGTERM,
+// waits up to 3s, then SIGKILLs, and removes the .collector-pid file.
+func registerCollectorCleanup(proc *os.Process, projectDir, sessionID string) func() {
+	return collector.RegisterCleanup(proc, projectDir, sessionID)
+}
 
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				if err := currentProc.Signal(syscall.Signal(0)); err == nil {
-					continue // process still alive
-				}
-				fmt.Fprintf(warnW, "htmlgraph: warning: collector died (pid=%d), respawning...\n", currentProc.Pid)
-				port, newProc, _, spawnErr := retrySpawnCollector(binPath, sessionID, projectDir, 3, nil, warnW)
-				if spawnErr != nil {
-					fmt.Fprintf(warnW, "htmlgraph: FATAL: collector respawn failed: %v\n", spawnErr)
-					return
-				}
-				writeCollectorPID(projectDir, sessionID, newProc.Pid)
-				fmt.Fprintf(warnW, "htmlgraph: info: collector respawned (pid=%d port=%d)\n", newProc.Pid, port)
-				currentProc = newProc
-			}
-		}
-	}()
+// removeCollectorPID removes the .collector-pid file for a session.
+// Best-effort: missing file or unreadable directory is not an error.
+func removeCollectorPID(projectDir, sessionID string) {
+	collector.RemoveCollectorPID(projectDir, sessionID)
+}
 
-	return func() { close(done) }
+// writeCollectorPID writes the collector PID to the session directory.
+// Best-effort: errors are silently ignored.
+func writeCollectorPID(projectDir, sessionID string, pid int) {
+	collector.WriteCollectorPID(projectDir, sessionID, pid)
 }
 
 // spawnSessionCollectorTo is the testable core of collector spawning.
@@ -176,8 +93,6 @@ func startCollectorWatchdog(initialProc *os.Process, binPath, sessionID, project
 // retry attempts using exponential backoff), and returns overrides and a
 // wantExit flag. On spawn failure it always writes a FATAL line to errW;
 // wantExit is true only when HTMLGRAPH_OTEL_STRICT=1.
-// Silent-fail is preserved for soft-precondition failures that occur before
-// spawn (binary path resolution) — those are handled by the caller.
 func spawnSessionCollectorTo(projectDir, binPath string, errW io.Writer) (otelEnvOverrides, bool) {
 	sessionID := generateOtelSessionID()
 
@@ -217,44 +132,4 @@ func spawnSessionCollector(projectDir string) otelEnvOverrides {
 		os.Exit(1)
 	}
 	return overrides
-}
-
-// registerCollectorCleanup spawns a reaper goroutine for the collector
-// child so it doesn't become a zombie if it exits on its own (idle
-// timeout). Returns a cleanup function that sends SIGTERM, waits, and
-// removes the .collector-pid file so subsequent liveness probes by
-// /api/otel/status do not see a stale PID after process exit.
-func registerCollectorCleanup(proc *os.Process, projectDir, sessionID string) func() {
-	go func() { _, _ = proc.Wait() }()
-
-	return func() {
-		_ = proc.Signal(syscall.SIGTERM)
-		deadline := time.Now().Add(3 * time.Second)
-		for time.Now().Before(deadline) {
-			if err := proc.Signal(syscall.Signal(0)); err != nil {
-				removeCollectorPID(projectDir, sessionID)
-				return // process exited
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		_ = proc.Kill()
-		removeCollectorPID(projectDir, sessionID)
-	}
-}
-
-// removeCollectorPID removes the .collector-pid file for a session.
-// Best-effort: missing file or unreadable directory is not an error.
-func removeCollectorPID(projectDir, sessionID string) {
-	pidPath := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID, ".collector-pid")
-	_ = os.Remove(pidPath)
-}
-
-// writeCollectorPID writes the collector PID to the session directory.
-// Best-effort: errors are silently ignored (the PID file is used by
-// the SessionEnd hook as a hint; its absence is not fatal).
-func writeCollectorPID(projectDir, sessionID string, pid int) {
-	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID)
-	_ = os.MkdirAll(sessDir, 0o755)
-	pidPath := filepath.Join(sessDir, ".collector-pid")
-	_ = os.WriteFile(pidPath, []byte(strconv.Itoa(pid)+"\n"), 0o644)
 }
