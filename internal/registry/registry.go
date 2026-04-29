@@ -61,6 +61,13 @@ type Entry struct {
 type Registry struct {
 	path    string
 	entries []Entry
+
+	// migrated is set when Load resolved this Registry's contents from the
+	// legacy ~/.local/share/htmlgraph/projects.json instead of the supplied
+	// canonical path. Callers can query MigrationPending() to learn whether
+	// a Save is needed solely to materialise the migration into the
+	// canonical XDG location, even when the in-memory slice is unchanged.
+	migrated bool
 }
 
 // Load reads the registry from path.  If the file does not exist an empty
@@ -77,8 +84,12 @@ func Load(path string) (*Registry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if entries, ok := loadLegacyForCanonical(path); ok {
-				return &Registry{path: path, entries: entries}, nil
+			entries, found, lerr := loadLegacyForCanonical(path)
+			if lerr != nil {
+				return nil, fmt.Errorf("registry.Load: legacy fallback: %w", lerr)
+			}
+			if found {
+				return &Registry{path: path, entries: entries, migrated: true}, nil
 			}
 			return &Registry{path: path}, nil
 		}
@@ -92,26 +103,48 @@ func Load(path string) (*Registry, error) {
 	return &Registry{path: path, entries: entries}, nil
 }
 
-// loadLegacyForCanonical reads the legacy registry file (if it exists and
-// the supplied path matches the current canonical DefaultPath). It returns
-// (entries, true) on a successful migration read; (nil, false) otherwise.
-// Malformed legacy JSON is treated the same as a missing legacy file —
-// the caller falls through to an empty registry rather than blocking startup.
-func loadLegacyForCanonical(path string) ([]Entry, bool) {
+// loadLegacyForCanonical reads the legacy registry file when path is the
+// current canonical DefaultPath. It returns:
+//
+//   - (entries, true, nil)   — legacy file exists, was readable, parsed cleanly
+//   - (nil,     false, nil)  — legacy file genuinely missing, OR path is not
+//                              the canonical default (no fallback applies)
+//   - (nil,     false, err)  — legacy file exists but read or JSON parse failed
+//
+// The third case is critical (review #55 F3): without it, a corrupt or
+// unreadable legacy file would be silently masked as "no legacy registry,"
+// the caller would fall through to an empty Registry, and the next Save
+// would overwrite the canonical path with `[]` — destroying the user's
+// project list. Propagating the error forces a hard stop until the
+// human sorts the file out by hand.
+func loadLegacyForCanonical(path string) ([]Entry, bool, error) {
 	canonical := canonicalDefaultPath()
 	legacy := legacyDefaultPath()
 	if path != canonical || canonical == legacy {
-		return nil, false
+		return nil, false, nil
 	}
 	data, err := os.ReadFile(legacy)
 	if err != nil {
-		return nil, false
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("read legacy %s: %w", legacy, err)
 	}
 	var entries []Entry
 	if err := json.Unmarshal(data, &entries); err != nil {
-		return nil, false
+		return nil, false, fmt.Errorf("parse legacy %s: %w", legacy, err)
 	}
-	return entries, true
+	return entries, true, nil
+}
+
+// MigrationPending reports whether this Registry was populated via the
+// legacy-path fallback (i.e. the canonical XDG path did not exist, but
+// the legacy path did, and Load read the legacy contents). When true,
+// callers SHOULD invoke Save at a convenient point so the canonical
+// path is materialised — otherwise a clean migration with no stale
+// entries would persist legacy-only forever.
+func (r *Registry) MigrationPending() bool {
+	return r != nil && r.migrated
 }
 
 // Save persists the registry to disk using a tempfile + os.Rename so the
@@ -128,12 +161,27 @@ func loadLegacyForCanonical(path string) ([]Entry, bool) {
 // deferred to keep the call-site churn small; this godoc is the contract.
 func (r *Registry) Save() error {
 	r.Prune()
-	return writeEntriesAtomic(r.path, r.entries)
+	if err := writeEntriesAtomic(r.path, r.entries); err != nil {
+		return err
+	}
+	// Migration is now materialised into the canonical path. Clearing the
+	// flag prevents a subsequent caller from re-saving on a stable Registry
+	// that already lives in canonical.
+	r.migrated = false
+	return nil
 }
 
 // writeEntriesAtomic is the shared atomic write used by Save and the
 // test-only WriteEntriesForTest helper. Keeping the on-disk format in one
 // place ensures the test helper cannot silently drift from production.
+//
+// The temp file is created via os.CreateTemp with a unique randomised
+// suffix in the same directory as the target so concurrent Save calls do
+// not stomp each other (review #55 F2 — the previous fixed `<path>.tmp`
+// allowed two writers to overwrite each other's tempfile and rename a
+// half-written file into place). os.Rename within the same directory is
+// atomic on POSIX. Any tempfile left behind on a partial failure is
+// cleaned up; the persistent file is never modified except by Rename.
 func writeEntriesAtomic(path string, entries []Entry) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -144,12 +192,28 @@ func writeEntriesAtomic(path string, entries []Entry) error {
 		return fmt.Errorf("registry: marshal: %w", err)
 	}
 	data = append(data, '\n')
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+
+	base := filepath.Base(path)
+	tmp, err := os.CreateTemp(dir, base+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("registry: create tmp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("registry: write tmp: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("registry: close tmp: %w", err)
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("registry: chmod tmp: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("registry: rename: %w", err)
 	}
 	return nil
@@ -166,27 +230,19 @@ func WriteEntriesForTest(path string, entries []Entry) error {
 	return writeEntriesAtomic(path, entries)
 }
 
-// looksLikeRealProject returns true only when dir contains a .htmlgraph/
-// subdirectory AND has a .git directory somewhere in its ancestor chain.
-// Temporary test directories (e.g. os.MkdirTemp paths) are typically not
-// inside a git repository, so they fail this check and are silently skipped
-// by Upsert — preventing registry pollution from test runs.
+// looksLikeRealProject returns true when dir contains a .htmlgraph/
+// subdirectory. That is the sole signal: HtmlGraph projects are not
+// required to be Git repositories, so a `.git` ancestor is NOT part of
+// the gate (review #55 F1).
+//
+// Test pollution is prevented at a different layer — every test that
+// could call Upsert isolates the registry via XDG_DATA_HOME, redirecting
+// writes into a per-test tempdir. Production callers that pass a stray
+// tempdir path will still register, which is the correct contract:
+// `htmlgraph init <dir>` on a non-Git directory must succeed.
 func looksLikeRealProject(dir string) bool {
-	if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err != nil {
-		return false
-	}
-	// Walk up looking for a .git directory.
-	for d := dir; ; {
-		if _, err := os.Stat(filepath.Join(d, ".git")); err == nil {
-			return true
-		}
-		parent := filepath.Dir(d)
-		if parent == d {
-			// Reached filesystem root without finding .git.
-			return false
-		}
-		d = parent
-	}
+	_, err := os.Stat(filepath.Join(dir, ".htmlgraph"))
+	return err == nil
 }
 
 // Upsert inserts or updates the entry for dir.  If an entry with the same
@@ -194,9 +250,10 @@ func looksLikeRealProject(dir string) bool {
 // GitRemoteURL) is updated and the original ID is preserved.  Otherwise a new
 // entry is appended with a freshly computed ID.
 //
-// Upsert silently skips directories that do not look like real projects (no
-// .htmlgraph/ subdirectory or no .git ancestor). This prevents test tempdirs
-// from polluting the registry. Before saving, callers should also call Prune.
+// Upsert silently skips directories that do not look like real projects
+// (no .htmlgraph/ subdirectory). Test pollution is prevented by every
+// caller running tests with XDG_DATA_HOME pointed at a tmpdir, not by a
+// .git heuristic. Before saving, callers should also call Prune.
 func (r *Registry) Upsert(dir, name, remoteURL string) {
 	dir = filepath.Clean(dir)
 	if !looksLikeRealProject(dir) {

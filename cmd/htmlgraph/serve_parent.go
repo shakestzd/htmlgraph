@@ -162,16 +162,20 @@ func runParentServer(bind string, port int) error {
 	// runs or deleted projects don't accumulate indefinitely. Best-effort:
 	// errors are silently ignored so a broken registry never blocks startup.
 	//
-	// Stat-then-skip: only Save when Prune actually removed entries. The
-	// previous unconditional Save() rewrote the registry on every startup
-	// even when nothing changed, generating gratuitous filesystem churn
-	// (PR #62 review issue #6).
+	// Save is triggered when EITHER:
+	//   - Prune removed entries (the registry on disk is now stale), OR
+	//   - Load resolved this Registry via the legacy-path fallback
+	//     (MigrationPending) and we still need to materialise it into the
+	//     canonical XDG path. Without the second arm, a clean legacy ->
+	//     canonical migration with no stale entries never writes the
+	//     canonical file at startup (review #55 F4).
 	//
 	// Uses defaultRegistryPath (the package-level indirection used by every
 	// other registry caller in this binary) so tests can stub the path
 	// once and have all subcommands plus this startup hook agree.
 	if reg, err := registry.Load(defaultRegistryPath()); err == nil {
-		if pruned := reg.Prune(); len(pruned) > 0 {
+		pruned := reg.Prune()
+		if len(pruned) > 0 || reg.MigrationPending() {
 			_ = reg.Save()
 		}
 	}

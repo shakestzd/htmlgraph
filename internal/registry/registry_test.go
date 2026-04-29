@@ -453,14 +453,20 @@ func TestEntry_StableID(t *testing.T) {
 	}
 }
 
-// TestNoRegistryPollution is a load-bearing regression test that verifies
-// Upsert silently skips directories that are not inside a git repository
-// (the shape of all Go test tempdirs), preventing registry pollution from
-// test runs.
+// TestNoRegistryPollution verifies Upsert's gate: directories without
+// a .htmlgraph/ subdirectory are silently rejected, while directories
+// that do have one are accepted regardless of whether they sit inside
+// a git repository (review #55 F1 — HtmlGraph projects are not required
+// to be Git repos). Test pollution is prevented by the XDG_DATA_HOME
+// isolation set up at the top of this test, NOT by a .git heuristic.
 func TestNoRegistryPollution(t *testing.T) {
-	// Isolate registry writes to a per-test tmpdir.
+	// Isolate BOTH registry locations: XDG (canonical) and HOME (legacy
+	// fallback). Without pinning HOME, the legacy-fallback in Load reads
+	// the user's real ~/.local/share/htmlgraph/projects.json on the first
+	// loadCount() call — corrupting the baseline.
 	xdg := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", xdg)
+	t.Setenv("HOME", t.TempDir())
 
 	regPath := registry.DefaultPath()
 	loadCount := func() int {
@@ -471,12 +477,16 @@ func TestNoRegistryPollution(t *testing.T) {
 		return len(r.List())
 	}
 
-	baseline := loadCount()
+	// Each sub-test reloads the baseline because Save() calls Prune(),
+	// which drops entries whose ProjectDir was cleaned up by a previous
+	// sub-test's t.TempDir(). Without re-baselining, a "+1 expected" check
+	// can fail because the prior entry was silently pruned mid-flight.
 
-	// Upsert from a plain tempdir (no .htmlgraph/, no .git ancestor).
-	// This simulates a Go test tempdir that should NOT pollute the registry.
-	t.Run("tempdir_rejected", func(t *testing.T) {
-		ghost := t.TempDir() // No .htmlgraph/, no .git
+	// Upsert from a plain tempdir (no .htmlgraph/) — must be rejected so
+	// that hooks running inside a stray cwd cannot register garbage.
+	t.Run("tempdir_no_htmlgraph_rejected", func(t *testing.T) {
+		baseline := loadCount()
+		ghost := t.TempDir()
 		r, _ := registry.Load(regPath)
 		r.Upsert(ghost, "ghost", "")
 		if err := r.Save(); err != nil {
@@ -484,32 +494,35 @@ func TestNoRegistryPollution(t *testing.T) {
 		}
 		after := loadCount()
 		if after != baseline {
-			t.Errorf("registry grew from %d to %d after Upsert of plain tempdir — pollution not blocked",
+			t.Errorf("registry grew from %d to %d after Upsert of plain tempdir — gate did not reject",
 				baseline, after)
 		}
 	})
 
-	// Upsert from a dir that has .htmlgraph/ but no .git ancestor.
-	// Should also be rejected.
-	t.Run("htmlgraph_but_no_git_rejected", func(t *testing.T) {
-		partial := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(partial, ".htmlgraph"), 0o755); err != nil {
+	// Upsert from a dir with .htmlgraph/ but no .git ancestor — must be
+	// ACCEPTED. Non-Git projects are valid HtmlGraph projects.
+	t.Run("htmlgraph_without_git_accepted", func(t *testing.T) {
+		baseline := loadCount()
+		nonGit := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(nonGit, ".htmlgraph"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		r, _ := registry.Load(regPath)
-		r.Upsert(partial, "partial", "")
+		r.Upsert(nonGit, "non-git", "")
 		if err := r.Save(); err != nil {
 			t.Fatalf("Save: %v", err)
 		}
 		after := loadCount()
-		if after != baseline {
-			t.Errorf("registry grew from %d to %d after Upsert of dir without .git — pollution not blocked",
-				baseline, after)
+		if after != baseline+1 {
+			t.Errorf("non-Git HtmlGraph project must register: registry went from %d to %d, want %d",
+				baseline, after, baseline+1)
 		}
 	})
 
 	// Upsert from a real-looking project (tempdir + .htmlgraph + .git).
-	// Should be accepted and grow the count by exactly 1.
+	// Verify the new entry shows up in the post-Save list — counting
+	// deltas is unreliable because Save's internal Prune drops entries
+	// whose ProjectDir got cleaned up by a previous sub-test's tempdir.
 	t.Run("real_project_accepted", func(t *testing.T) {
 		real := makeRealProject(t)
 		r, _ := registry.Load(regPath)
@@ -517,10 +530,120 @@ func TestNoRegistryPollution(t *testing.T) {
 		if err := r.Save(); err != nil {
 			t.Fatalf("Save: %v", err)
 		}
-		after := loadCount()
-		if after != baseline+1 {
-			t.Errorf("expected registry to grow by 1 (from %d to %d), got %d",
-				baseline, baseline+1, after)
+		reloaded, err := registry.Load(regPath)
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		found := false
+		for _, e := range reloaded.List() {
+			if e.ProjectDir == real {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("real project %q missing from saved registry; entries=%+v", real, reloaded.List())
 		}
 	})
+}
+
+// TestSave_AtomicTempfileUnique verifies F2: writeEntriesAtomic must not
+// leave a fixed-name `<path>.tmp` file behind, because two concurrent
+// Save calls would collide on it. We can't easily race-test mid-Save
+// from a test, but we can prove the new contract by writing many times
+// and confirming no `<path>.tmp` artifact ever appears.
+func TestSave_AtomicTempfileUnique(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "projects.json")
+
+	for i := 0; i < 5; i++ {
+		r, _ := registry.Load(path)
+		r.Upsert(filepath.Join(dir, "p"), "p", "")
+		if err := r.Save(); err != nil {
+			t.Fatalf("Save iter %d: %v", i, err)
+		}
+	}
+	if _, err := os.Stat(path + ".tmp"); err == nil {
+		t.Errorf("found leftover %s.tmp — fixed-name tempfile is back", path)
+	}
+	// Any randomised `*.tmp` siblings must also be cleaned up.
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("found leftover tempfile after Save: %s", e.Name())
+		}
+	}
+}
+
+// TestLoad_LegacyCorrupt covers F3: when the legacy fallback reads a
+// present-but-corrupt legacy file, Load must surface the error rather
+// than silently treating it as missing (which would let the next Save
+// overwrite the canonical path with `[]`).
+func TestLoad_LegacyCorrupt(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	xdg := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", xdg)
+
+	canonical := registry.DefaultPath()
+	legacy := filepath.Join(home, ".local", "share", "htmlgraph", "projects.json")
+
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("{not valid json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := registry.Load(canonical); err == nil {
+		t.Fatal("Load returned nil error for corrupt legacy file; want error so caller halts before clobbering canonical")
+	}
+}
+
+// TestLoad_MigrationPending covers F4: a successful legacy fallback
+// surfaces a MigrationPending() flag so callers can save even when the
+// in-memory slice is otherwise unchanged. After Save the flag clears.
+func TestLoad_MigrationPending(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	xdg := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", xdg)
+
+	canonical := registry.DefaultPath()
+	legacy := filepath.Join(home, ".local", "share", "htmlgraph", "projects.json")
+
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectDir := makeRealProject(t)
+	seed, _ := registry.Load(legacy)
+	seed.Upsert(projectDir, "legacy-proj", "")
+	if err := seed.Save(); err != nil {
+		t.Fatalf("seed legacy save: %v", err)
+	}
+
+	r, err := registry.Load(canonical)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !r.MigrationPending() {
+		t.Fatal("MigrationPending() = false after legacy fallback; want true")
+	}
+
+	if err := r.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if r.MigrationPending() {
+		t.Error("MigrationPending() still true after Save; want false")
+	}
+
+	// A subsequent Load on canonical (which now exists) must NOT report
+	// migration-pending.
+	r2, err := registry.Load(canonical)
+	if err != nil {
+		t.Fatalf("post-migration Load: %v", err)
+	}
+	if r2.MigrationPending() {
+		t.Error("post-migration Load reports MigrationPending(); want false")
+	}
 }
