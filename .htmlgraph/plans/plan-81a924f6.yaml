@@ -5,7 +5,7 @@ meta:
     description: 'Closes four gaps in the v2 plan system surfaced by an audit of commitPlanChange and section-targeted update flow: (1) approve/reject-slice write YAML but skip git commit, (2) set-slice-status and answer-slice-question are SQLite-only and never reach the YAML, (3) plan render leaves uncommitted HTML drift, (4) no concurrency protection around load-mutate-save. Also delivers the per-slice compression project (questions/critique/feedback embedded in slices instead of plan-level) which is the schema foundation that makes (2) routable.'
     created_at: "2026-04-29"
     status: draft
-    version: 8
+    version: 9
 design:
     problem: ""
     goals: []
@@ -120,6 +120,26 @@ slices:
       effort: S
       risk: Low
       tests: TestPlanRender_NoOpOnIdentical, TestPlanRender_CommitsOnDivergent
+      approved: false
+      comment: ""
+    - id: slic-7be5df58
+      num: 7
+      title: 'Migration command: plan migrate <plan-id>'
+      what: 'New CLI verb htmlgraph plan migrate that hoists plan-level Questions and Critique into per-slice blocks where attribution is recoverable (heuristic: question text mentions slice title or num). Orphan questions/critique stay at plan level with a migrated_at marker. Single commit at end.'
+      why: Three of the four sampled v2 plans (plan-8ee8f517, plan-a33c983e, plan-251676c5) still use the old plan-level shape. Without migration they'll stay split between plan-level and per-slice forever.
+      files:
+        - cmd/htmlgraph/plan_migrate.go
+        - internal/planyaml/migrate.go
+      deps:
+        - 3
+        - 4
+      done_when:
+        - Dry-run mode previews changes
+        - Apply mode commits a single migration commit
+        - Idempotent — re-running on a migrated plan is a no-op
+      effort: L
+      risk: Med
+      tests: TestPlanMigrate_DryRun, TestPlanMigrate_HoistsByTitleMatch, TestPlanMigrate_Idempotent
       approved: false
       comment: ""
 questions: []
