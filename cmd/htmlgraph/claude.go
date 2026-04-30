@@ -527,13 +527,7 @@ func launchClaude(opts LaunchOpts) error {
 		c.Dir = opts.ProjectRoot
 	}
 
-	if err := c.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
-		}
-		return err
-	}
-	return nil
+	return runHarnessWithCleanup(c, envOverrides.Cleanup)
 }
 
 // writeLaunchMarker writes .htmlgraph/.launch-mode for hooks to detect the launch mode.

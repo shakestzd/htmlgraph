@@ -234,13 +234,32 @@ func execGemini(opts geminiLaunchOpts) error {
 		return fmt.Errorf("gemini not found in PATH: %w\nInstall Gemini CLI first: https://github.com/google-gemini/gemini-cli", err)
 	}
 
+	// Resolve the effective project dir for OTel collector spawning.
+	effectiveProjDir := opts.ProjectRoot
+	if opts.HtmlgraphRoot != "" {
+		effectiveProjDir = opts.HtmlgraphRoot
+	}
+
+	// Spawn a per-session OTel collector when a project dir is known and OTel
+	// is not explicitly disabled. Non-fatal: falls back gracefully on failure.
+	var otelPort int
+	var otelSessionID string
+	var otelCleanup func()
+	if effectiveProjDir != "" && !isExplicitlyDisabled(os.Getenv("HTMLGRAPH_OTEL_ENABLED")) {
+		otelPort, otelSessionID, otelCleanup = spawnGeminiOtelCollector(effectiveProjDir)
+		if otelCleanup != nil {
+			defer otelCleanup()
+		}
+	}
+
 	c := exec.Command(geminiPath, geminiArgs...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
-	// Inject HTMLGRAPH_PROJECT_DIR, HTMLGRAPH_AGENT, and GEMINI_SYSTEM_MD so hooks,
-	// skills, and the orchestrator prompt all resolve correctly regardless of CWD.
+	// Build the child env: start from os.Environ, inject HTMLGRAPH_PROJECT_DIR,
+	// HTMLGRAPH_AGENT, GEMINI_SYSTEM_MD, and OTel exporter vars when a collector
+	// was spawned.
 	// When WorktreeRoot is set, the process runs in the worktree but
 	// HTMLGRAPH_PROJECT_DIR points to the canonical project root (HtmlgraphRoot).
 	env := os.Environ()
@@ -258,15 +277,10 @@ func execGemini(opts geminiLaunchOpts) error {
 	}
 	env = append(env, "HTMLGRAPH_AGENT=gemini")
 	env = append(env, "GEMINI_SYSTEM_MD="+systemMdPath)
+	env = buildGeminiOtelEnv(env, otelPort, otelSessionID)
 	c.Env = env
 
-	if err := c.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
-		}
-		return err
-	}
-	return nil
+	return runHarnessWithCleanup(c, otelCleanup)
 }
 
 // launchGeminiDefault launches Gemini interactively with HtmlGraph env injection.

@@ -168,6 +168,20 @@ func (r *Registry) Adapters() []Adapter {
 	return out
 }
 
+// ResolveSessionID returns the session ID for a signal under the given
+// attribute key, falling back to the resource-level attribute when the
+// signal-level attribute is missing or empty. This is the canonical
+// pattern every adapter follows: cardinality-controlled metrics may
+// strip per-data-point attributes, leaving only the resource. Used by
+// ClaudeAdapter ("session.id"), CodexAdapter ("conversation.id"), and
+// GeminiAdapter ("session.id").
+func ResolveSessionID(signalAttrs, resAttrs map[string]any, key string) string {
+	if v := AttrString(signalAttrs, key); v != "" {
+		return v
+	}
+	return AttrString(resAttrs, key)
+}
+
 // AttrString returns the string-valued attribute at key, or "" if missing
 // or not a string. Adapters use this heavily for semconv lookups.
 func AttrString(attrs map[string]any, key string) string {

@@ -239,14 +239,9 @@ func (c *ClaudeAdapter) baseSignal(
 		Kind:           kind,
 		NativeName:     name,
 		Timestamp:      ts,
-		SessionID:      AttrString(attrs, "session.id"),
+		SessionID:      ResolveSessionID(attrs, res.Attrs, "session.id"),
 		PromptID:       AttrString(attrs, "prompt.id"),
 		RawAttrs:       copyAttrs(attrs),
-	}
-	if sig.SessionID == "" {
-		// Some Claude signals carry session.id only on the resource
-		// (cardinality-controlled metrics). Fall back.
-		sig.SessionID = AttrString(res.Attrs, "session.id")
 	}
 	return sig
 }
