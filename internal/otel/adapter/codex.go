@@ -173,14 +173,9 @@ func (c *CodexAdapter) baseSignal(
 		Kind:           kind,
 		NativeName:     name,
 		Timestamp:      ts,
-		SessionID:      AttrString(attrs, "conversation.id"),
+		SessionID:      ResolveSessionID(attrs, res.Attrs, "conversation.id"),
 		PromptID:       AttrString(attrs, "gen_ai.prompt_id"),
 		RawAttrs:       copyAttrs(attrs),
-	}
-	if sig.SessionID == "" {
-		// Cardinality-controlled metrics may omit conversation.id from the
-		// data point. Fall back to the resource-level attribute.
-		sig.SessionID = AttrString(res.Attrs, "conversation.id")
 	}
 	return sig
 }

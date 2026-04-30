@@ -308,6 +308,29 @@ PID files stale until idle timeout.
   the watchdog and the side-effect helpers (`writeCollectorPID`,
   `registerCollectorCleanup`), revive the test.
 
+## Open questions (from feat-ac7532be, deferred)
+
+These were flagged in the original feature spec and remain unresolved at
+merge time. None blocked implementation, but each warrants a follow-up.
+
+- **Gemini env-var propagation reliability.** The current
+  `htmlgraph gemini` launcher injects `GEMINI_TELEMETRY_OTLP_ENDPOINT`
+  pre-fork, which is the cleanest path. The spec also mooted a
+  hook-based fallback (`SessionStart` writes port to disk; harness
+  picks it up), which would let users keep typing `gemini` directly.
+  We chose launcher-only for v1 (consistent with Claude/Codex). If
+  user friction with the wrapper command is reported, revisit by
+  measuring whether Gemini's hook-time env propagation actually works
+  in practice — earlier research notes suggested Gemini hooks cannot
+  mutate child env post-fork, but this was not exhaustively verified.
+- **`HTMLGRAPH_OTEL_STRICT` default flip.** RESILIENCE-1 made strict
+  mode opt-in (defaults to degraded silent failure). The original spec
+  said "opt-in initially, becomes default in next major." We have not
+  scheduled the flip. Decision needed: pick a release version (e.g.
+  v1.0.0 / v0.60.0), announce the deprecation, then flip. Until then,
+  CI and production deployments should set `HTMLGRAPH_OTEL_STRICT=1`
+  explicitly to opt in to fail-loud semantics today.
+
 ## Cross-references
 
 | Artifact | Where |
