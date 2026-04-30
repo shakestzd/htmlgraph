@@ -177,14 +177,9 @@ func (g *GeminiAdapter) baseSignal(
 		Kind:           kind,
 		NativeName:     name,
 		Timestamp:      ts,
-		SessionID:      AttrString(attrs, "session.id"),
+		SessionID:      ResolveSessionID(attrs, res.Attrs, "session.id"),
 		PromptID:       AttrString(attrs, "gen_ai.prompt_id"),
 		RawAttrs:       copyAttrs(attrs),
-	}
-	if sig.SessionID == "" {
-		// Cardinality-controlled metrics may omit session.id from the
-		// data point. Fall back to the resource-level attribute.
-		sig.SessionID = AttrString(res.Attrs, "session.id")
 	}
 	return sig
 }
