@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/models"
@@ -35,15 +34,10 @@ func lookupAgentIDByEvent(database *sql.DB, eventID string) string {
 //
 // parent_event_id is stored as best-effort lineage metadata with no FK constraint
 // (removed in bug-89990f33): the row is always persisted even when the parent row
-// doesn't exist yet. A warning is emitted to stderr when that happens so timing
-// races remain visible without silently dropping events.
+// doesn't exist yet (timing races are now silently OK).
 func InsertEvent(db *sql.DB, e *models.AgentEvent) error {
 	if e.ParentEventID != "" && e.ParentAgentID == "" {
 		e.ParentAgentID = lookupAgentIDByEvent(db, e.ParentEventID)
-		if e.ParentAgentID == "" {
-			log.Printf("WARNING agent_events: parent_event_id %q not found for event %s (tool=%s session=%s) — orphan lineage, row still inserted",
-				e.ParentEventID, e.EventID, e.ToolName, e.SessionID)
-		}
 	}
 	_, err := db.Exec(`
 		INSERT INTO agent_events (

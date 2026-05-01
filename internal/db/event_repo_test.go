@@ -813,3 +813,58 @@ func TestInsertEventOrphanParent(t *testing.T) {
 		t.Errorf("parent_event_id: got %q, want %q", parentID.String, "nonexistent-parent-id")
 	}
 }
+
+// TestInsertEventWithAddedColumns verifies that InsertEvent works correctly
+// with columns added by later migrations (reason, teammate_name, team_name, prompt_id).
+// This indirectly tests that the migration in migrateAgentEventsAddCheckConstraint
+// preserves all columns added by post-initial-schema ALTER TABLE statements.
+func TestInsertEventWithAddedColumns(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+	ev := &models.AgentEvent{
+		EventID:   "evt-added-cols-1",
+		AgentID:   "claude-code",
+		EventType: models.EventToolCall,
+		Timestamp: now,
+		ToolName:  "Bash",
+		SessionID: "sess-test",
+		Status:    "started",
+		Source:    "hook",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	// Insert event (which will run through db.Open and all migrations).
+	if err := db.InsertEvent(database, ev); err != nil {
+		t.Fatalf("InsertEvent: %v", err)
+	}
+
+	// Verify the event exists.
+	var count int
+	if err := database.QueryRow(`SELECT COUNT(*) FROM agent_events WHERE event_id = ?`, "evt-added-cols-1").Scan(&count); err != nil {
+		t.Fatalf("query count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("event not persisted: got count %d, want 1", count)
+	}
+
+	// Verify that columns added by later migrations exist and can be queried.
+	// The migration should have preserved these columns: reason, teammate_name, team_name, prompt_id.
+	var (
+		reason      sql.NullString
+		teammate    sql.NullString
+		teamName    sql.NullString
+		promptID    sql.NullString
+	)
+	if err := database.QueryRow(`
+		SELECT reason, teammate_name, team_name, prompt_id FROM agent_events WHERE event_id = ?`,
+		"evt-added-cols-1").Scan(&reason, &teammate, &teamName, &promptID); err != nil {
+		t.Fatalf("query added columns: %v (columns may not exist after migration)", err)
+	}
+	// All should be NULL since we didn't set them, but they must exist.
+	if !reason.Valid || reason.String != "" {
+		// NULL is OK, we just need to confirm the column exists
+	}
+}
