@@ -770,3 +770,46 @@ func TestMarkEventAborted(t *testing.T) {
 		t.Errorf("reason: got %q, want %q", reason.String, "swept")
 	}
 }
+
+// TestInsertEventOrphanParent verifies that InsertEvent persists the row even
+// when parent_event_id points to a non-existent event (bug-89990f33: dropping
+// the self-referential FK on parent_event_id prevents silent insert failures).
+func TestInsertEventOrphanParent(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+	ev := &models.AgentEvent{
+		EventID:       "evt-orphan-1",
+		AgentID:       "claude-code",
+		EventType:     models.EventToolCall,
+		Timestamp:     now,
+		ToolName:      "Read",
+		SessionID:     "sess-test",
+		ParentEventID: "nonexistent-parent-id",
+		Status:        "started",
+		Source:        "hook",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	if err := db.InsertEvent(database, ev); err != nil {
+		t.Fatalf("InsertEvent with orphan parent_event_id: %v (FK constraint must not block insert)", err)
+	}
+
+	var count int
+	if err := database.QueryRow(`SELECT COUNT(*) FROM agent_events WHERE event_id = ?`, "evt-orphan-1").Scan(&count); err != nil {
+		t.Fatalf("query count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("event not persisted: got count %d, want 1", count)
+	}
+
+	var parentID sql.NullString
+	if err := database.QueryRow(`SELECT parent_event_id FROM agent_events WHERE event_id = ?`, "evt-orphan-1").Scan(&parentID); err != nil {
+		t.Fatalf("query parent_event_id: %v", err)
+	}
+	if parentID.String != "nonexistent-parent-id" {
+		t.Errorf("parent_event_id: got %q, want %q", parentID.String, "nonexistent-parent-id")
+	}
+}

@@ -179,7 +179,6 @@ func CreateAllTables(db *sql.DB) error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			CHECK (NOT (event_type = 'tool_call' AND agent_id = 'human' AND (tool_name IS NULL OR tool_name != 'UserQuery'))),
 			FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE ON UPDATE CASCADE,
-			FOREIGN KEY (parent_event_id) REFERENCES agent_events(event_id) ON DELETE SET NULL ON UPDATE CASCADE,
 			FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE SET NULL ON UPDATE CASCADE
 		)`,
 
@@ -549,26 +548,31 @@ const agentEventsCheckConstraintDDL = `CREATE TABLE agent_events (
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			CHECK (NOT (event_type = 'tool_call' AND agent_id = 'human' AND (tool_name IS NULL OR tool_name != 'UserQuery'))),
 			FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE ON UPDATE CASCADE,
-			FOREIGN KEY (parent_event_id) REFERENCES agent_events(event_id) ON DELETE SET NULL ON UPDATE CASCADE,
 			FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE SET NULL ON UPDATE CASCADE
 		)`
 
 // migrateAgentEventsAddCheckConstraint adds the attribution CHECK constraint to
-// the existing agent_events table via copy-and-swap. It is idempotent: if the
-// current table DDL already contains the constraint marker string, it is a no-op.
-// The migration is also guarded by a metadata key so it only runs once.
+// the existing agent_events table via copy-and-swap, and also drops the
+// self-referential FK on parent_event_id (which caused silent insert failures
+// when the parent row didn't exist yet — see bug-89990f33). It is idempotent:
+// it only runs when the live DDL requires changes.
 func migrateAgentEventsAddCheckConstraint(db *sql.DB) error {
-	// Check if the constraint already exists in the live table DDL.
+	// Check if the live table DDL requires changes.
 	var currentSQL string
 	err := db.QueryRow(
 		`SELECT sql FROM sqlite_master WHERE type='table' AND name='agent_events'`,
 	).Scan(&currentSQL)
 	if err != nil {
-		// Table doesn't exist yet — CreateAllTables will create it with the constraint.
+		// Table doesn't exist yet — CreateAllTables will create it correctly.
 		return nil
 	}
-	if strings.Contains(currentSQL, "tool_name != 'UserQuery'") {
-		// Constraint already present — nothing to do.
+
+	needsCheck := !strings.Contains(currentSQL, "tool_name != 'UserQuery'")
+	// The parent_event_id self-referential FK causes silent insert drops when the
+	// parent row hasn't been written yet (timing race). Drop it.
+	hasParentEventFK := strings.Contains(currentSQL, "REFERENCES agent_events(event_id)")
+	if !needsCheck && !hasParentEventFK {
+		// Both the check constraint is present and the FK is already gone — nothing to do.
 		return nil
 	}
 
