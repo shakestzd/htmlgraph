@@ -1557,6 +1557,7 @@ function openPlanDetail(planId, title) {
           body.querySelectorAll('.slice-field-value p').forEach(function(p) {
             if (/^\(\d+\)/.test(p.textContent)) p.classList.add('numbered-step');
           });
+          wireSliceActions(planId, body);
           return;
         }
         var s = document.createElement('script');
@@ -1570,6 +1571,146 @@ function openPlanDetail(planId, title) {
     .catch(function() {
       body.innerHTML = '<div class="empty">Could not load plan: ' + planId + '</div>';
     });
+}
+
+// SLICE_EXEC_STATUSES mirrors validSliceExecutionStatuses in plan_yaml_cmds.go.
+var SLICE_EXEC_STATUSES = ['not_started','promoted','in_progress','done','blocked','superseded'];
+
+// wireSliceActions augments each .slice-card in container with approve/reject/
+// promote buttons, an execution-status select, and per-question submit
+// buttons. All actions POST to the slice-level endpoints in api_plans.go and
+// refresh slice state from GET /api/plans/{id} on 200.
+function wireSliceActions(planId, container) {
+  if (!planId || !container) return;
+  var cards = container.querySelectorAll('.slice-card[data-slice]');
+  cards.forEach(function(card) {
+    if (card.querySelector('.slice-actions')) return;
+    var num = card.dataset.slice;
+    if (!num) return;
+    var actions = document.createElement('div');
+    actions.className = 'slice-actions';
+    actions.dataset.sliceActions = num;
+    actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)';
+    card.dataset.planId = planId;
+    actions.appendChild(makeSliceBtn('Approve', 'approve', planId, num));
+    actions.appendChild(makeSliceBtn('Reject', 'reject', planId, num));
+    actions.appendChild(makeSliceBtn('Reject + changes', 'reject-changes', planId, num));
+    actions.appendChild(makeSliceBtn('Promote', 'promote', planId, num));
+    var statusLabel = document.createElement('label');
+    statusLabel.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:.85rem';
+    statusLabel.appendChild(document.createTextNode('Status:'));
+    var statusSel = document.createElement('select');
+    statusSel.dataset.sliceStatus = num;
+    var blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '—';
+    statusSel.appendChild(blank);
+    SLICE_EXEC_STATUSES.forEach(function(s) {
+      var o = document.createElement('option');
+      o.value = s;
+      o.textContent = s;
+      statusSel.appendChild(o);
+    });
+    statusSel.addEventListener('change', function() {
+      if (!this.value) return;
+      var v = this.value;
+      this.value = '';
+      sliceAction(planId, num, 'status', { execution_status: v }, card);
+    });
+    statusLabel.appendChild(statusSel);
+    actions.appendChild(statusLabel);
+    var result = document.createElement('span');
+    result.className = 'slice-action-result';
+    result.setAttribute('aria-live', 'polite');
+    result.style.cssText = 'font-size:.85rem;color:var(--text-muted)';
+    actions.appendChild(result);
+    card.appendChild(actions);
+
+    card.querySelectorAll('.slice-question-block textarea[data-section]').forEach(function(ta) {
+      if (ta.parentNode.querySelector('button[data-question-submit]')) return;
+      var sec = ta.dataset.section;
+      var qid = sec.replace(/^slice-\d+-question-/, '');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Save answer';
+      btn.dataset.questionSubmit = qid;
+      btn.style.cssText = 'margin-left:8px;padding:4px 10px;font-size:.85rem;cursor:pointer';
+      btn.addEventListener('click', function() {
+        sliceAction(planId, num, 'answer', { question_id: qid, answer_key: ta.value || '' }, card);
+      });
+      ta.parentNode.appendChild(btn);
+    });
+  });
+}
+
+function makeSliceBtn(label, action, planId, num) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = label;
+  b.dataset.sliceAction = action;
+  b.style.cssText = 'padding:4px 10px;font-size:.85rem;cursor:pointer;border:1px solid var(--border);background:var(--card);border-radius:4px';
+  b.addEventListener('click', function() {
+    var card = b.closest('.slice-card');
+    var route = action === 'reject-changes' ? 'reject' : action;
+    var body = {};
+    if (action === 'reject-changes') body.changes_requested = true;
+    sliceAction(planId, num, route, body, card);
+  });
+  return b;
+}
+
+function sliceAction(planId, sliceNum, route, body, card) {
+  if (!planId) return;
+  var result = card && card.querySelector('.slice-action-result');
+  if (result) result.textContent = '…';
+  fetch(buildProjectUrl('plans/' + planId + '/slice/' + sliceNum + '/' + route), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  }).then(function(r) {
+    return r.text().then(function(t) { return { ok: r.ok, status: r.status, text: t }; });
+  }).then(function(res) {
+    if (!res.ok) {
+      if (result) result.textContent = 'Error ' + res.status + ': ' + (res.text || '').slice(0, 120);
+      return;
+    }
+    var msg = route === 'promote' ? '' : 'OK';
+    try {
+      var data = JSON.parse(res.text);
+      if (data && data.feature_id) msg = 'Promoted → ' + data.feature_id;
+    } catch (_) {}
+    if (result) result.textContent = msg || 'OK';
+    refreshSliceState(planId, card);
+  }).catch(function(err) {
+    if (result) result.textContent = 'Network error: ' + err.message;
+  });
+}
+
+function refreshSliceState(planId, card) {
+  fetch(buildProjectUrl('plans/' + planId)).then(function(r) {
+    if (!r.ok) return null;
+    return r.json();
+  }).then(function(plan) {
+    if (!plan || !plan.slices) return;
+    plan.slices.forEach(function(s) {
+      var c = document.querySelector('.slice-card[data-slice="' + s.num + '"]');
+      if (!c) return;
+      c.dataset.status = s.approval_status || 'pending';
+      c.dataset.planId = planId;
+      var aBadge = c.querySelector('.slice-approval-badge');
+      if (aBadge) {
+        aBadge.className = 'badge badge-' + (s.approval_status || 'pending') + ' slice-approval-badge';
+        aBadge.textContent = s.approval_status || 'pending';
+      }
+      var eBadge = c.querySelector('.slice-exec-badge');
+      if (eBadge && s.execution_status) {
+        eBadge.textContent = s.execution_status;
+        eBadge.title = 'Execution: ' + s.execution_status;
+      }
+      var cb = c.querySelector('input[data-action="approve"]');
+      if (cb) cb.checked = (s.approval_status === 'approved');
+    });
+  }).catch(function() {});
 }
 
 function buildPlanSubnav(container) {
