@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/shakestzd/htmlgraph/internal/blame"
 	dbpkg "github.com/shakestzd/htmlgraph/internal/db"
 	"github.com/shakestzd/htmlgraph/internal/htmlparse"
 	"github.com/shakestzd/htmlgraph/internal/models"
@@ -289,6 +291,7 @@ func TestContextPack_CmdRegistered(t *testing.T) {
 }
 
 // TestContextPack_GoPackageQualifier validates the package inference logic.
+// Non-Go files return "" so callers can render "—" in table columns.
 func TestContextPack_GoPackageQualifier(t *testing.T) {
 	cases := []struct {
 		path string
@@ -297,8 +300,11 @@ func TestContextPack_GoPackageQualifier(t *testing.T) {
 		{"internal/foo/bar.go", "package foo"},
 		{"cmd/htmlgraph/main.go", "package htmlgraph"},
 		{"internal/db/schema.go", "package db"},
-		{"README.md", "README.md"},
-		{"Makefile", "Makefile"},
+		{"README.md", ""},
+		{"Makefile", ""},
+		{".devcontainer/Dockerfile", ""},
+		{"plugin/hooks/hooks.json", ""},
+		{"scripts/deploy.sh", ""},
 		{"top.go", "package main"},
 	}
 	for _, tc := range cases {
@@ -306,6 +312,169 @@ func TestContextPack_GoPackageQualifier(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("goPackageQualifier(%q) = %q, want %q", tc.path, got, tc.want)
 		}
+	}
+}
+
+// TestContextPack_Section4Placeholder verifies §4 shows "(no track attribution)"
+// when the work item has no track (bug-546cda63).
+func TestContextPack_Section4Placeholder(t *testing.T) {
+	_, hgDir, _ := setupContextPackEnv(t)
+
+	if err := runWiCreate("feature", "Untracked Feature", &wiCreateOpts{
+		priority:         "medium",
+		standaloneReason: "test",
+	}); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+
+	out := renderContextPack(featNode, "main", 0, 0, nil, nil, nil)
+
+	// §4 must contain the placeholder.
+	idx4 := strings.Index(out, "## 4. Code-Surface Helpers")
+	if idx4 == -1 {
+		t.Fatal("§4 header not found")
+	}
+	snippet4 := out[idx4 : idx4+150]
+	if !strings.Contains(snippet4, "(no track attribution)") {
+		t.Errorf("§4: expected '(no track attribution)', got:\n%s", snippet4)
+	}
+}
+
+// TestContextPack_EdgeAttributedCommits verifies that commitsByTrack finds
+// features attached via graph_edges (edge-based attribution from migrate-tracks),
+// not only via the track_id column (bug-680d0ee4).
+func TestContextPack_EdgeAttributedCommits(t *testing.T) {
+	_, _, proj := setupContextPackEnv(t)
+
+	trackID := "trk-edgetest"
+	featID := "feat-edgetest"
+
+	// Insert a minimal track + feature into SQLite WITHOUT setting track_id column.
+	// The feature belongs to the track only via a graph_edges row.
+	if _, err := proj.DB.Exec(`INSERT OR IGNORE INTO tracks (id, type, title, status, created_at, updated_at) VALUES (?, 'track', 'Edge Track', 'open', datetime('now'), datetime('now'))`, trackID); err != nil {
+		t.Fatalf("insert track: %v", err)
+	}
+	if _, err := proj.DB.Exec(`INSERT OR IGNORE INTO features (id, type, title, status, priority, created_at, updated_at) VALUES (?, 'feature', 'Edge Feature', 'open', 'medium', datetime('now'), datetime('now'))`, featID); err != nil {
+		t.Fatalf("insert feature: %v", err)
+	}
+	// Attach via edge, not column.
+	if _, err := proj.DB.Exec(`INSERT OR REPLACE INTO graph_edges (edge_id, from_node_id, from_node_type, to_node_id, to_node_type, relationship_type) VALUES ('e1', ?, 'feature', ?, 'track', 'part_of')`, featID, trackID); err != nil {
+		t.Fatalf("insert edge: %v", err)
+	}
+
+	// Seed a commit for the edge-attributed feature.
+	seedCommit(t, proj, "edge1234abcd5678", featID, "chore: edge-attributed commit", time.Now().UTC())
+
+	commits, err := commitsByTrack(proj, trackID)
+	if err != nil {
+		t.Fatalf("commitsByTrack: %v", err)
+	}
+	if len(commits) == 0 {
+		t.Error("expected at least one commit from edge-attributed feature, got none")
+	}
+}
+
+// TestContextPack_FileCap verifies §5 is capped at contextPackFileLimit rows and
+// emits a footer when truncated (bug-792a8319 symptom A).
+func TestContextPack_FileCap(t *testing.T) {
+	_, hgDir, _ := setupContextPackEnv(t)
+
+	if err := testCreate("track", "Big Track", "", "medium", false, false); err != nil {
+		t.Fatalf("create track: %v", err)
+	}
+	trackFiles, _ := filepath.Glob(filepath.Join(hgDir, "tracks", "trk-*.html"))
+	trackNode, _ := htmlparse.ParseFile(trackFiles[0])
+
+	if err := testCreate("feature", "Big Feature", trackNode.ID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+	featNode.TrackID = trackNode.ID
+
+	// Build a fake TrackArea with 30 files.
+	files := make([]blame.FileEntry, 30)
+	for i := range files {
+		files[i] = blame.FileEntry{
+			Path:     fmt.Sprintf("internal/pkg%d/file.go", i),
+			Features: 1,
+			Touches:  i + 1,
+		}
+	}
+	trackArea := &blame.TrackArea{
+		TrackID:    trackNode.ID,
+		TrackTitle: "Big Track",
+		Files:      files,
+	}
+
+	out := renderContextPack(featNode, "main", 0, 0, trackArea, nil, nil)
+
+	// Count table rows in §5.
+	lines := strings.Split(out, "\n")
+	tableRows := 0
+	inSection5 := false
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## 5.") {
+			inSection5 = true
+			continue
+		}
+		if strings.HasPrefix(line, "## ") && inSection5 {
+			break
+		}
+		if inSection5 && strings.HasPrefix(line, "| internal/") {
+			tableRows++
+		}
+	}
+	if tableRows > contextPackFileLimit {
+		t.Errorf("§5 has %d table rows, want at most %d", tableRows, contextPackFileLimit)
+	}
+	if !strings.Contains(out, "… and 10 more files") {
+		t.Errorf("expected truncation footer '… and 10 more files' in output, got:\n%s", out)
+	}
+}
+
+// TestContextPack_NonGoPackageColumn verifies non-Go files render "—" in the Package column
+// (bug-792a8319 symptom B).
+func TestContextPack_NonGoPackageColumn(t *testing.T) {
+	_, hgDir, _ := setupContextPackEnv(t)
+
+	if err := testCreate("track", "Mixed Track", "", "medium", false, false); err != nil {
+		t.Fatalf("create track: %v", err)
+	}
+	trackFiles, _ := filepath.Glob(filepath.Join(hgDir, "tracks", "trk-*.html"))
+	trackNode, _ := htmlparse.ParseFile(trackFiles[0])
+
+	if err := testCreate("feature", "Mixed Feature", trackNode.ID, "medium", false, false); err != nil {
+		t.Fatalf("create feature: %v", err)
+	}
+	featFiles, _ := filepath.Glob(filepath.Join(hgDir, "features", "feat-*.html"))
+	featNode, _ := htmlparse.ParseFile(featFiles[0])
+	featNode.TrackID = trackNode.ID
+
+	trackArea := &blame.TrackArea{
+		TrackID:    trackNode.ID,
+		TrackTitle: "Mixed Track",
+		Files: []blame.FileEntry{
+			{Path: "internal/foo/bar.go", Features: 1, Touches: 3},
+			{Path: "README.md", Features: 1, Touches: 1},
+			{Path: "scripts/deploy.sh", Features: 1, Touches: 2},
+		},
+	}
+
+	out := renderContextPack(featNode, "main", 0, 0, trackArea, nil, nil)
+
+	// "README.md" must NOT appear as a package column value — it should be "—".
+	if strings.Contains(out, "| README.md | README.md |") {
+		t.Error("non-Go file path should not appear as package column value")
+	}
+	if !strings.Contains(out, "| README.md | — |") {
+		t.Errorf("expected '| README.md | — |' in output, got:\n%s", out)
+	}
+	// Go file should still show package.
+	if !strings.Contains(out, "package foo") {
+		t.Errorf("expected 'package foo' for Go file in output, got:\n%s", out)
 	}
 }
 
