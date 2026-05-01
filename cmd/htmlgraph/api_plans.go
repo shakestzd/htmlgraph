@@ -3,14 +3,17 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -649,9 +652,16 @@ func planRouter(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 	yamlH := planYAMLHandler(htmlgraphDir)
 	renderH := planRenderHandler(database, htmlgraphDir)
 	eventsH := planEventsHandler(database)
+	getJSONH := planGetJSONHandler(htmlgraphDir)
+	slicesH := planSlicesHandler(htmlgraphDir)
+	sliceMutateH := sliceMutationRouter(htmlgraphDir)
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
+		case strings.Contains(path, "/slice/"):
+			sliceMutateH(w, r)
+		case strings.HasSuffix(path, "/slices"):
+			slicesH(w, r)
 		case strings.HasSuffix(path, "/chat"):
 			chatH(w, r)
 		case strings.HasSuffix(path, "/render"):
@@ -671,9 +681,383 @@ func planRouter(database *sql.DB, htmlgraphDir string) http.HandlerFunc {
 		case strings.HasSuffix(path, "/yaml"):
 			yamlH(w, r)
 		default:
+			// Bare /api/plans/{id} → JSON view of the plan.
+			if isBarePlanPath(path) {
+				getJSONH(w, r)
+				return
+			}
 			http.Error(w, "not found", http.StatusNotFound)
 		}
 	}
+}
+
+// isBarePlanPath reports whether path is exactly /api/plans/{id} with no
+// trailing action segment. Trailing slashes are tolerated.
+func isBarePlanPath(path string) bool {
+	_, err := extractPlanID(path, "")
+	return err == nil
+}
+
+// sliceJSONItem is the JSON shape used to describe one slice in plan/slices
+// responses. A separate type from planyaml.PlanSlice so the wire format is
+// stable and decoupled from the YAML schema (no omitempty surprises).
+type sliceJSONItem struct {
+	Num                    int    `json:"num"`
+	Title                  string `json:"title"`
+	ApprovalStatus         string `json:"approval_status"`
+	ExecutionStatus        string `json:"execution_status"`
+	Deps                   []int  `json:"deps"`
+	HasUnansweredQuestions bool   `json:"has_unanswered_questions"`
+}
+
+// planJSONResponse is the JSON shape returned by GET /api/plans/{id}.
+type planJSONResponse struct {
+	Meta      planyaml.PlanMeta       `json:"meta"`
+	Design    planyaml.PlanDesign     `json:"design"`
+	Slices    []sliceJSONItem         `json:"slices"`
+	Questions []planyaml.PlanQuestion `json:"questions"`
+}
+
+// buildSliceJSONItems projects the plan's slices into the JSON wire shape,
+// including derivation of has_unanswered_questions from slice.Questions.
+func buildSliceJSONItems(plan *planyaml.PlanYAML) []sliceJSONItem {
+	out := make([]sliceJSONItem, 0, len(plan.Slices))
+	for _, s := range plan.Slices {
+		deps := s.Deps
+		if deps == nil {
+			deps = []int{}
+		}
+		hasUnanswered := false
+		for _, q := range s.Questions {
+			if strings.TrimSpace(q.Answer) == "" {
+				hasUnanswered = true
+				break
+			}
+		}
+		out = append(out, sliceJSONItem{
+			Num:                    s.Num,
+			Title:                  s.Title,
+			ApprovalStatus:         s.ApprovalStatus,
+			ExecutionStatus:        s.ExecutionStatus,
+			Deps:                   deps,
+			HasUnansweredQuestions: hasUnanswered,
+		})
+	}
+	return out
+}
+
+// loadPlanYAMLForAPI loads the canonical YAML plan for a request. Returns
+// the plan, an http status code, and an error message string. status==0
+// means success.
+func loadPlanYAMLForAPI(htmlgraphDir, planID string) (*planyaml.PlanYAML, int, string) {
+	yamlPath := filepath.Join(htmlgraphDir, "plans", planID+".yaml")
+	plan, err := planyaml.Load(yamlPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, http.StatusNotFound, "plan not found"
+		}
+		return nil, http.StatusInternalServerError, fmt.Sprintf("loading plan: %v", err)
+	}
+	return plan, 0, ""
+}
+
+// planGetJSONHandler returns the full plan as JSON.
+// GET /api/plans/{id}
+func planGetJSONHandler(htmlgraphDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		planID, err := extractPlanID(r.URL.Path, "")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		plan, code, msg := loadPlanYAMLForAPI(htmlgraphDir, planID)
+		if code != 0 {
+			http.Error(w, msg, code)
+			return
+		}
+		questions := plan.Questions
+		if questions == nil {
+			questions = []planyaml.PlanQuestion{}
+		}
+		respondJSON(w, planJSONResponse{
+			Meta:      plan.Meta,
+			Design:    plan.Design,
+			Slices:    buildSliceJSONItems(plan),
+			Questions: questions,
+		})
+	}
+}
+
+// planSlicesHandler returns just the slices array for a plan.
+// GET /api/plans/{id}/slices
+func planSlicesHandler(htmlgraphDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		planID, err := extractPlanID(r.URL.Path, "/slices")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		plan, code, msg := loadPlanYAMLForAPI(htmlgraphDir, planID)
+		if code != 0 {
+			http.Error(w, msg, code)
+			return
+		}
+		respondJSON(w, buildSliceJSONItems(plan))
+	}
+}
+
+// parseSlicePath splits "/api/plans/<id>/slice/<n>/<action>" into its three
+// components. Validates that the path has the expected shape and that <n>
+// is a positive integer. Returns an error for any deviation.
+func parseSlicePath(urlPath string) (planID string, sliceNum int, action string, err error) {
+	const prefix = "/api/plans/"
+	trimmed := strings.TrimSuffix(urlPath, "/")
+	if !strings.HasPrefix(trimmed, prefix) {
+		return "", 0, "", fmt.Errorf("unexpected path: %s", urlPath)
+	}
+	rest := trimmed[len(prefix):]
+	parts := strings.Split(rest, "/")
+	// Expect exactly 4 segments: <id>, "slice", <n>, <action>
+	if len(parts) != 4 {
+		return "", 0, "", fmt.Errorf("invalid slice path: %s", urlPath)
+	}
+	if parts[0] == "" {
+		return "", 0, "", fmt.Errorf("missing plan ID in path: %s", urlPath)
+	}
+	if parts[1] != "slice" {
+		return "", 0, "", fmt.Errorf("expected /slice/ segment in path: %s", urlPath)
+	}
+	n, perr := parseSliceNum(parts[2])
+	if perr != nil {
+		return "", 0, "", perr
+	}
+	if parts[3] == "" {
+		return "", 0, "", fmt.Errorf("missing action in path: %s", urlPath)
+	}
+	return parts[0], n, parts[3], nil
+}
+
+// sliceMutationRouter dispatches /api/plans/{id}/slice/{n}/{action} to the
+// matching handler. Each handler validates the slice exists before calling
+// the underlying CLI helper so there is exactly one source of truth per
+// action — the run* / promoteSliceFromYAML helpers in plan_yaml_cmds.go and
+// plan_promote_slice.go.
+func sliceMutationRouter(htmlgraphDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		planID, sliceNum, action, err := parseSlicePath(r.URL.Path)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// Verify slice exists in the plan YAML before invoking any helper.
+		plan, code, msg := loadPlanYAMLForAPI(htmlgraphDir, planID)
+		if code != 0 {
+			http.Error(w, msg, code)
+			return
+		}
+		if _, _, ferr := findPlanSlice(plan, sliceNum); ferr != nil {
+			http.Error(w, ferr.Error(), http.StatusNotFound)
+			return
+		}
+		switch action {
+		case "approve":
+			handleSliceApprove(w, r, htmlgraphDir, planID, sliceNum)
+		case "reject":
+			handleSliceReject(w, r, htmlgraphDir, planID, sliceNum)
+		case "promote":
+			handleSlicePromote(w, r, htmlgraphDir, planID, sliceNum)
+		case "status":
+			handleSliceStatus(w, r, htmlgraphDir, planID, sliceNum)
+		case "answer":
+			handleSliceAnswer(w, r, htmlgraphDir, planID, sliceNum)
+		default:
+			http.Error(w, "unknown slice action: "+action, http.StatusNotFound)
+		}
+	}
+}
+
+// handleSliceApprove processes POST .../slice/{n}/approve.
+func handleSliceApprove(w http.ResponseWriter, r *http.Request, htmlgraphDir, planID string, sliceNum int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := runApproveSlice(htmlgraphDir, planID, strconv.Itoa(sliceNum)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]any{"ok": true, "approval_status": "approved"})
+}
+
+// sliceRejectRequest is the optional body for slice reject.
+type sliceRejectRequest struct {
+	ChangesRequested bool   `json:"changes_requested"`
+	Comment          string `json:"comment"` // currently not persisted — runRejectSlice has no comment param
+}
+
+// handleSliceReject processes POST .../slice/{n}/reject.
+func handleSliceReject(w http.ResponseWriter, r *http.Request, htmlgraphDir, planID string, sliceNum int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req sliceRejectRequest
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 64*1024))
+	if len(bytesTrimSpace(body)) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+	if err := runRejectSlice(htmlgraphDir, planID, strconv.Itoa(sliceNum), req.ChangesRequested); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	state := "rejected"
+	if req.ChangesRequested {
+		state = "changes_requested"
+	}
+	respondJSON(w, map[string]any{"ok": true, "approval_status": state})
+}
+
+// slicePromoteRequest is the optional body for slice promote.
+type slicePromoteRequest struct {
+	WaiveDeps bool `json:"waive_deps"`
+}
+
+// handleSlicePromote processes POST .../slice/{n}/promote.
+func handleSlicePromote(w http.ResponseWriter, r *http.Request, htmlgraphDir, planID string, sliceNum int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req slicePromoteRequest
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 64*1024))
+	if len(bytesTrimSpace(body)) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+	featID, err := promoteSliceFromYAML(htmlgraphDir, planID, sliceNum, req.WaiveDeps)
+	if err != nil {
+		http.Error(w, err.Error(), classifyPromoteError(err))
+		return
+	}
+	respondJSON(w, map[string]any{"ok": true, "feature_id": featID})
+}
+
+// classifyPromoteError maps a promote error to an HTTP status. Approval and
+// dependency violations are 409 Conflict (the slice exists but the request
+// is incompatible with current state); missing slice/plan is 404; everything
+// else is 500.
+func classifyPromoteError(err error) int {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not approved"):
+		return http.StatusConflict
+	case strings.Contains(msg, "blocking dependency"):
+		return http.StatusConflict
+	case strings.Contains(msg, "not found"):
+		return http.StatusNotFound
+	case strings.Contains(msg, "no track_id"):
+		return http.StatusConflict
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+// sliceStatusRequest is the body for slice status.
+type sliceStatusRequest struct {
+	ExecutionStatus string `json:"execution_status"`
+}
+
+// handleSliceStatus processes POST .../slice/{n}/status.
+func handleSliceStatus(w http.ResponseWriter, r *http.Request, htmlgraphDir, planID string, sliceNum int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req sliceStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	if req.ExecutionStatus == "" {
+		http.Error(w, "execution_status is required", http.StatusBadRequest)
+		return
+	}
+	if err := runSetSliceStatus(htmlgraphDir, planID, strconv.Itoa(sliceNum), req.ExecutionStatus); err != nil {
+		// runSetSliceStatus returns this error prefix for invalid values.
+		if strings.HasPrefix(err.Error(), "invalid slice execution status") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]any{"ok": true, "execution_status": req.ExecutionStatus})
+}
+
+// sliceAnswerRequest is the body for slice answer.
+type sliceAnswerRequest struct {
+	QuestionID string `json:"question_id"`
+	AnswerKey  string `json:"answer_key"`
+}
+
+// handleSliceAnswer processes POST .../slice/{n}/answer.
+func handleSliceAnswer(w http.ResponseWriter, r *http.Request, htmlgraphDir, planID string, sliceNum int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req sliceAnswerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	if req.QuestionID == "" || req.AnswerKey == "" {
+		http.Error(w, "question_id and answer_key are required", http.StatusBadRequest)
+		return
+	}
+	if err := runAnswerSliceQuestion(htmlgraphDir, planID, strconv.Itoa(sliceNum), req.QuestionID, req.AnswerKey); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]any{"ok": true})
+}
+
+// bytesTrimSpace is a tiny helper that trims ASCII whitespace from a byte
+// slice without forcing a string conversion. Used to detect empty bodies
+// before invoking json.Unmarshal (which would error on "").
+func bytesTrimSpace(b []byte) []byte {
+	start := 0
+	for start < len(b) {
+		c := b[start]
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			start++
+			continue
+		}
+		break
+	}
+	end := len(b)
+	for end > start {
+		c := b[end-1]
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			end--
+			continue
+		}
+		break
+	}
+	return b[start:end]
 }
 
 // planRenderHandler dynamically renders plan HTML from the YAML source.
