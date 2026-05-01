@@ -283,10 +283,11 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: HTML-canonical architecture migration</h1>
-  <p style="color:var(--text-dim)">Lock in HTML schema and migrate all consumers off SQLite as a required dependency, in six phases</p>
+  <p style="color:var(--text-dim)">Lock in a public HTML schema (JSON-LD payload + microdata body + link rel head edges + meta-name primitives + time datetime) that makes the work-item HTML files the canonical queryable substrate. Migrate every consumer (CLI, dashboard, ingest pipeline) off SQLite as a system requirement, in six phases. SQLite is allowed back later strictly as a disposable derived speed tier — not in this plan.
+</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 0 slices · Created 2026-05-01</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v1 · 11 slices · Created 2026-05-01</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -306,6 +307,17 @@ textarea::placeholder{color:var(--text-muted)}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Phase 0a — RCA and fix the SQLite ingestion path so OTEL spans render" data-status="pending" data-deps="" data-files="5"></div>
+    <div data-node="2" data-name="Phase 0b — Auto-recover empty/corrupt DB at startup; add `htmlgraph recover-db`" data-status="pending" data-deps="1" data-files="5"></div>
+    <div data-node="3" data-name="Phase 1a — Author schema v1 spec, Go types, and validator" data-status="pending" data-deps="" data-files="4"></div>
+    <div data-node="4" data-name="Phase 1b — Schema test fixtures (positive and negative)" data-status="pending" data-deps="3" data-files="8"></div>
+    <div data-node="5" data-name="Phase 2a — Templater refactor: derive all schema layers from one source struct" data-status="pending" data-deps="3,4" data-files="8"></div>
+    <div data-node="6" data-name="Phase 2b — Backfill migration of existing `.htmlgraph/*.html` files" data-status="pending" data-deps="5" data-files="4"></div>
+    <div data-node="7" data-name="Phase 3a — `internal/htmlparse` JSON-LD fast path + ParseLinks + ParseHeadMeta" data-status="pending" data-deps="4" data-files="7"></div>
+    <div data-node="8" data-name="Phase 3b — Migrate `trace`, `lineage`, `session list`, and `status` off SQLite" data-status="pending" data-deps="7" data-files="8"></div>
+    <div data-node="9" data-name="Phase 3c — `htmlgraph query` subcommand (gojq over JSON-LD)" data-status="pending" data-deps="7" data-files="5"></div>
+    <div data-node="10" data-name="Phase 3d — Dashboard endpoints serve JSON-LD; activity feed reads NDJSON directly" data-status="pending" data-deps="7,8" data-files="7"></div>
+    <div data-node="11" data-name="Phase 4 — Delete SQLite from the codebase" data-status="pending" data-deps="8,10" data-files="12"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -318,17 +330,33 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
-    <!--PLAN_DESIGN_CONTENT-->
-    <div class="sub-section">
-      <h4>Open Questions</h4>
-      <!--PLAN_QUESTIONS-->
-    </div>
+    <h4>Problem</h4>
+<div data-markdown>`.htmlgraph/htmlgraph.db` has corrupted three times in nine days. The architecture claims SQLite is a &#34;derived read index&#34; but the team treats it as authoritative — corruption is currently a session-breaking incident rather than a transparent rebuild. Today the OTEL activity feed shows zero spans because the DB is empty (no schema), even though 198 spans are durably written to NDJSON for the current session. Meanwhile the CLI is already ~85% HTML-direct (per a read-path audit): only `trace`, `lineage`, `session list`, and a supplemental block in `status` actually require SQLite. The cost-to-benefit has flipped: SQLite imposes a corruption class on every session for marginal speed wins on three commands at current scale.
+</div>
+<h4>Goals</h4>
+<ol>
+<li data-markdown>**Eliminate the corruption class** — losing the SQLite file must become a sub-second nuisance (rm + rebuild from canonical sources), not an incident.</li>
+<li data-markdown>**Promote HTML to genuinely canonical** — every fact in a work-item file is queryable by an explicit, versioned schema (JSON-LD, microdata, `&lt;link rel&gt;`, `&lt;meta name&gt;`, `&lt;time datetime&gt;`).</li>
+<li data-markdown>**Remove SQLite as a system requirement** — the binary builds, ships, and runs without any SQLite driver; full test suite passes with `--block-sqlite`.</li>
+<li data-markdown>**Preserve user-facing CLI surface** — every existing command keeps its name, flags, and behavior; users don&#39;t notice the migration.</li>
+<li data-markdown>**Land a new `htmlgraph query` subcommand** — jq-style filter over JSON-LD payloads, replacing ad-hoc shell pipelines.</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li data-markdown>No new runtime language deps (no Python, no Rust binary). Pure-Go embeds only (e.g. `itchyny/gojq`).</li>
+<li data-markdown>Schema vocabulary is versioned at `https://htmlgraph.dev/v1/`; future breaking changes go to `/v2/` plus a migrator.</li>
+<li data-markdown>Phase 0 must land first — we do not remove the SQLite path while it&#39;s the only thing serving the activity feed.</li>
+<li data-markdown>Every SQLite removal step must keep a non-SQLite fallback exercised by CI; no quiet code paths.</li>
+<li data-markdown>Migration of existing `.htmlgraph/*.html` files must preserve content semantics — diff-tested before rollout.</li>
+</ul>
+
     <div class="approval-row">
       <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
 </details>
+
 
 <!-- Structure Outline (hidden when empty) -->
 
@@ -337,7 +365,431 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    
+    <div class="slice-card" data-slice="1" data-slice-name="slice-1" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">Phase 0a — RCA and fix the SQLite ingestion path so OTEL spans render</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Diagnose why `.htmlgraph/htmlgraph.db` keeps ending up empty/corrupt
+(3 incidents in 9 days, plus a current zero-byte file with no schema).
+Confirm or refute the concurrent-collector hypothesis. Fix the
+ingestion writer in `internal/otel/receiver/writer.go` so OTEL spans
+from existing per-session NDJSON files repopulate `otel_signals`.
+Reproduce locally with two simultaneous Claude sessions; capture the
+failure mode in a test under `internal/otel/receiver/`.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Closes the immediate user-visible bug (activity feed shows no OTEL
+data) and stabilizes the baseline so the rest of the migration can
+proceed against a working dashboard. Without this, any migration
+regression is indistinguishable from the existing corruption.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/otel/receiver/writer.go, internal/otel/sink/ndjson/ndjson.go, internal/otel/adapter/claude.go, internal/storage/dbpath.go, internal/otel/receiver/writer_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Activity feed in the dashboard shows OTEL spans (api_request, tool_execution, tool_result) within one cold-start of `htmlgraph serve`.</li><li data-markdown="">A regression test reproduces the corruption / empty-schema scenario and verifies the fix.</li><li data-markdown="">Running two concurrent `htmlgraph claude` sessions does not cause DB corruption (verified manually &#43; scripted).</li><li data-markdown="">A new bug `[P1] SQLite read index ends up empty/corrupt` is filed under trk-c4615ad2 and closed by this slice&#39;s commits.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestWriter_BatchIngest_EmptyDB_AutoMigrates — open against a fresh empty DB, batch-insert 10 spans, assert all are queryable.
+Integration: TestConcurrentCollectors_NoCorruption — spin up two collectors writing to the same DB via the WAL path; assert PRAGMA integrity_check is OK after 1k spans each.
+Regression: existing `internal/otel/receiver/*_test.go` and `internal/otel/sink/*_test.go` still pass.
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="2" data-slice-name="slice-2" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#2</span>
+    <span class="slice-name">Phase 0b — Auto-recover empty/corrupt DB at startup; add `htmlgraph recover-db`</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-2">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">In the SQLite open path (`internal/storage/dbpath.go` and
+`cmd/htmlgraph/main.go` startup), detect: (a) zero-byte DB,
+(b) PRAGMA integrity_check failure. On either, quarantine the file
+to `.htmlgraph/htmlgraph.db.corrupt-&lt;unix&gt;` and rebuild from
+canonical sources (replay every `.htmlgraph/sessions/*/events.ndjson`
+through the indexer; reparse all work-item HTML for the work-item
+tables). Add explicit `htmlgraph recover-db` subcommand for manual
+recovery, sharing the same code path.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Defensive: turns the next corruption from an incident into a slow
+startup. Also serves as the dress rehearsal for Phase 4 — proves the
+DB can be rebuilt deterministically from canonical sources, which is
+the precondition for ever calling SQLite &#34;disposable.&#34;
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/storage/dbpath.go, internal/storage/recover.go, cmd/htmlgraph/main.go, cmd/htmlgraph/recover_db.go, cmd/htmlgraph/recover_db_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Starting `htmlgraph serve` against a zero-byte `htmlgraph.db` quarantines it and produces a fully-populated rebuild without operator intervention.</li><li data-markdown="">`htmlgraph recover-db` exits 0 and produces an identical DB to the auto-recovery path (golden-file comparison).</li><li data-markdown="">PRAGMA integrity_check failures during normal queries trigger a single quarantine &#43; rebuild, not an infinite loop.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestRecoverDB_FromZeroByte — empty file → fully-populated DB, all expected tables present.
+Unit: TestRecoverDB_FromCorrupt — write a known-bad page, assert quarantine &#43; rebuild.
+Integration: TestStartupAutoRecover — `htmlgraph status` against a corrupt DB succeeds.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="3" data-slice-name="slice-3" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#3</span>
+    <span class="slice-name">Phase 1a — Author schema v1 spec, Go types, and validator</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-3">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Write `docs/schema/v1.md` defining the `https://htmlgraph.dev/v1/`
+vocabulary: types (Feature, Bug, Spike, Plan, Track, Session, Commit,
+OtelSpan, AgentEvent), universal properties (id, type, title, status,
+created, updated, completedAt, score, body, agentAssigned,
+description), and link-rel relationship vocabulary (depends-on,
+blocked-by, caused-by, contained-in, part-of, references, supersedes,
+produced-by-session, produced-commit). Implement
+`internal/schema/v1.go` with Go structs matching the JSON-LD shape
+(`@context`, `@type`, `@id` &#43; properties). Implement
+`internal/schema/validate.go` — given an `io.Reader` over an HTML
+file, verify presence and consistency of `&lt;script
+type=&#34;application/ld&#43;json&#34;&gt;`, `&lt;meta name=&#34;htmlgraph:*&#34;&gt;`,
+`&lt;link rel=&#34;...&#34;&gt;`, and `&lt;time datetime=&#34;...&#34;&gt;` against the schema.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Establishes the public contract everything else depends on. The schema
+is the new architectural commitment; nothing else can land safely
+until it&#39;s frozen. Acts as both human documentation and a parser
+contract for tools (CLI, dashboard, external `hq`/`jq` users).
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>docs/schema/v1.md, internal/schema/v1.go, internal/schema/validate.go, internal/schema/validate_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`docs/schema/v1.md` exists, defines all listed types and properties, and lists the `&lt;link rel&gt;` vocabulary.</li><li data-markdown="">`internal/schema/v1.Feature`, `.Bug`, `.Spike`, `.Plan`, `.Track`, `.Session` Go structs round-trip via `encoding/json` matching the spec.</li><li data-markdown="">`internal/schema/Validate(r) error` returns nil for a hand-authored valid example, returns specific errors (missing field, wrong type) for known-bad cases.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestValidate_GoldenFeature — read a fixture under testdata/v1/, assert nil error.
+Unit: TestValidate_MissingTypes — for each mandatory field, verify a clear error message.
+Unit: TestRoundTrip — marshal → unmarshal → equality for each type.
+</div></div>
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-3" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="4" data-slice-name="slice-4" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#4</span>
+    <span class="slice-name">Phase 1b — Schema test fixtures (positive and negative)</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-4">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Author `internal/schema/testdata/v1/` containing one positive fixture
+per top-level type and at least three negative fixtures (missing
+required field, conflicting JSON-LD vs. meta-name status, malformed
+datetime). These fixtures are the canonical examples that downstream
+slices&#39; tests target. Include a `README.md` in the testdata dir
+explaining the fixture layout and how new types are added.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Without fixtures the validator from slice-3 has no real-world
+coverage. Fixtures also act as documentation by example for anyone
+writing migration code in slices 5-6, and as the regression bar
+for Phase 2 templater changes.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/schema/testdata/v1/feature_valid.html, internal/schema/testdata/v1/bug_valid.html, internal/schema/testdata/v1/track_valid.html, internal/schema/testdata/v1/session_valid.html, internal/schema/testdata/v1/feature_missing_status.html, internal/schema/testdata/v1/feature_jsonld_meta_mismatch.html, internal/schema/testdata/v1/feature_malformed_datetime.html, internal/schema/testdata/v1/README.md</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Each positive fixture passes `internal/schema.Validate` with nil error.</li><li data-markdown="">Each negative fixture fails `Validate` with a specific, non-generic error referencing the broken field.</li><li data-markdown="">Fixture README documents file naming and how to extend with new types.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestFixtures_AllPositiveValidate — table-driven over every *_valid.html file.
+Unit: TestFixtures_AllNegativeFail — table-driven over every other file, asserting expected error substring.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 3</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-4" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="5" data-slice-name="slice-5" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#5</span>
+    <span class="slice-name">Phase 2a — Templater refactor: derive all schema layers from one source struct</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending" data-badge-for="slice-5">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Audit every code path that emits work-item HTML (work item create/edit,
+plan rewrite, track render, `commitPlanChange`, session HTML emission)
+and refactor each to render from a single `internal/schema/v1.&lt;Type&gt;`
+struct. The renderer derives, from that one struct: (a) the JSON-LD
+`&lt;script&gt;` payload, (b) `&lt;meta name=&#34;htmlgraph:*&#34;&gt;` head metas,
+(c) `&lt;link rel=&#34;...&#34;&gt;` head edges, (d) microdata `itemscope`/
+`itemprop` decoration of body elements, (e) `&lt;time datetime&gt;` for
+every timestamp. No fact may be hand-authored in two layers — the
+struct is source of truth, the template derives. Every write path
+runs `schema.Validate` on its output and refuses to write malformed
+HTML.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Removes the duplication-and-drift class permanently. Once this lands,
+&#34;the HTML schema&#34; is a real architectural invariant rather than a
+style guide. Validation at write time turns schema regressions into
+test failures rather than corrupted artifacts.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/workitem/render.go, internal/plan/render.go, internal/track/render.go, internal/session/render.go, internal/htmltemplate/derive.go, cmd/htmlgraph/feature_create.go, cmd/htmlgraph/feature_edit.go, cmd/htmlgraph/plan_rewrite.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">Every emitter calls a single `htmltemplate.Render(struct)` entry point.</li><li data-markdown="">Every emitter validates output via `schema.Validate` before writing; CI test asserts no emitter bypasses the validator.</li><li data-markdown="">Generated HTML for a sample Feature struct contains JSON-LD with the same `status` as the rendered `&lt;meta name&gt;` and the body microdata; mismatch is impossible by construction.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestRender_FeatureMatchesSchema — render a sample Feature, validate output, assert specific selectors.
+Unit: TestRender_NoDuplication — given a struct with `status=&#34;x&#34;`, mutate the struct and re-render; assert all five layers updated.
+Integration: TestEmitterWriteRefusesInvalid — corrupt a render path to emit a missing-field HTML; assert write returns error.
+Regression: existing `internal/workitem/*_test.go`, plan render tests, and snapshot tests still pass.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 3,4</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-5" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="6" data-slice-name="slice-6" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#6</span>
+    <span class="slice-name">Phase 2b — Backfill migration of existing `.htmlgraph/*.html` files</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending" data-badge-for="slice-6">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Implement `htmlgraph migrate-html --to v1`: iterate every file under
+`.htmlgraph/{features,bugs,spikes,plans,tracks,sessions}/*.html`,
+extract facts via the current selector-based parser, populate a
+`schema.v1.&lt;Type&gt;` struct, re-render through the new templater
+(slice-5), and write back. Diff-test mode (`--dry-run`) prints
+semantic diffs (status, edges, timestamps) without writing. Failures
+are logged; the command exits non-zero if any file cannot be cleanly
+migrated. Add a one-off CI job that runs the migrator against a
+fixture corpus and asserts it converges.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Without backfill, the codebase has two HTML formats: schema-compliant
+(new emissions) and pre-schema (existing). The dual-format burden
+defeats the whole plan. Backfill collapses the world to a single
+format before Phase 3 reads can rely on it.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/migrate_html.go, internal/migrate/v0_to_v1.go, internal/migrate/v0_to_v1_test.go, internal/migrate/testdata/legacy/</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`htmlgraph migrate-html --dry-run` produces a clean diff for the working repo&#39;s `.htmlgraph/` (no semantic content lost).</li><li data-markdown="">After running `htmlgraph migrate-html --to v1`, `internal/schema.Validate` returns nil for every file under `.htmlgraph/`.</li><li data-markdown="">CI runs the migrator against `internal/migrate/testdata/legacy/` and asserts byte-equality on a second run (idempotent).</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestMigrate_FeatureSemanticPreserved — load legacy HTML, migrate, assert schema struct fields match expected.
+Unit: TestMigrate_Idempotent — run migrate twice, second pass produces zero diff.
+Integration: TestMigrate_FullCorpus — migrate the real `.htmlgraph/` (in CI sandbox), assert all files validate.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 5</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-6" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-6" data-comment-for="slice-6" placeholder="Comments on slice 6..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="7" data-slice-name="slice-7" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#7</span>
+    <span class="slice-name">Phase 3a — `internal/htmlparse` JSON-LD fast path &#43; ParseLinks &#43; ParseHeadMeta</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-7">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add three new exported functions to `internal/htmlparse`:
+(1) `ParseJSONLD(r) (*schema.v1.&lt;Type&gt;, error)` — extracts the
+first `&lt;script type=&#34;application/ld&#43;json&#34;&gt;` and unmarshals.
+(2) `ParseLinks(r) ([]Link, error)` — head-only stream parse for
+`&lt;link rel=&#34;...&#34; href=&#34;...&#34;&gt;` tags.
+(3) `ParseHeadMeta(r) (map[string]string, error)` — head-only stream
+parse for `&lt;meta name=&#34;htmlgraph:*&#34; content=&#34;...&#34;&gt;`.
+All three short-circuit on `&lt;/head&gt;`. Existing `ParseFile` continues
+to work via goquery for legacy callers and body-content extraction.
+Benchmark JSON-LD parse vs full parse and document the win.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">The fast paths are the perf justification for not needing SQLite for
+the common queries. ~1ms-per-file JSON-LD parse vs ~10ms goquery
+means a 200-item snapshot is ~200ms instead of 2 seconds —
+acceptable for CLI use, generous for dashboard cold-start.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/htmlparse/jsonld.go, internal/htmlparse/links.go, internal/htmlparse/head_meta.go, internal/htmlparse/jsonld_test.go, internal/htmlparse/links_test.go, internal/htmlparse/head_meta_test.go, internal/htmlparse/bench_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">All three functions return correct results on every fixture from slice-4.</li><li data-markdown="">Head-only parsers stop at `&lt;/head&gt;` (verified by benchmarking a 1MB body — parse time independent of body size).</li><li data-markdown="">Documented benchmark in `bench_test.go`: JSON-LD path ≥5× faster than goquery on a real Feature file.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestParseJSONLD_AllFixtures — table-driven over schema fixtures.
+Unit: TestParseLinks_HeadOnly — file with malicious gigantic body parses in &lt; 5ms.
+Bench: BenchmarkParseJSONLD vs BenchmarkParseFile_GoQuery on a real Feature.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 4</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-7" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-7" data-comment-for="slice-7" placeholder="Comments on slice 7..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="8" data-slice-name="slice-8" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#8</span>
+    <span class="slice-name">Phase 3b — Migrate `trace`, `lineage`, `session list`, and `status` off SQLite</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending" data-badge-for="slice-8">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Rewrite four CLI command read paths to use HTML &#43; git directly:
+(1) `htmlgraph trace &lt;id&gt;`: scan commits via `git log --grep`/path-
+filter; read produced-by-session and produced-commit `&lt;link rel&gt;`
+edges from work-item heads.
+(2) `htmlgraph lineage &lt;id&gt;`: BFS over work-item heads using
+`htmlparse.ParseLinks`; resolve neighbor IDs via `&lt;link rel&gt;` href
+basenames.
+(3) `htmlgraph session list`: scan `.htmlgraph/sessions/*.html` head
+metas; sort by `htmlgraph:created`.
+(4) `htmlgraph status`: drop the `dbpkg.CommitAttributionRate` block
+or recompute it on demand from work-item JSON-LD.
+All four commands gain a `--block-sqlite` debug flag (process-level)
+that fails if any SQLite open is attempted. CI runs every command
+with the flag set and asserts success.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">These four are the only SQLite-dependent CLI paths per the read-path
+audit. Moving them off SQLite is the bulk of the work that lets
+Phase 4 actually delete the dependency. The `--block-sqlite` flag
+is the binding contract — without it, &#34;we removed SQLite&#34; is
+aspirational.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/trace.go, cmd/htmlgraph/lineage.go, cmd/htmlgraph/session.go, cmd/htmlgraph/status.go, cmd/htmlgraph/block_sqlite.go, cmd/htmlgraph/trace_test.go, cmd/htmlgraph/lineage_test.go, cmd/htmlgraph/session_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`trace`, `lineage`, `session list`, and `status` all run successfully with `--block-sqlite`.</li><li data-markdown="">Output of each command is byte-identical (or semantic-equivalent, documented) to the SQLite-backed version on a representative fixture project.</li><li data-markdown="">CI runs the full CLI test suite with `HTMLGRAPH_BLOCK_SQLITE=1` and asserts no command opens a DB.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestTrace_NoSQLite — sample fixture project, compare output to recorded golden.
+Unit: TestLineage_NoSQLite — fixture with 3-deep edges, BFS produces correct order.
+Integration: TestCLI_BlockSQLite — run `find`, `relevant`, `snapshot`, `wip`, `feature show`, `trace`, `lineage`, `session list`, `status`, `analytics` with the flag; all exit 0.
+Regression: existing trace/lineage/session-list tests still pass.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 7</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-8" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-8" data-comment-for="slice-8" placeholder="Comments on slice 8..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="9" data-slice-name="slice-9" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#9</span>
+    <span class="slice-name">Phase 3c — `htmlgraph query` subcommand (gojq over JSON-LD)</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending" data-badge-for="slice-9">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Add `htmlgraph query &lt;jq-expr&gt; [paths...]`: extracts JSON-LD from
+every HTML file in the given paths (default `.htmlgraph/**/*.html`),
+pipes them through an embedded `github.com/itchyny/gojq` filter, and
+emits JSONL on stdout. Supports `--type feature` shorthand to scope
+to a single work-item type. Default output is one JSON object per
+file; `--slurp` collects into an array. Document common recipes in
+`docs/cli/query.md` (find all P1 bugs, lineage tree as JSON, etc.).
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Gives users and downstream scripts a stable shell-scriptable
+interface that doesn&#39;t require a new CLI subcommand for every read
+pattern. Replaces ad-hoc shell pipelines and prevents feature-creep
+pressure on the core CLI surface. Also serves as a power-user
+escape hatch when the dashboard doesn&#39;t expose a needed query.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/query.go, cmd/htmlgraph/query_test.go, docs/cli/query.md, go.mod, go.sum</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`htmlgraph query &#39;.status&#39; --type feature` lists the status of every feature file.</li><li data-markdown="">`htmlgraph query &#39;. | select(.status == &#34;in_progress&#34;)&#39;` filters correctly.</li><li data-markdown="">Embedded gojq does not reach the network; runs offline.</li><li data-markdown="">Documented at least 5 recipes in `docs/cli/query.md`.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestQuery_TypeFilter — table-driven against schema fixtures.
+Unit: TestQuery_SelectExpression — assert correct subset.
+Integration: TestQuery_RealRepo — runs against `.htmlgraph/` in CI; expected output count matches `find | wc -l`.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 7</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-9" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-9" data-comment-for="slice-9" placeholder="Comments on slice 9..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="10" data-slice-name="slice-10" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#10</span>
+    <span class="slice-name">Phase 3d — Dashboard endpoints serve JSON-LD; activity feed reads NDJSON directly</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending" data-badge-for="slice-10">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">Replace the SQLite-backed dashboard read path:
+(1) New endpoint `GET /api/items/:id` streams the JSON-LD payload
+from the corresponding HTML file.
+(2) New endpoint `GET /api/manifest` returns
+`[{file, mtime, type, id}, ...]` — head-only scan, cached with
+mtime invalidation.
+(3) `GET /api/feed` is rewritten to stream
+`.htmlgraph/sessions/*/events.ndjson` directly; merges hook events
+and OTEL spans into one timestamp-sorted stream. The activity feed
+bug (this conversation&#39;s symptom) goes away by construction — both
+kinds of events come from the same source.
+(4) Old SQLite-backed feed endpoint kept temporarily behind
+`?legacy=1` for parity comparison; removed in slice-11.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Closes the loop on the original symptom: hook events render but OTEL
+spans don&#39;t. Both will read from NDJSON via the same streaming
+decoder, so they cannot diverge. Also removes the dashboard&#39;s
+dependency on the SQLite read index, which is the gate to Phase 4.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/api_feed.go, cmd/htmlgraph/api_items.go, cmd/htmlgraph/api_manifest.go, cmd/htmlgraph/api_feed_test.go, internal/server/ndjson_stream.go, plugin/static/dashboard.html, plugin/static/dashboard.js</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`/api/feed` returns hook events and OTEL spans interleaved by timestamp without SQLite.</li><li data-markdown="">`/api/items/:id` returns the JSON-LD payload from the HTML file directly.</li><li data-markdown="">Visual parity test: run dashboard against a fixture session, screenshot the feed; matches recorded golden within tolerance.</li><li data-markdown="">`?legacy=1` still works for parity; CI compares old vs new output and asserts no semantic regression.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Unit: TestAPIFeed_NDJSONMergeOrder — assert events emit in monotonic timestamp order.
+Unit: TestAPIItems_JSONLDPassthrough — fixture file, assert payload matches.
+Integration: TestDashboardActivityFeedShowsSpans — ingest known NDJSON, assert feed contains spans (regression for current bug).
+</div></div>
+  <div class="slice-deps">Dependencies: slices 7,8</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-10" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-10" data-comment-for="slice-10" placeholder="Comments on slice 10..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="11" data-slice-name="slice-11" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#11</span>
+    <span class="slice-name">Phase 4 — Delete SQLite from the codebase</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-revision">Med</span>
+    <span class="badge badge-pending" data-badge-for="slice-11">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value" data-markdown="">With slices 1-10 landed, remove SQLite as a system requirement:
+(1) Delete `internal/storage/`, `internal/db/`, `cmd/htmlgraph/cache.go`
+(cache eviction is SQLite-specific), `cmd/htmlgraph/dbpath.go`.
+(2) Remove the SQLite driver (`mattn/go-sqlite3` or whichever is in
+`go.mod`); run `go mod tidy`.
+(3) Remove `htmlgraph reindex` (no index) — keep `htmlgraph
+recover-db` only if it now means &#34;rebuild any cached query state&#34;;
+otherwise delete it too.
+(4) Update `AGENTS.md`, `CLAUDE.md`, plugin system prompts: remove
+&#34;SQLite read index&#34; from the architecture table; replace with
+&#34;HTML files (canonical) &#43; NDJSON sessions (canonical)&#34;.
+(5) Update `.htmlgraph/.gitignore` to permanently ignore
+`htmlgraph.db*`; add a deploy-script step that nukes the file
+if present.
+(6) Verify binary size shrinks; record before/after in commit
+message.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value" data-markdown="">Closes the migration. Until SQLite is actually deleted, the team
+will keep accidentally adding code that reaches for it. &#34;Removing
+the option&#34; is the only way to make the architecture promise real.
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/storage/, internal/db/, cmd/htmlgraph/cache.go, cmd/htmlgraph/cache_pollution_test.go, cmd/htmlgraph/dbpath.go, go.mod, go.sum, AGENTS.md, CLAUDE.md, cmd/htmlgraph/prompts/system-prompt.md, .htmlgraph/.gitignore, scripts/deploy-all.sh</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li data-markdown="">`go.sum` no longer references `mattn/go-sqlite3` or any SQLite driver.</li><li data-markdown="">`grep -r &#39;database/sql&#39; cmd/ internal/` returns zero matches.</li><li data-markdown="">Full test suite passes.</li><li data-markdown="">Binary size reduction documented in commit message (expected: ~3-5 MB).</li><li data-markdown="">Architecture table in `AGENTS.md` no longer mentions SQLite.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-tests" data-markdown="">Integration: TestNoSQLiteDriver — `go test ./...` with a build tag that fails on `database/sql` import.
+Regression: full CLI command matrix passes.
+Smoke: fresh checkout, `go build`, `htmlgraph status` against a clean repo — works.
+</div></div>
+  <div class="slice-deps">Dependencies: slices 8,10</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-11" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-11" data-comment-for="slice-11" placeholder="Comments on slice 11..."></textarea>
+  </div>
+</div>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
@@ -346,14 +798,71 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="questions" class="section-card" data-phase="questions" data-status="pending">
   <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
   <div class="section-body">
+    
+    <div class="question-block" id="q-vocab-url">
+      <p>Should the schema vocabulary URL be `https://htmlgraph.dev/v1/` or something namespaced (e.g. `https://schema.htmlgraph.dev/v1/` or a github.io URL)?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-vocab-url" data-question="q-vocab-url" value="A: `https://htmlgraph.dev/v1/` — short, brand-aligned, reserves path for expansion"> A: `https://htmlgraph.dev/v1/` — short, brand-aligned, reserves path for expansion <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-vocab-url" data-question="q-vocab-url" value="B: `https://schema.htmlgraph.dev/v1/` — explicit namespace, leaves apex free"> B: `https://schema.htmlgraph.dev/v1/` — explicit namespace, leaves apex free</label>
+      
+      <label><input type="radio" name="q-vocab-url" data-question="q-vocab-url" value="C: `https://shakestzd.github.io/htmlgraph/schema/v1/` — no DNS commitment"> C: `https://shakestzd.github.io/htmlgraph/schema/v1/` — no DNS commitment</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-vocab-url" placeholder="Rationale for q-vocab-url..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-phase5-defer">
+      <p>Confirm Phase 5 (browser-as-query-engine) is out of scope for this plan?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-phase5-defer" data-question="q-phase5-defer" value="A: Defer — separate plan after Phase 4 lands"> A: Defer — separate plan after Phase 4 lands <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-phase5-defer" data-question="q-phase5-defer" value="B: Include now — add 3 more slices for manifest endpoint, in-tab index, IndexedDB persistence"> B: Include now — add 3 more slices for manifest endpoint, in-tab index, IndexedDB persistence</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-phase5-defer" placeholder="Rationale for q-phase5-defer..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-block-sqlite-flag">
+      <p>Should `--block-sqlite` be a process-level flag, an env var (`HTMLGRAPH_BLOCK_SQLITE`), or both?</p>
+      
+      
+      <label><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="A: Flag only — `--block-sqlite` on every command"> A: Flag only — `--block-sqlite` on every command</label>
+      
+      <label><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="B: Env only — `HTMLGRAPH_BLOCK_SQLITE=1`"> B: Env only — `HTMLGRAPH_BLOCK_SQLITE=1`</label>
+      
+      <label class="recommended"><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="C: Both — flag wins if both set"> C: Both — flag wins if both set <span class="rec-tag">recommended</span></label>
+      
+      <textarea data-section="questions" data-question-rationale="q-block-sqlite-flag" placeholder="Rationale for q-block-sqlite-flag..."></textarea>
+    </div>
+    
     <table class="q-table">
       <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
       <tbody id="questionsRecap">
-        <!--PLAN_QUESTIONS_RECAP-->
+        
+        <tr data-recap-for="q-vocab-url">
+          <td>Should the schema vocabulary URL be `https://htmlgraph.dev/v1/` or something namespaced (e.g. `https://schema.htmlgraph.dev/v1/` or a github.io URL)?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-phase5-defer">
+          <td>Confirm Phase 5 (browser-as-query-engine) is out of scope for this plan?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-block-sqlite-flag">
+          <td>Should `--block-sqlite` be a process-level flag, an env var (`HTMLGRAPH_BLOCK_SQLITE`), or both?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
       </tbody>
     </table>
   </div>
 </details>
+
 
 
 
@@ -364,8 +873,8 @@ textarea::placeholder{color:var(--text-muted)}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">12</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">12</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -469,7 +978,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6","slice-7","slice-8","slice-9","slice-10","slice-11"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');

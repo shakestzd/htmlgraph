@@ -2,15 +2,524 @@ meta:
     id: plan-3bbc313f
     track_id: trk-2c55adea
     title: HTML-canonical architecture migration
-    description: Lock in HTML schema and migrate all consumers off SQLite as a required dependency, in six phases
+    description: |
+        Lock in a public HTML schema (JSON-LD payload + microdata body + link rel head edges + meta-name primitives + time datetime) that makes the work-item HTML files the canonical queryable substrate. Migrate every consumer (CLI, dashboard, ingest pipeline) off SQLite as a system requirement, in six phases. SQLite is allowed back later strictly as a disposable derived speed tier — not in this plan.
     created_at: "2026-05-01"
     status: draft
-    version: 2
+    created_by: claude-opus
+    version: 1
 design:
-    problem: ""
-    goals: []
-    constraints: []
+    problem: |
+        `.htmlgraph/htmlgraph.db` has corrupted three times in nine days. The architecture claims SQLite is a "derived read index" but the team treats it as authoritative — corruption is currently a session-breaking incident rather than a transparent rebuild. Today the OTEL activity feed shows zero spans because the DB is empty (no schema), even though 198 spans are durably written to NDJSON for the current session. Meanwhile the CLI is already ~85% HTML-direct (per a read-path audit): only `trace`, `lineage`, `session list`, and a supplemental block in `status` actually require SQLite. The cost-to-benefit has flipped: SQLite imposes a corruption class on every session for marginal speed wins on three commands at current scale.
+    goals:
+        - '**Eliminate the corruption class** — losing the SQLite file must become a sub-second nuisance (rm + rebuild from canonical sources), not an incident.'
+        - '**Promote HTML to genuinely canonical** — every fact in a work-item file is queryable by an explicit, versioned schema (JSON-LD, microdata, `<link rel>`, `<meta name>`, `<time datetime>`).'
+        - '**Remove SQLite as a system requirement** — the binary builds, ships, and runs without any SQLite driver; full test suite passes with `--block-sqlite`.'
+        - '**Preserve user-facing CLI surface** — every existing command keeps its name, flags, and behavior; users don''t notice the migration.'
+        - '**Land a new `htmlgraph query` subcommand** — jq-style filter over JSON-LD payloads, replacing ad-hoc shell pipelines.'
+    constraints:
+        - No new runtime language deps (no Python, no Rust binary). Pure-Go embeds only (e.g. `itchyny/gojq`).
+        - Schema vocabulary is versioned at `https://htmlgraph.dev/v1/`; future breaking changes go to `/v2/` plus a migrator.
+        - Phase 0 must land first — we do not remove the SQLite path while it's the only thing serving the activity feed.
+        - Every SQLite removal step must keep a non-SQLite fallback exercised by CI; no quiet code paths.
+        - Migration of existing `.htmlgraph/*.html` files must preserve content semantics — diff-tested before rollout.
     approved: false
     comment: ""
-slices: []
-questions: []
+slices:
+    - id: slice-1
+      num: 1
+      title: Phase 0a — RCA and fix the SQLite ingestion path so OTEL spans render
+      what: |
+        Diagnose why `.htmlgraph/htmlgraph.db` keeps ending up empty/corrupt
+        (3 incidents in 9 days, plus a current zero-byte file with no schema).
+        Confirm or refute the concurrent-collector hypothesis. Fix the
+        ingestion writer in `internal/otel/receiver/writer.go` so OTEL spans
+        from existing per-session NDJSON files repopulate `otel_signals`.
+        Reproduce locally with two simultaneous Claude sessions; capture the
+        failure mode in a test under `internal/otel/receiver/`.
+      why: |
+        Closes the immediate user-visible bug (activity feed shows no OTEL
+        data) and stabilizes the baseline so the rest of the migration can
+        proceed against a working dashboard. Without this, any migration
+        regression is indistinguishable from the existing corruption.
+      files:
+        - internal/otel/receiver/writer.go
+        - internal/otel/sink/ndjson/ndjson.go
+        - internal/otel/adapter/claude.go
+        - internal/storage/dbpath.go
+        - internal/otel/receiver/writer_test.go
+      deps: []
+      done_when:
+        - Activity feed in the dashboard shows OTEL spans (api_request, tool_execution, tool_result) within one cold-start of `htmlgraph serve`.
+        - A regression test reproduces the corruption / empty-schema scenario and verifies the fix.
+        - Running two concurrent `htmlgraph claude` sessions does not cause DB corruption (verified manually + scripted).
+        - A new bug `[P1] SQLite read index ends up empty/corrupt` is filed under trk-c4615ad2 and closed by this slice's commits.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestWriter_BatchIngest_EmptyDB_AutoMigrates — open against a fresh empty DB, batch-insert 10 spans, assert all are queryable.
+        Integration: TestConcurrentCollectors_NoCorruption — spin up two collectors writing to the same DB via the WAL path; assert PRAGMA integrity_check is OK after 1k spans each.
+        Regression: existing `internal/otel/receiver/*_test.go` and `internal/otel/sink/*_test.go` still pass.
+      approved: false
+      comment: ""
+    - id: slice-2
+      num: 2
+      title: Phase 0b — Auto-recover empty/corrupt DB at startup; add `htmlgraph recover-db`
+      what: |
+        In the SQLite open path (`internal/storage/dbpath.go` and
+        `cmd/htmlgraph/main.go` startup), detect: (a) zero-byte DB,
+        (b) PRAGMA integrity_check failure. On either, quarantine the file
+        to `.htmlgraph/htmlgraph.db.corrupt-<unix>` and rebuild from
+        canonical sources (replay every `.htmlgraph/sessions/*/events.ndjson`
+        through the indexer; reparse all work-item HTML for the work-item
+        tables). Add explicit `htmlgraph recover-db` subcommand for manual
+        recovery, sharing the same code path.
+      why: |
+        Defensive: turns the next corruption from an incident into a slow
+        startup. Also serves as the dress rehearsal for Phase 4 — proves the
+        DB can be rebuilt deterministically from canonical sources, which is
+        the precondition for ever calling SQLite "disposable."
+      files:
+        - internal/storage/dbpath.go
+        - internal/storage/recover.go
+        - cmd/htmlgraph/main.go
+        - cmd/htmlgraph/recover_db.go
+        - cmd/htmlgraph/recover_db_test.go
+      deps:
+        - 1
+      done_when:
+        - Starting `htmlgraph serve` against a zero-byte `htmlgraph.db` quarantines it and produces a fully-populated rebuild without operator intervention.
+        - '`htmlgraph recover-db` exits 0 and produces an identical DB to the auto-recovery path (golden-file comparison).'
+        - PRAGMA integrity_check failures during normal queries trigger a single quarantine + rebuild, not an infinite loop.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestRecoverDB_FromZeroByte — empty file → fully-populated DB, all expected tables present.
+        Unit: TestRecoverDB_FromCorrupt — write a known-bad page, assert quarantine + rebuild.
+        Integration: TestStartupAutoRecover — `htmlgraph status` against a corrupt DB succeeds.
+      approved: false
+      comment: ""
+    - id: slice-3
+      num: 3
+      title: Phase 1a — Author schema v1 spec, Go types, and validator
+      what: |
+        Write `docs/schema/v1.md` defining the `https://htmlgraph.dev/v1/`
+        vocabulary: types (Feature, Bug, Spike, Plan, Track, Session, Commit,
+        OtelSpan, AgentEvent), universal properties (id, type, title, status,
+        created, updated, completedAt, score, body, agentAssigned,
+        description), and link-rel relationship vocabulary (depends-on,
+        blocked-by, caused-by, contained-in, part-of, references, supersedes,
+        produced-by-session, produced-commit). Implement
+        `internal/schema/v1.go` with Go structs matching the JSON-LD shape
+        (`@context`, `@type`, `@id` + properties). Implement
+        `internal/schema/validate.go` — given an `io.Reader` over an HTML
+        file, verify presence and consistency of `<script
+        type="application/ld+json">`, `<meta name="htmlgraph:*">`,
+        `<link rel="...">`, and `<time datetime="...">` against the schema.
+      why: |
+        Establishes the public contract everything else depends on. The schema
+        is the new architectural commitment; nothing else can land safely
+        until it's frozen. Acts as both human documentation and a parser
+        contract for tools (CLI, dashboard, external `hq`/`jq` users).
+      files:
+        - docs/schema/v1.md
+        - internal/schema/v1.go
+        - internal/schema/validate.go
+        - internal/schema/validate_test.go
+      deps: []
+      done_when:
+        - '`docs/schema/v1.md` exists, defines all listed types and properties, and lists the `<link rel>` vocabulary.'
+        - '`internal/schema/v1.Feature`, `.Bug`, `.Spike`, `.Plan`, `.Track`, `.Session` Go structs round-trip via `encoding/json` matching the spec.'
+        - '`internal/schema/Validate(r) error` returns nil for a hand-authored valid example, returns specific errors (missing field, wrong type) for known-bad cases.'
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestValidate_GoldenFeature — read a fixture under testdata/v1/, assert nil error.
+        Unit: TestValidate_MissingTypes — for each mandatory field, verify a clear error message.
+        Unit: TestRoundTrip — marshal → unmarshal → equality for each type.
+      approved: false
+      comment: ""
+    - id: slice-4
+      num: 4
+      title: Phase 1b — Schema test fixtures (positive and negative)
+      what: |
+        Author `internal/schema/testdata/v1/` containing one positive fixture
+        per top-level type and at least three negative fixtures (missing
+        required field, conflicting JSON-LD vs. meta-name status, malformed
+        datetime). These fixtures are the canonical examples that downstream
+        slices' tests target. Include a `README.md` in the testdata dir
+        explaining the fixture layout and how new types are added.
+      why: |
+        Without fixtures the validator from slice-3 has no real-world
+        coverage. Fixtures also act as documentation by example for anyone
+        writing migration code in slices 5-6, and as the regression bar
+        for Phase 2 templater changes.
+      files:
+        - internal/schema/testdata/v1/feature_valid.html
+        - internal/schema/testdata/v1/bug_valid.html
+        - internal/schema/testdata/v1/track_valid.html
+        - internal/schema/testdata/v1/session_valid.html
+        - internal/schema/testdata/v1/feature_missing_status.html
+        - internal/schema/testdata/v1/feature_jsonld_meta_mismatch.html
+        - internal/schema/testdata/v1/feature_malformed_datetime.html
+        - internal/schema/testdata/v1/README.md
+      deps:
+        - 3
+      done_when:
+        - Each positive fixture passes `internal/schema.Validate` with nil error.
+        - Each negative fixture fails `Validate` with a specific, non-generic error referencing the broken field.
+        - Fixture README documents file naming and how to extend with new types.
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestFixtures_AllPositiveValidate — table-driven over every *_valid.html file.
+        Unit: TestFixtures_AllNegativeFail — table-driven over every other file, asserting expected error substring.
+      approved: false
+      comment: ""
+    - id: slice-5
+      num: 5
+      title: 'Phase 2a — Templater refactor: derive all schema layers from one source struct'
+      what: |
+        Audit every code path that emits work-item HTML (work item create/edit,
+        plan rewrite, track render, `commitPlanChange`, session HTML emission)
+        and refactor each to render from a single `internal/schema/v1.<Type>`
+        struct. The renderer derives, from that one struct: (a) the JSON-LD
+        `<script>` payload, (b) `<meta name="htmlgraph:*">` head metas,
+        (c) `<link rel="...">` head edges, (d) microdata `itemscope`/
+        `itemprop` decoration of body elements, (e) `<time datetime>` for
+        every timestamp. No fact may be hand-authored in two layers — the
+        struct is source of truth, the template derives. Every write path
+        runs `schema.Validate` on its output and refuses to write malformed
+        HTML.
+      why: |
+        Removes the duplication-and-drift class permanently. Once this lands,
+        "the HTML schema" is a real architectural invariant rather than a
+        style guide. Validation at write time turns schema regressions into
+        test failures rather than corrupted artifacts.
+      files:
+        - internal/workitem/render.go
+        - internal/plan/render.go
+        - internal/track/render.go
+        - internal/session/render.go
+        - internal/htmltemplate/derive.go
+        - cmd/htmlgraph/feature_create.go
+        - cmd/htmlgraph/feature_edit.go
+        - cmd/htmlgraph/plan_rewrite.go
+      deps:
+        - 3
+        - 4
+      done_when:
+        - Every emitter calls a single `htmltemplate.Render(struct)` entry point.
+        - Every emitter validates output via `schema.Validate` before writing; CI test asserts no emitter bypasses the validator.
+        - Generated HTML for a sample Feature struct contains JSON-LD with the same `status` as the rendered `<meta name>` and the body microdata; mismatch is impossible by construction.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestRender_FeatureMatchesSchema — render a sample Feature, validate output, assert specific selectors.
+        Unit: TestRender_NoDuplication — given a struct with `status="x"`, mutate the struct and re-render; assert all five layers updated.
+        Integration: TestEmitterWriteRefusesInvalid — corrupt a render path to emit a missing-field HTML; assert write returns error.
+        Regression: existing `internal/workitem/*_test.go`, plan render tests, and snapshot tests still pass.
+      approved: false
+      comment: ""
+    - id: slice-6
+      num: 6
+      title: Phase 2b — Backfill migration of existing `.htmlgraph/*.html` files
+      what: |
+        Implement `htmlgraph migrate-html --to v1`: iterate every file under
+        `.htmlgraph/{features,bugs,spikes,plans,tracks,sessions}/*.html`,
+        extract facts via the current selector-based parser, populate a
+        `schema.v1.<Type>` struct, re-render through the new templater
+        (slice-5), and write back. Diff-test mode (`--dry-run`) prints
+        semantic diffs (status, edges, timestamps) without writing. Failures
+        are logged; the command exits non-zero if any file cannot be cleanly
+        migrated. Add a one-off CI job that runs the migrator against a
+        fixture corpus and asserts it converges.
+      why: |
+        Without backfill, the codebase has two HTML formats: schema-compliant
+        (new emissions) and pre-schema (existing). The dual-format burden
+        defeats the whole plan. Backfill collapses the world to a single
+        format before Phase 3 reads can rely on it.
+      files:
+        - cmd/htmlgraph/migrate_html.go
+        - internal/migrate/v0_to_v1.go
+        - internal/migrate/v0_to_v1_test.go
+        - internal/migrate/testdata/legacy/
+      deps:
+        - 5
+      done_when:
+        - '`htmlgraph migrate-html --dry-run` produces a clean diff for the working repo''s `.htmlgraph/` (no semantic content lost).'
+        - After running `htmlgraph migrate-html --to v1`, `internal/schema.Validate` returns nil for every file under `.htmlgraph/`.
+        - CI runs the migrator against `internal/migrate/testdata/legacy/` and asserts byte-equality on a second run (idempotent).
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestMigrate_FeatureSemanticPreserved — load legacy HTML, migrate, assert schema struct fields match expected.
+        Unit: TestMigrate_Idempotent — run migrate twice, second pass produces zero diff.
+        Integration: TestMigrate_FullCorpus — migrate the real `.htmlgraph/` (in CI sandbox), assert all files validate.
+      approved: false
+      comment: ""
+    - id: slice-7
+      num: 7
+      title: Phase 3a — `internal/htmlparse` JSON-LD fast path + ParseLinks + ParseHeadMeta
+      what: |
+        Add three new exported functions to `internal/htmlparse`:
+        (1) `ParseJSONLD(r) (*schema.v1.<Type>, error)` — extracts the
+        first `<script type="application/ld+json">` and unmarshals.
+        (2) `ParseLinks(r) ([]Link, error)` — head-only stream parse for
+        `<link rel="..." href="...">` tags.
+        (3) `ParseHeadMeta(r) (map[string]string, error)` — head-only stream
+        parse for `<meta name="htmlgraph:*" content="...">`.
+        All three short-circuit on `</head>`. Existing `ParseFile` continues
+        to work via goquery for legacy callers and body-content extraction.
+        Benchmark JSON-LD parse vs full parse and document the win.
+      why: |
+        The fast paths are the perf justification for not needing SQLite for
+        the common queries. ~1ms-per-file JSON-LD parse vs ~10ms goquery
+        means a 200-item snapshot is ~200ms instead of 2 seconds —
+        acceptable for CLI use, generous for dashboard cold-start.
+      files:
+        - internal/htmlparse/jsonld.go
+        - internal/htmlparse/links.go
+        - internal/htmlparse/head_meta.go
+        - internal/htmlparse/jsonld_test.go
+        - internal/htmlparse/links_test.go
+        - internal/htmlparse/head_meta_test.go
+        - internal/htmlparse/bench_test.go
+      deps:
+        - 4
+      done_when:
+        - All three functions return correct results on every fixture from slice-4.
+        - Head-only parsers stop at `</head>` (verified by benchmarking a 1MB body — parse time independent of body size).
+        - 'Documented benchmark in `bench_test.go`: JSON-LD path ≥5× faster than goquery on a real Feature file.'
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestParseJSONLD_AllFixtures — table-driven over schema fixtures.
+        Unit: TestParseLinks_HeadOnly — file with malicious gigantic body parses in < 5ms.
+        Bench: BenchmarkParseJSONLD vs BenchmarkParseFile_GoQuery on a real Feature.
+      approved: false
+      comment: ""
+    - id: slice-8
+      num: 8
+      title: Phase 3b — Migrate `trace`, `lineage`, `session list`, and `status` off SQLite
+      what: |
+        Rewrite four CLI command read paths to use HTML + git directly:
+        (1) `htmlgraph trace <id>`: scan commits via `git log --grep`/path-
+        filter; read produced-by-session and produced-commit `<link rel>`
+        edges from work-item heads.
+        (2) `htmlgraph lineage <id>`: BFS over work-item heads using
+        `htmlparse.ParseLinks`; resolve neighbor IDs via `<link rel>` href
+        basenames.
+        (3) `htmlgraph session list`: scan `.htmlgraph/sessions/*.html` head
+        metas; sort by `htmlgraph:created`.
+        (4) `htmlgraph status`: drop the `dbpkg.CommitAttributionRate` block
+        or recompute it on demand from work-item JSON-LD.
+        All four commands gain a `--block-sqlite` debug flag (process-level)
+        that fails if any SQLite open is attempted. CI runs every command
+        with the flag set and asserts success.
+      why: |
+        These four are the only SQLite-dependent CLI paths per the read-path
+        audit. Moving them off SQLite is the bulk of the work that lets
+        Phase 4 actually delete the dependency. The `--block-sqlite` flag
+        is the binding contract — without it, "we removed SQLite" is
+        aspirational.
+      files:
+        - cmd/htmlgraph/trace.go
+        - cmd/htmlgraph/lineage.go
+        - cmd/htmlgraph/session.go
+        - cmd/htmlgraph/status.go
+        - cmd/htmlgraph/block_sqlite.go
+        - cmd/htmlgraph/trace_test.go
+        - cmd/htmlgraph/lineage_test.go
+        - cmd/htmlgraph/session_test.go
+      deps:
+        - 7
+      done_when:
+        - '`trace`, `lineage`, `session list`, and `status` all run successfully with `--block-sqlite`.'
+        - Output of each command is byte-identical (or semantic-equivalent, documented) to the SQLite-backed version on a representative fixture project.
+        - CI runs the full CLI test suite with `HTMLGRAPH_BLOCK_SQLITE=1` and asserts no command opens a DB.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestTrace_NoSQLite — sample fixture project, compare output to recorded golden.
+        Unit: TestLineage_NoSQLite — fixture with 3-deep edges, BFS produces correct order.
+        Integration: TestCLI_BlockSQLite — run `find`, `relevant`, `snapshot`, `wip`, `feature show`, `trace`, `lineage`, `session list`, `status`, `analytics` with the flag; all exit 0.
+        Regression: existing trace/lineage/session-list tests still pass.
+      approved: false
+      comment: ""
+    - id: slice-9
+      num: 9
+      title: Phase 3c — `htmlgraph query` subcommand (gojq over JSON-LD)
+      what: |
+        Add `htmlgraph query <jq-expr> [paths...]`: extracts JSON-LD from
+        every HTML file in the given paths (default `.htmlgraph/**/*.html`),
+        pipes them through an embedded `github.com/itchyny/gojq` filter, and
+        emits JSONL on stdout. Supports `--type feature` shorthand to scope
+        to a single work-item type. Default output is one JSON object per
+        file; `--slurp` collects into an array. Document common recipes in
+        `docs/cli/query.md` (find all P1 bugs, lineage tree as JSON, etc.).
+      why: |
+        Gives users and downstream scripts a stable shell-scriptable
+        interface that doesn't require a new CLI subcommand for every read
+        pattern. Replaces ad-hoc shell pipelines and prevents feature-creep
+        pressure on the core CLI surface. Also serves as a power-user
+        escape hatch when the dashboard doesn't expose a needed query.
+      files:
+        - cmd/htmlgraph/query.go
+        - cmd/htmlgraph/query_test.go
+        - docs/cli/query.md
+        - go.mod
+        - go.sum
+      deps:
+        - 7
+      done_when:
+        - '`htmlgraph query ''.status'' --type feature` lists the status of every feature file.'
+        - '`htmlgraph query ''. | select(.status == "in_progress")''` filters correctly.'
+        - Embedded gojq does not reach the network; runs offline.
+        - Documented at least 5 recipes in `docs/cli/query.md`.
+      effort: M
+      risk: Low
+      tests: |
+        Unit: TestQuery_TypeFilter — table-driven against schema fixtures.
+        Unit: TestQuery_SelectExpression — assert correct subset.
+        Integration: TestQuery_RealRepo — runs against `.htmlgraph/` in CI; expected output count matches `find | wc -l`.
+      approved: false
+      comment: ""
+    - id: slice-10
+      num: 10
+      title: Phase 3d — Dashboard endpoints serve JSON-LD; activity feed reads NDJSON directly
+      what: |
+        Replace the SQLite-backed dashboard read path:
+        (1) New endpoint `GET /api/items/:id` streams the JSON-LD payload
+        from the corresponding HTML file.
+        (2) New endpoint `GET /api/manifest` returns
+        `[{file, mtime, type, id}, ...]` — head-only scan, cached with
+        mtime invalidation.
+        (3) `GET /api/feed` is rewritten to stream
+        `.htmlgraph/sessions/*/events.ndjson` directly; merges hook events
+        and OTEL spans into one timestamp-sorted stream. The activity feed
+        bug (this conversation's symptom) goes away by construction — both
+        kinds of events come from the same source.
+        (4) Old SQLite-backed feed endpoint kept temporarily behind
+        `?legacy=1` for parity comparison; removed in slice-11.
+      why: |
+        Closes the loop on the original symptom: hook events render but OTEL
+        spans don't. Both will read from NDJSON via the same streaming
+        decoder, so they cannot diverge. Also removes the dashboard's
+        dependency on the SQLite read index, which is the gate to Phase 4.
+      files:
+        - cmd/htmlgraph/api_feed.go
+        - cmd/htmlgraph/api_items.go
+        - cmd/htmlgraph/api_manifest.go
+        - cmd/htmlgraph/api_feed_test.go
+        - internal/server/ndjson_stream.go
+        - plugin/static/dashboard.html
+        - plugin/static/dashboard.js
+      deps:
+        - 7
+        - 8
+      done_when:
+        - '`/api/feed` returns hook events and OTEL spans interleaved by timestamp without SQLite.'
+        - '`/api/items/:id` returns the JSON-LD payload from the HTML file directly.'
+        - 'Visual parity test: run dashboard against a fixture session, screenshot the feed; matches recorded golden within tolerance.'
+        - '`?legacy=1` still works for parity; CI compares old vs new output and asserts no semantic regression.'
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestAPIFeed_NDJSONMergeOrder — assert events emit in monotonic timestamp order.
+        Unit: TestAPIItems_JSONLDPassthrough — fixture file, assert payload matches.
+        Integration: TestDashboardActivityFeedShowsSpans — ingest known NDJSON, assert feed contains spans (regression for current bug).
+      approved: false
+      comment: ""
+    - id: slice-11
+      num: 11
+      title: Phase 4 — Delete SQLite from the codebase
+      what: |
+        With slices 1-10 landed, remove SQLite as a system requirement:
+        (1) Delete `internal/storage/`, `internal/db/`, `cmd/htmlgraph/cache.go`
+        (cache eviction is SQLite-specific), `cmd/htmlgraph/dbpath.go`.
+        (2) Remove the SQLite driver (`mattn/go-sqlite3` or whichever is in
+        `go.mod`); run `go mod tidy`.
+        (3) Remove `htmlgraph reindex` (no index) — keep `htmlgraph
+        recover-db` only if it now means "rebuild any cached query state";
+        otherwise delete it too.
+        (4) Update `AGENTS.md`, `CLAUDE.md`, plugin system prompts: remove
+        "SQLite read index" from the architecture table; replace with
+        "HTML files (canonical) + NDJSON sessions (canonical)".
+        (5) Update `.htmlgraph/.gitignore` to permanently ignore
+        `htmlgraph.db*`; add a deploy-script step that nukes the file
+        if present.
+        (6) Verify binary size shrinks; record before/after in commit
+        message.
+      why: |
+        Closes the migration. Until SQLite is actually deleted, the team
+        will keep accidentally adding code that reaches for it. "Removing
+        the option" is the only way to make the architecture promise real.
+      files:
+        - internal/storage/
+        - internal/db/
+        - cmd/htmlgraph/cache.go
+        - cmd/htmlgraph/cache_pollution_test.go
+        - cmd/htmlgraph/dbpath.go
+        - go.mod
+        - go.sum
+        - AGENTS.md
+        - CLAUDE.md
+        - cmd/htmlgraph/prompts/system-prompt.md
+        - .htmlgraph/.gitignore
+        - scripts/deploy-all.sh
+      deps:
+        - 8
+        - 10
+      done_when:
+        - '`go.sum` no longer references `mattn/go-sqlite3` or any SQLite driver.'
+        - '`grep -r ''database/sql'' cmd/ internal/` returns zero matches.'
+        - Full test suite passes.
+        - 'Binary size reduction documented in commit message (expected: ~3-5 MB).'
+        - Architecture table in `AGENTS.md` no longer mentions SQLite.
+      effort: M
+      risk: Med
+      tests: |
+        Integration: TestNoSQLiteDriver — `go test ./...` with a build tag that fails on `database/sql` import.
+        Regression: full CLI command matrix passes.
+        Smoke: fresh checkout, `go build`, `htmlgraph status` against a clean repo — works.
+      approved: false
+      comment: ""
+questions:
+    - id: q-vocab-url
+      text: Should the schema vocabulary URL be `https://htmlgraph.dev/v1/` or something namespaced (e.g. `https://schema.htmlgraph.dev/v1/` or a github.io URL)?
+      description: |
+        The vocabulary URL becomes a public contract. Using the bare domain keeps it short and brand-aligned but reserves the path for future expansion. A subdomain leaves the apex free for marketing. A github.io URL avoids any DNS commitment but ties the schema to hosting choices.
+      recommended: bare-domain
+      options:
+        - key: bare-domain
+          label: 'A: `https://htmlgraph.dev/v1/` — short, brand-aligned, reserves path for expansion'
+        - key: subdomain
+          label: 'B: `https://schema.htmlgraph.dev/v1/` — explicit namespace, leaves apex free'
+        - key: github-io
+          label: 'C: `https://shakestzd.github.io/htmlgraph/schema/v1/` — no DNS commitment'
+      answer: null
+    - id: q-phase5-defer
+      text: Confirm Phase 5 (browser-as-query-engine) is out of scope for this plan?
+      description: |
+        Phase 5 is the higher-payoff but higher-risk follow-on: the dashboard becomes self-sufficient against a static HTML snapshot, with an in-tab IndexedDB index. Including it triples the plan size; deferring it means we ship a working SQLite-removal sooner and re-plan Phase 5 later. The plan as written defers it.
+      recommended: defer
+      options:
+        - key: defer
+          label: 'A: Defer — separate plan after Phase 4 lands'
+        - key: include
+          label: 'B: Include now — add 3 more slices for manifest endpoint, in-tab index, IndexedDB persistence'
+      answer: null
+    - id: q-block-sqlite-flag
+      text: Should `--block-sqlite` be a process-level flag, an env var (`HTMLGRAPH_BLOCK_SQLITE`), or both?
+      description: |
+        The flag is the binding contract that proves SQLite removal is real. Process-level is most explicit; env var is more ergonomic in CI; both is most flexible but adds surface area.
+      recommended: both
+      options:
+        - key: flag
+          label: 'A: Flag only — `--block-sqlite` on every command'
+        - key: env
+          label: 'B: Env only — `HTMLGRAPH_BLOCK_SQLITE=1`'
+        - key: both
+          label: 'C: Both — flag wins if both set'
+      answer: null
