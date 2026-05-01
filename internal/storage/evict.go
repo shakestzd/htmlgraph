@@ -13,9 +13,9 @@ import (
 
 // DefaultMaxAge / DefaultMaxSize are the policy used by opportunistic prune
 // and as the default flag values for `htmlgraph cache prune`. They match
-// the spike recommendation in spk-dfb051a3 (90-day age, 1 GiB cap).
+// the spike recommendation in spk-dfb051a3 (3-day age, 1 GiB cap).
 const (
-	DefaultMaxAge  = 90 * 24 * time.Hour
+	DefaultMaxAge  = 3 * 24 * time.Hour
 	DefaultMaxSize = int64(1) << 30
 )
 
@@ -198,7 +198,7 @@ func protectedSet(paths []string) map[string]bool {
 }
 
 // OpportunisticPrune is the default-policy wrapper invoked from the CLI's
-// PersistentPreRunE: 7-day prune cadence, 90-day max age, 1 GiB max size.
+// PersistentPreRunE: 7-day prune cadence, 3-day max age, 1 GiB max size.
 // projectDir is the active project's root — its cache dir is protected so
 // the sweep can't pull the read-index out from under the running command
 // (a particular hazard for sessions that have just touched the project,
