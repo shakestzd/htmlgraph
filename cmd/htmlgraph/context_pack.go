@@ -19,6 +19,7 @@ import (
 )
 
 const contextPackCommitLimit = 8
+const contextPackFileLimit = 20
 
 // contextPackCmd returns the cobra command for `htmlgraph context-pack <id>`.
 func contextPackCmd() *cobra.Command {
@@ -118,20 +119,21 @@ func resolveNode(proj *workitem.Project, id string) (*models.Node, error) {
 
 // commitsByTrack collects and deduplicates commits across all features in the
 // given track, sorted by timestamp descending, capped at contextPackCommitLimit.
-// Private because GetCommitsByTrack does not exist in internal/db.
+// Uses a UNION of column-based and edge-based track membership so that features
+// attributed via migrate-tracks (graph_edges) are included alongside direct ones.
 func commitsByTrack(proj *workitem.Project, trackID string) ([]models.GitCommit, error) {
 	if trackID == "" {
 		return nil, nil
 	}
-	features, err := proj.Features.Collection.List(workitem.WithTrackID(trackID))
+	featureIDs, err := dbpkg.GetFeatureIDsByTrack(proj.DB, trackID)
 	if err != nil {
 		return nil, err
 	}
 
 	seen := make(map[string]bool)
 	var all []models.GitCommit
-	for _, f := range features {
-		cs, err := dbpkg.GetCommitsByFeature(proj.DB, f.ID)
+	for _, fid := range featureIDs {
+		cs, err := dbpkg.GetCommitsByFeature(proj.DB, fid)
 		if err != nil {
 			continue
 		}
@@ -257,18 +259,38 @@ func renderContextPack(
 		fmt.Fprintln(&buf)
 	}
 
-	// Sections 4 & 5: Code surface
+	// Section 4: Code-Surface Helpers
 	fmt.Fprintln(&buf, "## 4. Code-Surface Helpers")
-	fmt.Fprintln(&buf, "\n## 5. File Paths with Package Qualifiers")
+	if node.TrackID == "" {
+		fmt.Fprintln(&buf, "\n(no track attribution)")
+	} else {
+		fmt.Fprintln(&buf, "\nUse `htmlgraph blame <file>` to identify file owners.")
+		fmt.Fprintf(&buf, "Use `htmlgraph code-areas --track %s` for the full file list.\n\n", node.TrackID)
+	}
+
+	// Section 5: File Paths with Package Qualifiers
+	fmt.Fprintln(&buf, "## 5. File Paths with Package Qualifiers")
 	if node.TrackID == "" || trackArea == nil {
 		fmt.Fprintln(&buf, "\n(no track attribution)")
 	} else {
 		fmt.Fprintf(&buf, "\nTrack: **%s** (%s)\n\n", trackArea.TrackTitle, trackArea.TrackID)
 		fmt.Fprintln(&buf, "| File | Package | Features | Touches |")
 		fmt.Fprintln(&buf, "|------|---------|----------|---------|")
-		for _, f := range trackArea.Files {
+		files := trackArea.Files
+		truncated := len(files) - contextPackFileLimit
+		if truncated > 0 {
+			files = files[:contextPackFileLimit]
+		}
+		for _, f := range files {
 			pkg := goPackageQualifier(f.Path)
-			fmt.Fprintf(&buf, "| %s | %s | %d | %d |\n", f.Path, pkg, f.Features, f.Touches)
+			pkgCol := pkg
+			if pkgCol == "" {
+				pkgCol = "—"
+			}
+			fmt.Fprintf(&buf, "| %s | %s | %d | %d |\n", f.Path, pkgCol, f.Features, f.Touches)
+		}
+		if truncated > 0 {
+			fmt.Fprintf(&buf, "\n… and %d more files in this track (use `htmlgraph code-areas --track %s` to see all).\n", truncated, trackArea.TrackID)
 		}
 		fmt.Fprintln(&buf)
 	}
@@ -315,12 +337,13 @@ func renderContextPack(
 	return buf.String()
 }
 
-// goPackageQualifier returns "package <dir>" for .go files; the raw path otherwise.
+// goPackageQualifier returns "package <dir>" for .go files; empty string otherwise.
 // The package name is inferred from the immediate parent directory, matching Go
-// convention (internal/foo/bar.go → "package foo").
+// convention (internal/foo/bar.go → "package foo"). Callers should render ""
+// as "—" in table columns.
 func goPackageQualifier(path string) string {
 	if !strings.HasSuffix(path, ".go") {
-		return path
+		return ""
 	}
 	dir := filepath.Dir(path)
 	if dir == "." || dir == "" {
