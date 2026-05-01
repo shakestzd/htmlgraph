@@ -719,11 +719,15 @@ type planJSONResponse struct {
 }
 
 // buildSliceJSONItems projects the plan's slices into the JSON wire shape,
-// including derivation of has_unanswered_questions from slice.Questions.
-// When db is non-nil, execution_status is overlaid from plan_feedback —
-// runSetSliceStatus writes only to plan_feedback, not the YAML.
+// including derivation of has_unanswered_questions. When db is non-nil:
+//   - execution_status is overlaid from plan_feedback (runSetSliceStatus
+//     writes only to plan_feedback, not the YAML)
+//   - slice question answers are overlaid from plan_feedback
+//     (runAnswerSliceQuestion writes only to plan_feedback) so a question
+//     answered via the API no longer appears unanswered.
 func buildSliceJSONItems(plan *planyaml.PlanYAML, db *sql.DB, planID string) []sliceJSONItem {
 	execOverlay := loadSliceExecOverlay(db, planID)
+	answerOverlay := loadSliceAnswerOverlay(db, planID)
 	out := make([]sliceJSONItem, 0, len(plan.Slices))
 	for _, s := range plan.Slices {
 		deps := s.Deps
@@ -732,7 +736,11 @@ func buildSliceJSONItems(plan *planyaml.PlanYAML, db *sql.DB, planID string) []s
 		}
 		hasUnanswered := false
 		for _, q := range s.Questions {
-			if strings.TrimSpace(q.Answer) == "" {
+			ans := q.Answer
+			if v, ok := answerOverlay[s.Num][q.ID]; ok {
+				ans = v
+			}
+			if strings.TrimSpace(ans) == "" {
 				hasUnanswered = true
 				break
 			}
@@ -777,6 +785,46 @@ func loadSliceExecOverlay(db *sql.DB, planID string) map[int]string {
 			continue
 		}
 		out[n] = value
+	}
+	return out
+}
+
+// loadSliceAnswerOverlay returns slice_num -> question_id -> answer read
+// from plan_feedback (action='answer', section='slice-<n>-question-<id>').
+// runAnswerSliceQuestion writes only to plan_feedback, never to the YAML.
+func loadSliceAnswerOverlay(db *sql.DB, planID string) map[int]map[string]string {
+	out := map[int]map[string]string{}
+	if db == nil {
+		return out
+	}
+	rows, err := db.Query(`SELECT section, value, question_id FROM plan_feedback
+		WHERE plan_id = ? AND action = 'answer' AND section LIKE 'slice-%-question-%'`, planID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var section, value, qid string
+		if err := rows.Scan(&section, &value, &qid); err != nil {
+			continue
+		}
+		// section format: slice-<num>-question-<question-id>
+		rest := strings.TrimPrefix(section, "slice-")
+		dash := strings.IndexByte(rest, '-')
+		if dash <= 0 {
+			continue
+		}
+		n, err := strconv.Atoi(rest[:dash])
+		if err != nil {
+			continue
+		}
+		if qid == "" {
+			qid = strings.TrimPrefix(rest[dash:], "-question-")
+		}
+		if _, ok := out[n]; !ok {
+			out[n] = map[string]string{}
+		}
+		out[n][qid] = value
 	}
 	return out
 }

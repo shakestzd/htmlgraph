@@ -122,7 +122,7 @@ func buildEventTreeOtel(database *sql.DB, limit int) ([]turn, error) {
 
 		if err := rows.Scan(&signalID, &traceID, &spanID, &sessionID,
 			&tsMicros, &durationMs, &attrsRaw, &featureID); err != nil {
-			continue
+			return nil, fmt.Errorf("scan otel interaction row: %w", err)
 		}
 
 		// Convert ts_micros to RFC3339 for the frontend.
@@ -179,6 +179,9 @@ func buildEventTreeOtel(database *sql.DB, limit int) ([]turn, error) {
 			Children:  children,
 			Stats:     stats,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate otel interaction rows: %w", err)
 	}
 
 	return turns, nil
@@ -237,6 +240,9 @@ func buildEventTreeHookUnanchored(database *sql.DB, limit int) ([]turn, error) {
 			Children:  children,
 			Stats:     stats,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate hook unanchored rows: %w", err)
 	}
 
 	if turns == nil {

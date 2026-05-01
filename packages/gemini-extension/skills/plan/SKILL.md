@@ -186,7 +186,7 @@ htmlgraph serve
 Tell the human:
 
 ```
-Plan ready for review in the dashboard at http://localhost:8088/#plans
+Plan ready for review in the dashboard at http://localhost:8080/#plans
 
 Per-slice review:
   1. Read each slice card — what/why/done_when/tests

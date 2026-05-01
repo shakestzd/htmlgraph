@@ -1,3 +1,5 @@
+//go:build !integration
+
 package main
 
 import (
@@ -15,6 +17,10 @@ import (
 // TestMain disables the reindex subprocess fork (`htmlgraph reindex`) for the
 // whole package so worktree-helper tests don't hang in environments where the
 // fork blocks on missing canonical state. Tracked as bug-bb5b26f6.
+//
+// Gated to !integration: serve_global_proxy_test.go ships its own TestMain
+// behind //go:build integration that builds the htmlgraph binary; only one
+// TestMain may be compiled per build-tag set.
 func TestMain(m *testing.M) {
 	worktree.SetReindexFnForTest(func(string, io.Writer) {})
 	os.Exit(m.Run())

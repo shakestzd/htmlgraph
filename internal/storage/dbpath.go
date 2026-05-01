@@ -71,6 +71,23 @@ func EnsureDBDir(dbPath string) error {
 	return os.MkdirAll(filepath.Dir(dbPath), 0o755)
 }
 
+// resolveForCompare returns an absolute, symlink-resolved form of p so two
+// paths that refer to the same file compare equal. Returns "" only when p
+// is empty — keep the empty sentinel out of equality comparisons.
+func resolveForCompare(p string) string {
+	if p == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	if resolved, evalErr := filepath.EvalSymlinks(abs); evalErr == nil {
+		return resolved
+	}
+	return abs
+}
+
 // CleanLegacyDBIfSafe checks for legacy project-local SQLite files and
 // handles them based on whether the canonical cache DB exists and is non-empty:
 //
@@ -96,12 +113,18 @@ func CleanLegacyDBIfSafe(projectDir string, w io.Writer) {
 			canonicalReady = true
 		}
 	}
+	canonicalResolved := resolveForCompare(canonicalPath)
 
 	dbDir := filepath.Join(projectDir, ".htmlgraph", ".db")
 
 	for _, p := range LegacyProjectDBPaths(projectDir) {
 		info, statErr := os.Stat(p)
 		if statErr != nil {
+			continue
+		}
+		// Guard against HTMLGRAPH_DB_PATH pointing at a legacy location:
+		// removing p would delete the configured DB the rest of the run uses.
+		if canonicalReady && resolveForCompare(p) == canonicalResolved {
 			continue
 		}
 		if canonicalReady {

@@ -124,10 +124,13 @@ func FinalizePlan(db *sql.DB, planID string) error {
 // This is a read-only helper introduced in slice-4 for the approve-slice /
 // reject-slice lifecycle commands.
 func GetSliceApprovals(db *sql.DB, planID string) (map[string]string, error) {
+	// Restrict to bare slice-<num> sections; slice-<num>-question-<id> rows
+	// belong to question answers and would pollute the approval map.
 	rows, err := db.Query(`
 		SELECT section, value
 		FROM plan_feedback
-		WHERE plan_id = ? AND action = 'approve' AND section LIKE 'slice-%'
+		WHERE plan_id = ? AND action = 'approve'
+		  AND section LIKE 'slice-%' AND section NOT LIKE 'slice-%-question-%'
 		ORDER BY section ASC`, planID)
 	if err != nil {
 		return nil, fmt.Errorf("get slice approvals (plan=%s): %w", planID, err)
