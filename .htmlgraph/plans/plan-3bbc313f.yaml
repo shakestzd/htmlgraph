@@ -511,15 +511,48 @@ questions:
           label: 'B: Include now — add 3 more slices for manifest endpoint, in-tab index, IndexedDB persistence'
       answer: null
     - id: q-block-sqlite-flag
-      text: Should `--block-sqlite` be a process-level flag, an env var (`HTMLGRAPH_BLOCK_SQLITE`), or both?
+      text: Should `--block-sqlite` be a runtime flag, a build tag, or both?
       description: |
-        The flag is the binding contract that proves SQLite removal is real. Process-level is most explicit; env var is more ergonomic in CI; both is most flexible but adds surface area.
-      recommended: both
+        Critic feedback: a runtime flag cannot intercept transitive sql.Open calls in 12+ internal packages. Only a build tag that replaces the driver import with an error-returning stub gives a compile-time guarantee. The runtime flag is still useful for local development ("does removing this code path actually work?") but the binding contract should be the build tag.
+      recommended: build-tag
       options:
         - key: flag
-          label: 'A: Flag only — `--block-sqlite` on every command'
-        - key: env
-          label: 'B: Env only — `HTMLGRAPH_BLOCK_SQLITE=1`'
+          label: 'A: Runtime flag only — easier to develop, but unenforceable'
+        - key: build-tag
+          label: 'B: Build tag only — compile-time guarantee, harder to A/B'
         - key: both
-          label: 'C: Both — flag wins if both set'
+          label: 'C: Build tag for CI/release; runtime flag for development'
+      answer: null
+    - id: q-add-corpus-audit-slice
+      text: Add a new slice (slice-12) for HTML corpus audit before freezing v1 schema?
+      description: |
+        Critic feedback: the schema URL `https://htmlgraph.dev/v1/` becomes a permanent public contract once committed into the 577 existing HTML files. Today's files use ad-hoc data-* attributes (data-status, data-type, data-since, data-relationship). Without auditing every distinct attribute and value actually in use, the v1 vocabulary will miss real fields and force a v2 migration soon after launch. The new slice would: parse all `.htmlgraph/**/*.html`, enumerate every distinct data-* attribute and edge type, produce a `docs/schema/v0-inventory.md` that informs slice-3.
+      recommended: "yes"
+      options:
+        - key: "yes"
+          label: 'A: Add slice-12 (corpus audit) as prerequisite to slice-3'
+        - key: "no"
+          label: 'B: Skip — accept that v1 may miss fields and require v2 sooner'
+      answer: null
+    - id: q-add-plugin-regen-slice
+      text: Add a new slice for plugin port regeneration after schema lands?
+      description: |
+        Critic feedback: htmlgraph ships the same plugin to Claude Code, Codex CLI, and Gemini CLI via `htmlgraph plugin build-ports`. The Codex and Gemini trees embed `system-prompt.md` which references the architecture (including the SQLite read index). Slice-11 updates AGENTS.md and CLAUDE.md but does not regenerate the per-target plugin trees. Without this, the deployed plugin docs will still reference SQLite after the migration.
+      recommended: "yes"
+      options:
+        - key: "yes"
+          label: 'A: Add slice-13 (plugin port regeneration) as final step after slice-11'
+        - key: "no"
+          label: 'B: Skip — handle as part of slice-11 with a single command in done_when'
+      answer: null
+    - id: q-add-ci-infra-slice
+      text: Add a new slice for CI infrastructure prerequisite?
+      description: |
+        Critic feedback: existing `.github/workflows/ci.yml` is a single flat quality-gates job with no matrix or workflow_call support. Slices 6 (migrator corpus test) and 8 (block-sqlite suite) require new CI jobs that the current infra cannot host. Either extend ci.yml in those slices or add a prerequisite slice. A prerequisite slice is cleaner — the CI work blocks the work that depends on it.
+      recommended: "yes"
+      options:
+        - key: "yes"
+          label: 'A: Add slice-14 (CI infrastructure) as prerequisite to slices 6 and 8'
+        - key: "no"
+          label: 'B: Fold the CI work into slices 6 and 8 themselves'
       answer: null

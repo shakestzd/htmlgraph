@@ -824,16 +824,49 @@ Smoke: fresh checkout, `go build`, `htmlgraph status` against a clean repo — w
     </div>
     
     <div class="question-block" id="q-block-sqlite-flag">
-      <p>Should `--block-sqlite` be a process-level flag, an env var (`HTMLGRAPH_BLOCK_SQLITE`), or both?</p>
+      <p>Should `--block-sqlite` be a runtime flag, a build tag, or both?</p>
       
       
-      <label><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="A: Flag only — `--block-sqlite` on every command"> A: Flag only — `--block-sqlite` on every command</label>
+      <label><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="A: Runtime flag only — easier to develop, but unenforceable"> A: Runtime flag only — easier to develop, but unenforceable</label>
       
-      <label><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="B: Env only — `HTMLGRAPH_BLOCK_SQLITE=1`"> B: Env only — `HTMLGRAPH_BLOCK_SQLITE=1`</label>
+      <label class="recommended"><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="B: Build tag only — compile-time guarantee, harder to A/B"> B: Build tag only — compile-time guarantee, harder to A/B <span class="rec-tag">recommended</span></label>
       
-      <label class="recommended"><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="C: Both — flag wins if both set"> C: Both — flag wins if both set <span class="rec-tag">recommended</span></label>
+      <label><input type="radio" name="q-block-sqlite-flag" data-question="q-block-sqlite-flag" value="C: Build tag for CI/release; runtime flag for development"> C: Build tag for CI/release; runtime flag for development</label>
       
       <textarea data-section="questions" data-question-rationale="q-block-sqlite-flag" placeholder="Rationale for q-block-sqlite-flag..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-add-corpus-audit-slice">
+      <p>Add a new slice (slice-12) for HTML corpus audit before freezing v1 schema?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-add-corpus-audit-slice" data-question="q-add-corpus-audit-slice" value="A: Add slice-12 (corpus audit) as prerequisite to slice-3"> A: Add slice-12 (corpus audit) as prerequisite to slice-3 <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-add-corpus-audit-slice" data-question="q-add-corpus-audit-slice" value="B: Skip — accept that v1 may miss fields and require v2 sooner"> B: Skip — accept that v1 may miss fields and require v2 sooner</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-add-corpus-audit-slice" placeholder="Rationale for q-add-corpus-audit-slice..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-add-plugin-regen-slice">
+      <p>Add a new slice for plugin port regeneration after schema lands?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-add-plugin-regen-slice" data-question="q-add-plugin-regen-slice" value="A: Add slice-13 (plugin port regeneration) as final step after slice-11"> A: Add slice-13 (plugin port regeneration) as final step after slice-11 <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-add-plugin-regen-slice" data-question="q-add-plugin-regen-slice" value="B: Skip — handle as part of slice-11 with a single command in done_when"> B: Skip — handle as part of slice-11 with a single command in done_when</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-add-plugin-regen-slice" placeholder="Rationale for q-add-plugin-regen-slice..."></textarea>
+    </div>
+    
+    <div class="question-block" id="q-add-ci-infra-slice">
+      <p>Add a new slice for CI infrastructure prerequisite?</p>
+      
+      
+      <label class="recommended"><input type="radio" name="q-add-ci-infra-slice" data-question="q-add-ci-infra-slice" value="A: Add slice-14 (CI infrastructure) as prerequisite to slices 6 and 8"> A: Add slice-14 (CI infrastructure) as prerequisite to slices 6 and 8 <span class="rec-tag">recommended</span></label>
+      
+      <label><input type="radio" name="q-add-ci-infra-slice" data-question="q-add-ci-infra-slice" value="B: Fold the CI work into slices 6 and 8 themselves"> B: Fold the CI work into slices 6 and 8 themselves</label>
+      
+      <textarea data-section="questions" data-question-rationale="q-add-ci-infra-slice" placeholder="Rationale for q-add-ci-infra-slice..."></textarea>
     </div>
     
     <table class="q-table">
@@ -853,7 +886,25 @@ Smoke: fresh checkout, `go build`, `htmlgraph status` against a clean repo — w
         </tr>
         
         <tr data-recap-for="q-block-sqlite-flag">
-          <td>Should `--block-sqlite` be a process-level flag, an env var (`HTMLGRAPH_BLOCK_SQLITE`), or both?</td>
+          <td>Should `--block-sqlite` be a runtime flag, a build tag, or both?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-add-corpus-audit-slice">
+          <td>Add a new slice (slice-12) for HTML corpus audit before freezing v1 schema?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-add-plugin-regen-slice">
+          <td>Add a new slice for plugin port regeneration after schema lands?</td>
+          <td class="recap-answer">&mdash;</td>
+          <td><span class="badge badge-pending">Pending</span></td>
+        </tr>
+        
+        <tr data-recap-for="q-add-ci-infra-slice">
+          <td>Add a new slice for CI infrastructure prerequisite?</td>
           <td class="recap-answer">&mdash;</td>
           <td><span class="badge badge-pending">Pending</span></td>
         </tr>
