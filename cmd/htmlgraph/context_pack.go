@@ -119,20 +119,39 @@ func resolveNode(proj *workitem.Project, id string) (*models.Node, error) {
 
 // commitsByTrack collects and deduplicates commits across all features in the
 // given track, sorted by timestamp descending, capped at contextPackCommitLimit.
-// Uses a UNION of column-based and edge-based track membership so that features
-// attributed via migrate-tracks (graph_edges) are included alongside direct ones.
+// Uses both database-derived track membership (GetFeatureIDsByTrack) and canonical-HTML
+// direct lookup (proj.Features with WithTrackID) to ensure no memberships are missed
+// due to stale local caches.
 func commitsByTrack(proj *workitem.Project, trackID string) ([]models.GitCommit, error) {
 	if trackID == "" {
 		return nil, nil
 	}
-	featureIDs, err := dbpkg.GetFeatureIDsByTrack(proj.DB, trackID)
+
+	// Collect feature IDs from two sources: SQLite index and canonical HTML.
+	dbIDs, err := dbpkg.GetFeatureIDsByTrack(proj.DB, trackID)
 	if err != nil {
 		return nil, err
 	}
 
+	// Also load directly from canonical HTML to catch any stale-DB misses.
+	htmlIDs, err := proj.Features.Collection.List(workitem.WithTrackID(trackID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge and dedupe feature IDs.
+	idSet := make(map[string]struct{})
+	for _, id := range dbIDs {
+		idSet[id] = struct{}{}
+	}
+	for _, node := range htmlIDs {
+		idSet[node.ID] = struct{}{}
+	}
+
+	// Load commits for each feature.
 	seen := make(map[string]bool)
 	var all []models.GitCommit
-	for _, fid := range featureIDs {
+	for fid := range idSet {
 		cs, err := dbpkg.GetCommitsByFeature(proj.DB, fid)
 		if err != nil {
 			continue

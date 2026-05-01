@@ -21,9 +21,11 @@ type Track struct {
 }
 
 // GetFeatureIDsByTrack returns all feature IDs belonging to a track, combining
-// two sources: (1) features.track_id column (direct attribution) and
+// three sources: (1) features.track_id column (direct attribution),
 // (2) graph_edges rows of type 'part_of' or 'member_of' where to_node_id = trackID
-// (edge-based attribution from migrate-tracks). Duplicates are deduplicated.
+// (edge-based attribution from migrate-tracks), and (3) graph_edges rows of type
+// 'contains' where from_node_id = trackID (track→feature containment edges).
+// Duplicates are deduplicated.
 func GetFeatureIDsByTrack(db *sql.DB, trackID string) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT id FROM features WHERE track_id = ?
@@ -31,8 +33,13 @@ func GetFeatureIDsByTrack(db *sql.DB, trackID string) ([]string, error) {
 		SELECT from_node_id FROM graph_edges
 		WHERE to_node_id = ?
 		  AND relationship_type IN ('part_of', 'member_of')
-		  AND from_node_id LIKE 'feat-%'`,
-		trackID, trackID,
+		  AND from_node_id LIKE 'feat-%'
+		UNION
+		SELECT to_node_id FROM graph_edges
+		WHERE from_node_id = ?
+		  AND relationship_type = 'contains'
+		  AND to_node_id LIKE 'feat-%'`,
+		trackID, trackID, trackID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get feature IDs for track %s: %w", trackID, err)
