@@ -183,7 +183,7 @@ func formatAreasMarkdown(r *blame.AreasResult, byFile bool) string {
 			for _, ta := range r.ByTrack {
 				fmt.Fprintf(&buf, "## Track: %s (%s)\n\n", ta.TrackTitle, ta.TrackID)
 				fmt.Fprintf(&buf, "%d features, %d files, %d total touches\n\n",
-					countUniqueFeatures(ta), len(ta.Files), ta.TouchCount)
+					ta.FeatureCount, len(ta.Files), ta.TouchCount)
 				fmt.Fprintln(&buf, "| File | Features | Touches |")
 				fmt.Fprintln(&buf, "|------|----------|---------|")
 				for _, f := range ta.Files {
@@ -207,25 +207,4 @@ func formatAreasMarkdown(r *blame.AreasResult, byFile bool) string {
 	return buf.String()
 }
 
-// countUniqueFeatures returns the sum of unique feature counts across all files
-// in a TrackArea by collecting distinct feature values from the FeatureCount.
-// Since FileEntry.Features stores the count of features per track per file,
-// we take the max across files (each file records the per-track FeatureCount
-// from the blame rollup, which is an aggregate, not an additive per-file value).
-// To avoid double-counting we approximate with the track-level FeatureCount
-// stored during aggregation — the TrackArea.FeatureCount was accumulated by
-// summing per-file track rollups, so we just return that total and trust the
-// caller uses it for display only.
-func countUniqueFeatures(ta blame.TrackArea) int {
-	// The track-level FeatureCount sums per-file track rollup feature counts,
-	// which may double-count features appearing in multiple files.  For the
-	// markdown header we want the per-track FeatureCount from one representative
-	// file (they all carry the same rollup value for the same track).
-	if len(ta.Files) == 0 {
-		return 0
-	}
-	// All files in the same track have the same per-track FeatureCount in their
-	// rollup — use the first file's value as the representative.
-	return ta.Files[0].Features
-}
 

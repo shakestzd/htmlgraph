@@ -21,7 +21,7 @@
 package ndjson
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,14 +43,18 @@ const (
 )
 
 // Sink appends signals to a per-session NDJSON file.
-// The file is kept open with a bufio.Writer for efficient batched writes.
+// Marshaled lines accumulate in an in-memory bytes.Buffer. flushAndSyncLocked
+// acquires the cross-process flock and writes the staged bytes directly to the
+// file in a single atomic append, so concurrent collector + indexer processes
+// can't interleave partial records (a bufio.Writer would silently flush mid-
+// Write without holding the flock).
 // A background goroutine periodically flushes and syncs the file.
 type Sink struct {
 	path string
-	mu   sync.Mutex // guards f, bw, eventCount, closed
+	mu   sync.Mutex // guards f, buf, eventCount, closed
 
 	f          *os.File
-	bw         *bufio.Writer
+	buf        bytes.Buffer
 	eventCount int
 	closed     bool
 
@@ -73,7 +77,6 @@ func New(projectDir, sessionID string) (*Sink, error) {
 	s := &Sink{
 		path:   path,
 		f:      f,
-		bw:     bufio.NewWriter(f),
 		stopCh: make(chan struct{}),
 	}
 
@@ -101,23 +104,26 @@ func (s *Sink) periodicSync() {
 	}
 }
 
-// flushAndSyncLocked flushes the bufio.Writer and calls Sync on the underlying
-// file. Must be called with s.mu held. Acquires the cross-process flock for
-// the duration of the actual file write so concurrent processes (e.g. a
-// collector child and the indexer) cannot interleave appends — the flock
-// MUST guard the bufio.Flush, not just the in-memory append, because that's
-// the moment buffered bytes hit the shared file.
+// flushAndSyncLocked writes any staged bytes to the file and fsyncs. Must be
+// called with s.mu held. The cross-process flock is held for the duration of
+// the file write + sync so concurrent processes cannot interleave partial
+// records. The buffer is reset only after a successful write so a failure
+// preserves the unwritten bytes for the next flush attempt.
 func (s *Sink) flushAndSyncLocked() error {
-	if s.bw == nil || s.f == nil {
+	if s.f == nil {
+		return nil
+	}
+	if s.buf.Len() == 0 {
 		return nil
 	}
 	if err := syscall.Flock(int(s.f.Fd()), syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("ndjson flock %s for flush: %w", s.path, err)
 	}
 	defer syscall.Flock(int(s.f.Fd()), syscall.LOCK_UN) //nolint:errcheck
-	if err := s.bw.Flush(); err != nil {
-		return fmt.Errorf("ndjson bufio flush: %w", err)
+	if _, err := s.f.Write(s.buf.Bytes()); err != nil {
+		return fmt.Errorf("ndjson write: %w", err)
 	}
+	s.buf.Reset()
 	if err := s.f.Sync(); err != nil {
 		return fmt.Errorf("ndjson fsync: %w", err)
 	}
@@ -125,11 +131,11 @@ func (s *Sink) flushAndSyncLocked() error {
 }
 
 // WriteBatch appends one JSON line per signal to events.ndjson.
-// Lines are written to an in-memory bufio.Writer; the cross-process flock
-// is acquired by flushAndSyncLocked at the moment buffered bytes are
-// actually written to the shared file (so concurrent collector + indexer
-// processes can't interleave appends). Empty batches are a no-op. After
-// every FlushThreshold cumulative events, a flush+sync is triggered.
+// Lines are staged in an in-memory bytes.Buffer; flushAndSyncLocked drains
+// the buffer to the file under the cross-process flock so concurrent
+// collector + indexer processes can't interleave partial records. Empty
+// batches are a no-op. After every FlushThreshold cumulative events, a
+// flush+sync is triggered.
 func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, resourceAttrs map[string]any, signals []otel.UnifiedSignal) error {
 	if len(signals) == 0 {
 		return nil
@@ -147,10 +153,8 @@ func (s *Sink) WriteBatch(_ context.Context, harness otel.Harness, resourceAttrs
 		if err != nil {
 			return fmt.Errorf("ndjson marshal signal %s: %w", signals[i].SignalID, err)
 		}
-		line = append(line, '\n')
-		if _, err := s.bw.Write(line); err != nil {
-			return fmt.Errorf("ndjson write signal %s: %w", signals[i].SignalID, err)
-		}
+		s.buf.Write(line)
+		s.buf.WriteByte('\n')
 		s.eventCount++
 	}
 
@@ -195,7 +199,6 @@ func (s *Sink) Close() error {
 			firstErr = err
 		}
 		s.f = nil
-		s.bw = nil
 	}
 	return firstErr
 }

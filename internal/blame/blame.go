@@ -96,6 +96,21 @@ func Query(ctx context.Context, db *sql.DB, path string, opts QueryOptions) (*Re
 	}, nil
 }
 
+// escapeLikePattern escapes the SQL LIKE wildcards %, _, and the escape
+// character itself (\) so a path containing those characters is treated as a
+// literal string rather than a pattern. Pairs with `ESCAPE '\'` in the query.
+func escapeLikePattern(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r == '\\' || r == '%' || r == '_' {
+			b.WriteRune('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 // queryFeatureRows fetches the raw per-feature rows for path.
 //
 // Path matching: feature_files currently stores absolute paths (with worktree
@@ -116,8 +131,8 @@ func queryFeatureRows(ctx context.Context, db *sql.DB, path string, opts QueryOp
 		FROM feature_files ff
 		LEFT JOIN features f ON f.id = ff.feature_id
 		LEFT JOIN tracks t ON t.id = f.track_id
-		WHERE (ff.file_path = ? OR ff.file_path LIKE ?)`)
-	args = append(args, path, "%/"+path)
+		WHERE (ff.file_path = ? OR ff.file_path LIKE ? ESCAPE '\')`)
+	args = append(args, path, "%/"+escapeLikePattern(path))
 
 	if opts.Since != nil {
 		qb.WriteString(` AND ff.last_seen >= ?`)

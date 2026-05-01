@@ -8,6 +8,7 @@ package blame
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"sort"
@@ -81,12 +82,22 @@ func skipDir(name string) bool {
 func WalkAreas(ctx context.Context, database *sql.DB, root string, opts WalkOptions) (*AreasResult, error) {
 	// trackMap accumulates per-track aggregates (ByTrack mode).
 	trackMap := make(map[string]*TrackArea)
+	// trackFeatures holds the set of distinct feature IDs touching each track,
+	// so FeatureCount reflects unique features rather than the per-file rollup
+	// summed across files (which double-counted features touching multiple files).
+	trackFeatures := make(map[string]map[string]struct{})
 	var byFile []FileArea
 	var untracked []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return nil // skip unreadable entries
+			// Failure to read root itself is fatal — we'd silently return an
+			// empty result. Failures on individual child entries (a single
+			// unreadable subdir or stale dirent) are skipped.
+			if path == root {
+				return walkErr
+			}
+			return nil
 		}
 		if d.IsDir() {
 			if path != root && skipDir(d.Name()) {
@@ -108,7 +119,7 @@ func WalkAreas(ctx context.Context, database *sql.DB, root string, opts WalkOpti
 
 		result, err := Query(ctx, database, rel, QueryOptions{})
 		if err != nil {
-			return nil // blame errors don't abort the walk
+			return fmt.Errorf("blame %s: %w", rel, err)
 		}
 
 		if len(result.Features) == 0 {
@@ -135,19 +146,36 @@ func WalkAreas(ctx context.Context, database *sql.DB, root string, opts WalkOpti
 					TrackTitle: tr.Title,
 				}
 				trackMap[tr.ID] = ta
+				trackFeatures[tr.ID] = make(map[string]struct{})
 			}
 			ta.Files = append(ta.Files, FileEntry{
 				Path:     rel,
 				Features: tr.FeatureCount,
 				Touches:  tr.TouchCount,
 			})
-			ta.FeatureCount += tr.FeatureCount
 			ta.TouchCount += tr.TouchCount
+		}
+		// Record distinct feature IDs per track from this file's features.
+		for _, fr := range result.Features {
+			if fr.TrackID == "" {
+				continue
+			}
+			if set, ok := trackFeatures[fr.TrackID]; ok {
+				set[fr.ID] = struct{}{}
+			}
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	// Resolve distinct-feature counts per track now that the walk is complete.
+	for id, ta := range trackMap {
+		ta.FeatureCount = len(trackFeatures[id])
 	}
 
 	res := &AreasResult{}
