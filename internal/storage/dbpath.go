@@ -14,11 +14,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // DBFileName is the canonical SQLite filename. Use the constant; never
 // inline the string in callers (enforced by TestNoInlineDBPathConstruction).
 const DBFileName = "htmlgraph.db"
+
+// legacyWarnOnce gates the legacy DB warning so it prints at most once per
+// process. This suppresses the warning spam when zero-byte files are silently
+// deleted, and limits the warning to one emission per process for non-empty files.
+var legacyWarnOnce sync.Once
 
 // CanonicalDBPath returns the absolute path to the SQLite read-index for
 // the given project. The DB lives in the host's OS cache directory keyed
@@ -73,25 +79,48 @@ func EnsureDBDir(dbPath string) error {
 }
 
 // WarnIfLegacyDBPresent checks whether any legacy project-local SQLite
-// files are still present and writes a human-readable warning to w for
-// each one found. It never deletes files or blocks startup.
+// files are still present and handles them:
 //
-// Wire from one place that runs early in every binary path — the root
-// cobra command's PersistentPreRun is the right location.
+// - Zero-byte (vestigial) files are silently deleted via os.Remove.
+// - Non-empty files emit an INFO message at most once per process (guarded by sync.Once).
+//
+// It never blocks startup. Wire from one place that runs early in every binary path —
+// the root cobra command's PersistentPreRun is the right location.
 func WarnIfLegacyDBPresent(projectDir string, w io.Writer) {
+	var hasWarning bool
 	for _, p := range LegacyProjectDBPaths(projectDir) {
 		info, err := os.Stat(p)
 		if err != nil {
 			continue
 		}
-		rel, err := filepath.Rel(projectDir, p)
-		if err != nil {
-			rel = p
+
+		// Zero-byte files are vestigial; delete silently.
+		if info.Size() == 0 {
+			_ = os.Remove(p)
+			continue
 		}
-		mb := float64(info.Size()) / (1024 * 1024)
-		fmt.Fprintf(w,
-			"[htmlgraph] WARNING: legacy SQLite file at %s (%.0f MB) is unused — DB now lives in the user cache dir. You can delete: %s\n",
-			rel, mb, p)
+
+		// Non-empty file; emit warning at most once per process.
+		hasWarning = true
+	}
+
+	if hasWarning {
+		legacyWarnOnce.Do(func() {
+			for _, p := range LegacyProjectDBPaths(projectDir) {
+				info, err := os.Stat(p)
+				if err != nil || info.Size() == 0 {
+					continue
+				}
+				rel, err := filepath.Rel(projectDir, p)
+				if err != nil {
+					rel = p
+				}
+				mb := float64(info.Size()) / (1024 * 1024)
+				fmt.Fprintf(w,
+					"[htmlgraph] INFO: legacy SQLite file at %s (%.1f MB) is unused — DB now lives in the user cache dir. You can delete: %s\n",
+					rel, mb, p)
+			}
+		})
 	}
 }
 
