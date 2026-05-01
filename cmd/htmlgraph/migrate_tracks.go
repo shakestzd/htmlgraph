@@ -69,7 +69,7 @@ Examples:
 				return err
 			}
 			printProjectHeaderIfDifferent(hgDir)
-			return runMigrateTracks(context.Background(), hgDir, opts, os.Stdout)
+			return runMigrateTracks(context.Background(), hgDir, opts, os.Stdout, os.Stderr)
 		},
 	}
 	cmd.Flags().StringVar(&opts.rulesPath, "rules", "", "path to rules YAML (required)")
@@ -86,7 +86,11 @@ Examples:
 // runMigrateTracks executes the classifier against the project at hgDir and
 // emits text/json output to out. When opts.write is true, applies confident
 // moves and records them in a manifest file under .htmlgraph/migrations/.
-func runMigrateTracks(ctx context.Context, hgDir string, opts migrateTracksOpts, out io.Writer) error {
+//
+// `out` is the primary output stream (decision table or JSON array).
+// `status` is the human status stream — sent there so JSON mode keeps `out`
+// pure-JSON-parseable. Pass io.Discard to suppress status entirely.
+func runMigrateTracks(ctx context.Context, hgDir string, opts migrateTracksOpts, out, status io.Writer) error {
 	if opts.rulesPath == "" {
 		return fmt.Errorf("--rules is required")
 	}
@@ -141,6 +145,15 @@ func runMigrateTracks(ctx context.Context, hgDir string, opts migrateTracksOpts,
 		}
 	}
 
+	// Validate proposed tracks BEFORE writing or even printing in --write
+	// mode. A typo'd track_id in the rules file should fail loudly up-front
+	// rather than partially applying and leaving the store in a torn state.
+	if opts.write {
+		if err := validateProposedTracks(p, decisions); err != nil {
+			return err
+		}
+	}
+
 	// Emit decisions in requested format.
 	switch opts.format {
 	case "json":
@@ -157,22 +170,45 @@ func runMigrateTracks(ctx context.Context, hgDir string, opts migrateTracksOpts,
 		return nil
 	}
 
-	// Apply confident moves and write the manifest.
+	// Apply confident moves and write the manifest. Status messages go to
+	// `status` (stderr) so JSON mode keeps `out` pure-JSON.
 	applyErrs := applyDecisions(p, decisions)
 	if writeErr := writeManifest(manifestPath, opts.rulesPath, decisions); writeErr != nil {
 		return fmt.Errorf("write manifest: %w (also had %d apply errors)", writeErr, len(applyErrs))
 	}
 	if len(applyErrs) > 0 {
-		fmt.Fprintf(out, "\nWARNING: %d apply errors:\n", len(applyErrs))
+		fmt.Fprintf(status, "\nWARNING: %d apply errors:\n", len(applyErrs))
 		for _, e := range applyErrs {
-			fmt.Fprintf(out, "  %v\n", e)
+			fmt.Fprintf(status, "  %v\n", e)
 		}
-		return fmt.Errorf("%d features failed to migrate (see manifest at %s)",
+		return fmt.Errorf("%d items failed to migrate (see manifest at %s)",
 			len(applyErrs), manifestPath)
 	}
-	fmt.Fprintf(out, "\nManifest written: %s\n", manifestPath)
-	fmt.Fprintln(out, "Run `htmlgraph reindex --full` to refresh the SQLite read index "+
+	fmt.Fprintf(status, "\nManifest written: %s\n", manifestPath)
+	fmt.Fprintln(status, "Run `htmlgraph reindex --full` to refresh the SQLite read index "+
 		"so blame/code-areas reflect the new attribution.")
+	return nil
+}
+
+// validateProposedTracks checks that every confident decision targets a track
+// that actually exists in the project. Returns the first missing track as an
+// error so the caller can abort BEFORE mutating any state.
+func validateProposedTracks(p *workitem.Project, decisions []migrate.Decision) error {
+	seen := map[string]bool{}
+	for _, d := range decisions {
+		if d.Reason != "confident" {
+			continue
+		}
+		if seen[d.ProposedTrack] {
+			continue
+		}
+		seen[d.ProposedTrack] = true
+		if _, err := p.Tracks.Get(d.ProposedTrack); err != nil {
+			return fmt.Errorf("rules reference unknown track %q (proposed for %s): %w — "+
+				"check docs/track-attribution-rules.yaml for typos",
+				d.ProposedTrack, d.FeatureID, err)
+		}
+	}
 	return nil
 }
 
@@ -232,20 +268,29 @@ func writeJSON(w io.Writer, decisions []migrate.Decision) error {
 }
 
 // applyDecisions performs the actual re-attribution for confident decisions.
-// Skips ambiguous, no-change, no-attribution, and no-match. Returns the list
-// of errors encountered (one per failed feature) without aborting on first
-// failure — partial progress is recorded in the manifest.
+// Skips ambiguous, no-change, no-attribution, and no-match. Dispatches to the
+// correct collection (features vs bugs) based on Decision.ItemType so a
+// confident bug move edits p.Bugs, not p.Features. Returns errors per item
+// without aborting on first failure — partial progress is recorded in the
+// manifest.
 func applyDecisions(p *workitem.Project, decisions []migrate.Decision) []error {
 	var errs []error
 	for _, d := range decisions {
 		if d.Reason != "confident" {
 			continue
 		}
-		if err := p.Features.Edit(d.FeatureID).SetTrack(d.ProposedTrack).Save(); err != nil {
+		switch d.ItemType {
+		case "feature", "bug":
+		default:
+			errs = append(errs, fmt.Errorf("%s: unsupported item_type %q", d.FeatureID, d.ItemType))
+			continue
+		}
+		col := collectionFor(p, d.ItemType)
+		if err := col.Edit(d.FeatureID).SetTrack(d.ProposedTrack).Save(); err != nil {
 			errs = append(errs, fmt.Errorf("%s: SetTrack: %w", d.FeatureID, err))
 			continue
 		}
-		if err := moveTrackEdges(p, d.FeatureID, "feature", d.ProposedTrack); err != nil {
+		if err := moveTrackEdges(p, d.FeatureID, d.ItemType, d.ProposedTrack); err != nil {
 			errs = append(errs, fmt.Errorf("%s: moveTrackEdges: %w", d.FeatureID, err))
 		}
 	}

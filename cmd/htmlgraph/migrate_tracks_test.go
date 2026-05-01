@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,7 +139,7 @@ func TestMigrateTracksDryRunOutput(t *testing.T) {
 		threshold: 0.6,
 		format:    "text",
 	}
-	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf); err != nil {
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard); err != nil {
 		t.Fatalf("runMigrateTracks: %v", err)
 	}
 
@@ -176,7 +177,7 @@ func TestMigrateTracksWriteCreatesManifest(t *testing.T) {
 		threshold: 0.6,
 		format:    "text",
 	}
-	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf); err != nil {
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard); err != nil {
 		t.Fatalf("runMigrateTracks: %v", err)
 	}
 
@@ -244,7 +245,7 @@ func TestMigrateTracksWriteRefusesOverwrite(t *testing.T) {
 		format:    "text",
 		// force is FALSE
 	}
-	err := runMigrateTracks(context.Background(), hgDir, opts, &buf)
+	err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard)
 	if err == nil {
 		t.Fatalf("expected error on existing manifest without --force")
 	}
@@ -255,7 +256,7 @@ func TestMigrateTracksWriteRefusesOverwrite(t *testing.T) {
 	// With --force it should succeed.
 	opts.force = true
 	buf.Reset()
-	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf); err != nil {
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard); err != nil {
 		t.Fatalf("runMigrateTracks --force: %v", err)
 	}
 }
@@ -271,7 +272,7 @@ func TestMigrateTracksJSONFormat(t *testing.T) {
 		threshold: 0.6,
 		format:    "json",
 	}
-	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf); err != nil {
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard); err != nil {
 		t.Fatalf("runMigrateTracks json: %v", err)
 	}
 	var ds []migrate.Decision
@@ -296,7 +297,7 @@ func TestMigrateTracksAmbiguousSkippedInWrite(t *testing.T) {
 		threshold: 0.6,
 		format:    "text",
 	}
-	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf); err != nil {
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard); err != nil {
 		t.Fatalf("runMigrateTracks: %v", err)
 	}
 
@@ -311,6 +312,144 @@ func TestMigrateTracksAmbiguousSkippedInWrite(t *testing.T) {
 	}
 	if feat.TrackID != trkOld {
 		t.Errorf("ambiguous feature should not have moved; track_id = %q, want %q", feat.TrackID, trkOld)
+	}
+}
+
+func TestMigrateTracksBugsWriteEditsBugCollection(t *testing.T) {
+	// Regression: roborev finding — --types bugs --write must edit p.Bugs,
+	// not p.Features. We seed a bug with yolo-dominant files and assert the
+	// canonical store reflects the bug's new track after --write.
+	hgDir, rulesPath := migrateTracksTestEnv(t)
+	trkYolo := os.Getenv("MTT_TRK_YOLO")
+	trkOld := os.Getenv("MTT_TRK_OLD")
+
+	p, err := workitem.Open(hgDir, "test-agent")
+	if err != nil {
+		t.Fatalf("workitem.Open: %v", err)
+	}
+	bg, err := p.Bugs.Create("Bug touching yolo", workitem.BugWithTrack(trkOld))
+	if err != nil {
+		t.Fatalf("Bugs.Create: %v", err)
+	}
+	for _, f := range []string{"cmd/htmlgraph/yolo.go", "cmd/htmlgraph/tmux.go", "cmd/htmlgraph/budget.go", "internal/worktree/manager.go"} {
+		if err := db.UpsertFeatureFile(p.DB, &models.FeatureFile{
+			ID: "ff-bug-" + bg.ID + "-" + f, FeatureID: bg.ID, FilePath: f, Operation: "edit",
+		}); err != nil {
+			t.Fatalf("UpsertFeatureFile: %v", err)
+		}
+	}
+	p.Close()
+
+	var buf bytes.Buffer
+	opts := migrateTracksOpts{
+		rulesPath: rulesPath,
+		write:     true,
+		types:     "bugs",
+		threshold: 0.6,
+		format:    "text",
+	}
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard); err != nil {
+		t.Fatalf("runMigrateTracks bugs: %v", err)
+	}
+
+	// Reopen and check: the BUG should be on trkYolo now.
+	p2, err := workitem.Open(hgDir, "test-agent")
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer p2.Close()
+	got, err := p2.Bugs.Get(bg.ID)
+	if err != nil {
+		t.Fatalf("Bugs.Get: %v", err)
+	}
+	if got.TrackID != trkYolo {
+		t.Errorf("bug track_id = %q, want %q", got.TrackID, trkYolo)
+	}
+}
+
+func TestMigrateTracksJSONWriteIsPureJSON(t *testing.T) {
+	// Regression: roborev finding — --format json --write must keep stdout
+	// pure-JSON-parseable. Status (manifest path, reindex hint) goes to
+	// stderr instead of being appended to stdout.
+	hgDir, rulesPath := migrateTracksTestEnv(t)
+
+	var stdout, stderr bytes.Buffer
+	opts := migrateTracksOpts{
+		rulesPath: rulesPath,
+		write:     true,
+		types:     "features",
+		threshold: 0.6,
+		format:    "json",
+	}
+	if err := runMigrateTracks(context.Background(), hgDir, opts, &stdout, &stderr); err != nil {
+		t.Fatalf("runMigrateTracks: %v", err)
+	}
+
+	// Stdout must parse as JSON without trailing junk.
+	var ds []migrate.Decision
+	dec := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
+	if err := dec.Decode(&ds); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\n--- stdout ---\n%s", err, stdout.String())
+	}
+	if dec.More() {
+		t.Errorf("stdout has trailing content after JSON decode: %s", stdout.String())
+	}
+	// Stderr should carry the manifest hint.
+	if !strings.Contains(stderr.String(), "Manifest written") {
+		t.Errorf("stderr missing manifest message:\n%s", stderr.String())
+	}
+}
+
+func TestMigrateTracksRejectsUnknownProposedTrack(t *testing.T) {
+	// Regression: roborev finding — a typo'd track_id in the rules file must
+	// fail before any mutation, not after partial application.
+	hgDir, _ := migrateTracksTestEnv(t)
+
+	// Replace the rules file with one that names a non-existent track.
+	badRules := filepath.Join(filepath.Dir(hgDir), "bad-rules.yaml")
+	if err := os.WriteFile(badRules, []byte(
+		"rules:\n"+
+			"  - { glob: \"cmd/htmlgraph/yolo.go\", track_id: \"trk-does-not-exist\", priority: 110 }\n"+
+			"  - { glob: \"cmd/htmlgraph/tmux.go\", track_id: \"trk-does-not-exist\", priority: 110 }\n"+
+			"  - { glob: \"cmd/htmlgraph/budget.go\", track_id: \"trk-does-not-exist\", priority: 110 }\n"+
+			"  - { glob: \"internal/worktree/**\", track_id: \"trk-does-not-exist\", priority: 100 }\n"),
+		0o644); err != nil {
+		t.Fatalf("write bad-rules: %v", err)
+	}
+
+	// Snapshot: featClear is on trkOld before the call.
+	featClear := os.Getenv("MTT_FEAT_CLEAR")
+	trkOld := os.Getenv("MTT_TRK_OLD")
+
+	var buf bytes.Buffer
+	opts := migrateTracksOpts{
+		rulesPath: badRules,
+		write:     true,
+		types:     "features",
+		threshold: 0.6,
+		format:    "text",
+	}
+	err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard)
+	if err == nil {
+		t.Fatalf("expected error for unknown ProposedTrack, got nil")
+	}
+	if !strings.Contains(err.Error(), "trk-does-not-exist") {
+		t.Errorf("error doesn't name the missing track: %v", err)
+	}
+
+	// And critically: nothing was mutated.
+	p, err := workitem.Open(hgDir, "test-agent")
+	if err != nil {
+		t.Fatalf("workitem.Open: %v", err)
+	}
+	defer p.Close()
+	feat, err := p.Features.Get(featClear)
+	if err != nil {
+		t.Fatalf("Features.Get: %v", err)
+	}
+	if feat.TrackID != trkOld {
+		t.Errorf("featClear was mutated despite validation failure: track_id = %q, want %q",
+			feat.TrackID, trkOld)
 	}
 }
 
@@ -336,7 +475,7 @@ func TestMigrateTracksTypesValidation(t *testing.T) {
 			format:    "text",
 		}
 		var buf bytes.Buffer
-		err := runMigrateTracks(context.Background(), hgDir, opts, &buf)
+		err := runMigrateTracks(context.Background(), hgDir, opts, &buf, io.Discard)
 		if c.ok && err != nil {
 			t.Errorf("types=%q: unexpected error %v", c.types, err)
 		}

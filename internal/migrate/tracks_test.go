@@ -131,6 +131,27 @@ func TestClassify_NoMatchingRules(t *testing.T) {
 	}
 }
 
+func TestClassify_LowConfidenceOnSameTrackStillAmbiguous(t *testing.T) {
+	// Regression: roborev finding — when a feature's current_track happens to
+	// be the dominant track but the dominance is below threshold, the result
+	// must be ambiguous, not no-change. A 1/4 share on the current track is
+	// still split attribution.
+	rules := testRules()
+	files := fakeFiles("feat-low",
+		"cmd/htmlgraph/yolo.go",         // 1 yolo
+		"cmd/htmlgraph/plan_create.go",  // 1 plan
+		"plugin/agents/x.md",            // 1 subagents
+		"internal/blame/blame.go",       // 1 lineage
+	)
+	d := ClassifyFeature(rules, files, "trk-yolo", 0.6)
+	if !d.Ambiguous {
+		t.Fatalf("expected ambiguous (1/4=0.25 < 0.6) even when current==dominant, got %+v", d)
+	}
+	if d.Reason != "ambiguous" {
+		t.Fatalf("reason = %q, want ambiguous", d.Reason)
+	}
+}
+
 func TestClassify_AlreadyOnDominantTrack(t *testing.T) {
 	rules := testRules()
 	files := fakeFiles("feat-stay", "cmd/htmlgraph/yolo.go", "cmd/htmlgraph/tmux.go")

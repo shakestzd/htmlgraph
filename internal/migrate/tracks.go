@@ -42,6 +42,7 @@ type RuleSet struct {
 //	"no-change"      — current_track is already the dominant track
 type Decision struct {
 	FeatureID     string  `json:"feature_id"`
+	ItemType      string  `json:"item_type"` // "feature" | "bug"
 	CurrentTrack  string  `json:"current_track"`
 	ProposedTrack string  `json:"proposed_track"`
 	DominantShare float64 `json:"dominant_share"`
@@ -100,14 +101,17 @@ func ClassifyFeature(rules *RuleSet, files []models.FeatureFile, currentTrack st
 	d.ProposedTrack = dominantTrack
 	d.DominantShare = share
 
-	if currentTrack == dominantTrack {
-		d.Reason = "no-change"
-		return d
-	}
-
+	// Ambiguity check runs first — a low-confidence dominance shouldn't be
+	// reported as settled just because the feature happens to already live on
+	// the dominant track. A 30% share is ambiguous regardless of where the
+	// feature is currently attributed.
 	if share < threshold {
 		d.Ambiguous = true
 		d.Reason = "ambiguous"
+		return d
+	}
+	if currentTrack == dominantTrack {
+		d.Reason = "no-change"
 		return d
 	}
 	d.Reason = "confident"
@@ -185,6 +189,7 @@ func classifyByType(database *sql.DB, typeName string, rules *RuleSet, threshold
 		// ClassifyFeature pulls FeatureID from files[0] when present; ensure
 		// we record the id even when files is empty.
 		d.FeatureID = id
+		d.ItemType = typeName
 		out = append(out, d)
 	}
 	return out, nil
