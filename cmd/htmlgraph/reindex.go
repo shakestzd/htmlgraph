@@ -27,6 +27,7 @@ are reparsed. Use --full to force a complete reparse of all files.`,
 	}
 	cmd.Flags().Bool("full", false, "Force full reindex of all HTML files (ignores git diff)")
 	cmd.Flags().BoolP("verbose", "v", false, "Print one line per error encountered during reindex")
+	cmd.AddCommand(reindexBackfillOrphansCmd())
 	return cmd
 }
 
