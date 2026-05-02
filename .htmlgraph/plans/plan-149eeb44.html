@@ -283,10 +283,11 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Delete SQLite and regenerate plugin ports (Phase 4)</h1>
-  <p style="color:var(--text-dim)">Sub-plan of plan-3bbc313f — Phase 4 deletion. With every consumer migrated, delete modernc.org/sqlite from go.mod, the internal/db/ package, the htmlgraph reindex command family, and SQLite mentions from all docs. Regenerate Codex/Gemini/Claude plugin ports so deployed marketplaces stop shipping the old architecture description. Tight 2-slice review surface is intentional.</p>
+  <p style="color:var(--text-dim)">Sub-plan of plan-3bbc313f — Phase 4 deletion. With every consumer migrated, delete modernc.org/sqlite from go.mod, the internal/db/ package, the htmlgraph reindex command family, and SQLite mentions from all docs. Regenerate Codex/Gemini/Claude plugin ports so deployed marketplaces stop shipping the old architecture description. Tight 2-slice review surface is intentional.
+</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 0 slices · Created 2026-05-01</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 2 slices · Created 2026-05-01</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -306,6 +307,8 @@ textarea::placeholder{color:var(--text-muted)}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Phase 4 — Delete `modernc.org/sqlite` from the codebase" data-status="pending" data-deps="" data-files="23"></div>
+    <div data-node="2" data-name="Phase 4b — Regenerate plugin ports (Codex, Gemini, Claude) after schema lands" data-status="pending" data-deps="1" data-files="7"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -318,17 +321,29 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
-    <!--PLAN_DESIGN_CONTENT-->
-    <div class="sub-section">
-      <h4>Open Questions</h4>
-      <!--PLAN_QUESTIONS-->
-    </div>
+    <h4>Problem</h4>
+<div data-markdown>Until SQLite is deleted from go.mod, the team will keep accidentally re-adding SQL-backed code paths (already happened mid-conversation with `internal/storage/evict.go`). Removing the option is the only way to make the architecture promise real. The deployed Codex and Gemini plugin trees still embed `system-prompt.md` describing the SQLite read index; without regeneration, marketplaces will continue shipping the old narrative.
+</div>
+<h4>Goals</h4>
+<ol>
+<li data-markdown>`grep -r &#39;database/sql&#39; cmd/ internal/` returns zero matches; `go.sum` no longer references modernc.org/sqlite.</li>
+<li data-markdown>Architecture docs in AGENTS.md, CLAUDE.md, and all three plugin trees describe HTML+NDJSON canonical.</li>
+<li data-markdown>Plugin port regeneration is bit-idempotent.</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li data-markdown>Run only after every consumer migration in Child D is verified.</li>
+<li data-markdown>Binary size reduction documented in commit message.</li>
+<li data-markdown>`.htmlgraph/htmlgraph.db*` added to `.gitignore`; deploy script nukes stray files.</li>
+</ul>
+
     <div class="approval-row">
       <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
 </details>
+
 
 <!-- Structure Outline (hidden when empty) -->
 
@@ -337,23 +352,140 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    
+    <div class="slice-card" data-slice="1" data-slice-name="slice-1" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">Phase 4 — Delete `modernc.org/sqlite` from the codebase</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending slice-exec-badge" title="Execution: not_started">Not Started</span>
+    <span class="badge badge-pending slice-approval-badge" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value slice-md"><p>With slices 1, 2, 5-10, 15, 16 landed (all SQL-using subsystems
+migrated), delete the dependency:</p>
+<p>(1) Delete the entire <code>internal/db/</code> package (18 files: schema,
+pragmas, *_repo.go, otel_schema, plan_feedback). All callers
+already migrated by prior slices.
+(2) Delete <code>internal/storage/dbpath.go</code>, <code>internal/storage/evict.go</code>
+(the latter just landed; verify no remaining callers).
+(3) Delete <code>cmd/htmlgraph/cache.go</code> and <code>cmd/htmlgraph/cache_pollution_test.go</code>
+(cache is SQLite-specific).
+(4) Delete the <code>htmlgraph reindex</code> command family (<code>reindex.go</code>,
+<code>reindex_files.go</code>, <code>reindex_helpers.go</code>, <code>reindex_sessions.go</code>,
+<code>reindex_trailers.go</code> and their tests) — there is no index to
+rebuild. Keep <code>htmlgraph recover-db</code> from slice-2 ONLY if it now
+means &#34;purge stray DB files&#34;; otherwise delete.
+(5) Delete <code>internal/db/disabled_stub.go</code> and <code>internal/db/enabled.go</code>
+(slice-8&#39;s build-tag stubs) — no longer needed.
+(6) Remove <code>modernc.org/sqlite v1.37.1</code> from <code>go.mod</code>; run <code>go mod tidy</code>.
+(7) Update <code>AGENTS.md</code>, <code>CLAUDE.md</code>, <code>cmd/htmlgraph/prompts/system-prompt.md</code>,
+and the plugin port trees (slice-13 covers regeneration): remove
+&#34;SQLite read index&#34; from architecture tables; replace with
+&#34;HTML files (canonical) + per-session NDJSON (canonical)&#34;.
+(8) Add <code>.htmlgraph/htmlgraph.db*</code> to <code>.gitignore</code>; deploy script
+nukes any stray files.
+(9) CI verifies: <code>grep -r &#39;database/sql&#39; cmd/ internal/</code> returns
+zero matches; <code>go.sum</code> no longer references modernc.org/sqlite.</p>
+<p>File-list ground truth: <code>rg -l &#39;&#34;database/sql&#34;&#39; cmd/ internal/</code>
+currently returns ~110 files. By the time slice-11 runs, that count
+must be 0. Slice-11 deletes the residual <code>internal/db/</code> package
+and updates docs; the actual migrations happen in slices 5, 6, 8,
+10, 15, 16.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value slice-md"><p>Closes the migration. Until SQLite is deleted from go.mod, the
+team will keep accidentally re-adding SQL-backed code paths
+(we&#39;ve watched it happen — <code>internal/storage/evict.go</code> landed
+mid-conversation). &#34;Removing the option&#34; is the only way to
+make the architecture promise real.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/db/, internal/storage/dbpath.go, internal/storage/evict.go, internal/storage/evict_test.go, cmd/htmlgraph/cache.go, cmd/htmlgraph/cache_pollution_test.go, cmd/htmlgraph/reindex.go, cmd/htmlgraph/reindex_files.go, cmd/htmlgraph/reindex_helpers.go, cmd/htmlgraph/reindex_sessions.go, cmd/htmlgraph/reindex_trailers.go, cmd/htmlgraph/reindex_test.go, cmd/htmlgraph/reindex_feature_files_test.go, cmd/htmlgraph/reindex_incremental_test.go, cmd/htmlgraph/reindex_sessions_test.go, cmd/htmlgraph/reindex_trailers_test.go, go.mod, go.sum, AGENTS.md, CLAUDE.md, cmd/htmlgraph/prompts/system-prompt.md, .htmlgraph/.gitignore, scripts/deploy-all.sh</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`go.sum` no longer references `mattn/go-sqlite3` or any SQLite driver.</li><li>`grep -r &#39;database/sql&#39; cmd/ internal/` returns zero matches.</li><li>Full test suite passes.</li><li>Binary size reduction documented in commit message (expected: ~3-5 MB).</li><li>Architecture table in `AGENTS.md` no longer mentions SQLite.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-md slice-tests"><p>Integration: TestNoSQLiteDriver — <code>go test ./...</code> with a build tag that fails on <code>database/sql</code> import.
+Regression: full CLI command matrix passes.
+Smoke: fresh checkout, <code>go build</code>, <code>htmlgraph status</code> against a clean repo — works.</p>
+</div></div>
+  
+  <div class="slice-field slice-critic-revisions">
+    <div class="slice-field-label">Critic Revisions</div>
+    <div class="slice-field-value">
+      
+      <div class="critic-revision">
+        <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+        <span class="critic-revision-source">researcher</span>
+        <span class="critic-revision-summary">ADDRESSED in revision: file list now enumerates real paths from grep audit (internal/db/ package, internal/storage/dbpath.go, reindex command family). 110 files import database/sql; deps now include slice-15 (hook handlers) and slice-16 (graph/agent/planchat/registry) so file count reaches 0 before deletion.</span>
+      </div>
+      
+      <div class="critic-revision">
+        <span class="badge badge-revision critic-revision-badge">MED</span>
+        <span class="critic-revision-source">researcher</span>
+        <span class="critic-revision-summary">ADDRESSED in revision: internal/storage/evict.go is now explicitly in the file list for deletion.</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="2" data-slice-name="slice-2" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#2</span>
+    <span class="slice-name">Phase 4b — Regenerate plugin ports (Codex, Gemini, Claude) after schema lands</span>
+    <span class="badge badge-pending">S</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending slice-exec-badge" title="Execution: not_started">Not Started</span>
+    <span class="badge badge-pending slice-approval-badge" data-badge-for="slice-2">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value slice-md"><p>htmlgraph ships the same plugin to three harnesses (Claude Code at
+<code>plugin/</code>, Codex CLI at <code>packages/codex-plugin/</code>, Gemini extension
+at <code>packages/gemini-extension/</code>) — all generated from
+<code>packages/plugin-core/manifest.json</code> by <code>htmlgraph plugin build-ports</code>.
+The Codex and Gemini trees embed <code>system-prompt.md</code> and architecture
+docs that reference the SQLite read index.</p>
+<p>After slice-11 deletes SQLite, run <code>htmlgraph plugin build-ports</code>
+and audit that the regenerated trees:
+(a) Have no SQLite mentions in any embedded markdown.
+(b) Reference the new HTML schema as canonical.
+(c) Are bit-identical to the source after a second regeneration
+(idempotent).</p>
+<p>Update <code>packages/plugin-core/manifest.json</code> and any shared assets
+under <code>plugin/{commands,agents,skills,templates,static,config}/</code> if
+the deletion of SQLite-related commands (e.g. <code>htmlgraph reindex</code>)
+requires command-tree changes.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value slice-md"><p>Without this, deployed plugins for Codex and Gemini will continue
+to ship docs describing the old architecture even after slice-11
+lands. Marketplaces ship from generated trees, not from source —
+regenerate and verify.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>packages/plugin-core/manifest.json, plugin/agents/, plugin/skills/, plugin/commands/, cmd/htmlgraph/prompts/system-prompt.md, packages/codex-plugin/, packages/gemini-extension/</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`htmlgraph plugin build-ports --target all` succeeds with zero diffs after a clean rebuild.</li><li>`grep -r -i sqlite packages/codex-plugin/ packages/gemini-extension/ plugin/` returns zero matches.</li><li>Architecture docs in all three plugin trees describe HTML&#43;NDJSON canonical.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-md slice-tests"><p>Integration: TestPluginPortsIdempotent — run build-ports twice, assert byte-equality.
+Lint: shell test that grep -r sqlite packages/ returns no matches.</p>
+</div></div>
+  
+  
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+  </div>
+</div>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
 
 <!-- Design Decisions (hidden for v2 plans — slice cards carry their own questions) -->
-<details id="questions" class="section-card" data-phase="questions" data-status="pending">
-  <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
-  <div class="section-body">
-    <table class="q-table">
-      <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
-      <tbody id="questionsRecap">
-        <!--PLAN_QUESTIONS_RECAP-->
-      </tbody>
-    </table>
-  </div>
-</details>
+
 
 
 
@@ -364,8 +496,8 @@ textarea::placeholder{color:var(--text-muted)}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">3</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">3</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -469,7 +601,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
