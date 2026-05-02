@@ -283,10 +283,11 @@ textarea::placeholder{color:var(--text-muted)}
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Write-path migration: templater + backfill + parser fast paths (Phase 2)</h1>
-  <p style="color:var(--text-dim)">Sub-plan of plan-3bbc313f — Phase 2 write-path. Refactor every HTML emitter to render from a single schema struct, backfill all 577 existing files to v1, and ship the read-side parser fast paths that downstream consumer migrations depend on. Highest-risk sub-plan in the migration: physically rewrites every HTML file in the repo.</p>
+  <p style="color:var(--text-dim)">Sub-plan of plan-3bbc313f — Phase 2 write-path. Refactor every HTML emitter to render from a single schema struct, backfill all 577 existing files to v1, and ship the read-side parser fast paths that downstream consumer migrations depend on. Highest-risk sub-plan in the migration: physically rewrites every HTML file in the repo.
+</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 0 slices · Created 2026-05-01</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 3 slices · Created 2026-05-01</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -306,6 +307,9 @@ textarea::placeholder{color:var(--text-muted)}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Phase 2a — Templater refactor: derive all schema layers from one source struct" data-status="pending" data-deps="" data-files="33"></div>
+    <div data-node="2" data-name="Phase 2b — Backfill migration of 577 existing `.htmlgraph/*.html` files" data-status="pending" data-deps="1" data-files="7"></div>
+    <div data-node="3" data-name="Phase 3a — `internal/htmlparse` JSON-LD fast path + ParseLinks + ParseHeadMeta" data-status="pending" data-deps="" data-files="7"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -318,17 +322,29 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
-    <!--PLAN_DESIGN_CONTENT-->
-    <div class="sub-section">
-      <h4>Open Questions</h4>
-      <!--PLAN_QUESTIONS-->
-    </div>
+    <h4>Problem</h4>
+<div data-markdown>Today HTML emission and HTML parsing are both ad-hoc: ~30 emitter call sites construct HTML from string concatenation, with the same fact often appearing in multiple places (e.g. status in head meta AND in body), making drift inevitable. The repo&#39;s 577 existing files are in a v0-ish format incompatible with v1. Until both the emitters and the corpus are converted, downstream read-path migrations have no schema-clean source to read from.
+</div>
+<h4>Goals</h4>
+<ol>
+<li data-markdown>Every HTML emitter renders from a single `internal/schema/v1.&lt;Type&gt;` struct via one entry point; every write call validates output before writing.</li>
+<li data-markdown>All 577 existing files migrate to v1, idempotent + reversible (git stash snapshot before write).</li>
+<li data-markdown>`internal/htmlparse` exposes head-only fast paths (JSON-LD, link rel, head meta) that are ≥5× faster than full goquery parse.</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li data-markdown>Backfill must be content-preserving: post-render whitespace-normalized body must match original byte-for-byte (`BodyPassthrough` invariant).</li>
+<li data-markdown>CI lint must fail any `os.WriteFile` to a `.html` path that bypasses `schema.Validate`.</li>
+<li data-markdown>Head-only parsers must short-circuit at `&lt;/head&gt;` (parse time independent of body size).</li>
+</ul>
+
     <div class="approval-row">
       <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
 </details>
+
 
 <!-- Structure Outline (hidden when empty) -->
 
@@ -337,23 +353,209 @@ textarea::placeholder{color:var(--text-muted)}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    
+    <div class="slice-card" data-slice="1" data-slice-name="slice-1" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#1</span>
+    <span class="slice-name">Phase 2a — Templater refactor: derive all schema layers from one source struct</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending slice-exec-badge" title="Execution: not_started">Not Started</span>
+    <span class="badge badge-pending slice-approval-badge" data-badge-for="slice-1">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value slice-md"><p>Refactor every HTML emitter to render from a single
+<code>internal/schema/v1.&lt;Type&gt;</code> struct. The renderer derives, from
+that one struct: (a) the JSON-LD <code>&lt;script&gt;</code> payload, (b)
+<code>&lt;meta name=&#34;htmlgraph:*&#34;&gt;</code> head metas, (c) <code>&lt;link rel=&#34;...&#34;&gt;</code>
+head edges, (d) microdata <code>itemscope</code>/<code>itemprop</code> decoration of
+body elements, (e) <code>&lt;time datetime&gt;</code> for every timestamp,
+(f) the <code>BodyPassthrough</code> field rendered verbatim into the body.
+The struct is source of truth; no fact is hand-authored twice.
+Every write path runs <code>schema.Validate</code> on its output and refuses
+to write malformed HTML. Add a CI lint that fails on any
+<code>os.WriteFile</code> / <code>file.Write</code> to a <code>.html</code> path that does not call
+<code>schema.Validate</code> on the buffer first.</p>
+<p>Real emitters to update (audited via grep):
+<code>internal/workitem/{htmlwriter,edit,features,bugs,spikes,plans,sessions,tracks,specs,collection}.go</code>,
+<code>internal/hooks/session_html.go</code>,
+<code>cmd/htmlgraph/{workitem_create,workitem_modify,workitem_edges}.go</code>,
+<code>cmd/htmlgraph/{plan_create,plan_mutations,plan_finalize,plan_finalize_yaml,plan_yaml_cmds,plan_promote_slice,plan_typed_sections,plan_migrate_orphans,plan_template,plan_wire,plan_yaml_extras}.go</code>,
+<code>cmd/htmlgraph/{cleanup,migrate,migrate_attribution}.go</code>,
+<code>cmd/htmlgraph/{api_plans,api_transcript}.go</code>,
+<code>cmd/htmlgraph/{reindex,reindex_files,reindex_helpers,reindex_sessions,reindex_trailers}.go</code>.
+Also update the templates in <code>plugin/templates/</code> (bug, chore,
+feature, spike) to align with the new schema.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value slice-md"><p>Removes the duplication-and-drift class permanently. Once this lands,
+&#34;the HTML schema&#34; is a real architectural invariant rather than a
+style guide. Validation at write time turns schema regressions into
+test failures rather than corrupted artifacts.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/schema/render.go, internal/workitem/htmlwriter.go, internal/workitem/edit.go, internal/workitem/features.go, internal/workitem/bugs.go, internal/workitem/spikes.go, internal/workitem/plans.go, internal/workitem/sessions.go, internal/workitem/tracks.go, internal/workitem/specs.go, internal/workitem/collection.go, internal/hooks/session_html.go, cmd/htmlgraph/workitem_create.go, cmd/htmlgraph/workitem_modify.go, cmd/htmlgraph/workitem_edges.go, cmd/htmlgraph/plan_mutations.go, cmd/htmlgraph/plan_yaml_cmds.go, cmd/htmlgraph/plan_finalize_yaml.go, cmd/htmlgraph/plan_promote_slice.go, cmd/htmlgraph/cleanup.go, cmd/htmlgraph/migrate.go, cmd/htmlgraph/migrate_attribution.go, cmd/htmlgraph/reindex.go, cmd/htmlgraph/reindex_files.go, cmd/htmlgraph/reindex_helpers.go, cmd/htmlgraph/reindex_sessions.go, cmd/htmlgraph/reindex_trailers.go, cmd/htmlgraph/api_plans.go, cmd/htmlgraph/api_transcript.go, plugin/templates/bug-template.html, plugin/templates/chore-template.html, plugin/templates/feature-template.html, plugin/templates/spike-template.html</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>Every emitter calls a single `htmltemplate.Render(struct)` entry point.</li><li>Every emitter validates output via `schema.Validate` before writing; CI test asserts no emitter bypasses the validator.</li><li>Generated HTML for a sample Feature struct contains JSON-LD with the same `status` as the rendered `&lt;meta name&gt;` and the body microdata; mismatch is impossible by construction.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-md slice-tests"><p>Unit: TestRender_FeatureMatchesSchema — render a sample Feature, validate output, assert specific selectors.
+Unit: TestRender_NoDuplication — given a struct with <code>status=&#34;x&#34;</code>, mutate the struct and re-render; assert all five layers updated.
+Integration: TestEmitterWriteRefusesInvalid — corrupt a render path to emit a missing-field HTML; assert write returns error.
+Regression: existing <code>internal/workitem/*_test.go</code>, plan render tests, and snapshot tests still pass.</p>
+</div></div>
+  
+  <div class="slice-field slice-critic-revisions">
+    <div class="slice-field-label">Critic Revisions</div>
+    <div class="slice-field-value">
+      
+      <div class="critic-revision">
+        <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+        <span class="critic-revision-source">researcher</span>
+        <span class="critic-revision-summary">All listed render.go files are fictional. Real emitter paths are: internal/workitem/htmlwriter.go, internal/hooks/session_html.go, cmd/htmlgraph/workitem_create.go, cmd/htmlgraph/workitem_modify.go, cmd/htmlgraph/plan_mutations.go, cmd/htmlgraph/plan_yaml_cmds.go. Hook-emitted session HTML in particular would be silently skipped by current file list.</span>
+      </div>
+      
+      <div class="critic-revision">
+        <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+        <span class="critic-revision-source">sonnet-coder</span>
+        <span class="critic-revision-summary">Slice scope is severely under-counted. Beyond the listed paths, HTML write/re-render also happens in reindex_files.go, workitem_edges.go, plan_promote_slice.go, ingest.go, and others. The &#39;no emitter bypasses validator&#39; done_when is unverifiable without an exhaustive grep for os.WriteFile / file.Write calls targeting `.htmlgraph/**/*.html`.</span>
+      </div>
+      
+      <div class="critic-revision">
+        <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+        <span class="critic-revision-source">sonnet-coder</span>
+        <span class="critic-revision-summary">commitPlanChange regeneration loop and hook handlers write HTML outside the listed file set. Add a CI lint that fails on any write to a .html path that does not call schema.Validate on the buffer.</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-1" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="2" data-slice-name="slice-2" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#2</span>
+    <span class="slice-name">Phase 2b — Backfill migration of 577 existing `.htmlgraph/*.html` files</span>
+    <span class="badge badge-blocked">L</span>
+    <span class="badge badge-blocked">High</span>
+    <span class="badge badge-pending slice-exec-badge" title="Execution: not_started">Not Started</span>
+    <span class="badge badge-pending slice-approval-badge" data-badge-for="slice-2">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value slice-md"><p>Implement <code>htmlgraph migrate-html --to v1</code>: iterate every file under
+<code>.htmlgraph/{features,bugs,spikes,plans,tracks,sessions}/*.html</code>
+(577 files in the working repo). EXTRACT facts from the existing
+<code>data-*</code> attribute scheme that&#39;s actually on disk today
+(<code>data-status</code>, <code>data-type</code>, <code>data-since</code>, <code>data-relationship</code>,
+and others enumerated in the slice-12 v0 inventory). NOT from
+JSON-LD or microdata, which don&#39;t yet exist on disk.</p>
+<p>Populate a <code>schema.v1.&lt;Type&gt;</code> struct including its <code>BodyPassthrough</code>
+field — capture every byte of body content not mapped to a known
+field, so hand-edits and freeform notes round-trip verbatim.
+Re-render via the new templater (slice-5) and write back.</p>
+<p>Rollback: before the first write, the migrator runs <code>git stash push -u</code>
+on <code>.htmlgraph/</code> (or commits a snapshot to a <code>pre-v1-migration</code> branch)
+so any failed migration can be reverted with one git command.</p>
+<p>Modes:
+<code>--dry-run</code> prints semantic diffs and exits 0/1 based on diff cleanliness
+without writing.
+<code>--write</code> performs the rollback snapshot, then iterates with fail-loud
+on any file where the post-render whitespace-normalized body differs
+from the original.
+<code>--check</code> validates that every file under <code>.htmlgraph/</code> already passes
+<code>schema.Validate</code> (used in CI to assert the migration converged).</p>
+<p>Add a CI job that runs <code>htmlgraph migrate-html --dry-run</code> against the
+committed <code>.htmlgraph/</code> snapshot in this repo (the repo dogfoods
+itself) and uploads the diff as an artifact for human review BEFORE
+the write path is enabled.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value slice-md"><p>Without backfill, the codebase has two HTML formats: schema-compliant
+(new emissions) and pre-schema (existing). The dual-format burden
+defeats the whole plan. Backfill collapses the world to a single
+format before Phase 3 reads can rely on it.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>cmd/htmlgraph/migrate_html.go, cmd/htmlgraph/migrate_html_test.go, internal/migrate/v0_to_v1.go, internal/migrate/v0_to_v1_test.go, internal/migrate/rollback.go, internal/migrate/testdata/legacy/, .github/workflows/ci.yml</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>`htmlgraph migrate-html --dry-run` produces a clean semantic diff for the working repo&#39;s `.htmlgraph/` (status, edges, timestamps preserved; passthrough body byte-identical after whitespace normalization).</li><li>After `htmlgraph migrate-html --write`, `internal/schema.Validate` returns nil for every file under `.htmlgraph/{features,bugs,spikes,plans,tracks,sessions}/`.</li><li>CI artifact: dry-run diff is uploaded for human review on every PR that touches `internal/migrate/` or `internal/schema/`.</li><li>Idempotent: running migrate-html twice produces zero diff on the second pass.</li><li>Rollback verified: a manual test confirms `git stash pop` (or branch checkout) restores all 577 files to pre-migration state byte-for-byte.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-md slice-tests"><p>Unit: TestMigrate_FeatureSemanticPreserved — load legacy HTML, migrate, assert schema struct fields match expected.
+Unit: TestMigrate_Idempotent — run migrate twice, second pass produces zero diff.
+Integration: TestMigrate_FullCorpus — migrate the real <code>.htmlgraph/</code> (in CI sandbox), assert all files validate.</p>
+</div></div>
+  
+  <div class="slice-field slice-critic-revisions">
+    <div class="slice-field-label">Critic Revisions</div>
+    <div class="slice-field-value">
+      
+      <div class="critic-revision">
+        <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+        <span class="critic-revision-source">sonnet-coder</span>
+        <span class="critic-revision-summary">The migrator must read the EXISTING format (data-* attributes: data-status, data-type, data-created, data-relationship, data-since), not JSON-LD or microdata which don&#39;t yet exist on disk. Plan as written reads from the wrong source. Add: pre-commit git snapshot of every file as rollback; --dry-run pass against actual corpus committed in CI artifacts before write path is enabled.</span>
+      </div>
+      
+      <div class="critic-revision">
+        <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+        <span class="critic-revision-source">sonnet-coder</span>
+        <span class="critic-revision-summary">Hand-edited body content (task notes, agent comments, freeform inline HTML) has no canonical field mapping and will be silently dropped or mangled by re-render. Add an explicit &#39;passthrough body&#39; field to schema.v1.&lt;Type&gt; that round-trips arbitrary inner HTML verbatim. Fail-loud on any post-render diff after whitespace normalization.</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  
+  <div class="slice-deps">Dependencies: slices 1</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-2" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+  </div>
+</div>
+<div class="slice-card" data-slice="3" data-slice-name="slice-3" data-status="pending">
+  <div class="slice-header">
+    <span class="slice-num">#3</span>
+    <span class="slice-name">Phase 3a — `internal/htmlparse` JSON-LD fast path &#43; ParseLinks &#43; ParseHeadMeta</span>
+    <span class="badge badge-revision">M</span>
+    <span class="badge badge-pending">Low</span>
+    <span class="badge badge-pending slice-exec-badge" title="Execution: not_started">Not Started</span>
+    <span class="badge badge-pending slice-approval-badge" data-badge-for="slice-3">Pending</span>
+  </div>
+  
+  <div class="slice-field"><div class="slice-field-label">What</div><div class="slice-field-value slice-md"><p>Add three new exported functions to <code>internal/htmlparse</code>:
+(1) <code>ParseJSONLD(r) (*schema.v1.&lt;Type&gt;, error)</code> — extracts the
+first <code>&lt;script type=&#34;application/ld+json&#34;&gt;</code> and unmarshals.
+(2) <code>ParseLinks(r) ([]Link, error)</code> — head-only stream parse for
+<code>&lt;link rel=&#34;...&#34; href=&#34;...&#34;&gt;</code> tags.
+(3) <code>ParseHeadMeta(r) (map[string]string, error)</code> — head-only stream
+parse for <code>&lt;meta name=&#34;htmlgraph:*&#34; content=&#34;...&#34;&gt;</code>.
+All three short-circuit on <code>&lt;/head&gt;</code>. Existing <code>ParseFile</code> continues
+to work via goquery for legacy callers and body-content extraction.
+Benchmark JSON-LD parse vs full parse and document the win.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Why</div><div class="slice-field-value slice-md"><p>The fast paths are the perf justification for not needing SQLite for
+the common queries. ~1ms-per-file JSON-LD parse vs ~10ms goquery
+means a 200-item snapshot is ~200ms instead of 2 seconds —
+acceptable for CLI use, generous for dashboard cold-start.</p>
+</div></div>
+  <div class="slice-field"><div class="slice-field-label">Files</div><div class="slice-field-value"><code>internal/htmlparse/jsonld.go, internal/htmlparse/links.go, internal/htmlparse/head_meta.go, internal/htmlparse/jsonld_test.go, internal/htmlparse/links_test.go, internal/htmlparse/head_meta_test.go, internal/htmlparse/bench_test.go</code></div></div>
+  <div class="slice-field"><div class="slice-field-label">Done when</div><ul class="slice-done-list"><li>All three functions return correct results on every fixture from slice-4.</li><li>Head-only parsers stop at `&lt;/head&gt;` (verified by benchmarking a 1MB body — parse time independent of body size).</li><li>Documented benchmark in `bench_test.go`: JSON-LD path ≥5× faster than goquery on a real Feature file.</li></ul></div>
+  
+  <div class="slice-field"><div class="slice-field-label">Test Strategy</div><div class="slice-field-value slice-md slice-tests"><p>Unit: TestParseJSONLD_AllFixtures — table-driven over schema fixtures.
+Unit: TestParseLinks_HeadOnly — file with malicious gigantic body parses in &lt; 5ms.
+Bench: BenchmarkParseJSONLD vs BenchmarkParseFile_GoQuery on a real Feature.</p>
+</div></div>
+  
+  
+  <div class="slice-deps">Dependencies: none</div>
+  <div class="approval-row">
+    <label><input type="checkbox" data-section="slice-3" data-action="approve"> Approve slice</label>
+    <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
+  </div>
+</div>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
 
 <!-- Design Decisions (hidden for v2 plans — slice cards carry their own questions) -->
-<details id="questions" class="section-card" data-phase="questions" data-status="pending">
-  <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
-  <div class="section-body">
-    <table class="q-table">
-      <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
-      <tbody id="questionsRecap">
-        <!--PLAN_QUESTIONS_RECAP-->
-      </tbody>
-    </table>
-  </div>
-</details>
+
 
 
 
@@ -364,8 +566,8 @@ textarea::placeholder{color:var(--text-muted)}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">4</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">4</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -469,7 +671,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
