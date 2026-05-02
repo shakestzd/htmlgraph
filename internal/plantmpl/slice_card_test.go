@@ -719,18 +719,19 @@ func TestSliceCard_ReconcilesExistingApprovalCheckbox(t *testing.T) {
 		t.Fatalf("Render: %v", err)
 	}
 	html := buf.String()
-	// There must be exactly ONE approval checkbox (one mechanism, not duplicated).
-	checkboxCount := strings.Count(html, `data-action="approve"`)
-	if checkboxCount != 1 {
-		t.Errorf("expected exactly 1 approve checkbox, got %d in:\n%s", checkboxCount, html)
+	// The approval segmented control uses three radio buttons (approve/changes/reject),
+	// all with data-action="approve". Verify there are exactly 3 (the full segmented group).
+	approveCount := strings.Count(html, `data-action="approve"`)
+	if approveCount != 3 {
+		t.Errorf("expected 3 approval radio inputs (segmented control), got %d in:\n%s", approveCount, html)
 	}
 	// The visual status badge must reference the same slice key (data-badge-for=slice-7).
 	if !strings.Contains(html, `data-badge-for="slice-7"`) {
 		t.Errorf("expected badge with data-badge-for=\"slice-7\" in output:\n%s", html)
 	}
-	// When approved, the checkbox should be pre-checked.
-	if !strings.Contains(html, `checked`) {
-		t.Errorf("approved slice should have checked checkbox:\n%s", html)
+	// When approved, the radio for "approved" value should be pre-checked.
+	if !strings.Contains(html, `value="approved" data-section="slice-7" data-action="approve" checked`) {
+		t.Errorf("approved slice should have checked 'approved' radio:\n%s", html)
 	}
 }
 
