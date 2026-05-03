@@ -5,9 +5,9 @@ meta:
     description: |
         Pilot for the OODA active-observer initiative. Adds `htmlgraph compliance auto <id>` — a manual CLI command that compares a feature's spec against its implementation diff via `claude -p` (headless) and writes structured findings to a `<section class="compliance-findings">` in the feature HTML. Pilot scope is intentionally manual: validates LLM judgment quality before automation locks in the prompt. Hook-driven automatic invocation and OTel telemetry are deferred to follow-on plans gated on pilot success. Built on primitives confirmed in spike `spk-13b6115b`. This rewrite reflects critique findings from opus (technical) and sonnet (scope) — most notably collapsing a premature harness abstraction, integrating concurrent-write safety up-front, and adding an explicit evaluation mechanism so the pilot can measure its own success.
     created_at: "2026-05-03"
-    status: active
+    status: finalized
     created_by: claude-opus
-    version: 2
+    version: 5
 design:
     problem: |
         Today, completing a feature in HtmlGraph is a one-way write: the agent marks `feature complete`, the HTML body is updated, and the OODA loop's Act → Observe edge depends on a human later reading lineage and judging whether the implementation matched the spec. Specs grow stale; checkbox compliance is manually maintained or skipped; drift between spec and code is invisible until someone notices. A manual `compliance auto` command introduces an LLM judgment step that can run on completed features, surfacing implementation-vs-spec drift while keeping the pilot's blast radius small enough to evaluate without committing to automation.
@@ -27,6 +27,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-38a032e8
       num: 1
       title: '`htmlgraph compliance auto <id>` — manual end-to-end run with safety integrated'
       what: |
@@ -128,7 +129,7 @@ slices:
       approved: false
       comment: ""
       approval_status: pending
-      execution_status: not_started
+      execution_status: promoted
       questions:
         - id: q-write-back-format
           text: Where should compliance findings live in the feature HTML?

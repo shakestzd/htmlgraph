@@ -422,7 +422,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-72685272" data-plan-id="plan-72685272" data-feature-id="trk-8a7e82d8" data-status="active">
+<article id="plan-72685272" data-plan-id="plan-72685272" data-feature-id="trk-8a7e82d8" data-status="finalized">
 
 <!-- Plan Header -->
 <header class="plan-header">
@@ -431,7 +431,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 2 slices · Created 2026-05-03</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v5 · 2 slices · Created 2026-05-03</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -510,7 +510,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
         <span class="slice-summary-badges">
           <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-revision badge-sm">Med</span>
-          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-revision badge-sm" title="Execution: promoted">Promoted</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
           <span class="badge badge-sm badge-issues" title="11 critic issue(s)">11 issues</span>
           <span class="badge badge-sm badge-questions" title="4 open question(s)">4 Q</span>
@@ -740,34 +740,82 @@ e. Truncate at <code>--max-diff-chars</code> (default 50000) at nearest line bou
         
         <div class="question-block slice-question-block">
           <p>Where should compliance findings live in the feature HTML?</p>
-          <textarea
-            data-section="slice-1-question-q-write-back-format"
-            data-comment-for="slice-1-question-q-write-back-format"
-            placeholder="Answer question q-write-back-format..."></textarea>
+          <p class="question-desc">Idempotency, queryability, and dashboard visibility differ across these options.
+The compliance findings need to be replaceable on re-run (not appended), queryable
+for history/cohort views, and visible to the user reading the feature page.
+</p>
+          
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-1-question-q-write-back-format" data-section="slice-1-question-q-write-back-format" data-action="answer" value="section"> section — `&lt;section class=&#39;compliance-findings&#39;&gt;` with `data-*` attributes. Structured, queryable, parallels existing `&lt;section class=&#39;spec&#39;&gt;`. <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-1-question-q-write-back-format" data-section="slice-1-question-q-write-back-format" data-action="answer" value="addnote"> addnote — `Collection.AddNote` appends a `&lt;p&gt;`. Minimal new code, but findings buried in body and not idempotent.</label>
+            
+            <label><input type="radio" name="slice-1-question-q-write-back-format" data-section="slice-1-question-q-write-back-format" data-action="answer" value="properties"> properties — `Properties` map on node. Simplest, but invisible in HTML view.</label>
+            
+          
         </div>
         
         <div class="question-block slice-question-block">
           <p>How does the LLM see the implementation diff?</p>
-          <textarea
-            data-section="slice-1-question-q-diff-source"
-            data-comment-for="slice-1-question-q-diff-source"
-            placeholder="Answer question q-diff-source..."></textarea>
+          <p class="question-desc">Determinism, testability, and permission-mode complexity differ. Opus critique
+noted that whichever approach is chosen needs `git -C &lt;root&gt;` for project-root
+resolution, `--first-parent` for merge-commit safety, and a fallback via
+`feature_files` when commits aren&#39;t attributed to the feature.
+</p>
+          
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-1-question-q-diff-source" data-section="slice-1-question-q-diff-source" data-action="answer" value="prompt-text"> prompt-text — pre-compute via `git show`, embed as text in user prompt; truncate at 50k chars <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-1-question-q-diff-source" data-section="slice-1-question-q-diff-source" data-action="answer" value="bash-allowed"> bash-allowed — allow `Bash(git show)` in `--allowedTools`, let LLM fetch the diff itself</label>
+            
+            <label><input type="radio" name="slice-1-question-q-diff-source" data-section="slice-1-question-q-diff-source" data-action="answer" value="read-files"> read-files — allow `Read` on changed files, let LLM read them directly</label>
+            
+          
         </div>
         
         <div class="question-block slice-question-block">
           <p>When the feature has no spec section, what should auto-compliance do?</p>
-          <textarea
-            data-section="slice-1-question-q-no-spec-behavior"
-            data-comment-for="slice-1-question-q-no-spec-behavior"
-            placeholder="Answer question q-no-spec-behavior..."></textarea>
+          <p class="question-desc">Visibility vs silent skip vs synthetic generation. Silent skip leaves users
+wondering whether the pilot is broken; generated stub specs are theater.
+</p>
+          
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-1-question-q-no-spec-behavior" data-section="slice-1-question-q-no-spec-behavior" data-action="answer" value="skip-with-note"> skip-with-note — write a &#39;no spec&#39; finding section, exit 0 <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-1-question-q-no-spec-behavior" data-section="slice-1-question-q-no-spec-behavior" data-action="answer" value="silent-skip"> silent-skip — exit 0 with no side effect</label>
+            
+            <label><input type="radio" name="slice-1-question-q-no-spec-behavior" data-section="slice-1-question-q-no-spec-behavior" data-action="answer" value="generate-then-score"> generate-then-score — run `htmlgraph spec generate`, score against the auto-generated stub</label>
+            
+          
         </div>
         
         <div class="question-block slice-question-block">
           <p>Default model &#43; effort for auto-compliance?</p>
-          <textarea
-            data-section="slice-1-question-q-model-default"
-            data-comment-for="slice-1-question-q-model-default"
-            placeholder="Answer question q-model-default..."></textarea>
+          <p class="question-desc">Cost vs signal quality. The recommendation here may flip to haiku-low pending
+the empirical cost measurement (`q-cost-measurement`). All three remain
+user-selectable via `--model` and `--effort` flags.
+</p>
+          
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-1-question-q-model-default" data-section="slice-1-question-q-model-default" data-action="answer" value="sonnet-medium"> sonnet-medium — `claude-sonnet-4-6` &#43; medium effort. Estimated ~$0.03/call (provisional pending q-cost-measurement). <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-1-question-q-model-default" data-section="slice-1-question-q-model-default" data-action="answer" value="haiku-low"> haiku-low — `claude-haiku-4-5` &#43; low effort. ~$0.001–$0.003/call. May miss nuance.</label>
+            
+            <label><input type="radio" name="slice-1-question-q-model-default" data-section="slice-1-question-q-model-default" data-action="answer" value="opus-high"> opus-high — `claude-opus-4-7` &#43; high effort. ~$0.10–$0.30/call. Overkill for pilot.</label>
+            
+          
         </div>
         
       </div>
@@ -959,18 +1007,40 @@ e. Truncate at <code>--max-diff-chars</code> (default 50000) at nearest line bou
         
         <div class="question-block slice-question-block">
           <p>Where does compliance history come from?</p>
-          <textarea
-            data-section="slice-2-question-q-history-storage"
-            data-comment-for="slice-2-question-q-history-storage"
-            placeholder="Answer question q-history-storage..."></textarea>
+          <p class="question-desc">Pilot scope. SQLite backing is YAGNI until multi-feature analytics; can be
+added in the OTel telemetry follow-on plan once the pilot proves value.
+</p>
+          
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-2-question-q-history-storage" data-section="slice-2-question-q-history-storage" data-action="answer" value="parse-from-html"> parse-from-html — read prior findings from feature HTML&#39;s `&lt;details&gt;` blocks (last 5 retained by slice 1&#39;s section writer) <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-2-question-q-history-storage" data-section="slice-2-question-q-history-storage" data-action="answer" value="separate-table"> separate-table — store every run in a SQLite `compliance_runs` table; HTML retains only most recent</label>
+            
+            <label><input type="radio" name="slice-2-question-q-history-storage" data-section="slice-2-question-q-history-storage" data-action="answer" value="both"> both — HTML for visibility, SQLite for analytics</label>
+            
+          
         </div>
         
         <div class="question-block slice-question-block">
           <p>Day 14 quality audit rigor?</p>
-          <textarea
-            data-section="slice-2-question-q-eval-rigor"
-            data-comment-for="slice-2-question-q-eval-rigor"
-            placeholder="Answer question q-eval-rigor..."></textarea>
+          <p class="question-desc">Adjustable upward if the day-7 checkpoint reveals signal noise. Matches
+`q-pilot-success-bar`&#39;s definition of pilot success.
+</p>
+          
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-2-question-q-eval-rigor" data-section="slice-2-question-q-eval-rigor" data-action="answer" value="ten-findings-one-reviewer"> 10 findings, 1 reviewer, ≥70% agreement — pragmatic; matches `q-pilot-success-bar` recommendation <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-2-question-q-eval-rigor" data-section="slice-2-question-q-eval-rigor" data-action="answer" value="twenty-findings-two-reviewers"> 20 findings, 2 reviewers, agreement-on-agreement — more rigorous; double the time</label>
+            
+            <label><input type="radio" name="slice-2-question-q-eval-rigor" data-section="slice-2-question-q-eval-rigor" data-action="answer" value="five-findings-qualitative"> 5 findings, 1 reviewer, qualitative — cheapest but easy to game</label>
+            
+          
         </div>
         
       </div>
@@ -1190,6 +1260,21 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
       if(badge) setBadge(badge,true);
     }
   });
+
+  // Slice-local question radio chips (data-action="answer", data-section=slice-N-question-<id>)
+  document.querySelectorAll('input[type="radio"][data-action="answer"]').forEach(function(r){
+    r.addEventListener('change',function(){
+      var sec=this.dataset.section;
+      if(planId){
+        fetch((window.htmlgraphPlanBase||'')+'/api/plans/'+planId+'/feedback',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:sec,action:'answer',value:this.value,question_id:sec})
+        });
+      }
+    });
+  });
+
   var allRows=document.querySelectorAll('[data-recap-for]');
   var allAnswered=Array.prototype.every.call(allRows,function(r){
     var b=r.querySelector('.badge');
