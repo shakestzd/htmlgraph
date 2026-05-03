@@ -4,6 +4,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -37,14 +38,35 @@ func BuildPragmas(dbPath string) map[string]string {
 }
 
 // ApplyPragmas sets all performance PRAGMAs on a database connection.
+//
+// All PRAGMAs are executed on a single dedicated *sql.Conn (pinned via
+// db.Conn) to prevent the connection-pool race where busy_timeout is set on
+// connection A but journal_mode (or another required PRAGMA) runs on
+// connection B, which has busy_timeout=0 and immediately returns SQLITE_BUSY
+// if the write lock is contended.
+//
 // Some PRAGMAs (busy_timeout, cache_size) are best-effort and may not apply
 // to all backing stores (e.g., in-memory SQLite); failures are logged at debug
 // level and don't block the Open. Other PRAGMAs are required.
 func ApplyPragmas(db *sql.DB, pragmas map[string]string) error {
+	ctx := context.Background()
+
+	// Acquire a dedicated connection so every PRAGMA below runs on the same
+	// underlying SQLite connection. This is critical: busy_timeout is
+	// per-connection state, and journal_mode=WAL must run on the same
+	// connection that already has busy_timeout set — otherwise a fresh pooled
+	// connection will see busy_timeout=0 and return SQLITE_BUSY immediately
+	// when the database is locked.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for pragmas: %w", err)
+	}
+	defer conn.Close()
+
 	// Must run before journal_mode: if the write lock is held, busy_timeout
 	// tells SQLite how long to wait before returning SQLITE_BUSY.
 	if bt, ok := pragmas["busy_timeout"]; ok {
-		if _, err := db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %s", bt)); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA busy_timeout = %s", bt)); err != nil {
 			log.Printf("debug: skipping PRAGMA busy_timeout (not supported on this backing): %v", err)
 		}
 	}
@@ -61,7 +83,7 @@ func ApplyPragmas(db *sql.DB, pragmas map[string]string) error {
 		if !ok {
 			continue
 		}
-		_, err := db.Exec(fmt.Sprintf("PRAGMA %s = %s", pragma, value))
+		_, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA %s = %s", pragma, value))
 		if err != nil {
 			return fmt.Errorf("applying PRAGMA %s: %w", pragma, err)
 		}
@@ -72,7 +94,7 @@ func ApplyPragmas(db *sql.DB, pragmas map[string]string) error {
 		if !ok {
 			continue
 		}
-		_, err := db.Exec(fmt.Sprintf("PRAGMA %s = %s", pragma, value))
+		_, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA %s = %s", pragma, value))
 		if err != nil {
 			// Best-effort: log at debug, continue. In-memory DBs in tests
 			// may reject busy_timeout / cache_size; that's fine because
