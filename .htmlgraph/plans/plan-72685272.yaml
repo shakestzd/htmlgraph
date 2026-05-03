@@ -7,7 +7,7 @@ meta:
     created_at: "2026-05-03"
     status: finalized
     created_by: claude-opus
-    version: 5
+    version: 6
 design:
     problem: |
         Today, completing a feature in HtmlGraph is a one-way write: the agent marks `feature complete`, the HTML body is updated, and the OODA loop's Act → Observe edge depends on a human later reading lineage and judging whether the implementation matched the spec. Specs grow stale; checkbox compliance is manually maintained or skipped; drift between spec and code is invisible until someone notices. A manual `compliance auto` command introduces an LLM judgment step that can run on completed features, surfacing implementation-vs-spec drift while keeping the pilot's blast radius small enough to evaluate without committing to automation.
@@ -222,6 +222,7 @@ slices:
           severity: MEDIUM
           summary: Cost data attributes (`data-cost-usd`, `data-model`) integrated into section write — no infrastructure cost
     - id: slice-2
+      feature_id: feat-834180bf
       num: 2
       title: 'Pilot evaluation: cost measurement, dogfood, history command, review checkpoints'
       what: |
@@ -271,7 +272,7 @@ slices:
       approved: false
       comment: ""
       approval_status: pending
-      execution_status: not_started
+      execution_status: promoted
       questions:
         - id: q-history-storage
           text: Where does compliance history come from?
