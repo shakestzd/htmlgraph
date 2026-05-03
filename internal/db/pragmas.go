@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"strings"
 )
 
 // Pragmas mirrors the Python PRAGMA_SETTINGS from pragmas.py.
@@ -82,6 +83,18 @@ func ApplyPragmas(db *sql.DB, pragmas map[string]string) error {
 		value, ok := pragmas[pragma]
 		if !ok {
 			continue
+		}
+		// Special case: journal_mode is case-insensitive and may already be set.
+		// Querying first avoids lock escalation from SHARED→EXCLUSIVE when upgrading
+		// DEFERRED transactions, which returns SQLITE_BUSY immediately on contention.
+		if strings.EqualFold(pragma, "journal_mode") {
+			var current string
+			if err := conn.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&current); err == nil {
+				if strings.EqualFold(current, value) {
+					continue // already in desired mode — skip the lock-acquiring SET
+				}
+			}
+			// fall through to the SET below if query failed or modes differ
 		}
 		_, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA %s = %s", pragma, value))
 		if err != nil {
