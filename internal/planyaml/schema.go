@@ -75,6 +75,13 @@ type PlanSlice struct {
 	// V2 slice-local spec fields.
 	Questions       []SliceQuestion  `yaml:"questions,omitempty"`        // slice-local open questions
 	CriticRevisions []CriticRevision `yaml:"critic_revisions,omitempty"` // critic feedback specific to this slice
+
+	// DecisionsNotes is free-text Markdown captured by `htmlgraph plan
+	// elicit-decisions` (typically Scope/Decisions/Context). Slice 1's
+	// `htmlgraph spec generate --insert` weaves this prose verbatim into the
+	// generated spec's `## Decisions` section. Free text — not a typed schema.
+	// Empty/absent renders no Decisions section.
+	DecisionsNotes string `yaml:"decisions_notes,omitempty"`
 }
 
 // SliceQuestion is an open question scoped to a single slice. It supports two
