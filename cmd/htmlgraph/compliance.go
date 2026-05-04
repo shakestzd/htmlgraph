@@ -8,10 +8,121 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 
 	"github.com/shakestzd/htmlgraph/internal/workitem"
 	"github.com/spf13/cobra"
 )
+
+// atomicWriteCounter provides a unique sequence number per atomic write call,
+// used to make temp filenames unique even when called from multiple goroutines
+// in the same process (which all share the same PID).
+var atomicWriteCounter atomic.Int64
+
+// writeComplianceSection replaces (or inserts) a <section class="compliance-findings"> block
+// in the feature HTML file. The replacement is idempotent: any existing section is replaced
+// by class match. The write is atomic via atomicWriteFile in internal/workitem.
+//
+// attrs is a map of data-* attribute names (without the "data-" prefix) → values.
+// body is the inner HTML content for the section.
+func writeComplianceSection(featurePath string, attrs map[string]string, body string) error {
+	content, err := os.ReadFile(featurePath)
+	if err != nil {
+		return fmt.Errorf("read feature file: %w", err)
+	}
+
+	sectionHTML := buildComplianceSectionHTML(attrs, body)
+	updated := replaceOrAppendSection(string(content), sectionHTML)
+
+	return writeFileAtomicRaw(featurePath, []byte(updated))
+}
+
+// buildComplianceSectionHTML constructs the <section class="compliance-findings"> element.
+func buildComplianceSectionHTML(attrs map[string]string, body string) string {
+	attrOrder := []string{"score", "cost-usd", "model", "spec-hash", "timestamp", "diff-truncated"}
+	var sb strings.Builder
+	sb.WriteString(`<section class="compliance-findings"`)
+	for _, k := range attrOrder {
+		if v, ok := attrs[k]; ok {
+			sb.WriteString(fmt.Sprintf(` data-%s="%s"`, k, v))
+		}
+	}
+	// Write any extra attrs not in the canonical order.
+	for k, v := range attrs {
+		found := false
+		for _, canonical := range attrOrder {
+			if k == canonical {
+				found = true
+				break
+			}
+		}
+		if !found {
+			sb.WriteString(fmt.Sprintf(` data-%s="%s"`, k, v))
+		}
+	}
+	sb.WriteString(">\n")
+	sb.WriteString(body)
+	sb.WriteString("\n</section>")
+	return sb.String()
+}
+
+// replaceOrAppendSection replaces an existing <section class="compliance-findings"> in html,
+// or appends it before </body> if none exists.
+func replaceOrAppendSection(html, sectionHTML string) string {
+	const openTag = `<section class="compliance-findings"`
+	const closeTag = `</section>`
+
+	start := strings.Index(html, openTag)
+	if start == -1 {
+		// No existing section — append before </body>.
+		bodyClose := strings.LastIndex(html, "</body>")
+		if bodyClose == -1 {
+			return html + "\n" + sectionHTML
+		}
+		return html[:bodyClose] + sectionHTML + "\n" + html[bodyClose:]
+	}
+
+	// Find the matching </section> after the opening tag.
+	afterOpen := html[start:]
+	end := strings.Index(afterOpen, closeTag)
+	if end == -1 {
+		// Malformed: just replace to end.
+		return html[:start] + sectionHTML
+	}
+	end += start + len(closeTag)
+	return html[:start] + sectionHTML + html[end:]
+}
+
+// writeFileAtomicRaw writes data to path atomically using temp+rename without
+// acquiring the per-node mutex (caller is responsible for concurrency control
+// when needed). Used by compliance write path which manages its own locking.
+func writeFileAtomicRaw(path string, data []byte) error {
+	seq := atomicWriteCounter.Add(1)
+	tmp := fmt.Sprintf("%s.tmp.%d.%d", path, os.Getpid(), seq)
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("open temp: %w", err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("sync temp: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("close temp: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
 
 // criterionStatus represents the state of a single acceptance criterion.
 type criterionStatus int
@@ -53,14 +164,23 @@ func complianceCmd() *cobra.Command {
 		Long: `Read the spec section from a feature HTML file and report on each acceptance criterion.
 
 Criteria marked with [ ] are UNCHECKED, [x] are PASSED.
-Exit 0 if no failures found; exit 1 if any criteria are explicitly marked as failed.`,
-		Args: cobra.ExactArgs(1),
+Exit 0 if no failures found; exit 1 if any criteria are explicitly marked as failed.
+
+Use 'htmlgraph compliance auto <id>' to run LLM-powered auto-grading.`,
+		Args: cobra.ArbitraryArgs,
 		RunE: func(_ *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("feature-id required")
+			}
 			return runCompliance(args[0], jsonOut)
 		},
 	}
 
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+
+	// Register the auto subcommand.
+	cmd.AddCommand(complianceAutoCmd())
+
 	return cmd
 }
 

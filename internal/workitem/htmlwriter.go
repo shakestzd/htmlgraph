@@ -10,10 +10,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
+
+// featureWriteMu serialises concurrent WriteNodeHTML calls for the same feature
+// ID in a single process. Keyed by node ID (string) → *sync.Mutex.
+// This prevents lost-update races when two goroutines write the same HTML file
+// concurrently (e.g. two compliance auto invocations in tests).
+var featureWriteMu sync.Map
+
+// atomicWriteCounter provides a unique sequence number per atomic write call,
+// used to make temp filenames unique even when called from multiple goroutines
+// in the same process (which all share the same PID).
+var atomicWriteCounter atomic.Int64
 
 // --- ID generation -----------------------------------------------------------
 
@@ -70,11 +83,22 @@ var nodeTmpl = template.Must(
 // writes it to the collection directory.  The output MUST be parseable by
 // htmlparse.ParseFile to ensure round-trip fidelity.
 //
+// Writes are atomic: the content is rendered to a temp file, fsynced, then
+// renamed over the target path (POSIX rename is atomic). A per-node mutex
+// serialises concurrent in-process writes for the same node ID to prevent
+// lost-update races.
+//
 // Returns the absolute path of the written file.
 func WriteNodeHTML(dir string, node *models.Node) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create dir %s: %w", dir, err)
 	}
+
+	// Acquire per-node mutex to serialize concurrent writes for the same node.
+	muVal, _ := featureWriteMu.LoadOrStore(node.ID, &sync.Mutex{})
+	mu := muVal.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 
 	path := filepath.Join(dir, node.ID+".html")
 	html, err := renderNodeHTML(node)
@@ -82,10 +106,49 @@ func WriteNodeHTML(dir string, node *models.Node) (string, error) {
 		return "", fmt.Errorf("render %s: %w", node.ID, err)
 	}
 
-	if err := os.WriteFile(path, []byte(html), 0o644); err != nil {
+	if err := atomicWriteFile(path, []byte(html), 0o644); err != nil {
 		return "", fmt.Errorf("write %s: %w", path, err)
 	}
 	return path, nil
+}
+
+// atomicWriteFile writes data to path atomically: it writes to a temp file in
+// the same directory, calls Sync to flush to storage, then renames the temp
+// file over the target. POSIX rename is atomic within the same filesystem.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	seq := atomicWriteCounter.Add(1)
+	tmp := fmt.Sprintf("%s.tmp.%d.%d", path, os.Getpid(), seq)
+
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return fmt.Errorf("open temp file: %w", err)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("write temp file: %w", err)
+	}
+
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("sync temp file: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	_ = dir // ensure dir is always used (for documentation clarity)
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("rename temp to target: %w", err)
+	}
+
+	return nil
 }
 
 // renderNodeHTML produces the full HTML document for a node using
