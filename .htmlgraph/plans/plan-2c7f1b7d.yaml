@@ -1,0 +1,16 @@
+meta:
+    id: plan-2c7f1b7d
+    track_id: trk-8f9bc323
+    title: Native agent-teams enablement + hook payload completeness + docs update
+    description: 'Auto-set CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 in HtmlGraph launchers (htmlgraph claude / yolo / dev), respecting user-set env values as override. Add opt-out toggle in .htmlgraph/config.json. Verify and complete the existing TeammateIdle/TaskCreated/TaskCompleted hook handlers — current implementation captures teammate identity but may miss team-specific payload fields (task_id, task_subject, task_description, team_name). Update CLAUDE.md to document v2.1.64+ JSON control payload support; current docs only mention exit-code 2. Optional: HtmlGraph-specific subagent definition usable as a teammate via natural-language reference. Built on doc-grounded research already completed.'
+    created_at: "2026-05-04"
+    status: draft
+    version: 2
+design:
+    problem: ""
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices: []
+questions: []
