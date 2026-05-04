@@ -21,11 +21,16 @@ var atomicWriteCounter atomic.Int64
 
 // writeComplianceSection replaces (or inserts) a <section class="compliance-findings"> block
 // in the feature HTML file. The replacement is idempotent: any existing section is replaced
-// by class match. The write is atomic via atomicWriteFile in internal/workitem.
+// by class match. The write is atomic via writeFileAtomicRaw.
+//
+// The whole read-modify-write window runs inside workitem.LockFeatureForWrite
+// so racing writers (e.g. `spec generate --insert`) cannot lose updates.
 //
 // attrs is a map of data-* attribute names (without the "data-" prefix) → values.
 // body is the inner HTML content for the section.
 func writeComplianceSection(featurePath string, attrs map[string]string, body string) error {
+	defer workitem.LockFeatureForWrite(featurePathToID(featurePath))()
+
 	content, err := os.ReadFile(featurePath)
 	if err != nil {
 		return fmt.Errorf("read feature file: %w", err)
@@ -35,6 +40,13 @@ func writeComplianceSection(featurePath string, attrs map[string]string, body st
 	updated := replaceOrAppendSection(string(content), sectionHTML)
 
 	return writeFileAtomicRaw(featurePath, []byte(updated))
+}
+
+// featurePathToID extracts the feature ID from a path like
+// `.htmlgraph/features/feat-abc123.html`. Used to key per-feature locks.
+func featurePathToID(featurePath string) string {
+	base := filepath.Base(featurePath)
+	return strings.TrimSuffix(base, ".html")
 }
 
 // buildComplianceSectionHTML constructs the <section class="compliance-findings"> element.

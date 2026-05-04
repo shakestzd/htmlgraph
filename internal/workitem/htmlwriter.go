@@ -17,11 +17,27 @@ import (
 	"github.com/shakestzd/htmlgraph/internal/models"
 )
 
-// featureWriteMu serialises concurrent WriteNodeHTML calls for the same feature
-// ID in a single process. Keyed by node ID (string) → *sync.Mutex.
-// This prevents lost-update races when two goroutines write the same HTML file
-// concurrently (e.g. two compliance auto invocations in tests).
+// featureWriteMu serialises concurrent writes that touch the same feature HTML
+// file in a single process. Keyed by node ID (string) → *sync.Mutex.
+// This prevents lost-update races between writers — `WriteNodeHTML`,
+// `compliance auto`'s findings writer, and `spec generate --insert`'s spec
+// writer all acquire the same per-feature lock via LockFeatureForWrite.
 var featureWriteMu sync.Map
+
+// LockFeatureForWrite acquires a per-feature mutex so multiple in-process
+// writers cannot race on the same HTML file. Callers MUST defer the returned
+// release function.
+//
+// The acquire-read-modify-write window must be inside the lock; the underlying
+// atomic temp+rename remains safe regardless. This closes the lost-update race
+// when `compliance auto` and `spec generate --insert` (or any other section
+// writer) target the same feature concurrently.
+func LockFeatureForWrite(featureID string) (release func()) {
+	muVal, _ := featureWriteMu.LoadOrStore(featureID, &sync.Mutex{})
+	mu := muVal.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
 
 // atomicWriteCounter provides a unique sequence number per atomic write call,
 // used to make temp filenames unique even when called from multiple goroutines
@@ -95,10 +111,7 @@ func WriteNodeHTML(dir string, node *models.Node) (string, error) {
 	}
 
 	// Acquire per-node mutex to serialize concurrent writes for the same node.
-	muVal, _ := featureWriteMu.LoadOrStore(node.ID, &sync.Mutex{})
-	mu := muVal.(*sync.Mutex)
-	mu.Lock()
-	defer mu.Unlock()
+	defer LockFeatureForWrite(node.ID)()
 
 	path := filepath.Join(dir, node.ID+".html")
 	html, err := renderNodeHTML(node)
