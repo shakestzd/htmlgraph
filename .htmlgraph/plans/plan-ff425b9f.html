@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="htmlgraph-version" content="1.0">
-<title>Plan: Sub-agent dispatch hardening — attribution session-walk + worktree commit guard</title>
+<title>Plan: Sub-agent dispatch hardening — diagnostic spike + attribution / commit guard / YOLO inheritance</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
@@ -400,6 +400,13 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <ul class="slice-nav-list" id="slice-nav-list">
     
     <li>
+      <a href="#slice-0" class="slice-nav-item" data-slice-nav="0">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="0"></span>
+        <span>#0 Diagnostic spike: capture real failing-dispatch DB state to verify root cause</span>
+      </a>
+    </li>
+    
+    <li>
       <a href="#slice-1" class="slice-nav-item" data-slice-nav="1">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="1"></span>
         <span>#1 PreToolUse claim check walks parent session chain (fixes #87 / bug-0413c3c4)</span>
@@ -433,12 +440,12 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 
 <!-- Plan Header -->
 <header class="plan-header">
-  <h1>Plan: Sub-agent dispatch hardening — attribution session-walk + worktree commit guard</h1>
-  <p style="color:var(--text-dim)">Fixes two infrastructure-blocking bugs surfaced in GitHub #87 (bug-0413c3c4) and #88 (bug-730c0f19). The /htmlgraph:execute parallel dispatch model is currently non-functional: in a real-world dispatch of 8 features, 6 of 8 sub-agents got stuck on attribution-claim session-ID mismatches (sub-agent runs under different session than orchestrator's `feature start`), and 2 of 8 successful sub-agents committed directly to main instead of isolated worktree branches (Claude Code's `isolation:"worktree"` falls through when the parent is itself in a worktree). Slice 1 walks the parent-session chain in the PreToolUse claim check, mirroring the `getSessionAndParent` pattern already established in `yolo_guard.go`. Slice 2 adds a PreToolUse Bash guard that detects sub-agent `git commit` invocations on main without an explicit per-agent branch and refuses, defending against Claude Code's worktree-creation behavior at the htmlgraph hook layer. Slice 3 closes the third manifestation of this same dispatch-failure pattern (per bug-8ff540a7 / GitHub #90): the YOLO-mode permission check in `yolo_guard.go`'s `checkYoloMode` (or equivalent) refuses sub-agent Edit/Write because the sub-agent's own session isn't tagged YOLO, even though the parent orchestrator is. Slice 3 applies slice 1's same `getSessionAndParent` walker to the YOLO-mode predicate so sub-agents inherit the parent's YOLO posture.
+  <h1>Plan: Sub-agent dispatch hardening — diagnostic spike + attribution / commit guard / YOLO inheritance</h1>
+  <p style="color:var(--text-dim)">Fixes three infrastructure-blocking dispatch-failure bugs (#87 attribution, #88 commit-to-main, #90 YOLO inheritance). Originally drafted as 3 slices; opus + sonnet critique surfaced HIGH findings that the plan rests on load-bearing assumptions that don't hold against the codebase: (a) sub-agent and orchestrator may share `session_id` per bug-cb4918d8 — the actual discriminator is `agent_id`, so a session_id-keyed chain walk wouldn't find lineage; (b) `GetToolUseContext` at `internal/db/session_repo.go:175` already has a `claimed_by_agent_id → owner_session_id` fallback that may already cover #87 — the cited 6/8 failure may be a different root cause entirely; (c) `getSessionAndParent` is one-hop and the helper's blast radius covers 4+ existing callers; (d) slice 3's premise (Claude Code does NOT propagate `bypassPermissions`) is unverified. Restructured: slice 0 is a diagnostic spike to capture real failing-dispatch DB state and verify which assumptions hold; slices 1-3 are deferred until slice 0's findings inform their actual scope, with critic_revisions documenting the open architectural questions. The original slice content is retained for context but should NOT be implemented as-is until slice 0 confirms the mechanism.
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v4 · 3 slices · Created 2026-05-04</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v5 · 4 slices · Created 2026-05-04</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -458,9 +465,10 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
-    <div data-node="1" data-name="PreToolUse claim check walks parent session chain (fixes #87 / bug-0413c3c4)" data-status="pending" data-deps="" data-files="3"></div>
-    <div data-node="2" data-name="PreToolUse guard refuses sub-agent git commit on main (fixes #88 / bug-730c0f19)" data-status="pending" data-deps="1" data-files="3"></div>
-    <div data-node="3" data-name="YOLO permission inheritance via parent-session chain (fixes #90 / bug-8ff540a7)" data-status="pending" data-deps="1" data-files="3"></div>
+    <div data-node="0" data-name="Diagnostic spike: capture real failing-dispatch DB state to verify root cause" data-status="pending" data-deps="" data-files="1"></div>
+    <div data-node="1" data-name="PreToolUse claim check walks parent session chain (fixes #87 / bug-0413c3c4)" data-status="pending" data-deps="0" data-files="3"></div>
+    <div data-node="2" data-name="PreToolUse guard refuses sub-agent git commit on main (fixes #88 / bug-730c0f19)" data-status="pending" data-deps="0,1" data-files="3"></div>
+    <div data-node="3" data-name="YOLO permission inheritance via parent-session chain (fixes #90 / bug-8ff540a7)" data-status="pending" data-deps="0,1" data-files="3"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -475,6 +483,8 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <div class="section-body">
     <h4>Problem</h4>
 <div data-markdown>/htmlgraph:execute dispatches sub-agents in parallel against a track&#39;s features. Two infrastructure bugs make this fundamentally broken today: (1) the orchestrator&#39;s `htmlgraph feature start &lt;id&gt;` creates a claim under the orchestrator&#39;s session ID, but sub-agents run under different session IDs; the PreToolUse hook&#39;s claim lookup uses the sub-agent&#39;s own session, sees `claim=none`, and refuses Write/Edit/MultiEdit. Sub-agents cannot fix this from inside themselves (`feature start` from a sub-agent records a claim under yet another session, leaving the parent&#39;s claim in place). 6 of 8 sub-agents in the cited dispatch wasted 30-50 turns each investigating this. (2) Sub-agents dispatched with `Agent({isolation:&#34;worktree&#34;})` sometimes commit directly to main instead of an isolated branch — when the parent orchestrator is itself in a worktree, Claude Code appears to skip nested worktree creation, leaving sub-agents writing in the parent&#39;s working directory which after a checkout had ended up on main. 2 of 8 successful sub-agents in the cited dispatch had this happen; quality gates passed by luck. (3) Sub-agents dispatched from a parent in YOLO mode have their `Edit`/`Write` calls blocked because the YOLO-mode hook check (likely `checkYoloMode` in `yolo_guard.go` or a sibling) uses the sub-agent&#39;s own session ID directly. The sub-agent is not tagged YOLO; the check returns false; the gate refuses. In the cited dispatch one sub-agent burned 50 tool calls investigating the hook source instead of implementing the feature.
+
+**Restructure note (post-critique 2026-05-05):** opus&#39;s technical critique surfaced that the chain-walk approach in slice 1 may not work as designed — sub-agent CloudEvents share the orchestrator&#39;s session_id (per bug-cb4918d8), so `getSessionAndParent(sessionID)` resolves to the orchestrator&#39;s row directly with empty parent_session_id, not to a synthetic agent_id-keyed lineage row. The actual claim resolution path through `GetToolUseContext`&#39;s `claimed_by_agent_id → owner_session_id` fallback may already handle the cited failure mode; if so, the 6/8 failures have a different root cause (perhaps `claimed_by_agent_id` is being populated when it shouldn&#39;t, breaking the COALESCE order; perhaps the claim&#39;s status is `completed` rather than in-progress; perhaps the sub-agent payload now carries a fresh session_id contrary to the bug-cb4918d8 invariant). Slice 0 captures real DB state from a reproduced failure to verify which mechanism is broken before slices 1-3 implement fixes.
 </div>
 <h4>Goals</h4>
 <ol>
@@ -488,6 +498,10 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <li data-markdown>**Backward compatible** — the orchestrator&#39;s existing claim flow (single-agent sessions doing their own `feature start`) continues to work. Slice 1 only EXTENDS the lookup to walk parent chains; it doesn&#39;t change behavior when the agent owns the claim itself.</li>
 <li data-markdown>**No new infrastructure** — both fixes use existing hook plumbing (`internal/hooks/pretooluse.go`) and existing precedent (`internal/hooks/yolo_guard.go`&#39;s `getSessionAndParent`). No new packages, no new dependencies.</li>
 <li data-markdown>**Defense-in-depth, not silver bullet** — slice 2&#39;s guard refuses commits but cannot retroactively un-commit or rewrite history. If a sub-agent has already committed to main before this guard ships, manual recovery is required (out of scope; users can revert/cherry-pick).</li>
+<li data-markdown>**Spike-first ordering** — slices 1, 2, and 3 depend on slice 0&#39;s findings document. They must NOT be promoted until slice 0 produces concrete evidence of the actual failure mechanism. Their current `what` fields are aspirational and will likely need rewriting based on slice 0&#39;s data.</li>
+<li data-markdown>**Helper blast radius (per opus F4)** — `getSessionAndParent` is currently one-hop with 4 existing callers (`hasRecentResearch`, `hasRecentDiffReview`, `hasRecentTestRun`, `checkYoloUIValidationGuard`). Any extension to multi-hop must include cycle detection, depth limit, and regression tests for all 4 existing callers.</li>
+<li data-markdown>**Hot-path performance (per opus F-perf)** — PreToolUse fires on every tool call. Multiple guards walking the chain redundantly is O(N×guards) per call. Slices 1-3 should cache the chain walk in `toolUseContext` for the lifetime of one hook invocation (single-walk, multi-consumer).</li>
+<li data-markdown>**Reuse, don&#39;t reinvent** — slice 2 must reuse the existing `gitCommitPattern` regex (per the canonical bug-a10ae96a anchored-Bash-matching rule) and `currentBranchIn(event.CWD)` helper from `yolo_guard.go`. Slice 3 must pin its target to `isYoloFromDB` (yolo_guard.go:44), NOT a non-existent `checkYoloMode`.</li>
 </ul>
 
     <div class="approval-row">
@@ -505,7 +519,210 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    <details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-1" data-status="pending" data-approval="pending">
+    <details class="slice-card" id="slice-0" data-slice="0" data-slice-name="slice-0" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 0: Diagnostic spike: capture real failing-dispatch DB state to verify root cause">
+    <span class="slice-num">#0</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Diagnostic spike: capture real failing-dispatch DB state to verify root cause</span>
+      <span class="slice-preview">Read-only investigation slice.</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-pending badge-sm">S</span>
+          <span class="badge badge-pending badge-sm">Low</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-0">Pending</span>
+          
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-0-approval" value="approved" data-section="slice-0" data-action="approve" aria-label="Approve slice 0">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-0-approval" value="changes_requested" data-section="slice-0" data-action="approve" aria-label="Request changes for slice 0">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-0-approval" value="rejected" data-section="slice-0" data-action="approve" aria-label="Reject slice 0">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-0-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Read-only investigation slice. No production code changes. Output is a
+markdown findings document at <code>docs/spikes/dispatch-hardening-spike.md</code>
+that captures real DB state from a reproduced failing dispatch and
+verifies which load-bearing assumptions in slices 1-3 hold.</p>
+<p>Approach:</p>
+<ol>
+<li>
+<p><strong>Reproduce the failure.</strong> Either replay the cited 6/8 dispatch from
+track trk-9a3c622d (jobsmith) if the data is still available, or set
+up a minimal reproduction:</p>
+<ul>
+<li>Start an orchestrator session, run <code>htmlgraph feature start &lt;id&gt;</code></li>
+<li>Spawn an Agent({isolation:&#34;worktree&#34;, subagent_type:&#34;htmlgraph:sonnet-coder&#34;})</li>
+<li>Have the sub-agent attempt Edit/Write</li>
+<li>Observe the exact failure mode (claim mismatch error, YOLO refusal,
+commit-on-main, etc.)</li>
+</ul>
+</li>
+<li>
+<p><strong>Capture the DB state at the failure point.</strong>
+For both orchestrator and sub-agent sessions, dump:</p>
+<ul>
+<li><code>agent_events</code> rows (specifically: session_id, agent_id, parent_session_id, parent_agent_id, tool_name, tool_input)</li>
+<li><code>sessions</code> rows (session_id, parent_session_id, metadata.permission_mode)</li>
+<li><code>claims</code> rows (feature_id, owner_session_id, claimed_by_agent_id, status)</li>
+<li><code>agent_lineage_trace</code> rows (trace_id, root_session_id)</li>
+</ul>
+</li>
+<li>
+<p><strong>Answer the load-bearing questions:</strong></p>
+<ul>
+<li>Q1: Does the sub-agent&#39;s tool-call CloudEvent.session_id MATCH the
+orchestrator&#39;s session_id (per bug-cb4918d8 invariant), or are they
+different?</li>
+<li>Q2: Does <code>GetToolUseContext</code>&#39;s existing <code>claimed_by_agent_id -&gt; owner_session_id</code> COALESCE chain return the orchestrator&#39;s claim
+when called with the sub-agent&#39;s (session_id, agent_id) tuple?
+If yes -- what&#39;s actually breaking in the cited 6/8 failure?</li>
+<li>Q3: For the YOLO inheritance bug (#90), does Claude Code propagate
+<code>permission_mode=bypassPermissions</code> into the sub-agent&#39;s CloudEvent
+payload? If yes -- <code>isYoloFromEvent</code> already handles inheritance;
+slice 3 is unnecessary.</li>
+<li>Q4: For commit-to-main (#88), what was the actual sub-agent CWD
+when it ran git commit? Was a new worktree created, or did
+Claude Code&#39;s <code>isolation:&#34;worktree&#34;</code> fall through?</li>
+</ul>
+</li>
+<li>
+<p><strong>Write the findings document</strong> at <code>docs/spikes/dispatch-hardening-spike.md</code>:</p>
+<ul>
+<li>Section per question (Q1-Q4) with evidence (sample rows, code
+citations, transcript excerpts)</li>
+<li>&#34;Confirmed root causes&#34; section: which mechanisms actually broke</li>
+<li>&#34;Slice 1 / 2 / 3 implications&#34; section: for each downstream slice,
+list which of its current <code>what</code> steps are correct, which need
+re-scoping, and which are wrong-problem-fixes</li>
+<li>&#34;Recommended slice-1-3 rewrite&#34; section: bullet-point sketch of
+the actual fixes needed (not full slice cards; just direction)</li>
+</ul>
+</li>
+<li>
+<p><strong>Smoke-test the existing fallback (Q2).</strong> Add a transient test in
+<code>internal/db/session_repo_test.go</code> (in a SEPARATE BRANCH or worktree
+-- do NOT commit this) that builds the (session_id-shared, agent_id-
+distinct) sub-agent fixture per bug-cb4918d8 and asserts whether
+<code>GetToolUseContext</code> returns the orchestrator&#39;s claim. If yes, slice 1
+needs to be re-scoped to fix what&#39;s ACTUALLY broken in the 6/8
+failure (likely <code>claimed_by_agent_id</code> populated incorrectly or claim
+status <code>completed</code>).</p>
+</li>
+</ol>
+</div>
+          <label for="slice-0-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-0-why-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Opus&#39;s RED verdict on the original 3-slice plan: &#34;this plan rests on
+three load-bearing assumptions that don&#39;t hold up against the codebase.&#34;
+Annotating findings as critic_revisions doesn&#39;t capture the depth -- at
+minimum, slice 1 may be solving the wrong problem. Diagnostic data
+first, fixes second. The spike is small (read-only, ~half a day) and
+its findings either confirm the existing 3-slice direction or surface
+the actual root cause for proper fixes. Either outcome is a strict
+improvement over implementing speculative fixes that may ship without
+addressing the bug.</p>
+</div>
+          <label for="slice-0-why-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>docs/spikes/dispatch-hardening-spike.md</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>`docs/spikes/dispatch-hardening-spike.md` exists with sections Q1-Q4 answered with concrete evidence</li><li>Q2 (existing fallback) is verified via a transient test against `GetToolUseContext` with the bug-cb4918d8 fixture pattern</li><li>Slice 1/2/3 implications section explicitly says, for each, whether the current `what` is correct, needs re-scoping, or is wrong-problem</li><li>Recommended rewrite section gives bullet-point direction for each downstream slice</li><li>No production code changes shipped from this slice (transient test is gitignored or stashed)</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 1</span>
+            <ul><li>not applicable -- spike is investigation-only.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>a transient `internal/db/session_repo_test.go` test exercising</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="other">
+            <span class="test-chip">OTHER &middot; 1</span>
+            <ul><li>bug-cb4918d8&#39;s fixture pattern; not committed to main.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing tests pass unchanged (no production code touched).</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+
+    <div class="slice-deps">Dependencies: none</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-0" data-comment-for="slice-0" placeholder="Comments on slice 0..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-1" data-status="pending" data-approval="pending">
   <summary class="slice-summary" aria-label="Slice 1: PreToolUse claim check walks parent session chain (fixes #87 / bug-0413c3c4)">
     <span class="slice-num">#1</span>
     <span class="slice-title-col">
@@ -517,7 +734,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="6 critic issue(s)">6 issues</span>
           <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -552,11 +769,11 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <div class="markdown-block reveal-content serif-prose"><p>The PreToolUse hook in <code>internal/hooks/pretooluse.go</code> checks whether the current session owns the active feature claim before allowing Write/Edit/MultiEdit. Today the check uses only the sub-agent&#39;s own session ID and refuses if <code>claim=none</code>. Sub-agents dispatched by an orchestrator that ran <code>htmlgraph feature start</code> see no claim under their own session and get blocked.</p>
 <p><strong>Implementation:</strong></p>
 <ol>
-<li><strong>Locate the claim check.</strong> Find the spot in <code>pretooluse.go</code> (or its callees) that resolves the claim by session ID — likely a function like <code>resolveActiveFeatureClaim(sessionID)</code> or similar.</li>
+<li><strong>Locate the claim check.</strong> Find the spot in <code>pretooluse.go</code> (or its callees) that resolves the claim by session ID -- likely a function like <code>resolveActiveFeatureClaim(sessionID)</code> or similar.</li>
 <li><strong>Locate the parent-chain walker.</strong> <code>internal/hooks/yolo_guard.go</code> already has <code>getSessionAndParent(sessionID)</code> (or similarly named) that walks the parent chain via <code>agent_events</code> (or <code>sessions</code>) table to find the orchestrator session. Reuse it; do NOT duplicate.</li>
 <li><strong>Replace the lookup with a parent-chain walk.</strong> When the current session has no claim, walk up via <code>getSessionAndParent</code> and check each ancestor session for an active claim. If any ancestor session owns a claim for the feature being touched, treat it as the effective claim and allow the operation.</li>
 <li><strong>Logging:</strong> when the claim is inherited via parent chain, log a structured note (e.g., <code>claim inherited: session=&lt;sub&gt; parent=&lt;orch&gt; feat=&lt;id&gt;</code>) so the dispatch path is auditable.</li>
-<li><strong>Conservative scope:</strong> only walk the chain when <code>claim=none</code> for the current session. If the current session has its own (different) claim, leave existing behavior — don&#39;t try to merge or transfer.</li>
+<li><strong>Conservative scope:</strong> only walk the chain when <code>claim=none</code> for the current session. If the current session has its own (different) claim, leave existing behavior -- don&#39;t try to merge or transfer.</li>
 </ol>
 </div>
           <label for="slice-1-what-reveal" class="reveal-label">Show full description</label>
@@ -570,7 +787,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-1-why-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>Without this, /htmlgraph:execute parallel dispatch is dead in the water: 6 of 8 sub-agents got stuck investigating the hook in the cited real-world example. The fix mirrors precedent already in the codebase (yolo_guard.go), so the implementation cost is low and the risk surface is well-understood. Walking the parent chain is the right semantic — sub-agents are doing work ON BEHALF of the orchestrator that started the feature; treating the orchestrator&#39;s claim as inherited matches the dispatch model.</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Without this, /htmlgraph:execute parallel dispatch is dead in the water: 6 of 8 sub-agents got stuck investigating the hook in the cited real-world example. The fix mirrors precedent already in the codebase (yolo_guard.go), so the implementation cost is low and the risk surface is well-understood. Walking the parent chain is the right semantic -- sub-agents are doing work ON BEHALF of the orchestrator that started the feature; treating the orchestrator&#39;s claim as inherited matches the dispatch model.</p>
 </div>
           <label for="slice-1-why-reveal" class="reveal-label">Show full description</label>
           
@@ -586,7 +803,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Sub-agent whose session is a direct child of orchestrator session (recorded in `agent_events` parent links) can Write/Edit/MultiEdit on a feature whose claim is owned by the orchestrator session</li><li>Sub-agent without a parent-chain link (or whose chain doesn&#39;t reach a claim-holding session) is still refused, with the existing error message</li><li>Multi-hop chains work: if sub-agent A spawns sub-sub-agent B, and orchestrator owns the claim, B&#39;s writes are allowed (chain walked via `getSessionAndParent`&#39;s recursive resolution)</li><li>Existing behavior preserved when current session owns its own claim (no chain walk needed)</li><li>Structured log line emitted when claim is inherited via chain — auditable in OTel session events</li></ul>
+        <ul class="slice-done-list"><li>Sub-agent whose session is a direct child of orchestrator session (recorded in `agent_events` parent links) can Write/Edit/MultiEdit on a feature whose claim is owned by the orchestrator session</li><li>Sub-agent without a parent-chain link (or whose chain doesn&#39;t reach a claim-holding session) is still refused, with the existing error message</li><li>Multi-hop chains work: if sub-agent A spawns sub-sub-agent B, and orchestrator owns the claim, B&#39;s writes are allowed (chain walked via `getSessionAndParent`&#39;s recursive resolution)</li><li>Existing behavior preserved when current session owns its own claim (no chain walk needed)</li><li>Structured log line emitted when claim is inherited via chain -- auditable in OTel session events</li></ul>
       </div>
       
     
@@ -606,12 +823,12 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           
           <div class="test-group" data-kind="other">
             <span class="test-chip">OTHER &middot; 6</span>
-            <ul><li>- TestClaimCheck_OwnSessionClaim — current session owns claim; pass-through unchanged</li><li>- TestClaimCheck_NoClaimNoChain — no claim, no parent; refuse (existing behavior preserved)</li><li>- TestClaimCheck_ParentOwnsClaim — current session has no claim, parent does; allow</li><li>- TestClaimCheck_GrandparentOwnsClaim — 2-hop chain; allow</li><li>- TestClaimCheck_ChainBrokenAtSomeHop — chain walk hits a session with neither a parent nor a claim; refuse</li><li>- TestClaimCheck_LogEmitted — when chain walk finds an ancestor claim, structured log line emitted with sub/parent/feat IDs</li></ul>
+            <ul><li>- TestClaimCheck_OwnSessionClaim -- current session owns claim; pass-through unchanged</li><li>- TestClaimCheck_NoClaimNoChain -- no claim, no parent; refuse (existing behavior preserved)</li><li>- TestClaimCheck_ParentOwnsClaim -- current session has no claim, parent does; allow</li><li>- TestClaimCheck_GrandparentOwnsClaim -- 2-hop chain; allow</li><li>- TestClaimCheck_ChainBrokenAtSomeHop -- chain walk hits a session with neither a parent nor a claim; refuse</li><li>- TestClaimCheck_LogEmitted -- when chain walk finds an ancestor claim, structured log line emitted with sub/parent/feat IDs</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
             <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestPreToolUse_DispatchedSubagentWriteAllowed — fixture sets up orchestrator session with feature start &#43; claim, then a sub-agent session linked to it; sub-agent attempts Edit; PreToolUse allows. Mirror with grandparent chain.</li></ul>
+            <ul><li>TestPreToolUse_DispatchedSubagentWriteAllowed -- fixture sets up orchestrator session with feature start &#43; claim, then a sub-agent session linked to it; sub-agent attempts Edit; PreToolUse allows. Mirror with grandparent chain.</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
@@ -626,6 +843,49 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">Chain-walk by session_id is wrong key -- per bug-cb4918d8, sub-agent and orchestrator share session_id; discriminator is agent_id. getSessionAndParent(sessionID) for a sub-agent returns the orchestrator&#39;s row with empty parent. Walker must walk by agent_id (or use agent_lineage_trace.trace_id -&gt; root_session_id). Re-scope after slice 0 confirms.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">GetToolUseContext at db/session_repo.go:175 already has claimed_by_agent_id -&gt; owner_session_id fallback for sub-agent claim resolution (added for bug-cb4918d8). Slice 1 may be solving the wrong problem; cited 6/8 failure may have a different root cause (claimed_by_agent_id over-population, claim status mismatch, fresh session_id violating cb4918d8 invariant). Slice 0 must verify.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">opus &#43; sonnet</span>
+          <span class="critic-revision-summary">getSessionAndParent is currently one-hop, not recursive. Multi-hop done_when requires extension. Helper has 4 existing callers (research, diff-review, test-run, screenshot guards) -- extending it cascades. Need a NEW helper walkSessionAncestors(db, sid, depthLimit) to avoid blast radius, OR explicit regression tests for all 4 callers.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">Slice 1 files list missing internal/db/session_repo.go -- actual claim SQL lookup is GetToolUseContext at lines 175-211 there, NOT pretooluse.go. The hook layer just consumes the resolved context.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">No cycle detection -- malformed sessions table where session A&#39;s parent is B and B&#39;s parent is A would loop forever and hang the hook. Walker must track visited IDs.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">Hot-path performance -- PreToolUse fires on every tool call. With slices 1&#43;2&#43;3 each walking the chain (1-N queries each), Edit/Write/Bash incurs O(N*3) sessions queries per call. Cache the walk in toolUseContext for the lifetime of one hook invocation.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
     <div class="slice-field slice-questions">
@@ -634,18 +894,18 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
         
         <div class="question-block slice-question-block">
           <p>Should the parent-chain walk have a depth limit?</p>
-          <p class="question-desc">Theoretically a session could have an unbounded parent chain. In practice, dispatch is at most 2-3 levels deep (orchestrator → sub-agent → maybe sub-sub-agent). But infinite chain walking on a malformed `agent_events` table could deadlock the hook.
+          <p class="question-desc">Theoretically a session could have an unbounded parent chain. In practice, dispatch is at most 2-3 levels deep (orchestrator -&gt; sub-agent -&gt; maybe sub-sub-agent). But infinite chain walking on a malformed `agent_events` table could deadlock the hook.
 </p>
           
             
             
             
             
-            <label class="recommended"><input type="radio" name="slice-1-question-q-chain-depth-limit" data-section="slice-1-question-q-chain-depth-limit" data-action="answer" value="limit-10"> limit-10 — walk at most 10 hops; refuse beyond. Generous; matches reasonable dispatch depths. <span class="rec-tag">recommended</span></label>
+            <label class="recommended"><input type="radio" name="slice-1-question-q-chain-depth-limit" data-section="slice-1-question-q-chain-depth-limit" data-action="answer" value="limit-10"> limit-10 -- walk at most 10 hops; refuse beyond. Generous; matches reasonable dispatch depths. <span class="rec-tag">recommended</span></label>
             
-            <label><input type="radio" name="slice-1-question-q-chain-depth-limit" data-section="slice-1-question-q-chain-depth-limit" data-action="answer" value="limit-3"> limit-3 — walk at most 3 hops. Tight; matches observed real-world depth.</label>
+            <label><input type="radio" name="slice-1-question-q-chain-depth-limit" data-section="slice-1-question-q-chain-depth-limit" data-action="answer" value="limit-3"> limit-3 -- walk at most 3 hops. Tight; matches observed real-world depth.</label>
             
-            <label><input type="radio" name="slice-1-question-q-chain-depth-limit" data-section="slice-1-question-q-chain-depth-limit" data-action="answer" value="no-limit"> no-limit — walk until parent is null. Risk of infinite walk if data is malformed.</label>
+            <label><input type="radio" name="slice-1-question-q-chain-depth-limit" data-section="slice-1-question-q-chain-depth-limit" data-action="answer" value="no-limit"> no-limit -- walk until parent is null. Risk of infinite walk if data is malformed.</label>
             
           
         </div>
@@ -659,11 +919,11 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
             
             
             
-            <label class="recommended"><input type="radio" name="slice-1-question-q-claim-mismatch-policy" data-section="slice-1-question-q-claim-mismatch-policy" data-action="answer" value="parent-claim-wins"> parent-claim-wins — if parent owns the claim for the file&#39;s feature, allow. The sub-agent&#39;s own claim is for unrelated work. <span class="rec-tag">recommended</span></label>
+            <label class="recommended"><input type="radio" name="slice-1-question-q-claim-mismatch-policy" data-section="slice-1-question-q-claim-mismatch-policy" data-action="answer" value="parent-claim-wins"> parent-claim-wins -- if parent owns the claim for the file&#39;s feature, allow. The sub-agent&#39;s own claim is for unrelated work. <span class="rec-tag">recommended</span></label>
             
-            <label><input type="radio" name="slice-1-question-q-claim-mismatch-policy" data-section="slice-1-question-q-claim-mismatch-policy" data-action="answer" value="own-claim-wins"> own-claim-wins — if current session has any claim, only that one counts; parent walk is skipped. Strictest; risks blocking legitimate cross-feature dispatch.</label>
+            <label><input type="radio" name="slice-1-question-q-claim-mismatch-policy" data-section="slice-1-question-q-claim-mismatch-policy" data-action="answer" value="own-claim-wins"> own-claim-wins -- if current session has any claim, only that one counts; parent walk is skipped. Strictest; risks blocking legitimate cross-feature dispatch.</label>
             
-            <label><input type="radio" name="slice-1-question-q-claim-mismatch-policy" data-section="slice-1-question-q-claim-mismatch-policy" data-action="answer" value="refuse-on-conflict"> refuse-on-conflict — if claims disagree on the feature, refuse. Safest but may surface as new false-positive blocks.</label>
+            <label><input type="radio" name="slice-1-question-q-claim-mismatch-policy" data-section="slice-1-question-q-claim-mismatch-policy" data-action="answer" value="refuse-on-conflict"> refuse-on-conflict -- if claims disagree on the feature, refuse. Safest but may surface as new false-positive blocks.</label>
             
           
         </div>
@@ -672,7 +932,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     </div>
     
 
-    <div class="slice-deps">Dependencies: none</div>
+    <div class="slice-deps">Dependencies: slices 0</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
@@ -694,7 +954,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="6 critic issue(s)">6 issues</span>
           <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -730,7 +990,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <p><strong>Implementation:</strong></p>
 <ol>
 <li><strong>Detect the Bash tool call.</strong> PreToolUse fires for every tool. Filter for <code>tool_name == &#34;Bash&#34;</code> AND <code>tool_input[&#34;command&#34;]</code> matches a regex like <code>^\s*git\s+commit\b</code> (case-insensitive). Fall through for non-commit Bash calls.</li>
-<li><strong>Identify sub-agent sessions.</strong> Use slice 1&#39;s <code>getSessionAndParent</code> to determine if the current session has a parent (i.e., is a sub-agent). If the current session is the orchestrator (no parent), allow normally — the orchestrator commits on main intentionally.</li>
+<li><strong>Identify sub-agent sessions.</strong> Use slice 1&#39;s <code>getSessionAndParent</code> to determine if the current session has a parent (i.e., is a sub-agent). If the current session is the orchestrator (no parent), allow normally -- the orchestrator commits on main intentionally.</li>
 <li><strong>Resolve current branch.</strong> Run <code>git -C &lt;cwd&gt; rev-parse --abbrev-ref HEAD</code> from the hook to get the branch. If it returns <code>main</code> or <code>master</code> AND the session has a parent: refuse with structured error.</li>
 <li><strong>Per-agent branch convention</strong> (escape hatch): if the branch matches <code>worktree-agent-*</code> or <code>subagent-*</code> or has the env var <code>HTMLGRAPH_AGENT_BRANCH=1</code> set in the hook&#39;s spawned env, allow even on main. This lets dispatch tooling explicitly mark &#34;this is a per-agent branch I created intentionally&#34; without forcing branch-name matching.</li>
 <li><strong>Error message structure:</strong> the refusal must include (a) which session is blocked, (b) what branch it&#39;s on, (c) suggested remediation: &#34;create a per-agent branch first: <code>git checkout -b worktree-agent-&lt;short-session-id&gt;</code> then commit and merge to the track branch via the orchestrator.&#34; Include the parent-session ID for cross-reference.</li>
@@ -748,7 +1008,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-2-why-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>Two of 8 sub-agents in the cited real-world dispatch committed directly to main; quality gates passing was luck. With this guard, the same path produces a clear refusal at the htmlgraph layer regardless of how Claude Code&#39;s <code>isolation:&#34;worktree&#34;</code> resolves. The orchestrator&#39;s commits are unaffected (it has no parent session). Per-agent branches with the documented naming or env var work normally — the guard is targeted at the specific failure mode (sub-agent + main + no per-agent branch).</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Two of 8 sub-agents in the cited real-world dispatch committed directly to main; quality gates passing was luck. With this guard, the same path produces a clear refusal at the htmlgraph layer regardless of how Claude Code&#39;s <code>isolation:&#34;worktree&#34;</code> resolves. The orchestrator&#39;s commits are unaffected (it has no parent session). Per-agent branches with the documented naming or env var work normally -- the guard is targeted at the specific failure mode (sub-agent + main + no per-agent branch).</p>
 </div>
           <label for="slice-2-why-reveal" class="reveal-label">Show full description</label>
           
@@ -764,7 +1024,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list slice-done-list--grid"><li>Sub-agent (session has parent) attempting `git commit` while on branch `main` or `master` is refused with a structured error message naming session, branch, and remediation</li><li>Orchestrator (session has no parent) committing on main is allowed normally</li><li>Sub-agent committing on a branch matching `worktree-agent-*` or `subagent-*` (or with `HTMLGRAPH_AGENT_BRANCH=1` set) is allowed regardless of whether the branch base is main</li><li>Non-`git commit` Bash calls fall through (the guard only intercepts commit specifically — not `git status`, `git log`, or any other Bash)</li><li>Sub-agent on a non-main, non-master, non-recognized branch (e.g., `trk-XXX`): allow (matches the dispatch model where parents work on track branches)</li><li>Hook&#39;s `git -C &lt;cwd&gt; rev-parse` failures (not a git repo, etc.) — fall through (don&#39;t block on detection failure)</li></ul>
+        <ul class="slice-done-list slice-done-list--grid"><li>Sub-agent (session has parent) attempting `git commit` while on branch `main` or `master` is refused with a structured error message naming session, branch, and remediation</li><li>Orchestrator (session has no parent) committing on main is allowed normally</li><li>Sub-agent committing on a branch matching `worktree-agent-*` or `subagent-*` (or with `HTMLGRAPH_AGENT_BRANCH=1` set) is allowed regardless of whether the branch base is main</li><li>Non-`git commit` Bash calls fall through (the guard only intercepts commit specifically -- not `git status`, `git log`, or any other Bash)</li><li>Sub-agent on a non-main, non-master, non-recognized branch (e.g., `trk-XXX`): allow (matches the dispatch model where parents work on track branches)</li><li>Hook&#39;s `git -C &lt;cwd&gt; rev-parse` failures (not a git repo, etc.) -- fall through (don&#39;t block on detection failure)</li></ul>
       </div>
       
     
@@ -784,12 +1044,12 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           
           <div class="test-group" data-kind="other">
             <span class="test-chip">OTHER &middot; 9</span>
-            <ul><li>- TestCommitGuard_OrchestratorOnMain_Allowed — session has no parent; allow</li><li>- TestCommitGuard_SubagentOnMain_Refused — session has parent, branch=main; refuse with structured message</li><li>- TestCommitGuard_SubagentOnMaster_Refused — same with `master`</li><li>- TestCommitGuard_SubagentOnTrackBranch_Allowed — session has parent, branch=`trk-foo`; allow</li><li>- TestCommitGuard_SubagentOnAgentBranch_Allowed — session has parent, branch matches `worktree-agent-*`; allow</li><li>- TestCommitGuard_SubagentEnvOverride_Allowed — env `HTMLGRAPH_AGENT_BRANCH=1` set; allow on main</li><li>- TestCommitGuard_NonCommitBash_Allowed — Bash command is `git status`, `git log`, etc.; fall through (allow)</li><li>- TestCommitGuard_GitDetectionFails_Allowed — `cwd` is not a git repo; fall through</li><li>- TestCommitGuard_RemediationMessage — refusal error includes session ID, branch, parent ID, suggested branch-creation command</li></ul>
+            <ul><li>- TestCommitGuard_OrchestratorOnMain_Allowed -- session has no parent; allow</li><li>- TestCommitGuard_SubagentOnMain_Refused -- session has parent, branch=main; refuse with structured message</li><li>- TestCommitGuard_SubagentOnMaster_Refused -- same with `master`</li><li>- TestCommitGuard_SubagentOnTrackBranch_Allowed -- session has parent, branch=`trk-foo`; allow</li><li>- TestCommitGuard_SubagentOnAgentBranch_Allowed -- session has parent, branch matches `worktree-agent-*`; allow</li><li>- TestCommitGuard_SubagentEnvOverride_Allowed -- env `HTMLGRAPH_AGENT_BRANCH=1` set; allow on main</li><li>- TestCommitGuard_NonCommitBash_Allowed -- Bash command is `git status`, `git log`, etc.; fall through (allow)</li><li>- TestCommitGuard_GitDetectionFails_Allowed -- `cwd` is not a git repo; fall through</li><li>- TestCommitGuard_RemediationMessage -- refusal error includes session ID, branch, parent ID, suggested branch-creation command</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
             <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestPreToolUse_DispatchedSubagentCommitOnMainBlocked — fixture orchestrator session &#43; sub-agent session linked; sub-agent issues `git commit -m &#34;...&#34;` while on main; PreToolUse refuses with the documented error message.</li></ul>
+            <ul><li>TestPreToolUse_DispatchedSubagentCommitOnMainBlocked -- fixture orchestrator session &#43; sub-agent session linked; sub-agent issues `git commit -m &#34;...&#34;` while on main; PreToolUse refuses with the documented error message.</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
@@ -803,6 +1063,49 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">Silent bypass on detached HEAD / unrelated CWD -- git rev-parse returns &#39;HEAD&#39; or errors when CWD isn&#39;t a git repo or is in detached state. Plan&#39;s &#39;fall through on detection failure&#39; means commits land silently. No logging when bypass fires. Refuse on detached HEAD for sub-agents; emit structured debug log on every fall-through; consider rev-parse --show-toplevel comparison to project root.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">gitCommitPattern already exists at yolo_guard.go:237 (anchored regex from bug-a10ae96a, the canonical &#39;don&#39;t match git commit-tree / commit-graph&#39; fix). Plan&#39;s &#39;^\s*git\s&#43;commit\b&#39; would re-introduce that bug. MUST reuse gitCommitPattern, not write new regex.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">currentBranchIn(event.CWD) already exists at yolo_guard.go:660-674 -- slice 2 must reuse it, not re-implement the git subprocess call.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus &#43; sonnet</span>
+          <span class="critic-revision-summary">Branch-name escape hatch via worktree-agent-* / subagent-* prefixes is brittle and effectively dead code given allow-all-non-main semantics in done_when. Invert the rule: refuse ONLY on main, master, and remote HEAD branch (from git symbolic-ref refs/remotes/origin/HEAD); allow all other branches. Drop the escape-hatch question.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">checkYoloWorktreeGuard at yolo_guard.go:328 already blocks Write/Edit on main in YOLO mode. Need slice 0 to explain how the cited 2 sub-agents got past it (was YOLO not active? did isolation:worktree create a new checkout of main?) before slice 2&#39;s commit guard can be considered correct as last-line-of-defense vs. redundant with the existing guard.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">HTMLGRAPH_AGENT_BRANCH=1 env-var escape hatch leaks across boundary -- env vars set in parent persist into all children. Drop env-var hatch entirely; rely on branch denylist.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -819,11 +1122,11 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
             
             
             
-            <label class="recommended"><input type="radio" name="slice-2-question-q-branch-naming-convention" data-section="slice-2-question-q-branch-naming-convention" data-action="answer" value="worktree-agent-prefix"> worktree-agent-prefix — names like `worktree-agent-&lt;short-session-id&gt;` or `worktree-agent-&lt;feat-id&gt;`. Aligns with Claude Code&#39;s worktree dir naming when isolation:worktree DOES create one. <span class="rec-tag">recommended</span></label>
+            <label class="recommended"><input type="radio" name="slice-2-question-q-branch-naming-convention" data-section="slice-2-question-q-branch-naming-convention" data-action="answer" value="worktree-agent-prefix"> worktree-agent-prefix -- names like `worktree-agent-&lt;short-session-id&gt;` or `worktree-agent-&lt;feat-id&gt;`. Aligns with Claude Code&#39;s worktree dir naming when isolation:worktree DOES create one. <span class="rec-tag">recommended</span></label>
             
-            <label><input type="radio" name="slice-2-question-q-branch-naming-convention" data-section="slice-2-question-q-branch-naming-convention" data-action="answer" value="subagent-or-feat-prefix"> subagent-or-feat-prefix — accept either `subagent-*` or `feat-*` as escape hatch. More permissive; risk of accidentally committing as &#39;feat-XXX&#39; on a non-isolated worktree.</label>
+            <label><input type="radio" name="slice-2-question-q-branch-naming-convention" data-section="slice-2-question-q-branch-naming-convention" data-action="answer" value="subagent-or-feat-prefix"> subagent-or-feat-prefix -- accept either `subagent-*` or `feat-*` as escape hatch. More permissive; risk of accidentally committing as &#39;feat-XXX&#39; on a non-isolated worktree.</label>
             
-            <label><input type="radio" name="slice-2-question-q-branch-naming-convention" data-section="slice-2-question-q-branch-naming-convention" data-action="answer" value="env-var-only"> env-var-only — drop branch-name patterns; require explicit `HTMLGRAPH_AGENT_BRANCH=1` env. Strictest; means dispatch tooling must always set the var explicitly.</label>
+            <label><input type="radio" name="slice-2-question-q-branch-naming-convention" data-section="slice-2-question-q-branch-naming-convention" data-action="answer" value="env-var-only"> env-var-only -- drop branch-name patterns; require explicit `HTMLGRAPH_AGENT_BRANCH=1` env. Strictest; means dispatch tooling must always set the var explicitly.</label>
             
           
         </div>
@@ -837,11 +1140,11 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
             
             
             
-            <label class="recommended"><input type="radio" name="slice-2-question-q-master-handling" data-section="slice-2-question-q-master-handling" data-action="answer" value="both"> both — refuse sub-agent commits on `main` AND `master`. Defensive; covers legacy repos. <span class="rec-tag">recommended</span></label>
+            <label class="recommended"><input type="radio" name="slice-2-question-q-master-handling" data-section="slice-2-question-q-master-handling" data-action="answer" value="both"> both -- refuse sub-agent commits on `main` AND `master`. Defensive; covers legacy repos. <span class="rec-tag">recommended</span></label>
             
-            <label><input type="radio" name="slice-2-question-q-master-handling" data-section="slice-2-question-q-master-handling" data-action="answer" value="main-only"> main-only — only refuse on `main`. Cleaner if we&#39;re confident no users have master.</label>
+            <label><input type="radio" name="slice-2-question-q-master-handling" data-section="slice-2-question-q-master-handling" data-action="answer" value="main-only"> main-only -- only refuse on `main`. Cleaner if we&#39;re confident no users have master.</label>
             
-            <label><input type="radio" name="slice-2-question-q-master-handling" data-section="slice-2-question-q-master-handling" data-action="answer" value="configurable"> configurable — read protected branches from `.htmlgraph/config.json`. More flexible; more code.</label>
+            <label><input type="radio" name="slice-2-question-q-master-handling" data-section="slice-2-question-q-master-handling" data-action="answer" value="configurable"> configurable -- read protected branches from `.htmlgraph/config.json`. More flexible; more code.</label>
             
           
         </div>
@@ -850,7 +1153,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     </div>
     
 
-    <div class="slice-deps">Dependencies: slices 1</div>
+    <div class="slice-deps">Dependencies: slices 0,1</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
@@ -872,7 +1175,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -938,7 +1241,7 @@ when the walk finds an ancestor&#39;s YOLO posture, so the path is auditable.</l
           
           <input type="checkbox" id="slice-3-why-reveal" class="reveal-toggle">
           <div class="markdown-block reveal-content serif-prose"><p>Without this, /htmlgraph:execute parallel dispatch from a YOLO-mode parent
-can&#39;t actually do work — sub-agents are blocked at every Edit/Write. This is
+can&#39;t actually do work -- sub-agents are blocked at every Edit/Write. This is
 the same dispatch-failure pattern as slice 1 (claim ownership) and slice 2
 (commit-to-main); fixing it once in slice 1&#39;s helper makes this slice a
 one-call extension at a different gate site. Defense-in-depth across all the
@@ -958,7 +1261,7 @@ hook predicates that gate sub-agent behavior on session-local state.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list slice-done-list--grid"><li>Sub-agent whose session is a child of an orchestrator session in YOLO mode has Edit/Write calls accepted (no longer refused)</li><li>Multi-hop chains: sub-sub-agent inherits via grandparent walk</li><li>Sub-agent without parent chain reaching a YOLO session is still blocked (existing behavior)</li><li>Sub-agent with its own explicit YOLO tag — pass-through unchanged (no walk needed)</li><li>Structured log line emitted when YOLO posture is inherited via chain</li><li>Same depth limit as slice 1 (per `q-chain-depth-limit` answer) applied here</li></ul>
+        <ul class="slice-done-list slice-done-list--grid"><li>Sub-agent whose session is a child of an orchestrator session in YOLO mode has Edit/Write calls accepted (no longer refused)</li><li>Multi-hop chains: sub-sub-agent inherits via grandparent walk</li><li>Sub-agent without parent chain reaching a YOLO session is still blocked (existing behavior)</li><li>Sub-agent with its own explicit YOLO tag -- pass-through unchanged (no walk needed)</li><li>Structured log line emitted when YOLO posture is inherited via chain</li><li>Same depth limit as slice 1 (per `q-chain-depth-limit` answer) applied here</li></ul>
       </div>
       
     
@@ -978,12 +1281,12 @@ hook predicates that gate sub-agent behavior on session-local state.</p>
           
           <div class="test-group" data-kind="other">
             <span class="test-chip">OTHER &middot; 7</span>
-            <ul><li>- TestYoloCheck_OwnSessionYolo — current session tagged YOLO; pass-through</li><li>- TestYoloCheck_NoYoloNoChain — no parent, no YOLO; refuse</li><li>- TestYoloCheck_ParentYolo — parent tagged YOLO; allow</li><li>- TestYoloCheck_GrandparentYolo — 2-hop chain; allow</li><li>- TestYoloCheck_LogEmitted — chain inheritance logs structured note</li><li>fixture orchestrator session tagged YOLO; sub-agent linked to it via</li><li>agent_events; sub-agent Edit; PreToolUse allows.</li></ul>
+            <ul><li>- TestYoloCheck_OwnSessionYolo -- current session tagged YOLO; pass-through</li><li>- TestYoloCheck_NoYoloNoChain -- no parent, no YOLO; refuse</li><li>- TestYoloCheck_ParentYolo -- parent tagged YOLO; allow</li><li>- TestYoloCheck_GrandparentYolo -- 2-hop chain; allow</li><li>- TestYoloCheck_LogEmitted -- chain inheritance logs structured note</li><li>fixture orchestrator session tagged YOLO; sub-agent linked to it via</li><li>agent_events; sub-agent Edit; PreToolUse allows.</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
             <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestPreToolUse_DispatchedSubagentEditAllowed_FromYoloParent —</li></ul>
+            <ul><li>TestPreToolUse_DispatchedSubagentEditAllowed_FromYoloParent --</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
@@ -997,6 +1300,31 @@ hook predicates that gate sub-agent behavior on session-local state.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Premise unverified -- slice 3 assumes Claude Code does NOT propagate permission_mode=bypassPermissions to sub-agent CloudEvents. If it DOES propagate, isYoloFromEvent already handles inheritance and slice 3 is fixing a phantom problem. Slice 0 Q3 must confirm before this slice can be implemented.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">Target predicate underspecified -- there is NO function named checkYoloMode or isYoloSession in internal/hooks/. The actual YOLO state path is isYoloFromEvent -&gt; isYoloFromDB at yolo_guard.go:44. Slice 3 must pin to isYoloFromDB; do NOT touch the other 6 yolo_guard predicates (checkYoloUIValidationGuard, checkYoloRoborevGuard, checkYoloCommitGuard, checkYoloBudgetGuard, checkYoloDiffReviewGuard, checkYoloWorktreeGuard) -- they consume the chain-walked posture via isYoloFromEvent&#39;s aggregation.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MEDIUM</span>
+          <span class="critic-revision-source">opus &#43; sonnet</span>
+          <span class="critic-revision-summary">q-yolo-inherit-strictness recommendation parent-yolo-overrides removes the ability for legitimate non-YOLO sub-agents (security audits, sandboxed tests) to opt out. Default to own-tag-wins; make parent-yolo-overrides opt-in via env var (HTMLGRAPH_YOLO_INHERIT=1) or session-metadata field. Document the escape hatch.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -1015,11 +1343,11 @@ Should parent&#39;s YOLO override?
             
             
             
-            <label class="recommended"><input type="radio" name="slice-3-question-q-yolo-inherit-strictness" data-section="slice-3-question-q-yolo-inherit-strictness" data-action="answer" value="parent-yolo-overrides"> parent-yolo-overrides — if parent is YOLO, sub-agent inherits regardless of own tag. Matches the dispatch model (sub-agent works ON BEHALF of parent). <span class="rec-tag">recommended</span></label>
+            <label class="recommended"><input type="radio" name="slice-3-question-q-yolo-inherit-strictness" data-section="slice-3-question-q-yolo-inherit-strictness" data-action="answer" value="parent-yolo-overrides"> parent-yolo-overrides -- if parent is YOLO, sub-agent inherits regardless of own tag. Matches the dispatch model (sub-agent works ON BEHALF of parent). <span class="rec-tag">recommended</span></label>
             
-            <label><input type="radio" name="slice-3-question-q-yolo-inherit-strictness" data-section="slice-3-question-q-yolo-inherit-strictness" data-action="answer" value="own-tag-wins"> own-tag-wins — explicit non-YOLO on sub-agent blocks inheritance. Safer but less ergonomic for dispatch.</label>
+            <label><input type="radio" name="slice-3-question-q-yolo-inherit-strictness" data-section="slice-3-question-q-yolo-inherit-strictness" data-action="answer" value="own-tag-wins"> own-tag-wins -- explicit non-YOLO on sub-agent blocks inheritance. Safer but less ergonomic for dispatch.</label>
             
-            <label><input type="radio" name="slice-3-question-q-yolo-inherit-strictness" data-section="slice-3-question-q-yolo-inherit-strictness" data-action="answer" value="refuse-on-conflict"> refuse-on-conflict — if tags disagree, refuse. Most conservative; surfaces ambiguous configurations.</label>
+            <label><input type="radio" name="slice-3-question-q-yolo-inherit-strictness" data-section="slice-3-question-q-yolo-inherit-strictness" data-action="answer" value="refuse-on-conflict"> refuse-on-conflict -- if tags disagree, refuse. Most conservative; surfaces ambiguous configurations.</label>
             
           
         </div>
@@ -1028,7 +1356,7 @@ Should parent&#39;s YOLO override?
     </div>
     
 
-    <div class="slice-deps">Dependencies: slices 1</div>
+    <div class="slice-deps">Dependencies: slices 0,1</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
@@ -1055,8 +1383,8 @@ Should parent&#39;s YOLO override?
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">4</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">4</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">5</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">5</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -1136,7 +1464,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-0","slice-1","slice-2","slice-3"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
