@@ -15,7 +15,7 @@ import (
 // manifest name/version, the three workhorse hook events, and at least one
 // command/agent/skill copied from the asset sources. The test is
 // self-contained: it does not shell out, hit the network, or depend on the
-// htmlgraph binary being installed.
+// erinn binary being installed.
 func TestClaudeParityFromLiveManifest(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {

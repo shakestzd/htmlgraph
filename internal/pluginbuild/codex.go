@@ -11,10 +11,10 @@ func init() { Register(codexAdapter{}) }
 // codexAdapter emits the Codex CLI marketplace tree. Layout:
 //
 //	<outDir>/.agents/plugins/marketplace.json
-//	<outDir>/.agents/plugins/htmlgraph/.codex-plugin/plugin.json
-//	<outDir>/.agents/plugins/htmlgraph/hooks.json
-//	<outDir>/.agents/plugins/htmlgraph/.mcp.json
-//	<outDir>/.agents/plugins/htmlgraph/{commands,agents,skills,templates,static,config}/
+//	<outDir>/.agents/plugins/erinn/.codex-plugin/plugin.json
+//	<outDir>/.agents/plugins/erinn/hooks.json
+//	<outDir>/.agents/plugins/erinn/.mcp.json
+//	<outDir>/.agents/plugins/erinn/{commands,agents,skills,templates,static,config}/
 //
 // Codex 0.121.0+ registers plugins exclusively via `codex marketplace add <path>`.
 // Codex expects the marketplace root to contain `.agents/plugins/marketplace.json`
@@ -22,7 +22,7 @@ func init() { Register(codexAdapter{}) }
 //
 // Codex hook event names differ from Claude in a few places (TaskStarted,
 // TaskComplete, TurnAborted) — the manifest's `targets` field controls which
-// events are emitted here. Business logic stays in `htmlgraph hook <handler>`
+// events are emitted here. Business logic stays in `erinn hook <handler>`
 // so the Codex plugin is a thin wrapper just like the Claude one.
 type codexAdapter struct{}
 
@@ -34,7 +34,7 @@ func (codexAdapter) Name() string { return "codex" }
 // Hand-maintained files (README.md) outside these paths are never touched.
 // The owned subtree is narrowed to the plugin's own directory to avoid
 // deleting sibling plugins under .agents/plugins/.
-var codexOwnedSubtrees = []string{".agents/plugins/htmlgraph"}
+var codexOwnedSubtrees = []string{".agents/plugins/erinn"}
 
 func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	target, ok := m.Targets[c.Name()]
@@ -46,7 +46,7 @@ func (c codexAdapter) Emit(m *Manifest, repoRoot, outDir string) error {
 	// Codex expects: <outDir>/.agents/plugins/<plugin-name>/
 	pluginSubdir := target.PluginSubdir
 	if pluginSubdir == "" {
-		pluginSubdir = ".agents/plugins/htmlgraph"
+		pluginSubdir = ".agents/plugins/erinn"
 	}
 	pluginDir := filepath.Join(outDir, pluginSubdir)
 
@@ -197,7 +197,7 @@ func writeCodexManifest(m *Manifest, path string) error {
 		License:    m.License,
 		Keywords:   m.Keywords,
 		Interface: codexInterfaceJSON{
-			DisplayName:      "HtmlGraph",
+			DisplayName:      "Erinn AI",
 			ShortDescription: m.Description,
 			DeveloperName:    m.Author.Name,
 			Category:         m.Category,
@@ -217,7 +217,7 @@ func writeCodexHooks(m *Manifest, path string) error {
 		}
 		cmd := e.Command
 		if cmd == "" {
-			cmd = "htmlgraph hook " + e.Handler
+			cmd = "erinn hook " + e.Handler
 		}
 		group := claudeMatcherGroup{
 			Matcher: e.Matcher,
@@ -235,7 +235,7 @@ func writeCodexHooks(m *Manifest, path string) error {
 	return writeJSON(path, orderedHookMap{keys: order, values: hooks})
 }
 
-// ensureCodexMCP writes a stub .mcp.json if none exists. HtmlGraph doesn't
+// ensureCodexMCP writes a stub .mcp.json if none exists. Erinn AI doesn't
 // currently expose an MCP server, but the file is part of the Codex plugin
 // contract and future MCP integrations land here without schema churn.
 func ensureCodexMCP(path string) error {

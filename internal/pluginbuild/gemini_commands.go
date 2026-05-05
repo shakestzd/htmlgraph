@@ -23,7 +23,7 @@ func init() {
 // TOML command under <outDir>/commands/<namespace>/<name>.toml. Gemini loads
 // .toml commands where the `prompt` key is the full markdown body; the
 // namespace segment means the slash-command resolves to /<namespace>:<name>
-// (e.g. /htmlgraph:feature-start). When the target declares no namespace the
+// (e.g. /erinn:feature-start). When the target declares no namespace the
 // files land directly under commands/ — a degenerate case kept for symmetry.
 func emitGeminiCommands(m *Manifest, repoRoot, outDir string, t Target) error {
 	if m.AssetSources.Commands == "" {

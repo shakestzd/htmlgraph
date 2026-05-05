@@ -78,7 +78,7 @@ type HookMatrix struct {
 	Events []HookEvent `json:"events"`
 }
 
-// HookEvent declares a single event entry. Handler is the `htmlgraph hook
+// HookEvent declares a single event entry. Handler is the `erinn hook
 // <handler>` subcommand (ignored when Command is set). Command is an escape
 // hatch for shell-only hooks like the Claude timestamp injector. Targets is
 // the list of target names for which this entry is emitted.

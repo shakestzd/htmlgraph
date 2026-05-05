@@ -1,5 +1,5 @@
 {
-  "name": "HtmlGraph",
+  "name": "Erinn AI",
   "owner": {
     "name": "Shakes Dlamini",
     "email": "shakestzd@gmail.com",
@@ -9,7 +9,7 @@
   "version": "0.35.0",
   "plugins": [
     {
-      "name": "htmlgraph",
+      "name": "erinn",
       "version": "0.35.0",
       "source": "../",
       "description": "HTML-based agent observability + workflow analytics (Git-first JSONL + rebuildable SQLite index)",
@@ -29,8 +29,8 @@
         "email": "shakestzd@gmail.com",
         "url": "https://github.com/shakestzd"
       },
-      "repository": "https://github.com/shakestzd/htmlgraph",
-      "homepage": "https://github.com/shakestzd/htmlgraph#readme",
+      "repository": "https://github.com/shakestzd/erinn",
+      "homepage": "https://github.com/shakestzd/erinn#readme",
       "license": "MIT",
       "keywords": [
         "observability",

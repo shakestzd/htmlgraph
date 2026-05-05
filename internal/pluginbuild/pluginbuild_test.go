@@ -11,7 +11,7 @@ import (
 // adapters without depending on the live packages/plugin-core/manifest.json.
 func fixtureManifest() *Manifest {
 	return &Manifest{
-		Name:        "htmlgraph",
+		Name:        "erinn",
 		Version:     "0.0.0-test",
 		Description: "test plugin",
 		Author:      Author{Name: "Tester", Email: "t@example.com"},
@@ -27,12 +27,12 @@ func fixtureManifest() *Manifest {
 				ManifestPath:           ".codex-plugin/plugin.json",
 				HooksPath:              "hooks.json",
 				MCPPath:                ".mcp.json",
-				MarketplaceName:        "htmlgraph",
-				MarketplaceDisplayName: "HtmlGraph",
+				MarketplaceName:        "erinn",
+				MarketplaceDisplayName: "Erinn AI",
 				MarketplaceCategory:    "Dev",
-				PluginSubdir:           ".agents/plugins/htmlgraph",
+				PluginSubdir:           ".agents/plugins/erinn",
 			},
-			"gemini": {OutDir: "packages/gemini-extension", ManifestPath: "gemini-extension.json", HooksPath: "hooks/hooks.json", ContextFile: "GEMINI.md", CommandNamespace: "htmlgraph"},
+			"gemini": {OutDir: "packages/gemini-extension", ManifestPath: "gemini-extension.json", HooksPath: "hooks/hooks.json", ContextFile: "GEMINI.md", CommandNamespace: "erinn"},
 		},
 		AssetSources: AssetSources{
 			Commands: "plugin/commands",
@@ -59,7 +59,7 @@ func TestClaudeAdapterEmitsManifestAndHooks(t *testing.T) {
 
 	var plug claudePluginJSON
 	readJSON(t, filepath.Join(outDir, ".claude-plugin", "plugin.json"), &plug)
-	if plug.Name != "htmlgraph" || plug.Version != "0.0.0-test" {
+	if plug.Name != "erinn" || plug.Version != "0.0.0-test" {
 		t.Fatalf("claude manifest wrong: %+v", plug)
 	}
 
@@ -69,7 +69,7 @@ func TestClaudeAdapterEmitsManifestAndHooks(t *testing.T) {
 	}
 	// Hooks assertions: Claude-only events present, Codex-only absent.
 	s := string(hooksRaw)
-	for _, want := range []string{`"SessionStart"`, `"Stop"`, `"UserPromptSubmit"`, `"htmlgraph hook session-start"`, `"htmlgraph hook stop"`} {
+	for _, want := range []string{`"SessionStart"`, `"Stop"`, `"UserPromptSubmit"`, `"erinn hook session-start"`, `"erinn hook stop"`} {
 		if !contains(s, want) {
 			t.Errorf("claude hooks missing %q:\n%s", want, s)
 		}
@@ -89,7 +89,7 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	repoRoot := t.TempDir()
 	seedAssets(t, repoRoot)
 	outDir := filepath.Join(repoRoot, "packages", "codex-marketplace")
-	pluginDir := filepath.Join(outDir, ".agents", "plugins", "htmlgraph")
+	pluginDir := filepath.Join(outDir, ".agents", "plugins", "erinn")
 
 	if err := (codexAdapter{}).Emit(fixtureManifest(), repoRoot, outDir); err != nil {
 		t.Fatalf("Emit: %v", err)
@@ -97,7 +97,7 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 
 	var plug codexPluginJSON
 	readJSON(t, filepath.Join(pluginDir, ".codex-plugin", "plugin.json"), &plug)
-	if plug.Interface.DisplayName != "HtmlGraph" {
+	if plug.Interface.DisplayName != "Erinn AI" {
 		t.Errorf("codex interface.displayName: %+v", plug.Interface)
 	}
 	if plug.Author.Email != "t@example.com" {
@@ -124,7 +124,7 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	}
 	s := string(hooksRaw)
 	// Codex-only events present, Claude-only absent.
-	for _, want := range []string{`"SessionStart"`, `"UserPromptSubmit"`, `"TaskStarted"`, `"htmlgraph hook task-started"`} {
+	for _, want := range []string{`"SessionStart"`, `"UserPromptSubmit"`, `"TaskStarted"`, `"erinn hook task-started"`} {
 		if !contains(s, want) {
 			t.Errorf("codex hooks missing %q:\n%s", want, s)
 		}
@@ -157,7 +157,7 @@ func TestGeminiAdapterEmitsSkeleton(t *testing.T) {
 	// Manifest: required name/version/description plus contextFileName derived from target.ContextFile.
 	var manifest geminiExtensionJSON
 	readJSON(t, filepath.Join(outDir, "gemini-extension.json"), &manifest)
-	if manifest.Name != "htmlgraph" || manifest.Version != "0.0.0-test" {
+	if manifest.Name != "erinn" || manifest.Version != "0.0.0-test" {
 		t.Fatalf("gemini manifest wrong: %+v", manifest)
 	}
 	if manifest.ContextFileName != "GEMINI.md" {
@@ -280,7 +280,7 @@ func TestCodexAdapterRemovesStaleFiles(t *testing.T) {
 
 	// Seed a stale file inside .agents/ (the owned subtree) that will not be
 	// reproduced by Emit.
-	staleFile := filepath.Join(outDir, ".agents", "plugins", "htmlgraph", "commands", "stale-removed.md")
+	staleFile := filepath.Join(outDir, ".agents", "plugins", "erinn", "commands", "stale-removed.md")
 	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestGeminiAdapterRemovesStaleFiles(t *testing.T) {
 	// Seed a stale TOML under commands/ that will not be reproduced by Emit
 	// (the fixture manifest's commands dir contains hello.md → hello.toml,
 	// but not stale-removed.toml).
-	staleFile := filepath.Join(outDir, "commands", "htmlgraph", "stale-removed.toml")
+	staleFile := filepath.Join(outDir, "commands", "erinn", "stale-removed.toml")
 	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
 		t.Fatal(err)
 	}

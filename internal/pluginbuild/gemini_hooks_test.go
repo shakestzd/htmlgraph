@@ -88,11 +88,11 @@ func TestGeminiHookHandlerOverride(t *testing.T) {
 	s := string(data)
 
 	// Gemini SessionEnd event must invoke session-end handler, not stop.
-	if !strings.Contains(s, "htmlgraph hook session-end") {
-		t.Errorf("expected SessionEnd to invoke 'htmlgraph hook session-end' for Gemini:\n%s", s)
+	if !strings.Contains(s, "erinn hook session-end") {
+		t.Errorf("expected SessionEnd to invoke 'erinn hook session-end' for Gemini:\n%s", s)
 	}
-	if strings.Contains(s, "htmlgraph hook stop") {
-		t.Errorf("Gemini SessionEnd should not invoke 'htmlgraph hook stop' (that's Claude's):\n%s", s)
+	if strings.Contains(s, "erinn hook stop") {
+		t.Errorf("Gemini SessionEnd should not invoke 'erinn hook stop' (that's Claude's):\n%s", s)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestGeminiHookExtensionPathVar(t *testing.T) {
 		Hooks: HookMatrix{Events: []HookEvent{
 			{
 				Name:    "SessionStart",
-				Command: "$GEMINI_EXTENSION_DIR/bin/htmlgraph hook session-start",
+				Command: "$GEMINI_EXTENSION_DIR/bin/erinn hook session-start",
 				Targets: []string{"gemini"},
 			},
 		}},
@@ -181,7 +181,7 @@ func TestGeminiHookMatcherWildcard(t *testing.T) {
 // TestGeminiAdapterEmitsHooksFromFixture exercises the Gemini hooks sub-emitter
 // against the fixture manifest. It asserts that:
 //   - `hooks/hooks.json` is written with the SessionStart event and its mapped
-//     `htmlgraph hook session-start` command.
+//     `erinn hook session-start` command.
 //   - Codex-only events (TaskStarted) do not leak into the Gemini output.
 //   - Claude-only matcher variants (SessionStart + `session-resume` / matcher
 //     "resume") do not leak into the Gemini output.
@@ -224,7 +224,7 @@ func TestGeminiAdapterEmitsHooksFromFixture(t *testing.T) {
 	}
 	s := string(hooksRaw)
 
-	for _, want := range []string{`"SessionStart"`, `"htmlgraph hook session-start"`} {
+	for _, want := range []string{`"SessionStart"`, `"erinn hook session-start"`} {
 		if !strings.Contains(s, want) {
 			t.Errorf("gemini hooks missing %q:\n%s", want, s)
 		}

@@ -1,11 +1,11 @@
-# /htmlgraph:feature-primary
+# /erinn:feature-primary
 
 Set the primary feature for activity attribution
 
 ## Usage
 
 ```
-/htmlgraph:feature-primary <feature-id>
+/erinn:feature-primary <feature-id>
 ```
 
 ## Parameters
@@ -16,7 +16,7 @@ Set the primary feature for activity attribution
 ## Examples
 
 ```bash
-/htmlgraph:feature-primary feature-001
+/erinn:feature-primary feature-001
 ```
 Set feature-001 as the primary feature for activity attribution
 
@@ -30,13 +30,13 @@ Set feature-001 as the primary feature for activity attribution
 
 1. **Start the feature (makes it the active/primary feature):**
    ```bash
-   htmlgraph feature start {feature_id}
+   erinn feature start {feature_id}
    ```
 
 2. **Get feature details and other active features:**
    ```bash
-   htmlgraph feature show {feature_id}
-   htmlgraph find features --status in-progress
+   erinn feature show {feature_id}
+   erinn find features --status in-progress
    ```
 
 3. **Present a summary** using the output template below with:

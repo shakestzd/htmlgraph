@@ -44,7 +44,7 @@ func emitGeminiHooks(m *Manifest, repoRoot, outDir string, t Target) error {
 			if e.GeminiHandler != "" {
 				handler = e.GeminiHandler
 			}
-			cmd = "htmlgraph hook " + handler
+			cmd = "erinn hook " + handler
 		}
 		// Variable substitution: Gemini exposes the extension directory as
 		// ${extensionPath}, not $GEMINI_EXTENSION_DIR.

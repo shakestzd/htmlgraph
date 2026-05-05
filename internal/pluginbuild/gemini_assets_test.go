@@ -74,7 +74,7 @@ func TestGeminiAdapterSkipsMissingContextFile(t *testing.T) {
 // locally so we don't depend on the wider fixture evolving across phases.
 func geminiPhase1Manifest() *Manifest {
 	return &Manifest{
-		Name:        "htmlgraph",
+		Name:        "erinn",
 		Version:     "0.0.0-test",
 		Description: "test plugin",
 		Targets: map[string]Target{
@@ -83,7 +83,7 @@ func geminiPhase1Manifest() *Manifest {
 				ManifestPath:     "gemini-extension.json",
 				HooksPath:        "hooks/hooks.json",
 				ContextFile:      "GEMINI.md",
-				CommandNamespace: "htmlgraph",
+				CommandNamespace: "erinn",
 			},
 		},
 		AssetSources: AssetSources{

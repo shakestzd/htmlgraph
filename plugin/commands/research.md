@@ -1,4 +1,4 @@
-# /htmlgraph:research
+# /erinn:research
 
 Perform structured research before planning implementation. Uses WebSearch to gather best practices, patterns, and solutions from the web.
 
@@ -7,7 +7,7 @@ Claude performs the searches directly using WebSearch — this is not delegated 
 ## Usage
 
 ```
-/htmlgraph:research <topic> [--spike SPIKE_ID]
+/erinn:research <topic> [--spike SPIKE_ID]
 ```
 
 ## Parameters
@@ -19,12 +19,12 @@ Claude performs the searches directly using WebSearch — this is not delegated 
 ## Examples
 
 ```bash
-/htmlgraph:research "Real-time WebSocket best practices"
+/erinn:research "Real-time WebSocket best practices"
 ```
 Research WebSocket patterns and document findings
 
 ```bash
-/htmlgraph:research "JWT token security" --spike spike-abc123
+/erinn:research "JWT token security" --spike spike-abc123
 ```
 Research JWT security and attach findings to existing spike
 
@@ -74,11 +74,11 @@ This command implements the mandatory research phase. Research reduces:
 
    If spike provided:
    ```bash
-   htmlgraph spike show {spike_id}
+   erinn spike show {spike_id}
    ```
    Record findings by presenting them in the structured format below, referencing the spike ID.
 
-   Note: spike findings are captured in the chat output. Run `htmlgraph spike complete <id>` when investigation is done.
+   Note: spike findings are captured in the chat output. Run `erinn spike complete <id>` when investigation is done.
 
    Otherwise, present findings in structured format.
 
@@ -91,8 +91,8 @@ This command implements the mandatory research phase. Research reduces:
    - ✅ Links to sources
 
 6. **Suggest next steps:**
-   - If spike exists → "Complete spike steps, then use /htmlgraph:plan"
-   - If no spike → "Use /htmlgraph:plan to create track from findings"
+   - If spike exists → "Complete spike steps, then use /erinn:plan"
+   - If no spike → "Use /erinn:plan to create track from findings"
 
 ### Research Structure Template:
 
@@ -219,8 +219,8 @@ Before completing research, verify:
 The complete planning workflow is:
 
 ```
-1. /htmlgraph:research "{topic}"          → Gather best practices
-2. /htmlgraph:plan "{description}" --spike → Create planning spike
+1. /erinn:research "{topic}"          → Gather best practices
+2. /erinn:plan "{description}" --spike → Create planning spike
 3. [Complete spike steps]                  → Design solution
 4. [Create track from plan]                → Structure implementation
 5. [Create features from track]            → Execute work
@@ -230,7 +230,7 @@ The complete planning workflow is:
 
 ```bash
 # Step 1: Research
-/htmlgraph:research "OAuth 2.0 implementation with FastAPI"
+/erinn:research "OAuth 2.0 implementation with FastAPI"
 
 # Research finds:
 # - Use authlib library (most maintained)
@@ -239,7 +239,7 @@ The complete planning workflow is:
 # - Use refresh token rotation
 
 # Step 2: Create spike with research context
-/htmlgraph:plan "User Authentication System" --spike --timebox 4
+/erinn:plan "User Authentication System" --spike --timebox 4
 
 # Step 3: During spike, use research to:
 # - Define requirements (from best practices)
@@ -248,7 +248,7 @@ The complete planning workflow is:
 # - Identify risks (from anti-patterns)
 
 # Step 4: Create track from spike
-# Use: htmlgraph track create "title" with spike findings
+# Use: erinn track create "title" with spike findings
 
 # Step 5: Implement features
 # With confidence from research-backed design
@@ -284,7 +284,7 @@ With research:
 After research is complete, record it in the spike if one was provided:
 
 ```bash
-htmlgraph spike show {spike_id}
+erinn spike show {spike_id}
 ```
 
-Note in your response that research has been validated so that `/htmlgraph:plan` can incorporate findings when creating the track.
+Note in your response that research has been validated so that `/erinn:plan` can incorporate findings when creating the track.

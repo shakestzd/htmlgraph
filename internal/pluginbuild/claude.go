@@ -87,7 +87,7 @@ func writeClaudeHooks(m *Manifest, path string) error {
 		}
 		cmd := e.Command
 		if cmd == "" {
-			cmd = "htmlgraph hook " + e.Handler
+			cmd = "erinn hook " + e.Handler
 		}
 		group := claudeMatcherGroup{
 			Matcher: e.Matcher,

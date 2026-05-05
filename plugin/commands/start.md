@@ -1,11 +1,11 @@
-# /htmlgraph:start
+# /erinn:start
 
 Start a new session with context continuity and status overview
 
 ## Usage
 
 ```
-/htmlgraph:start
+/erinn:start
 ```
 
 ## Parameters
@@ -15,7 +15,7 @@ Start a new session with context continuity and status overview
 ## Examples
 
 ```bash
-/htmlgraph:start
+/erinn:start
 ```
 Begin a new development session and choose what to work on
 
@@ -27,12 +27,12 @@ Begin a new development session and choose what to work on
 
 **DO THIS:**
 
-**DELEGATION**: For complex project reviews or analysis of large backlogs, delegate to `Task(subagent_type="htmlgraph:researcher")`.
+**DELEGATION**: For complex project reviews or analysis of large backlogs, delegate to `Task(subagent_type="erinn:researcher")`.
 
 1. **Get comprehensive session start info:**
    ```bash
-   htmlgraph snapshot --summary
-   htmlgraph analytics summary
+   erinn snapshot --summary
+   erinn analytics summary
    ```
 
 2. **Parse the output** to extract:
@@ -55,7 +55,7 @@ Begin a new development session and choose what to work on
 
 5. **Ask the user what they want to work on** with data-driven options
 
-6. **Wait for user direction** before taking any action. If invoked programmatically (no human in the loop), use the top recommendation from `htmlgraph recommend` automatically instead of waiting.
+6. **Wait for user direction** before taking any action. If invoked programmatically (no human in the loop), use the top recommendation from `erinn recommend` automatically instead of waiting.
 
 7. **Apply constraints:**
    - Maximum 5 features can be in progress (WIP limit)
@@ -66,8 +66,8 @@ Begin a new development session and choose what to work on
 
 8. **Remind the user:**
    - All activity is automatically tracked to features
-   - View progress in browser: `htmlgraph serve` → http://localhost:8080
-   - Use `/htmlgraph:plan` to start new work with proper planning
+   - View progress in browser: `erinn serve` → http://localhost:8080
+   - Use `/erinn:plan` to start new work with proper planning
 
 ### Output Format:
 
@@ -119,5 +119,5 @@ Based on strategic analysis, I recommend:
    - Why: {top_reasons}
 2. Continue with current feature
 3. Start a different feature
-4. Create new work item (`/htmlgraph:plan`)
+4. Create new work item (`/erinn:plan`)
 5. Something else

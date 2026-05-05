@@ -1,11 +1,11 @@
-# /htmlgraph:feature-add
+# /erinn:feature-add
 
 Add a new feature to the backlog
 
 ## Usage
 
 ```
-/htmlgraph:feature-add [title]
+/erinn:feature-add [title]
 ```
 
 ## Parameters
@@ -16,12 +16,12 @@ Add a new feature to the backlog
 ## Examples
 
 ```bash
-/htmlgraph:feature-add User Authentication
+/erinn:feature-add User Authentication
 ```
 Add a new feature with the title "User Authentication"
 
 ```bash
-/htmlgraph:feature-add
+/erinn:feature-add
 ```
 Prompt the user for a feature title
 
@@ -38,19 +38,19 @@ Prompt the user for a feature title
    - If no title → ask the user: "What feature would you like to add?"
 
 2. **Get track ID:**
-   - Run `htmlgraph track list` to show available tracks
+   - Run `erinn track list` to show available tracks
    - Ask the user: "Which track should this feature belong to? (provide trk-id)"
 
 3. **Create the feature using CLI:**
    ```bash
-   htmlgraph feature create "{title}" --track {trk-id}
+   erinn feature create "{title}" --track {trk-id}
    ```
 
 4. **Present confirmation** using the output template below with the feature ID, title, and status from CLI output.
 
 5. **Suggest next steps:**
-   - Show command to start working: `/htmlgraph:feature-start {feature_id}`
-   - Optionally suggest `/htmlgraph:plan` to plan the feature
+   - Show command to start working: `/erinn:feature-start {feature_id}`
+   - Optionally suggest `/erinn:plan` to plan the feature
 
 ### Output Format:
 
@@ -62,5 +62,5 @@ Prompt the user for a feature title
 
 Start working on it with:
 ```bash
-htmlgraph feature start {feature_id}
+erinn feature start {feature_id}
 ```

@@ -1,11 +1,11 @@
-# /htmlgraph:deploy
+# /erinn:deploy
 
-Deploy a new HtmlGraph release. Handles quality gates, git push, GitHub Release, marketplace sync, plugin update, and CLI binary rebuild.
+Deploy a new Erinn AI release. Handles quality gates, git push, GitHub Release, marketplace sync, plugin update, and CLI binary rebuild.
 
 ## Usage
 
 ```
-/htmlgraph:deploy <version>
+/erinn:deploy <version>
 ```
 
 ## Parameters
@@ -15,12 +15,12 @@ Deploy a new HtmlGraph release. Handles quality gates, git push, GitHub Release,
 ## Examples
 
 ```
-/htmlgraph:deploy 0.42.3
+/erinn:deploy 0.42.3
 ```
 Patch release (bug fixes)
 
 ```
-/htmlgraph:deploy 0.43.0
+/erinn:deploy 0.43.0
 ```
 Minor release (new features)
 
@@ -52,7 +52,7 @@ The script handles everything:
 - Git commit, tag, push
 - GitHub Actions triggers GoReleaser (cross-platform binaries)
 - Marketplace clone pull
-- `claude plugin update htmlgraph@htmlgraph`
+- `claude plugin update erinn@erinn`
 - CLI binary rebuild via `plugin/build.sh`
 
 ### Post-deployment verification
@@ -64,7 +64,7 @@ gh run list --workflow=release-go.yml --limit 1
 
 # Verify installed versions match
 grep '"version"' plugin/.claude-plugin/plugin.json
-cat ~/.local/share/htmlgraph/.binary-version
+cat ~/.local/share/erinn/.binary-version
 ```
 
 ### If deployment fails
@@ -73,8 +73,8 @@ cat ~/.local/share/htmlgraph/.binary-version
 - **Git push failure**: Check branch is main, no upstream conflicts
 - **Plugin update failure**: Manually pull marketplace clone and retry:
   ```bash
-  (cd ~/.claude/plugins/marketplaces/htmlgraph && git pull origin main)
-  claude plugin update htmlgraph@htmlgraph
+  (cd ~/.claude/plugins/marketplaces/erinn && git pull origin main)
+  claude plugin update erinn@erinn
   ```
 - **Build failure**: Run `sh plugin/build.sh` directly
 

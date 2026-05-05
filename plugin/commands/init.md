@@ -1,11 +1,11 @@
-# /htmlgraph:init
+# /erinn:init
 
-Initialize HtmlGraph in a project
+Initialize Erinn AI in a project
 
 ## Usage
 
 ```
-/htmlgraph:init
+/erinn:init
 ```
 
 ## Parameters
@@ -15,9 +15,9 @@ Initialize HtmlGraph in a project
 ## Examples
 
 ```bash
-/htmlgraph:init
+/erinn:init
 ```
-Set up HtmlGraph directory structure in project
+Set up Erinn AI directory structure in project
 
 
 
@@ -29,16 +29,16 @@ Set up HtmlGraph directory structure in project
 
 1. **Initialize project:**
    ```bash
-   htmlgraph init
+   erinn init
    ```
-   The command will report whether `.htmlgraph/` was created or already exists.
+   The command will report whether `.erinn/` was created or already exists.
 
 2. **Present next steps** using the output template below.
 
 3. **Guide the user:**
-   - How to plan work: `/htmlgraph:plan "title"`
-   - How to start session: `/htmlgraph:start`
-   - How to view dashboard: `/htmlgraph:serve`
+   - How to plan work: `/erinn:plan "title"`
+   - How to start session: `/erinn:start`
+   - How to view dashboard: `/erinn:serve`
 
 4. **Highlight key points:**
    - All subsequent work will be tracked automatically
@@ -47,36 +47,36 @@ Set up HtmlGraph directory structure in project
 
 ### Output Format:
 
-## HtmlGraph Initialized
+## Erinn AI Initialized
 
-Created `.htmlgraph/` directory with:
+Created `.erinn/` directory with:
 - `features/` - Feature work items
 - `sessions/` - Session activity logs
 - `tracks/` - Multi-feature tracks
 - `spikes/` - Research and investigation
 - `bugs/` - Bug tracking
-- `htmlgraph.db` - SQLite read index for queries and dashboard
+- `erinn.db` - SQLite read index for queries and dashboard
 - `refs.json` - Project metadata references
-- `styles.css` - Default stylesheet for HtmlGraph HTML nodes
+- `styles.css` - Default stylesheet for Erinn AI HTML nodes
 
 Note:
-- Additional paths such as plans, events, and launch/session markers may appear later as other HtmlGraph commands and hooks run.
-- Current `htmlgraph init` does not create legacy analytics directories like `insights/`, `metrics/`, or `cigs/`.
+- Additional paths such as plans, events, and launch/session markers may appear later as other Erinn AI commands and hooks run.
+- Current `erinn init` does not create legacy analytics directories like `insights/`, `metrics/`, or `cigs/`.
 
 ### Next Steps
-1. Plan new work: `/htmlgraph:plan "Feature title"`
-2. Start session: `/htmlgraph:start`
-3. View dashboard: `/htmlgraph:serve`
+1. Plan new work: `/erinn:plan "Feature title"`
+2. Start session: `/erinn:start`
+3. View dashboard: `/erinn:serve`
 
 ### Quick Start
 ```bash
 # Start planning
-/htmlgraph:plan "Add user authentication"
+/erinn:plan "Add user authentication"
 
 # Begin work
-/htmlgraph:start
+/erinn:start
 
 # View progress
-/htmlgraph:serve
+/erinn:serve
 # Open http://localhost:8080
 ```
