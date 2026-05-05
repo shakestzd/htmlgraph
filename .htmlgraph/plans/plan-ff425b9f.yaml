@@ -2,15 +2,166 @@ meta:
     id: plan-ff425b9f
     track_id: trk-cb36e595
     title: Sub-agent dispatch hardening — attribution session-walk + worktree commit guard
-    description: 'Fixes two infrastructure-blocking bugs from GitHub #87 (bug-0413c3c4) and #88 (bug-730c0f19). Without these fixes, /htmlgraph:execute parallel dispatch is non-functional: 6 of 8 sub-agents get stuck on attribution-claim session mismatches, and 2 of 8 commit directly to main instead of isolated worktrees. Slice 1 walks the parent-session chain in the PreToolUse claim check (mirrors yolo_guard.go''s getSessionAndParent pattern). Slice 2 adds a PreToolUse git-commit guard that refuses sub-agent commits to main without an explicit per-agent branch, defending against Claude Code''s isolation:worktree failing to create a nested worktree when the parent is itself in one.'
-    created_at: "2026-05-05"
-    status: draft
-    version: 2
+    description: |
+        Fixes two infrastructure-blocking bugs surfaced in GitHub #87 (bug-0413c3c4) and #88 (bug-730c0f19). The /htmlgraph:execute parallel dispatch model is currently non-functional: in a real-world dispatch of 8 features, 6 of 8 sub-agents got stuck on attribution-claim session-ID mismatches (sub-agent runs under different session than orchestrator's `feature start`), and 2 of 8 successful sub-agents committed directly to main instead of isolated worktree branches (Claude Code's `isolation:"worktree"` falls through when the parent is itself in a worktree). Slice 1 walks the parent-session chain in the PreToolUse claim check, mirroring the `getSessionAndParent` pattern already established in `yolo_guard.go`. Slice 2 adds a PreToolUse Bash guard that detects sub-agent `git commit` invocations on main without an explicit per-agent branch and refuses, defending against Claude Code's worktree-creation behavior at the htmlgraph hook layer.
+    created_at: "2026-05-04"
+    status: active
+    created_by: claude-opus
+    version: 3
 design:
-    problem: ""
-    goals: []
-    constraints: []
+    problem: |
+        /htmlgraph:execute dispatches sub-agents in parallel against a track's features. Two infrastructure bugs make this fundamentally broken today: (1) the orchestrator's `htmlgraph feature start <id>` creates a claim under the orchestrator's session ID, but sub-agents run under different session IDs; the PreToolUse hook's claim lookup uses the sub-agent's own session, sees `claim=none`, and refuses Write/Edit/MultiEdit. Sub-agents cannot fix this from inside themselves (`feature start` from a sub-agent records a claim under yet another session, leaving the parent's claim in place). 6 of 8 sub-agents in the cited dispatch wasted 30-50 turns each investigating this. (2) Sub-agents dispatched with `Agent({isolation:"worktree"})` sometimes commit directly to main instead of an isolated branch — when the parent orchestrator is itself in a worktree, Claude Code appears to skip nested worktree creation, leaving sub-agents writing in the parent's working directory which after a checkout had ended up on main. 2 of 8 successful sub-agents in the cited dispatch had this happen; quality gates passed by luck.
+    goals:
+        - '**Parallel dispatch unblocked** — sub-agents inheriting attribution from a parent orchestrator session can write/edit/multiedit without manual claim shuffling. Mirrors the parent-chain walk already used in `yolo_guard.go` for the screenshot guard.'
+        - '**Main protected from accidental commits** — sub-agents attempting `git commit` while on `main`/`master` without an explicit per-agent branch are refused with a clear error and remediation. The orchestrator and sub-agents on per-agent branches commit normally.'
+        - '**No upstream Claude Code dependency** — the worktree commit guard sits at htmlgraph''s PreToolUse hook layer, not Claude Code''s Agent dispatch. We control whether sub-agent commits land on main regardless of what `isolation:"worktree"` does upstream.'
+    constraints:
+        - '**Backward compatible** — the orchestrator''s existing claim flow (single-agent sessions doing their own `feature start`) continues to work. Slice 1 only EXTENDS the lookup to walk parent chains; it doesn''t change behavior when the agent owns the claim itself.'
+        - '**No new infrastructure** — both fixes use existing hook plumbing (`internal/hooks/pretooluse.go`) and existing precedent (`internal/hooks/yolo_guard.go`''s `getSessionAndParent`). No new packages, no new dependencies.'
+        - '**Defense-in-depth, not silver bullet** — slice 2''s guard refuses commits but cannot retroactively un-commit or rewrite history. If a sub-agent has already committed to main before this guard ships, manual recovery is required (out of scope; users can revert/cherry-pick).'
     approved: false
     comment: ""
-slices: []
+slices:
+    - id: slice-1
+      num: 1
+      title: 'PreToolUse claim check walks parent session chain (fixes #87 / bug-0413c3c4)'
+      what: |
+        The PreToolUse hook in `internal/hooks/pretooluse.go` checks whether the current session owns the active feature claim before allowing Write/Edit/MultiEdit. Today the check uses only the sub-agent's own session ID and refuses if `claim=none`. Sub-agents dispatched by an orchestrator that ran `htmlgraph feature start` see no claim under their own session and get blocked.
+
+        **Implementation:**
+        1. **Locate the claim check.** Find the spot in `pretooluse.go` (or its callees) that resolves the claim by session ID — likely a function like `resolveActiveFeatureClaim(sessionID)` or similar.
+        2. **Locate the parent-chain walker.** `internal/hooks/yolo_guard.go` already has `getSessionAndParent(sessionID)` (or similarly named) that walks the parent chain via `agent_events` (or `sessions`) table to find the orchestrator session. Reuse it; do NOT duplicate.
+        3. **Replace the lookup with a parent-chain walk.** When the current session has no claim, walk up via `getSessionAndParent` and check each ancestor session for an active claim. If any ancestor session owns a claim for the feature being touched, treat it as the effective claim and allow the operation.
+        4. **Logging:** when the claim is inherited via parent chain, log a structured note (e.g., `claim inherited: session=<sub> parent=<orch> feat=<id>`) so the dispatch path is auditable.
+        5. **Conservative scope:** only walk the chain when `claim=none` for the current session. If the current session has its own (different) claim, leave existing behavior — don't try to merge or transfer.
+      why: |
+        Without this, /htmlgraph:execute parallel dispatch is dead in the water: 6 of 8 sub-agents got stuck investigating the hook in the cited real-world example. The fix mirrors precedent already in the codebase (yolo_guard.go), so the implementation cost is low and the risk surface is well-understood. Walking the parent chain is the right semantic — sub-agents are doing work ON BEHALF of the orchestrator that started the feature; treating the orchestrator's claim as inherited matches the dispatch model.
+      files:
+        - internal/hooks/pretooluse.go
+        - internal/hooks/pretooluse_test.go
+        - internal/hooks/yolo_guard.go
+      deps: []
+      done_when:
+        - Sub-agent whose session is a direct child of orchestrator session (recorded in `agent_events` parent links) can Write/Edit/MultiEdit on a feature whose claim is owned by the orchestrator session
+        - Sub-agent without a parent-chain link (or whose chain doesn't reach a claim-holding session) is still refused, with the existing error message
+        - 'Multi-hop chains work: if sub-agent A spawns sub-sub-agent B, and orchestrator owns the claim, B''s writes are allowed (chain walked via `getSessionAndParent`''s recursive resolution)'
+        - Existing behavior preserved when current session owns its own claim (no chain walk needed)
+        - Structured log line emitted when claim is inherited via chain — auditable in OTel session events
+      effort: M
+      risk: Med
+      tests: |
+        Unit:
+        - TestClaimCheck_OwnSessionClaim — current session owns claim; pass-through unchanged
+        - TestClaimCheck_NoClaimNoChain — no claim, no parent; refuse (existing behavior preserved)
+        - TestClaimCheck_ParentOwnsClaim — current session has no claim, parent does; allow
+        - TestClaimCheck_GrandparentOwnsClaim — 2-hop chain; allow
+        - TestClaimCheck_ChainBrokenAtSomeHop — chain walk hits a session with neither a parent nor a claim; refuse
+        - TestClaimCheck_LogEmitted — when chain walk finds an ancestor claim, structured log line emitted with sub/parent/feat IDs
+
+        Integration: TestPreToolUse_DispatchedSubagentWriteAllowed — fixture sets up orchestrator session with feature start + claim, then a sub-agent session linked to it; sub-agent attempts Edit; PreToolUse allows. Mirror with grandparent chain.
+
+        Regression: existing `pretooluse_test.go` tests pass unchanged; `yolo_guard_test.go` continues to pass (we're reusing its helper, not modifying it).
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-chain-depth-limit
+          text: Should the parent-chain walk have a depth limit?
+          description: |
+            Theoretically a session could have an unbounded parent chain. In practice, dispatch is at most 2-3 levels deep (orchestrator → sub-agent → maybe sub-sub-agent). But infinite chain walking on a malformed `agent_events` table could deadlock the hook.
+          recommended: limit-10
+          options:
+            - key: limit-10
+              label: limit-10 — walk at most 10 hops; refuse beyond. Generous; matches reasonable dispatch depths.
+            - key: limit-3
+              label: limit-3 — walk at most 3 hops. Tight; matches observed real-world depth.
+            - key: no-limit
+              label: no-limit — walk until parent is null. Risk of infinite walk if data is malformed.
+        - id: q-claim-mismatch-policy
+          text: What if the current session has a claim for feat-A, but the parent owns a claim for feat-B (the file being edited)?
+          description: |
+            Edge case: sub-agent's own session has been marked active for a different feature (perhaps it ran feature start itself). The parent's claim is for the feature whose file we're editing. Three plausible policies.
+          recommended: parent-claim-wins
+          options:
+            - key: parent-claim-wins
+              label: parent-claim-wins — if parent owns the claim for the file's feature, allow. The sub-agent's own claim is for unrelated work.
+            - key: own-claim-wins
+              label: own-claim-wins — if current session has any claim, only that one counts; parent walk is skipped. Strictest; risks blocking legitimate cross-feature dispatch.
+            - key: refuse-on-conflict
+              label: refuse-on-conflict — if claims disagree on the feature, refuse. Safest but may surface as new false-positive blocks.
+    - id: slice-2
+      num: 2
+      title: 'PreToolUse guard refuses sub-agent git commit on main (fixes #88 / bug-730c0f19)'
+      what: |
+        Add a new PreToolUse guard at `internal/hooks/worktree_commit_guard.go` that intercepts Bash tool calls matching `git commit` from sub-agent sessions and refuses if the working directory's branch is `main` or `master`, unless an explicit per-agent branch convention is in effect.
+
+        **Implementation:**
+        1. **Detect the Bash tool call.** PreToolUse fires for every tool. Filter for `tool_name == "Bash"` AND `tool_input["command"]` matches a regex like `^\s*git\s+commit\b` (case-insensitive). Fall through for non-commit Bash calls.
+        2. **Identify sub-agent sessions.** Use slice 1's `getSessionAndParent` to determine if the current session has a parent (i.e., is a sub-agent). If the current session is the orchestrator (no parent), allow normally — the orchestrator commits on main intentionally.
+        3. **Resolve current branch.** Run `git -C <cwd> rev-parse --abbrev-ref HEAD` from the hook to get the branch. If it returns `main` or `master` AND the session has a parent: refuse with structured error.
+        4. **Per-agent branch convention** (escape hatch): if the branch matches `worktree-agent-*` or `subagent-*` or has the env var `HTMLGRAPH_AGENT_BRANCH=1` set in the hook's spawned env, allow even on main. This lets dispatch tooling explicitly mark "this is a per-agent branch I created intentionally" without forcing branch-name matching.
+        5. **Error message structure:** the refusal must include (a) which session is blocked, (b) what branch it's on, (c) suggested remediation: "create a per-agent branch first: `git checkout -b worktree-agent-<short-session-id>` then commit and merge to the track branch via the orchestrator." Include the parent-session ID for cross-reference.
+        6. **Wire the guard into pretooluse.go's dispatch.** Register it AFTER slice 1's claim-check enhancement (deps: [1]) so the parent-chain logic is available. Keep the guard small and isolated in its own file.
+      why: |
+        Two of 8 sub-agents in the cited real-world dispatch committed directly to main; quality gates passing was luck. With this guard, the same path produces a clear refusal at the htmlgraph layer regardless of how Claude Code's `isolation:"worktree"` resolves. The orchestrator's commits are unaffected (it has no parent session). Per-agent branches with the documented naming or env var work normally — the guard is targeted at the specific failure mode (sub-agent + main + no per-agent branch).
+      files:
+        - internal/hooks/pretooluse.go
+        - internal/hooks/worktree_commit_guard.go
+        - internal/hooks/worktree_commit_guard_test.go
+      deps:
+        - 1
+      done_when:
+        - Sub-agent (session has parent) attempting `git commit` while on branch `main` or `master` is refused with a structured error message naming session, branch, and remediation
+        - Orchestrator (session has no parent) committing on main is allowed normally
+        - Sub-agent committing on a branch matching `worktree-agent-*` or `subagent-*` (or with `HTMLGRAPH_AGENT_BRANCH=1` set) is allowed regardless of whether the branch base is main
+        - Non-`git commit` Bash calls fall through (the guard only intercepts commit specifically — not `git status`, `git log`, or any other Bash)
+        - 'Sub-agent on a non-main, non-master, non-recognized branch (e.g., `trk-XXX`): allow (matches the dispatch model where parents work on track branches)'
+        - Hook's `git -C <cwd> rev-parse` failures (not a git repo, etc.) — fall through (don't block on detection failure)
+      effort: M
+      risk: Med
+      tests: |
+        Unit:
+        - TestCommitGuard_OrchestratorOnMain_Allowed — session has no parent; allow
+        - TestCommitGuard_SubagentOnMain_Refused — session has parent, branch=main; refuse with structured message
+        - TestCommitGuard_SubagentOnMaster_Refused — same with `master`
+        - TestCommitGuard_SubagentOnTrackBranch_Allowed — session has parent, branch=`trk-foo`; allow
+        - TestCommitGuard_SubagentOnAgentBranch_Allowed — session has parent, branch matches `worktree-agent-*`; allow
+        - TestCommitGuard_SubagentEnvOverride_Allowed — env `HTMLGRAPH_AGENT_BRANCH=1` set; allow on main
+        - TestCommitGuard_NonCommitBash_Allowed — Bash command is `git status`, `git log`, etc.; fall through (allow)
+        - TestCommitGuard_GitDetectionFails_Allowed — `cwd` is not a git repo; fall through
+        - TestCommitGuard_RemediationMessage — refusal error includes session ID, branch, parent ID, suggested branch-creation command
+
+        Integration: TestPreToolUse_DispatchedSubagentCommitOnMainBlocked — fixture orchestrator session + sub-agent session linked; sub-agent issues `git commit -m "..."` while on main; PreToolUse refuses with the documented error message.
+
+        Regression: existing PreToolUse tests pass; slice 1's claim-walk tests pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-branch-naming-convention
+          text: What branch-name pattern marks a 'per-agent branch' as the escape hatch?
+          description: |
+            Without a recognized name, the guard refuses. Need a convention.
+          recommended: worktree-agent-prefix
+          options:
+            - key: worktree-agent-prefix
+              label: worktree-agent-prefix — names like `worktree-agent-<short-session-id>` or `worktree-agent-<feat-id>`. Aligns with Claude Code's worktree dir naming when isolation:worktree DOES create one.
+            - key: subagent-or-feat-prefix
+              label: subagent-or-feat-prefix — accept either `subagent-*` or `feat-*` as escape hatch. More permissive; risk of accidentally committing as 'feat-XXX' on a non-isolated worktree.
+            - key: env-var-only
+              label: env-var-only — drop branch-name patterns; require explicit `HTMLGRAPH_AGENT_BRANCH=1` env. Strictest; means dispatch tooling must always set the var explicitly.
+        - id: q-master-handling
+          text: Treat `master` the same as `main`?
+          description: |
+            Old repos still have `master` as the default. Newer repos (including htmlgraph) use `main`.
+          recommended: both
+          options:
+            - key: both
+              label: both — refuse sub-agent commits on `main` AND `master`. Defensive; covers legacy repos.
+            - key: main-only
+              label: main-only — only refuse on `main`. Cleaner if we're confident no users have master.
+            - key: configurable
+              label: configurable — read protected branches from `.htmlgraph/config.json`. More flexible; more code.
 questions: []
