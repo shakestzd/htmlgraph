@@ -1,0 +1,16 @@
+meta:
+    id: plan-ff425b9f
+    track_id: trk-cb36e595
+    title: Sub-agent dispatch hardening — attribution session-walk + worktree commit guard
+    description: 'Fixes two infrastructure-blocking bugs from GitHub #87 (bug-0413c3c4) and #88 (bug-730c0f19). Without these fixes, /htmlgraph:execute parallel dispatch is non-functional: 6 of 8 sub-agents get stuck on attribution-claim session mismatches, and 2 of 8 commit directly to main instead of isolated worktrees. Slice 1 walks the parent-session chain in the PreToolUse claim check (mirrors yolo_guard.go''s getSessionAndParent pattern). Slice 2 adds a PreToolUse git-commit guard that refuses sub-agent commits to main without an explicit per-agent branch, defending against Claude Code''s isolation:worktree failing to create a nested worktree when the parent is itself in one.'
+    created_at: "2026-05-05"
+    status: draft
+    version: 2
+design:
+    problem: ""
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices: []
+questions: []
