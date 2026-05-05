@@ -1,14 +1,14 @@
 {
-  "name": "htmlgraph",
+  "name": "erinn",
   "interface": {
-    "displayName": "HtmlGraph"
+    "displayName": "Erinn AI"
   },
   "plugins": [
     {
-      "name": "htmlgraph",
+      "name": "erinn",
       "source": {
         "source": "local",
-        "path": "./htmlgraph"
+        "path": "./erinn"
       },
       "policy": {
         "installation": "AVAILABLE",

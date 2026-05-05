@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook session-start"
+            "command": "erinn hook session-start"
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook session-resume"
+            "command": "erinn hook session-resume"
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook session-end"
+            "command": "erinn hook session-end"
           }
         ]
       }
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook user-prompt"
+            "command": "erinn hook user-prompt"
           }
         ]
       },
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook pretooluse"
+            "command": "erinn hook pretooluse"
           }
         ]
       }
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook posttooluse"
+            "command": "erinn hook posttooluse"
           }
         ]
       },
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook exit-plan-mode",
+            "command": "erinn hook exit-plan-mode",
             "timeout": 30
           }
         ]
@@ -90,7 +90,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook subagent-start"
+            "command": "erinn hook subagent-start"
           }
         ]
       }
@@ -101,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook subagent-stop"
+            "command": "erinn hook subagent-stop"
           }
         ]
       }
@@ -112,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook stop"
+            "command": "erinn hook stop"
           }
         ]
       }
@@ -123,7 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook posttooluse-failure"
+            "command": "erinn hook posttooluse-failure"
           }
         ]
       }
@@ -134,7 +134,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook pre-compact"
+            "command": "erinn hook pre-compact"
           }
         ]
       }
@@ -145,7 +145,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook teammate-idle"
+            "command": "erinn hook teammate-idle"
           }
         ]
       }
@@ -156,7 +156,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook task-completed"
+            "command": "erinn hook task-completed"
           }
         ]
       }
@@ -167,7 +167,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook instructions-loaded"
+            "command": "erinn hook instructions-loaded"
           }
         ]
       }
@@ -178,7 +178,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook worktree-create"
+            "command": "erinn hook worktree-create"
           }
         ]
       }
@@ -189,7 +189,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook worktree-remove"
+            "command": "erinn hook worktree-remove"
           }
         ]
       }
@@ -200,7 +200,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook post-compact"
+            "command": "erinn hook post-compact"
           }
         ]
       }
@@ -211,7 +211,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook task-created"
+            "command": "erinn hook task-created"
           }
         ]
       }
@@ -222,7 +222,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook permission-request"
+            "command": "erinn hook permission-request"
           }
         ]
       }
@@ -233,7 +233,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "htmlgraph hook config-change"
+            "command": "erinn hook config-change"
           }
         ]
       }
