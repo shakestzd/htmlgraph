@@ -2,7 +2,7 @@
 //
 // These types mirror the Python Pydantic models in models.py and event_log.py,
 // ensuring JSON-compatible serialization so both runtimes can read/write the
-// same .htmlgraph/ files and SQLite databases.
+// same .erinn/ files and SQLite databases.
 package models
 
 import "strings"

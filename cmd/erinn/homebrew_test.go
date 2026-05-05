@@ -7,20 +7,20 @@ import (
 	"testing"
 )
 
-// formulaPath returns the absolute path to Formula/htmlgraph.rb in the repo root.
+// formulaPath returns the absolute path to Formula/erinn.rb in the repo root.
 func formulaPath(t *testing.T) string {
 	t.Helper()
 	root, err := projectRoot()
 	if err != nil {
 		t.Fatalf("could not determine project root: %v", err)
 	}
-	return filepath.Join(root, "Formula", "htmlgraph.rb")
+	return filepath.Join(root, "Formula", "erinn.rb")
 }
 
 func TestHomebrewFormulaExists(t *testing.T) {
 	formula := formulaPath(t)
 	if _, err := os.Stat(formula); os.IsNotExist(err) {
-		t.Fatalf("Formula/htmlgraph.rb does not exist at %s", formula)
+		t.Fatalf("Formula/erinn.rb does not exist at %s", formula)
 	}
 }
 
@@ -29,7 +29,7 @@ func TestHomebrewFormulaStructure(t *testing.T) {
 
 	data, err := os.ReadFile(formula)
 	if err != nil {
-		t.Fatalf("could not read Formula/htmlgraph.rb: %v", err)
+		t.Fatalf("could not read Formula/erinn.rb: %v", err)
 	}
 	content := string(data)
 
@@ -37,7 +37,7 @@ func TestHomebrewFormulaStructure(t *testing.T) {
 		name    string
 		pattern string
 	}{
-		{"class declaration", "class Htmlgraph < Formula"},
+		{"class declaration", "class Erinn < Formula"},
 		{"desc field", "desc "},
 		{"homepage field", "homepage "},
 		{"version field", "version "},
@@ -50,13 +50,13 @@ func TestHomebrewFormulaStructure(t *testing.T) {
 		{"linux amd64 url", "linux_amd64"},
 		{"sha256 field", "sha256"},
 		{"install method", "def install"},
-		{"bin.install", `bin.install "htmlgraph"`},
+		{"bin.install", `bin.install "erinn"`},
 		{"test block", "test do"},
 	}
 
 	for _, req := range required {
 		if !strings.Contains(content, req.pattern) {
-			t.Errorf("Formula/htmlgraph.rb missing %s (expected to contain %q)", req.name, req.pattern)
+			t.Errorf("Formula/erinn.rb missing %s (expected to contain %q)", req.name, req.pattern)
 		}
 	}
 }
@@ -66,22 +66,22 @@ func TestHomebrewFormulaURLPattern(t *testing.T) {
 
 	data, err := os.ReadFile(formula)
 	if err != nil {
-		t.Fatalf("could not read Formula/htmlgraph.rb: %v", err)
+		t.Fatalf("could not read Formula/erinn.rb: %v", err)
 	}
 	content := string(data)
 
 	// Verify URLs reference the correct GitHub repo
 	if !strings.Contains(content, "shakestzd/erinn") {
-		t.Error("Formula/htmlgraph.rb should reference shakestzd/erinn repo")
+		t.Error("Formula/erinn.rb should reference shakestzd/erinn repo")
 	}
 
 	// Verify URL uses releases/download pattern
 	if !strings.Contains(content, "releases/download") {
-		t.Error("Formula/htmlgraph.rb should use GitHub releases/download URL pattern")
+		t.Error("Formula/erinn.rb should use GitHub releases/download URL pattern")
 	}
 
 	// Verify archive format is tar.gz
 	if !strings.Contains(content, ".tar.gz") {
-		t.Error("Formula/htmlgraph.rb should reference .tar.gz archives")
+		t.Error("Formula/erinn.rb should reference .tar.gz archives")
 	}
 }

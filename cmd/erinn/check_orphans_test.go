@@ -10,7 +10,7 @@ import (
 
 func TestCheckOrphansFindsUnlinkedItems(t *testing.T) {
 	tmpDir := t.TempDir()
-	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	hgDir := filepath.Join(tmpDir, ".erinn")
 	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
 		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
 	}

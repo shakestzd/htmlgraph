@@ -108,7 +108,7 @@ func TestResolveSessionID_ActiveSessionFile(t *testing.T) {
 	t.Setenv("CLAUDE_SESSION_ID", "")
 
 	dir := t.TempDir()
-	htmlgraphDir := filepath.Join(dir, ".htmlgraph")
+	htmlgraphDir := filepath.Join(dir, ".erinn")
 	if err := os.MkdirAll(htmlgraphDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}

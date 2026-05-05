@@ -193,14 +193,14 @@ func TestResolvePluginDir_SymlinkWalkUpFallback(t *testing.T) {
 }
 
 // TestResolvePluginDir_ProjectRootDetection tests that resolveProjectPluginDir
-// walks up from CWD to find .htmlgraph/ and plugin/.
+// walks up from CWD to find .erinn/ and plugin/.
 func TestResolvePluginDir_ProjectRootDetection(t *testing.T) {
-	// Create a fake project with .htmlgraph/ and plugin/
+	// Create a fake project with .erinn/ and plugin/
 	tmpDir := t.TempDir()
 
-	// Create .htmlgraph directory (marks project root)
-	if err := os.MkdirAll(filepath.Join(tmpDir, ".htmlgraph"), 0755); err != nil {
-		t.Fatalf("failed to create .htmlgraph: %v", err)
+	// Create .erinn directory (marks project root)
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".erinn"), 0755); err != nil {
+		t.Fatalf("failed to create .erinn: %v", err)
 	}
 
 	// Create plugin directory structure
@@ -228,12 +228,12 @@ func TestResolvePluginDir_ProjectRootDetection(t *testing.T) {
 // TestResolvePluginDir_ProjectRootDetectionFromSubdirectory tests that
 // resolveProjectPluginDir can walk UP from a subdirectory to find the project root.
 func TestResolvePluginDir_ProjectRootDetectionFromSubdirectory(t *testing.T) {
-	// Create a fake project with .htmlgraph/ and plugin/
+	// Create a fake project with .erinn/ and plugin/
 	tmpDir := t.TempDir()
 
-	// Create .htmlgraph directory (marks project root)
-	if err := os.MkdirAll(filepath.Join(tmpDir, ".htmlgraph"), 0755); err != nil {
-		t.Fatalf("failed to create .htmlgraph: %v", err)
+	// Create .erinn directory (marks project root)
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".erinn"), 0755); err != nil {
+		t.Fatalf("failed to create .erinn: %v", err)
 	}
 
 	// Create plugin directory structure

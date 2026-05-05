@@ -31,7 +31,7 @@ var funcPrefixes = map[string]string{
 // warnings if it violates size/complexity limits. Returns empty string when
 // no issues are found. Designed to complete in <5ms (single read, line scan).
 func CheckFileQuality(filePath string) string {
-	// Skip .htmlgraph/ directory entirely.
+	// Skip .erinn/ directory entirely.
 	if containsHtmlgraphDir(filePath) {
 		return ""
 	}

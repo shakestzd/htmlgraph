@@ -391,7 +391,7 @@ func TestPromoteSlice_PlanRemainsActive(t *testing.T) {
 
 func TestExecutePreview_IncludesPromotedSliceFeatures(t *testing.T) {
 	dir := t.TempDir()
-	hgDir := filepath.Join(dir, ".htmlgraph")
+	hgDir := filepath.Join(dir, ".erinn")
 	for _, sub := range []string{"plans", "features", "tracks"} {
 		if err := os.MkdirAll(filepath.Join(hgDir, sub), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", sub, err)
@@ -471,11 +471,11 @@ func TestExecutePreview_IncludesPromotedSliceFeatures(t *testing.T) {
 
 // seedPromoteFixture creates a temp project with a single approved slice and
 // returns the htmlgraph dir + plan ID. The layout mirrors production: a
-// project root (t.TempDir()) containing a .htmlgraph/ subdirectory.
+// project root (t.TempDir()) containing a .erinn/ subdirectory.
 func seedPromoteFixture(t *testing.T, decisionsNotes string) (hgDir, planID string) {
 	t.Helper()
 	projectRoot := t.TempDir()
-	hgDir = filepath.Join(projectRoot, ".htmlgraph")
+	hgDir = filepath.Join(projectRoot, ".erinn")
 	for _, sub := range []string{"plans", "features", "tracks"} {
 		if err := os.MkdirAll(filepath.Join(hgDir, sub), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", sub, err)
@@ -527,7 +527,7 @@ func seedPromoteFixture(t *testing.T, decisionsNotes string) (hgDir, planID stri
 	return hgDir, planID
 }
 
-// writeSpecEnforcementConfig writes a config.json into the .htmlgraph dir.
+// writeSpecEnforcementConfig writes a config.json into the .erinn dir.
 func writeSpecEnforcementConfig(t *testing.T, hgDir string, promoteSlice, featureComplete bool) {
 	t.Helper()
 	body := fmt.Sprintf(`{"spec_enforcement":{"promote_slice":%t,"feature_complete":%t}}`,

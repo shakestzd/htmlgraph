@@ -72,12 +72,12 @@ func writeMinimalSessionHTML(t *testing.T, dir, sessionID string) {
 
 func TestCollectSessionHTMLIDs_Empty(t *testing.T) {
 	dir := t.TempDir()
-	sessionsDir := filepath.Join(dir, ".htmlgraph", "sessions")
+	sessionsDir := filepath.Join(dir, ".erinn", "sessions")
 	if err := os.MkdirAll(sessionsDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	ids, err := collectSessionHTMLIDs(filepath.Join(dir, ".htmlgraph"))
+	ids, err := collectSessionHTMLIDs(filepath.Join(dir, ".erinn"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,8 +88,8 @@ func TestCollectSessionHTMLIDs_Empty(t *testing.T) {
 
 func TestCollectSessionHTMLIDs_MissingDir(t *testing.T) {
 	dir := t.TempDir()
-	// .htmlgraph/sessions/ does not exist — should return empty set, not error.
-	ids, err := collectSessionHTMLIDs(filepath.Join(dir, ".htmlgraph"))
+	// .erinn/sessions/ does not exist — should return empty set, not error.
+	ids, err := collectSessionHTMLIDs(filepath.Join(dir, ".erinn"))
 	if err != nil {
 		t.Fatalf("unexpected error for missing dir: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestCollectSessionHTMLIDs_MissingDir(t *testing.T) {
 
 func TestCollectSessionHTMLIDs_MixedFiles(t *testing.T) {
 	dir := t.TempDir()
-	sessionsDir := filepath.Join(dir, ".htmlgraph", "sessions")
+	sessionsDir := filepath.Join(dir, ".erinn", "sessions")
 	if err := os.MkdirAll(sessionsDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestCollectSessionHTMLIDs_MixedFiles(t *testing.T) {
 		}
 	}
 
-	ids, err := collectSessionHTMLIDs(filepath.Join(dir, ".htmlgraph"))
+	ids, err := collectSessionHTMLIDs(filepath.Join(dir, ".erinn"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -240,12 +240,12 @@ func TestFindContentFreeSessionIDs_NoAgentEvents(t *testing.T) {
 
 // ---------- runCleanupGhostSessions integration tests ----------
 
-// setupHTMLGraphDir creates a .htmlgraph/ directory tree with an SQLite DB
+// setupHTMLGraphDir creates a .erinn/ directory tree with an SQLite DB
 // at the given root, and returns the htmlgraphDir path.
 func setupHTMLGraphDir(t *testing.T) (string, *sql.DB) {
 	t.Helper()
 	root := t.TempDir()
-	hgDir := filepath.Join(root, ".htmlgraph")
+	hgDir := filepath.Join(root, ".erinn")
 	sessionsDir := filepath.Join(hgDir, "sessions")
 	if err := os.MkdirAll(sessionsDir, 0o755); err != nil {
 		t.Fatalf("mkdir sessions: %v", err)

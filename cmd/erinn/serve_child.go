@@ -49,7 +49,7 @@ func serveChildCmd() *cobra.Command {
 func runServeChild(port int) error {
 	htmlgraphDir, err := findHtmlgraphDir()
 	if err != nil {
-		return fmt.Errorf("locate .htmlgraph: %w", err)
+		return fmt.Errorf("locate .erinn: %w", err)
 	}
 
 	dbPath, err := storage.CanonicalDBPath(filepath.Dir(htmlgraphDir))

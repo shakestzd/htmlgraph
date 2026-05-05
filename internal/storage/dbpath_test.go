@@ -22,10 +22,10 @@ import (
 //  2. Lines that contain BOTH filepath.Join and storage.DBFileName.
 //     This catches the regression class fixed by bug-62f14f8c, where
 //     internal/hooks/runner.go silently fell back to constructing
-//     .htmlgraph/.db/htmlgraph.db whenever os.UserCacheDir() errored.
+//     .erinn/.db/htmlgraph.db whenever os.UserCacheDir() errored.
 //     Comparison sites (e.g. `if base == storage.DBFileName`) remain
 //     allowed because they do not synthesize a path.
-//  3. Lines containing ".htmlgraph/.db" or ".db/htmlgraph" — the legacy
+//  3. Lines containing ".erinn/.db" or ".db/htmlgraph" — the legacy
 //     in-tree DB locations should never appear in callers; only
 //     storage.LegacyProjectDBPaths (inside internal/storage) may
 //     reference them, for the orphan-detection warning.
@@ -73,7 +73,7 @@ func TestNoInlineDBPathConstruction(t *testing.T) {
 	// storage.DBFileName, which is allowed).
 	linePatterns := []string{
 		`"htmlgraph.db"`,   // literal filename
-		`".htmlgraph/.db"`, // legacy ext4-volume path segment
+		`".erinn/.db"`, // legacy ext4-volume path segment
 		`".db/htmlgraph"`,  // partial path hinting at legacy layout
 	}
 
@@ -218,8 +218,8 @@ func TestLegacyProjectDBPaths(t *testing.T) {
 		t.Fatalf("expected 2 legacy paths, got %d", len(paths))
 	}
 
-	want0 := filepath.Join(projectDir, ".htmlgraph", "htmlgraph.db")
-	want1 := filepath.Join(projectDir, ".htmlgraph", ".db", "htmlgraph.db")
+	want0 := filepath.Join(projectDir, ".erinn", "htmlgraph.db")
+	want1 := filepath.Join(projectDir, ".erinn", ".db", "htmlgraph.db")
 
 	if paths[0] != want0 {
 		t.Errorf("path[0]: got %s, want %s", paths[0], want0)
@@ -243,9 +243,9 @@ func TestCleanLegacyDBIfSafe_DeletesWhenCanonicalReady(t *testing.T) {
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
 	// Set up legacy file.
-	legacyDir := filepath.Join(projectDir, ".htmlgraph")
+	legacyDir := filepath.Join(projectDir, ".erinn")
 	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	legacyFile := filepath.Join(legacyDir, "htmlgraph.db")
 	if err := os.WriteFile(legacyFile, []byte("stale"), 0o600); err != nil {
@@ -277,9 +277,9 @@ func TestCleanLegacyDBIfSafe_WarnsWhenCanonicalMissing(t *testing.T) {
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
 	// Set up legacy file (~430 KB so it shows as 0.4 MB, not 0 MB).
-	legacyDir := filepath.Join(projectDir, ".htmlgraph")
+	legacyDir := filepath.Join(projectDir, ".erinn")
 	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	legacyFile := filepath.Join(legacyDir, "htmlgraph.db")
 	content := make([]byte, 440*1024) // 440 KB
@@ -322,9 +322,9 @@ func TestCleanLegacyDBIfSafe_WarnsWhenCanonicalEmpty(t *testing.T) {
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
 	// Set up legacy file.
-	legacyDir := filepath.Join(projectDir, ".htmlgraph")
+	legacyDir := filepath.Join(projectDir, ".erinn")
 	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	legacyFile := filepath.Join(legacyDir, "htmlgraph.db")
 	if err := os.WriteFile(legacyFile, []byte("stale data"), 0o600); err != nil {
@@ -346,7 +346,7 @@ func TestCleanLegacyDBIfSafe_WarnsWhenCanonicalEmpty(t *testing.T) {
 }
 
 // TestCleanLegacyDBIfSafe_RemovesEmptyDBDir verifies that the empty
-// .htmlgraph/.db/ directory is removed when the canonical DB is non-empty.
+// .erinn/.db/ directory is removed when the canonical DB is non-empty.
 func TestCleanLegacyDBIfSafe_RemovesEmptyDBDir(t *testing.T) {
 	projectDir := t.TempDir()
 
@@ -357,10 +357,10 @@ func TestCleanLegacyDBIfSafe_RemovesEmptyDBDir(t *testing.T) {
 	}
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
-	// Create empty .htmlgraph/.db/ directory (no legacy DB file inside).
-	dbDir := filepath.Join(projectDir, ".htmlgraph", ".db")
+	// Create empty .erinn/.db/ directory (no legacy DB file inside).
+	dbDir := filepath.Join(projectDir, ".erinn", ".db")
 	if err := os.MkdirAll(dbDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph/.db: %v", err)
+		t.Fatalf("mkdir .erinn/.db: %v", err)
 	}
 
 	var buf strings.Builder
@@ -378,7 +378,7 @@ func TestCleanLegacyDBIfSafe_RemovesEmptyDBDir(t *testing.T) {
 }
 
 // TestCleanLegacyDBIfSafe_LeavesNonEmptyDBDir verifies that a non-empty
-// .htmlgraph/.db/ directory (containing unrelated files) is NOT removed.
+// .erinn/.db/ directory (containing unrelated files) is NOT removed.
 func TestCleanLegacyDBIfSafe_LeavesNonEmptyDBDir(t *testing.T) {
 	projectDir := t.TempDir()
 
@@ -389,10 +389,10 @@ func TestCleanLegacyDBIfSafe_LeavesNonEmptyDBDir(t *testing.T) {
 	}
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
-	// Create .htmlgraph/.db/ with an unrelated file inside.
-	dbDir := filepath.Join(projectDir, ".htmlgraph", ".db")
+	// Create .erinn/.db/ with an unrelated file inside.
+	dbDir := filepath.Join(projectDir, ".erinn", ".db")
 	if err := os.MkdirAll(dbDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph/.db: %v", err)
+		t.Fatalf("mkdir .erinn/.db: %v", err)
 	}
 	unrelated := filepath.Join(dbDir, "unrelated.txt")
 	if err := os.WriteFile(unrelated, []byte("keep me"), 0o600); err != nil {
@@ -423,7 +423,7 @@ func TestCleanLegacyDBIfSafe_NoLegacyFiles(t *testing.T) {
 	}
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
-	// No .htmlgraph/ directory or legacy files created.
+	// No .erinn/ directory or legacy files created.
 
 	var buf strings.Builder
 	storage.CleanLegacyDBIfSafe(projectDir, &buf)
@@ -462,9 +462,9 @@ func TestCleanLegacyDBIfSafe_DeletesZeroByteFile(t *testing.T) {
 	t.Setenv("ERINN_DB_PATH", canonicalPath)
 
 	// Create a zero-byte legacy file (vestigial).
-	legacyDir := filepath.Join(projectDir, ".htmlgraph")
+	legacyDir := filepath.Join(projectDir, ".erinn")
 	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	legacyFile := filepath.Join(legacyDir, "htmlgraph.db")
 	if err := os.WriteFile(legacyFile, []byte{}, 0o600); err != nil {
@@ -486,15 +486,15 @@ func TestCleanLegacyDBIfSafe_DeletesZeroByteFile(t *testing.T) {
 }
 
 // TestCleanLegacyDBIfSafe_ERINN_DB_PATH_PointingAtLegacy verifies that when
-// ERINN_DB_PATH is explicitly set to a legacy path (e.g. .htmlgraph/htmlgraph.db),
+// ERINN_DB_PATH is explicitly set to a legacy path (e.g. .erinn/htmlgraph.db),
 // that file is NOT deleted and the .db/ directory is also protected.
 func TestCleanLegacyDBIfSafe_ERINN_DB_PATH_PointingAtLegacy(t *testing.T) {
 	projectDir := t.TempDir()
 
 	// Set up the legacy path as the canonical DB via ERINN_DB_PATH.
-	legacyDir := filepath.Join(projectDir, ".htmlgraph")
+	legacyDir := filepath.Join(projectDir, ".erinn")
 	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	legacyFile := filepath.Join(legacyDir, "htmlgraph.db")
 	if err := os.WriteFile(legacyFile, []byte("data"), 0o600); err != nil {

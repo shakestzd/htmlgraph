@@ -50,7 +50,7 @@ func otelCollectCmd() *cobra.Command {
 }
 
 func runOtelCollect(sessionID, projectDir, listenAddr string, noIdleTimeout bool) error {
-	sessDir := filepath.Join(projectDir, ".htmlgraph", "sessions", sessionID)
+	sessDir := filepath.Join(projectDir, ".erinn", "sessions", sessionID)
 	if err := os.MkdirAll(sessDir, 0o755); err != nil {
 		return fmt.Errorf("create session dir: %w", err)
 	}

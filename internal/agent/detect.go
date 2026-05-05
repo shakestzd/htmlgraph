@@ -61,7 +61,7 @@ func detectID() string {
 // ResolveSessionID returns the current session ID using a four-step fallback:
 //  1. ERINN_SESSION_ID env var (set by writeEnvVars via CLAUDE_ENV_FILE)
 //  2. CLAUDE_SESSION_ID env var (normalised — Claude Code path-style IDs)
-//  3. .htmlgraph/.active-session file in projectDir
+//  3. .erinn/.active-session file in projectDir
 //  4. Generated "cli-<pid>-<unix>" for plain CLI invocations
 func ResolveSessionID(projectDir string) string {
 	if v := os.Getenv("ERINN_SESSION_ID"); v != "" {
@@ -104,17 +104,17 @@ func containsSlash(s string) bool {
 	return false
 }
 
-// activeSessionFile is the minimal JSON shape read from .htmlgraph/.active-session.
+// activeSessionFile is the minimal JSON shape read from .erinn/.active-session.
 // We duplicate just the fields we need here to avoid importing internal/hooks
 // (which would create an import cycle).
 type activeSessionFile struct {
 	SessionID string `json:"session_id"`
 }
 
-// readActiveSessionID reads the session_id field from .htmlgraph/.active-session.
+// readActiveSessionID reads the session_id field from .erinn/.active-session.
 // Returns empty string when the file doesn't exist or can't be parsed.
 func readActiveSessionID(projectDir string) string {
-	path := filepath.Join(projectDir, ".htmlgraph", ".active-session")
+	path := filepath.Join(projectDir, ".erinn", ".active-session")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return ""

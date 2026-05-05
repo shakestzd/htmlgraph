@@ -12,14 +12,14 @@ import (
 	"github.com/shakestzd/erinn/internal/models"
 )
 
-// setupLifecycleDB creates a temp project dir with .htmlgraph/ and a real
+// setupLifecycleDB creates a temp project dir with .erinn/ and a real
 // SQLite DB. Returns the database and the project dir.
 func setupLifecycleDB(t *testing.T) (*sql.DB, string) {
 	t.Helper()
 	projectDir := t.TempDir()
-	hgDir := filepath.Join(projectDir, ".htmlgraph")
+	hgDir := filepath.Join(projectDir, ".erinn")
 	if err := os.MkdirAll(hgDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	database, err := db.Open(filepath.Join(hgDir, "htmlgraph.db"))
 	if err != nil {

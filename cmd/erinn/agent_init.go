@@ -61,16 +61,16 @@ htmlgraph feature create "Short description" --standalone "<reason>" --descripti
 func safetyRulesSection() string {
 	return `## HtmlGraph Safety Rules
 
-### FORBIDDEN: Do NOT touch .htmlgraph/ directory
+### FORBIDDEN: Do NOT touch .erinn/ directory
 NEVER:
-- Edit files in ` + "`.htmlgraph/`" + ` directory
-- Create new files in ` + "`.htmlgraph/`" + `
-- Modify ` + "`.htmlgraph/*.html`" + ` files
-- Write to ` + "`.htmlgraph/*.db`" + ` or any database files
-- Delete or rename ` + "`.htmlgraph/`" + ` files
-- Read ` + "`.htmlgraph/`" + ` files directly (` + "`cat`" + `, ` + "`grep`" + `, ` + "`sqlite3`" + `)
+- Edit files in ` + "`.erinn/`" + ` directory
+- Create new files in ` + "`.erinn/`" + `
+- Modify ` + "`.erinn/*.html`" + ` files
+- Write to ` + "`.erinn/*.db`" + ` or any database files
+- Delete or rename ` + "`.erinn/`" + ` files
+- Read ` + "`.erinn/`" + ` files directly (` + "`cat`" + `, ` + "`grep`" + `, ` + "`sqlite3`" + `)
 
-The .htmlgraph directory is managed by the CLI and hooks.
+The .erinn directory is managed by the CLI and hooks.
 
 ### Use CLI instead of direct file operations
 ` + "```bash" + `
@@ -80,9 +80,9 @@ htmlgraph snapshot --summary  # View all items
 htmlgraph find "<query>"      # Search work items
 
 # INCORRECT — never do this
-cat .htmlgraph/features/feat-xxx.html
-sqlite3 .htmlgraph/htmlgraph.db "SELECT ..."
-grep -r topic .htmlgraph/
+cat .erinn/features/feat-xxx.html
+sqlite3 .erinn/htmlgraph.db "SELECT ..."
+grep -r topic .erinn/
 ` + "```" + `
 `
 }

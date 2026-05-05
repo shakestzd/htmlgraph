@@ -28,9 +28,9 @@ func openMemDB(t *testing.T) *sql.DB {
 // ResolveSessionID can find a session ID from the file path.
 func writeActiveSessionFile(t *testing.T, dir, sessionID string) {
 	t.Helper()
-	htmlgraphDir := filepath.Join(dir, ".htmlgraph")
+	htmlgraphDir := filepath.Join(dir, ".erinn")
 	if err := os.MkdirAll(htmlgraphDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	data := map[string]interface{}{
 		"session_id": sessionID,
@@ -183,8 +183,8 @@ func TestEnsureSession_ColdPath_WritesActiveSession(t *testing.T) {
 	database := openMemDB(t)
 
 	dir := t.TempDir()
-	// Create the .htmlgraph directory but not .active-session.
-	if err := os.MkdirAll(filepath.Join(dir, ".htmlgraph"), 0o755); err != nil {
+	// Create the .erinn directory but not .active-session.
+	if err := os.MkdirAll(filepath.Join(dir, ".erinn"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	t.Setenv("ERINN_SESSION_ID", sessionID)
@@ -199,7 +199,7 @@ func TestEnsureSession_ColdPath_WritesActiveSession(t *testing.T) {
 	}
 
 	// Verify .active-session was written and contains the session ID.
-	activePath := filepath.Join(dir, ".htmlgraph", ".active-session")
+	activePath := filepath.Join(dir, ".erinn", ".active-session")
 	b, err := os.ReadFile(activePath)
 	if err != nil {
 		t.Fatalf("reading .active-session: %v", err)

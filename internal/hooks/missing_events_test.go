@@ -8,7 +8,7 @@ import (
 	"github.com/shakestzd/erinn/internal/models"
 )
 
-// setupMissingEventsDB creates a temp project dir with .htmlgraph/ and an
+// setupMissingEventsDB creates a temp project dir with .erinn/ and an
 // active session, returning the database and the session ID.
 func setupMissingEventsDB(t *testing.T) (*testDB, string) {
 	t.Helper()

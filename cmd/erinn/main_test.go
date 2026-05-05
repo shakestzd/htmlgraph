@@ -17,15 +17,15 @@ func fakeCmd(name string) *cobra.Command {
 	return &cobra.Command{Use: name}
 }
 
-// setupTestProject creates a temporary directory with a .htmlgraph/
+// setupTestProject creates a temporary directory with a .erinn/
 // subdirectory (mimicking a real HtmlGraph project) and returns the project
 // root path and a cleanup function.
 func setupTestProject(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
-	hgDir := filepath.Join(tmpDir, ".htmlgraph")
+	hgDir := filepath.Join(tmpDir, ".erinn")
 	if err := os.MkdirAll(hgDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 	// Create a .git directory so looksLikeRealProject passes the git-ancestor
 	// check introduced by the registry hardening (bug-cc41e3d2).

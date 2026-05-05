@@ -30,19 +30,19 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		return &HookResult{}, nil
 	}
 
-	// Guard: never intercept writes to .htmlgraph/ — mirror of
+	// Guard: never intercept writes to .erinn/ — mirror of
 	// pretooluse-htmlgraph-guard.py to prevent accidental DB corruption.
-	// Covers Write/Edit/MultiEdit tools AND Bash commands that target .htmlgraph/.
+	// Covers Write/Edit/MultiEdit tools AND Bash commands that target .erinn/.
 	if isHtmlGraphWrite(event) {
 		return &HookResult{
 			Decision: "block",
-			Reason:   ".htmlgraph/ is managed by HtmlGraph SDK. Use SDK methods instead.",
+			Reason:   ".erinn/ is managed by HtmlGraph SDK. Use SDK methods instead.",
 		}, nil
 	}
 	if isBashHtmlGraphWrite(event) {
 		return &HookResult{
 			Decision: "block",
-			Reason:   ".htmlgraph/ is managed by HtmlGraph CLI. Use `htmlgraph` commands instead of direct file manipulation.",
+			Reason:   ".erinn/ is managed by HtmlGraph CLI. Use `htmlgraph` commands instead of direct file manipulation.",
 		}, nil
 	}
 
@@ -308,7 +308,7 @@ func checkBashCwdGuard(event *CloudEvent) string {
 //   - cd dir && cmd1 && cmd2
 var bareCdPattern = regexp.MustCompile(`^cd\s+[^;)]+&&`)
 
-// isHtmlGraphWrite returns true for file-write tools targeting .htmlgraph/.
+// isHtmlGraphWrite returns true for file-write tools targeting .erinn/.
 func isHtmlGraphWrite(event *CloudEvent) bool {
 	switch event.ToolName {
 	case "Write", "Edit", "MultiEdit":
@@ -324,15 +324,15 @@ func isHtmlGraphWrite(event *CloudEvent) bool {
 
 func containsHtmlgraphDir(path string) bool {
 	for i := range path {
-		if path[i] == '.' && i+11 <= len(path) && path[i:i+11] == ".htmlgraph/" {
+		if path[i] == '.' && i+11 <= len(path) && path[i:i+11] == ".erinn/" {
 			return true
 		}
 	}
-	return path == ".htmlgraph"
+	return path == ".erinn"
 }
 
 // isBashHtmlGraphWrite detects Bash commands that directly manipulate
-// .htmlgraph/ files (rm, sed, echo/cat redirect, python -c, mv, cp, etc.).
+// .erinn/ files (rm, sed, echo/cat redirect, python -c, mv, cp, etc.).
 // These bypass the structured Write/Edit tools and must be blocked.
 func isBashHtmlGraphWrite(event *CloudEvent) bool {
 	if event.ToolName != "Bash" {
@@ -350,35 +350,35 @@ func isBashHtmlGraphWrite(event *CloudEvent) bool {
 }
 
 // bashHtmlGraphCLI matches commands that invoke the htmlgraph CLI binary.
-// These are allowed since the CLI is the approved interface to .htmlgraph/.
+// These are allowed since the CLI is the approved interface to .erinn/.
 var bashHtmlGraphCLI = regexp.MustCompile(`\bhtmlgraph\b`)
 
-// bashHtmlGraphWritePattern matches Bash commands that write to .htmlgraph/.
+// bashHtmlGraphWritePattern matches Bash commands that write to .erinn/.
 // Covers: rm, sed -i, echo/cat/tee redirects (> or >>), mv, cp, python -c,
 // touch, chmod, mkdir, and any other direct manipulation.
 var bashHtmlGraphWritePattern = regexp.MustCompile(
 	`(?:` +
-		`\brm\s+.*\.htmlgraph/` +
+		`\brm\s+.*\.erinn/` +
 		`|` +
-		`\bsed\s+-i.*\.htmlgraph/` +
+		`\bsed\s+-i.*\.erinn/` +
 		`|` +
-		`>[^&\s]\S*\.htmlgraph/` +
+		`>[^&\s]\S*\.erinn/` +
 		`|` +
-		`>>[^&\s]\S*\.htmlgraph/` +
+		`>>[^&\s]\S*\.erinn/` +
 		`|` +
-		`\btee\s+\S*\.htmlgraph/` +
+		`\btee\s+\S*\.erinn/` +
 		`|` +
-		`\bmv\s+.*\.htmlgraph/` +
+		`\bmv\s+.*\.erinn/` +
 		`|` +
-		`\bcp\s+.*\.htmlgraph/` +
+		`\bcp\s+.*\.erinn/` +
 		`|` +
-		`\btouch\s+\S*\.htmlgraph/` +
+		`\btouch\s+\S*\.erinn/` +
 		`|` +
-		`\bchmod\s+.*\.htmlgraph/` +
+		`\bchmod\s+.*\.erinn/` +
 		`|` +
-		`\bmkdir\s+.*\.htmlgraph/` +
+		`\bmkdir\s+.*\.erinn/` +
 		`|` +
-		`\bpython[23]?\s+-c\s+.*\.htmlgraph/` +
+		`\bpython[23]?\s+-c\s+.*\.erinn/` +
 		`)`,
 )
 
@@ -548,7 +548,7 @@ func toInt(v any) int {
 
 // checkProjectDivergence compares the CWD of the current event against the
 // project_dir stored in the session row. When they resolve to different
-// .htmlgraph/ roots:
+// .erinn/ roots:
 //   - Write tools are blocked with a clear error message.
 //   - Read-only tools are silently allowed, but a warning is written to debug.log.
 //

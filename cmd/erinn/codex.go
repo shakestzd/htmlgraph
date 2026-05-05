@@ -25,7 +25,7 @@ func codexConfigPath() string {
 }
 
 // codexMarketplaceSection is the TOML key that indicates our marketplace is registered.
-const codexMarketplaceSection = `[marketplaces.htmlgraph]`
+const codexMarketplaceSection = `[marketplaces.erinn]`
 
 // isCodexMarketplaceInstalledAt is the testable core that reads the given path.
 func isCodexMarketplaceInstalledAt(configPath string) bool {
@@ -34,7 +34,7 @@ func isCodexMarketplaceInstalledAt(configPath string) bool {
 		return false
 	}
 	content := string(data)
-	return strings.Contains(content, "[marketplaces.htmlgraph]") ||
+	return strings.Contains(content, "[marketplaces.erinn]") ||
 		strings.Contains(content, `[plugins."htmlgraph@htmlgraph"]`)
 }
 
@@ -69,9 +69,9 @@ func getCodexMarketplacePathAt(configPath string) string {
 		return ""
 	}
 
-	// Check [marketplaces.htmlgraph]
+	// Check [marketplaces.erinn]
 	if mkts, ok := tree["marketplaces"].(map[string]any); ok {
-		if hg, ok := mkts["htmlgraph"].(map[string]any); ok {
+		if hg, ok := mkts["erinn"].(map[string]any); ok {
 			if source, ok := hg["source"].(string); ok {
 				return source
 			}
@@ -475,12 +475,12 @@ func launchCodexDev(resumeID string, cleanup, dryRun bool, extraArgs []string) e
 }
 
 // resolveLocalCodexMarketplace returns the absolute path to packages/codex-marketplace/
-// by walking up from CWD to find the project root (directory containing .htmlgraph/).
+// by walking up from CWD to find the project root (directory containing .erinn/).
 // Returns an error if no project root is found or the marketplace directory is missing.
 func resolveLocalCodexMarketplace() (string, error) {
 	htmlgraphDir, err := findHtmlgraphDir()
 	if err != nil {
-		return "", fmt.Errorf("could not find project root (.htmlgraph/ directory not found)\n" +
+		return "", fmt.Errorf("could not find project root (.erinn/ directory not found)\n" +
 			"Run from the HtmlGraph project directory, or use htmlgraph codex --init for the marketplace version")
 	}
 	projectRoot := filepath.Dir(htmlgraphDir)
@@ -512,9 +512,9 @@ type codexLaunchOpts struct {
 	ProjectRoot string
 	// WorktreeRoot, when non-empty, overrides the working directory for the
 	// Codex process. The process runs in WorktreeRoot but ERINN_PROJECT_DIR
-	// is set to HtmlgraphRoot (the canonical project root with .htmlgraph/).
+	// is set to HtmlgraphRoot (the canonical project root with .erinn/).
 	WorktreeRoot string
-	// HtmlgraphRoot is the canonical project root containing .htmlgraph/.
+	// HtmlgraphRoot is the canonical project root containing .erinn/.
 	// Used to set ERINN_PROJECT_DIR when running in a worktree.
 	HtmlgraphRoot string
 }

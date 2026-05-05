@@ -58,10 +58,10 @@ type Result struct {
 
 // Query runs the blame lookup for path and returns the aggregated Result.
 // Returns a Result with empty slices (not an error) when no features touched path.
-// Returns an error only on DB failures or unknown path under .htmlgraph/.
+// Returns an error only on DB failures or unknown path under .erinn/.
 func Query(ctx context.Context, db *sql.DB, path string, opts QueryOptions) (*Result, error) {
-	if strings.Contains(path, ".htmlgraph/") || strings.HasPrefix(path, ".htmlgraph") {
-		return nil, fmt.Errorf("path %q is under .htmlgraph/ — use `htmlgraph` CLI commands to inspect work items, not direct file paths", path)
+	if strings.Contains(path, ".erinn/") || strings.HasPrefix(path, ".erinn") {
+		return nil, fmt.Errorf("path %q is under .erinn/ — use `htmlgraph` CLI commands to inspect work items, not direct file paths", path)
 	}
 
 	rows, err := queryFeatureRows(ctx, db, path, opts)

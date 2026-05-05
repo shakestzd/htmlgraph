@@ -27,24 +27,24 @@ type FileInfo struct {
 	LastIndexedAt time.Time `json:"last_indexed_at"`
 }
 
-// Indexer polls .htmlgraph/sessions/*/events.ndjson files for new appends,
+// Indexer polls .erinn/sessions/*/events.ndjson files for new appends,
 // parses each line into a UnifiedSignal, and applies them to SQLite via snk.
 type Indexer struct {
-	htmlgraphDir string
-	snk          sink.SignalSink
-	database     *sql.DB // optional; enables prompt_id bridging when set
+	erinnDir string
+	snk      sink.SignalSink
+	database *sql.DB // optional; enables prompt_id bridging when set
 
 	mu     sync.RWMutex
 	status map[string]FileInfo
 }
 
-// New constructs an Indexer rooted at htmlgraphDir.
-// htmlgraphDir is the .htmlgraph/ directory (e.g. /path/to/project/.htmlgraph).
-func New(htmlgraphDir string, snk sink.SignalSink) *Indexer {
+// New constructs an Indexer rooted at erinnDir.
+// erinnDir is the .erinn/ directory (e.g. /path/to/project/.erinn).
+func New(erinnDir string, snk sink.SignalSink) *Indexer {
 	return &Indexer{
-		htmlgraphDir: htmlgraphDir,
-		snk:          snk,
-		status:       make(map[string]FileInfo),
+		erinnDir: erinnDir,
+		snk:      snk,
+		status:   make(map[string]FileInfo),
 	}
 }
 
@@ -102,7 +102,7 @@ func (idx *Indexer) runOnce(ctx context.Context) {
 
 // discoverSessions returns session IDs that have an events.ndjson file.
 func (idx *Indexer) discoverSessions() ([]string, error) {
-	sessionsDir := filepath.Join(idx.htmlgraphDir, "sessions")
+	sessionsDir := filepath.Join(idx.erinnDir, "sessions")
 	entries, err := os.ReadDir(sessionsDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -127,7 +127,7 @@ func (idx *Indexer) discoverSessions() ([]string, error) {
 // processSession tails events.ndjson for sessionID from the last checkpoint,
 // parses each line, and applies the batch to snk. On success, writes a new checkpoint.
 func (idx *Indexer) processSession(ctx context.Context, sessionID string) error {
-	sessDir := filepath.Join(idx.htmlgraphDir, "sessions", sessionID)
+	sessDir := filepath.Join(idx.erinnDir, "sessions", sessionID)
 	ndjsonPath := filepath.Join(sessDir, "events.ndjson")
 	checkpointPath := filepath.Join(sessDir, ".index-offset")
 

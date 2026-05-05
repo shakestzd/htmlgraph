@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// orchestratorConfig mirrors the JSON stored in .htmlgraph/orchestrator.json.
+// orchestratorConfig mirrors the JSON stored in .erinn/orchestrator.json.
 type orchestratorConfig struct {
 	Enabled       bool   `json:"enabled"`
 	Mode          string `json:"mode,omitempty"`

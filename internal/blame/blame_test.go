@@ -185,9 +185,9 @@ func TestQuery_UnknownPath_EmptyNotError(t *testing.T) {
 func TestQuery_HtmlgraphPath_Error(t *testing.T) {
 	database := openTestDB(t)
 
-	_, err := blame.Query(context.Background(), database, ".htmlgraph/features/feat-abc.html", blame.QueryOptions{})
+	_, err := blame.Query(context.Background(), database, ".erinn/features/feat-abc.html", blame.QueryOptions{})
 	if err == nil {
-		t.Error("expected error for .htmlgraph/ path, got nil")
+		t.Error("expected error for .erinn/ path, got nil")
 	}
 }
 

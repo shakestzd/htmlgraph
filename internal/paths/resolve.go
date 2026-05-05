@@ -18,7 +18,7 @@ import (
 type ProjectDirOptions struct {
 	// ExplicitDir is the value of the --project-dir CLI flag.
 	// When non-empty it is checked first and an error is returned if it
-	// does not contain a .htmlgraph directory.
+	// does not contain a .erinn directory.
 	ExplicitDir string
 
 	// EventCWD is the "cwd" field extracted from a CloudEvent payload.
@@ -35,7 +35,7 @@ type ProjectDirOptions struct {
 }
 
 // ResolveProjectDir locates the project root (the directory that contains
-// .htmlgraph/) using the following priority order:
+// .erinn/) using the following priority order:
 //
 //  1. opts.ExplicitDir (--project-dir flag) — hard error if set but invalid
 //  2. ERINN_PROJECT_DIR env var — written by yolo mode (subagent override);
@@ -45,27 +45,27 @@ type ProjectDirOptions struct {
 //  4. Session-scoped hint file — written by SubagentStart for worktree
 //     subagents whose CLAUDE_ENV_FILE is unset; read via ReadSessionHint()
 //  5. ResolveViaGitCommonDir() — worktree → main repo root
-//  6. opts.EventCWD — direct .htmlgraph check
-//  7. os.Getwd() — direct .htmlgraph check
+//  6. opts.EventCWD — direct .erinn check
+//  7. os.Getwd() — direct .erinn check
 //  8. Walk-up from opts.EventCWD (limited by WalkLevels when > 0)
 //  9. Walk-up from os.Getwd() (unlimited)
 //
-// Returns the project root directory (not the .htmlgraph subdirectory).
-// The only hard-error case is when ExplicitDir is set but no .htmlgraph
+// Returns the project root directory (not the .erinn subdirectory).
+// The only hard-error case is when ExplicitDir is set but no .erinn
 // can be found there.  All other failures fall back gracefully.
 func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 	// 1. Explicit flag — highest priority, hard-fail on miss.
 	if opts.ExplicitDir != "" {
-		if _, err := os.Stat(filepath.Join(opts.ExplicitDir, ".htmlgraph")); err == nil {
+		if _, err := os.Stat(filepath.Join(opts.ExplicitDir, ".erinn")); err == nil {
 			return opts.ExplicitDir, nil
 		}
-		return "", fmt.Errorf("--project-dir %q: no .htmlgraph directory found. cd into a repo with .htmlgraph/ or set $CLAUDE_PROJECT_DIR", opts.ExplicitDir)
+		return "", fmt.Errorf("--project-dir %q: no .erinn directory found. cd into a repo with .erinn/ or set $CLAUDE_PROJECT_DIR", opts.ExplicitDir)
 	}
 
 	// 2. ERINN_PROJECT_DIR env var — written by yolo mode (subagent override);
 	// takes precedence over ambient CLAUDE_PROJECT_DIR.
 	if d := os.Getenv("ERINN_PROJECT_DIR"); d != "" {
-		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
+		if _, err := os.Stat(filepath.Join(d, ".erinn")); err == nil {
 			return d, nil
 		}
 	}
@@ -75,7 +75,7 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 	// session's hook runner (not inherited as a stale value from a parent shell).
 	// See: fix for bug-71fc095f (split-brain session HTML when user cd's between projects).
 	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" && os.Getenv("ERINN_SESSION_ID") != "" {
-		if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
+		if _, err := os.Stat(filepath.Join(d, ".erinn")); err == nil {
 			return d, nil
 		}
 	}
@@ -86,7 +86,7 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 	// don't set SessionID and skip this.
 	if opts.SessionID != "" {
 		if d := ReadSessionHint(opts.SessionID); d != "" {
-			if _, err := os.Stat(filepath.Join(d, ".htmlgraph")); err == nil {
+			if _, err := os.Stat(filepath.Join(d, ".erinn")); err == nil {
 				return d, nil
 			}
 		}
@@ -103,14 +103,14 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 
 	// 6. EventCWD direct check.
 	if opts.EventCWD != "" {
-		if _, err := os.Stat(filepath.Join(opts.EventCWD, ".htmlgraph")); err == nil {
+		if _, err := os.Stat(filepath.Join(opts.EventCWD, ".erinn")); err == nil {
 			return opts.EventCWD, nil
 		}
 	}
 
 	// 7. Process CWD direct check.
 	if wd, err := os.Getwd(); err == nil {
-		if _, err := os.Stat(filepath.Join(wd, ".htmlgraph")); err == nil {
+		if _, err := os.Stat(filepath.Join(wd, ".erinn")); err == nil {
 			return wd, nil
 		}
 	}
@@ -137,10 +137,10 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 	if wd, err := os.Getwd(); err == nil {
 		return wd, nil
 	}
-	return "", errors.New("no .htmlgraph directory found. cd into a repo with .htmlgraph/ or run `htmlgraph status` to confirm your project dir")
+	return "", errors.New("no .erinn directory found. cd into a repo with .erinn/ or run `htmlgraph status` to confirm your project dir")
 }
 
-// walkUpForHtmlgraph traverses parent directories looking for .htmlgraph/.
+// walkUpForHtmlgraph traverses parent directories looking for .erinn/.
 // maxLevels == 0 means walk all the way to the filesystem root.
 func walkUpForHtmlgraph(start string, maxLevels int) string {
 	dir := start
@@ -150,7 +150,7 @@ func walkUpForHtmlgraph(start string, maxLevels int) string {
 			break
 		}
 		dir = parent
-		if _, err := os.Stat(filepath.Join(dir, ".htmlgraph")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, ".erinn")); err == nil {
 			return dir
 		}
 	}
@@ -168,7 +168,7 @@ func walkUpForHtmlgraph(start string, maxLevels int) string {
 // walk-up logic.
 //
 // The function also verifies that the resolved main repo root contains a
-// `.htmlgraph/` directory before returning it, so callers can use the return
+// `.erinn/` directory before returning it, so callers can use the return
 // value directly as a project root without a second stat.
 //
 // If dir is empty the function uses os.Getwd().
@@ -203,7 +203,7 @@ func ResolveViaGitCommonDir(dir string) string {
 
 	mainRepoRoot := filepath.Dir(gitCommonDir)
 
-	candidate := filepath.Join(mainRepoRoot, ".htmlgraph")
+	candidate := filepath.Join(mainRepoRoot, ".erinn")
 	if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 		return mainRepoRoot
 	}

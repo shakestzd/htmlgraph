@@ -170,7 +170,7 @@ func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir, session
 		// handled by the traceparent queue (writeTraceparent is called by the
 		// SubagentStart handler before this function). Write the project dir
 		// to a session-scoped temp file so downstream hook processes can still
-		// resolve .htmlgraph/ when their EventCWD is a temp directory.
+		// resolve .erinn/ when their EventCWD is a temp directory.
 		debugLog(projectDir, "[htmlgraph] CLAUDE_ENV_FILE unset — writing session-scoped project dir hint (agent=%s session=%s)", agentType, sessionID)
 		writeSessionProjectDirHint(sessionID, projectDir)
 		return
@@ -187,7 +187,7 @@ func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir, session
 		parentEventID, agentID, agentType,
 	)
 	// Also propagate the project directory so subagent hook invocations can
-	// resolve .htmlgraph/ even when their EventCWD is a temp dir.
+	// resolve .erinn/ even when their EventCWD is a temp dir.
 	if projectDir != "" {
 		lines += "export ERINN_PROJECT_DIR=" + projectDir + "\n"
 	}

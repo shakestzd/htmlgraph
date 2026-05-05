@@ -195,23 +195,23 @@ func TestWalkAreas_RootScoping(t *testing.T) {
 }
 
 // TestWalkAreas_ExcludesHtmlgraphDir verifies that work-item HTML under
-// .htmlgraph/ is excluded — those files have their own attribution model
+// .erinn/ is excluded — those files have their own attribution model
 // and would otherwise drown out the source-code inventory.
 func TestWalkAreas_ExcludesHtmlgraphDir(t *testing.T) {
 	database := openTestDB(t)
 
 	root := t.TempDir()
 	writeFile(t, root, "visible.go")
-	hgDir := filepath.Join(root, ".htmlgraph")
+	hgDir := filepath.Join(root, ".erinn")
 	if err := os.MkdirAll(hgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeFile(t, hgDir, "trk-x.html")
-	gitInit(t, root, "visible.go", ".htmlgraph/trk-x.html")
+	gitInit(t, root, "visible.go", ".erinn/trk-x.html")
 
 	insertTrack(t, database, "trk-htmlgraph", "Track Htmlgraph")
 	insertFeature(t, database, "feat-htmlgraph", "Feature Htmlgraph", "trk-htmlgraph")
-	insertFeatureFile(t, database, "ff-htmlgraph", "feat-htmlgraph", ".htmlgraph/trk-x.html")
+	insertFeatureFile(t, database, "ff-htmlgraph", "feat-htmlgraph", ".erinn/trk-x.html")
 
 	res, err := blame.WalkAreas(context.Background(), database, root, blame.WalkOptions{
 		IncludeUntracked: boolPtr(true),
@@ -222,14 +222,14 @@ func TestWalkAreas_ExcludesHtmlgraphDir(t *testing.T) {
 
 	for _, ta := range res.ByTrack {
 		for _, f := range ta.Files {
-			if filepath.Dir(f.Path) == ".htmlgraph" {
-				t.Errorf("file under .htmlgraph/ should not appear in ByTrack: %s", f.Path)
+			if filepath.Dir(f.Path) == ".erinn" {
+				t.Errorf("file under .erinn/ should not appear in ByTrack: %s", f.Path)
 			}
 		}
 	}
 	for _, u := range res.Untracked {
-		if filepath.Dir(u) == ".htmlgraph" {
-			t.Errorf("file under .htmlgraph/ should not appear in Untracked: %s", u)
+		if filepath.Dir(u) == ".erinn" {
+			t.Errorf("file under .erinn/ should not appear in Untracked: %s", u)
 		}
 	}
 }

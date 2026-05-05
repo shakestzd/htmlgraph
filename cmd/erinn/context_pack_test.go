@@ -16,12 +16,12 @@ import (
 	"github.com/shakestzd/erinn/internal/workitem"
 )
 
-// setupContextPackEnv creates a minimal .htmlgraph directory tree and opens a
+// setupContextPackEnv creates a minimal .erinn directory tree and opens a
 // Project. Returns the temp root dir, hgDir, and the open project.
 func setupContextPackEnv(t *testing.T) (tmpDir, hgDir string, proj *workitem.Project) {
 	t.Helper()
 	tmpDir = t.TempDir()
-	hgDir = filepath.Join(tmpDir, ".htmlgraph")
+	hgDir = filepath.Join(tmpDir, ".erinn")
 	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
 		if err := os.MkdirAll(filepath.Join(hgDir, sub), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", sub, err)

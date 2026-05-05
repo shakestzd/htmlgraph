@@ -24,13 +24,13 @@ import (
 //     featOrphan (no feature_files),
 //     featStable (already on its dominant track).
 //
-// Returns the .htmlgraph directory path and a project root for the test.
+// Returns the .erinn directory path and a project root for the test.
 func migrateTracksTestEnv(t *testing.T) (hgDir, rulesPath string) {
 	t.Helper()
 	root := t.TempDir()
-	hgDir = filepath.Join(root, ".htmlgraph")
+	hgDir = filepath.Join(root, ".erinn")
 	if err := os.MkdirAll(hgDir, 0o755); err != nil {
-		t.Fatalf("mkdir .htmlgraph: %v", err)
+		t.Fatalf("mkdir .erinn: %v", err)
 	}
 
 	// Force the DB to live inside the project for test isolation.

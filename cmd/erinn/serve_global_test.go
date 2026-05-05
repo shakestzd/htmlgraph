@@ -14,16 +14,16 @@ import (
 	"github.com/shakestzd/erinn/internal/registry"
 )
 
-// globalTestProject creates a tmpdir project with a .htmlgraph dir. Unlike
+// globalTestProject creates a tmpdir project with a .erinn dir. Unlike
 // the pre-doorway version, it does NOT populate a SQLite schema because
-// the doorway server no longer opens project DBs. A bare .htmlgraph/
+// the doorway server no longer opens project DBs. A bare .erinn/
 // directory is enough for registry.Upsert to accept the path.
 // A .git directory is also created so looksLikeRealProject passes the
 // git-ancestor check introduced by the registry hardening (bug-cc41e3d2).
 func globalTestProject(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
-	hgDir := filepath.Join(tmp, ".htmlgraph")
+	hgDir := filepath.Join(tmp, ".erinn")
 	if err := os.MkdirAll(hgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestDoorwayNeverOpensDBs(t *testing.T) {
 	p1 := globalTestProject(t)
 	setupGlobalRegistry(t, p1)
 
-	dbPath := filepath.Join(p1, ".htmlgraph", "htmlgraph.db")
+	dbPath := filepath.Join(p1, ".erinn", "htmlgraph.db")
 
 	// Initialize a minimal schema so we can detect any mutation.
 	db, err := sql.Open("sqlite", dbPath)
