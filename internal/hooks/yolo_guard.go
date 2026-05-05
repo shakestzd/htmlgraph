@@ -38,6 +38,43 @@ func isYoloFromEvent(event *CloudEvent, htmlgraphDir string) bool {
 	return isYoloFromDB(htmlgraphDir, event.SessionID)
 }
 
+// isYoloWithInheritance checks YOLO mode for the current session and, when the
+// current session has no YOLO marker, walks the parent-session chain to check
+// whether any ancestor session is in YOLO posture.
+//
+// Conservative scope: only walks when the current session has no YOLO tag of
+// its own (i.e. isYoloFromEvent returns false and event.PermissionMode is empty).
+// An explicit non-YOLO permission_mode on the current session is never overridden.
+//
+// When YOLO is inherited from an ancestor, a debug log line is emitted for
+// auditability.
+func isYoloWithInheritance(event *CloudEvent, htmlgraphDir string, database *sql.DB, sessionID, projectDir string) bool {
+	if isYoloFromEvent(event, htmlgraphDir) {
+		return true
+	}
+	// An explicit non-empty, non-bypass permission_mode means the current session
+	// has declared itself non-YOLO — do not override with an ancestor's posture.
+	if event.PermissionMode != "" {
+		return false
+	}
+	// Current session has no declared mode. Walk the parent chain.
+	if database == nil || sessionID == "" {
+		return false
+	}
+	sessionIDs := getSessionAndParent(database, sessionID)
+	if len(sessionIDs) < 2 {
+		return false // no parent
+	}
+	for _, parentID := range sessionIDs[1:] {
+		if isYoloFromDB(htmlgraphDir, parentID) {
+			debugLog(projectDir, "[htmlgraph] yolo inherited: session=%s parent=%s",
+				sessionID, parentID)
+			return true
+		}
+	}
+	return false
+}
+
 // isYoloFromDB looks up the session's permission_mode from the sessions.metadata
 // JSON column. This is populated by the ConfigChange hook when the user toggles
 // permission mode in Claude Code.
