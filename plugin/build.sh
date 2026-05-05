@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# build.sh - Build the htmlgraph Go binary for the plugin.
+# build.sh - Build the erinn Go binary for the plugin.
 #
 # Usage:
-#   ./build.sh          # Dev mode: binary at hooks/bin/htmlgraph
-#   ./build.sh --dist   # Dist mode: binary at hooks/bin/htmlgraph-bin,
-#                        #            bootstrap script at hooks/bin/htmlgraph
+#   ./build.sh          # Dev mode: binary at ~/.local/bin/erinn
+#   ./build.sh --dist   # Dist mode: binary at hooks/bin/erinn-bin,
+#                        #            bootstrap script at hooks/bin/erinn
 
 set -euo pipefail
 
@@ -34,41 +34,41 @@ VERSION_RAW=$(git describe --tags --always 2>/dev/null || echo "dev")
 VERSION="${VERSION_RAW#v}"
 
 if [ "${DIST_MODE}" = true ]; then
-    echo "Building htmlgraph (dist mode, version: ${VERSION})..."
+    echo "Building erinn (dist mode, version: ${VERSION})..."
     go build -ldflags "-s -w -X main.version=${VERSION}" \
-        -o "${BIN_DIR}/htmlgraph-bin" ./cmd/htmlgraph/
-    chmod +x "${BIN_DIR}/htmlgraph-bin"
+        -o "${BIN_DIR}/erinn-bin" ./cmd/erinn/
+    chmod +x "${BIN_DIR}/erinn-bin"
 
     # Copy bootstrap script as the entry point
-    cp "${BIN_DIR}/bootstrap.sh" "${BIN_DIR}/htmlgraph"
-    chmod +x "${BIN_DIR}/htmlgraph"
+    cp "${BIN_DIR}/bootstrap.sh" "${BIN_DIR}/erinn"
+    chmod +x "${BIN_DIR}/erinn"
 
     # Install to ~/.local/bin so bootstrap skips download
     INSTALL_DIR="${HOME}/.local/bin"
-    META_DIR="${HOME}/.local/share/htmlgraph"
+    META_DIR="${HOME}/.local/share/erinn"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
-    rm -f "${INSTALL_DIR}/htmlgraph"  # Fresh inode avoids macOS signature cache
-    cp "${BIN_DIR}/htmlgraph-bin" "${INSTALL_DIR}/htmlgraph"
-    chmod +x "${INSTALL_DIR}/htmlgraph"
+    rm -f "${INSTALL_DIR}/erinn"  # Fresh inode avoids macOS signature cache
+    cp "${BIN_DIR}/erinn-bin" "${INSTALL_DIR}/erinn"
+    chmod +x "${INSTALL_DIR}/erinn"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
 
     echo "Dist build complete:"
-    echo "  Entry point: plugin/hooks/bin/htmlgraph (bootstrap)"
-    echo "  Binary:      plugin/hooks/bin/htmlgraph-bin"
-    echo "  Installed:   ${INSTALL_DIR}/htmlgraph (v${VERSION})"
+    echo "  Entry point: plugin/hooks/bin/erinn (bootstrap)"
+    echo "  Binary:      plugin/hooks/bin/erinn-bin"
+    echo "  Installed:   ${INSTALL_DIR}/erinn (v${VERSION})"
 else
-    echo "Building htmlgraph (dev mode, version: ${VERSION})..."
+    echo "Building erinn (dev mode, version: ${VERSION})..."
 
-    # Build directly to ~/.local/bin/htmlgraph — no intermediate artifact.
+    # Build directly to ~/.local/bin/erinn — no intermediate artifact.
     # The plugin-has-its-own-binary architecture was removed in commit 5ae76555c;
-    # hooks.json now uses bare 'htmlgraph' via PATH lookup.
+    # hooks.json now uses bare 'erinn' via PATH lookup.
     INSTALL_DIR="${HOME}/.local/bin"
-    META_DIR="${HOME}/.local/share/htmlgraph"
+    META_DIR="${HOME}/.local/share/erinn"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
-    rm -f "${INSTALL_DIR}/htmlgraph"  # Fresh inode avoids macOS signature cache
+    rm -f "${INSTALL_DIR}/erinn"  # Fresh inode avoids macOS signature cache
     go build -ldflags "-s -w -X main.version=${VERSION}" \
-        -o "${INSTALL_DIR}/htmlgraph" ./cmd/htmlgraph/
-    chmod +x "${INSTALL_DIR}/htmlgraph"
+        -o "${INSTALL_DIR}/erinn" ./cmd/erinn/
+    chmod +x "${INSTALL_DIR}/erinn"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
-    echo "Installed: ${INSTALL_DIR}/htmlgraph (v${VERSION})"
+    echo "Installed: ${INSTALL_DIR}/erinn (v${VERSION})"
 fi
