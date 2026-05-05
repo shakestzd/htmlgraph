@@ -6,18 +6,41 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/shakestzd/htmlgraph/internal/registry"
 )
 
-// makeRealProject creates a tempdir that passes looksLikeRealProject:
-// it has a .htmlgraph/ subdirectory and a .git/ directory (in the same dir,
-// satisfying the ancestor walk). Returns the project root.
+// makeSafeBaseDir creates a temp directory directly under os.TempDir() using
+// a "proj-*" prefix so no component of the path starts with "Test". This is
+// required for tests that call Upsert: t.TempDir() produces a path whose
+// parent starts with "Test" (e.g. /tmp/TestFooBar123/001) which triggers
+// ShouldSkipRegistration, causing Upsert to silently skip the entry.
+//
+// Returns the directory path. t.Cleanup is registered to remove it.
+func makeSafeBaseDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp(os.TempDir(), "proj-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
+// makeRealProject creates a directory that passes looksLikeRealProject:
+// it has a .htmlgraph/ subdirectory and a .git/ directory. Returns the project root.
+//
+// The directory is created directly under os.TempDir() with a "proj-*" prefix,
+// NOT under t.TempDir(). This is intentional: t.TempDir() returns a path whose
+// parent component starts with "Test", which would trigger ShouldSkipRegistration
+// and cause Upsert to silently skip the entry — breaking tests that explicitly
+// verify registry behaviour for real-looking project directories.
 func makeRealProject(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
+	dir := makeSafeBaseDir(t)
 	if err := os.MkdirAll(filepath.Join(dir, ".htmlgraph"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -25,6 +48,23 @@ func makeRealProject(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+// makePersistentRegistryPath creates a registry path outside os.TempDir() so
+// tests can exercise the persistent-registry guard without touching the real
+// user registry.
+func makePersistentRegistryPath(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(wd, ".registry-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return filepath.Join(dir, "projects.json")
 }
 
 // TestLoad_MissingFile ensures Load on a nonexistent path returns an empty registry with no error.
@@ -168,10 +208,11 @@ func TestSave_AtomicRename(t *testing.T) {
 
 // TestPrune_RemovesStale ensures Prune removes entries whose <dir>/.htmlgraph does not exist.
 func TestPrune_RemovesStale(t *testing.T) {
-	tmp := t.TempDir()
+	// Use makeSafeBaseDir to avoid ShouldSkipRegistration blocking Upsert.
+	validDir := makeSafeBaseDir(t)
+	staleDir := makeSafeBaseDir(t)
 
 	// Valid project: has both .htmlgraph and .git subdirectories (passes Upsert guard).
-	validDir := filepath.Join(tmp, "valid-project")
 	if err := os.MkdirAll(filepath.Join(validDir, ".htmlgraph"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +221,6 @@ func TestPrune_RemovesStale(t *testing.T) {
 	}
 
 	// Stale project: was once valid (upserted), then .htmlgraph was removed.
-	staleDir := filepath.Join(tmp, "stale-project")
 	if err := os.MkdirAll(filepath.Join(staleDir, ".htmlgraph"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +228,7 @@ func TestPrune_RemovesStale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path := filepath.Join(tmp, "projects.json")
+	path := filepath.Join(t.TempDir(), "projects.json")
 	r, err := registry.Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -222,11 +262,9 @@ func TestPrune_RemovesStale(t *testing.T) {
 // path containing "/wt-" to the "main" root so we can drive the
 // logic without a real git repo.
 func TestDropLinkedWorktrees(t *testing.T) {
-	tmp := t.TempDir()
-
 	// Create real-looking project dirs (with .htmlgraph + .git) so Upsert
-	// accepts them.
-	makeProjAt := func(dir string) {
+	// accepts them. Use makeSafeBaseDir to avoid ShouldSkipRegistration.
+	addHgGit := func(dir string) {
 		t.Helper()
 		if err := os.MkdirAll(filepath.Join(dir, ".htmlgraph"), 0o755); err != nil {
 			t.Fatal(err)
@@ -235,16 +273,16 @@ func TestDropLinkedWorktrees(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	mainDir := filepath.Join(tmp, "main")
-	wt1 := filepath.Join(tmp, "wt-feat-a")
-	wt2 := filepath.Join(tmp, "wt-feat-b")
-	standalone := filepath.Join(tmp, "other-project")
-	makeProjAt(mainDir)
-	makeProjAt(wt1)
-	makeProjAt(wt2)
-	makeProjAt(standalone)
+	mainDir := makeSafeBaseDir(t)
+	wt1 := makeSafeBaseDir(t)
+	wt2 := makeSafeBaseDir(t)
+	standalone := makeSafeBaseDir(t)
+	addHgGit(mainDir)
+	addHgGit(wt1)
+	addHgGit(wt2)
+	addHgGit(standalone)
 
-	path := filepath.Join(tmp, "projects.json")
+	path := filepath.Join(t.TempDir(), "projects.json")
 	r, err := registry.Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -283,10 +321,10 @@ func TestDropLinkedWorktrees(t *testing.T) {
 // TestDropLinkedWorktrees_NilResolver is a safety check — passing nil
 // must be a no-op, not a panic.
 func TestDropLinkedWorktrees_NilResolver(t *testing.T) {
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "projects.json")
+	path := filepath.Join(t.TempDir(), "projects.json")
 	r, _ := registry.Load(path)
-	aDir := filepath.Join(tmp, "a")
+	// Use makeSafeBaseDir to avoid ShouldSkipRegistration rejecting the Upsert.
+	aDir := makeSafeBaseDir(t)
 	if err := os.MkdirAll(filepath.Join(aDir, ".htmlgraph"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -501,9 +539,15 @@ func TestNoRegistryPollution(t *testing.T) {
 
 	// Upsert from a dir with .htmlgraph/ but no .git ancestor — must be
 	// ACCEPTED. Non-Git projects are valid HtmlGraph projects.
+	// Use a proj-* prefixed dir directly under os.TempDir() so the path
+	// doesn't have a Test* component (which would trigger ShouldSkipRegistration).
 	t.Run("htmlgraph_without_git_accepted", func(t *testing.T) {
 		baseline := loadCount()
-		nonGit := t.TempDir()
+		nonGit, err := os.MkdirTemp(os.TempDir(), "proj-nongit-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.RemoveAll(nonGit) })
 		if err := os.MkdirAll(filepath.Join(nonGit, ".htmlgraph"), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -645,5 +689,151 @@ func TestLoad_MigrationPending(t *testing.T) {
 	}
 	if r2.MigrationPending() {
 		t.Error("post-migration Load reports MigrationPending(); want false")
+	}
+}
+
+// ---- ShouldSkipRegistration tests ----
+
+// TestShouldSkipRegistration_TempDirTestPattern verifies that a path inside
+// the OS temp dir with a Test* component is identified as a skip candidate.
+func TestShouldSkipRegistration_TempDirTestPattern(t *testing.T) {
+	// Build a synthetic path under os.TempDir() with a "Test" component.
+	base, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		base = os.TempDir()
+	}
+	testPath := filepath.Join(base, "TestFooBar123", "sub")
+	if !registry.ShouldSkipRegistration(testPath) {
+		t.Errorf("ShouldSkipRegistration(%q) = false, want true", testPath)
+	}
+}
+
+// TestShouldSkipRegistration_TempDirNonTest verifies that a path inside
+// os.TempDir() without a Test* component is NOT skipped.
+func TestShouldSkipRegistration_TempDirNonTest(t *testing.T) {
+	base, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		base = os.TempDir()
+	}
+	realTempPath := filepath.Join(base, "myproject")
+	if registry.ShouldSkipRegistration(realTempPath) {
+		t.Errorf("ShouldSkipRegistration(%q) = true, want false (no Test* component)", realTempPath)
+	}
+}
+
+// TestShouldSkipRegistration_RealPath verifies a normal production path is not skipped.
+func TestShouldSkipRegistration_RealPath(t *testing.T) {
+	if registry.ShouldSkipRegistration("/workspaces/htmlgraph") {
+		t.Error("ShouldSkipRegistration(/workspaces/htmlgraph) = true, want false")
+	}
+}
+
+// TestShouldSkipRegistration_EnvVar verifies the HTMLGRAPH_SKIP_REGISTER=1 env
+// var causes all paths to be skipped regardless of the path structure.
+func TestShouldSkipRegistration_EnvVar(t *testing.T) {
+	t.Setenv("HTMLGRAPH_SKIP_REGISTER", "1")
+	if !registry.ShouldSkipRegistration("/workspaces/htmlgraph") {
+		t.Error("ShouldSkipRegistration with HTMLGRAPH_SKIP_REGISTER=1 returned false, want true")
+	}
+	if !registry.ShouldSkipRegistration("/tmp/myproject") {
+		t.Error("ShouldSkipRegistration with HTMLGRAPH_SKIP_REGISTER=1 returned false for /tmp path")
+	}
+}
+
+// TestShouldSkipRegistration_UpsertBlocked verifies that Upsert silently
+// rejects a path that ShouldSkipRegistration identifies as a test tempdir.
+func TestShouldSkipRegistration_UpsertBlocked(t *testing.T) {
+	// Build a fake Test* path under os.TempDir() that also has a .htmlgraph dir
+	// (to ensure looksLikeRealProject would pass if skip weren't active).
+	base, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		base = os.TempDir()
+	}
+	testProjDir := filepath.Join(base, "TestRegistrySkip123")
+	if err := os.MkdirAll(filepath.Join(testProjDir, ".htmlgraph"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testProjDir)
+
+	reg, _ := registry.Load(makePersistentRegistryPath(t))
+	reg.Upsert(testProjDir, "test-proj", "")
+	if len(reg.List()) != 0 {
+		t.Errorf("Upsert accepted a test tempdir path; registry has %d entries, want 0", len(reg.List()))
+	}
+}
+
+// ---- PruneStale tests ----
+
+// TestPruneStale_RemovesOldEntries verifies that entries older than the TTL
+// are removed while recent ones are kept.
+func TestPruneStale_RemovesOldEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "projects.json")
+
+	old := time.Now().Add(-4 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	recent := time.Now().Add(-1 * time.Hour).UTC().Format(time.RFC3339)
+
+	entries := []registry.Entry{
+		{ID: "aabbccdd", ProjectDir: "/old/proj", Name: "old", LastSeen: old},
+		{ID: "11223344", ProjectDir: "/recent/proj", Name: "recent", LastSeen: recent},
+	}
+	if err := registry.WriteEntriesForTest(path, entries); err != nil {
+		t.Fatalf("WriteEntriesForTest: %v", err)
+	}
+
+	reg, err := registry.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	removed := registry.PruneStale(reg, 3*24*time.Hour)
+	if removed != 1 {
+		t.Errorf("PruneStale removed %d entries, want 1", removed)
+	}
+	remaining := reg.List()
+	if len(remaining) != 1 {
+		t.Fatalf("expected 1 remaining entry, got %d", len(remaining))
+	}
+	if remaining[0].Name != "recent" {
+		t.Errorf("wrong entry kept: %q", remaining[0].Name)
+	}
+}
+
+// TestPruneStale_EmptyRegistry verifies PruneStale is a no-op on an empty registry.
+func TestPruneStale_EmptyRegistry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "projects.json")
+	reg, _ := registry.Load(path)
+	removed := registry.PruneStale(reg, 3*24*time.Hour)
+	if removed != 0 {
+		t.Errorf("PruneStale on empty registry removed %d, want 0", removed)
+	}
+	if len(reg.List()) != 0 {
+		t.Errorf("PruneStale on empty registry left %d entries, want 0", len(reg.List()))
+	}
+}
+
+// TestPruneStale_AllRecent verifies PruneStale keeps all entries when none are stale.
+func TestPruneStale_AllRecent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "projects.json")
+
+	recent := time.Now().Add(-1 * time.Hour).UTC().Format(time.RFC3339)
+	entries := []registry.Entry{
+		{ID: "aabbccdd", ProjectDir: "/proj/a", Name: "a", LastSeen: recent},
+		{ID: "11223344", ProjectDir: "/proj/b", Name: "b", LastSeen: recent},
+	}
+	if err := registry.WriteEntriesForTest(path, entries); err != nil {
+		t.Fatalf("WriteEntriesForTest: %v", err)
+	}
+
+	reg, err := registry.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	removed := registry.PruneStale(reg, 3*24*time.Hour)
+	if removed != 0 {
+		t.Errorf("PruneStale removed %d entries from all-recent registry, want 0", removed)
+	}
+	if len(reg.List()) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(reg.List()))
 	}
 }

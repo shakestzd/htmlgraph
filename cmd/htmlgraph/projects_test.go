@@ -231,3 +231,108 @@ func readTableNames(t *testing.T, dbPath string) []string {
 	}
 	return names
 }
+
+// TestPruneSince_3d_RemovesOlder verifies that --since 3d removes entries older
+// than 3 days while keeping recent ones.
+func TestPruneSince_3d_RemovesOlder(t *testing.T) {
+	old := time.Now().Add(-4 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	recent := time.Now().Add(-1 * time.Hour).UTC().Format(time.RFC3339)
+
+	regPath := withRegistryAtAndStale(t, []registry.Entry{
+		{ProjectDir: "/tmp/old-project", Name: "old", LastSeen: old},
+		{ProjectDir: "/tmp/recent-project", Name: "recent", LastSeen: recent},
+	})
+
+	cmd := projectsCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"prune", "--since", "3d"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	reloaded, err := registry.Load(regPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := reloaded.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry after --since prune, got %d: %+v", len(entries), entries)
+	}
+	if entries[0].Name != "recent" {
+		t.Errorf("wrong entry kept: %q", entries[0].Name)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "pruned 1") {
+		t.Errorf("expected 'pruned 1' in output, got: %s", out)
+	}
+}
+
+// TestPruneTempdirOnly_RemovesTestPaths verifies --tempdir-only removes only
+// entries that match Go test tempdir naming pattern.
+func TestPruneTempdirOnly_RemovesTestPaths(t *testing.T) {
+	// Build a real test-tempdir path so ShouldSkipRegistration returns true.
+	base := os.TempDir()
+	testPath := filepath.Join(base, "TestPruneTarget999")
+
+	regPath := withRegistryAtAndStale(t, []registry.Entry{
+		{ProjectDir: testPath, Name: "test-pollution"},
+		{ProjectDir: "/workspaces/htmlgraph", Name: "real"},
+	})
+
+	cmd := projectsCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"prune", "--tempdir-only"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	reloaded, err := registry.Load(regPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := reloaded.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry after --tempdir-only prune, got %d: %+v", len(entries), entries)
+	}
+	if entries[0].Name != "real" {
+		t.Errorf("wrong entry kept: %q", entries[0].Name)
+	}
+}
+
+// TestPruneDryRun_DoesNotWrite verifies --dry-run prints what would be removed
+// without mutating the registry on disk.
+func TestPruneDryRun_DoesNotWrite(t *testing.T) {
+	old := time.Now().Add(-4 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	regPath := withRegistryAtAndStale(t, []registry.Entry{
+		{ProjectDir: "/tmp/old-dry-project", Name: "old", LastSeen: old},
+	})
+
+	cmd := projectsCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"prune", "--since", "3d", "--dry-run"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	// Registry on disk should be unchanged.
+	reloaded, err := registry.Load(regPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := reloaded.List()
+	if len(entries) != 1 {
+		t.Fatalf("dry-run must not write: expected 1 entry on disk, got %d", len(entries))
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "dry-run") {
+		t.Errorf("expected 'dry-run' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "would prune") {
+		t.Errorf("expected 'would prune' in output, got: %s", out)
+	}
+}

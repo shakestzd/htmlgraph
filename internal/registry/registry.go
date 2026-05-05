@@ -30,10 +30,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
+
+// DefaultRegistryTTL is the maximum age of a registry entry before passive
+// cleanup removes it. Three days reflects the dashboard's purpose: active
+// work. If you haven't touched a project in three days it shouldn't pollute
+// the landing view; re-running htmlgraph in the project re-registers it instantly.
+const DefaultRegistryTTL = 3 * 24 * time.Hour
 
 // Entry represents a single registered HtmlGraph project.
 type Entry struct {
@@ -108,7 +115,7 @@ func Load(path string) (*Registry, error) {
 //
 //   - (entries, true, nil)   — legacy file exists, was readable, parsed cleanly
 //   - (nil,     false, nil)  — legacy file genuinely missing, OR path is not
-//                              the canonical default (no fallback applies)
+//     the canonical default (no fallback applies)
 //   - (nil,     false, err)  — legacy file exists but read or JSON parse failed
 //
 // The third case is critical (review #55 F3): without it, a corrupt or
@@ -161,6 +168,15 @@ func (r *Registry) MigrationPending() bool {
 // deferred to keep the call-site churn small; this godoc is the contract.
 func (r *Registry) Save() error {
 	r.Prune()
+	return r.SaveExact()
+}
+
+// SaveExact persists the in-memory registry verbatim using the same atomic
+// tempfile + rename path as Save, but without an implicit structural prune.
+// Callers that have already curated the entry set (for example, TTL cleanup)
+// should prefer this helper so they don't accidentally drop otherwise-kept
+// entries whose .htmlgraph directory is temporarily unavailable.
+func (r *Registry) SaveExact() error {
 	if err := writeEntriesAtomic(r.path, r.entries); err != nil {
 		return err
 	}
@@ -230,16 +246,111 @@ func WriteEntriesForTest(path string, entries []Entry) error {
 	return writeEntriesAtomic(path, entries)
 }
 
+// ShouldSkipRegistration reports whether dir should be silently skipped at
+// registration time, preventing test temp directories from polluting the
+// project registry.
+//
+// Two conditions trigger a skip:
+//
+//  1. HTMLGRAPH_SKIP_REGISTER=1 env var — explicit opt-out for tests.
+//  2. The path is inside os.TempDir() AND a component of the path under
+//     tempdir starts with "Test" (Go's t.TempDir() naming convention:
+//     /tmp/TestFooNNNN/sub).
+//
+// Production paths (e.g. /workspaces/htmlgraph) are never skipped because they
+// do not live under the OS temp directory.
+func ShouldSkipRegistration(projectDir string) bool {
+	if os.Getenv("HTMLGRAPH_SKIP_REGISTER") == "1" {
+		return true
+	}
+	return isGoTestTempDirPath(projectDir)
+}
+
+// isGoTestTempDirPath reports whether projectDir points inside os.TempDir() and
+// contains a Test* path component under that temp root, matching Go's
+// t.TempDir() naming convention.
+func isGoTestTempDirPath(projectDir string) bool {
+	tempDir, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		tempDir = os.TempDir()
+	}
+	abs, err := filepath.Abs(projectDir)
+	if err != nil {
+		return false
+	}
+	if !strings.HasPrefix(abs, tempDir+string(filepath.Separator)) {
+		return false
+	}
+	// Walk up path components between abs and tempDir looking for a
+	// component that starts with "Test" — the Go test runner name pattern.
+	for p := abs; p != tempDir && p != "/" && p != "."; p = filepath.Dir(p) {
+		leaf := filepath.Base(p)
+		if strings.HasPrefix(leaf, "Test") {
+			return true
+		}
+	}
+	return false
+}
+
+// pathInsideTempDir reports whether path lives under os.TempDir(). Test suites
+// that redirect the registry file into a temp location should still be able to
+// exercise tempdir projects without polluting the user's persistent registry.
+func pathInsideTempDir(path string) bool {
+	tempDir, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		tempDir = os.TempDir()
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	return abs == tempDir || strings.HasPrefix(abs, tempDir+string(filepath.Separator))
+}
+
+// PruneStale removes entries whose LastSeen timestamp is older than ttl.
+// It returns the number of removed entries. The in-memory registry is
+// mutated; call Save to persist.
+func PruneStale(reg *Registry, ttl time.Duration) int {
+	cutoff := time.Now().Add(-ttl)
+	var removed int
+	kept := reg.entries[:0]
+	for _, p := range reg.entries {
+		t, err := time.Parse(time.RFC3339, p.LastSeen)
+		if err != nil || t.Before(cutoff) {
+			removed++
+			continue
+		}
+		kept = append(kept, p)
+	}
+	reg.entries = kept
+	return removed
+}
+
+// PruneTempdirEntries removes entries whose ProjectDir is inside os.TempDir()
+// and has a Test* component (i.e. paths that match Go test temp dirs).
+// Returns the number removed.
+func PruneTempdirEntries(reg *Registry) int {
+	var removed int
+	kept := reg.entries[:0]
+	for _, e := range reg.entries {
+		if ShouldSkipRegistration(e.ProjectDir) {
+			removed++
+			continue
+		}
+		kept = append(kept, e)
+	}
+	reg.entries = kept
+	return removed
+}
+
 // looksLikeRealProject returns true when dir contains a .htmlgraph/
 // subdirectory. That is the sole signal: HtmlGraph projects are not
 // required to be Git repositories, so a `.git` ancestor is NOT part of
 // the gate (review #55 F1).
 //
-// Test pollution is prevented at a different layer — every test that
-// could call Upsert isolates the registry via XDG_DATA_HOME, redirecting
-// writes into a per-test tempdir. Production callers that pass a stray
-// tempdir path will still register, which is the correct contract:
-// `htmlgraph init <dir>` on a non-Git directory must succeed.
+// Registration hardening lives in Upsert, not here: a real project is still
+// defined solely by the presence of .htmlgraph/. The tempdir guard decides
+// whether that real project should be written to the persistent registry.
 func looksLikeRealProject(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".htmlgraph"))
 	return err == nil
@@ -250,12 +361,20 @@ func looksLikeRealProject(dir string) bool {
 // GitRemoteURL) is updated and the original ID is preserved.  Otherwise a new
 // entry is appended with a freshly computed ID.
 //
-// Upsert silently skips directories that do not look like real projects
-// (no .htmlgraph/ subdirectory). Test pollution is prevented by every
-// caller running tests with XDG_DATA_HOME pointed at a tmpdir, not by a
-// .git heuristic. Before saving, callers should also call Prune.
+// Upsert silently skips:
+//   - Directories that do not look like real projects (no .htmlgraph/ subdirectory).
+//   - Directories that match test temp-dir patterns when the target registry is
+//     persistent (test-local registries under os.TempDir() are allowed).
+//
+// Before saving, callers should also call Prune.
 func (r *Registry) Upsert(dir, name, remoteURL string) {
 	dir = filepath.Clean(dir)
+	if os.Getenv("HTMLGRAPH_SKIP_REGISTER") == "1" {
+		return
+	}
+	if isGoTestTempDirPath(dir) && !pathInsideTempDir(r.path) {
+		return
+	}
 	if !looksLikeRealProject(dir) {
 		return
 	}

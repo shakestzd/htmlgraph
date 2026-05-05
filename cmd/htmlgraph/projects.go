@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/shakestzd/htmlgraph/internal/registry"
 	"github.com/shakestzd/htmlgraph/internal/storage"
@@ -87,14 +90,59 @@ With --gone, show only orphan entries whose .htmlgraph directory no longer exist
 }
 
 func projectsPruneCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		pruneSince       string
+		pruneTempdirOnly bool
+		pruneDryRun      bool
+	)
+
+	cmd := &cobra.Command{
 		Use:   "prune",
-		Short: "Remove registry entries whose .htmlgraph directory no longer exists",
+		Short: "Remove stale registry entries",
+		Long: `Remove stale registry entries from ~/.local/share/htmlgraph/projects.json.
+
+Default behavior (no flags): remove entries whose .htmlgraph directory no longer exists.
+
+With --since: also remove entries last_seen older than the given duration.
+  Accepts Go duration strings (e.g. 30m, 48h) or a "Nd" shorthand for N days.
+
+With --tempdir-only: remove only entries whose project_dir is inside the OS temp
+  directory and matches the Go test naming pattern (Test*), regardless of last_seen.
+
+With --dry-run: print what would be removed without writing to disk.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			reg, err := registry.Load(defaultRegistryPath())
 			if err != nil {
 				return fmt.Errorf("load registry: %w", err)
 			}
+
+			// --tempdir-only: remove only test tempdir entries.
+			if pruneTempdirOnly {
+				return pruneTempdirOnlyAction(cmd, reg, pruneDryRun)
+			}
+
+			// --since: TTL-based prune (with optional dry-run).
+			if pruneSince != "" {
+				return pruneWithSinceAction(cmd, reg, pruneSince, pruneDryRun)
+			}
+
+			// Default: remove entries whose .htmlgraph directory no longer exists.
+			if pruneDryRun {
+				// Dry-run structural prune: report what would be removed.
+				var wouldRemove []string
+				for _, e := range reg.List() {
+					hgDir := filepath.Join(e.ProjectDir, ".htmlgraph")
+					if _, statErr := os.Stat(hgDir); statErr != nil {
+						wouldRemove = append(wouldRemove, e.ProjectDir)
+					}
+				}
+				for _, p := range wouldRemove {
+					fmt.Fprintln(cmd.OutOrStdout(), "would prune:", p)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "dry-run: would prune %d entries\n", len(wouldRemove))
+				return nil
+			}
+
 			before := len(reg.List())
 			pruned := reg.Prune()
 			kept := before - len(pruned)
@@ -108,6 +156,92 @@ func projectsPruneCmd() *cobra.Command {
 			return reg.Save()
 		},
 	}
+	cmd.Flags().StringVar(&pruneSince, "since", "", "remove entries last_seen older than this duration (e.g. 3d, 48h, 30m)")
+	cmd.Flags().BoolVar(&pruneTempdirOnly, "tempdir-only", false, "remove only entries inside OS temp dir matching Go test naming pattern (Test*)")
+	cmd.Flags().BoolVar(&pruneDryRun, "dry-run", false, "print what would be removed without writing to disk")
+	return cmd
+}
+
+// parseDuration parses a duration string supporting the "Nd" shorthand for days
+// in addition to standard Go duration strings (e.g. 48h, 30m).
+func parseDuration(s string) (time.Duration, error) {
+	// Handle "Nd" shorthand where N is an integer.
+	if strings.HasSuffix(s, "d") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err != nil {
+			return 0, fmt.Errorf("expected integer before 'd', got %q", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	return time.ParseDuration(s)
+}
+
+// structuralPrune removes entries whose .htmlgraph directory is missing and
+// returns the list of removed ProjectDir values. The registry is mutated.
+func structuralPrune(reg *registry.Registry) []string {
+	return reg.Prune()
+}
+
+// pruneWithSinceAction handles the --since flag path: applies both structural
+// prune and TTL prune, printing what was removed (or would be in dry-run).
+func pruneWithSinceAction(cmd *cobra.Command, reg *registry.Registry, since string, dryRun bool) error {
+	ttl, err := parseDuration(since)
+	if err != nil {
+		return fmt.Errorf("invalid --since value %q: %w", since, err)
+	}
+
+	// Reload a fresh registry for dry-run inspection, or use current for live run.
+	allBefore := reg.List()
+	cutoff := time.Now().Add(-ttl)
+
+	var wouldRemove []string
+	for _, e := range allBefore {
+		t, terr := time.Parse(time.RFC3339, e.LastSeen)
+		if terr != nil || t.Before(cutoff) {
+			wouldRemove = append(wouldRemove, e.ProjectDir)
+		}
+	}
+
+	if dryRun {
+		for _, p := range wouldRemove {
+			fmt.Fprintln(cmd.OutOrStdout(), "would prune:", p)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "dry-run: would prune %d entries\n", len(wouldRemove))
+		return nil
+	}
+
+	removed := registry.PruneStale(reg, ttl)
+	kept := len(reg.List())
+	fmt.Fprintf(cmd.OutOrStdout(), "pruned %d stale projects, kept %d\n", removed, kept)
+	if removed == 0 {
+		return nil
+	}
+	return reg.SaveExact()
+}
+
+// pruneTempdirOnlyAction handles the --tempdir-only flag path.
+func pruneTempdirOnlyAction(cmd *cobra.Command, reg *registry.Registry, dryRun bool) error {
+	if dryRun {
+		var wouldRemove []string
+		for _, e := range reg.List() {
+			if registry.ShouldSkipRegistration(e.ProjectDir) {
+				wouldRemove = append(wouldRemove, e.ProjectDir)
+			}
+		}
+		for _, p := range wouldRemove {
+			fmt.Fprintln(cmd.OutOrStdout(), "would prune:", p)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "dry-run: would prune %d tempdir entries\n", len(wouldRemove))
+		return nil
+	}
+
+	removed := registry.PruneTempdirEntries(reg)
+	kept := len(reg.List())
+	fmt.Fprintf(cmd.OutOrStdout(), "pruned %d tempdir entries, kept %d\n", removed, kept)
+	if removed == 0 {
+		return nil
+	}
+	return reg.SaveExact()
 }
 
 // countItems returns a compact summary of feature/bug/spike counts in the
