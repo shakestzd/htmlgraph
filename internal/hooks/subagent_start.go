@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
-	"github.com/shakestzd/erinn/internal/paths"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
+	"github.com/shakestzd/wipnote/internal/paths"
 )
 
 // SubagentStart handles the SubagentStart Claude Code hook event.

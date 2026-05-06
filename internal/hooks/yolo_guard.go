@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/paths"
-	"github.com/shakestzd/erinn/internal/storage"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/paths"
+	"github.com/shakestzd/wipnote/internal/storage"
 )
 
 // mergeInProgressFn is injected for testing. In production, it checks the real

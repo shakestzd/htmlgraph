@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/otel/materialize"
-	"github.com/shakestzd/erinn/internal/paths"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/otel/materialize"
+	"github.com/shakestzd/wipnote/internal/paths"
 )
 
 // SessionEnd handles the SessionEnd Claude Code hook event.

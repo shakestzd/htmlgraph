@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/blame"
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/blame"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // openTestDB creates an in-memory SQLite database with the full HtmlGraph schema.

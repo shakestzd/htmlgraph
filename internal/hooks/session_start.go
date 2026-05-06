@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
-	"github.com/shakestzd/erinn/internal/otel"
-	"github.com/shakestzd/erinn/internal/otel/sink/ndjson"
-	"github.com/shakestzd/erinn/internal/paths"
-	"github.com/shakestzd/erinn/internal/worktree"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
+	"github.com/shakestzd/wipnote/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel/sink/ndjson"
+	"github.com/shakestzd/wipnote/internal/paths"
+	"github.com/shakestzd/wipnote/internal/worktree"
 )
 
 // ActiveSessionData is the JSON structure written to .erinn/.active-session

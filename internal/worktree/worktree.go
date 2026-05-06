@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/htmlparse"
-	"github.com/shakestzd/erinn/internal/slug"
+	"github.com/shakestzd/wipnote/internal/htmlparse"
+	"github.com/shakestzd/wipnote/internal/slug"
 )
 
 // RepairGitdirIfStale checks whether the current directory is a linked git

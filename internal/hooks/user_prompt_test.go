@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // setupTestDB creates a per-test on-disk SQLite DB with schema and a session.

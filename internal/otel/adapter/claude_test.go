@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
-	"github.com/shakestzd/erinn/internal/otel/adapter"
+	"github.com/shakestzd/wipnote/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel/adapter"
 )
 
 func claudeRes(version string) adapter.OTLPResource {

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/db"
+	"github.com/shakestzd/wipnote/internal/db"
 )
 
 // TestExtractBranchFromWorktreePath verifies the worktree path → branch name extraction.

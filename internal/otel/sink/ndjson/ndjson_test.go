@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
-	"github.com/shakestzd/erinn/internal/otel/sink/ndjson"
+	"github.com/shakestzd/wipnote/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel/sink/ndjson"
 )
 
 func makeSignal(kind otel.Kind, id, sessionID string) otel.UnifiedSignal {

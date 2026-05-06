@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // UpsertFeatureFile inserts a feature_file row or updates last_seen on conflict.

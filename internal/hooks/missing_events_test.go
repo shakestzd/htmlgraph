@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // setupMissingEventsDB creates a temp project dir with .erinn/ and an

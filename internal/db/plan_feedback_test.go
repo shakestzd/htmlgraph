@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/db"
+	"github.com/shakestzd/wipnote/internal/db"
 )
 
 // setupPlanDB returns an in-memory database with a test plan feature row.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/plantmpl"
+	"github.com/shakestzd/wipnote/internal/plantmpl"
 )
 
 // ---------------------------------------------------------------------------

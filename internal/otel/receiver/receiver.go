@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel/adapter"
-	"github.com/shakestzd/erinn/internal/otel/sink"
+	"github.com/shakestzd/wipnote/internal/otel/adapter"
+	"github.com/shakestzd/wipnote/internal/otel/sink"
 )
 
 // Config controls the embedded OTLP receiver that ships inside

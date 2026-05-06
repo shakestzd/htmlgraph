@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
+	"github.com/shakestzd/wipnote/internal/db"
 )
 
 func TestUpsertTrack_Insert(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // SessionCollection provides read operations for sessions.

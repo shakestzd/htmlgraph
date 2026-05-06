@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // setupLifecycleDB creates a temp project dir with .erinn/ and a real
@@ -135,7 +135,7 @@ func TestHookLifecycle(t *testing.T) {
 		ToolUseID: "tool-use-001",
 		ToolInput: map[string]any{"command": "(cd packages/go && go test ./...)"},
 		ToolResult: map[string]any{
-			"output":   "ok  github.com/shakestzd/erinn/...",
+			"output":   "ok  github.com/shakestzd/wipnote/...",
 			"is_error": false,
 		},
 	}

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/agent"
-	"github.com/shakestzd/erinn/internal/db"
+	"github.com/shakestzd/wipnote/internal/agent"
+	"github.com/shakestzd/wipnote/internal/db"
 	_ "modernc.org/sqlite"
 )
 

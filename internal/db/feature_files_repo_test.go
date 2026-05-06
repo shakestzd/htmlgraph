@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 func TestResolveFileOwner_ReturnsMostFrequent(t *testing.T) {

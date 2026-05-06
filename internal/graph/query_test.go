@@ -3,7 +3,7 @@ package graph
 import (
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // makeNode is a test helper that creates a Node with the given ID.

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shakestzd/erinn/internal/paths"
+	"github.com/shakestzd/wipnote/internal/paths"
 )
 
 // agentTraceFormatVersion is the pinned Agent Trace RFC version.

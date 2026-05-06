@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/models"
-	"github.com/shakestzd/erinn/internal/workitem"
+	"github.com/shakestzd/wipnote/internal/models"
+	"github.com/shakestzd/wipnote/internal/workitem"
 )
 
 // newTestProject creates a Project rooted in a temp dir with the required subdirectories.

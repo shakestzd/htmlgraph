@@ -10,7 +10,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/shakestzd/erinn/internal/registry"
+	"github.com/shakestzd/wipnote/internal/registry"
 )
 
 // makeSafeBaseDir creates a temp directory directly under os.TempDir() using

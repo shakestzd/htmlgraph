@@ -32,8 +32,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
-	"github.com/shakestzd/erinn/internal/otel/sink"
+	"github.com/shakestzd/wipnote/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel/sink"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // PlanOption configures a new plan during creation.

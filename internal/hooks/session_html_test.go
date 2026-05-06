@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/ingest"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/ingest"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 func TestCreateSessionHTML(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/agent"
+	"github.com/shakestzd/wipnote/internal/agent"
 )
 
 // --- Detect tests ---

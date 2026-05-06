@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel"
 )
 
 // TestParseLine_ValidSpan verifies all fields are mapped correctly for a span line.

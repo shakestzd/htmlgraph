@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/shakestzd/erinn/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel"
 )
 
 //go:embed models.json

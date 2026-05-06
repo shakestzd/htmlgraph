@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/plantmpl"
-	"github.com/shakestzd/erinn/internal/planyaml"
+	"github.com/shakestzd/wipnote/internal/plantmpl"
+	"github.com/shakestzd/wipnote/internal/planyaml"
 )
 
 // ---------------------------------------------------------------------------

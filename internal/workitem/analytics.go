@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/graph"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/graph"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // Bottleneck describes a stalled work item or overloaded track.

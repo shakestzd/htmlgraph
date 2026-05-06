@@ -8,7 +8,7 @@ package sink
 import (
 	"context"
 
-	"github.com/shakestzd/erinn/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel"
 )
 
 // SignalSink is the persistence abstraction for a batch of unified signals.

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/paths"
+	"github.com/shakestzd/wipnote/internal/paths"
 )
 
 // TestResolveViaGitCommonDir_NonGitDir verifies that a plain (non-git)

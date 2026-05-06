@@ -3,8 +3,8 @@ package receiver_test
 import (
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/otel/adapter"
-	"github.com/shakestzd/erinn/internal/otel/receiver"
+	"github.com/shakestzd/wipnote/internal/otel/adapter"
+	"github.com/shakestzd/wipnote/internal/otel/receiver"
 )
 
 func TestDeriveSignalIDStable(t *testing.T) {

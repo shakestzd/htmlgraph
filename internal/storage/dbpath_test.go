@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/storage"
+	"github.com/shakestzd/wipnote/internal/storage"
 )
 
 // TestNoInlineDBPathConstruction walks cmd/ and internal/ (skipping the

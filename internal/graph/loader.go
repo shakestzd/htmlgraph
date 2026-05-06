@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shakestzd/erinn/internal/htmlparse"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/htmlparse"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // LoadDir reads all HTML work item files from a directory and returns Nodes.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/plantmpl"
+	"github.com/shakestzd/wipnote/internal/plantmpl"
 )
 
 func TestProgressBarRendersSection(t *testing.T) {

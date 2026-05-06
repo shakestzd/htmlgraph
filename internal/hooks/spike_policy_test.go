@@ -15,7 +15,7 @@ import (
 func TestHooksPackageDoesNotImportWorkitem(t *testing.T) {
 	out, err := exec.Command(
 		"go", "list", "-f", `{{join .Imports "\n"}}`,
-		"github.com/shakestzd/erinn/internal/hooks",
+		"github.com/shakestzd/wipnote/internal/hooks",
 	).Output()
 	if err != nil {
 		t.Fatalf("go list failed: %v", err)

@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel"
 )
 
 // OTLPResource is the subset of an OTLP ResourceSpans/ResourceLogs/

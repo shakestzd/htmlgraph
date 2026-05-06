@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel/retention"
+	"github.com/shakestzd/wipnote/internal/otel/retention"
 	_ "modernc.org/sqlite"
 )
 

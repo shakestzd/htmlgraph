@@ -10,10 +10,10 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/shakestzd/erinn/internal/otel"
-	"github.com/shakestzd/erinn/internal/otel/adapter"
-	"github.com/shakestzd/erinn/internal/otel/otlp"
-	"github.com/shakestzd/erinn/internal/otel/sink"
+	"github.com/shakestzd/wipnote/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel/adapter"
+	"github.com/shakestzd/wipnote/internal/otel/otlp"
+	"github.com/shakestzd/wipnote/internal/otel/sink"
 
 	// TracesData/MetricsData/LogsData are wire-compatible wrappers with
 	// identical field numbers to ExportTraceServiceRequest etc. We use

@@ -12,9 +12,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/shakestzd/erinn/internal/agent"
-	"github.com/shakestzd/erinn/internal/paths"
-	"github.com/shakestzd/erinn/internal/storage"
+	"github.com/shakestzd/wipnote/internal/agent"
+	"github.com/shakestzd/wipnote/internal/paths"
+	"github.com/shakestzd/wipnote/internal/storage"
 )
 
 // CloudEvent is the JSON payload Claude Code sends to every hook via stdin.

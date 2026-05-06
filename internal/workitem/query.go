@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/graph"
-	"github.com/shakestzd/erinn/internal/htmlparse"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/graph"
+	"github.com/shakestzd/wipnote/internal/htmlparse"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // SortOrder specifies ascending or descending sort direction.

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	dbpkg "github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/storage"
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/storage"
 )
 
 // --- Base types --------------------------------------------------------------

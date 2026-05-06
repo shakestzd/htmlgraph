@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	dbpkg "github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // BugOption configures a new bug during creation.

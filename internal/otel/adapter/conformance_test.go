@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
-	"github.com/shakestzd/erinn/internal/otel/adapter"
+	"github.com/shakestzd/wipnote/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel/adapter"
 )
 
 // adapterCase parameterises one adapter under test.

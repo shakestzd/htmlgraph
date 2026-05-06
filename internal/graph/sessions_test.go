@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/graph"
+	"github.com/shakestzd/wipnote/internal/graph"
 )
 
 func seedSession(t *testing.T, database *sql.DB, sessionID, agent, status string) {

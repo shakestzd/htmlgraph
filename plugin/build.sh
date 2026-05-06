@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# build.sh - Build the erinn Go binary for the plugin.
+# build.sh - Build the wipnote Go binary for the plugin.
 #
 # Usage:
-#   ./build.sh          # Dev mode: binary at ~/.local/bin/erinn
-#   ./build.sh --dist   # Dist mode: binary at hooks/bin/erinn-bin,
-#                        #            bootstrap script at hooks/bin/erinn
+#   ./build.sh          # Dev mode: binary at ~/.local/bin/wipnote
+#   ./build.sh --dist   # Dist mode: binary at hooks/bin/wipnote-bin,
+#                        #            bootstrap script at hooks/bin/wipnote
 
 set -euo pipefail
 
@@ -34,41 +34,47 @@ VERSION_RAW=$(git describe --tags --always 2>/dev/null || echo "dev")
 VERSION="${VERSION_RAW#v}"
 
 if [ "${DIST_MODE}" = true ]; then
-    echo "Building erinn (dist mode, version: ${VERSION})..."
+    echo "Building wipnote (dist mode, version: ${VERSION})..."
     go build -ldflags "-s -w -X main.version=${VERSION}" \
-        -o "${BIN_DIR}/erinn-bin" ./cmd/erinn/
-    chmod +x "${BIN_DIR}/erinn-bin"
+        -o "${BIN_DIR}/wipnote-bin" ./cmd/wipnote/
+    chmod +x "${BIN_DIR}/wipnote-bin"
 
     # Copy bootstrap script as the entry point
-    cp "${BIN_DIR}/bootstrap.sh" "${BIN_DIR}/erinn"
-    chmod +x "${BIN_DIR}/erinn"
+    cp "${BIN_DIR}/bootstrap.sh" "${BIN_DIR}/wipnote"
+    chmod +x "${BIN_DIR}/wipnote"
 
     # Install to ~/.local/bin so bootstrap skips download
     INSTALL_DIR="${HOME}/.local/bin"
-    META_DIR="${HOME}/.local/share/erinn"
+    META_DIR="${HOME}/.local/share/wipnote"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
-    rm -f "${INSTALL_DIR}/erinn"  # Fresh inode avoids macOS signature cache
-    cp "${BIN_DIR}/erinn-bin" "${INSTALL_DIR}/erinn"
-    chmod +x "${INSTALL_DIR}/erinn"
+    rm -f "${INSTALL_DIR}/wipnote"  # Fresh inode avoids macOS signature cache
+    cp "${BIN_DIR}/wipnote-bin" "${INSTALL_DIR}/wipnote"
+    chmod +x "${INSTALL_DIR}/wipnote"
+    # Short alias `wn` -> `wipnote`
+    ln -sfn "${INSTALL_DIR}/wipnote" "${INSTALL_DIR}/wn"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
 
     echo "Dist build complete:"
-    echo "  Entry point: plugin/hooks/bin/erinn (bootstrap)"
-    echo "  Binary:      plugin/hooks/bin/erinn-bin"
-    echo "  Installed:   ${INSTALL_DIR}/erinn (v${VERSION})"
+    echo "  Entry point: plugin/hooks/bin/wipnote (bootstrap)"
+    echo "  Binary:      plugin/hooks/bin/wipnote-bin"
+    echo "  Installed:   ${INSTALL_DIR}/wipnote (v${VERSION})"
+    echo "  Alias:       ${INSTALL_DIR}/wn -> wipnote"
 else
-    echo "Building erinn (dev mode, version: ${VERSION})..."
+    echo "Building wipnote (dev mode, version: ${VERSION})..."
 
-    # Build directly to ~/.local/bin/erinn — no intermediate artifact.
+    # Build directly to ~/.local/bin/wipnote — no intermediate artifact.
     # The plugin-has-its-own-binary architecture was removed in commit 5ae76555c;
-    # hooks.json now uses bare 'erinn' via PATH lookup.
+    # hooks.json now uses bare 'wipnote' via PATH lookup.
     INSTALL_DIR="${HOME}/.local/bin"
-    META_DIR="${HOME}/.local/share/erinn"
+    META_DIR="${HOME}/.local/share/wipnote"
     mkdir -p "${INSTALL_DIR}" "${META_DIR}"
-    rm -f "${INSTALL_DIR}/erinn"  # Fresh inode avoids macOS signature cache
+    rm -f "${INSTALL_DIR}/wipnote"  # Fresh inode avoids macOS signature cache
     go build -ldflags "-s -w -X main.version=${VERSION}" \
-        -o "${INSTALL_DIR}/erinn" ./cmd/erinn/
-    chmod +x "${INSTALL_DIR}/erinn"
+        -o "${INSTALL_DIR}/wipnote" ./cmd/wipnote/
+    chmod +x "${INSTALL_DIR}/wipnote"
+    # Short alias `wn` -> `wipnote`
+    ln -sfn "${INSTALL_DIR}/wipnote" "${INSTALL_DIR}/wn"
     echo "${VERSION}" > "${META_DIR}/.binary-version"
-    echo "Installed: ${INSTALL_DIR}/erinn (v${VERSION})"
+    echo "Installed: ${INSTALL_DIR}/wipnote (v${VERSION})"
+    echo "Alias:     ${INSTALL_DIR}/wn -> wipnote"
 fi

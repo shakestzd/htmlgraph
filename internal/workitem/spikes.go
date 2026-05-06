@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
-	dbpkg "github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // SpikeOption configures a new spike during creation.

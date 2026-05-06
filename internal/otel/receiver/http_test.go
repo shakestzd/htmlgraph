@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/otel/adapter"
-	"github.com/shakestzd/erinn/internal/otel/receiver"
-	sqls "github.com/shakestzd/erinn/internal/otel/sink/sqlite"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/otel/adapter"
+	"github.com/shakestzd/wipnote/internal/otel/receiver"
+	sqls "github.com/shakestzd/wipnote/internal/otel/sink/sqlite"
 
 	"google.golang.org/protobuf/proto"
 

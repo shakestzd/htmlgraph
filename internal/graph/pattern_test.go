@@ -3,7 +3,7 @@ package graph_test
 import (
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/graph"
+	"github.com/shakestzd/wipnote/internal/graph"
 )
 
 // --- FindOrphans ---

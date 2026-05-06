@@ -1,4 +1,4 @@
-module github.com/shakestzd/erinn
+module github.com/shakestzd/wipnote
 
 go 1.24.0
 

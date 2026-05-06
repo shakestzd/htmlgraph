@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // GeminiSessionFile is a discovered Gemini session JSON file.

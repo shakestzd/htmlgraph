@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shakestzd/erinn/internal/graph"
-	"github.com/shakestzd/erinn/internal/htmlparse"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/graph"
+	"github.com/shakestzd/wipnote/internal/htmlparse"
+	"github.com/shakestzd/wipnote/internal/models"
 
-	dbpkg "github.com/shakestzd/erinn/internal/db"
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
 )
 
 // FilterFunc is a predicate applied to nodes during queries.

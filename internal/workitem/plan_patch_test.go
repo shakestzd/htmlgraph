@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // crispiPlanHTML is a minimal CRISPI plan file that contains data-zone= markers

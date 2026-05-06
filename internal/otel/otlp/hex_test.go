@@ -3,7 +3,7 @@ package otlp_test
 import (
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/otel/otlp"
+	"github.com/shakestzd/wipnote/internal/otel/otlp"
 )
 
 func TestHexEncodeRoundTrip(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/otel/collector"
+	"github.com/shakestzd/wipnote/internal/otel/collector"
 )
 
 // startSleepProc starts a long-lived /bin/sh sleep process for test injection.

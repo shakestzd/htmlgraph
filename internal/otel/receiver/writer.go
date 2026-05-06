@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/otel"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/otel"
 )
 
 // dbExecer is the minimal interface shared by *sql.Conn and *sql.Tx, used

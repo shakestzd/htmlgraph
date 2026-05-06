@@ -3,7 +3,7 @@ package adapter
 import (
 	"time"
 
-	"github.com/shakestzd/erinn/internal/otel"
+	"github.com/shakestzd/wipnote/internal/otel"
 )
 
 // CodexAdapter converts Codex CLI OTel emissions into UnifiedSignals.

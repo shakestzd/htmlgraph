@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shakestzd/erinn/internal/htmlparse"
-	"github.com/shakestzd/erinn/internal/workitem"
+	"github.com/shakestzd/wipnote/internal/htmlparse"
+	"github.com/shakestzd/wipnote/internal/workitem"
 )
 
 // ---------------------------------------------------------------------------

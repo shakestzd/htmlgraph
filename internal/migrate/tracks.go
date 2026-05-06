@@ -15,8 +15,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/shakestzd/erinn/internal/db"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/models"
 	"gopkg.in/yaml.v3"
 )
 

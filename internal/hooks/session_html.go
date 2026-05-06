@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shakestzd/erinn/internal/ingest"
-	"github.com/shakestzd/erinn/internal/models"
+	"github.com/shakestzd/wipnote/internal/ingest"
+	"github.com/shakestzd/wipnote/internal/models"
 )
 
 // SessionEvent holds the data needed to write a <li> element to a session's
