@@ -12,7 +12,7 @@ import (
 	"github.com/shakestzd/wipnote/internal/hooks"
 )
 
-// hookCmd returns the "erinn hook" parent command with all subcommands.
+// hookCmd returns the "wipnote hook" parent command with all subcommands.
 func hookCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "hook",
@@ -24,8 +24,8 @@ JSON result to stdout. They replace the Python hook scripts, eliminating the
 ~500ms uv cold-start cost per hook invocation.
 
 Usage in hooks.json:
-  "command": "erinn hook session-start"
-  "command": "erinn hook pretooluse"
+  "command": "wipnote hook session-start"
+  "command": "wipnote hook pretooluse"
   etc.`,
 		// Propagate the compiled version to the hooks package so session-start
 		// can detect CLI/plugin version mismatches.

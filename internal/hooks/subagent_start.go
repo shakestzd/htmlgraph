@@ -78,7 +78,7 @@ func SubagentStart(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 			AgentType:     agentType,
 			SessionID:     sessionID,
 			CWD:           projectDir,
-			ParentAgentID: os.Getenv("ERINN_AGENT_ID"),
+			ParentAgentID: os.Getenv("WIPNOTE_AGENT_ID"),
 			CreatedAt:     time.Now().UnixMicro(),
 		}
 		if err := db.UpsertPendingSubagentStart(database, pending); err != nil {

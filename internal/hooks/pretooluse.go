@@ -17,8 +17,8 @@ import (
 // PreToolUse handles the PreToolUse Claude Code hook event.
 // It inserts a tool_call agent_event row and allows the tool to proceed.
 func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
-	// Kill switch: ERINN_GUARDS_OFF=1 disables ALL guards for emergency use.
-	if os.Getenv("ERINN_GUARDS_OFF") == "1" {
+	// Kill switch: WIPNOTE_GUARDS_OFF=1 disables ALL guards for emergency use.
+	if os.Getenv("WIPNOTE_GUARDS_OFF") == "1" {
 		return &HookResult{}, nil
 	}
 
@@ -238,7 +238,7 @@ func recordEventAndAllow(event *CloudEvent, ctx *toolUseContext, database *sql.D
 	}
 	_, _ = db.ReapExpiredClaims(database)
 
-	os.Setenv("ERINN_CURRENT_EVENT_ID", ev.EventID)
+	os.Setenv("WIPNOTE_CURRENT_EVENT_ID", ev.EventID)
 
 	// Capture the parent UserQuery event ID at PreToolUse time (before the tool
 	// executes) and persist it to CLAUDE_ENV_FILE so PostToolUse reads the same
@@ -251,7 +251,7 @@ func recordEventAndAllow(event *CloudEvent, ctx *toolUseContext, database *sql.D
 	return &HookResult{}, nil
 }
 
-// writeParentPromptEvent persists parentEventID as ERINN_PARENT_PROMPT_EVENT
+// writeParentPromptEvent persists parentEventID as WIPNOTE_PARENT_PROMPT_EVENT
 // to CLAUDE_ENV_FILE so PostToolUse hook processes can read the correct parent
 // without querying the DB (which would return the wrong UserQuery when a new
 // prompt has arrived since the tool started).
@@ -260,7 +260,7 @@ func recordEventAndAllow(event *CloudEvent, ctx *toolUseContext, database *sql.D
 // unset — the existing LatestEventByTool DB fallback remains correct in that case.
 func writeParentPromptEvent(parentEventID string) {
 	// Keep the in-process env var current so any same-process callers see it.
-	os.Setenv("ERINN_PARENT_PROMPT_EVENT", parentEventID)
+	os.Setenv("WIPNOTE_PARENT_PROMPT_EVENT", parentEventID)
 
 	envFile := os.Getenv("CLAUDE_ENV_FILE")
 	if envFile == "" {
@@ -274,7 +274,7 @@ func writeParentPromptEvent(parentEventID string) {
 		return
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "export ERINN_PARENT_PROMPT_EVENT=%s\n", parentEventID)
+	fmt.Fprintf(f, "export WIPNOTE_PARENT_PROMPT_EVENT=%s\n", parentEventID)
 }
 
 // checkBashCwdGuard detects Bash commands that would permanently change the

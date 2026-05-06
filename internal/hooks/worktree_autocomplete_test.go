@@ -221,8 +221,8 @@ func TestWorktreeRemove_AutoCompletes(t *testing.T) {
 	database, projectDir := setupLifecycleDB(t)
 
 	sessionID := "wt-remove-test-001"
-	t.Setenv("ERINN_SESSION_ID", sessionID)
-	t.Setenv("ERINN_PROJECT_DIR", projectDir)
+	t.Setenv("WIPNOTE_SESSION_ID", sessionID)
+	t.Setenv("WIPNOTE_PROJECT_DIR", projectDir)
 
 	_, err := database.Exec(
 		`INSERT INTO sessions (session_id, agent_assigned, status, created_at) VALUES (?, ?, ?, datetime('now'))`,
@@ -281,8 +281,8 @@ func TestWorktreeRemove_UnknownBranch(t *testing.T) {
 	database, projectDir := setupLifecycleDB(t)
 
 	sessionID := "wt-remove-unknown-001"
-	t.Setenv("ERINN_SESSION_ID", sessionID)
-	t.Setenv("ERINN_PROJECT_DIR", projectDir)
+	t.Setenv("WIPNOTE_SESSION_ID", sessionID)
+	t.Setenv("WIPNOTE_PROJECT_DIR", projectDir)
 
 	_, err := database.Exec(
 		`INSERT INTO sessions (session_id, agent_assigned, status, created_at) VALUES (?, ?, ?, datetime('now'))`,

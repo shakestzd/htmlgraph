@@ -38,9 +38,9 @@ type Config struct {
 	DBPath string
 }
 
-// LoadConfigFromEnv reads ERINN_OTEL_* env vars and returns a
+// LoadConfigFromEnv reads WIPNOTE_OTEL_* env vars and returns a
 // Config with sensible defaults. Calling with no env set yields an
-// enabled receiver (default-on). Set ERINN_OTEL_ENABLED=0 to opt out.
+// enabled receiver (default-on). Set WIPNOTE_OTEL_ENABLED=0 to opt out.
 //
 // projectDir is ignored — it was previously used to derive a
 // per-project port hash, but per-session collectors now handle OTLP
@@ -49,22 +49,22 @@ type Config struct {
 //
 // Recognized vars:
 //
-//	ERINN_OTEL_ENABLED    (0/false/no/off to disable; default on)
-//	ERINN_OTEL_BIND       (default 127.0.0.1)
-//	ERINN_OTEL_HTTP_PORT  (explicit override; default 4318)
+//	WIPNOTE_OTEL_ENABLED    (0/false/no/off to disable; default on)
+//	WIPNOTE_OTEL_BIND       (default 127.0.0.1)
+//	WIPNOTE_OTEL_HTTP_PORT  (explicit override; default 4318)
 func LoadConfigFromEnv(dbPath string, projectDir string) Config {
-	raw := os.Getenv("ERINN_OTEL_ENABLED")
+	raw := os.Getenv("WIPNOTE_OTEL_ENABLED")
 	enabled := !isExplicitlyDisabled(raw)
 
 	// Determine the OTLP HTTP port. Explicit env var always wins; otherwise
 	// fall back to the OTel default (4318). The project-hashed port
 	// derivation has been removed — per-session collectors use ephemeral
 	// ports and the serve process no longer embeds a receiver.
-	httpPort := parseIntDefault(os.Getenv("ERINN_OTEL_HTTP_PORT"), 4318)
+	httpPort := parseIntDefault(os.Getenv("WIPNOTE_OTEL_HTTP_PORT"), 4318)
 
 	c := Config{
 		Enabled:  enabled,
-		BindHost: envOr("ERINN_OTEL_BIND", "127.0.0.1"),
+		BindHost: envOr("WIPNOTE_OTEL_BIND", "127.0.0.1"),
 		HTTPPort: httpPort,
 		DBPath:   dbPath,
 	}

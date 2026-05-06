@@ -217,7 +217,7 @@ func TestHTTPHandler_RejectsBadContentType(t *testing.T) {
 }
 
 // TestReceiver_DisabledIsNoop proves the opt-in posture: with
-// ERINN_OTEL_ENABLED unset, Start returns nil without binding
+// WIPNOTE_OTEL_ENABLED unset, Start returns nil without binding
 // a port or opening a DB.
 func TestReceiver_DisabledIsNoop(t *testing.T) {
 	r, err := receiver.New(receiver.Config{Enabled: false}, nil)

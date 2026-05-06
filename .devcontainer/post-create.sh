@@ -87,10 +87,10 @@ fi
 INPUT=$(cat)
 SESS_ID=$(echo "$INPUT" | python3 -c "import sys, json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
 ACTIVE_WORK=$(htmlgraph statusline --session "$SESS_ID" 2>/dev/null)
-export ERINN_ACTIVE="$ACTIVE_WORK"
+export WIPNOTE_ACTIVE="$ACTIVE_WORK"
 
-OMP_BIN="${ERINN_OMP_BIN:-$(which oh-my-posh 2>/dev/null)}"
-OMP_CONFIG="${ERINN_OMP_CONFIG:-$HOME/.claude.omp.json}"
+OMP_BIN="${WIPNOTE_OMP_BIN:-$(which oh-my-posh 2>/dev/null)}"
+OMP_CONFIG="${WIPNOTE_OMP_CONFIG:-$HOME/.claude.omp.json}"
 
 if [ -n "$OMP_BIN" ] && [ -f "$OMP_CONFIG" ]; then
     echo "$INPUT" | "$OMP_BIN" claude --config "$OMP_CONFIG"

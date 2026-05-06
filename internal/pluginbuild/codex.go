@@ -217,7 +217,7 @@ func writeCodexHooks(m *Manifest, path string) error {
 		}
 		cmd := e.Command
 		if cmd == "" {
-			cmd = "erinn hook " + e.Handler
+			cmd = "wipnote hook " + e.Handler
 		}
 		group := claudeMatcherGroup{
 			Matcher: e.Matcher,

@@ -45,8 +45,8 @@ resolve_version() {
 
     if [ ! -f "${plugin_json}" ]; then
         # Third fallback: explicit env var (for CI / pinning).
-        if [ -n "${ERINN_VERSION:-}" ]; then
-            echo "${ERINN_VERSION}"
+        if [ -n "${WIPNOTE_VERSION:-}" ]; then
+            echo "${WIPNOTE_VERSION}"
             return
         fi
 

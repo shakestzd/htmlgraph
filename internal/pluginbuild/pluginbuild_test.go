@@ -69,7 +69,7 @@ func TestClaudeAdapterEmitsManifestAndHooks(t *testing.T) {
 	}
 	// Hooks assertions: Claude-only events present, Codex-only absent.
 	s := string(hooksRaw)
-	for _, want := range []string{`"SessionStart"`, `"Stop"`, `"UserPromptSubmit"`, `"erinn hook session-start"`, `"erinn hook stop"`} {
+	for _, want := range []string{`"SessionStart"`, `"Stop"`, `"UserPromptSubmit"`, `"wipnote hook session-start"`, `"wipnote hook stop"`} {
 		if !contains(s, want) {
 			t.Errorf("claude hooks missing %q:\n%s", want, s)
 		}
@@ -124,7 +124,7 @@ func TestCodexAdapterEmitsManifestHooksAndMCP(t *testing.T) {
 	}
 	s := string(hooksRaw)
 	// Codex-only events present, Claude-only absent.
-	for _, want := range []string{`"SessionStart"`, `"UserPromptSubmit"`, `"TaskStarted"`, `"erinn hook task-started"`} {
+	for _, want := range []string{`"SessionStart"`, `"UserPromptSubmit"`, `"TaskStarted"`, `"wipnote hook task-started"`} {
 		if !contains(s, want) {
 			t.Errorf("codex hooks missing %q:\n%s", want, s)
 		}

@@ -183,10 +183,10 @@ func TestReceiver_Burst(t *testing.T) {
 // and overrides behave as documented.
 func TestLoadConfigFromEnv(t *testing.T) {
 	// Default: enabled (default-on semantics).
-	t.Setenv("ERINN_OTEL_ENABLED", "")
-	t.Setenv("ERINN_OTEL_HTTP_PORT", "")
-	t.Setenv("ERINN_OTEL_BIND", "")
-	t.Setenv("ERINN_PROJECT_DIR", "")
+	t.Setenv("WIPNOTE_OTEL_ENABLED", "")
+	t.Setenv("WIPNOTE_OTEL_HTTP_PORT", "")
+	t.Setenv("WIPNOTE_OTEL_BIND", "")
+	t.Setenv("WIPNOTE_PROJECT_DIR", "")
 	cfg := receiver.LoadConfigFromEnv("/tmp/x", "")
 	if !cfg.Enabled {
 		t.Error("default Enabled should be true (default-on)")
@@ -198,17 +198,17 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		t.Errorf("default BindHost = %q", cfg.BindHost)
 	}
 
-	// Explicit ERINN_OTEL_ENABLED=0 → disabled.
-	t.Setenv("ERINN_OTEL_ENABLED", "0")
+	// Explicit WIPNOTE_OTEL_ENABLED=0 → disabled.
+	t.Setenv("WIPNOTE_OTEL_ENABLED", "0")
 	cfg = receiver.LoadConfigFromEnv("/tmp/x", "")
 	if cfg.Enabled {
-		t.Error("ERINN_OTEL_ENABLED=0 should set Enabled=false")
+		t.Error("WIPNOTE_OTEL_ENABLED=0 should set Enabled=false")
 	}
 
 	// Custom port via env var wins over project hash.
-	t.Setenv("ERINN_OTEL_ENABLED", "1")
-	t.Setenv("ERINN_OTEL_HTTP_PORT", "14318")
-	t.Setenv("ERINN_OTEL_BIND", "0.0.0.0")
+	t.Setenv("WIPNOTE_OTEL_ENABLED", "1")
+	t.Setenv("WIPNOTE_OTEL_HTTP_PORT", "14318")
+	t.Setenv("WIPNOTE_OTEL_BIND", "0.0.0.0")
 	cfg = receiver.LoadConfigFromEnv("/tmp/x", "/some/project")
 	if !cfg.Enabled || cfg.HTTPPort != 14318 || cfg.BindHost != "0.0.0.0" {
 		t.Errorf("envs not applied: %+v", cfg)
@@ -220,9 +220,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 // hash-based port derivation has been removed — per-session collectors use
 // ephemeral ports.
 func TestLoadConfigFromEnv_DefaultPort(t *testing.T) {
-	t.Setenv("ERINN_OTEL_HTTP_PORT", "")
-	t.Setenv("ERINN_OTEL_ENABLED", "")
-	t.Setenv("ERINN_OTEL_BIND", "")
+	t.Setenv("WIPNOTE_OTEL_HTTP_PORT", "")
+	t.Setenv("WIPNOTE_OTEL_ENABLED", "")
+	t.Setenv("WIPNOTE_OTEL_BIND", "")
 
 	cfg := receiver.LoadConfigFromEnv("", "/home/user/project-alpha")
 	if cfg.HTTPPort != 4318 {
@@ -230,18 +230,18 @@ func TestLoadConfigFromEnv_DefaultPort(t *testing.T) {
 	}
 }
 
-// TestLoadConfigFromEnv_EnvOverride verifies ERINN_OTEL_HTTP_PORT wins
+// TestLoadConfigFromEnv_EnvOverride verifies WIPNOTE_OTEL_HTTP_PORT wins
 // over the default port.
 func TestLoadConfigFromEnv_EnvOverride(t *testing.T) {
-	t.Setenv("ERINN_OTEL_HTTP_PORT", "5000")
-	t.Setenv("ERINN_OTEL_ENABLED", "")
+	t.Setenv("WIPNOTE_OTEL_HTTP_PORT", "5000")
+	t.Setenv("WIPNOTE_OTEL_ENABLED", "")
 
 	cfg := receiver.LoadConfigFromEnv("", "/home/user/any-project")
 	if cfg.HTTPPort != 5000 {
-		t.Errorf("ERINN_OTEL_HTTP_PORT=5000 should win, got %d", cfg.HTTPPort)
+		t.Errorf("WIPNOTE_OTEL_HTTP_PORT=5000 should win, got %d", cfg.HTTPPort)
 	}
 
-	t.Cleanup(func() { t.Setenv("ERINN_OTEL_HTTP_PORT", "") })
+	t.Cleanup(func() { t.Setenv("WIPNOTE_OTEL_HTTP_PORT", "") })
 }
 
 // makeClaudeLogPayload builds a marshalled LogsData byte slice that

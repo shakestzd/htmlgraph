@@ -146,8 +146,8 @@ func claimTraceparent() *agentTraceRecord {
 	return best
 }
 
-// writeSubagentEnvVars writes ERINN_PARENT_EVENT, ERINN_AGENT_ID,
-// ERINN_AGENT_TYPE, ERINN_CONTRIBUTOR_TYPE, and OTEL_RESOURCE_ATTRIBUTES
+// writeSubagentEnvVars writes WIPNOTE_PARENT_EVENT, WIPNOTE_AGENT_ID,
+// WIPNOTE_AGENT_TYPE, WIPNOTE_CONTRIBUTOR_TYPE, and OTEL_RESOURCE_ATTRIBUTES
 // to CLAUDE_ENV_FILE so the subagent's hooks know their parent delegation,
 // agent identity, and Agent Trace contributor classification.
 //
@@ -183,13 +183,13 @@ func writeSubagentEnvVars(parentEventID, agentID, agentType, projectDir, session
 	defer f.Close()
 
 	lines := fmt.Sprintf(
-		"export ERINN_PARENT_EVENT=%s\nexport ERINN_AGENT_ID=%s\nexport ERINN_AGENT_TYPE=%s\nexport ERINN_CONTRIBUTOR_TYPE=ai_agent\n",
+		"export WIPNOTE_PARENT_EVENT=%s\nexport WIPNOTE_AGENT_ID=%s\nexport WIPNOTE_AGENT_TYPE=%s\nexport WIPNOTE_CONTRIBUTOR_TYPE=ai_agent\n",
 		parentEventID, agentID, agentType,
 	)
 	// Also propagate the project directory so subagent hook invocations can
 	// resolve .erinn/ even when their EventCWD is a temp dir.
 	if projectDir != "" {
-		lines += "export ERINN_PROJECT_DIR=" + projectDir + "\n"
+		lines += "export WIPNOTE_PROJECT_DIR=" + projectDir + "\n"
 	}
 	// Merge htmlgraph.agent_id into OTEL_RESOURCE_ATTRIBUTES so the subagent's
 	// OTel SDK emits this attribute on every span. Merge with any existing value
@@ -215,7 +215,7 @@ func mergeOTELResourceAttrs(existing, newPair string) string {
 
 // writeSessionProjectDirHint persists projectDir to a session-scoped temp file
 // so that future hook processes (running in subagent temp dirs) can read it via
-// paths.ReadSessionHint when ERINN_PROJECT_DIR is not in their env.
+// paths.ReadSessionHint when WIPNOTE_PROJECT_DIR is not in their env.
 func writeSessionProjectDirHint(sessionID, projectDir string) {
 	paths.WriteSessionHint(sessionID, projectDir)
 }
@@ -236,10 +236,10 @@ func ApplyTraceparent() (parentSession, parentEvent string) {
 		return "", ""
 	}
 	if tp.TraceID != "" {
-		os.Setenv("ERINN_PARENT_SESSION", tp.TraceID)
+		os.Setenv("WIPNOTE_PARENT_SESSION", tp.TraceID)
 	}
 	if tp.ParentSpanID != "" {
-		os.Setenv("ERINN_PARENT_EVENT", tp.ParentSpanID)
+		os.Setenv("WIPNOTE_PARENT_EVENT", tp.ParentSpanID)
 	}
 	return tp.TraceID, tp.ParentSpanID
 }

@@ -58,7 +58,7 @@ func TestCheckSubagentCommitGuard_SubagentOnMain(t *testing.T) {
 		}
 	})
 
-	// Sub-agent with ERINN_AGENT_BRANCH=1 → escape hatch, allowed.
+	// Sub-agent with WIPNOTE_AGENT_BRANCH=1 → escape hatch, allowed.
 	t.Run("subagent_with_agent_branch_env_is_allowed", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		if err := initTestGitRepoOnBranch(t, tmpDir, "main"); err != nil {
@@ -72,10 +72,10 @@ func TestCheckSubagentCommitGuard_SubagentOnMain(t *testing.T) {
 				"command": "git commit -m \"test commit\"",
 			},
 		}
-		t.Setenv("ERINN_AGENT_BRANCH", "1")
+		t.Setenv("WIPNOTE_AGENT_BRANCH", "1")
 		reason := checkSubagentCommitGuard(commitEvent, "parent-sess-xyz", tmpDir)
 		if reason != "" {
-			t.Errorf("expected ERINN_AGENT_BRANCH=1 to allow commit, got: %q", reason)
+			t.Errorf("expected WIPNOTE_AGENT_BRANCH=1 to allow commit, got: %q", reason)
 		}
 	})
 

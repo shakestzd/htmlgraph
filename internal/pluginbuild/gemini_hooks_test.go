@@ -88,10 +88,10 @@ func TestGeminiHookHandlerOverride(t *testing.T) {
 	s := string(data)
 
 	// Gemini SessionEnd event must invoke session-end handler, not stop.
-	if !strings.Contains(s, "erinn hook session-end") {
+	if !strings.Contains(s, "wipnote hook session-end") {
 		t.Errorf("expected SessionEnd to invoke 'erinn hook session-end' for Gemini:\n%s", s)
 	}
-	if strings.Contains(s, "erinn hook stop") {
+	if strings.Contains(s, "wipnote hook stop") {
 		t.Errorf("Gemini SessionEnd should not invoke 'erinn hook stop' (that's Claude's):\n%s", s)
 	}
 }
@@ -224,7 +224,7 @@ func TestGeminiAdapterEmitsHooksFromFixture(t *testing.T) {
 	}
 	s := string(hooksRaw)
 
-	for _, want := range []string{`"SessionStart"`, `"erinn hook session-start"`} {
+	for _, want := range []string{`"SessionStart"`, `"wipnote hook session-start"`} {
 		if !strings.Contains(s, want) {
 			t.Errorf("gemini hooks missing %q:\n%s", want, s)
 		}

@@ -38,9 +38,9 @@ type ProjectDirOptions struct {
 // .erinn/) using the following priority order:
 //
 //  1. opts.ExplicitDir (--project-dir flag) — hard error if set but invalid
-//  2. ERINN_PROJECT_DIR env var — written by yolo mode (subagent override);
+//  2. WIPNOTE_PROJECT_DIR env var — written by yolo mode (subagent override);
 //     takes precedence over ambient CLAUDE_PROJECT_DIR
-//  3. CLAUDE_PROJECT_DIR env var — gated on ERINN_SESSION_ID being set to
+//  3. CLAUDE_PROJECT_DIR env var — gated on WIPNOTE_SESSION_ID being set to
 //     avoid picking up stale values from a parent shell (fix for bug-71fc095f)
 //  4. Session-scoped hint file — written by SubagentStart for worktree
 //     subagents whose CLAUDE_ENV_FILE is unset; read via ReadSessionHint()
@@ -62,19 +62,19 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 		return "", fmt.Errorf("--project-dir %q: no .erinn directory found. cd into a repo with .erinn/ or set $CLAUDE_PROJECT_DIR", opts.ExplicitDir)
 	}
 
-	// 2. ERINN_PROJECT_DIR env var — written by yolo mode (subagent override);
+	// 2. WIPNOTE_PROJECT_DIR env var — written by yolo mode (subagent override);
 	// takes precedence over ambient CLAUDE_PROJECT_DIR.
-	if d := os.Getenv("ERINN_PROJECT_DIR"); d != "" {
+	if d := os.Getenv("WIPNOTE_PROJECT_DIR"); d != "" {
 		if _, err := os.Stat(filepath.Join(d, ".erinn")); err == nil {
 			return d, nil
 		}
 	}
 
-	// 3. CLAUDE_PROJECT_DIR env var — only trusted when ERINN_SESSION_ID is
+	// 3. CLAUDE_PROJECT_DIR env var — only trusted when WIPNOTE_SESSION_ID is
 	// also set, confirming this env var was written by the current Claude Code
 	// session's hook runner (not inherited as a stale value from a parent shell).
 	// See: fix for bug-71fc095f (split-brain session HTML when user cd's between projects).
-	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" && os.Getenv("ERINN_SESSION_ID") != "" {
+	if d := os.Getenv("CLAUDE_PROJECT_DIR"); d != "" && os.Getenv("WIPNOTE_SESSION_ID") != "" {
 		if _, err := os.Stat(filepath.Join(d, ".erinn")); err == nil {
 			return d, nil
 		}

@@ -728,15 +728,15 @@ func TestShouldSkipRegistration_RealPath(t *testing.T) {
 	}
 }
 
-// TestShouldSkipRegistration_EnvVar verifies the ERINN_SKIP_REGISTER=1 env
+// TestShouldSkipRegistration_EnvVar verifies the WIPNOTE_SKIP_REGISTER=1 env
 // var causes all paths to be skipped regardless of the path structure.
 func TestShouldSkipRegistration_EnvVar(t *testing.T) {
-	t.Setenv("ERINN_SKIP_REGISTER", "1")
+	t.Setenv("WIPNOTE_SKIP_REGISTER", "1")
 	if !registry.ShouldSkipRegistration("/workspaces/htmlgraph") {
-		t.Error("ShouldSkipRegistration with ERINN_SKIP_REGISTER=1 returned false, want true")
+		t.Error("ShouldSkipRegistration with WIPNOTE_SKIP_REGISTER=1 returned false, want true")
 	}
 	if !registry.ShouldSkipRegistration("/tmp/myproject") {
-		t.Error("ShouldSkipRegistration with ERINN_SKIP_REGISTER=1 returned false for /tmp path")
+		t.Error("ShouldSkipRegistration with WIPNOTE_SKIP_REGISTER=1 returned false for /tmp path")
 	}
 }
 

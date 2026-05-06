@@ -68,7 +68,7 @@ func TestEnsureSession_HotPath(t *testing.T) {
 
 	dir := t.TempDir()
 	writeActiveSessionFile(t, dir, sessionID)
-	t.Setenv("ERINN_SESSION_ID", sessionID)
+	t.Setenv("WIPNOTE_SESSION_ID", sessionID)
 	t.Setenv("CLAUDE_SESSION_ID", "")
 
 	// Count rows before.
@@ -100,9 +100,9 @@ func TestEnsureSession_ColdPath(t *testing.T) {
 
 	dir := t.TempDir()
 	writeActiveSessionFile(t, dir, sessionID)
-	t.Setenv("ERINN_SESSION_ID", sessionID)
+	t.Setenv("WIPNOTE_SESSION_ID", sessionID)
 	t.Setenv("CLAUDE_SESSION_ID", "")
-	t.Setenv("ERINN_AGENT_ID", "test-agent")
+	t.Setenv("WIPNOTE_AGENT_ID", "test-agent")
 	t.Setenv("CLAUDE_CODE", "")
 	t.Setenv("CLAUDE_MODEL", "test-model")
 
@@ -128,7 +128,7 @@ func TestEnsureSession_Transient(t *testing.T) {
 
 	dir := t.TempDir()
 	// Clear env so ResolveSessionID falls through to the generated "cli-<pid>-<ts>" form.
-	t.Setenv("ERINN_SESSION_ID", "")
+	t.Setenv("WIPNOTE_SESSION_ID", "")
 	t.Setenv("CLAUDE_SESSION_ID", "")
 	// No .active-session file, so a transient ID is generated.
 
@@ -148,7 +148,7 @@ func TestEnsureSession_Transient(t *testing.T) {
 	}
 }
 
-// TestEnsureSession_SetsEnv verifies that os.Setenv("ERINN_SESSION_ID") is
+// TestEnsureSession_SetsEnv verifies that os.Setenv("WIPNOTE_SESSION_ID") is
 // called after a successful resolve, so downstream EnvSessionID() works.
 func TestEnsureSession_SetsEnv(t *testing.T) {
 	const sessionID = "env-set-session-003"
@@ -158,20 +158,20 @@ func TestEnsureSession_SetsEnv(t *testing.T) {
 
 	dir := t.TempDir()
 	writeActiveSessionFile(t, dir, sessionID)
-	t.Setenv("ERINN_SESSION_ID", sessionID)
+	t.Setenv("WIPNOTE_SESSION_ID", sessionID)
 	t.Setenv("CLAUDE_SESSION_ID", "")
 
 	// Clear the env var so we can verify it's re-set by EnsureSession.
-	os.Unsetenv("ERINN_SESSION_ID")
+	os.Unsetenv("WIPNOTE_SESSION_ID")
 
 	_, err := agent.EnsureSession(database, dir)
 	if err != nil {
 		t.Fatalf("EnsureSession env set: %v", err)
 	}
 
-	got := os.Getenv("ERINN_SESSION_ID")
+	got := os.Getenv("WIPNOTE_SESSION_ID")
 	if got != sessionID {
-		t.Errorf("ERINN_SESSION_ID not set: got %q, want %q", got, sessionID)
+		t.Errorf("WIPNOTE_SESSION_ID not set: got %q, want %q", got, sessionID)
 	}
 }
 
@@ -187,9 +187,9 @@ func TestEnsureSession_ColdPath_WritesActiveSession(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, ".erinn"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	t.Setenv("ERINN_SESSION_ID", sessionID)
+	t.Setenv("WIPNOTE_SESSION_ID", sessionID)
 	t.Setenv("CLAUDE_SESSION_ID", "")
-	t.Setenv("ERINN_AGENT_ID", "test-agent")
+	t.Setenv("WIPNOTE_AGENT_ID", "test-agent")
 	t.Setenv("CLAUDE_CODE", "")
 	t.Setenv("CLAUDE_MODEL", "")
 
