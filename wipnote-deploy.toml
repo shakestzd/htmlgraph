@@ -4,8 +4,8 @@
 # You can customize steps, hooks, and plugin updates.
 
 [project]
-name = "erinn"
-pypi_package = "erinn"  # PyPI package name (if different from project name)
+name = "wipnote"
+pypi_package = "wipnote"  # PyPI package name (if different from project name)
 
 [deployment]
 # Deployment steps (in order)
