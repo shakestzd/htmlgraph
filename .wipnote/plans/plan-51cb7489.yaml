@@ -2,15 +2,278 @@ meta:
     id: plan-51cb7489
     track_id: trk-0677c709
     title: Codex-native wipnote skills and subagents
-    description: Design a single-source plugin-core architecture that emits Codex-native skills and custom agent TOML while preserving the business logic currently authored for the Claude Code wipnote plugin.
+    description: |
+        Design a single-source plugin-core architecture that emits Codex-native skills and custom agent TOML while preserving the business logic currently authored for the Claude Code wipnote plugin.
     created_at: "2026-05-06"
-    status: draft
-    version: 2
+    status: active
+    created_by: codex
+    version: 3
 design:
-    problem: ""
-    goals: []
-    constraints: []
+    problem: |
+        wipnote currently treats `plugin/skills/**/SKILL.md` and `plugin/agents/*.md` as cross-harness assets, then copies them into the Codex marketplace tree. That is sufficient for Codex skills now that the plugin manifest points at `./skills/`, but it is not sufficient for Codex custom agents: current Codex documentation says custom agents are standalone TOML files under `.codex/agents/` or `~/.codex/agents/`, not plugin-root `agents/*.md` files. The result is a partial port where the skills load but wipnote's named subagents do not appear in Codex. The next architecture must keep business logic in one place while emitting each harness's native packaging format.
+    goals:
+        - '**One business source** - agent and skill behavior is authored once, with target-specific shells generated from it.'
+        - '**Codex-native output** - generated Codex skills follow the `SKILL.md` directory contract and generated Codex agents become `.codex/agents/*.toml` custom agents.'
+        - '**Claude compatibility** - existing Claude Code plugin assets keep their behavior and naming unless an intentional compatibility layer is added.'
+        - '**Install-time repair** - `wipnote codex --init`, `--dev`, and normal launch install or refresh all Codex-visible assets, including custom agents.'
+        - '**Regression proof** - tests and smoke checks prove both skills and custom agents appear in Codex prompt/debug surfaces.'
+    constraints:
+        - 'Official Codex docs: plugins bundle skills, hooks, MCP, apps, and assets; custom agents are currently standalone TOML files, so do not invent an undocumented `agents` plugin manifest field.'
+        - Do not hand-edit generated trees under `packages/codex-marketplace/`; update generators and regenerate.
+        - 'Preserve local-first behavior: users should not need network access after installing the wipnote binary and local marketplace.'
+        - Keep generated Codex agent files out of project source unless explicitly requested; user-level install under `~/.codex/agents/` is the safest default for shipped plugin agents.
+        - Avoid broad rewrites of all command/skill content in the first implementation; focus on agent and skill packaging contracts.
     approved: false
     comment: ""
-slices: []
-questions: []
+slices:
+    - id: slice-1
+      num: 1
+      title: Define canonical plugin asset model
+      what: |
+        Add a small internal representation in `internal/pluginbuild` for shared
+        skill and agent business logic. Parse frontmatter and body from the
+        existing `plugin/skills/**/SKILL.md` and `plugin/agents/*.md` files into
+        structs such as `SkillAsset` and `AgentAsset`.
+
+        Reuse existing `splitFrontmatter` parsing patterns from
+        `internal/pluginbuild/gemini_agents.go`, but move shared parsing helpers
+        into a target-neutral file. Keep the source files in `plugin/` as the
+        canonical authoring surface for this slice; do not introduce a new DSL yet.
+      why: |
+        The current generator copies or lightly translates files per target, which
+        makes it hard to reason about what is business logic versus harness
+        packaging. A parsed intermediate model gives Codex, Claude, and Gemini a
+        stable shared input without duplicating instructions or behavior.
+      files:
+        - internal/pluginbuild/core.go
+        - internal/pluginbuild/adapter.go
+        - internal/pluginbuild/gemini_agents.go
+        - internal/pluginbuild/pluginbuild_test.go
+      deps: []
+      done_when:
+        - Target-neutral tests parse representative skill and agent markdown frontmatter plus body content.
+        - Gemini agent translation still passes using the shared parser instead of its private parser.
+        - No generated output changes for Claude or Gemini except formatting that tests explicitly approve.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: add parser tests for frontmatter/body splitting, missing frontmatter, unknown fields, and invalid YAML.
+        Regression: run `go test ./internal/pluginbuild` and compare generated Gemini agent fixtures.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-canonical-source
+          text: Should the first pass keep `plugin/` markdown as canonical, or introduce `packages/plugin-core/assets` as canonical source?
+          recommended: keep-plugin
+          options:
+            - key: keep-plugin
+              label: Keep plugin/ — smallest migration with existing Claude compatibility
+            - key: move-core
+              label: Move to plugin-core — cleaner long-term but larger migration
+    - id: slice-2
+      num: 2
+      title: Emit Codex-native skills without duplicating business logic
+      what: |
+        Add a Codex skill emitter that writes `packages/codex-marketplace/.agents/plugins/wipnote/skills/<skill-dir>/SKILL.md`
+        from the canonical `SkillAsset` model. Keep Codex-compatible
+        `name` and `description` frontmatter, preserve the body as the business
+        logic, and keep optional `references/`, `scripts/`, and `assets/` folders
+        when present.
+
+        This slice should make Codex skills an owned generated output rather than
+        a blind copy. It should also update docs in `packages/plugin-core/README.md`
+        to say skills are single-source but target-emitted.
+      why: |
+        Skills already load in Codex, but their current success depends on a copy
+        assumption. Codex has explicit skill structure and prompt-budget behavior;
+        owning the Codex skill emission lets wipnote normalize frontmatter,
+        descriptions, and path layout while keeping the workflow body shared.
+      files:
+        - internal/pluginbuild/codex.go
+        - internal/pluginbuild/codex_test.go
+        - internal/pluginbuild/adapter.go
+        - packages/plugin-core/README.md
+        - packages/codex-marketplace/.agents/plugins/wipnote/skills/agent-context/SKILL.md
+      deps:
+        - 1
+      done_when:
+        - Codex skill output is generated from parsed skill assets, not copied blindly as part of generic assets.
+        - A test asserts every generated Codex skill has `SKILL.md` with non-empty `name` and `description`.
+        - '`codex debug prompt-input "test"` still lists all wipnote skills after `wipnote codex --dev` refreshes the cache.'
+      effort: M
+      risk: Med
+      tests: |
+        Unit: add `TestCodexSkillsGeneratedFromAssets` for names, descriptions, and preserved body content.
+        Integration: run `go run ./cmd/wipnote plugin build-ports --target codex`, `go test ./internal/pluginbuild ./cmd/wipnote`, and a prompt-input smoke grep for wipnote skills.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-3
+      num: 3
+      title: Translate wipnote agents into Codex custom-agent TOML
+      what: |
+        Add a Codex agent translator that converts canonical `AgentAsset` values
+        into `.toml` files matching the documented Codex custom agent schema:
+        `name`, `description`, and `developer_instructions` are required, with
+        optional `model`, `model_reasoning_effort`, `sandbox_mode`,
+        `nickname_candidates`, and `skills.config` only when there is a clear
+        Codex mapping.
+
+        The initial mapping should:
+        - Emit `developer_instructions` from the markdown body plus any
+          `initialPrompt` text.
+        - Map Claude model aliases conservatively: `haiku` to an inexpensive
+          Codex model only if the repo already has a Codex model policy; otherwise
+          omit `model` and inherit from parent.
+        - Omit Claude-only fields such as `color`, `tools`, and `maxTurns` unless
+          Codex has documented equivalents.
+        - Prefix or namespace names only if needed to avoid collisions; prefer
+          stable names like `wipnote-sonnet-coder` for user-level agents.
+      why: |
+        Codex does not currently load plugin-root `agents/*.md` as subagents.
+        Custom agents must be TOML files in the documented agent locations. This
+        translator is the bridge that keeps wipnote's agent business logic single
+        sourced while making agents visible to Codex.
+      files:
+        - internal/pluginbuild/codex_agents.go
+        - internal/pluginbuild/codex_agents_test.go
+        - plugin/agents/haiku-coder.md
+        - plugin/agents/sonnet-coder.md
+        - plugin/agents/reader.md
+        - plugin/agents/researcher.md
+        - plugin/agents/opus-coder.md
+        - plugin/agents/test-runner.md
+      deps:
+        - 1
+      done_when:
+        - Each current wipnote agent has a generated Codex TOML representation with required fields.
+        - Claude-only metadata is either translated through a documented Codex field or deliberately omitted with test coverage.
+        - Agent instructions include the original business logic body and wipnote attribution pre-flight behavior.
+      effort: L
+      risk: High
+      tests: |
+        Unit: parse each `plugin/agents/*.md`, translate to TOML, parse the TOML back, and assert required Codex fields.
+        Regression: assert no unsupported Claude fields (`tools`, `color`, `maxTurns`) leak into generated Codex TOML.
+        Manual smoke: after install, ask Codex to list available custom agents or inspect prompt/debug output for the generated names.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-agent-install-scope
+          text: Should wipnote install generated Codex custom agents globally or project-locally?
+          recommended: user-global
+          options:
+            - key: user-global
+              label: User global — works across repos after `wipnote codex`
+            - key: project-local
+              label: Project local — check in `.codex/agents`, but may pollute repos
+    - id: slice-4
+      num: 4
+      title: Install and refresh Codex custom agents during wipnote codex launch
+      what: |
+        Extend the `cmd/wipnote/codex.go` setup path so `wipnote codex --init`,
+        `wipnote codex --dev`, and normal `wipnote codex` ensure generated Codex
+        custom-agent TOML files exist in the selected Codex agent location.
+
+        In dev mode, force-refresh the generated agent files on each launch, just
+        like the local plugin cache. In normal mode, install missing or stale
+        files idempotently. Add a clear ownership marker comment or generated
+        header so wipnote can update its own files without touching user-authored
+        agents.
+      why: |
+        Even with a correct generator, users will not see wipnote subagents unless
+        the launcher installs them into a Codex-scanned location. This slice makes
+        the behavior work for every wipnote user, not only developers who manually
+        copy generated files.
+      files:
+        - cmd/wipnote/codex.go
+        - cmd/wipnote/codex_test.go
+        - internal/pluginbuild/codex_agents.go
+        - packages/codex-marketplace/.agents/plugins/wipnote/agents/
+      deps:
+        - 3
+      done_when:
+        - '`wipnote codex --dev` refreshes generated agent TOML and leaves unrelated user agents untouched.'
+        - '`wipnote codex --init` installs missing agents idempotently.'
+        - Tests cover fresh install, stale generated file replacement, and user-authored file preservation.
+      effort: M
+      risk: High
+      tests: |
+        Unit: use temporary HOME to assert install paths, generated headers, idempotence, and stale replacement.
+        Integration: run `go test ./cmd/wipnote -run 'Test.*Codex'` and `go run ./cmd/wipnote codex --dev -- exec ...` smoke.
+        Manual smoke: verify Codex recognizes `wipnote-sonnet-coder`, `wipnote-reader`, and `wipnote-test-runner` as custom agents.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-5
+      num: 5
+      title: Document and validate cross-harness parity
+      what: |
+        Update `packages/plugin-core/README.md` and relevant AGENTS/plugin docs
+        to describe the new single-source architecture:
+        - canonical business logic lives in parsed plugin assets,
+        - Claude receives Claude-native markdown,
+        - Gemini receives translated command and agent metadata,
+        - Codex receives plugin-packaged skills plus installed custom-agent TOML.
+
+        Add a parity test that enumerates canonical agent and skill names and
+        asserts every target emits an expected representation. Add a small
+        operator checklist for verifying Codex after launch: `codex debug
+        prompt-input` for skills, and custom-agent listing or spawn smoke for
+        agents.
+      why: |
+        The previous docs said markdown formats were compatible across Claude and
+        Codex, which is now known to be false for agents. Updating the docs and
+        parity tests prevents future regressions and gives maintainers a reliable
+        way to reason about generated ports.
+      files:
+        - packages/plugin-core/README.md
+        - AGENTS.md
+        - internal/pluginbuild/parity_test.go
+        - cmd/wipnote/codex_test.go
+      deps:
+        - 2
+        - 3
+        - 4
+      done_when:
+        - Docs explicitly distinguish shared business logic from target-native packaging.
+        - Parity tests fail if a canonical agent or skill is absent from a target that should expose it.
+        - The Codex verification checklist covers skills, hooks, and custom agents.
+      effort: M
+      risk: Low
+      tests: |
+        Unit: run `go test ./internal/pluginbuild ./cmd/wipnote`.
+        Documentation regression: grep docs to ensure the old claim that Codex agents are compatible markdown is gone.
+        Smoke: run `wipnote plugin build-ports --target codex` and inspect generated output paths.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+questions:
+    - id: q-agent-model-policy
+      text: Should Codex custom agents pin models or inherit from the parent session?
+      description: |
+        Claude agent files use `haiku`, `sonnet`, and `opus` aliases. Codex custom agents can specify concrete models, but pinning model IDs may age poorly and may override user/session policy.
+      recommended: inherit
+      options:
+        - key: inherit
+          label: Inherit parent — safest and most future-proof
+        - key: pin-current
+          label: Pin current models — closer to Claude intent but needs maintenance
+      answer: null
+    - id: q-agent-namespacing
+      text: Should generated Codex agent names include a `wipnote-` prefix?
+      description: |
+        Codex custom agents live in a flat namespace. Prefixing avoids collisions with built-ins and user agents, but differs from Claude agent names.
+      recommended: prefix
+      options:
+        - key: prefix
+          label: Prefix — avoid collisions in flat Codex namespace
+        - key: preserve
+          label: Preserve names — closer to Claude but collision-prone
+      answer: null
