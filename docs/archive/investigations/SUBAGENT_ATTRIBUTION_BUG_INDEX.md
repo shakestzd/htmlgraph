@@ -139,7 +139,7 @@ PROBLEM:
   ✗ Cannot distinguish orchestrator from subagent work
 
 ROOT CAUSE:
-  Event tracking hook uses global session cache (.htmlgraph/session.json)
+  Event tracking hook uses global session cache (.wipnote/session.json)
   instead of checking environment variables for subagent context.
 
 THE FIX:
@@ -160,8 +160,8 @@ EFFORT:
 | File | Lines | Change | Complexity |
 |------|-------|--------|------------|
 | `packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-spawner-router.py` | 412-430 | Add 20 lines to set environment variables | Low |
-| `src/python/htmlgraph/hooks/event_tracker.py` | 710-723 | Replace 14 lines with 45 lines to detect and handle subagent | Medium |
-| `src/python/htmlgraph/hooks/context.py` | ~105 | Add 15 line documentation comment | Low |
+| `src/python/wipnote/hooks/event_tracker.py` | 710-723 | Replace 14 lines with 45 lines to detect and handle subagent | Medium |
+| `src/python/wipnote/hooks/context.py` | ~105 | Add 15 line documentation comment | Low |
 
 ---
 
@@ -259,11 +259,11 @@ The fix will enable this existing system to work as designed.
 
 ## References
 
-- Session Manager: `src/python/htmlgraph/session_manager.py`
-- Event Tracker: `src/python/htmlgraph/hooks/event_tracker.py`
-- Hook Context: `src/python/htmlgraph/hooks/context.py`
+- Session Manager: `src/python/wipnote/session_manager.py`
+- Event Tracker: `src/python/wipnote/hooks/event_tracker.py`
+- Hook Context: `src/python/wipnote/hooks/context.py`
 - PreToolUse Hook: `packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-spawner-router.py`
-- Database Schema: `src/python/htmlgraph/db/schema.py`
+- Database Schema: `src/python/wipnote/db/schema.py`
 - Tests: `tests/integration/test_orchestrator_spawner_delegation.py`
 
 ---

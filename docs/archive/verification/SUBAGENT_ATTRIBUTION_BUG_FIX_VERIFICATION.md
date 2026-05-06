@@ -54,7 +54,7 @@ logger.info(f"Setting HTMLGRAPH_PARENT_AGENT={parent_agent}")
 
 ## Fix #2: Track Event Hook - Subagent Session Creation ✅
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 
 **Lines**: 714-756
 
@@ -129,7 +129,7 @@ else:
         # Fallback: No session_id in hook_input - use global session cache
         active_session = manager.get_active_session()
         if not active_session:
-            # No active HtmlGraph session yet; start one
+            # No active Wipnote session yet; start one
             try:
                 active_session = manager.start_session(
                     session_id=None,
@@ -153,7 +153,7 @@ else:
 
 ## Fix #3: Documentation ✅
 
-**File**: `src/python/htmlgraph/hooks/context.py`
+**File**: `src/python/wipnote/hooks/context.py`
 
 **Lines**: 107-122
 
@@ -161,7 +161,7 @@ else:
 ```python
 # NOTE: We intentionally do NOT use SessionManager.get_active_session()
 # as a fallback because the "active session" is stored in a global file
-# (.htmlgraph/session.json) that's shared across all Claude windows.
+# (.wipnote/session.json) that's shared across all Claude windows.
 # Using it would cause cross-window event contamination where tool calls
 # from Window B get linked to UserQuery events from Window A.
 #
@@ -256,7 +256,7 @@ subagent_session_id = f"{parent_session_id}-{subagent_type}"
 
 **Check subagent sessions in database**:
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT session_id, agent_assigned, is_subagent, parent_session_id
 FROM sessions
 WHERE is_subagent = 1
@@ -273,7 +273,7 @@ session-xyz789-codex|codex-spawner|1|session-xyz789
 
 **Check subagent events**:
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT session_id, tool_name, model
 FROM agent_events
 WHERE session_id LIKE '%-gemini' OR session_id LIKE '%-codex'
@@ -290,7 +290,7 @@ session-abc123-gemini|Edit|gemini-2.0-flash
 
 **Check parent-child event links**:
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT event_id, parent_event_id, tool_name, session_id
 FROM agent_events
 WHERE parent_event_id IS NOT NULL
@@ -313,8 +313,8 @@ event-task-001|NULL|Task|session-abc123
 
 **Files Modified**:
 1. ✅ `packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-spawner-router.py`
-2. ✅ `src/python/htmlgraph/hooks/event_tracker.py`
-3. ✅ `src/python/htmlgraph/hooks/context.py`
+2. ✅ `src/python/wipnote/hooks/event_tracker.py`
+3. ✅ `src/python/wipnote/hooks/context.py`
 
 **Related Commits**:
 - `c142e0e` - Use session_id from hook_input in track_event()

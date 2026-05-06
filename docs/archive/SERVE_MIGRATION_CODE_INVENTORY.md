@@ -1,10 +1,10 @@
-# HtmlGraph `serve` Migration - Code Inventory
+# Wipnote `serve` Migration - Code Inventory
 
 ## File-by-File Breakdown
 
 ### 1. Active FastAPI Implementation
 
-#### `/src/python/htmlgraph/api/main.py` (2,300+ lines)
+#### `/src/python/wipnote/api/main.py` (2,300+ lines)
 **Status:** ✅ Active, core server
 
 **Structure:**
@@ -45,7 +45,7 @@ Lines 2253-2300:  create_app() factory function
 
 ---
 
-#### `/src/python/htmlgraph/operations/fastapi_server.py` (230 lines)
+#### `/src/python/wipnote/operations/fastapi_server.py` (230 lines)
 **Status:** ✅ Active, server operations
 
 **Functions:**
@@ -82,7 +82,7 @@ FastAPIServerStartResult(
         "port": 8000,
         "original_port": 8080,
         "host": "127.0.0.1",
-        "db_path": "/Users/shakes/.htmlgraph/index.sqlite",
+        "db_path": "/Users/shakes/.wipnote/index.sqlite",
         "auto_port": True,
         "reload": False,
     }
@@ -93,13 +93,13 @@ FastAPIServerStartResult(
 
 ### 2. Legacy Server Implementation (INACTIVE)
 
-#### `/src/python/htmlgraph/server.py` (1,600+ lines)
+#### `/src/python/wipnote/server.py` (1,600+ lines)
 **Status:** ❌ Inactive, can be deleted
 
 **Structure:**
 ```python
 Lines 1-31:       Module docstring, imports
-Lines 33-163:     HtmlGraphAPIHandler class
+Lines 33-163:     WipnoteAPIHandler class
   • Lines 33-58:    Class variables & initialization
   • Lines 60-162:   _get_graph() - lazy graph loading
 
@@ -186,7 +186,7 @@ POST   /api/tracks/{id}?sync=true               - Sync track
 
 ---
 
-#### `/src/python/htmlgraph/operations/server.py` (300 lines)
+#### `/src/python/wipnote/operations/server.py` (300 lines)
 **Status:** ❌ Inactive, can be deleted
 
 **Functions:**
@@ -215,13 +215,13 @@ Lines 277-302:    _find_available_port()
 
 ### 3. CLI Integration
 
-#### `/src/python/htmlgraph/cli.py` (4,700+ lines)
+#### `/src/python/wipnote/cli.py` (4,700+ lines)
 **Status:** ✅ Active, but needs updates
 
 **Current serve command:**
 ```python
 Lines 140-194:    cmd_serve(args)
-  • Entry point when user runs: htmlgraph serve
+  • Entry point when user runs: wipnote serve
   • Calls: start_fastapi_server()
   • Calls: run_fastapi_server() (async)
   • Prints server info with Rich console
@@ -239,7 +239,7 @@ Lines 5120-5135:  Argument parser setup
 parser_serve = subparsers.add_parser('serve', ...)
 parser_serve.add_argument('--port', type=int, default=8080)
 parser_serve.add_argument('--host', default='localhost')
-parser_serve.add_argument('--graph-dir', default='.htmlgraph')
+parser_serve.add_argument('--graph-dir', default='.wipnote')
 parser_serve.add_argument('--auto-port', action='store_true')
 parser_serve.add_argument('--db', default=None)
 parser_serve.add_argument('--reload', action='store_true')
@@ -254,7 +254,7 @@ parser_serve.add_argument('--verbose', action='store_true')
 
 ### 4. Supporting Components
 
-#### `/src/python/htmlgraph/file_watcher.py` (active)
+#### `/src/python/wipnote/file_watcher.py` (active)
 **Status:** ✅ Implemented, ready to use
 
 **GraphWatcher class:**
@@ -267,7 +267,7 @@ parser_serve.add_argument('--verbose', action='store_true')
 
 ---
 
-#### `/src/python/htmlgraph/analytics_index.py` (active)
+#### `/src/python/wipnote/analytics_index.py` (active)
 **Status:** ✅ Implemented, used by both
 
 **AnalyticsIndex class:**
@@ -320,7 +320,7 @@ Lines 264-305:    TestGetServerStatus
 
 ### Legacy Server Flow
 ```
-User runs: htmlgraph serve --port 8080
+User runs: wipnote serve --port 8080
        ↓
 cli.py: cmd_serve()
        ↓
@@ -328,7 +328,7 @@ operations/server.py: start_server()
        ├─ sync_dashboard_files()
        ├─ create graph directories
        ├─ build analytics index if needed
-       ├─ HTTPServer((host, port), HtmlGraphAPIHandler)
+       ├─ HTTPServer((host, port), WipnoteAPIHandler)
        └─ GraphWatcher.start()
        ↓
 server.py: serve_forever() in HTTPServer
@@ -342,7 +342,7 @@ HTTP requests from clients
 
 ### FastAPI Server Flow
 ```
-User runs: htmlgraph serve --port 8080
+User runs: wipnote serve --port 8080
        ↓
 cli.py: cmd_serve()
        ↓
@@ -390,7 +390,7 @@ config/
 cli.py
   └─ operations/server.py
       ├─ server.py
-      │  ├─ HtmlGraph
+      │  ├─ Wipnote
       │  ├─ GraphWatcher
       │  ├─ AnalyticsIndex
       │  └─ http.server (stdlib)
@@ -418,17 +418,17 @@ cli.py
 
 ### Active Code
 ```
-src/python/htmlgraph/api/main.py              2,300 lines
-src/python/htmlgraph/operations/fastapi_server.py  230 lines
-src/python/htmlgraph/cli.py (serve section)   ~50 lines
+src/python/wipnote/api/main.py              2,300 lines
+src/python/wipnote/operations/fastapi_server.py  230 lines
+src/python/wipnote/cli.py (serve section)   ~50 lines
                                               ─────────
 Total Active Code:                           ~2,580 lines
 ```
 
 ### Inactive Code (Can Delete)
 ```
-src/python/htmlgraph/server.py                1,600 lines
-src/python/htmlgraph/operations/server.py      300 lines
+src/python/wipnote/server.py                1,600 lines
+src/python/wipnote/operations/server.py      300 lines
 tests/operations/test_server.py                300 lines
                                               ─────────
 Total Legacy Code:                           ~2,200 lines
@@ -449,7 +449,7 @@ Total New Code:                              ~1,000 lines
 
 ### Current Imports in cli.py (serve command)
 ```python
-from htmlgraph.operations.fastapi_server import (
+from wipnote.operations.fastapi_server import (
     run_fastapi_server,
     start_fastapi_server,
 )
@@ -458,7 +458,7 @@ from htmlgraph.operations.fastapi_server import (
 ### Current Imports in operations/fastapi_server.py
 ```python
 import uvicorn
-from htmlgraph.api.main import create_app
+from wipnote.api.main import create_app
 ```
 
 ### Current Imports in api/main.py
@@ -474,15 +474,15 @@ from pydantic import BaseModel
 ### UNUSED Imports (from legacy server)
 ```python
 # These are never imported when running FastAPI
-from htmlgraph.server import HtmlGraphAPIHandler, sync_dashboard_files
-from htmlgraph.operations.server import start_server, stop_server, get_server_status
+from wipnote.server import WipnoteAPIHandler, sync_dashboard_files
+from wipnote.operations.server import start_server, stop_server, get_server_status
 ```
 
 ---
 
 ## Database Schema (FastAPI Only)
 
-The FastAPI server reads from SQLite at `.htmlgraph/index.sqlite`:
+The FastAPI server reads from SQLite at `.wipnote/index.sqlite`:
 
 ### Tables Used:
 - `agent_events` - Stores all agent activity events
@@ -494,7 +494,7 @@ The FastAPI server reads from SQLite at `.htmlgraph/index.sqlite`:
 - Various analytics tables (read-only for dashboard)
 
 ### Tables NOT Used in FastAPI:
-- HTML files in `.htmlgraph/{collection}/` directories
+- HTML files in `.wipnote/{collection}/` directories
 - Legacy: Read directly from HTML graph files
 - New: Only reads SQLite database
 
@@ -547,8 +547,8 @@ The FastAPI server reads from SQLite at `.htmlgraph/index.sqlite`:
 ```
 ☐ Verify all REST endpoints working in FastAPI
 ☐ Run full test suite with FastAPI only
-☐ Delete src/python/htmlgraph/server.py
-☐ Delete src/python/htmlgraph/operations/server.py
+☐ Delete src/python/wipnote/server.py
+☐ Delete src/python/wipnote/operations/server.py
 ☐ Delete tests/operations/test_server.py
 ☐ Search for remaining imports of deleted modules
 ☐ Update import documentation
@@ -562,28 +562,28 @@ The FastAPI server reads from SQLite at `.htmlgraph/index.sqlite`:
 ## Quick Navigation Guide
 
 To understand the current state:
-1. Start: `src/python/htmlgraph/cli.py` lines 140-194 (entry point)
-2. Next: `src/python/htmlgraph/operations/fastapi_server.py` (server ops)
-3. Then: `src/python/htmlgraph/api/main.py` (FastAPI app)
-4. Reference: `src/python/htmlgraph/server.py` (legacy, for feature comparison)
+1. Start: `src/python/wipnote/cli.py` lines 140-194 (entry point)
+2. Next: `src/python/wipnote/operations/fastapi_server.py` (server ops)
+3. Then: `src/python/wipnote/api/main.py` (FastAPI app)
+4. Reference: `src/python/wipnote/server.py` (legacy, for feature comparison)
 
 To implement Phase 1 (REST API):
-1. Review: `src/python/htmlgraph/server.py` lines 398-1268 (handlers)
-2. Port to: `src/python/htmlgraph/api/main.py` (add routes)
+1. Review: `src/python/wipnote/server.py` lines 398-1268 (handlers)
+2. Port to: `src/python/wipnote/api/main.py` (add routes)
 3. Test: `tests/api/test_rest_api.py` (new file)
 
 To implement Phase 2 (File Watching):
-1. Review: `src/python/htmlgraph/file_watcher.py` (GraphWatcher)
-2. Update: `src/python/htmlgraph/operations/fastapi_server.py`
-3. Update: `src/python/htmlgraph/cli.py` argument parser
+1. Review: `src/python/wipnote/file_watcher.py` (GraphWatcher)
+2. Update: `src/python/wipnote/operations/fastapi_server.py`
+3. Update: `src/python/wipnote/cli.py` argument parser
 
 To implement Phase 3 (CLI Arguments):
-1. Update: `src/python/htmlgraph/cli.py` argument definitions
-2. Update: `src/python/htmlgraph/operations/fastapi_server.py` functions
+1. Update: `src/python/wipnote/cli.py` argument definitions
+2. Update: `src/python/wipnote/operations/fastapi_server.py` functions
 3. Test: All command variations
 
 To implement Phase 4 (Cleanup):
-1. Delete: `src/python/htmlgraph/server.py`
-2. Delete: `src/python/htmlgraph/operations/server.py`
+1. Delete: `src/python/wipnote/server.py`
+2. Delete: `src/python/wipnote/operations/server.py`
 3. Delete: `tests/operations/test_server.py`
 4. Verify: `uv run pytest` passes

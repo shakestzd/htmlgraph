@@ -2,7 +2,7 @@
 
 ## Initialize Project
 
-**Problem**: Start a new HtmlGraph project from scratch.
+**Problem**: Start a new Wipnote project from scratch.
 
 **Solution**:
 
@@ -11,22 +11,22 @@
 mkdir my-project
 cd my-project
 
-# Initialize HtmlGraph with git hooks
-htmlgraph init --install-hooks
+# Initialize Wipnote with git hooks
+wipnote init --install-hooks
 
 # Verify setup
-htmlgraph status
+wipnote status
 ```
 
 **Explanation**:
-- `htmlgraph init` creates the `.htmlgraph/` directory structure
+- `wipnote init` creates the `.wipnote/` directory structure
 - `--install-hooks` installs git hooks for automatic activity tracking
 - Creates `index.html` dashboard at project root
 - Sets up JSONL event stream and SQLite index
 
 **What Gets Created**:
 ```
-.htmlgraph/
+.wipnote/
 ├── features/       # Feature HTML files
 ├── sessions/       # Session HTML files
 ├── tracks/         # Track directories
@@ -45,10 +45,10 @@ htmlgraph status
 
 ```bash
 # Option 1: During init
-htmlgraph init --install-hooks
+wipnote init --install-hooks
 
 # Option 2: After init
-htmlgraph setup install-hooks
+wipnote setup install-hooks
 
 # Verify hooks are installed
 ls -la .git/hooks/
@@ -74,7 +74,7 @@ ls -la .git/hooks/
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Option 1: Set agent in SDK initialization
 sdk = SDK(agent="claude-code")
@@ -86,7 +86,7 @@ sdk = SDK()  # Reads from environment
 
 # Option 3: Set in shell
 export HTMLGRAPH_AGENT=my-agent-name
-htmlgraph status  # Uses env variable
+wipnote status  # Uses env variable
 ```
 
 **Explanation**:
@@ -110,13 +110,13 @@ htmlgraph status  # Uses env variable
 
 ```bash
 # Start server (default port 8080)
-htmlgraph serve
+wipnote serve
 
 # Custom port
-htmlgraph serve --port 3000
+wipnote serve --port 3000
 
 # Auto-reload on file changes
-htmlgraph serve --watch
+wipnote serve --watch
 ```
 
 **Explanation**:
@@ -133,12 +133,12 @@ htmlgraph serve --watch
 
 ## Bootstrap Example Data
 
-**Problem**: Start with sample data to understand HtmlGraph.
+**Problem**: Start with sample data to understand Wipnote.
 
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="learning")
 
@@ -176,7 +176,7 @@ api = sdk.features.where(title="API Endpoints")[0]
 sdk.features.add_dependency(auth.id, db.id, "blocks")
 sdk.features.add_dependency(api.id, auth.id, "blocks")
 
-print("\nBootstrap complete! Run 'htmlgraph serve' to see the dashboard.")
+print("\nBootstrap complete! Run 'wipnote serve' to see the dashboard.")
 ```
 
 **What You Get**:
@@ -188,16 +188,16 @@ print("\nBootstrap complete! Run 'htmlgraph serve' to see the dashboard.")
 
 ## Cleanup and Reset
 
-**Problem**: Start fresh or remove HtmlGraph from a project.
+**Problem**: Start fresh or remove Wipnote from a project.
 
 **Solution**:
 
 ```bash
 # Backup first!
-cp -r .htmlgraph .htmlgraph.backup
+cp -r .wipnote .wipnote.backup
 
-# Remove all HtmlGraph data
-rm -rf .htmlgraph
+# Remove all Wipnote data
+rm -rf .wipnote
 
 # Uninstall git hooks
 rm .git/hooks/post-commit
@@ -205,7 +205,7 @@ rm .git/hooks/post-checkout
 rm .git/hooks/post-merge
 
 # Reinitialize if needed
-htmlgraph init --install-hooks
+wipnote init --install-hooks
 ```
 
 **Caution**:

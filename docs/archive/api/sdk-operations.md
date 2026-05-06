@@ -25,7 +25,7 @@ status = sdk.get_server_status(result.handle)
 ```
 
 **Methods added:**
-- `start_server()` - Start HtmlGraph web server
+- `start_server()` - Start Wipnote web server
 - `stop_server()` - Stop running server
 - `get_server_status()` - Check server status
 
@@ -107,7 +107,7 @@ SDK methods are thin wrappers that delegate directly to the operations layer:
 
 ```python
 def start_server(self, port: int = 8080, ...) -> Any:
-    from htmlgraph.operations import server
+    from wipnote.operations import server
 
     return server.start_server(
         port=port,
@@ -136,7 +136,7 @@ def analyze_session(self, session_id: str) -> Any:
 - Operations layer defines concrete types
 - SDK doesn't need to import all operation types
 - Docstrings document expected return types
-- Users can import types from `htmlgraph.operations` if needed
+- Users can import types from `wipnote.operations` if needed
 
 ### 3. Parameter Mapping
 
@@ -241,7 +241,7 @@ Created `tests/test_sdk_operations.py` with 17 tests covering:
 
 Verified with mypy:
 ```bash
-uv run mypy src/python/htmlgraph/sdk.py
+uv run mypy src/python/wipnote/sdk.py
 # Success: no issues found
 ```
 
@@ -251,7 +251,7 @@ uv run mypy src/python/htmlgraph/sdk.py
 - [x] Docstrings with examples for each method
 - [x] Integration tests pass (17/17)
 - [x] Type hints correct (mypy passes)
-- [x] Imports from `htmlgraph.operations` only
+- [x] Imports from `wipnote.operations` only
 - [x] Help system updated
 - [x] __dir__ method updated
 
@@ -260,7 +260,7 @@ uv run mypy src/python/htmlgraph/sdk.py
 ### Starting a Server
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -279,7 +279,7 @@ sdk.stop_server(result.handle)
 ### Setting Up Hooks
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -298,7 +298,7 @@ print(f"Enabled hooks: {hooks.enabled}")
 ### Analyzing Project
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -320,18 +320,18 @@ for rec in recs.recommendations[:5]:
 ## Related Files
 
 **Modified:**
-- `src/python/htmlgraph/sdk.py` - Added 13 new methods, updated help system
+- `src/python/wipnote/sdk.py` - Added 13 new methods, updated help system
 
 **Created:**
 - `tests/test_sdk_operations.py` - Integration tests (17 tests)
 - `docs/sdk-operations-implementation.md` - This document
 
 **Dependencies:**
-- `src/python/htmlgraph/operations/__init__.py` - Operations layer exports
-- `src/python/htmlgraph/operations/server.py` - Server operations
-- `src/python/htmlgraph/operations/hooks.py` - Hook operations
-- `src/python/htmlgraph/operations/events.py` - Event operations
-- `src/python/htmlgraph/operations/analytics.py` - Analytics operations
+- `src/python/wipnote/operations/__init__.py` - Operations layer exports
+- `src/python/wipnote/operations/server.py` - Server operations
+- `src/python/wipnote/operations/hooks.py` - Hook operations
+- `src/python/wipnote/operations/events.py` - Event operations
+- `src/python/wipnote/operations/analytics.py` - Analytics operations
 
 ## Next Steps
 

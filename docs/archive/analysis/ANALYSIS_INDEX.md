@@ -29,7 +29,7 @@
 ---
 
 ### 2. Complete Spike Analysis (COMPREHENSIVE)
-**File:** `.htmlgraph/spikes/system-prompt-persistence-strategy.md`
+**File:** `.wipnote/spikes/system-prompt-persistence-strategy.md`
 **Length:** ~4,000 words
 **Best For:** Deep technical understanding, architects, detailed planning
 
@@ -44,7 +44,7 @@
 - 8. Testing strategy (unit, integration, E2E)
 - 9. Edge cases & handling
 - 10. Metrics & success criteria
-- 11. Integration points with HtmlGraph
+- 11. Integration points with Wipnote
 - 12. Open questions & future enhancements
 - 13. Summary & recommendations
 - Appendices with quick reference
@@ -54,7 +54,7 @@
 ---
 
 ### 3. Architecture & Technical Design (DETAILED)
-**File:** `.htmlgraph/spikes/SESSION_START_HOOK_ARCHITECTURE.md`
+**File:** `.wipnote/spikes/SESSION_START_HOOK_ARCHITECTURE.md`
 **Length:** ~3,000 words
 **Best For:** Engineers, implementers, technical validation
 
@@ -129,7 +129,7 @@
 ### If you're planning Phase 1 implementation:
 1. Read: SYSTEM_PROMPT_PERSISTENCE_SUMMARY.md (Phase 1 section)
 2. Read: .claude/SYSTEM_PROMPT_PERSISTENCE_QUICKREF.md (Hook pseudo-code)
-3. Review: .htmlgraph/spikes/system-prompt-persistence-strategy.md (Phase 1 subsection)
+3. Review: .wipnote/spikes/system-prompt-persistence-strategy.md (Phase 1 subsection)
 4. Time: 20 minutes
 5. Outcome: Implementation plan clear
 
@@ -231,11 +231,11 @@
 1. `SYSTEM_PROMPT_PERSISTENCE_SUMMARY.md` - Executive summary
 2. `ANALYSIS_INDEX.md` (this file) - Navigation guide
 3. `.claude/SYSTEM_PROMPT_PERSISTENCE_QUICKREF.md` - Quick reference
-4. `.htmlgraph/spikes/system-prompt-persistence-strategy.md` - Main spike
-5. `.htmlgraph/spikes/SESSION_START_HOOK_ARCHITECTURE.md` - Architecture
+4. `.wipnote/spikes/system-prompt-persistence-strategy.md` - Main spike
+5. `.wipnote/spikes/SESSION_START_HOOK_ARCHITECTURE.md` - Architecture
 
-### HtmlGraph Integration
-- Spike entry created in HtmlGraph with findings
+### Wipnote Integration
+- Spike entry created in Wipnote with findings
 - Linked to spike markdown documents
 - Findings documented for future reference
 
@@ -278,4 +278,4 @@ A: Claude Code only. For others, embed in GEMINI.md or SDK.
 
 **Analysis Complete. Ready for Phase 1 Implementation.**
 **Date:** 2026-01-05
-**Status:** All documentation created and saved to HtmlGraph
+**Status:** All documentation created and saved to Wipnote

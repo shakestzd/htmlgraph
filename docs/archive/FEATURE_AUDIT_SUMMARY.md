@@ -1,15 +1,15 @@
-# HtmlGraph Feature Audit - Executive Summary
+# Wipnote Feature Audit - Executive Summary
 
 **Date:** January 5, 2026
 **Total Features Audited:** 90
-**Result:** Comprehensive spike created at `.htmlgraph/spikes/spk-e8bd6ad3.html`
+**Result:** Comprehensive spike created at `.wipnote/spikes/spk-e8bd6ad3.html`
 
 ---
 
 ## Key Findings
 
 ### The Real Problem
-HtmlGraph has accumulated **40%+ distraction features** that don't enable core value. Two specific features stand out as major time-wasters:
+Wipnote has accumulated **40%+ distraction features** that don't enable core value. Two specific features stand out as major time-wasters:
 
 1. **Graph Visualization (feat-621bea48)** - Planned 60+ engineering hours
    - Result: 0.71% connection density, 98% isolated nodes
@@ -127,12 +127,12 @@ Replace DAUs, features shipped, etc. with real metrics:
 
 ## Strategic Insights
 
-### HtmlGraph is NOT
+### Wipnote is NOT
 - A project management tool (Jira exists)
 - A visualization/analytics platform (Metabase exists)
 - A task runner (Make/Just exist)
 
-### HtmlGraph IS
+### Wipnote IS
 - **A coordination layer for AI agents** (unique)
 - **Session-persistent context bridge** (unique)
 - **Multi-model orchestration routing** (unique)
@@ -175,9 +175,9 @@ Success is measured by **reliable orchestration + cost optimization + work attri
 
 Complete analysis with all 90 features categorized, effort estimates, and strategic recommendations is available in:
 
-**File:** `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/spikes/spk-e8bd6ad3.html`
+**File:** `/Users/shakes/DevProjects/htmlgraph/.wipnote/spikes/spk-e8bd6ad3.html`
 
-This document is synchronized with HtmlGraph's own tracking system and includes:
+This document is synchronized with Wipnote's own tracking system and includes:
 - Complete feature inventory with status/priority
 - Categorization rationale for all 90 features
 - Engineering effort analysis (what was wasted, what worked)
@@ -189,6 +189,6 @@ This document is synchronized with HtmlGraph's own tracking system and includes:
 
 ## Bottom Line
 
-HtmlGraph has **excellent core foundations** for multi-agent orchestration. The roadmap needs **ruthless focus**: complete 3 critical TODOs, shelf visualizations, defer future phases. Success is **reliability + cost optimization + attribution**, not fancy dashboards.
+Wipnote has **excellent core foundations** for multi-agent orchestration. The roadmap needs **ruthless focus**: complete 3 critical TODOs, shelf visualizations, defer future phases. Success is **reliability + cost optimization + attribution**, not fancy dashboards.
 
 **Estimated impact of following this roadmap:** 50+ hours engineering time freed up, 30%+ improvement in focus, faster delivery of core value.

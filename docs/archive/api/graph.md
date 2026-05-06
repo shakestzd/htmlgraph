@@ -1,10 +1,10 @@
-# HtmlGraph
+# Wipnote
 
 Core graph operations, queries, and traversal algorithms.
 
 ## Overview
 
-The `HtmlGraph` class provides:
+The `Wipnote` class provides:
 
 - Node and edge management
 - Multiple query methods (CSS selectors, QueryBuilder, Find API)
@@ -14,10 +14,10 @@ The `HtmlGraph` class provides:
 ## Initialization
 
 ```python
-from htmlgraph import HtmlGraph
+from wipnote import Wipnote
 
 # Initialize with graph directory
-graph = HtmlGraph(graph_dir=".htmlgraph")
+graph = Wipnote(graph_dir=".wipnote")
 ```
 
 ## Node Operations
@@ -25,7 +25,7 @@ graph = HtmlGraph(graph_dir=".htmlgraph")
 ### Adding Nodes
 
 ```python
-from htmlgraph.models import Node
+from wipnote.models import Node
 
 node = Node(
     id="feature-001",
@@ -67,7 +67,7 @@ graph.remove("feature-001")
 
 ## Query Methods
 
-HtmlGraph provides four ways to query nodes:
+Wipnote provides four ways to query nodes:
 
 ### 1. CSS Selector Queries
 
@@ -85,7 +85,7 @@ urgent = graph.query('[data-status="blocked"][data-priority="high"]')
 For complex queries with OR, NOT, numeric comparisons, and text search.
 
 ```python
-from htmlgraph import QueryBuilder
+from wipnote import QueryBuilder
 
 # Simple equality
 features = graph.query_builder().where("type", "feature").execute()

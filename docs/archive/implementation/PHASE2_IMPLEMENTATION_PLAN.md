@@ -120,7 +120,7 @@ def layer2_persist_to_env_file():
 
         # Add new variables
         new_vars = [
-            "# HtmlGraph system prompt persistence",
+            "# Wipnote system prompt persistence",
             "export CLAUDE_SESSION_PROMPT_INJECTED=true",
             f"export CLAUDE_PREFERRED_MODEL=haiku",
             f"export CLAUDE_DELEGATE_SCRIPT=\"{project_dir}/.claude/delegate.sh\"",
@@ -360,7 +360,7 @@ def check_layer3_recovery():
 4. Hook timeout
 
 **Response:**
-1. SessionStart hook logs failure to `.htmlgraph/sessions/` log
+1. SessionStart hook logs failure to `.wipnote/sessions/` log
 2. Layer 3 records failure in backup file
 3. Recovery mechanism checks on next SessionStart
 4. If multiple consecutive failures, warning logged
@@ -802,8 +802,8 @@ CLAUDE_ENV_FILE provides the best balance of reliability (95%) and zero token co
    - Cons: Adds small file
    - Cost: 0 tokens | Reliability: 99% | Latency: <10ms
 
-2. **.htmlgraph/sessions/ log**
-   - Pros: Integrated with HtmlGraph tracking
+2. **.wipnote/sessions/ log**
+   - Pros: Integrated with Wipnote tracking
    - Cons: Different format, requires JSON parsing
    - Cost: 0 tokens | Reliability: 95% | Latency: <10ms
 
@@ -827,7 +827,7 @@ CLAUDE_ENV_FILE provides the best balance of reliability (95%) and zero token co
 - Hooks typically output JSON
 - Easier to validate programmatically
 - No additional dependencies (YAML requires external package)
-- Standard across HtmlGraph codebase
+- Standard across Wipnote codebase
 
 ---
 
@@ -1218,7 +1218,7 @@ Cover:
 
 - **Phase 1 Summary:** `SYSTEM_PROMPT_PERSISTENCE_SUMMARY.md`
 - **Phase 1 Quick Ref:** `.claude/SYSTEM_PROMPT_PERSISTENCE_QUICKREF.md`
-- **Full Analysis:** See HtmlGraph spikes in `.htmlgraph/spikes/`
+- **Full Analysis:** See Wipnote spikes in `.wipnote/spikes/`
 - **Hook Docs:** `packages/claude-plugin/hooks/README.md`
 
 ---

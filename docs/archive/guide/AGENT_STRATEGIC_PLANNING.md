@@ -1,15 +1,15 @@
 # Agent Strategic Planning Guide
 
-This guide shows AI agents how to use HtmlGraph's strategic planning and dependency analytics features to make smart decisions about what to work on.
+This guide shows AI agents how to use Wipnote's strategic planning and dependency analytics features to make smart decisions about what to work on.
 
 ## Quick Start
 
 ```bash
 # Get smart recommendations
-htmlgraph analytics recommend
+wipnote analytics recommend
 
 # Find bottlenecks
-htmlgraph analytics bottlenecks
+wipnote analytics bottlenecks
 ```
 
 ## Available Features
@@ -25,7 +25,7 @@ htmlgraph analytics bottlenecks
 
 **Example**:
 ```bash
-htmlgraph analytics bottlenecks --top 5
+wipnote analytics bottlenecks --top 5
 ```
 
 ### 2. Get Parallel Work ⚡
@@ -39,7 +39,7 @@ htmlgraph analytics bottlenecks --top 5
 
 **Example**:
 ```bash
-htmlgraph analytics recommend --agent-count 5
+wipnote analytics recommend --agent-count 5
 ```
 
 ### 3. Recommend Next Work 💡
@@ -53,7 +53,7 @@ htmlgraph analytics recommend --agent-count 5
 
 **Example**:
 ```bash
-htmlgraph analytics recommend --agent-count 3
+wipnote analytics recommend --agent-count 3
 ```
 
 ### 4. Assess Risks ⚠️
@@ -68,7 +68,7 @@ htmlgraph analytics recommend --agent-count 3
 **Example**:
 ```bash
 # View snapshot for an overview of project health
-htmlgraph snapshot --summary
+wipnote snapshot --summary
 ```
 
 ### 5. Analyze Impact 📊
@@ -82,7 +82,7 @@ htmlgraph snapshot --summary
 
 **Example**:
 ```bash
-htmlgraph analytics bottlenecks
+wipnote analytics bottlenecks
 # Shows impact scores and blocks_count for each bottleneck
 ```
 
@@ -92,19 +92,19 @@ Here's a recommended decision flow for AI agents:
 
 ```bash
 # 1. Check for bottlenecks
-htmlgraph analytics bottlenecks --top 3
+wipnote analytics bottlenecks --top 3
 
 # 2. Get smart recommendations
-htmlgraph analytics recommend --agent-count 1
+wipnote analytics recommend --agent-count 1
 
 # 3. Start work on the recommended task
-htmlgraph feature start feat-<id>
+wipnote feature start feat-<id>
 
 # 4. Check for parallel work (if coordinating with other agents)
-htmlgraph analytics recommend --agent-count 3
+wipnote analytics recommend --agent-count 3
 
 # 5. Periodic health check
-htmlgraph snapshot --summary
+wipnote snapshot --summary
 ```
 
 ## Best Practices

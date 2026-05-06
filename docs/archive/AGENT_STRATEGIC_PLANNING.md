@@ -1,6 +1,6 @@
 # Agent Strategic Planning
 
-This page documents the strategic planning workflow for agents working in HtmlGraph.
+This page documents the strategic planning workflow for agents working in Wipnote.
 
 ## Purpose
 - Define goals and constraints for agent work

@@ -134,7 +134,7 @@ $ gemini -p "What is 2+2?" --output-format json --yolo -m gemini-2.0-flash
 
 ### 5. Spawner Code Analysis
 
-**File:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/spawners/gemini.py`
+**File:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestration/spawners/gemini.py`
 
 **Line 100-114:** Default model parameter
 
@@ -201,7 +201,7 @@ result = spawner.spawn(
 
 **Change spawner default from `None` to `"gemini-2.5-flash"`**
 
-**File:** `src/python/htmlgraph/orchestration/spawners/gemini.py`
+**File:** `src/python/wipnote/orchestration/spawners/gemini.py`
 
 ```python
 def spawn(
@@ -268,7 +268,7 @@ model=None  # Use defaults
 
 ```bash
 $ uv run python -c "
-from htmlgraph.orchestration.spawners.gemini import GeminiSpawner
+from wipnote.orchestration.spawners.gemini import GeminiSpawner
 spawner = GeminiSpawner()
 result = spawner.spawn(
     prompt='What is 2+2?',
@@ -287,7 +287,7 @@ print(f'Error: {result.error}')
 
 ```bash
 $ uv run python -c "
-from htmlgraph.orchestration.spawners.gemini import GeminiSpawner
+from wipnote.orchestration.spawners.gemini import GeminiSpawner
 spawner = GeminiSpawner()
 result = spawner.spawn(
     prompt='What is 2+2?',
@@ -306,7 +306,7 @@ print(f'Response: {result.response}')
 
 ```bash
 $ uv run python -c "
-from htmlgraph.orchestration.spawners.gemini import GeminiSpawner
+from wipnote.orchestration.spawners.gemini import GeminiSpawner
 spawner = GeminiSpawner()
 result = spawner.spawn(
     prompt='What is 2+2?',

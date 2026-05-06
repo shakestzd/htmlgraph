@@ -4,7 +4,7 @@ Development server for the dashboard.
 
 ## Overview
 
-The server module runs the HtmlGraph FastAPI application, which provides the REST API, WebSocket and SSE endpoints, and the activity feed backend used by the dashboard. The primary interactive dashboard is served by a separate Phoenix LiveView application at `http://localhost:4000`; the FastAPI server (default port 8080) handles the data layer.
+The server module runs the Wipnote FastAPI application, which provides the REST API, WebSocket and SSE endpoints, and the activity feed backend used by the dashboard. The primary interactive dashboard is served by a separate Phoenix LiveView application at `http://localhost:4000`; the FastAPI server (default port 8080) handles the data layer.
 
 ## Usage
 
@@ -12,26 +12,26 @@ The server module runs the HtmlGraph FastAPI application, which provides the RES
 
 ```bash
 # Start server on default port (8080)
-htmlgraph serve
+wipnote serve
 
 # Custom port
-htmlgraph serve --port 3000
+wipnote serve --port 3000
 
 # Custom host
-htmlgraph serve --host 0.0.0.0 --port 8080
+wipnote serve --host 0.0.0.0 --port 8080
 
 # Auto-reload on file changes
-htmlgraph serve --watch
+wipnote serve --watch
 ```
 
 ### Python API
 
 ```python
-from htmlgraph.server import serve
+from wipnote.server import serve
 
 # Start server
 serve(
-    graph_dir=".htmlgraph",
+    graph_dir=".wipnote",
     port=8080,
     host="localhost",
     watch=False
@@ -48,4 +48,4 @@ serve(
 
 ## Complete API Reference
 
-For detailed API documentation with method signatures and server configuration, see the Python source code in `src/python/htmlgraph/api/`.
+For detailed API documentation with method signatures and server configuration, see the Python source code in `src/python/wipnote/api/`.

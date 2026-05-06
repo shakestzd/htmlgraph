@@ -1,8 +1,8 @@
-# Gemini Task: HtmlGraph Dependency Optimization Analysis
+# Gemini Task: Wipnote Dependency Optimization Analysis
 
 ## 🎯 Mission
 
-Analyze HtmlGraph's current dependencies to ensure we're maximizing value for both **AI agents** (easy to learn/use) and **human users** (easy to understand/review). Identify underutilized features and recommend lean, high-impact additions.
+Analyze Wipnote's current dependencies to ensure we're maximizing value for both **AI agents** (easy to learn/use) and **human users** (easy to understand/review). Identify underutilized features and recommend lean, high-impact additions.
 
 ---
 
@@ -25,7 +25,7 @@ For EACH dependency, conduct thorough research:
 
 ### 1. Current Usage Analysis
 
-**Search the HtmlGraph codebase:**
+**Search the Wipnote codebase:**
 ```bash
 # For each dependency, find:
 grep -r "from justhtml" src/
@@ -282,14 +282,14 @@ Now is the time to find dependencies that could TRANSFORM the agent/user experie
 
 ## 📁 Documentation Format
 
-**Create spike in HtmlGraph:**
+**Create spike in Wipnote:**
 
 ```python
-from htmlgraph import SDK, SpikeType
+from wipnote import SDK, SpikeType
 
 sdk = SDK(agent='gemini')
 
-spike = sdk.spikes.create("HtmlGraph Dependency Optimization Analysis") \
+spike = sdk.spikes.create("Wipnote Dependency Optimization Analysis") \
     .set_spike_type(SpikeType.TECHNICAL) \
     .set_timebox_hours(3) \
     .set_findings('''
@@ -419,12 +419,12 @@ Your analysis should:
 
 ## 🚀 Getting Started
 
-1. **Fork/clone HtmlGraph repo** (or access codebase)
+1. **Fork/clone Wipnote repo** (or access codebase)
 2. **Install dependencies**: `uv sync`
 3. **Run grep searches** to map current usage
 4. **Research each dependency** (docs + GitHub + web)
 5. **Test features** in Python REPL to understand capabilities
-6. **Document findings** in HtmlGraph spike
+6. **Document findings** in Wipnote spike
 7. **Create prioritized roadmap**
 
 ---
@@ -433,7 +433,7 @@ Your analysis should:
 
 - **Timebox**: 2-3 hours max
 - **Focus**: Quality over quantity - prioritize high-impact findings
-- **Context**: HtmlGraph is a graph database built on HTML files for AI agent coordination
+- **Context**: Wipnote is a graph database built on HTML files for AI agent coordination
 - **Audience**: Primary = AI agents, Secondary = Human users
 - **Philosophy Evolution**:
   - ~~"HTML is All You Need"~~ - **This is OUTDATED thinking**

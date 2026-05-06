@@ -136,12 +136,12 @@ def main():
 **File**: `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/scripts/posttooluse-integrator.py`
 
 **Key Lines**:
-- **Line 12**: Imports handler: `from htmlgraph.hooks.posttooluse import main`
+- **Line 12**: Imports handler: `from wipnote.hooks.posttooluse import main`
 - **Line 14-15**: Entry point calls main: `if __name__ == "__main__": main()`
 
 **What it does**:
 ```python
-from htmlgraph.hooks.posttooluse import main
+from wipnote.hooks.posttooluse import main
 
 if __name__ == "__main__":
     main()
@@ -156,12 +156,12 @@ if __name__ == "__main__":
 **File**: `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-integrator.py`
 
 **Key Lines**:
-- **Line 18**: Imports handler: `from htmlgraph.hooks.pretooluse import main`
+- **Line 18**: Imports handler: `from wipnote.hooks.pretooluse import main`
 - **Line 20-21**: Entry point: `if __name__ == "__main__": main()`
 
 **What it does**:
 ```python
-from htmlgraph.hooks.pretooluse import main
+from wipnote.hooks.pretooluse import main
 
 if __name__ == "__main__":
     main()
@@ -200,7 +200,7 @@ def main() -> None:
 
 ### 7. event_tracker.py - Event Recording Logic
 
-**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/event_tracker.py`
 
 **Key Functions**:
 
@@ -257,7 +257,7 @@ elif hook_type == "PostToolUse":
 
 ### 8. posttooluse.py - Unified PostToolUse Hook
 
-**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/posttooluse.py`
+**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/posttooluse.py`
 
 **Key Functions**:
 
@@ -302,7 +302,7 @@ async def posttooluse_hook(
 
 ### 9. prompt_analyzer.py - UserQuery Creation
 
-**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/prompt_analyzer.py`
+**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/prompt_analyzer.py`
 
 **Function: create_user_query_event()** (not shown but called by user-prompt-submit.py:51):
 - Creates UserQuery event in database
@@ -316,7 +316,7 @@ async def posttooluse_hook(
 
 ### 10. schema.py - Database Schema
 
-**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py`
+**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/db/schema.py`
 
 **insert_event()** (Line 500-588):
 ```python
@@ -416,7 +416,7 @@ PostToolUse event fired
 
 ```bash
 # Check for duplicates before fix
-sqlite3 .htmlgraph/htmlgraph.db << 'EOF'
+sqlite3 .wipnote/wipnote.db << 'EOF'
 SELECT input_summary, COUNT(*) as count, GROUP_CONCAT(event_id) as ids
 FROM agent_events
 WHERE tool_name = 'UserQuery'

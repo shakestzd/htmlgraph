@@ -1,10 +1,10 @@
 # Delegation Enforcement Admin Guide
 
-Administrative guide for setting up and managing HtmlGraph delegation enforcement across teams and projects.
+Administrative guide for setting up and managing Wipnote delegation enforcement across teams and projects.
 
 ## Overview
 
-HtmlGraph's delegation enforcement system ensures cost-optimal AI agent coordination by automatically enforcing delegation patterns, maintaining system prompt persistence across sessions, and monitoring compliance with orchestrator directives.
+Wipnote's delegation enforcement system ensures cost-optimal AI agent coordination by automatically enforcing delegation patterns, maintaining system prompt persistence across sessions, and monitoring compliance with orchestrator directives.
 
 **Key Benefits:**
 - Cost reduction through intelligent model selection (Haiku for simple tasks, Sonnet for complex work)
@@ -71,7 +71,7 @@ uv run pytest tests/hooks/test_system_prompt_persistence.py
 
 ### Step 2: Configure Delegation Modes
 
-HtmlGraph supports two deployment modes:
+Wipnote supports two deployment modes:
 
 #### Strict Mode (Enforcement)
 ```json
@@ -143,17 +143,17 @@ System prompts auto-inject at session start via PostSessionStart hooks. Configur
 
 ### Real-Time Compliance Dashboard
 
-View delegation compliance metrics in HtmlGraph:
+View delegation compliance metrics in Wipnote:
 
 ```bash
 # View overall compliance status
-uv run htmlgraph status
+uv run wipnote status
 
 # Check delegation patterns by agent
-uv run htmlgraph delegation-report
+uv run wipnote delegation-report
 
 # View cost optimization metrics
-uv run htmlgraph costs --breakdown
+uv run wipnote costs --breakdown
 ```
 
 ### Compliance Metrics
@@ -220,13 +220,13 @@ Track costs per team/project:
 
 ```bash
 # View costs by team
-uv run htmlgraph costs --by-team
+uv run wipnote costs --by-team
 
 # View costs by project
-uv run htmlgraph costs --by-project
+uv run wipnote costs --by-project
 
 # Export for billing
-uv run htmlgraph costs --export csv --period monthly
+uv run wipnote costs --export csv --period monthly
 ```
 
 ## Troubleshooting
@@ -238,7 +238,7 @@ uv run htmlgraph costs --export csv --period monthly
 **Solution:**
 ```bash
 # 1. Verify hook is executing
-uv run htmlgraph hooks --type PostSessionStart
+uv run wipnote hooks --type PostSessionStart
 
 # 2. Check system prompt file exists
 ls -la .claude/system-prompt.md
@@ -263,11 +263,11 @@ grep "enforcement_level" .claude/config/*.json
 /hooks PreToolUse
 
 # 3. Look for bypass flags in session
-sqlite3 .htmlgraph/htmlgraph.db \
+sqlite3 .wipnote/wipnote.db \
   "SELECT * FROM sessions WHERE status='active' LIMIT 1;"
 
 # 4. Re-enable enforcement
-uv run htmlgraph config set delegation_enforcement.mode strict
+uv run wipnote config set delegation_enforcement.mode strict
 ```
 
 ### Issue: Cost Overruns Due to Model Selection
@@ -277,13 +277,13 @@ uv run htmlgraph config set delegation_enforcement.mode strict
 **Solution:**
 ```bash
 # 1. Review recent model assignments
-uv run htmlgraph costs --breakdown --period 1d
+uv run wipnote costs --breakdown --period 1d
 
 # 2. Check model selection rules
 cat .claude/config/model-selection.json
 
 # 3. Analyze pattern (manual override?)
-sqlite3 .htmlgraph/htmlgraph.db \
+sqlite3 .wipnote/wipnote.db \
   "SELECT model, COUNT(*) FROM agent_events \
    WHERE timestamp > datetime('now', '-1 day') \
    GROUP BY model;"
@@ -301,13 +301,13 @@ sqlite3 .htmlgraph/htmlgraph.db \
 cat .claude/config/alerts.json
 
 # 2. Analyze false positive context
-uv run htmlgraph delegation-report --detailed
+uv run wipnote delegation-report --detailed
 
 # 3. Adjust thresholds for your team
-uv run htmlgraph config set alerts.direct_execution_spike.threshold 15
+uv run wipnote config set alerts.direct_execution_spike.threshold 15
 
 # 4. Add exclusions for legitimate direct execution
-uv run htmlgraph config add alerts.exclusions.task_types emergency_fixes
+uv run wipnote config add alerts.exclusions.task_types emergency_fixes
 ```
 
 ## Best Practices
@@ -352,7 +352,7 @@ Review delegation metrics weekly:
 ```bash
 # Weekly review
 cron: "0 9 * * 1"  # Monday 9am
-task: "uv run htmlgraph delegation-report --export json > report-$(date +%Y%m%d).json"
+task: "uv run wipnote delegation-report --export json > report-$(date +%Y%m%d).json"
 ```
 
 ### 4. Exception Handling
@@ -382,29 +382,29 @@ Define when exceptions are allowed:
 
 ```bash
 # View current config
-uv run htmlgraph config show
+uv run wipnote config show
 
 # Update setting
-uv run htmlgraph config set delegation_enforcement.mode strict
+uv run wipnote config set delegation_enforcement.mode strict
 
 # Reset to defaults
-uv run htmlgraph config reset --section delegation_enforcement
+uv run wipnote config reset --section delegation_enforcement
 ```
 
 ### Reporting
 
 ```bash
 # Delegation compliance report
-uv run htmlgraph delegation-report [--format json|csv|html]
+uv run wipnote delegation-report [--format json|csv|html]
 
 # Cost breakdown
-uv run htmlgraph costs --breakdown --period [1d|1w|1m|all]
+uv run wipnote costs --breakdown --period [1d|1w|1m|all]
 
 # Model usage metrics
-uv run htmlgraph metrics --type models --period 1w
+uv run wipnote metrics --type models --period 1w
 
 # Task coverage analysis
-uv run htmlgraph metrics --type tasks --period 1w
+uv run wipnote metrics --type tasks --period 1w
 ```
 
 ### Hooks
@@ -422,8 +422,8 @@ Active hooks for delegation enforcement:
 
 For issues or feature requests:
 
-1. **Check logs:** `.htmlgraph/errors.jsonl`
-2. **Review metrics:** `uv run htmlgraph status`
+1. **Check logs:** `.wipnote/errors.jsonl`
+2. **Review metrics:** `uv run wipnote status`
 3. **Test in isolation:** Run specific hooks with `--debug`
 4. **Report issue:** Include metrics snapshot and recent logs
 

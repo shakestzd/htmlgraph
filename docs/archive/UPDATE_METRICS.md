@@ -36,7 +36,7 @@
 1. "Why Strict Delegation Matters" - Added Cost Optimization as #1
 2. "Decision Framework" - Reordered to cost-first (5 questions)
 3. "Orchestrator Reflection System" - Added cost-awareness questions
-4. "Integration with HtmlGraph SDK" - HeadlessSpawner examples
+4. "Integration with Wipnote SDK" - HeadlessSpawner examples
 5. "Git Workflow Patterns" - Copilot as default
 
 ## Language Transformation
@@ -177,7 +177,7 @@ Task(prompt=explorer["prompt"], subagent_type=explorer["subagent_type"])
 ### After
 ```python
 # Cost-optimized multi-AI delegation
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 spawner = HeadlessSpawner()
 
 research_result = spawner.spawn_gemini(...)  # FREE

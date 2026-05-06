@@ -14,7 +14,7 @@ The orchestrator delegation enforcement had hardcoded thresholds that were too a
 
 ### 1. Configuration Infrastructure
 
-**Created:** `src/python/htmlgraph/orchestrator_config.py`
+**Created:** `src/python/wipnote/orchestrator_config.py`
 
 Provides complete configuration management with:
 - **Pydantic models** for type-safe config (ThresholdsConfig, AntiPatternsConfig, ModesConfig)
@@ -32,7 +32,7 @@ Provides complete configuration management with:
 
 ### 2. Default Configuration
 
-**Created:** `.htmlgraph/orchestrator-config.yaml`
+**Created:** `.wipnote/orchestrator-config.yaml`
 
 **Increased thresholds (more permissive):**
 ```yaml
@@ -51,7 +51,7 @@ anti_patterns:
 
 ### 3. Integration with Orchestrator Mode
 
-**Modified:** `src/python/htmlgraph/orchestrator_mode.py`
+**Modified:** `src/python/wipnote/orchestrator_mode.py`
 
 - Added `violation_history: list[dict]` field to track full violation timeline
 - Updated `increment_violation()` to use time-based decay and collapsing
@@ -73,14 +73,14 @@ if effective_count >= config.thresholds.circuit_breaker_violations:
 
 ### 4. Updated Enforcement Logic
 
-**Modified:** `src/python/htmlgraph/hooks/orchestrator.py`
+**Modified:** `src/python/wipnote/hooks/orchestrator.py`
 
 - Load config dynamically in `is_allowed_orchestrator_operation()`
 - Use `config.thresholds.exploration_calls` for exploration detection
 - Display current threshold in violation messages (e.g., "3/5 violations")
 - Added config adjustment hint in circuit breaker message
 
-**Modified:** `src/python/htmlgraph/hooks/validator.py`
+**Modified:** `src/python/wipnote/hooks/validator.py`
 
 - Converted hardcoded `ANTI_PATTERNS` dict to `get_anti_patterns()` function
 - Dynamically generates patterns from config
@@ -88,19 +88,19 @@ if effective_count >= config.thresholds.circuit_breaker_violations:
 
 ### 5. CLI Commands
 
-**Modified:** `src/python/htmlgraph/cli/work/orchestration.py`
+**Modified:** `src/python/wipnote/cli/work/orchestration.py`
 
 Added three new commands:
 
 ```bash
 # Show current configuration
-uv run htmlgraph orchestrator config-show
+uv run wipnote orchestrator config-show
 
 # Set a threshold value
-uv run htmlgraph orchestrator config-set thresholds.exploration_calls 7
+uv run wipnote orchestrator config-set thresholds.exploration_calls 7
 
 # Reset to defaults
-uv run htmlgraph orchestrator config-reset
+uv run wipnote orchestrator config-reset
 ```
 
 **Implemented Classes:**
@@ -110,7 +110,7 @@ uv run htmlgraph orchestrator config-reset
 
 ### 6. Documentation Updates
 
-**Modified:** `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt`
+**Modified:** `src/python/wipnote/orchestrator-system-prompt-optimized.txt`
 
 Added new section explaining:
 - Default threshold values
@@ -156,10 +156,10 @@ Added new section explaining:
 ### 4. Project-Specific Tuning
 - Teams can adjust thresholds per project
 - Strict enforcement for production, relaxed for research projects
-- Configuration lives in `.htmlgraph/` (version controlled)
+- Configuration lives in `.wipnote/` (version controlled)
 
 ### 5. User-Level Defaults
-- Personal defaults in `~/.config/htmlgraph/orchestrator-config.yaml`
+- Personal defaults in `~/.config/wipnote/orchestrator-config.yaml`
 - Applied to all projects without project-specific config
 - Easy to customize personal workflow preferences
 
@@ -167,9 +167,9 @@ Added new section explaining:
 
 ### View Current Configuration
 ```bash
-$ uv run htmlgraph orchestrator config-show
+$ uv run wipnote orchestrator config-show
 
-HtmlGraph Orchestrator Configuration
+Wipnote Orchestrator Configuration
 ==================================================
 
 Thresholds:
@@ -188,21 +188,21 @@ Anti-patterns:
 ### Adjust Thresholds
 ```bash
 # Be more strict (lower threshold)
-$ uv run htmlgraph orchestrator config-set thresholds.exploration_calls 3
+$ uv run wipnote orchestrator config-set thresholds.exploration_calls 3
 
 # Be more lenient (higher threshold)
-$ uv run htmlgraph orchestrator config-set thresholds.circuit_breaker_violations 8
+$ uv run wipnote orchestrator config-set thresholds.circuit_breaker_violations 8
 
 # Increase decay window (violations last longer)
-$ uv run htmlgraph orchestrator config-set thresholds.violation_decay_seconds 300
+$ uv run wipnote orchestrator config-set thresholds.violation_decay_seconds 300
 ```
 
 ### Reset to Defaults
 ```bash
-$ uv run htmlgraph orchestrator config-reset
+$ uv run wipnote orchestrator config-reset
 
 Configuration reset to defaults
-Config file: .htmlgraph/orchestrator-config.yaml
+Config file: .wipnote/orchestrator-config.yaml
 Exploration calls: 5
 Circuit breaker: 5
 Violation decay: 120s
@@ -211,8 +211,8 @@ Violation decay: 120s
 ## Technical Details
 
 ### Configuration Priority
-1. Project-specific: `.htmlgraph/orchestrator-config.yaml`
-2. User defaults: `~/.config/htmlgraph/orchestrator-config.yaml`
+1. Project-specific: `.wipnote/orchestrator-config.yaml`
+2. User defaults: `~/.config/wipnote/orchestrator-config.yaml`
 3. Built-in defaults: Hardcoded in `OrchestratorConfig` class
 
 ### Time-Based Decay Algorithm
@@ -248,16 +248,16 @@ def get_effective_violation_count(violations, config):
 ## Files Modified/Created
 
 ### Created (3 files)
-1. `src/python/htmlgraph/orchestrator_config.py` - Config management (331 lines)
-2. `.htmlgraph/orchestrator-config.yaml` - Default config (45 lines)
+1. `src/python/wipnote/orchestrator_config.py` - Config management (331 lines)
+2. `.wipnote/orchestrator-config.yaml` - Default config (45 lines)
 3. `tests/test_orchestrator_config.py` - Comprehensive tests (324 lines)
 
 ### Modified (5 files)
-1. `src/python/htmlgraph/orchestrator_mode.py` - Time-based decay integration
-2. `src/python/htmlgraph/hooks/orchestrator.py` - Use configurable thresholds
-3. `src/python/htmlgraph/hooks/validator.py` - Dynamic anti-pattern generation
-4. `src/python/htmlgraph/cli/work/orchestration.py` - CLI commands
-5. `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt` - Documentation
+1. `src/python/wipnote/orchestrator_mode.py` - Time-based decay integration
+2. `src/python/wipnote/hooks/orchestrator.py` - Use configurable thresholds
+3. `src/python/wipnote/hooks/validator.py` - Dynamic anti-pattern generation
+4. `src/python/wipnote/cli/work/orchestration.py` - CLI commands
+5. `src/python/wipnote/orchestrator-system-prompt-optimized.txt` - Documentation
 
 ## Quality Assurance
 
@@ -280,8 +280,8 @@ def get_effective_violation_count(violations, config):
 
 ### For Existing Users
 1. **No action required** - Defaults are more permissive
-2. **Optional:** Create `.htmlgraph/orchestrator-config.yaml` to customize
-3. **Optional:** Set personal defaults in `~/.config/htmlgraph/orchestrator-config.yaml`
+2. **Optional:** Create `.wipnote/orchestrator-config.yaml` to customize
+3. **Optional:** Set personal defaults in `~/.config/wipnote/orchestrator-config.yaml`
 
 ### For New Users
 - Configuration is automatic with sensible defaults

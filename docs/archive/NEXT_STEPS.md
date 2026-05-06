@@ -40,13 +40,13 @@ Task(
 2. Watch the database update:
 ```bash
 # Before
-sqlite3 .htmlgraph/index.sqlite "SELECT COUNT(*) FROM agent_events"
+sqlite3 .wipnote/index.sqlite "SELECT COUNT(*) FROM agent_events"
 # → 3
 
 # Wait 5 seconds...
 
 # After
-sqlite3 .htmlgraph/index.sqlite "SELECT COUNT(*) FROM agent_events"
+sqlite3 .wipnote/index.sqlite "SELECT COUNT(*) FROM agent_events"
 # → 4 (or higher)
 ```
 
@@ -83,7 +83,7 @@ uv run pytest tests/hooks/test_hybrid_event_capture.py -v
 
 **How to do it:**
 ```python
-from htmlgraph.hooks.event_tracker import track_tool_execution
+from wipnote.hooks.event_tracker import track_tool_execution
 
 track_tool_execution(
     tool_name="ManualTest",
@@ -103,7 +103,7 @@ track_tool_execution(
 ```bash
 # Already running on port 9999
 # If not, start it:
-uv run htmlgraph serve --port 9999
+uv run wipnote serve --port 9999
 ```
 
 ### 2. Access Dashboard
@@ -202,7 +202,7 @@ Once you create real events using Method A above:
 **Watch database for new events:**
 ```bash
 # In one terminal:
-watch -n 1 'sqlite3 .htmlgraph/index.sqlite "SELECT COUNT(*) FROM agent_events; SELECT MAX(timestamp) FROM agent_events"'
+watch -n 1 'sqlite3 .wipnote/index.sqlite "SELECT COUNT(*) FROM agent_events; SELECT MAX(timestamp) FROM agent_events"'
 ```
 
 **Watch API for updates:**
@@ -213,7 +213,7 @@ watch -n 2 'curl -s http://localhost:9999/api/events | jq ".[-1] | {event_id, ti
 
 ### Event Log File
 ```bash
-tail -f .htmlgraph/hook-debug.jsonl
+tail -f .wipnote/hook-debug.jsonl
 ```
 
 Shows raw hook execution logs.
@@ -224,9 +224,9 @@ Shows raw hook execution logs.
 
 | Issue | Check | Solution |
 |-------|-------|----------|
-| No events in dashboard | Database: `sqlite3 .htmlgraph/index.sqlite "SELECT COUNT(*) FROM agent_events"` | Create events using Method A |
+| No events in dashboard | Database: `sqlite3 .wipnote/index.sqlite "SELECT COUNT(*) FROM agent_events"` | Create events using Method A |
 | Old events only | Database timestamps | Use Task() to create new events |
-| Dashboard not responding | `curl http://localhost:9999/api/events` | Restart dashboard: `pkill htmlgraph serve` then `uv run htmlgraph serve --port 9999` |
+| Dashboard not responding | `curl http://localhost:9999/api/events` | Restart dashboard: `pkill wipnote serve` then `uv run wipnote serve --port 9999` |
 | Can't import Task | Context is direct Python | Switch to Claude Code environment |
 | Hooks not running | Check `.claude/hooks/` directory | Verify hooks.json exists and is valid |
 
@@ -272,7 +272,7 @@ Shows raw hook execution logs.
 **A:** Yes! Use the `/api/events` endpoint or query the database directly.
 
 ### Q: Are events stored permanently?
-**A:** Yes. They're in SQLite database at `.htmlgraph/index.sqlite`. They persist between sessions.
+**A:** Yes. They're in SQLite database at `.wipnote/index.sqlite`. They persist between sessions.
 
 ### Q: What if I restart the dashboard?
 **A:** Events persist in the database. Dashboard just reads from the database. Restarting doesn't lose any data.
@@ -305,6 +305,6 @@ Shows raw hook execution logs.
 **Files Created:**
 - `EVENT_CAPTURE_DIAGNOSTIC_REPORT.md` - Full technical report
 - `NEXT_STEPS.md` - This file (actionable next steps)
-- `.htmlgraph/EVENT_CAPTURE_DIAGNOSTIC.md` - Summary for reference
+- `.wipnote/EVENT_CAPTURE_DIAGNOSTIC.md` - Summary for reference
 
 **Ready to proceed?** Follow Method A above to create your first real event!

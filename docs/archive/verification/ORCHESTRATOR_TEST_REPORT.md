@@ -33,7 +33,7 @@ Tests covered:
 - Corrupted file handling
 
 **Key Validations:**
-- State persists correctly to `.htmlgraph/orchestrator-mode.json`
+- State persists correctly to `.wipnote/orchestrator-mode.json`
 - Manager creates default path if not specified
 - Corrupted files return default state gracefully
 - Multiple enable calls update timestamp
@@ -45,7 +45,7 @@ Tests covered:
 Tests covered:
 - Mode disabled: All operations allowed
 - Always allowed operations: Task, AskUserQuestion, TodoWrite
-- SDK operations: htmlgraph commands, git read-only, inline SDK usage
+- SDK operations: wipnote commands, git read-only, inline SDK usage
 - Single lookup allowed: First Read/Grep/Glob
 - Multiple lookup blocked: Second+ Read/Grep/Glob calls
 - Implementation blocked: Edit, Write, NotebookEdit, Delete
@@ -104,7 +104,7 @@ Total: 861/862 tests passing (99.9%)
 ### Scenario 1: Strict Mode Enforcement
 **Setup:** Enable strict mode
 ```bash
-uv run htmlgraph orchestrator enable --level strict
+uv run wipnote orchestrator enable --level strict
 ```
 
 **Test Cases:**
@@ -137,14 +137,14 @@ uv run htmlgraph orchestrator enable --level strict
    - Result: ✅ PASSED
 
 4. **SDK Commands**
-   - Input: `htmlgraph feature list`
+   - Input: `wipnote feature list`
    - Expected: ALLOWED (SDK operations exempt)
    - Result: ✅ PASSED
 
 ### Scenario 2: Guidance Mode
 **Setup:** Enable guidance mode
 ```bash
-uv run htmlgraph orchestrator enable --level guidance
+uv run wipnote orchestrator enable --level guidance
 ```
 
 **Test Cases:**
@@ -171,23 +171,23 @@ uv run htmlgraph orchestrator enable --level guidance
 **Test:** User workflow of disabling and re-enabling
 ```bash
 # Check status
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 # → "disabled, disabled by user"
 
 # Enable
-uv run htmlgraph orchestrator enable --level strict
+uv run wipnote orchestrator enable --level strict
 # → "enabled (strict enforcement)"
 
 # Disable
-uv run htmlgraph orchestrator disable
+uv run wipnote orchestrator disable
 # → "disabled" (sets user flag)
 
 # Check status
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 # → "disabled, disabled by user (auto-activation prevented)"
 
 # Re-enable
-uv run htmlgraph orchestrator enable --level guidance
+uv run wipnote orchestrator enable --level guidance
 # → "enabled (guidance mode)" (clears user flag)
 ```
 
@@ -202,7 +202,7 @@ uv run htmlgraph orchestrator enable --level guidance
 **Impact:** Multiple lookup detection may not work in production
 
 **Description:**
-Two hooks write to the same file (`/tmp/htmlgraph-tool-history.json`) using different formats:
+Two hooks write to the same file (`/tmp/wipnote-tool-history.json`) using different formats:
 
 1. **orchestrator-enforce.py** format:
    ```json
@@ -235,8 +235,8 @@ Both hooks maintain tool history but use incompatible schemas. When validate-wor
    - Implement in shared utility module
 
 2. **Option B:** Separate history files
-   - orchestrator: `/tmp/htmlgraph-orchestrator-history.json`
-   - validate-work: `/tmp/htmlgraph-validate-history.json`
+   - orchestrator: `/tmp/wipnote-orchestrator-history.json`
+   - validate-work: `/tmp/wipnote-validate-history.json`
 
 3. **Option C:** Disable one hook
    - If validate-work is deprecated, remove it
@@ -353,15 +353,15 @@ The orchestrator enforcement system is **production-ready** with one documented 
 
 **Test Logs:**
 - Full orchestrator suite: 73/73 passed
-- Full htmlgraph suite: 788/789 passed (1 pre-existing failure)
+- Full wipnote suite: 788/789 passed (1 pre-existing failure)
 - Integration scenarios: All passed
 
 **Files Modified:**
 - None (all tests use temporary directories)
 
 **Files Created:**
-- `/tmp/htmlgraph-tool-history.json` (temporary, cleaned between tests)
-- `.htmlgraph/orchestrator-mode.json` (state file, working correctly)
+- `/tmp/wipnote-tool-history.json` (temporary, cleaned between tests)
+- `.wipnote/orchestrator-mode.json` (state file, working correctly)
 
 **Git Status:**
 - Clean (test-only changes, no production code modified)

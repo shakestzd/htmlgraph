@@ -27,7 +27,7 @@ All **4 major orchestration bug fixes** have been **verified working correctly**
 ## ✅ Verification Checklist
 
 ### Bug #1: Subagent Context Detection
-- [x] File exists: `src/python/htmlgraph/hooks/subagent_detection.py` (202 lines)
+- [x] File exists: `src/python/wipnote/hooks/subagent_detection.py` (202 lines)
 - [x] 5-level detection strategy implemented
 - [x] Integrated into orchestrator.py and validator.py
 - [x] Allows subagent tool use while enforcing orchestrator rules
@@ -52,7 +52,7 @@ All **4 major orchestration bug fixes** have been **verified working correctly**
 
 ### Bug #4: Configurable Thresholds
 - [x] Config system implemented: `orchestrator_config.py` (358 lines)
-- [x] YAML configuration file: `.htmlgraph/orchestrator-config.yaml`
+- [x] YAML configuration file: `.wipnote/orchestrator-config.yaml`
 - [x] Time-based decay working (120 seconds default)
 - [x] Rapid sequence collapsing working (10 seconds window)
 - [x] 3 CLI commands implemented (show, set, reset)
@@ -143,21 +143,21 @@ test_cli_sdk_both_use_operations         # 1 failure
 ## ✅ Implementation Files
 
 ### New Files Created (7)
-1. `src/python/htmlgraph/hooks/subagent_detection.py` (202 lines) - Bug #1
-2. `src/python/htmlgraph/hooks/git_commands.py` (150 lines) - Bug #3
-3. `src/python/htmlgraph/orchestrator_config.py` (358 lines) - Bug #4
-4. `.htmlgraph/orchestrator-config.yaml` (45 lines) - Bug #4
+1. `src/python/wipnote/hooks/subagent_detection.py` (202 lines) - Bug #1
+2. `src/python/wipnote/hooks/git_commands.py` (150 lines) - Bug #3
+3. `src/python/wipnote/orchestrator_config.py` (358 lines) - Bug #4
+4. `.wipnote/orchestrator-config.yaml` (45 lines) - Bug #4
 5. `tests/test_orchestrator_config.py` (324 lines) - Bug #4 Tests
 6. `tests/hooks/test_git_commands.py` (200+ lines) - Bug #3 Tests
 7. `ORCHESTRATION_BUGS_FIXED.md` - Complete documentation
 
 ### Modified Files (12)
-- `src/python/htmlgraph/hooks/orchestrator.py` - Session isolation, git consistency, config
-- `src/python/htmlgraph/hooks/validator.py` - Session isolation, git consistency, config
-- `src/python/htmlgraph/hooks/subagent_detection.py` - Type error fixes
-- `src/python/htmlgraph/hooks/pretooluse.py` - Type error fixes
-- `src/python/htmlgraph/orchestrator_mode.py` - Violation history, time decay
-- `src/python/htmlgraph/cli/work/orchestration.py` - CLI commands for config
+- `src/python/wipnote/hooks/orchestrator.py` - Session isolation, git consistency, config
+- `src/python/wipnote/hooks/validator.py` - Session isolation, git consistency, config
+- `src/python/wipnote/hooks/subagent_detection.py` - Type error fixes
+- `src/python/wipnote/hooks/pretooluse.py` - Type error fixes
+- `src/python/wipnote/orchestrator_mode.py` - Violation history, time decay
+- `src/python/wipnote/cli/work/orchestration.py` - CLI commands for config
 - Plus 6 more for integration
 
 ---
@@ -247,7 +247,7 @@ test_cli_sdk_both_use_operations         # 1 failure
 - `VERIFICATION_FINAL_SUMMARY.md` - This document
 
 ### Updated System Documentation
-- `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt` - System prompt updates
+- `src/python/wipnote/orchestrator-system-prompt-optimized.txt` - System prompt updates
 - Code comments and docstrings throughout
 
 ---
@@ -303,10 +303,10 @@ All 4 critical orchestration bugs have been:
 ## 📞 Contact & Questions
 
 For questions about:
-- **Subagent detection:** See `src/python/htmlgraph/hooks/subagent_detection.py`
-- **Session isolation:** See `src/python/htmlgraph/hooks/orchestrator.py` and `validator.py`
-- **Git classification:** See `src/python/htmlgraph/hooks/git_commands.py`
-- **Configurable thresholds:** See `src/python/htmlgraph/orchestrator_config.py`
+- **Subagent detection:** See `src/python/wipnote/hooks/subagent_detection.py`
+- **Session isolation:** See `src/python/wipnote/hooks/orchestrator.py` and `validator.py`
+- **Git classification:** See `src/python/wipnote/hooks/git_commands.py`
+- **Configurable thresholds:** See `src/python/wipnote/orchestrator_config.py`
 
 All implementations include comprehensive docstrings and comments.
 

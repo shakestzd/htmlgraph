@@ -8,7 +8,7 @@ feature branches. One track = one branch = one PR = one merge to main.
 
 ## Context
 
-htmlgraph currently creates a branch per feature in YOLO mode
+wipnote currently creates a branch per feature in YOLO mode
 (`yolo.go:createFeatureWorktree`). This produces many small branches and PRs,
 each representing a fragment of a larger initiative. Reviewers see pieces, not
 the whole. Merge conflicts between features in the same track get resolved on
@@ -132,7 +132,7 @@ independently and conflicts surface there.
 
 ### Phase 1: Track Worktree Creation
 
-**Modified file:** `packages/go/cmd/htmlgraph/yolo.go`
+**Modified file:** `packages/go/cmd/wipnote/yolo.go`
 
 Replace `createFeatureWorktree` with `createTrackWorktree`:
 
@@ -162,9 +162,9 @@ func createTrackWorktree(trackID, projectRoot string) (string, func(), error) {
 
     // Store track metadata in branch config
     exec.Command("git", "-C", worktreePath, "config",
-        "branch."+branchName+".htmlgraph-track", trackID).Run()
+        "branch."+branchName+".wipnote-track", trackID).Run()
     exec.Command("git", "-C", worktreePath, "config",
-        "branch."+branchName+".htmlgraph-started",
+        "branch."+branchName+".wipnote-started",
         time.Now().UTC().Format(time.RFC3339)).Run()
 
     fmt.Printf("  Worktree: %s (branch: %s)\n", worktreePath, branchName)
@@ -177,7 +177,7 @@ func createTrackWorktree(trackID, projectRoot string) (string, func(), error) {
 }
 ```
 
-**Modified file:** `packages/go/cmd/htmlgraph/yolo.go`
+**Modified file:** `packages/go/cmd/wipnote/yolo.go`
 
 Update `launchYoloDefault` and `launchYoloDev`: when `--track` is provided,
 create a track worktree. When `--feature` is provided, check if the feature
@@ -214,7 +214,7 @@ Each agent gets a worktree branched from the TRACK branch, not from main:
 
     Agent(
         description="feat-001: Add check command",
-        subagent_type="htmlgraph:sonnet-coder",
+        subagent_type="wipnote:sonnet-coder",
         isolation="worktree",
         prompt="
             You are working on track trk-3030989f.
@@ -227,7 +227,7 @@ Each agent gets a worktree branched from the TRACK branch, not from main:
     )
 ```
 
-**New function in:** `packages/go/cmd/htmlgraph/yolo.go`
+**New function in:** `packages/go/cmd/wipnote/yolo.go`
 
 ```go
 // createAgentWorktree creates an ephemeral worktree for a parallel agent.
@@ -261,7 +261,7 @@ func createAgentWorktree(trackID, taskID, projectRoot string) (string, func(), e
 
 ### Phase 3: Track Status from Git
 
-**New command:** `htmlgraph track status <track-id>`
+**New command:** `wipnote track status <track-id>`
 
 Derives execution status entirely from git:
 
@@ -336,7 +336,7 @@ func checkYoloWorktreeGuard(toolName, branch string, yolo bool) string {
     }
     if branch == "main" || branch == "master" {
         return "YOLO mode requires a track branch or worktree. " +
-            "Launch with: htmlgraph yolo --track <track-id>"
+            "Launch with: wipnote yolo --track <track-id>"
     }
     return ""
 }
@@ -381,7 +381,7 @@ One PR per track means:
 ### Deprecation Path
 
 1. **Now:** Add track worktree support alongside feature worktrees
-2. **Next:** Default `htmlgraph yolo --feature` to use parent track's branch
+2. **Next:** Default `wipnote yolo --feature` to use parent track's branch
    when one exists
 3. **Later:** Remove `createFeatureWorktree`, require all YOLO work to have a
    track. Standalone features get auto-wrapped in a single-feature track.
@@ -401,7 +401,7 @@ One PR per track means:
 | When was it merged? | `git log main --merges --grep='trk-{id}' --format=%ci` |
 | Active agent branches? | `git branch --list 'trk-{id}/agent-*'` |
 | Which agents are done? | `git branch --merged trk-{id} --list 'trk-{id}/agent-*'` |
-| Track metadata? | `git config --get branch.trk-{id}.htmlgraph-track` |
+| Track metadata? | `git config --get branch.trk-{id}.wipnote-track` |
 
 ---
 
@@ -412,7 +412,7 @@ One PR per track means:
 ├── trk-3030989f/                   # Track worktree (persistent during execution)
 │   ├── .git                        # Worktree git link
 │   ├── packages/                   # Full repo checkout on track branch
-│   └── .htmlgraph/                 # Shared work item store
+│   └── .wipnote/                 # Shared work item store
 │
 │   # During parallel execution only:
 │   ├── agent-feat-001/             # Ephemeral agent worktree

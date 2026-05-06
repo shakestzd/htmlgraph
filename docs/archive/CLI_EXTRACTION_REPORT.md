@@ -45,7 +45,7 @@ Successfully extracted and refactored work management commands from `cli_legacy.
 **Before:**
 ```python
 # Duplicated old command delegation
-from htmlgraph.cli_commands.feature import FeatureCreateCommand as OldFeatureCreateCommand
+from wipnote.cli_commands.feature import FeatureCreateCommand as OldFeatureCreateCommand
 command = OldFeatureCreateCommand(...)
 command.run(...)
 ```
@@ -105,19 +105,19 @@ All constants pulled from `cli/constants.py`:
 ### Manual Command Testing
 
 ```bash
-✅ uv run htmlgraph session list
+✅ uv run wipnote session list
    - Displays 57 sessions in Rich table
    - Columns: ID, Status, Agent, Events, Started
 
-✅ uv run htmlgraph feature list
+✅ uv run wipnote feature list
    - Displays all features with filtering
    - Columns: ID, Title, Status, Priority, Updated
 
-✅ uv run htmlgraph track list
+✅ uv run wipnote track list
    - Displays 42 tracks with component info
    - Shows format type (consolidated/directory)
 
-✅ uv run htmlgraph archive list
+✅ uv run wipnote archive list
    - Displays 4 archive files
    - Shows filename, size, modified date
 ```
@@ -125,13 +125,13 @@ All constants pulled from `cli/constants.py`:
 ### Code Quality Checks
 
 ```bash
-✅ uv run ruff check --fix src/python/htmlgraph/cli/work.py
+✅ uv run ruff check --fix src/python/wipnote/cli/work.py
    - All linting issues fixed
 
-✅ uv run ruff format src/python/htmlgraph/cli/work.py
+✅ uv run ruff format src/python/wipnote/cli/work.py
    - File properly formatted
 
-✅ uv run mypy src/python/htmlgraph/cli/work.py
+✅ uv run mypy src/python/wipnote/cli/work.py
    - Success: no type errors
 ```
 
@@ -148,13 +148,13 @@ All constants pulled from `cli/constants.py`:
 
 ### Modified Files
 
-1. **`src/python/htmlgraph/cli/work.py`** (1,645 lines)
+1. **`src/python/wipnote/cli/work.py`** (1,645 lines)
    - Replaced delegations to old implementations with SDK calls
    - Added Rich table/panel formatting
    - Improved error messages with constants
    - Added type hints and docstrings
 
-2. **`src/python/htmlgraph/cli/__init__.py`**
+2. **`src/python/wipnote/cli/__init__.py`**
    - Added backward compatibility export: `cmd_init`
    - Maintains test compatibility
 
@@ -167,7 +167,7 @@ All constants pulled from `cli/constants.py`:
 3. **Use SDK directly** instead of delegating
 4. **Apply Rich formatting** for output
 5. **Use constants** for messages and styles
-6. **Test manually** with `uv run htmlgraph <command>`
+6. **Test manually** with `uv run wipnote <command>`
 7. **Run linters**: `ruff check --fix && ruff format && mypy`
 8. **Verify tests pass**
 
@@ -209,14 +209,14 @@ The extraction was successful. All primary work management commands (sessions, f
 **Verification Commands:**
 ```bash
 # Test all commands work
-uv run htmlgraph session list
-uv run htmlgraph feature list
-uv run htmlgraph track list
-uv run htmlgraph archive list
+uv run wipnote session list
+uv run wipnote feature list
+uv run wipnote track list
+uv run wipnote archive list
 
 # Verify code quality
-uv run ruff check --fix src/python/htmlgraph/cli/work.py
-uv run mypy src/python/htmlgraph/cli/work.py
+uv run ruff check --fix src/python/wipnote/cli/work.py
+uv run mypy src/python/wipnote/cli/work.py
 ```
 
 **Status:** ✅ Complete and verified

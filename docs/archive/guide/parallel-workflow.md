@@ -1,6 +1,6 @@
 # Optimal Parallel Agent Workflow
 
-This document defines the optimal workflow for parallel agent execution in HtmlGraph, based on:
+This document defines the optimal workflow for parallel agent execution in Wipnote, based on:
 - Transcript analytics from real parallel sessions
 - Industry best practices (Anthropic, Microsoft, Google patterns)
 - Anti-pattern detection and health scoring
@@ -32,10 +32,10 @@ This document defines the optimal workflow for parallel agent execution in HtmlG
 
 ```bash
 # Get parallel opportunities
-htmlgraph analytics recommend --agent-count 5
+wipnote analytics recommend --agent-count 5
 
 # Check for blockers
-htmlgraph analytics bottlenecks --top 3
+wipnote analytics bottlenecks --top 3
 # Fix blockers first to unlock more parallel work
 ```
 
@@ -43,10 +43,10 @@ htmlgraph analytics bottlenecks --top 3
 
 ```bash
 # Get a project health overview (circular deps, orphaned tasks, etc.)
-htmlgraph snapshot --summary
+wipnote snapshot --summary
 
 # Find bottlenecks to identify single points of failure
-htmlgraph analytics bottlenecks
+wipnote analytics bottlenecks
 ```
 
 ### 1.3 Cost-Benefit Decision
@@ -199,7 +199,7 @@ Use analytics to route tasks to appropriate agents:
 
 ```bash
 # Get recommended agent assignments
-htmlgraph analytics recommend --agent-count 5
+wipnote analytics recommend --agent-count 5
 # Returns tasks grouped by recommended agent count and priority
 ```
 
@@ -213,10 +213,10 @@ htmlgraph analytics recommend --agent-count 5
 
 ```bash
 # After agents complete, check session health
-htmlgraph session list --recent 10
+wipnote session list --recent 10
 
 # Check specific session details
-htmlgraph session show <session-id>
+wipnote session show <session-id>
 ```
 
 ### 4.2 Anti-Pattern Detection
@@ -325,12 +325,12 @@ if not all(validation.values()):
 
 ```bash
 # Mark completed features
-htmlgraph feature complete feat-001
-htmlgraph feature complete feat-002
-htmlgraph feature complete feat-003
+wipnote feature complete feat-001
+wipnote feature complete feat-002
+wipnote feature complete feat-003
 
 # Unlock Level 1 tasks (depended on Level 0)
-htmlgraph analytics recommend --agent-count 5
+wipnote analytics recommend --agent-count 5
 # Now Level 1 tasks are in the ready list
 ```
 
@@ -385,23 +385,23 @@ Parallel execution metrics:
 
 ```bash
 # Analyze what can be parallelized
-htmlgraph analytics recommend --agent-count 5
+wipnote analytics recommend --agent-count 5
 
 # Check bottlenecks first
-htmlgraph analytics bottlenecks --top 5
+wipnote analytics bottlenecks --top 5
 
 # Get project health overview
-htmlgraph snapshot --summary
+wipnote snapshot --summary
 ```
 
 ### Health Check After Parallel Work
 
 ```bash
 # View recent session activity
-htmlgraph session list --recent 10
+wipnote session list --recent 10
 
 # Check specific session
-htmlgraph session show <session-id>
+wipnote session show <session-id>
 ```
 
 ---
@@ -431,8 +431,8 @@ START: Need to complete multiple tasks
 
 ## References
 
-- [HtmlGraph Transcript Analytics](./src/python/htmlgraph/transcript_analytics.py)
-- [Dependency Analysis](./src/python/htmlgraph/analytics/dependency.py)
+- [Wipnote Transcript Analytics](./src/python/wipnote/transcript_analytics.py)
+- [Dependency Analysis](./src/python/wipnote/analytics/dependency.py)
 - [Multi-Agent Coordination Tests](./tests/integration/test_multi_agent_coordination.py)
 - [Anthropic Multi-Agent Research System](https://www.anthropic.com/engineering/multi-agent-research-system)
 - [Microsoft Agent Orchestration Patterns](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)

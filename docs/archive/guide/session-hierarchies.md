@@ -2,7 +2,7 @@
 
 ## What Are Session Hierarchies?
 
-Session hierarchies capture the **parent-child relationships** created when you delegate work to subagents. Every time an orchestrator spawns a Task(), HtmlGraph automatically creates a session hierarchy that shows:
+Session hierarchies capture the **parent-child relationships** created when you delegate work to subagents. Every time an orchestrator spawns a Task(), Wipnote automatically creates a session hierarchy that shows:
 
 - **Who did the work** - Orchestrator agent, subagent types
 - **When work happened** - Timeline of session creation and completion
@@ -32,7 +32,7 @@ Day 2 (Different agent):
 
 ### Solution: Session Hierarchies
 
-With HtmlGraph tracking:
+With Wipnote tracking:
 ```
 Orchestrator Session (Claude)
 ├── Child Session 1 (Subagent-Gemini): Explore codebase
@@ -70,7 +70,7 @@ Day 2: Pick up where you left off
        status = "in-progress"
 
 2. Orchestrator calls Task()
-   └── HtmlGraph creates child session
+   └── Wipnote creates child session
        parent_session_id = "sess-abc123"
        subagent_type = "general-purpose"
        delegated_prompt = "..."
@@ -90,12 +90,12 @@ Day 2: Pick up where you left off
 
 5. Results available to orchestrator
    └── Parent can query child:
-       htmlgraph session show sess-child-xyz
+       wipnote session show sess-child-xyz
 ```
 
 ### Event Capture
 
-HtmlGraph captures everything that happens in a session:
+Wipnote captures everything that happens in a session:
 
 ```json
 {
@@ -130,21 +130,21 @@ HtmlGraph captures everything that happens in a session:
 
 ```bash
 # List all sessions
-htmlgraph session list
+wipnote session list
 
 # Get session details (includes child sessions)
-htmlgraph session show sess-abc123
+wipnote session show sess-abc123
 
 # View session hierarchy as a tree
-htmlgraph session tree sess-abc123
+wipnote session tree sess-abc123
 
 # Find sessions for a feature
-htmlgraph session find-feature feature-001
+wipnote session find-feature feature-001
 ```
 
 ### Using the Dashboard
 
-The HtmlGraph dashboard has an **Orchestration** tab that visualizes hierarchies:
+The Wipnote dashboard has an **Orchestration** tab that visualizes hierarchies:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -177,11 +177,11 @@ Click on any session to see:
 ### Using the CLI (continued)
 
 ```bash
-# All the commands above work with uv run htmlgraph as well
-uv run htmlgraph session list
-uv run htmlgraph session show sess-abc123
-uv run htmlgraph session tree sess-abc123
-uv run htmlgraph session find-feature feature-001
+# All the commands above work with uv run wipnote as well
+uv run wipnote session list
+uv run wipnote session show sess-abc123
+uv run wipnote session tree sess-abc123
+uv run wipnote session find-feature feature-001
 ```
 
 ---
@@ -243,10 +243,10 @@ Each session captures different event types:
 
 ```bash
 # View session details including event counts
-htmlgraph session show sess-child-xyz
+wipnote session show sess-child-xyz
 
 # View full event log in browser
-open .htmlgraph/sessions/sess-child-xyz.html
+open .wipnote/sessions/sess-child-xyz.html
 ```
 
 ---
@@ -257,30 +257,30 @@ open .htmlgraph/sessions/sess-child-xyz.html
 
 ```bash
 # View session hierarchy starting from parent
-htmlgraph session tree sess-abc123
+wipnote session tree sess-abc123
 
 # Inspect individual child session details
-htmlgraph session show sess-child-xyz
+wipnote session show sess-child-xyz
 ```
 
 ### Scenario 2: "Did the orchestrator make the right decision?"
 
 ```bash
 # View orchestrator session and all delegated children
-htmlgraph session tree sess-orchestrator-id
+wipnote session tree sess-orchestrator-id
 
 # Check overall session status
-htmlgraph session show sess-orchestrator-id
+wipnote session show sess-orchestrator-id
 ```
 
 ### Scenario 3: "Why did feature X take so long?"
 
 ```bash
 # View all sessions linked to a feature
-htmlgraph session find-feature feature-001
+wipnote session find-feature feature-001
 
 # View session timeline in dashboard
-uv run htmlgraph serve
+uv run wipnote serve
 # Navigate to Sessions tab, filter by feature
 ```
 
@@ -288,11 +288,11 @@ uv run htmlgraph serve
 
 ```bash
 # Find sessions for the feature then inspect each
-htmlgraph session find-feature feature-001
-htmlgraph session show sess-abc123
+wipnote session find-feature feature-001
+wipnote session show sess-abc123
 
 # Open session files in browser for full event logs
-open .htmlgraph/sessions/sess-abc123.html
+open .wipnote/sessions/sess-abc123.html
 ```
 
 ---
@@ -314,10 +314,10 @@ Results: Available immediately after all complete
 **Query pattern:**
 ```bash
 # View orchestrator session and all parallel children
-htmlgraph session tree sess-orchestrator
+wipnote session tree sess-orchestrator
 
 # All children are visible in the hierarchy
-htmlgraph session show sess-orchestrator
+wipnote session show sess-orchestrator
 ```
 
 ### Pattern 2: Sequential Handoff
@@ -337,7 +337,7 @@ Task 3 (Implementation - uses Task 2 results)
 ```bash
 # Each Task() call in sequence — results from task1 are passed in task2's prompt
 # View the chain via session hierarchy
-htmlgraph session tree sess-orchestrator
+wipnote session tree sess-orchestrator
 ```
 
 ### Pattern 3: Hierarchical Delegation (Nested)
@@ -353,10 +353,10 @@ Orchestrator (Level 0)
 **Query pattern:**
 ```bash
 # View full multi-level hierarchy
-htmlgraph session tree sess-level0
+wipnote session tree sess-level0
 
 # Inspect any level by session ID
-htmlgraph session show sess-level1-child
+wipnote session show sess-level1-child
 ```
 
 ---
@@ -382,7 +382,7 @@ Task(
 
 ```bash
 # Later: Query all work on feature
-htmlgraph session find-feature feature-001
+wipnote session find-feature feature-001
 ```
 
 ### 2. Document Key Decisions
@@ -390,7 +390,7 @@ htmlgraph session find-feature feature-001
 When delegating critical work, document the decision:
 
 ```bash
-htmlgraph spike create "Delegated auth refactoring to parallel subagents"
+wipnote spike create "Delegated auth refactoring to parallel subagents"
 # Then open the spike HTML and add findings
 ```
 
@@ -400,20 +400,20 @@ Periodically review session patterns:
 
 ```bash
 # View all sessions for a feature
-htmlgraph session find-feature feature-001
+wipnote session find-feature feature-001
 
 # Check for slow or failed sessions in dashboard
-uv run htmlgraph serve
+uv run wipnote serve
 ```
 
 ### 4. Use Hierarchy for Cost Attribution
 
 ```bash
 # View session hierarchy to understand work distribution
-htmlgraph session tree sess-orchestrator
+wipnote session tree sess-orchestrator
 
 # Dashboard shows agent attribution across sessions
-uv run htmlgraph serve
+uv run wipnote serve
 ```
 
 ### 5. Preserve Context in Handoffs
@@ -421,7 +421,7 @@ uv run htmlgraph serve
 When handing off between agents, document findings in a spike:
 
 ```bash
-htmlgraph spike create "Handoff context from <agent>"
+wipnote spike create "Handoff context from <agent>"
 # Add findings to the spike file, reference session and feature IDs
 ```
 
@@ -431,11 +431,11 @@ htmlgraph spike create "Handoff context from <agent>"
 
 **Q: Are parent-child sessions created automatically?**
 
-A: Yes! HtmlGraph automatically creates child sessions when you call Task(). You don't need to manually create them.
+A: Yes! Wipnote automatically creates child sessions when you call Task(). You don't need to manually create them.
 
 **Q: Can I query sessions from completed features?**
 
-A: Yes. Sessions are stored permanently in `.htmlgraph/sessions/`. You can query them anytime, even if the feature is complete.
+A: Yes. Sessions are stored permanently in `.wipnote/sessions/`. You can query them anytime, even if the feature is complete.
 
 **Q: What's the deepest hierarchy I should create?**
 
@@ -443,15 +443,15 @@ A: Usually 2-3 levels (orchestrator → subagent → grandchild). Beyond that, c
 
 **Q: Do I need to know session IDs?**
 
-A: No. Use `htmlgraph session find-feature <feature_id>` to get all sessions for a feature without knowing IDs.
+A: No. Use `wipnote session find-feature <feature_id>` to get all sessions for a feature without knowing IDs.
 
 **Q: Can different agents see the same session hierarchy?**
 
-A: Yes. Sessions are shared in `.htmlgraph/sessions/`. Any agent with access to the directory can see all sessions.
+A: Yes. Sessions are shared in `.wipnote/sessions/`. Any agent with access to the directory can see all sessions.
 
 **Q: How long are session records kept?**
 
-A: Indefinitely. Sessions are stored in the `.htmlgraph/` directory which should be committed to git. They're part of your project history.
+A: Indefinitely. Sessions are stored in the `.wipnote/` directory which should be committed to git. They're part of your project history.
 
 **Q: Can I manually create a session hierarchy?**
 

@@ -6,15 +6,15 @@ When Phase 2 is complete, execute Phase 3 with:
 
 ```bash
 # 1. Verify Phase 2 complete
-ls -1 src/python/htmlgraph/api/repositories/*.py | wc -l  # Expected: 5
-ls -1 src/python/htmlgraph/api/services/*.py | wc -l      # Expected: 4
+ls -1 src/python/wipnote/api/repositories/*.py | wc -l  # Expected: 5
+ls -1 src/python/wipnote/api/services/*.py | wc -l      # Expected: 4
 
 # 2. Run Phase 3a: Unit Tests
 cd /Users/shakes/DevProjects/htmlgraph
 uv run pytest tests/unit/api/ -v --tb=short
 
 # 3. Check coverage
-uv run pytest tests/unit/api/ --cov=src/python/htmlgraph/api --cov-report=term-missing
+uv run pytest tests/unit/api/ --cov=src/python/wipnote/api --cov-report=term-missing
 
 # 4. Run full test suite
 uv run pytest --tb=short
@@ -66,7 +66,7 @@ uv run pytest tests/unit/api/ -v
 
 | # | Criterion | Target | How to Verify |
 |---|-----------|--------|---------------|
-| 1 | Code Organization | main.py <500 lines | `wc -l src/python/htmlgraph/api/main.py` |
+| 1 | Code Organization | main.py <500 lines | `wc -l src/python/wipnote/api/main.py` |
 | 2 | API Compatibility | 100% shape match | Integration tests |
 | 3 | Database Arch | 100% FastSQLA | `grep -r "aiosqlite" src/` (only in repos) |
 | 4 | Caching | >80% hit rate | Performance tests |
@@ -155,8 +155,8 @@ uv run ruff check --fix && uv run ruff format
 ## Troubleshooting Quick Guide
 
 ### Tests Failing
-1. Check Phase 2 complete: `ls src/python/htmlgraph/api/repositories/`
-2. Check DB schema: `sqlite3 .htmlgraph/htmlgraph.db ".schema agent_events"`
+1. Check Phase 2 complete: `ls src/python/wipnote/api/repositories/`
+2. Check DB schema: `sqlite3 .wipnote/wipnote.db ".schema agent_events"`
 3. Check fixtures work: `uv run pytest tests/unit/api/conftest.py -v`
 
 ### Coverage Below 85%
@@ -165,13 +165,13 @@ uv run ruff check --fix && uv run ruff format
 3. Add tests for uncovered code
 
 ### Performance Not Improving
-1. Enable query logging: `SQLALCHEMY_ECHO=true python -c "from htmlgraph.api.main import get_app; ..."`
+1. Enable query logging: `SQLALCHEMY_ECHO=true python -c "from wipnote.api.main import get_app; ..."`
 2. Check for N+1 queries: `grep "SELECT" debug.log | wc -l` (should be small)
 3. Verify cache working: Check logs for "Cache HIT"
 
 ### Type Errors
 ```bash
-uv run mypy src/python/htmlgraph/api/
+uv run mypy src/python/wipnote/api/
 # Review and fix each error
 # Add type hints where needed
 ```
@@ -199,9 +199,9 @@ uv run ruff check --fix src/  # Auto-fix
 - Reference: `docs/api/PHASE3_QUICK_REFERENCE.md` (this file)
 
 **Production Code**:
-- Repositories: `src/python/htmlgraph/api/repositories/`
-- Services: `src/python/htmlgraph/api/services/`
-- Main: `src/python/htmlgraph/api/main.py`
+- Repositories: `src/python/wipnote/api/repositories/`
+- Services: `src/python/wipnote/api/services/`
+- Main: `src/python/wipnote/api/main.py`
 
 ---
 
@@ -219,7 +219,7 @@ uv run pytest tests/unit/api/ -v
 
 ### Generate Coverage Report
 ```bash
-uv run pytest --cov=src/python/htmlgraph/api --cov-report=html
+uv run pytest --cov=src/python/wipnote/api --cov-report=html
 open htmlcov/index.html
 ```
 

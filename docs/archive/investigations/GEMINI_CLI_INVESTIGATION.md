@@ -70,7 +70,7 @@ WHERE tool_name LIKE '%gemini%' AND status = 'failed';
 
 ## GeminiSpawner Code Analysis
 
-**File**: `src/python/htmlgraph/orchestration/spawners/gemini.py`
+**File**: `src/python/wipnote/orchestration/spawners/gemini.py`
 
 The spawner correctly builds commands but hardcodes `gemini-2.0-flash` in tracking:
 ```python
@@ -158,7 +158,7 @@ cmd.append("--no-thinking")
 
 ### Code Changes Required
 
-**File**: `src/python/htmlgraph/orchestration/spawners/gemini.py`
+**File**: `src/python/wipnote/orchestration/spawners/gemini.py`
 
 ```python
 # Change 1: Don't force model selection (around line 144-145)
@@ -178,7 +178,7 @@ spawned_agent=model or "gemini-default",  # Was: "gemini-2.0-flash"
 | Location | `/Users/shakes/.nvm/versions/node/v22.20.0/bin/gemini` | - |
 | OAuth Credentials | Valid | `~/.gemini/oauth_creds.json` |
 | API Access | Working | Default models only |
-| MCP Extensions | 3 loaded | htmlgraph, chrome-devtools, clasp |
+| MCP Extensions | 3 loaded | wipnote, chrome-devtools, clasp |
 
 ## Extension Warning (Non-Critical)
 
@@ -196,7 +196,7 @@ After implementing fix:
 # 1. Test spawner directly
 cd /Users/shakes/DevProjects/htmlgraph
 python -c "
-from htmlgraph.orchestration.spawners import GeminiSpawner
+from wipnote.orchestration.spawners import GeminiSpawner
 spawner = GeminiSpawner()
 result = spawner.spawn('What is 2+2?')
 print(f'Success: {result.success}')
@@ -204,7 +204,7 @@ print(f'Response: {result.response}')
 "
 
 # 2. Verify database shows successful events
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT tool_name, status, created_at
 FROM agent_events
 WHERE tool_name LIKE '%gemini%'

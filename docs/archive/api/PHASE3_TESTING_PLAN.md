@@ -13,7 +13,7 @@ Phase 3 validates that the API refactor (Phase 2) meets all acceptance criteria:
 ## Acceptance Criteria Checklist
 
 ### Criteria 1: Code Organization
-- [ ] `src/python/htmlgraph/api/main.py` reduced to <500 lines (from 2761)
+- [ ] `src/python/wipnote/api/main.py` reduced to <500 lines (from 2761)
 - [ ] All database queries moved to repositories
 - [ ] All business logic moved to services
 - [ ] All models defined in schemas module
@@ -403,11 +403,11 @@ Before deploying to PyPI:
 
 ## References
 
-- Repository pattern: `src/python/htmlgraph/api/repositories/`
-- Service layer: `src/python/htmlgraph/api/services/`
-- Cache implementation: `src/python/htmlgraph/api/cache.py`
-- Database layer: `src/python/htmlgraph/api/db.py`
-- WebSocket handlers: `src/python/htmlgraph/api/broadcast_websocket.py`
+- Repository pattern: `src/python/wipnote/api/repositories/`
+- Service layer: `src/python/wipnote/api/services/`
+- Cache implementation: `src/python/wipnote/api/cache.py`
+- Database layer: `src/python/wipnote/api/db.py`
+- WebSocket handlers: `src/python/wipnote/api/broadcast_websocket.py`
 
 ---
 

@@ -1,6 +1,6 @@
 # Migration Guide: CSS Selectors to Advanced Queries
 
-This guide helps you migrate from CSS-only queries to HtmlGraph's advanced query APIs.
+This guide helps you migrate from CSS-only queries to Wipnote's advanced query APIs.
 
 ## Why Migrate?
 

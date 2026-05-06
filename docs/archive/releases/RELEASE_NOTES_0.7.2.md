@@ -1,4 +1,4 @@
-# Release Notes - HtmlGraph 0.7.2
+# Release Notes - Wipnote 0.7.2
 
 **Release Date:** December 23, 2025
 **Type:** Patch Release (Bug Fix)
@@ -15,8 +15,8 @@
 - **Root Cause:** Session HTML serialization was missing `primary_work_type` and `work_breakdown` attributes
 - **Impact:** Work Type Classification feature (introduced in 0.7.0) was non-functional
 - **Files Changed:**
-  - `src/python/htmlgraph/models.py` - Added `data-primary-work-type` and `data-work-breakdown` to Session HTML output
-  - `src/python/htmlgraph/converter.py` - Updated `html_to_session()` to parse work type fields
+  - `src/python/wipnote/models.py` - Added `data-primary-work-type` and `data-work-breakdown` to Session HTML output
+  - `src/python/wipnote/converter.py` - Updated `html_to_session()` to parse work type fields
 
 **What was broken:**
 ```python
@@ -72,17 +72,17 @@ This ensures:
 
 ### PyPI (Python Package)
 ```bash
-pip install --upgrade htmlgraph==0.7.2
+pip install --upgrade wipnote==0.7.2
 ```
 
 ### Claude Plugin
 ```bash
-claude plugin update htmlgraph
+claude plugin update wipnote
 ```
 
 ### Verify Installation
 ```bash
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+python -c "import wipnote; print(wipnote.__version__)"
 # Should output: 0.7.2
 ```
 
@@ -117,10 +117,10 @@ No manual migration required.
 
 ## 🔗 Related Links
 
-- **GitHub Release:** https://github.com/shakestzd/htmlgraph/releases/tag/v0.7.2
-- **PyPI Package:** https://pypi.org/project/htmlgraph/0.7.2/
-- **Full Changelog:** https://github.com/shakestzd/htmlgraph/compare/v0.7.1...v0.7.2
-- **Documentation:** https://shakes-tzd.github.io/htmlgraph/
+- **GitHub Release:** https://github.com/shakestzd/wipnote/releases/tag/v0.7.2
+- **PyPI Package:** https://pypi.org/project/wipnote/0.7.2/
+- **Full Changelog:** https://github.com/shakestzd/wipnote/compare/v0.7.1...v0.7.2
+- **Documentation:** https://shakes-tzd.github.io/wipnote/
 
 ---
 
@@ -143,6 +143,6 @@ cf9d11c - fix: add primary_work_type and work_breakdown to Session HTML serializ
 
 ---
 
-**Thank you for using HtmlGraph!** 🎉
+**Thank you for using Wipnote!** 🎉
 
-For questions or issues, please visit: https://github.com/shakestzd/htmlgraph/issues
+For questions or issues, please visit: https://github.com/shakestzd/wipnote/issues

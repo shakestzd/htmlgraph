@@ -35,11 +35,11 @@ This document tracks all quality gates and validation requirements for Phase 1A/
 
 ```bash
 # 1. Linting
-uv run ruff check --fix src/python/htmlgraph/cli.py
-uv run ruff format src/python/htmlgraph/cli.py
+uv run ruff check --fix src/python/wipnote/cli.py
+uv run ruff format src/python/wipnote/cli.py
 
 # 2. Type Checking
-uv run mypy src/python/htmlgraph/cli.py --strict
+uv run mypy src/python/wipnote/cli.py --strict
 
 # 3. CLI Tests
 uv run pytest tests/python/test_cli_commands.py -v
@@ -71,7 +71,7 @@ uv run pytest tests/ -v --tb=short
 **Validation Command:**
 ```bash
 grep -E "\[red\]|\[green\]|\[yellow\]|\[cyan\]" \
-  src/python/htmlgraph/cli.py | wc -l
+  src/python/wipnote/cli.py | wc -l
 # Should be > 100
 ```
 
@@ -88,11 +88,11 @@ grep -E "\[red\]|\[green\]|\[yellow\]|\[cyan\]" \
 **Validation Commands:**
 ```bash
 # Count Rich component usage
-grep -c "Table(" src/python/htmlgraph/cli.py    # Tables
-grep -c "Panel(" src/python/htmlgraph/cli.py    # Panels
-grep -c "Progress(" src/python/htmlgraph/cli.py # Progress
-grep -c "Prompt.ask" src/python/htmlgraph/cli.py # Prompts
-grep -c "Confirm.ask" src/python/htmlgraph/cli.py # Confirms
+grep -c "Table(" src/python/wipnote/cli.py    # Tables
+grep -c "Panel(" src/python/wipnote/cli.py    # Panels
+grep -c "Progress(" src/python/wipnote/cli.py # Progress
+grep -c "Prompt.ask" src/python/wipnote/cli.py # Prompts
+grep -c "Confirm.ask" src/python/wipnote/cli.py # Confirms
 ```
 
 #### 3.3 Print() Elimination
@@ -106,7 +106,7 @@ grep -c "Confirm.ask" src/python/htmlgraph/cli.py # Confirms
 **Validation:**
 ```bash
 # Count remaining print() statements
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "# " | grep -v "console.print" | wc -l
 # Should be 0
 ```
@@ -117,27 +117,27 @@ grep -n "print(" src/python/htmlgraph/cli.py | \
 
 ```bash
 # Feature Management
-uv run htmlgraph feature list                    # Verify table formatting
-uv run htmlgraph feature create "Test" --priority high  # Verify colors
-uv run htmlgraph feature show [id]               # Verify panel formatting
-uv run htmlgraph feature delete [id]             # Verify confirmation prompt
+uv run wipnote feature list                    # Verify table formatting
+uv run wipnote feature create "Test" --priority high  # Verify colors
+uv run wipnote feature show [id]               # Verify panel formatting
+uv run wipnote feature delete [id]             # Verify confirmation prompt
 
 # Session Management
-uv run htmlgraph session list                    # Verify table formatting
-uv run htmlgraph session start                   # Verify status spinner
-uv run htmlgraph session end [id]                # Verify prompts
+uv run wipnote session list                    # Verify table formatting
+uv run wipnote session start                   # Verify status spinner
+uv run wipnote session end [id]                # Verify prompts
 
 # Track Management
-uv run htmlgraph track list                      # Verify table formatting
-uv run htmlgraph track new "Title"               # Verify success message
+uv run wipnote track list                      # Verify table formatting
+uv run wipnote track new "Title"               # Verify success message
 
 # Analytics
-uv run htmlgraph analytics                       # Verify progress bar
-uv run htmlgraph analytics --recent 5            # Verify table output
+uv run wipnote analytics                       # Verify progress bar
+uv run wipnote analytics --recent 5            # Verify table output
 
 # Error Handling
-uv run htmlgraph feature show invalid-id         # Verify red error
-uv run htmlgraph session end                     # Verify prompt/error
+uv run wipnote feature show invalid-id         # Verify red error
+uv run wipnote session end                     # Verify prompt/error
 ```
 
 **Manual Verification Checklist:**
@@ -207,14 +207,14 @@ uv run pytest tests/python/test_cli_rich_output.py -v
 **Coverage Commands:**
 ```bash
 # Code coverage
-uv run pytest tests/ --cov=src/python/htmlgraph \
+uv run pytest tests/ --cov=src/python/wipnote \
   --cov-report=term-missing --cov-report=html
 
 # Type checking
-uv run mypy src/python/htmlgraph/ --strict
+uv run mypy src/python/wipnote/ --strict
 
 # Linting
-uv run ruff check src/python/htmlgraph/
+uv run ruff check src/python/wipnote/
 ```
 
 ---
@@ -292,24 +292,24 @@ uv run pytest tests/python/test_cli_commands.py -v --tb=short
 
 **Step 2: Check quality gates**
 ```bash
-uv run ruff check src/python/htmlgraph/cli.py
-uv run mypy src/python/htmlgraph/cli.py --strict
+uv run ruff check src/python/wipnote/cli.py
+uv run mypy src/python/wipnote/cli.py --strict
 ```
 
 **Step 3: Search for regressions**
 ```bash
 # Look for remaining print() statements
-grep -n "print(" src/python/htmlgraph/cli.py | grep -v "console.print"
+grep -n "print(" src/python/wipnote/cli.py | grep -v "console.print"
 
 # Look for incomplete Rich usage
-grep -n "console.print(" src/python/htmlgraph/cli.py | \
+grep -n "console.print(" src/python/wipnote/cli.py | \
   grep -v "\[" | head -20  # Check for non-colored output
 ```
 
 **Step 4: Verify JSON output**
 ```bash
 # Test JSON output doesn't have markup
-uv run htmlgraph --format json feature list 2>&1 | \
+uv run wipnote --format json feature list 2>&1 | \
   grep -E "\[red\]|\[green\]" && echo "ERROR: Markup in JSON!" || echo "OK"
 ```
 
@@ -377,8 +377,8 @@ uv run htmlgraph --format json feature list 2>&1 | \
 ## Documentation References
 
 - **Implementation Guide:** `docs/RICH_OUTPUT_GUIDE.md`
-- **Feature Tracking:** `.htmlgraph/features/feat-4d5b889e.html`
-- **Code Examples:** `src/python/htmlgraph/cli.py` (lines 54-66, 100-130)
+- **Feature Tracking:** `.wipnote/features/feat-4d5b889e.html`
+- **Code Examples:** `src/python/wipnote/cli.py` (lines 54-66, 100-130)
 
 ---
 

@@ -1,6 +1,6 @@
 # Features & Tracks
 
-Learn how to create and manage features and tracks in HtmlGraph.
+Learn how to create and manage features and tracks in Wipnote.
 
 ## Features
 
@@ -11,20 +11,20 @@ Features are the atomic units of work. Each feature represents a single delivera
 #### Basic Feature
 
 ```bash
-htmlgraph feature create "Add user profile page" --priority high
+wipnote feature create "Add user profile page" --priority high
 ```
 
 #### Feature with Steps
 
 ```bash
-htmlgraph feature create "Add user profile page" --priority high
+wipnote feature create "Add user profile page" --priority high
 # Steps can be added in the HTML file directly or via the dashboard
 ```
 
 #### Feature with Custom Properties
 
 ```bash
-htmlgraph feature create "Add user profile page" --priority high
+wipnote feature create "Add user profile page" --priority high
 # Open the feature HTML to set additional properties
 ```
 
@@ -32,33 +32,33 @@ htmlgraph feature create "Add user profile page" --priority high
 
 ```bash
 # Get all features
-htmlgraph feature list
+wipnote feature list
 
 # Filter by status
-htmlgraph find features --status in-progress
+wipnote find features --status in-progress
 
 # Filter by priority
-htmlgraph find features --priority high
+wipnote find features --priority high
 
 # Get a specific feature
-htmlgraph feature show feat-a1b2c3d4
+wipnote feature show feat-a1b2c3d4
 ```
 
 ### Updating Features
 
 ```bash
 # Start working on a feature (sets status to in-progress)
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 
 # Complete a feature
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 ```
 
 ### Deleting Features
 
 ```bash
 # No direct CLI equivalent — archive or cancel instead
-htmlgraph feature show feat-a1b2c3d4
+wipnote feature show feat-a1b2c3d4
 # Edit the HTML directly to change status to "cancelled"
 ```
 
@@ -81,7 +81,7 @@ Use tracks when:
 #### Simple Track
 
 ```bash
-htmlgraph track new "User Authentication System" --priority high
+wipnote track new "User Authentication System" --priority high
 ```
 
 #### Track with Spec and Plan
@@ -92,26 +92,26 @@ Use the TrackBuilder API for complex tracks. See the [TrackBuilder Guide](track-
 
 ```bash
 # Create the track first
-htmlgraph track new "User Authentication System" --priority high
+wipnote track new "User Authentication System" --priority high
 # Note the track ID (e.g. trk-a1b2c3d4)
 
 # Create features linked to the track
-htmlgraph feature create "OAuth Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "JWT Implementation" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Testing & Deployment" --priority medium --track trk-a1b2c3d4
+wipnote feature create "OAuth Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "JWT Implementation" --priority high --track trk-a1b2c3d4
+wipnote feature create "Testing & Deployment" --priority medium --track trk-a1b2c3d4
 ```
 
 ### Querying Tracks
 
 ```bash
 # Get all tracks
-htmlgraph track list
+wipnote track list
 
 # Get a specific track
-htmlgraph track show trk-a1b2c3d4
+wipnote track show trk-a1b2c3d4
 
 # Get all features for a track
-htmlgraph find features --track trk-a1b2c3d4
+wipnote find features --track trk-a1b2c3d4
 ```
 
 ### Track Structure
@@ -119,7 +119,7 @@ htmlgraph find features --track trk-a1b2c3d4
 Each track creates a directory with three HTML files:
 
 ```
-.htmlgraph/tracks/trk-a1b2c3d4/
+.wipnote/tracks/trk-a1b2c3d4/
 ├── index.html    # Track overview and status
 ├── spec.html     # Requirements and success criteria
 └── plan.html     # Phased implementation plan
@@ -135,19 +135,19 @@ Features can have relationships with other features:
 
 ```bash
 # Create features
-htmlgraph feature create "Database Schema"
-htmlgraph feature create "User Authentication"
+wipnote feature create "Database Schema"
+wipnote feature create "User Authentication"
 
 # Add blocking relationship (edit the feature HTML directly
 # or use the dashboard to link features)
-# Open .htmlgraph/features/feat-<auth-id>.html and add the edge
+# Open .wipnote/features/feat-<auth-id>.html and add the edge
 ```
 
 ### Related Features
 
 ```bash
 # Link related features via the dashboard or by editing feature HTML directly
-uv run htmlgraph serve
+uv run wipnote serve
 # Navigate to the feature and add relationships
 ```
 
@@ -173,13 +173,13 @@ todo → in-progress → blocked → in-progress → done
 
 ```bash
 # Create a feature
-htmlgraph feature create "Add profile page" --priority high
+wipnote feature create "Add profile page" --priority high
 
 # Start working on it
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 
 # Mark as complete
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 ```
 
 ## Best Practices
@@ -213,7 +213,7 @@ For tracks, invest time in the spec and plan:
 Document decisions and discoveries by creating a spike:
 
 ```bash
-htmlgraph spike create "Decided to use Passport.js for OAuth (simpler than Auth0)"
+wipnote spike create "Decided to use Passport.js for OAuth (simpler than Auth0)"
 ```
 
 ## Next Steps

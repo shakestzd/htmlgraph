@@ -6,7 +6,7 @@
 
 ## Overview
 
-The HtmlGraph hook system has been refactored from monolithic scripts (7,363 lines of duplicated logic) to a thin-shell architecture with centralized, reusable modules.
+The Wipnote hook system has been refactored from monolithic scripts (7,363 lines of duplicated logic) to a thin-shell architecture with centralized, reusable modules.
 
 ### Problem Statement
 
@@ -77,11 +77,11 @@ if __name__ == "__main__":
 
 **After (103 lines):**
 ```python
-#!/usr/bin/env -S uv run --with htmlgraph>=0.25.0
+#!/usr/bin/env -S uv run --with wipnote>=0.25.0
 """UserPromptSubmit Hook - Thin shell wrapper"""
 
-from htmlgraph.hooks.context import HookContext
-from htmlgraph.hooks.prompt_analyzer import (
+from wipnote.hooks.context import HookContext
+from wipnote.hooks.prompt_analyzer import (
     classify_prompt,
     create_user_query_event,
     # ... other functions
@@ -150,10 +150,10 @@ def main():
                        │
                        ▼
         ┌────────────────────────────┐
-        │   HtmlGraph Core Services  │
+        │   Wipnote Core Services  │
         ├────────────────────────────┤
         │ - SessionManager           │
-        │ - HtmlGraphDB              │
+        │ - WipnoteDB              │
         │ - Event tracking           │
         │ - Feature management       │
         └────────────────────────────┘
@@ -223,7 +223,7 @@ Resolve project directory with fallback hierarchy:
 
 **Example:**
 ```python
-from htmlgraph.hooks.bootstrap import resolve_project_dir
+from wipnote.hooks.bootstrap import resolve_project_dir
 
 project_dir = resolve_project_dir()
 # Returns: "/Users/shakes/DevProjects/my-project"
@@ -234,16 +234,16 @@ project_dir = resolve_project_dir()
 ```python
 def bootstrap_pythonpath(project_dir: str) -> None
 ```
-Add htmlgraph to Python path in two deployment modes:
-- **Development**: Add `src/python` if in htmlgraph repository
+Add wipnote to Python path in two deployment modes:
+- **Development**: Add `src/python` if in wipnote repository
 - **Installed**: Nothing (already in site-packages)
 
 **Example:**
 ```python
-from htmlgraph.hooks.bootstrap import bootstrap_pythonpath
+from wipnote.hooks.bootstrap import bootstrap_pythonpath
 
 bootstrap_pythonpath("/Users/shakes/DevProjects/my-project")
-# Now "import htmlgraph" works correctly
+# Now "import wipnote" works correctly
 ```
 
 ---
@@ -251,14 +251,14 @@ bootstrap_pythonpath("/Users/shakes/DevProjects/my-project")
 ```python
 def get_graph_dir(cwd: str | None = None) -> Path
 ```
-Get or create `.htmlgraph` directory at project root.
+Get or create `.wipnote` directory at project root.
 
 **Example:**
 ```python
-from htmlgraph.hooks.bootstrap import get_graph_dir
+from wipnote.hooks.bootstrap import get_graph_dir
 
 graph_dir = get_graph_dir()
-# Returns: Path("/Users/shakes/DevProjects/my-project/.htmlgraph")
+# Returns: Path("/Users/shakes/DevProjects/my-project/.wipnote")
 # Creates directory if it doesn't exist
 ```
 
@@ -271,7 +271,7 @@ Initialize standardized logger for hook scripts.
 
 **Example:**
 ```python
-from htmlgraph.hooks.bootstrap import init_logger
+from wipnote.hooks.bootstrap import init_logger
 
 logger = init_logger(__name__)
 logger.info("Hook started")
@@ -290,7 +290,7 @@ logger.error("Something went wrong")
 @dataclass
 class HookContext:
     project_dir: str                  # Project root directory
-    graph_dir: Path                   # .htmlgraph directory
+    graph_dir: Path                   # .wipnote directory
     session_id: str                   # Session identifier
     agent_id: str                     # Agent/tool name
     hook_input: dict                  # Raw hook input from Claude Code
@@ -310,7 +310,7 @@ Factory method that auto-detects all context from hook input.
 ```python
 import json
 import sys
-from htmlgraph.hooks.context import HookContext
+from wipnote.hooks.context import HookContext
 
 hook_input = json.load(sys.stdin)
 context = HookContext.from_input(hook_input)
@@ -343,7 +343,7 @@ session = context.session_manager.start_session(...)
 @property
 def database(self) -> Any
 ```
-Lazy-load HtmlGraphDB on first access.
+Lazy-load WipnoteDB on first access.
 
 **Example:**
 ```python
@@ -398,7 +398,7 @@ with HookContext.from_input(hook_input) as context:
 #### ParentActivityTracker
 Tracks active parent context for Skill/Task invocations.
 
-**File**: `.htmlgraph/parent-activity.json`
+**File**: `.wipnote/parent-activity.json`
 ```json
 {
   "parent_id": "evt-xyz123",
@@ -426,9 +426,9 @@ Delete parent activity file.
 **Example:**
 ```python
 from pathlib import Path
-from htmlgraph.hooks.state_manager import ParentActivityTracker
+from wipnote.hooks.state_manager import ParentActivityTracker
 
-tracker = ParentActivityTracker(Path(".htmlgraph"))
+tracker = ParentActivityTracker(Path(".wipnote"))
 parent = tracker.load()
 
 if not parent:
@@ -442,7 +442,7 @@ else:
 #### UserQueryEventTracker
 Tracks UserQuery event ID for parent-child linking (session-scoped).
 
-**File**: `.htmlgraph/user-query-event-{SESSION_ID}.json`
+**File**: `.wipnote/user-query-event-{SESSION_ID}.json`
 ```json
 {
   "event_id": "evt-abc456",
@@ -468,7 +468,7 @@ Delete UserQuery event file.
 
 **Example:**
 ```python
-tracker = UserQueryEventTracker(Path(".htmlgraph"))
+tracker = UserQueryEventTracker(Path(".wipnote"))
 
 # Save for current session
 tracker.save("sess-xyz789", "evt-abc456")
@@ -484,7 +484,7 @@ if event_id:
 #### DriftQueueManager
 Manages drift classification queue for high-drift activities.
 
-**File**: `.htmlgraph/drift-queue.json`
+**File**: `.wipnote/drift-queue.json`
 ```json
 {
   "activities": [
@@ -529,7 +529,7 @@ Clear activities while preserving last_classification timestamp.
 
 **Example:**
 ```python
-manager = DriftQueueManager(Path(".htmlgraph"))
+manager = DriftQueueManager(Path(".wipnote"))
 
 # Load queue
 queue = manager.load()
@@ -594,7 +594,7 @@ Build prompt for AI-based activity classification.
 
 **Example:**
 ```python
-from htmlgraph.hooks.drift_handler import (
+from wipnote.hooks.drift_handler import (
     load_drift_config,
     calculate_drift_score,
     should_auto_classify,
@@ -629,7 +629,7 @@ Get active session or create new one.
 
 **Example:**
 ```python
-from htmlgraph.hooks.session_handler import init_or_get_session
+from wipnote.hooks.session_handler import init_or_get_session
 
 session = init_or_get_session(context)
 if session:
@@ -643,7 +643,7 @@ else:
 ```python
 def handle_session_start(context: HookContext, session: Any | None) -> dict
 ```
-Initialize HtmlGraph tracking for session:
+Initialize Wipnote tracking for session:
 - Initialize database entry
 - Load active features and spikes
 - Build feature context string
@@ -680,7 +680,7 @@ Create UserQuery event in database for parent-child linking.
 ```python
 def check_version_status() -> dict | None
 ```
-Check if HtmlGraph has updates available.
+Check if Wipnote has updates available.
 
 **Returns:**
 ```python
@@ -814,7 +814,7 @@ Main entry point for tracking hook events.
 
 **Example:**
 ```python
-from htmlgraph.hooks.event_tracker import track_event
+from wipnote.hooks.event_tracker import track_event
 
 result = track_event("PostToolUse", {
     "tool": "Edit",
@@ -882,10 +882,10 @@ Each hook script in `.claude-plugin/hooks/scripts/` is now a thin wrapper (20-11
 All refactored hooks follow this pattern:
 
 ```python
-#!/usr/bin/env -S uv run --with htmlgraph>=0.25.0
+#!/usr/bin/env -S uv run --with wipnote>=0.25.0
 """Hook name - Thin shell wrapper
 
-Delegates all logic to htmlgraph.hooks.* modules.
+Delegates all logic to wipnote.hooks.* modules.
 This script is ~50 lines and orchestrates:
 1. Load hook input from stdin
 2. Create HookContext
@@ -895,9 +895,9 @@ This script is ~50 lines and orchestrates:
 
 import json
 import sys
-from htmlgraph.hooks.bootstrap import init_logger
-from htmlgraph.hooks.context import HookContext
-from htmlgraph.hooks.some_module import function1, function2
+from wipnote.hooks.bootstrap import init_logger
+from wipnote.hooks.context import HookContext
+from wipnote.hooks.some_module import function1, function2
 
 logger = init_logger(__name__)
 
@@ -947,15 +947,15 @@ if __name__ == "__main__":
 ### Example: session-start.py (109 lines)
 
 ```python
-#!/usr/bin/env -S uv run --with htmlgraph>=0.25.0
+#!/usr/bin/env -S uv run --with wipnote>=0.25.0
 """Session Start Hook - Thin shell wrapper"""
 
 import json
 import sys
 
-from htmlgraph.hooks.bootstrap import init_logger
-from htmlgraph.hooks.context import HookContext
-from htmlgraph.hooks.session_handler import (
+from wipnote.hooks.bootstrap import init_logger
+from wipnote.hooks.context import HookContext
+from wipnote.hooks.session_handler import (
     check_version_status,
     handle_session_start,
     init_or_get_session,
@@ -1023,20 +1023,20 @@ Before creating a new hook, check if needed logic already exists:
 
 ```bash
 # Search for related functions
-grep -r "def my_function" /htmlgraph/hooks/*.py
+grep -r "def my_function" /wipnote/hooks/*.py
 
 # Check imports in existing hooks
-grep "from htmlgraph.hooks" /packages/claude-plugin/.claude-plugin/hooks/scripts/*.py
+grep "from wipnote.hooks" /packages/claude-plugin/.claude-plugin/hooks/scripts/*.py
 ```
 
 #### Step 2: Create Module Function (if needed)
 
-Add to existing module or create new module in `src/python/htmlgraph/hooks/`:
+Add to existing module or create new module in `src/python/wipnote/hooks/`:
 
 **Example: Adding to prompt_analyzer.py**
 
 ```python
-# src/python/htmlgraph/hooks/prompt_analyzer.py
+# src/python/wipnote/hooks/prompt_analyzer.py
 
 def classify_security_intent(prompt: str) -> dict:
     """Classify security-related intent in prompt."""
@@ -1061,18 +1061,18 @@ Create new hook script in `packages/claude-plugin/.claude-plugin/hooks/scripts/`
 **Example: new-hook.py (50 lines)**
 
 ```python
-#!/usr/bin/env -S uv run --with htmlgraph>=0.25.0
+#!/usr/bin/env -S uv run --with wipnote>=0.25.0
 """New Hook - Thin shell wrapper
 
-Delegates security analysis to htmlgraph.hooks.prompt_analyzer.
+Delegates security analysis to wipnote.hooks.prompt_analyzer.
 """
 
 import json
 import sys
 
-from htmlgraph.hooks.bootstrap import init_logger
-from htmlgraph.hooks.context import HookContext
-from htmlgraph.hooks.prompt_analyzer import classify_security_intent
+from wipnote.hooks.bootstrap import init_logger
+from wipnote.hooks.context import HookContext
+from wipnote.hooks.prompt_analyzer import classify_security_intent
 
 logger = init_logger(__name__)
 
@@ -1138,7 +1138,7 @@ Create test file: `tests/hooks/test_new_hook.py`
 """Tests for new hook functionality."""
 
 import pytest
-from htmlgraph.hooks.prompt_analyzer import classify_security_intent
+from wipnote.hooks.prompt_analyzer import classify_security_intent
 
 
 class TestSecurityIntentClassification:
@@ -1172,8 +1172,8 @@ uv run pytest tests/hooks/test_new_hook.py -v
 uv run pytest tests/hooks/ -v
 
 # Check code quality
-uv run ruff check src/python/htmlgraph/hooks/
-uv run mypy src/python/htmlgraph/hooks/
+uv run ruff check src/python/wipnote/hooks/
+uv run mypy src/python/wipnote/hooks/
 ```
 
 ---
@@ -1207,7 +1207,7 @@ uv run pytest tests/hooks/test_bootstrap.py -v
 uv run pytest tests/hooks/test_bootstrap.py::TestResolveProjectDir::test_uses_claude_env -v
 
 # Run with coverage
-uv run pytest tests/hooks/ --cov=src/python/htmlgraph/hooks --cov-report=html
+uv run pytest tests/hooks/ --cov=src/python/wipnote/hooks --cov-report=html
 
 # Run with output capture disabled (see print statements)
 uv run pytest tests/hooks/ -v -s
@@ -1224,14 +1224,14 @@ uv run pytest tests/hooks/ -k "test_lazy_load" -v
 import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from htmlgraph.hooks.context import HookContext
+from wipnote.hooks.context import HookContext
 
 
 @pytest.fixture
 def temp_graph_dir():
-    """Create temporary .htmlgraph directory."""
+    """Create temporary .wipnote directory."""
     with TemporaryDirectory() as tmpdir:
-        graph_dir = Path(tmpdir) / ".htmlgraph"
+        graph_dir = Path(tmpdir) / ".wipnote"
         graph_dir.mkdir(parents=True)
         yield graph_dir
 
@@ -1270,7 +1270,7 @@ def hook_context(sample_hook_input, temp_graph_dir, monkeypatch):
 
 import pytest
 from pathlib import Path
-from htmlgraph.hooks.bootstrap import (
+from wipnote.hooks.bootstrap import (
     resolve_project_dir,
     get_graph_dir,
     init_logger,
@@ -1308,16 +1308,16 @@ class TestResolveProjectDir:
 
 
 class TestGetGraphDir:
-    """Test .htmlgraph directory resolution."""
+    """Test .wipnote directory resolution."""
 
     def test_creates_graph_dir(self, monkeypatch, tmp_path):
-        """Test creates .htmlgraph if missing."""
+        """Test creates .wipnote if missing."""
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
 
         graph_dir = get_graph_dir()
 
         assert graph_dir.exists()
-        assert graph_dir.name == ".htmlgraph"
+        assert graph_dir.name == ".wipnote"
 
     def test_idempotent(self, monkeypatch, tmp_path):
         """Test calling twice doesn't fail."""
@@ -1353,12 +1353,12 @@ class TestGetGraphDir:
 
 The SQLite database is stored at:
 ```
-.htmlgraph/htmlgraph.db
+.wipnote/wipnote.db
 ```
 
 Configure via environment variable:
 ```bash
-export HTMLGRAPH_DB_PATH="/custom/path/htmlgraph.db"
+export HTMLGRAPH_DB_PATH="/custom/path/wipnote.db"
 ```
 
 ### Environment Variables
@@ -1369,7 +1369,7 @@ export HTMLGRAPH_DB_PATH="/custom/path/htmlgraph.db"
 | `CLAUDE_AGENT_NICKNAME` | Agent/tool name | `unknown` |
 | `HTMLGRAPH_AGENT_ID` | Override agent ID | (use CLAUDE_AGENT_NICKNAME) |
 | `HTMLGRAPH_DISABLE_TRACKING` | Disable all tracking | `0` (tracking enabled) |
-| `HTMLGRAPH_DB_PATH` | Custom database path | `.htmlgraph/htmlgraph.db` |
+| `HTMLGRAPH_DB_PATH` | Custom database path | `.wipnote/wipnote.db` |
 
 ### Drift Configuration
 
@@ -1434,7 +1434,7 @@ If upgrading from a version before the thin-shell refactoring:
 
 **What Changed:**
 - ✅ Hook scripts are now ~50 lines instead of 1000+
-- ✅ Logic moved to importable modules in `htmlgraph.hooks.*`
+- ✅ Logic moved to importable modules in `wipnote.hooks.*`
 - ✅ Lazy-loading reduces startup time
 - ✅ Much easier to test
 
@@ -1446,14 +1446,14 @@ If upgrading from a version before the thin-shell refactoring:
 
 **Migration Steps:**
 
-1. **Update htmlgraph package:**
+1. **Update wipnote package:**
    ```bash
-   uv pip install --upgrade htmlgraph>=0.25.0
+   uv pip install --upgrade wipnote>=0.25.0
    ```
 
 2. **Update Claude plugin:**
    ```bash
-   claude plugin update htmlgraph
+   claude plugin update wipnote
    ```
 
 3. **Verify hooks are installed:**
@@ -1469,13 +1469,13 @@ If upgrading from a version before the thin-shell refactoring:
 **Troubleshooting:**
 
 **Q: Hooks not running?**
-- A: Check hook installation: `claude plugin update htmlgraph && claude --reload-hooks`
+- A: Check hook installation: `claude plugin update wipnote && claude --reload-hooks`
 
-**Q: "HtmlGraph not available" error?**
-- A: Install htmlgraph: `uv pip install htmlgraph>=0.25.0`
+**Q: "Wipnote not available" error?**
+- A: Install wipnote: `uv pip install wipnote>=0.25.0`
 
 **Q: Old hook scripts still loaded?**
-- A: Clear plugin cache: `rm -rf ~/.claude/plugins/htmlgraph* && claude plugin install htmlgraph`
+- A: Clear plugin cache: `rm -rf ~/.claude/plugins/wipnote* && claude plugin install wipnote`
 
 **Q: Database migration needed?**
 - A: No, database schema unchanged - upgrade safely
@@ -1490,7 +1490,7 @@ If upgrading from a version before the thin-shell refactoring:
 ```
 Hook start
 ├─ Import SessionManager (~100ms)
-├─ Import HtmlGraphDB (~150ms)
+├─ Import WipnoteDB (~150ms)
 ├─ Parse hook input (~10ms)
 └─ Total: ~260ms before doing actual work
 ```
@@ -1528,11 +1528,11 @@ Improvement: 69% faster
 | Module | Function | Purpose |
 |--------|----------|---------|
 | `bootstrap` | `resolve_project_dir()` | Find project root |
-| `bootstrap` | `get_graph_dir()` | Get `.htmlgraph` directory |
+| `bootstrap` | `get_graph_dir()` | Get `.wipnote` directory |
 | `bootstrap` | `init_logger()` | Create logger |
 | `context` | `HookContext.from_input()` | Create context from hook input |
 | `context` | `context.session_manager` | Lazy-load SessionManager |
-| `context` | `context.database` | Lazy-load HtmlGraphDB |
+| `context` | `context.database` | Lazy-load WipnoteDB |
 | `context` | `context.close()` | Clean up resources |
 | `state_manager` | `ParentActivityTracker` | Track parent context |
 | `state_manager` | `UserQueryEventTracker` | Track UserQuery events |

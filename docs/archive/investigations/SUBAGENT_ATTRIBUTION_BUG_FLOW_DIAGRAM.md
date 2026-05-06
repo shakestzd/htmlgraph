@@ -11,7 +11,7 @@
 │ 1. Orchestrator starts                                                │
 │ 2. SessionStart hook runs                                            │
 │ 3. Creates session-abc123                                            │
-│ 4. Stores in .htmlgraph/session.json (GLOBAL CACHE)                 │
+│ 4. Stores in .wipnote/session.json (GLOBAL CACHE)                 │
 └────────────────────────────────────────────────────────────────────────┘
 
                                     │
@@ -84,10 +84,10 @@
 │       os.environ.get("HTMLGRAPH_PARENT_SESSION") → None             │
 │                                                                      │
 │ 4. Flow to session ID resolution:                                   │
-│    manager = SessionManager(".htmlgraph")                           │
+│    manager = SessionManager(".wipnote")                           │
 │    active_session = manager.get_active_session()                    │
 │                                                                      │
-│    ❌ BUG: get_active_session() reads .htmlgraph/session.json       │
+│    ❌ BUG: get_active_session() reads .wipnote/session.json       │
 │          (the GLOBAL cache written by orchestrator)                 │
 │          Returns: session-abc123 (PARENT'S SESSION!)                │
 │                                                                      │
@@ -318,7 +318,7 @@ RESULT: Clear separation! Correct attribution! Accurate cost analysis!
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       GLOBAL CACHE                         │
-│             .htmlgraph/session.json                        │
+│             .wipnote/session.json                        │
 │                                                             │
 │  session-abc123  ← Written once, never updated!           │
 └─────────────────────────────────────────────────────────────┘

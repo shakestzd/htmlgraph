@@ -2,7 +2,7 @@
 
 ## Overview
 
-HtmlGraph SDK 0.9 introduces a major refactoring to improve code organization and maintainability. This guide helps contributors adapt to the new module structure.
+Wipnote SDK 0.9 introduces a major refactoring to improve code organization and maintainability. This guide helps contributors adapt to the new module structure.
 
 **TL;DR:** Modules have been reorganized into logical directories (`builders/`, `collections/`, `analytics/`), but **public imports remain unchanged**. Most code will continue to work without modification.
 
@@ -14,7 +14,7 @@ HtmlGraph SDK 0.9 introduces a major refactoring to improve code organization an
 
 **Before (0.8.x):**
 ```
-htmlgraph/
+wipnote/
 ├── sdk.py
 ├── analytics.py               # Analytics class
 ├── dependency_analytics.py    # DependencyAnalytics class
@@ -32,7 +32,7 @@ htmlgraph/
 
 **After (0.9.x):**
 ```
-htmlgraph/
+wipnote/
 ├── sdk.py                     # Main entry point
 ├── track_builder.py           # TrackCollection only
 ├── builders/                  # All builders organized here
@@ -73,9 +73,9 @@ htmlgraph/
 
 ```python
 # These still work (unchanged)
-from htmlgraph import SDK, Analytics, DependencyAnalytics
-from htmlgraph.builders import FeatureBuilder, SpikeBuilder, TrackBuilder
-from htmlgraph.collections import BaseCollection, FeatureCollection
+from wipnote import SDK, Analytics, DependencyAnalytics
+from wipnote.builders import FeatureBuilder, SpikeBuilder, TrackBuilder
+from wipnote.collections import BaseCollection, FeatureCollection
 
 sdk = SDK(agent="claude")
 # All existing code continues to work
@@ -89,38 +89,38 @@ sdk = SDK(agent="claude")
 
 **Before:**
 ```python
-from htmlgraph.analytics import Analytics
-from htmlgraph.dependency_analytics import DependencyAnalytics
+from wipnote.analytics import Analytics
+from wipnote.dependency_analytics import DependencyAnalytics
 ```
 
 **After:**
 ```python
-from htmlgraph.analytics import Analytics, DependencyAnalytics
+from wipnote.analytics import Analytics, DependencyAnalytics
 # Or direct module imports:
-from htmlgraph.analytics.work_type import Analytics
-from htmlgraph.analytics.dependency import DependencyAnalytics
+from wipnote.analytics.work_type import Analytics
+from wipnote.analytics.dependency import DependencyAnalytics
 ```
 
 #### TrackBuilder Imports
 
 **Before:**
 ```python
-from htmlgraph.track_builder import TrackBuilder, TrackCollection
+from wipnote.track_builder import TrackBuilder, TrackCollection
 ```
 
 **After:**
 ```python
-from htmlgraph.builders.track import TrackBuilder  # Moved location
-from htmlgraph.track_builder import TrackCollection  # Unchanged
+from wipnote.builders.track import TrackBuilder  # Moved location
+from wipnote.track_builder import TrackCollection  # Unchanged
 # Or use the convenience import:
-from htmlgraph.track_builder import TrackBuilder  # Re-exported for compatibility
+from wipnote.track_builder import TrackBuilder  # Re-exported for compatibility
 ```
 
 #### SessionManager Access
 
 **Before (direct import):**
 ```python
-from htmlgraph.session_manager import SessionManager
+from wipnote.session_manager import SessionManager
 
 manager = SessionManager(graph_dir)
 manager.start_feature(feature_id="feat-123", agent="claude")
@@ -128,7 +128,7 @@ manager.start_feature(feature_id="feat-123", agent="claude")
 
 **After (via SDK):**
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude", directory=graph_dir)
 sdk.features.start("feat-123")  # Uses SessionManager internally
@@ -146,17 +146,17 @@ sdk.session_manager.start_feature(feature_id="feat-123", collection="features", 
 
 **⚠️ Internal module paths changed:**
 
-1. **`htmlgraph.analytics` → `htmlgraph.analytics.work_type`**
-   - Public import `from htmlgraph import Analytics` still works
+1. **`wipnote.analytics` → `wipnote.analytics.work_type`**
+   - Public import `from wipnote import Analytics` still works
    - Direct import path changed for internal use
 
-2. **`htmlgraph.dependency_analytics` → `htmlgraph.analytics.dependency`**
-   - Public import `from htmlgraph import DependencyAnalytics` still works
+2. **`wipnote.dependency_analytics` → `wipnote.analytics.dependency`**
+   - Public import `from wipnote import DependencyAnalytics` still works
    - Direct import path changed for internal use
 
-3. **`htmlgraph.track_builder.TrackBuilder` → `htmlgraph.builders.track.TrackBuilder`**
+3. **`wipnote.track_builder.TrackBuilder` → `wipnote.builders.track.TrackBuilder`**
    - Re-exported in `track_builder.py` for backward compatibility
-   - Preferred import: `from htmlgraph.builders import TrackBuilder`
+   - Preferred import: `from wipnote.builders import TrackBuilder`
 
 ### CLI Changes
 
@@ -227,10 +227,10 @@ uv run pytest tests/ -v
 
 ```python
 # Verify all imports work
-from htmlgraph import SDK, Analytics, DependencyAnalytics
-from htmlgraph.builders import FeatureBuilder, SpikeBuilder, TrackBuilder
-from htmlgraph.collections import BaseCollection, FeatureCollection
-from htmlgraph.models import SpikeType, MaintenanceType, WorkType
+from wipnote import SDK, Analytics, DependencyAnalytics
+from wipnote.builders import FeatureBuilder, SpikeBuilder, TrackBuilder
+from wipnote.collections import BaseCollection, FeatureCollection
+from wipnote.models import SpikeType, MaintenanceType, WorkType
 
 print("✓ All imports successful")
 ```
@@ -252,7 +252,7 @@ print("✓ All imports successful")
 
 - **Documentation:** See `docs/api/sdk.md` for complete SDK reference
 - **Examples:** Check `docs/examples/` for updated code samples
-- **Issues:** Report problems at https://github.com/shakestzd/htmlgraph/issues
+- **Issues:** Report problems at https://github.com/shakestzd/wipnote/issues
 
 ---
 

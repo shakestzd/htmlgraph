@@ -51,7 +51,7 @@ Task(
 
 **AFTER**:
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 
@@ -166,8 +166,8 @@ git_result = spawner.spawn_copilot(...)
 
 Added links to:
 - `/multi-ai-orchestration` skill (comprehensive guide)
-- `src/python/htmlgraph/orchestration/model_selection.py` (decision matrix)
-- `src/python/htmlgraph/orchestration/headless_spawner.py` (implementation)
+- `src/python/wipnote/orchestration/model_selection.py` (decision matrix)
+- `src/python/wipnote/orchestration/headless_spawner.py` (implementation)
 
 ## Behavior Change Example
 
@@ -184,7 +184,7 @@ Task(prompt="Commit changes...", subagent_type="general-purpose")   # $5
 
 **AFTER (New Imperative Behavior)**:
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 spawner = HeadlessSpawner()
 
 # Exploration (FREE!)
@@ -260,5 +260,5 @@ To verify the changes are working:
 
 - Original file: `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/rules/orchestration.md`
 - Multi-AI skill: `packages/claude-plugin/skills/multi-ai-orchestration-skill/SKILL.md`
-- HeadlessSpawner: `src/python/htmlgraph/orchestration/headless_spawner.py`
-- Model selection: `src/python/htmlgraph/orchestration/model_selection.py`
+- HeadlessSpawner: `src/python/wipnote/orchestration/headless_spawner.py`
+- Model selection: `src/python/wipnote/orchestration/model_selection.py`

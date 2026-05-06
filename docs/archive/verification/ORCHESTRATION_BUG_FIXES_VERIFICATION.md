@@ -28,7 +28,7 @@ Additionally, **3 critical issues were discovered and fixed during testing**:
 #### Bug #1: Subagent Context Detection
 | Item | Status | Details |
 |------|--------|---------|
-| File exists | ✅ YES | `/src/python/htmlgraph/hooks/subagent_detection.py` (202 lines) |
+| File exists | ✅ YES | `/src/python/wipnote/hooks/subagent_detection.py` (202 lines) |
 | 5-level detection | ✅ YES | ENV vars → session state → database queries |
 | Integration | ✅ YES | Called at start of orchestrator.py and validator.py |
 | Exports | ✅ YES | Function available via `__all__` |
@@ -37,7 +37,7 @@ Additionally, **3 critical issues were discovered and fixed during testing**:
 #### Bug #2: Session Isolation (Tool History)
 | Item | Status | Details |
 |------|--------|---------|
-| Old system removed | ✅ YES | `/tmp/htmlgraph-tool-history.json` not referenced anywhere |
+| Old system removed | ✅ YES | `/tmp/wipnote-tool-history.json` not referenced anywhere |
 | New DB queries | ✅ YES | Both orchestrator.py and validator.py use `load_tool_history(session_id)` |
 | Session filtering | ✅ YES | WHERE clause filters by `session_id` in both hooks |
 | Graceful degradation | ✅ YES | Returns empty list on error (safe default) |
@@ -47,7 +47,7 @@ Additionally, **3 critical issues were discovered and fixed during testing**:
 #### Bug #3: Git Command Consistency
 | Item | Status | Details |
 |------|---------|---------|
-| Shared module | ✅ YES | `/src/python/htmlgraph/hooks/git_commands.py` (150 lines) |
+| Shared module | ✅ YES | `/src/python/wipnote/hooks/git_commands.py` (150 lines) |
 | GIT_READ_ONLY set | ✅ YES | 13 commands defined |
 | GIT_WRITE_OPS set | ✅ YES | 17 commands defined |
 | Unified function | ✅ YES | `should_allow_git_command()` called by both hooks |
@@ -58,7 +58,7 @@ Additionally, **3 critical issues were discovered and fixed during testing**:
 | Item | Status | Details |
 |------|--------|---------|
 | Config module | ✅ YES | `orchestrator_config.py` (358 lines) with Pydantic models |
-| Config file | ✅ YES | `.htmlgraph/orchestrator-config.yaml` with new defaults |
+| Config file | ✅ YES | `.wipnote/orchestrator-config.yaml` with new defaults |
 | CLI commands | ✅ YES | 3 commands (config-show, config-set, config-reset) |
 | Time decay | ✅ YES | 120-second default violation expiration |
 | Rapid collapsing | ✅ YES | 10-second window for grouping violations |
@@ -83,7 +83,7 @@ return result
 ```
 
 **Status:** ✅ FIXED - MyPy now passes
-- **Verification:** `uv run mypy src/python/htmlgraph/hooks/subagent_detection.py` → Success
+- **Verification:** `uv run mypy src/python/wipnote/hooks/subagent_detection.py` → Success
 
 ---
 
@@ -101,7 +101,7 @@ history = await loop.run_in_executor(None, lambda: validator_load_history(sessio
 ```
 
 **Status:** ✅ FIXED - MyPy now passes
-- **Verification:** `uv run mypy src/python/htmlgraph/hooks/pretooluse.py` → Success
+- **Verification:** `uv run mypy src/python/wipnote/hooks/pretooluse.py` → Success
 
 ---
 
@@ -254,21 +254,21 @@ if subcommand == "branch":
 ## Files Modified/Created
 
 ### New Files (7)
-1. `src/python/htmlgraph/hooks/subagent_detection.py` (202 lines)
-2. `src/python/htmlgraph/hooks/git_commands.py` (150 lines)
-3. `src/python/htmlgraph/orchestrator_config.py` (358 lines)
-4. `.htmlgraph/orchestrator-config.yaml` (45 lines)
+1. `src/python/wipnote/hooks/subagent_detection.py` (202 lines)
+2. `src/python/wipnote/hooks/git_commands.py` (150 lines)
+3. `src/python/wipnote/orchestrator_config.py` (358 lines)
+4. `.wipnote/orchestrator-config.yaml` (45 lines)
 5. `tests/test_orchestrator_config.py` (324 lines)
 6. `tests/hooks/test_git_commands.py` (varies)
 7. `ORCHESTRATION_BUGS_FIXED.md` (documentation)
 
 ### Modified Files (12)
-1. `src/python/htmlgraph/hooks/orchestrator.py` - Session isolation, git consistency, config integration
-2. `src/python/htmlgraph/hooks/validator.py` - Session isolation, git consistency, config integration
-3. `src/python/htmlgraph/hooks/subagent_detection.py` - Fixed MyPy type error
-4. `src/python/htmlgraph/hooks/pretooluse.py` - Fixed MyPy type error
-5. `src/python/htmlgraph/orchestrator_mode.py` - Added violation history, time decay
-6. `src/python/htmlgraph/cli/work/orchestration.py` - Added CLI commands
+1. `src/python/wipnote/hooks/orchestrator.py` - Session isolation, git consistency, config integration
+2. `src/python/wipnote/hooks/validator.py` - Session isolation, git consistency, config integration
+3. `src/python/wipnote/hooks/subagent_detection.py` - Fixed MyPy type error
+4. `src/python/wipnote/hooks/pretooluse.py` - Fixed MyPy type error
+5. `src/python/wipnote/orchestrator_mode.py` - Added violation history, time decay
+6. `src/python/wipnote/cli/work/orchestration.py` - Added CLI commands
 7. And 6 more (minor updates for integration)
 
 ---

@@ -73,7 +73,7 @@
    - Investigation questions
 
 2. **Implementation & Fix**
-   - **File**: src/python/htmlgraph/hooks/pretooluse.py (lines 367-410)
+   - **File**: src/python/wipnote/hooks/pretooluse.py (lines 367-410)
    - **What was fixed**:
      - PreToolUse hook now reads `HTMLGRAPH_PARENT_EVENT` from environment
      - Tool events in subagents properly nest under Task delegation

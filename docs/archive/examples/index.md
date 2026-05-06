@@ -1,6 +1,6 @@
 # Examples
 
-Real-world examples of using HtmlGraph.
+Real-world examples of using Wipnote.
 
 ## Examples by Type
 
@@ -17,10 +17,10 @@ Real-world examples of using HtmlGraph.
 
 ### Personal Knowledge Base
 
-Use HtmlGraph to manage notes and ideas:
+Use Wipnote to manage notes and ideas:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="me")
 
@@ -94,9 +94,9 @@ print(feature.handoff_notes)  # See what Agent 1 did
 
 Browse the example implementations:
 
-- [Todo List](https://github.com/shakestzd/htmlgraph/tree/main/examples/todo-list)
-- [Agent Coordination](https://github.com/shakestzd/htmlgraph/tree/main/examples/agent-coordination)
-- [Knowledge Base](https://github.com/shakestzd/htmlgraph/tree/main/examples/knowledge-base)
+- [Todo List](https://github.com/shakestzd/wipnote/tree/main/examples/todo-list)
+- [Agent Coordination](https://github.com/shakestzd/wipnote/tree/main/examples/agent-coordination)
+- [Knowledge Base](https://github.com/shakestzd/wipnote/tree/main/examples/knowledge-base)
 
 ## Next Steps
 

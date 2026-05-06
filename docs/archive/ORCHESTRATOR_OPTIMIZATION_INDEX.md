@@ -1,7 +1,7 @@
 # Orchestrator System Prompt Optimization - Complete Index
 
 **Date:** 2025-01-03
-**Project:** HtmlGraph Orchestrator Prompt Optimization
+**Project:** Wipnote Orchestrator Prompt Optimization
 **Status:** ✓ COMPLETE
 
 ---
@@ -18,7 +18,7 @@
      - Spawner Selection Logic (5 decision points + special cases)
      - 6 Detailed Routing Examples
      - Contextualized Permission Modes
-     - HtmlGraph Integration Patterns
+     - Wipnote Integration Patterns
      - Cost Optimization Rules
      - Validation Checklist
 
@@ -60,7 +60,7 @@
      - Key improvements (token efficiency, clarity, precision)
      - Detailed improvements by dimension
      - 3 Routing examples with specific numbers
-     - HtmlGraph integration verification
+     - Wipnote integration verification
      - Clarity metrics (before/after)
      - Anti-patterns section
      - Success metrics (after integration)
@@ -77,7 +77,7 @@
      - Routing clarity improvements (6 improvements documented)
      - Spawner selection enhancements (problem → solution)
      - Decision framework improvements (5 improvements)
-     - HtmlGraph integration verification
+     - Wipnote integration verification
      - Clarity metrics (quantitative + qualitative)
      - Comprehensive routing examples
      - Anti-patterns analysis (new additions)
@@ -282,7 +282,7 @@ A: Yes. The documents provide templates. Adapt to your needs, but measure the im
    - Adjust based on patterns
 
 5. **Share results**
-   - Document learnings in HtmlGraph spike
+   - Document learnings in Wipnote spike
    - Suggest refinements based on patterns
    - Update system prompt if needed
 

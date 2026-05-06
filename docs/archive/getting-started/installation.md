@@ -2,23 +2,23 @@
 
 ## Requirements
 
-HtmlGraph requires Python 3.10 or higher.
+Wipnote requires Python 3.10 or higher.
 
 ## Install from PyPI
 
-The easiest way to install HtmlGraph is via pip:
+The easiest way to install Wipnote is via pip:
 
 ```bash
-pip install htmlgraph
+pip install wipnote
 ```
 
 Or using uv (recommended):
 
 ```bash
-uv pip install htmlgraph
+uv pip install wipnote
 ```
 
-> **Note:** Use `uvx htmlgraph` (not `uv run htmlgraph`) to run CLI commands after installation.
+> **Note:** Use `uvx wipnote` (not `uv run wipnote`) to run CLI commands after installation.
 > `uv run` uses your project's lockfile and may run a cached/locked version instead of the latest.
 > `uvx` always runs the installed package directly, ensuring you get the correct version.
 
@@ -27,23 +27,23 @@ uv pip install htmlgraph
 Clone the repository and install in development mode:
 
 ```bash
-git clone https://github.com/shakestzd/htmlgraph.git
-cd htmlgraph
+git clone https://github.com/shakestzd/wipnote.git
+cd wipnote
 uv pip install -e .
 ```
 
 ## Verify Installation
 
-Check that HtmlGraph is installed correctly:
+Check that Wipnote is installed correctly:
 
 ```bash
-uv run python -c "import htmlgraph; print(htmlgraph.__version__)"
+uv run python -c "import wipnote; print(wipnote.__version__)"
 ```
 
 Or using the CLI:
 
 ```bash
-htmlgraph --version
+wipnote --version
 ```
 
 ## Optional Dependencies
@@ -66,29 +66,29 @@ uv pip install -e ".[docs]"
 ### Claude Code Plugin
 
 ```bash
-# Install the HtmlGraph plugin for Claude Code
-claude plugin install htmlgraph
+# Install the Wipnote plugin for Claude Code
+claude plugin install wipnote
 
 # Or from local marketplace
 claude plugin marketplace add local-marketplace
-claude plugin install htmlgraph
+claude plugin install wipnote
 ```
 
 ### Gemini CLI Extension
 
 ```bash
-# Install the HtmlGraph extension for Gemini CLI
-gemini extension install htmlgraph
+# Install the Wipnote extension for Gemini CLI
+gemini extension install wipnote
 ```
 
 ### Codex CLI Skill
 
 ```bash
-# Install the HtmlGraph skill for Codex CLI
-codex skill install htmlgraph
+# Install the Wipnote skill for Codex CLI
+codex skill install wipnote
 ```
 
 ## Next Steps
 
 - [Quick Start Guide](quick-start.md) - Get started with your first graph
-- [Core Concepts](concepts.md) - Understand HtmlGraph fundamentals
+- [Core Concepts](concepts.md) - Understand Wipnote fundamentals

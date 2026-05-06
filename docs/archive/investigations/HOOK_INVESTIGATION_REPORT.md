@@ -26,7 +26,7 @@ Claude Code Plugin System
 │       ├── user-prompt-submit.py
 │       └── ... (12 more)
 │
-└── .claude/hooks/                               (PROJECT: HtmlGraph development)
+└── .claude/hooks/                               (PROJECT: Wipnote development)
     ├── hooks.json                               (Project hook manifest)
     └── scripts/                                 (15 hook implementations)
         ├── session-start.py                     (38 KB, older version)
@@ -52,13 +52,13 @@ Claude Code Plugin System
 |--------|------------------------|-----------------|
 | Size | 496 bytes | 496 bytes |
 | Type | **Thin wrapper** | **Full implementation** |
-| Implementation | Delegates to `htmlgraph.hooks.subagent_stop` | Inline full logic |
+| Implementation | Delegates to `wipnote.hooks.subagent_stop` | Inline full logic |
 | MD5 Hash | `0c1b1ace4798e0e7b4804a638dd158ed` | `6afb8e28a650865782d529875188f2e2` |
 | **Status** | ✅ Current | ❌ Stale |
 
 **Plugin Version (Current):**
 ```python
-from htmlgraph.hooks.subagent_stop import main
+from wipnote.hooks.subagent_stop import main
 
 if __name__ == "__main__":
     main()
@@ -87,12 +87,12 @@ if __name__ == "__main__":
 **Plugin has features project lacks:**
 ```python
 # Plugin imports (lines 151-159):
-from htmlgraph.cigs import (
+from wipnote.cigs import (
     AutonomyRecommender,
     PatternDetector,
     ViolationTracker,
 )
-from htmlgraph.reflection import get_reflection_context
+from wipnote.reflection import get_reflection_context
 # ... ~50 lines of CIGS integration logic
 ```
 
@@ -130,7 +130,7 @@ Checked files show varying sync status:
 ### What This Breaks
 
 1. **subagent-stop.py Duplication**
-   - Plugin version (thin wrapper) calls `htmlgraph.hooks.subagent_stop`
+   - Plugin version (thin wrapper) calls `wipnote.hooks.subagent_stop`
    - Project version (inline) executes same logic inline
    - **Result: subagent completions tracked TWICE (duplicate events)**
 
@@ -158,11 +158,11 @@ Checked files show varying sync status:
 This is intentional design (NOT a bug):
 
 1. **Plugin hooks** = Source of truth for distributed package
-   - Used by all users installing `htmlgraph` plugin
+   - Used by all users installing `wipnote` plugin
    - Should be well-tested and stable
    - Located in: `packages/claude-plugin/hooks/`
 
-2. **Project hooks** = HtmlGraph dogfooding overrides
+2. **Project hooks** = Wipnote dogfooding overrides
    - Test experimental features before releasing
    - Can safely be out of sync for testing
    - Located in: `.claude/hooks/`
@@ -179,7 +179,7 @@ This is intentional design (NOT a bug):
    Are you implementing a PLUGIN feature (for all users)?
    → Edit: packages/claude-plugin/hooks/scripts/
 
-   Are you testing a DOGFOODING-ONLY feature (HtmlGraph development)?
+   Are you testing a DOGFOODING-ONLY feature (Wipnote development)?
    → Edit: .claude/hooks/scripts/
 
    Are you fixing a bug that affects both?
@@ -228,7 +228,7 @@ packages/claude-plugin/hooks/
 .claude/hooks/
 ├── hooks.json                              (Project manifest)
 ├── hooks.json.bak                          (Backup)
-├── protect-htmlgraph.sh
+├── protect-wipnote.sh
 ├── session-start.sh
 └── scripts/
     ├── link-activities.py

@@ -1,11 +1,11 @@
 # Common Workflows
 
-Practical patterns for using HtmlGraph SDK in AI agent sessions.
+Practical patterns for using Wipnote SDK in AI agent sessions.
 
 ## Session Start
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 info = sdk.get_session_start_info()
@@ -327,7 +327,7 @@ if drift["stale_items"]:
 ## Complete Example: Feature Implementation
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize
 sdk = SDK(agent="claude")

@@ -12,13 +12,13 @@
 
 ```python
 def execute(self) -> CommandResult:
-    """Initialize the .htmlgraph directory."""
-    from htmlgraph import cli_legacy  # ❌ ModuleNotFoundError
+    """Initialize the .wipnote directory."""
+    from wipnote import cli_legacy  # ❌ ModuleNotFoundError
 
     args = argparse.Namespace(...)
     cli_legacy.cmd_init(args)  # ❌ Function doesn't exist
 
-    return CommandResult(text="Initialized .htmlgraph directory")
+    return CommandResult(text="Initialized .wipnote directory")
 ```
 
 ---
@@ -29,26 +29,26 @@ Replace with temporary implementation:
 
 ```python
 def execute(self) -> CommandResult:
-    """Initialize the .htmlgraph directory."""
+    """Initialize the .wipnote directory."""
     from pathlib import Path
-    from htmlgraph.config import HtmlGraphConfig
-    from htmlgraph.db.schema import HtmlGraphDB
+    from wipnote.config import WipnoteConfig
+    from wipnote.db.schema import WipnoteDB
 
     # Temporary implementation until full refactor
     base_dir = Path(self.dir)
-    htmlgraph_dir = base_dir / ".htmlgraph"
+    wipnote_dir = base_dir / ".wipnote"
 
     # Create directories
-    config = HtmlGraphConfig(graph_dir=htmlgraph_dir)
+    config = WipnoteConfig(graph_dir=wipnote_dir)
     config.ensure_directories()
 
     # Initialize database
-    db_path = htmlgraph_dir / "htmlgraph.db"
-    db = HtmlGraphDB(str(db_path))
+    db_path = wipnote_dir / "wipnote.db"
+    db = WipnoteDB(str(db_path))
 
     return CommandResult(
         success=True,
-        text=f"Initialized .htmlgraph at {self.dir}"
+        text=f"Initialized .wipnote at {self.dir}"
     )
 ```
 
@@ -58,18 +58,18 @@ def execute(self) -> CommandResult:
 
 ### 1. Create Operations Module
 
-**File:** `src/python/htmlgraph/cli/operations/initialization.py`
+**File:** `src/python/wipnote/cli/operations/initialization.py`
 
 **Functions to implement:**
 
 ```python
 # Main entry point
-def initialize_htmlgraph(config: InitConfig, verbose: bool = False) -> CommandResult
+def initialize_wipnote(config: InitConfig, verbose: bool = False) -> CommandResult
 
 # Core operations
 def create_directory_structure(base_dir: Path, include_events_keep: bool = True) -> dict[str, Path]
 def initialize_database(db_path: Path, skip_analytics_cache: bool = False) -> tuple[bool, str]
-def create_default_config_files(htmlgraph_dir: Path, install_hooks: bool = False) -> dict[str, Path]
+def create_default_config_files(wipnote_dir: Path, install_hooks: bool = False) -> dict[str, Path]
 
 # Git integration
 def update_gitignore(project_dir: Path, patterns: list[str] | None = None) -> tuple[bool, str]
@@ -77,7 +77,7 @@ def install_git_hooks(project_dir: Path, force: bool = False, dry_run: bool = Fa
 
 # Validation
 def validate_init_prerequisites(base_dir: Path, install_hooks: bool = False) -> list[str]
-def verify_initialization(htmlgraph_dir: Path, check_database: bool = True) -> tuple[bool, list[str]]
+def verify_initialization(wipnote_dir: Path, check_database: bool = True) -> tuple[bool, list[str]]
 
 # Interactive
 def run_interactive_wizard(base_dir: Path) -> InitConfig
@@ -85,12 +85,12 @@ def run_interactive_wizard(base_dir: Path) -> InitConfig
 
 ### 2. Update InitCommand
 
-**File:** `src/python/htmlgraph/cli/core.py`
+**File:** `src/python/wipnote/cli/core.py`
 
 ```python
 def execute(self) -> CommandResult:
-    """Initialize the .htmlgraph directory."""
-    from htmlgraph.cli.operations import initialize_htmlgraph, run_interactive_wizard
+    """Initialize the .wipnote directory."""
+    from wipnote.cli.operations import initialize_wipnote, run_interactive_wizard
 
     # Run interactive wizard if requested
     if self.interactive:
@@ -105,7 +105,7 @@ def execute(self) -> CommandResult:
             no_events_keep=self.no_events_keep,
         )
 
-    return initialize_htmlgraph(config, verbose=True)
+    return initialize_wipnote(config, verbose=True)
 ```
 
 ### 3. Write Tests
@@ -119,26 +119,26 @@ Key tests:
 - `test_install_git_hooks_creates_symlinks`
 - `test_validate_init_prerequisites_detects_conflicts`
 - `test_verify_initialization_detects_incomplete_setup`
-- `test_initialize_htmlgraph_full_workflow`
-- `test_initialize_htmlgraph_with_hooks`
+- `test_initialize_wipnote_full_workflow`
+- `test_initialize_wipnote_with_hooks`
 
 ---
 
 ## What Init Should Do
 
 1. **Create directories:**
-   - `.htmlgraph/features/`
-   - `.htmlgraph/sessions/`
-   - `.htmlgraph/events/`
-   - `.htmlgraph/spikes/`
-   - `.htmlgraph/tracks/`
-   - `.htmlgraph/bugs/`
-   - `.htmlgraph/chores/`
-   - `.htmlgraph/archives/`
-   - `.htmlgraph/logs/errors/`
+   - `.wipnote/features/`
+   - `.wipnote/sessions/`
+   - `.wipnote/events/`
+   - `.wipnote/spikes/`
+   - `.wipnote/tracks/`
+   - `.wipnote/bugs/`
+   - `.wipnote/chores/`
+   - `.wipnote/archives/`
+   - `.wipnote/logs/errors/`
 
 2. **Initialize databases:**
-   - `htmlgraph.db` (unified event database)
+   - `wipnote.db` (unified event database)
    - `index.sqlite` (analytics cache, optional)
 
 3. **Create config files:**
@@ -146,11 +146,11 @@ Key tests:
    - `hooks-config.json` (if `--install-hooks`)
 
 4. **Update .gitignore** (unless `--no-update-gitignore`):
-   - `.htmlgraph/index.sqlite*`
-   - `.htmlgraph/sessions/*.jsonl`
-   - `.htmlgraph/events/*.jsonl`
-   - `.htmlgraph/parent-activity.json`
-   - `.htmlgraph/logs/errors/`
+   - `.wipnote/index.sqlite*`
+   - `.wipnote/sessions/*.jsonl`
+   - `.wipnote/events/*.jsonl`
+   - `.wipnote/parent-activity.json`
+   - `.wipnote/logs/errors/`
 
 5. **Install git hooks** (if `--install-hooks`):
    - `post-commit`
@@ -163,10 +163,10 @@ Key tests:
 ## Dependencies
 
 ### Internal Modules (Already Exist)
-- `htmlgraph.config.HtmlGraphConfig` - Directory management
-- `htmlgraph.db.schema.HtmlGraphDB` - Database creation
-- `htmlgraph.hooks.installer.HookInstaller` - Hook installation
-- `htmlgraph.cli.models.InitConfig` - Configuration model ✅
+- `wipnote.config.WipnoteConfig` - Directory management
+- `wipnote.db.schema.WipnoteDB` - Database creation
+- `wipnote.hooks.installer.HookInstaller` - Hook installation
+- `wipnote.cli.models.InitConfig` - Configuration model ✅
 
 ### Standard Library Only
 - `pathlib` - Directory operations
@@ -196,11 +196,11 @@ Key tests:
 - [ ] Error handling
 
 **Manual Testing:**
-- [ ] `htmlgraph init`
-- [ ] `htmlgraph init --install-hooks`
-- [ ] `htmlgraph init --interactive`
-- [ ] `htmlgraph init --no-index`
-- [ ] `htmlgraph init --no-update-gitignore`
+- [ ] `wipnote init`
+- [ ] `wipnote init --install-hooks`
+- [ ] `wipnote init --interactive`
+- [ ] `wipnote init --no-index`
+- [ ] `wipnote init --no-update-gitignore`
 
 ---
 
@@ -236,8 +236,8 @@ Key tests:
 
 - **Full Plan:** `INIT_COMMAND_REFACTORING_PLAN.md` (detailed analysis)
 - **This Guide:** `INIT_REFACTOR_QUICK_REFERENCE.md` (quick reference)
-- **Model:** `src/python/htmlgraph/cli/models.py:120-138` (InitConfig)
-- **Current Code:** `src/python/htmlgraph/cli/core.py:397-412` (InitCommand)
+- **Model:** `src/python/wipnote/cli/models.py:120-138` (InitConfig)
+- **Current Code:** `src/python/wipnote/cli/core.py:397-412` (InitCommand)
 
 ---
 
@@ -245,12 +245,12 @@ Key tests:
 
 ```bash
 # Apply quick fix
-vim src/python/htmlgraph/cli/core.py
+vim src/python/wipnote/cli/core.py
 
 # Create operations module
-mkdir -p src/python/htmlgraph/cli/operations
-touch src/python/htmlgraph/cli/operations/__init__.py
-touch src/python/htmlgraph/cli/operations/initialization.py
+mkdir -p src/python/wipnote/cli/operations
+touch src/python/wipnote/cli/operations/__init__.py
+touch src/python/wipnote/cli/operations/initialization.py
 
 # Create tests
 mkdir -p tests/cli/operations
@@ -261,13 +261,13 @@ touch tests/cli/operations/test_initialization.py
 uv run pytest tests/cli/operations/ -v
 
 # Type check
-uv run mypy src/python/htmlgraph/cli/operations/
+uv run mypy src/python/wipnote/cli/operations/
 
 # Lint
-uv run ruff check --fix src/python/htmlgraph/cli/operations/
+uv run ruff check --fix src/python/wipnote/cli/operations/
 
 # Test manually
-uv run htmlgraph init --help
-uv run htmlgraph init
-uv run htmlgraph init --install-hooks
+uv run wipnote init --help
+uv run wipnote init
+uv run wipnote init --install-hooks
 ```

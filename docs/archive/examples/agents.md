@@ -1,11 +1,11 @@
 # Agent Workflows
 
-Examples of integrating HtmlGraph with AI agents.
+Examples of integrating Wipnote with AI agents.
 
 ## Claude Code Integration
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # SDK automatically detects agent from environment
 sdk = SDK(agent="claude")
@@ -84,7 +84,7 @@ feature.save()
 ## Custom Agent Integration
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 class MyCustomAgent:
     def __init__(self, name):
@@ -145,7 +145,7 @@ agent.process_task("Add user authentication")
 ## Session Management
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 

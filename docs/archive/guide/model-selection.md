@@ -83,7 +83,7 @@ Task(
     4. Verify no regressions
 
     Report results by creating a spike:
-    htmlgraph spike create "Auth Fix: [RESULTS]"
+    wipnote spike create "Auth Fix: [RESULTS]"
     """,
     subagent_type="general-purpose"  # Uses Haiku
 )
@@ -162,7 +162,7 @@ Task(
     - Risks and mitigations
 
     Report findings by creating a spike:
-    htmlgraph spike create "Caching Strategy: [DESIGN]"
+    wipnote spike create "Caching Strategy: [DESIGN]"
     """,
     subagent_type="sonnet"  # Request Sonnet explicitly
 )
@@ -243,7 +243,7 @@ Task(
     - Recommended path forward
 
     Report findings by creating a spike:
-    htmlgraph spike create "Collab System Design: [RESEARCH]"
+    wipnote spike create "Collab System Design: [RESEARCH]"
     """,
     subagent_type="opus"  # Request Opus explicitly
 )

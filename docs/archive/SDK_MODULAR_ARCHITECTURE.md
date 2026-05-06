@@ -1,4 +1,4 @@
-# HtmlGraph SDK - Modular Architecture
+# Wipnote SDK - Modular Architecture
 
 **Comprehensive guide to the refactored SDK structure**
 
@@ -18,7 +18,7 @@
 
 ## Overview
 
-The HtmlGraph SDK uses a **modular mixin-based architecture** that composes specialized functionality into a unified interface. This design emerged from refactoring a monolithic 2,492-line `sdk.py` file into focused, maintainable components.
+The Wipnote SDK uses a **modular mixin-based architecture** that composes specialized functionality into a unified interface. This design emerged from refactoring a monolithic 2,492-line `sdk.py` file into focused, maintainable components.
 
 ### Key Principles
 
@@ -32,13 +32,13 @@ The HtmlGraph SDK uses a **modular mixin-based architecture** that composes spec
 
 **Before (Monolithic):**
 ```
-src/python/htmlgraph/
+src/python/wipnote/
 └── sdk.py (2,492 lines - everything in one file)
 ```
 
 **After (Modular):**
 ```
-src/python/htmlgraph/sdk/
+src/python/wipnote/sdk/
 ├── __init__.py           # SDK composition (80 lines)
 ├── base.py               # Core initialization (485 lines)
 ├── constants.py          # Configuration (217 lines)
@@ -134,7 +134,7 @@ src/python/htmlgraph/sdk/
 
 **Purpose**: Property-based access to analytics interfaces
 
-**Location**: `src/python/htmlgraph/sdk/analytics/registry.py`
+**Location**: `src/python/wipnote/sdk/analytics/registry.py`
 
 **Responsibilities**:
 - Lazy-load analytics engines
@@ -169,7 +169,7 @@ class AnalyticsRegistry:
 
 ### 2. Session Management (4 Mixins)
 
-**Location**: `src/python/htmlgraph/sdk/session/`
+**Location**: `src/python/wipnote/sdk/session/`
 
 #### 2a. SessionManagerMixin
 
@@ -243,7 +243,7 @@ sdk.track_activity(session_id, activity_type, ...)
 
 ### 3. PlanningMixin
 
-**Location**: `src/python/htmlgraph/sdk/planning/mixin.py`
+**Location**: `src/python/wipnote/sdk/planning/mixin.py`
 
 **Purpose**: Strategic planning and work recommendations
 
@@ -279,7 +279,7 @@ sdk.aggregate_parallel_results(agent_ids)
 ```python
 def find_bottlenecks(self, top_n: int = 5) -> list[BottleneckDict]:
     """Delegates to bottlenecks module."""
-    from htmlgraph.sdk.planning.bottlenecks import find_bottlenecks
+    from wipnote.sdk.planning.bottlenecks import find_bottlenecks
     return find_bottlenecks(self, top_n=top_n)
 ```
 
@@ -287,7 +287,7 @@ def find_bottlenecks(self, top_n: int = 5) -> list[BottleneckDict]:
 
 ### 4. OrchestrationMixin
 
-**Location**: `src/python/htmlgraph/sdk/orchestration/coordinator.py`
+**Location**: `src/python/wipnote/sdk/orchestration/coordinator.py`
 
 **Purpose**: Multi-agent coordination and spawning
 
@@ -312,7 +312,7 @@ sdk.orchestrator  # Property - lazy-loaded coordinator
 
 ### 5. OperationsMixin
 
-**Location**: `src/python/htmlgraph/sdk/operations/mixin.py`
+**Location**: `src/python/wipnote/sdk/operations/mixin.py`
 
 **Purpose**: Infrastructure operations (server, hooks, events, analytics)
 
@@ -340,13 +340,13 @@ sdk.analyze_project()
 sdk.get_work_recommendations()
 ```
 
-**Delegation**: All methods delegate to `htmlgraph.operations` module for shared backend.
+**Delegation**: All methods delegate to `wipnote.operations` module for shared backend.
 
 **Example**:
 ```python
 def start_server(self, port=8080, host="localhost", watch=True, auto_port=False):
     """Delegates to operations.server module."""
-    from htmlgraph.operations import server
+    from wipnote.operations import server
     return server.start_server(
         port=port,
         graph_dir=self._directory,
@@ -361,7 +361,7 @@ def start_server(self, port=8080, host="localhost", watch=True, auto_port=False)
 
 ### 6. CoreMixin
 
-**Location**: `src/python/htmlgraph/sdk/mixins/mixin.py`
+**Location**: `src/python/wipnote/sdk/mixins/mixin.py`
 
 **Purpose**: Essential SDK utilities
 
@@ -399,7 +399,7 @@ sdk._log_event(event_type, tool_name, ...)
 
 ### 7. TaskAttributionMixin
 
-**Location**: `src/python/htmlgraph/sdk/mixins/attribution.py`
+**Location**: `src/python/wipnote/sdk/mixins/attribution.py`
 
 **Purpose**: Task and subagent work tracking
 
@@ -413,7 +413,7 @@ sdk.get_subagent_work(agent_id)
 
 ### 8. HelpMixin
 
-**Location**: `src/python/htmlgraph/sdk/help/mixin.py`
+**Location**: `src/python/wipnote/sdk/help/mixin.py`
 
 **Purpose**: Interactive help and introspection
 
@@ -431,7 +431,7 @@ dir(sdk)             # List all available methods
 The main SDK class is a **thin composition layer** that inherits from all mixins:
 
 ```python
-# src/python/htmlgraph/sdk/__init__.py
+# src/python/wipnote/sdk/__init__.py
 
 class SDK(
     AnalyticsRegistry,
@@ -450,10 +450,10 @@ class SDK(
 
     def __init__(self, directory=None, agent=None, ...):
         # Initialize shared resources
-        self._directory = Path(directory or discover_htmlgraph_dir())
+        self._directory = Path(directory or discover_wipnote_dir())
         self._agent_id = agent or auto_discover_agent()
-        self._db = HtmlGraphDB(...)
-        self._graph = HtmlGraph(...)
+        self._db = WipnoteDB(...)
+        self._graph = Wipnote(...)
 
         # Initialize collections
         self.features = FeatureCollection(self)
@@ -489,7 +489,7 @@ SDK (thin composition layer)
    │
    ├──▶ OperationsMixin ──▶ Operations modules (server, hooks, events, analytics)
    │
-   └──▶ CoreMixin ──▶ HtmlGraphDB, HtmlGraph, RefManager
+   └──▶ CoreMixin ──▶ WipnoteDB, Wipnote, RefManager
 ```
 
 **Lazy Loading Strategy**:
@@ -542,13 +542,13 @@ The modular refactor was **100% backward compatible**:
 
 ```python
 # Old code (pre-refactor)
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="claude")
 sdk.analytics.work_type_distribution()
 sdk.find_bottlenecks(top_n=5)
 
 # New code (post-refactor) - IDENTICAL
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="claude")
 sdk.analytics.work_type_distribution()
 sdk.find_bottlenecks(top_n=5)
@@ -566,13 +566,13 @@ Both old and new import paths work:
 
 ```python
 # Old path (still works)
-from htmlgraph import SDK
+from wipnote import SDK
 
 # New path (also works)
-from htmlgraph.sdk import SDK
+from wipnote.sdk import SDK
 
 # Direct mixin access (for custom compositions)
-from htmlgraph.sdk.planning import PlanningMixin
+from wipnote.sdk.planning import PlanningMixin
 ```
 
 ---
@@ -583,7 +583,7 @@ from htmlgraph.sdk.planning import PlanningMixin
 
 To add a new capability domain:
 
-1. Create mixin file: `src/python/htmlgraph/sdk/new_domain/mixin.py`
+1. Create mixin file: `src/python/wipnote/sdk/new_domain/mixin.py`
 2. Define mixin class with methods
 3. Add to SDK composition in `sdk/__init__.py`
 4. Add exports to `sdk/new_domain/__init__.py`
@@ -591,15 +591,15 @@ To add a new capability domain:
 Example:
 
 ```python
-# src/python/htmlgraph/sdk/testing/mixin.py
+# src/python/wipnote/sdk/testing/mixin.py
 class TestingMixin:
     """Test execution and validation."""
 
     def run_tests(self, pattern: str) -> TestResult:
-        from htmlgraph.sdk.testing.runner import run_tests
+        from wipnote.sdk.testing.runner import run_tests
         return run_tests(self, pattern)
 
-# src/python/htmlgraph/sdk/__init__.py
+# src/python/wipnote/sdk/__init__.py
 class SDK(
     # ... existing mixins
     TestingMixin,
@@ -612,9 +612,9 @@ class SDK(
 Users can compose custom SDKs with only needed mixins:
 
 ```python
-from htmlgraph.sdk.base import BaseSDK
-from htmlgraph.sdk.planning import PlanningMixin
-from htmlgraph.sdk.analytics import AnalyticsRegistry
+from wipnote.sdk.base import BaseSDK
+from wipnote.sdk.planning import PlanningMixin
+from wipnote.sdk.analytics import AnalyticsRegistry
 
 class LightweightSDK(BaseSDK, PlanningMixin, AnalyticsRegistry):
     """Custom SDK with only planning and analytics."""
@@ -635,7 +635,7 @@ Mixins are **thin delegation layers**. They don't implement complex logic; they 
 # In PlanningMixin
 def find_bottlenecks(self, top_n: int = 5) -> list[BottleneckDict]:
     """Delegates to bottlenecks module."""
-    from htmlgraph.sdk.planning.bottlenecks import find_bottlenecks
+    from wipnote.sdk.planning.bottlenecks import find_bottlenecks
     return find_bottlenecks(self, top_n=top_n)
 ```
 
@@ -663,8 +663,8 @@ Use TYPE_CHECKING to import types without runtime cost:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from htmlgraph.models import Node
-    from htmlgraph.types import BottleneckDict
+    from wipnote.models import Node
+    from wipnote.types import BottleneckDict
 ```
 
 **Why?** Prevents circular imports, maintains type safety.
@@ -676,7 +676,7 @@ SDK initialization sets up shared resources (database, graphs) that mixins acces
 ```python
 class CoreMixin:
     _directory: Path
-    _db: HtmlGraphDB
+    _db: WipnoteDB
     _agent_id: str | None
     # ... mixins declare what they need
 ```
@@ -709,13 +709,13 @@ class CoreMixin:
 - [ARCHITECTURE.md](./architecture/design.md) - Design philosophy and patterns
 - [API_REFERENCE.md](./api/reference.md) - Complete SDK API documentation
 - [AGENTS.md](../AGENTS.md) - SDK usage guide for AI agents
-- Source code: `src/python/htmlgraph/sdk/`
+- Source code: `src/python/wipnote/sdk/`
 
 ---
 
 ## Summary
 
-The HtmlGraph SDK's modular architecture achieves:
+The Wipnote SDK's modular architecture achieves:
 
 ✅ **Maintainability** - Small, focused components (100-400 lines each)
 ✅ **Extensibility** - Easy to add new capabilities via mixins

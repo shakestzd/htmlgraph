@@ -1,6 +1,6 @@
 # Quality Gates - Pre-Commit Hooks and Type Safety
 
-HtmlGraph enforces automated quality standards through pre-commit hooks and type checking. This ensures all code merged to `main` meets strict quality criteria.
+Wipnote enforces automated quality standards through pre-commit hooks and type checking. This ensures all code merged to `main` meets strict quality criteria.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ git commit -m "Your message"
 
 ## Quality Gates Overview
 
-All commits to HtmlGraph are validated against these gates:
+All commits to Wipnote are validated against these gates:
 
 | Gate | Tool | Purpose | Auto-Fix |
 |------|------|---------|----------|
@@ -48,7 +48,7 @@ Ensures consistent code formatting across the project.
 
 ```bash
 # Run manually
-uv run ruff format src/python/htmlgraph/
+uv run ruff format src/python/wipnote/
 
 # Pre-commit runs with --fix flag (auto-corrects)
 ```
@@ -76,7 +76,7 @@ Detects code quality problems and style violations.
 
 ```bash
 # Run manually
-uv run ruff check src/python/htmlgraph/
+uv run ruff check src/python/wipnote/
 
 # Pre-commit runs with --fix flag
 ```
@@ -108,7 +108,7 @@ Enforces static type safety - **NO AUTO-FIX**.
 
 ```bash
 # Run manually
-uv run mypy src/python/htmlgraph/
+uv run mypy src/python/wipnote/
 ```
 
 **Enforced rules:**
@@ -217,7 +217,7 @@ git commit -m "test"  # Hooks will run
 
 ```bash
 # Make a change with formatting issues
-echo "x=1+2" >> src/python/htmlgraph/example.py
+echo "x=1+2" >> src/python/wipnote/example.py
 
 # Try to commit
 git add .
@@ -233,7 +233,7 @@ git commit -m "Add example"
 
 ```bash
 # Add untyped function
-cat >> src/python/htmlgraph/example.py << 'EOF'
+cat >> src/python/wipnote/example.py << 'EOF'
 def calculate(x):  # Missing type hint!
     return x + 1
 EOF
@@ -242,11 +242,11 @@ EOF
 git commit -m "Add calculator"
 
 # Output:
-# mypy: src/python/htmlgraph/example.py:42: error: Function is missing a return type annotation
+# mypy: src/python/wipnote/example.py:42: error: Function is missing a return type annotation
 # ❌ Commit blocked (requires manual fix)
 
 # Fix it
-cat >> src/python/htmlgraph/example.py << 'EOF'
+cat >> src/python/wipnote/example.py << 'EOF'
 def calculate(x: int) -> int:
     return x + 1
 EOF
@@ -307,7 +307,7 @@ git commit -m "Re-enable mypy hook"
 
 ## Type Safety Standards
 
-HtmlGraph enforces strict type safety:
+Wipnote enforces strict type safety:
 
 ### Required Type Annotations
 
@@ -328,7 +328,7 @@ def create_feature(title: str, description: str) -> Feature:
 features = fetch_features()
 
 # ✅ GOOD
-from htmlgraph.collections import Feature
+from wipnote.collections import Feature
 features: list[Feature] = fetch_features()
 ```
 
@@ -395,12 +395,12 @@ All Pass?
 ======================================
 pre-commit hook: ruff-format
 ======================================
-Fixed 3 issues in src/python/htmlgraph/example.py
+Fixed 3 issues in src/python/wipnote/example.py
 
 ======================================
 pre-commit hook: ruff
 ======================================
-Fixed 2 issues in src/python/htmlgraph/example.py
+Fixed 2 issues in src/python/wipnote/example.py
 
 ======================================
 pre-commit hook: mypy
@@ -442,7 +442,7 @@ pre-commit run --all-files
 pre-commit autoupdate
 
 # Or manually run
-uv run mypy src/python/htmlgraph/
+uv run mypy src/python/wipnote/
 ```
 
 ### Issue: Ruff "Unknown rule" Error
@@ -465,7 +465,7 @@ cat pyproject.toml | grep -A 20 "\[tool.ruff\]"
 pre-commit clean
 
 # Run only changed files
-pre-commit run --files src/python/htmlgraph/changed_file.py
+pre-commit run --files src/python/wipnote/changed_file.py
 ```
 
 ## Configuration Reference
@@ -600,7 +600,7 @@ pre-commit run --verbose
 pre-commit run mypy --verbose
 
 # Show what files trigger hook
-pre-commit run ruff --files "src/python/htmlgraph/*.py"
+pre-commit run ruff --files "src/python/wipnote/*.py"
 ```
 
 **Reset and reinstall:**

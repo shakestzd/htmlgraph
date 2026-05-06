@@ -324,7 +324,7 @@ test_fallback_activation()             # Layer 2/3 work when Layer 1 fails
 
 ## Integration Points
 
-### With HtmlGraph Features
+### With Wipnote Features
 
 **Orchestrator Mode:**
 - System prompt provides directives
@@ -432,7 +432,7 @@ test_fallback_activation()             # Layer 2/3 work when Layer 1 fails
 
 ## Full Analysis Document
 
-**Location:** `.htmlgraph/spikes/system-prompt-persistence-strategy.md`
+**Location:** `.wipnote/spikes/system-prompt-persistence-strategy.md`
 
 The full spike contains:
 - Detailed SessionStart hook capabilities analysis
@@ -489,7 +489,7 @@ A: 250-500 tokens per session start (about 0.25-0.5% of typical 150k-200k token 
 ## Contact & Support
 
 For questions about this analysis:
-- See full spike: `.htmlgraph/spikes/system-prompt-persistence-strategy.md`
+- See full spike: `.wipnote/spikes/system-prompt-persistence-strategy.md`
 - Review hook docs: `hook-documentation.md`
 - Check implementation templates in this document
 

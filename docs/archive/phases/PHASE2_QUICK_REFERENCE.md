@@ -448,7 +448,7 @@ A: LOW. All mitigations in place, no breaking changes.
 - **Phase 1 Summary:** `SYSTEM_PROMPT_PERSISTENCE_SUMMARY.md`
 - **Phase 1 Quick Ref:** `.claude/SYSTEM_PROMPT_PERSISTENCE_QUICKREF.md`
 - **Hook Docs:** `packages/claude-plugin/hooks/README.md`
-- **HtmlGraph Spike:** See `.htmlgraph/spikes/` for tracking
+- **Wipnote Spike:** See `.wipnote/spikes/` for tracking
 
 ---
 

@@ -27,11 +27,11 @@
   - [x] Generic Exception (unexpected errors)
 
 ### SDK Integration
-- [x] HtmlGraph SDK initialized safely
+- [x] Wipnote SDK initialized safely
   - [x] Environment variables checked (HTMLGRAPH_PARENT_SESSION, HTMLGRAPH_PARENT_AGENT)
   - [x] Graceful fallback if SDK unavailable
-  - [x] No errors if not in HtmlGraph context
-- [x] Activity tracking optional (track_in_htmlgraph parameter)
+  - [x] No errors if not in Wipnote context
+- [x] Activity tracking optional (track_in_wipnote parameter)
 - [x] Tracking failures don't break execution
 - [x] Parent session context preserved
 
@@ -228,7 +228,7 @@
 - [x] Gemini FREE tier prioritized
 - [x] Fallback to Haiku (cheaper than Sonnet)
 - [x] Token tracking enables cost monitoring
-- [x] HtmlGraph integration for cost reporting
+- [x] Wipnote integration for cost reporting
 
 ---
 
@@ -255,7 +255,7 @@
 
 ---
 
-## 7. HtmlGraph Integration
+## 7. Wipnote Integration
 
 ### Activity Tracking
 - [x] Gemini events tracked
@@ -286,7 +286,7 @@
 - [x] Payload includes relevant details
 
 ### Tracking Optional
-- [x] track_in_htmlgraph parameter
+- [x] track_in_wipnote parameter
 - [x] Graceful degradation if SDK unavailable
 - [x] Test: test_tracking_disabled_by_default_skips_tracking ✅
 
@@ -475,7 +475,7 @@
 - [x] Timeout frequency monitoring recommended
 - [x] Cost tracking via tokens_used
 - [x] Fallback activation frequency recommended
-- [x] HtmlGraph integration for observability
+- [x] Wipnote integration for observability
 
 ---
 
@@ -506,7 +506,7 @@ All spawners (Gemini, Codex, Copilot, Claude/Haiku) are production-ready with:
 - Comprehensive error handling
 - Automatic fallback patterns
 - Cost tracking and optimization
-- HtmlGraph integration for observability
+- Wipnote integration for observability
 - Complete documentation and examples
 
 Deploy with confidence.
@@ -524,12 +524,12 @@ Deploy with confidence.
 ### Deploy to Production
 1. Merge SPAWNER_VERIFICATION_REPORT.md to documentation
 2. Run tests: `uv run pytest tests/python/test_headless_spawner.py`
-3. Verify deployment: `uv run htmlgraph status`
-4. Monitor: Check HtmlGraph spikes for spawner usage
+3. Verify deployment: `uv run wipnote status`
+4. Monitor: Check Wipnote spikes for spawner usage
 
 ### Quick Reference: Success Patterns
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 

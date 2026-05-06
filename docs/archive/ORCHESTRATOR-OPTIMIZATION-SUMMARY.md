@@ -10,7 +10,7 @@ Successfully reviewed and optimized the orchestrator system prompt (`orchestrato
 
 1. **`orchestrator-system-prompt-optimized.txt`** - Full optimized prompt (ready for deployment)
 2. **`ORCHESTRATOR-OPTIMIZATION-SUMMARY.md`** - This file
-3. **HtmlGraph Spike** - `spk-1a6ad4d9` - Detailed analysis and recommendations
+3. **Wipnote Spike** - `spk-1a6ad4d9` - Detailed analysis and recommendations
 
 ## Key Improvements
 
@@ -152,33 +152,33 @@ spawn_codex("Fix bug 3")
    - Complex design example
    - GitHub workflow example
 
-5. **HtmlGraph Integration** (Complete pattern)
+5. **Wipnote Integration** (Complete pattern)
    ```bash
    # Create feature to track the work
-   htmlgraph feature create "Implement OAuth" --priority high
-   htmlgraph feature start feat-<id>
+   wipnote feature create "Implement OAuth" --priority high
+   wipnote feature start feat-<id>
 
    # Delegate task via Task() tool, then record findings
-   htmlgraph spike create "OAuth delegation findings"
+   wipnote spike create "OAuth delegation findings"
    ```
 
 6. **Adoption Path** (4-step learning curve)
    1. Learn decision tree (5 questions)
    2. Memorize spawner selection matrix (5 options)
    3. Apply routing scenarios (6 common cases)
-   4. Track with HtmlGraph CLI (every delegation)
+   4. Track with Wipnote CLI (every delegation)
 
-### 5. HtmlGraph Integration Verification
+### 5. Wipnote Integration Verification
 
 **Verified against implementation:**
-- ✅ `htmlgraph feature create` - Correct CLI command
-- ✅ `htmlgraph feature start` - Correct CLI command
-- ✅ `htmlgraph spike create` - Correct CLI command
+- ✅ `wipnote feature create` - Correct CLI command
+- ✅ `wipnote feature start` - Correct CLI command
+- ✅ `wipnote spike create` - Correct CLI command
 - ✅ `delegate_with_id()` - Correct function
-- ✅ HtmlGraph tracking - Complete
+- ✅ Wipnote tracking - Complete
 
 **Added missing:**
-- Full HtmlGraph integration example
+- Full Wipnote integration example
 - Permission mode guidance
 - Cost estimation explanations
 
@@ -319,7 +319,7 @@ The optimized orchestrator system prompt delivers:
 ✅ **Complete spawner selection matrix** - Clear decision aid
 ✅ **6 common routing scenarios** - Copy-paste reference
 ✅ **Clear anti-patterns** - Prevents common mistakes
-✅ **HtmlGraph integration** - Fully documented
+✅ **Wipnote integration** - Fully documented
 
 **Status:** Ready for immediate deployment with `--append-system-prompt` flag.
 
@@ -332,6 +332,6 @@ The optimized orchestrator system prompt delivers:
 **Files:**
 - `orchestrator-system-prompt-optimized.txt` - Full optimized prompt
 - `ORCHESTRATOR-OPTIMIZATION-SUMMARY.md` - This summary
-- **HtmlGraph Spike:** `spk-1a6ad4d9` - Detailed analysis
+- **Wipnote Spike:** `spk-1a6ad4d9` - Detailed analysis
 
 **Next Steps:** Review, approve, and deploy optimized version.

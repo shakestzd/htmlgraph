@@ -51,7 +51,7 @@
 
 ### Source 3: MARKETPLACE CACHE (AUTO-UPDATE) ⚠️
 ```
-/Users/shakes/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json
+/Users/shakes/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json
 ```
 - Lines 3-17: UserPromptSubmit (2 hooks - outdated)
 - Lines 53-68: PreToolUse (2 hooks - outdated with extra spawner-router.py)
@@ -88,7 +88,7 @@ User submits prompt
   Claude Code Hooks Merger loads from 3 sources:
         ├─ Source 1: packages/claude-plugin/.claude-plugin/hooks/hooks.json
         ├─ Source 2: packages/claude-plugin/hooks/hooks.json (DUPLICATE)
-        └─ Source 3: ~/.claude/plugins/marketplaces/htmlgraph/.../hooks.json
+        └─ Source 3: ~/.claude/plugins/marketplaces/wipnote/.../hooks.json
         ↓
   Each source registers the same UserPromptSubmit hook
         ↓
@@ -125,7 +125,7 @@ uv run pytest
 ## Related Issues Discovered
 
 ### PreToolUse Duplication in Marketplace Cache
-**File:** `/Users/shakes/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json`
+**File:** `/Users/shakes/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json`
 
 **Issue:** Lines 53-68 have 2 PreToolUse hooks:
 - pretooluse-integrator.py
@@ -170,11 +170,11 @@ packages/claude-plugin/
 |------|--------|--------|
 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | ✅ Correct | KEEP |
 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/hooks.json` | ❌ Duplicate | DELETE |
-| `~/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | ⚠️ Cache | AUTO-UPDATE |
-| `~/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/hooks/hooks.json` | ⚠️ Cache | AUTO-UPDATE |
-| `~/.claude/plugins/cache/htmlgraph/htmlgraph/0.24.1/hooks/hooks.json` | 🗑️ Old cache | Ignore |
-| `~/.claude/plugins/cache/htmlgraph/htmlgraph/0.9.6/hooks/hooks.json` | 🗑️ Old cache | Ignore |
-| `~/.claude/plugins/cache/htmlgraph/htmlgraph/0.25.0/hooks/hooks.json` | 🗑️ Old cache | Ignore |
+| `~/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | ⚠️ Cache | AUTO-UPDATE |
+| `~/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/hooks/hooks.json` | ⚠️ Cache | AUTO-UPDATE |
+| `~/.claude/plugins/cache/wipnote/wipnote/0.24.1/hooks/hooks.json` | 🗑️ Old cache | Ignore |
+| `~/.claude/plugins/cache/wipnote/wipnote/0.9.6/hooks/hooks.json` | 🗑️ Old cache | Ignore |
+| `~/.claude/plugins/cache/wipnote/wipnote/0.25.0/hooks/hooks.json` | 🗑️ Old cache | Ignore |
 
 ---
 
@@ -201,7 +201,7 @@ grep -r "UserPromptSubmit" /Users/shakes/DevProjects/htmlgraph/packages/claude-p
 grep -r "UserPromptSubmit" /Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json
 # Output: Found
 
-grep -r "UserPromptSubmit" ~/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json
+grep -r "UserPromptSubmit" ~/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json
 # Output: Found
 
 # Total: 3 sources = 3x execution

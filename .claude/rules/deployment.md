@@ -7,16 +7,16 @@ paths:
 
 # Deployment & Release Rules
 
-**CRITICAL: Use `./scripts/deploy-all.sh` or `/htmlgraph:deploy` for all deployment operations.**
+**CRITICAL: Use `./scripts/deploy-all.sh` or `/wipnote:deploy` for all deployment operations.**
 
 ## Two Independent Install Paths
 
-HtmlGraph has **two components** that must stay in sync after every release:
+Wipnote has **two components** that must stay in sync after every release:
 
 | Component | Location | Mechanism |
 |-----------|----------|-----------|
-| **CLI binary** | `~/.local/bin/htmlgraph` (copy) | `plugin/build.sh` |
-| **Plugin** | `~/.claude/plugins/cache/htmlgraph/htmlgraph/<ver>/` | `claude plugin install htmlgraph@htmlgraph` |
+| **CLI binary** | `~/.local/bin/wipnote` (copy) | `plugin/build.sh` |
+| **Plugin** | `~/.claude/plugins/cache/wipnote/wipnote/<ver>/` | `claude plugin install wipnote@wipnote` |
 
 The deploy script updates both automatically. **Never update one without the other.**
 
@@ -26,7 +26,7 @@ The deploy script updates both automatically. **Never update one without the oth
 
 ### Why Copy (Not Symlink) for CLI
 
-`build.sh` copies the binary to `~/.local/bin/htmlgraph`. A symlink would make every project use the live dev binary — dangerous if the dev tree has a broken build mid-refactor. The copy provides isolation between "htmlgraph the thing I'm building" and "htmlgraph the thing I rely on."
+`build.sh` copies the binary to `~/.local/bin/wipnote`. A symlink would make every project use the live dev binary — dangerous if the dev tree has a broken build mid-refactor. The copy provides isolation between "wipnote the thing I'm building" and "wipnote the thing I rely on."
 
 ## Using the Deployment Script
 
@@ -35,7 +35,7 @@ The deploy script updates both automatically. **Never update one without the oth
 ./scripts/deploy-all.sh 1.0.0 --no-confirm
 
 # Or via slash command:
-/htmlgraph:deploy 1.0.0
+/wipnote:deploy 1.0.0
 ```
 
 **Pre-requisite:** `go test ./...` must pass.
@@ -45,7 +45,7 @@ The deploy script updates both automatically. **Never update one without the oth
 2. **Version bump** — Updates `plugin/.claude-plugin/plugin.json`
 3. **Git push** — Commits version change, tags, pushes to origin/main
 4. **GitHub Release** — Tag triggers GoReleaser via GitHub Actions
-5. **Marketplace pull** — `git pull` on `~/.claude/plugins/marketplaces/htmlgraph/`
+5. **Marketplace pull** — `git pull` on `~/.claude/plugins/marketplaces/wipnote/`
 6. **Plugin reinstall** — `claude plugin uninstall` + `install` (clean `gitCommitSha`)
 7. **CLI rebuild** — `plugin/build.sh` copies binary to `~/.local/bin/`
 
@@ -73,7 +73,7 @@ gh run list --workflow=release-go.yml --limit 1
 
 # Installed versions match
 grep '"version"' plugin/.claude-plugin/plugin.json
-cat ~/.local/share/htmlgraph/.binary-version
+cat ~/.local/share/wipnote/.binary-version
 ```
 
 ## Rollback

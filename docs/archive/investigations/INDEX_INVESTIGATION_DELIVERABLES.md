@@ -163,16 +163,16 @@ Other ............... 797 events (27%)
 - `/Users/shakes/DevProjects/htmlgraph/INDEX_INVESTIGATION_DELIVERABLES.md` (this file)
 
 ### Source Code
-- `src/python/htmlgraph/event_log.py` - Event recording
-- `src/python/htmlgraph/analytics_index.py` - SQLite indexing (line 674: session_events)
-- `src/python/htmlgraph/dashboard.html` - Activity Feed (line 5080: fetchActivityLog)
-- `src/python/htmlgraph/server.py` - API endpoints (line 540-545: session events)
+- `src/python/wipnote/event_log.py` - Event recording
+- `src/python/wipnote/analytics_index.py` - SQLite indexing (line 674: session_events)
+- `src/python/wipnote/dashboard.html` - Activity Feed (line 5080: fetchActivityLog)
+- `src/python/wipnote/server.py` - API endpoints (line 540-545: session events)
 
 ### Data Files
-- `.htmlgraph/index.sqlite` - SQLite database with all events
-- `.htmlgraph/events/sess-fd50862f.jsonl` - Main session (8,407 events)
-- `.htmlgraph/events/0e6fd1e4-bc71-4424-88d4-3e88562ba5ed.jsonl` - Codex subagent (2,962 events)
-- `.htmlgraph/features/*.html` - 10 features created by Codex
+- `.wipnote/index.sqlite` - SQLite database with all events
+- `.wipnote/events/sess-fd50862f.jsonl` - Main session (8,407 events)
+- `.wipnote/events/0e6fd1e4-bc71-4424-88d4-3e88562ba5ed.jsonl` - Codex subagent (2,962 events)
+- `.wipnote/features/*.html` - 10 features created by Codex
 
 ---
 
@@ -334,10 +334,10 @@ GROUP BY feature_id ORDER BY COUNT(*) DESC;
 
 ### Critical Files
 
-- Dashboard: `src/python/htmlgraph/dashboard.html` (line 5080)
-- Analytics: `src/python/htmlgraph/analytics_index.py` (line 674)
-- Events: `src/python/htmlgraph/event_log.py`
-- API: `src/python/htmlgraph/server.py` (line 540)
+- Dashboard: `src/python/wipnote/dashboard.html` (line 5080)
+- Analytics: `src/python/wipnote/analytics_index.py` (line 674)
+- Events: `src/python/wipnote/event_log.py`
+- API: `src/python/wipnote/server.py` (line 540)
 
 ---
 

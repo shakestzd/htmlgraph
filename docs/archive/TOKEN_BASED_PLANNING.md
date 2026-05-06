@@ -56,7 +56,7 @@ Task: Implement FeatureRepository Interface
 └─ Parallelizable with: TrackRepository, AnalyticsRepository
 ```
 
-### Real-World Token Costs from HtmlGraph
+### Real-World Token Costs from Wipnote
 
 **Phase 1 - Analysis (Complete)**
 - 6 parallel agents: 45,000 tokens total
@@ -329,10 +329,10 @@ Success Metrics:
 └─ All integration tests passing
 ```
 
-## Example: Using Token-Based Planning for HtmlGraph Phase 2
+## Example: Using Token-Based Planning for Wipnote Phase 2
 
 ```
-PROJECT: HtmlGraph Single Source of Truth Refactoring
+PROJECT: Wipnote Single Source of Truth Refactoring
 TOTAL BUDGET: 268,000 tokens (parallel across all phases)
 
 PHASE 2: Repository Implementation

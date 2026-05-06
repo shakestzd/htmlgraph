@@ -13,7 +13,7 @@
 Complete quality gates framework for Phase 1A/1B has been established. All supporting infrastructure, documentation, and automated testing is ready for implementation.
 
 ### What We're Building
-Converting 550+ remaining `print()` statements in HtmlGraph CLI to beautiful Rich-formatted output with colors, symbols, tables, and progress bars.
+Converting 550+ remaining `print()` statements in Wipnote CLI to beautiful Rich-formatted output with colors, symbols, tables, and progress bars.
 
 ### Success Metrics
 - **Before:** 698 plain print() statements
@@ -186,7 +186,7 @@ RICH USAGE:
 **Before Starting:**
 1. Read: `docs/RICH_OUTPUT_GUIDE.md`
 2. Keep open: `QUICK_REFERENCE_PHASE_1AB.md`
-3. Review: Lines 54-130 in `src/python/htmlgraph/cli.py`
+3. Review: Lines 54-130 in `src/python/wipnote/cli.py`
 
 **During Implementation:**
 1. Replace `print()` with `console.print()`
@@ -197,9 +197,9 @@ RICH USAGE:
 
 **Quality Gates Command (Run Before Every Commit):**
 ```bash
-uv run ruff check --fix src/python/htmlgraph/cli.py && \
-uv run ruff format src/python/htmlgraph/cli.py && \
-uv run mypy src/python/htmlgraph/cli.py --strict && \
+uv run ruff check --fix src/python/wipnote/cli.py && \
+uv run ruff format src/python/wipnote/cli.py && \
+uv run mypy src/python/wipnote/cli.py --strict && \
 uv run pytest tests/python/test_cli_rich_output.py -v && \
 uv run pytest tests/python/test_cli_commands.py -v
 ```
@@ -208,7 +208,7 @@ uv run pytest tests/python/test_cli_commands.py -v
 ```bash
 # Count remaining plain print() statements
 # Should DECREASE or stay same, NEVER INCREASE
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "console.print" | grep -v "# " | wc -l
 
 # Expected: Decreasing from 550
@@ -305,7 +305,7 @@ grep -n "print(" src/python/htmlgraph/cli.py | \
 
 ### Feature Tracking
 ```
-/Users/shakes/DevProjects/htmlgraph/.htmlgraph/features/feat-4d5b889e.html
+/Users/shakes/DevProjects/htmlgraph/.wipnote/features/feat-4d5b889e.html
 ├─ Feature HTML file
 ├─ Implementation steps tracked
 ├─ Session links
@@ -426,10 +426,10 @@ if Confirm.ask("Continue?"):
 ### For Quality Assurance
 - **Validation Report:** `QUALITY_GATES_VALIDATION_REPORT.md` (metrics and status)
 - **Test Suite:** `tests/python/test_cli_rich_output.py` (automated validation)
-- **Feature Tracking:** `.htmlgraph/features/feat-4d5b889e.html` (progress updates)
+- **Feature Tracking:** `.wipnote/features/feat-4d5b889e.html` (progress updates)
 
 ### For Feature Tracking
-- **Feature HTML:** `.htmlgraph/features/feat-4d5b889e.html`
+- **Feature HTML:** `.wipnote/features/feat-4d5b889e.html`
 - **Session Links:** Updated automatically via hooks
 - **Step Status:** Track implementation steps 1-5
 

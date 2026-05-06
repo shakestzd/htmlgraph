@@ -17,7 +17,7 @@ All spawners have been verified for production readiness. The implementation is 
 - ✅ Edge cases handled correctly
 - ✅ Cost tracking accurate
 - ✅ Error recovery patterns documented
-- ✅ HtmlGraph integration working
+- ✅ Wipnote integration working
 
 ---
 
@@ -35,7 +35,7 @@ All spawners have been verified for production readiness. The implementation is 
 - ✅ Timeout handling (subprocess.TimeoutExpired)
 - ✅ JSON parse error handling
 - ✅ CLI failure (non-zero exit code)
-- ✅ Event parsing and HtmlGraph tracking
+- ✅ Event parsing and Wipnote tracking
 - ✅ Tracking disabled parameter
 
 #### Success Case Verification
@@ -105,7 +105,7 @@ Empty response → Detect via (success=True and not response)
 - ✅ JSONL event parsing
 - ✅ Token usage calculation
 - ✅ Sandbox mode configuration
-- ✅ HtmlGraph tracking with events
+- ✅ Wipnote tracking with events
 - ✅ Activity tracking for commands and file changes
 
 #### Success Case Verification
@@ -176,7 +176,7 @@ Empty response → Detect and fallback to Sonnet
 - ✅ Quota exceeded scenario (graceful handling)
 - ✅ Response parsing (before stats block)
 - ✅ Tool permission configuration
-- ✅ HtmlGraph tracking for start/result
+- ✅ Wipnote tracking for start/result
 
 #### Success Case Verification
 ```python
@@ -437,7 +437,7 @@ Result: Second line parsed successfully ✅
 
 **Gemini stream-json:**
 - Real-time tracking of events
-- Events tracked in HtmlGraph as parsed
+- Events tracked in Wipnote as parsed
 - Response extracted from last message event
 
 **Gemini json:**
@@ -514,7 +514,7 @@ tokens = (
 
 ---
 
-## 5. HtmlGraph Integration Verification
+## 5. Wipnote Integration Verification
 
 ### 5.1 Activity Tracking
 
@@ -622,7 +622,7 @@ Verification:
 - ✅ Token usage tracked accurately
 - ✅ Fallback triggered on failure
 - ✅ Cost savings realized (FREE vs paid)
-- ✅ Results documented in HtmlGraph
+- ✅ Results documented in Wipnote
 
 ### Codex Spawner
 - ✅ Codex CLI executes successfully
@@ -631,7 +631,7 @@ Verification:
 - ✅ Sandbox mode enforced correctly
 - ✅ Fallback triggered on failure
 - ✅ Code generated meets quality standards
-- ✅ Results documented in HtmlGraph
+- ✅ Results documented in Wipnote
 
 ### Copilot Spawner
 - ✅ Copilot CLI executes successfully
@@ -639,7 +639,7 @@ Verification:
 - ✅ GitHub operations completed
 - ✅ Response extracted from output
 - ✅ Fallback triggered on failure
-- ✅ Results documented in HtmlGraph
+- ✅ Results documented in Wipnote
 
 ### All Spawners
 - ✅ Handle success cases (normal delegation)
@@ -659,7 +659,7 @@ Verification:
 4. **Claude CLI:** Built into Claude Code application
 
 ### Configuration
-1. **HtmlGraph Tracking:** Optional (graceful fallback if unavailable)
+1. **Wipnote Tracking:** Optional (graceful fallback if unavailable)
 2. **Timeout Values:** Adjust based on typical task duration
 3. **Fallback Strategy:** Use Task() tool for resilience
 4. **Cost Monitoring:** Track tokens_used in results
@@ -669,7 +669,7 @@ Verification:
 2. **Detect empty responses** (success=True but response empty)
 3. **Implement fallback patterns** in agent scaffolds
 4. **Monitor token usage** for cost optimization
-5. **Log results** in HtmlGraph for tracking
+5. **Log results** in Wipnote for tracking
 6. **Test timeout values** for your environment
 7. **Configure permissions** (sandbox, tools) carefully
 
@@ -715,7 +715,7 @@ All spawners are **production-ready and reliable**. The implementation demonstra
 1. **Robustness:** Comprehensive error handling for all failure modes
 2. **Reliability:** 100% unit test pass rate with extensive coverage
 3. **Resilience:** Automatic fallback patterns for all failure scenarios
-4. **Observability:** HtmlGraph integration for cost and activity tracking
+4. **Observability:** Wipnote integration for cost and activity tracking
 5. **Flexibility:** Support for multiple AI providers with consistent API
 6. **Safety:** Sandbox modes, permission controls, timeout handling
 
@@ -726,7 +726,7 @@ All spawners are **production-ready and reliable**. The implementation demonstra
 ## Appendix: Code References
 
 ### HeadlessSpawner Implementation
-- **File:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/headless_spawner.py`
+- **File:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestration/headless_spawner.py`
 - **Classes:**
   - `AIResult`: Result dataclass with success, response, tokens, error, raw_output, tracked_events
   - `HeadlessSpawner`: Main spawner class with spawn_gemini, spawn_codex, spawn_copilot, spawn_claude methods

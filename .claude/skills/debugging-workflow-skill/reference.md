@@ -1,6 +1,6 @@
 # Debugging Workflow - Complete Reference
 
-This document provides comprehensive debugging methodology for HtmlGraph development.
+This document provides comprehensive debugging methodology for Wipnote development.
 
 ## Table of Contents
 
@@ -8,7 +8,7 @@ This document provides comprehensive debugging methodology for HtmlGraph develop
 2. [Debugging Agents](#debugging-agents)
 3. [Built-in Debug Tools](#built-in-debug-tools)
 4. [Debugging Workflow Patterns](#debugging-workflow-patterns)
-5. [HtmlGraph Debug Commands](#htmlgraph-debug-commands)
+5. [Wipnote Debug Commands](#wipnote-debug-commands)
 6. [Integration with Orchestrator Mode](#integration-with-orchestrator-mode)
 7. [Quality Gates](#quality-gates)
 8. [Common Debugging Scenarios](#common-debugging-scenarios)
@@ -20,7 +20,7 @@ This document provides comprehensive debugging methodology for HtmlGraph develop
 
 **NEVER implement solutions based on assumptions. ALWAYS research documentation first.**
 
-This principle emerged from dogfooding HtmlGraph development. We repeatedly violated it by:
+This principle emerged from dogfooding Wipnote development. We repeatedly violated it by:
 - ❌ Making multiple trial-and-error attempts before researching
 - ❌ Implementing "fixes" based on guesses instead of documentation
 - ❌ Not using available debugging tools and agents
@@ -31,7 +31,7 @@ This principle emerged from dogfooding HtmlGraph development. We repeatedly viol
 2. ✅ **Understand** - Identify root cause through evidence
 3. ✅ **Implement** - Apply fix based on understanding
 4. ✅ **Validate** - Test to confirm fix works
-5. ✅ **Document** - Capture learning in HtmlGraph spike
+5. ✅ **Document** - Capture learning in Wipnote spike
 
 ### Why Research First?
 
@@ -55,7 +55,7 @@ This principle emerged from dogfooding HtmlGraph development. We repeatedly viol
 
 ## Debugging Agents
 
-HtmlGraph plugin includes three specialized agents for systematic debugging.
+Wipnote plugin includes three specialized agents for systematic debugging.
 
 ### 1. Researcher Agent
 
@@ -91,7 +91,7 @@ Task(
     2. Hook documentation: https://code.claude.com/docs/en/hooks.md
     3. GitHub issues related to hook merging
 
-    Document findings in HtmlGraph spike.
+    Document findings in Wipnote spike.
     """,
     subagent_type="researcher"
 )
@@ -104,9 +104,9 @@ Task(
 - Plugin development: https://code.claude.com/docs/en/plugins.md
 
 **Output Format:**
-Document findings in HtmlGraph spike:
+Document findings in Wipnote spike:
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent='researcher')
 spike = sdk.spikes.create('Research: Claude Code hook merging') \
     .set_findings("""
@@ -195,11 +195,11 @@ uv run pytest -vv               # Verbose test output
 uv run pytest -x                # Stop on first failure
 uv run pytest --pdb             # Drop into debugger on failure
 
-# HtmlGraph debugging
-htmlgraph orchestrator status  # Check orchestrator state
-htmlgraph status              # List active features
-htmlgraph feature show <id>   # Feature details
-htmlgraph session list  # Active sessions
+# Wipnote debugging
+wipnote orchestrator status  # Check orchestrator state
+wipnote status              # List active features
+wipnote feature show <id>   # Feature details
+wipnote session list  # Active sessions
 ```
 
 **Example Delegation:**
@@ -254,7 +254,7 @@ uv run pytest tests/test_features.py
 uv run pytest tests/test_features.py::test_feature_creation
 
 # Run with coverage
-uv run pytest --cov=src/python/htmlgraph --cov-report=html
+uv run pytest --cov=src/python/wipnote --cov-report=html
 
 # Type checking
 uv run mypy src/
@@ -340,31 +340,31 @@ claude plugin list
 # Shows: installed plugins and versions
 
 # Update plugin
-claude plugin update htmlgraph
+claude plugin update wipnote
 # Updates to latest version
 ```
 
-### HtmlGraph CLI Tools
+### Wipnote CLI Tools
 
 ```bash
 # Check orchestrator status
-htmlgraph orchestrator status
+wipnote orchestrator status
 # Shows: mode (strict/permissive), active features
 
 # List all features
-htmlgraph status
+wipnote status
 # Shows: features, status, priority
 
 # View specific feature
-htmlgraph feature show <id>
+wipnote feature show <id>
 # Shows: full feature details, edges, steps
 
 # List active sessions
-htmlgraph session list
+wipnote session list
 # Shows: current sessions with activity
 
 # View session details
-htmlgraph session show <session-id>
+wipnote session show <session-id>
 # Shows: session events, timeline
 
 # Sync documentation
@@ -372,10 +372,10 @@ htmlgraph session show <session-id>
 # Shows: which docs are out of sync
 
 # Analytics
-htmlgraph analytics summary
+wipnote analytics summary
 # Shows: recommended work based on analytics
 
-htmlgraph analytics summary
+wipnote analytics summary
 # Shows: blocking features
 ```
 
@@ -487,12 +487,12 @@ def fix_attempt_2():
 
 ---
 
-## HtmlGraph Debug Commands
+## Wipnote Debug Commands
 
 ### Orchestrator Status
 
 ```bash
-htmlgraph orchestrator status
+wipnote orchestrator status
 ```
 
 **Shows:**
@@ -510,16 +510,16 @@ htmlgraph orchestrator status
 
 ```bash
 # List all features
-htmlgraph status
+wipnote status
 
 # Show specific feature
-htmlgraph feature show feat-abc123
+wipnote feature show feat-abc123
 
 # List by status
-htmlgraph feature list --status in-progress
+wipnote feature list --status in-progress
 
 # List by priority
-htmlgraph feature list --priority high
+wipnote feature list --priority high
 ```
 
 **Shows:**
@@ -532,16 +532,16 @@ htmlgraph feature list --priority high
 
 ```bash
 # List all sessions
-htmlgraph session list
+wipnote session list
 
 # Show active sessions only
-htmlgraph session list
+wipnote session list
 
 # Show specific session
-htmlgraph session show sess-abc123
+wipnote session show sess-abc123
 
 # Session timeline
-htmlgraph session timeline sess-abc123
+wipnote session timeline sess-abc123
 ```
 
 **Shows:**
@@ -554,13 +554,13 @@ htmlgraph session timeline sess-abc123
 
 ```bash
 # Recommend next work
-htmlgraph analytics summary
+wipnote analytics summary
 
 # Find bottlenecks
-htmlgraph analytics summary
+wipnote analytics summary
 
 # Show dependency graph
-htmlgraph analytics dependency-graph
+wipnote analytics dependency-graph
 ```
 
 **Shows:**
@@ -695,13 +695,13 @@ The `deploy-all.sh` script enforces:
 
 **Symptoms:**
 ```python
-ImportError: cannot import name 'Feature' from 'htmlgraph'
+ImportError: cannot import name 'Feature' from 'wipnote'
 ```
 
 **Research First:**
-1. Check package structure in `src/python/htmlgraph/`
+1. Check package structure in `src/python/wipnote/`
 2. Verify `__init__.py` exports
-3. Confirm installation: `uv pip list | grep htmlgraph`
+3. Confirm installation: `uv pip list | grep wipnote`
 
 **Common Causes:**
 - Package not installed: `uv pip install -e .`
@@ -766,7 +766,7 @@ error: Incompatible types in assignment
 - `packages/claude-plugin/agents/test-runner.md` - Quality gates
 
 **Debugging workflows:**
-- `.htmlgraph/spikes/` - Past debugging sessions
+- `.wipnote/spikes/` - Past debugging sessions
 - Learn from previous sessions
 - Avoid repeating mistakes
 
@@ -778,7 +778,7 @@ error: Incompatible types in assignment
 - Plugins: https://code.claude.com/docs/en/plugins.md
 - GitHub issues: https://github.com/anthropics/claude-code/issues
 
-**HtmlGraph:**
+**Wipnote:**
 - README.md - Project overview
 - AGENTS.md - SDK and API documentation
 - CLAUDE.md - Development guidelines

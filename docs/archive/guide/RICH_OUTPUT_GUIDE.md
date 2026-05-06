@@ -1,6 +1,6 @@
 # Rich Output Formatting Guide
 
-**For:** HtmlGraph CLI Implementation
+**For:** Wipnote CLI Implementation
 **Feature:** Phase 1A/1B - Maximize Rich Console
 **Target Audience:** Codex, Copilot, and future CLI developers
 
@@ -20,7 +20,7 @@
 
 ## Color Scheme
 
-HtmlGraph uses a consistent color scheme for all CLI output:
+Wipnote uses a consistent color scheme for all CLI output:
 
 ### Primary Colors
 
@@ -29,7 +29,7 @@ HtmlGraph uses a consistent color scheme for all CLI output:
 | Red | `[red]...[/red]` | Errors, failures, blocking issues | `[red]✗ Operation failed[/red]` |
 | Green | `[green]...[/green]` | Success, completion, positive results | `[green]✓ Feature created[/green]` |
 | Yellow | `[yellow]...[/yellow]` | Warnings, caution, potential issues | `[yellow]⚠ Uncommitted changes[/yellow]` |
-| Cyan | `[cyan]...[/cyan]` | Information, status, metadata | `[cyan]ℹ Project: htmlgraph[/cyan]` |
+| Cyan | `[cyan]...[/cyan]` | Information, status, metadata | `[cyan]ℹ Project: wipnote[/cyan]` |
 | Magenta | `[magenta]...[/magenta]` | Important items, highlights | `[magenta]★ High priority[/magenta]` |
 
 ### Style Modifiers
@@ -88,7 +88,7 @@ console.print("[red]✗ Failed to create feature[/red]")
 console.print("[yellow]⚠ This action cannot be undone[/yellow]")
 
 # Info
-console.print("[cyan]ℹ Run 'htmlgraph status' to check progress[/cyan]")
+console.print("[cyan]ℹ Run 'wipnote status' to check progress[/cyan]")
 
 # Priority
 console.print("[magenta]★ High priority feature detected[/magenta]")
@@ -224,7 +224,7 @@ panel = Panel(
     "[cyan]Commands:\n"
     "  feature list    - Show all features\n"
     "  feature create  - Create new feature[/cyan]",
-    title="[bold]HtmlGraph CLI[/bold]",
+    title="[bold]Wipnote CLI[/bold]",
     style="bold green"
 )
 console.print(panel)
@@ -356,7 +356,7 @@ console.print(f"  [dim]Reason: {error_message}[/dim]")
 console.print("[yellow]⚠ Warning: This action is permanent[/yellow]")
 
 # With suggestion
-console.print(f"[yellow]⚠[/yellow] No features found. Create one with: htmlgraph feature create")
+console.print(f"[yellow]⚠[/yellow] No features found. Create one with: wipnote feature create")
 ```
 
 ### Pattern 4: Info Message
@@ -401,7 +401,7 @@ help_text = """
   [green]--help[/green]            Show this message
 """
 
-panel = Panel(help_text, title="[bold]HtmlGraph CLI Help[/bold]", style="bold cyan")
+panel = Panel(help_text, title="[bold]Wipnote CLI Help[/bold]", style="bold cyan")
 console.print(panel)
 ```
 
@@ -512,7 +512,7 @@ try:
     feature = get_feature(feature_id)
 except FeatureNotFound:
     console.print(f"[red]✗ Error:[/red] Feature not found: [bold]{feature_id}[/bold]")
-    console.print("[dim cyan]Use 'htmlgraph feature list' to see available features[/dim cyan]")
+    console.print("[dim cyan]Use 'wipnote feature list' to see available features[/dim cyan]")
     sys.exit(1)
 ```
 
@@ -542,7 +542,7 @@ def test_error_message_has_color():
 
 def test_json_output_clean():
     """Test JSON output has no Rich markup."""
-    result = run_command(["htmlgraph", "feature", "list", "--format", "json"])
+    result = run_command(["wipnote", "feature", "list", "--format", "json"])
 
     # Parse JSON
     data = json.loads(result.stdout)
@@ -558,18 +558,18 @@ def test_json_output_clean():
 
 ```bash
 # Count print() statements converted
-grep -c "console.print" src/python/htmlgraph/cli.py
+grep -c "console.print" src/python/wipnote/cli.py
 
 # Check for remaining plain print()
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "console.print" | grep -v "# "
 
 # Verify Rich imports
-grep "from rich" src/python/htmlgraph/cli.py
+grep "from rich" src/python/wipnote/cli.py
 
 # Check for color usage
 grep -c "\[red\]\|\[green\]\|\[yellow\]\|\[cyan\]" \
-  src/python/htmlgraph/cli.py
+  src/python/wipnote/cli.py
 ```
 
 ---
@@ -677,7 +677,7 @@ box.ASCII         # +--- (for compatibility)
 - **Rich Documentation:** https://rich.readthedocs.io/
 - **ANSI Color Codes:** https://en.wikipedia.org/wiki/ANSI_escape_code
 - **Unicode Symbols:** https://unicode-table.com/
-- **HtmlGraph CLI:** `src/python/htmlgraph/cli.py`
+- **Wipnote CLI:** `src/python/wipnote/cli.py`
 - **Quality Gates:** `QUALITY_GATES_PHASE_1AB.md`
 
 ---

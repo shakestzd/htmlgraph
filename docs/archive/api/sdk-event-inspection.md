@@ -1,13 +1,13 @@
 # SDK Event Inspection Guide
 
-**IMPORTANT: Always use the SDK to inspect HtmlGraph data. Never read `.htmlgraph/` files directly.**
+**IMPORTANT: Always use the SDK to inspect Wipnote data. Never read `.wipnote/` files directly.**
 
 ## Why Use the SDK?
 
 ❌ **WRONG** - Reading files directly:
 ```python
 # DON'T DO THIS
-with open('.htmlgraph/events/session-123.jsonl') as f:
+with open('.wipnote/events/session-123.jsonl') as f:
     for line in f:
         evt = json.loads(line)
         print(evt)
@@ -15,7 +15,7 @@ with open('.htmlgraph/events/session-123.jsonl') as f:
 
 ✅ **RIGHT** - Using SDK:
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude-code')
 session = sdk.sessions.get('session-123')
@@ -25,8 +25,8 @@ events = session.get_events(limit=10)
 ## Quick Start
 
 ```python
-from htmlgraph import SDK
-from htmlgraph.session_manager import SessionManager
+from wipnote import SDK
+from wipnote.session_manager import SessionManager
 
 sdk = SDK(agent='claude-code')
 sm = SessionManager()
@@ -110,8 +110,8 @@ for feature, count in stats['by_feature'].items():
 Here's how to properly verify session management and event tracking:
 
 ```python
-from htmlgraph import SDK
-from htmlgraph.session_manager import SessionManager
+from wipnote import SDK
+from wipnote.session_manager import SessionManager
 
 sdk = SDK(agent='claude-code')
 sm = SessionManager()
@@ -160,7 +160,7 @@ for tool, count in sorted(stats['by_tool'].items(), key=lambda x: x[1], reverse=
 
 ## Best Practices
 
-1. **Always use SDK** - Never read `.htmlgraph/` files directly
+1. **Always use SDK** - Never read `.wipnote/` files directly
 2. **Use pagination** - For large sessions, use `limit` and `offset`
 3. **Filter early** - Use `query_events()` filters to reduce data
 4. **Check attribution** - Use `feature_id` filter to verify attribution
@@ -218,7 +218,7 @@ If you have code that reads files directly, here's how to migrate:
 import json
 
 # Reading JSONL directly
-with open('.htmlgraph/events/session-123.jsonl') as f:
+with open('.wipnote/events/session-123.jsonl') as f:
     events = [json.loads(line) for line in f if line.strip()]
 
 # Getting last 10
@@ -227,7 +227,7 @@ recent = events[-10:]
 
 ### After (✅ Right):
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK()
 session = sdk.sessions.get('session-123')

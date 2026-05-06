@@ -1,6 +1,6 @@
 # Agents
 
-HtmlGraph provides seamless integration with AI agents through SDKs, CLI tools, and browser extensions.
+Wipnote provides seamless integration with AI agents through SDKs, CLI tools, and browser extensions.
 
 ## Supported Agents
 
@@ -11,7 +11,7 @@ Official plugin for Claude Code CLI.
 **Installation:**
 
 ```bash
-claude plugin install htmlgraph
+claude plugin install wipnote
 ```
 
 **Features:**
@@ -22,7 +22,7 @@ claude plugin install htmlgraph
 - Feature creation decision framework
 - Session continuity across conversations
 
-**Documentation:** See the `htmlgraph` skill in Claude Code.
+**Documentation:** See the `wipnote` skill in Claude Code.
 
 ### Gemini CLI
 
@@ -31,7 +31,7 @@ Extension for Gemini CLI.
 **Installation:**
 
 ```bash
-gemini extension install htmlgraph
+gemini extension install wipnote
 ```
 
 **Features:**
@@ -50,7 +50,7 @@ Skill for Codex CLI.
 **Installation:**
 
 ```bash
-codex skill install htmlgraph
+codex skill install wipnote
 ```
 
 **Features:**
@@ -70,31 +70,31 @@ When an agent begins working:
 
 ```bash
 # Check current status
-htmlgraph status
+wipnote status
 ```
 
 ### 2. Create or Select Feature
 
 ```bash
 # Create a new feature
-htmlgraph feature create "Add user profile page" --priority high
+wipnote feature create "Add user profile page" --priority high
 
 # Start working on it
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 ```
 
 ### 3. Work and Track Progress
 
 ```bash
 # Document decisions as spikes
-htmlgraph spike create "Chose React Router over Reach Router (better TypeScript support)"
+wipnote spike create "Chose React Router over Reach Router (better TypeScript support)"
 ```
 
 ### 4. Complete Feature
 
 ```bash
 # Mark feature as done
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 ```
 
 ## Multi-Agent Collaboration
@@ -107,7 +107,7 @@ Agents claim features by starting them:
 
 ```bash
 # Agent claims a feature
-htmlgraph feature start feature-001
+wipnote feature start feature-001
 ```
 
 ### Handoff Notes
@@ -116,11 +116,11 @@ When passing work between agents, document the handoff as a spike:
 
 ```bash
 # Agent 1 documents phase 1 completion
-htmlgraph spike create "OAuth setup complete. OAuth provider configured, redirect endpoints created. Blocked on Database schema (feature-005). Next: JWT signing once DB ready, add token refresh logic."
+wipnote spike create "OAuth setup complete. OAuth provider configured, redirect endpoints created. Blocked on Database schema (feature-005). Next: JWT signing once DB ready, add token refresh logic."
 
 # Agent 2 checks status before picking up
-htmlgraph feature show feature-001
-htmlgraph snapshot --summary
+wipnote feature show feature-001
+wipnote snapshot --summary
 ```
 
 ## CLI Integration Patterns
@@ -128,36 +128,36 @@ htmlgraph snapshot --summary
 ### Simple Task
 
 ```bash
-htmlgraph feature create "Quick task" --priority medium
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature create "Quick task" --priority medium
+wipnote feature start feat-a1b2c3d4
 # Do work...
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 ```
 
 ### Complex Multi-Step Work
 
 ```bash
 # Create a track for multi-phase work
-htmlgraph track new "Complex Agent Task" --priority high
+wipnote track new "Complex Agent Task" --priority high
 # Note track ID (e.g. trk-a1b2c3d4)
 
 # Create features per phase
-htmlgraph feature create "Phase 1: Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2: Implementation" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 1: Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2: Implementation" --priority high --track trk-a1b2c3d4
 
 # Work through each feature
-htmlgraph feature start feat-phase1-id
+wipnote feature start feat-phase1-id
 # ... do work ...
-htmlgraph feature complete feat-phase1-id
+wipnote feature complete feat-phase1-id
 
-htmlgraph feature start feat-phase2-id
+wipnote feature start feat-phase2-id
 # ... do work ...
-htmlgraph feature complete feat-phase2-id
+wipnote feature complete feat-phase2-id
 ```
 
 ## Hooks
 
-HtmlGraph uses hooks to automatically track agent activity.
+Wipnote uses hooks to automatically track agent activity.
 
 ### Available Hooks
 
@@ -173,12 +173,12 @@ HtmlGraph uses hooks to automatically track agent activity.
 Hooks are configured automatically via the Claude Code plugin. The plugin bundles a `hooks.json` that registers all event handlers. Hook scripts live in `packages/claude-plugin/hooks/scripts/` in the plugin source. Install the plugin to activate all hooks:
 
 ```bash
-claude plugin install htmlgraph
+claude plugin install wipnote
 ```
 
 ### Custom Hooks
 
-Hooks are configured in `packages/claude-plugin/hooks/scripts/`. They run automatically via the plugin and use the `htmlgraph` CLI for tracking operations.
+Hooks are configured in `packages/claude-plugin/hooks/scripts/`. They run automatically via the plugin and use the `wipnote` CLI for tracking operations.
 
 ## Best Practices
 
@@ -208,10 +208,10 @@ Use this framework to decide when to create a feature:
 For multi-feature projects, create a track first:
 
 ```bash
-htmlgraph track new "Multi-phase project" --priority high
+wipnote track new "Multi-phase project" --priority high
 # Create features linked to the track
-htmlgraph feature create "Phase 1" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 1" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2" --priority high --track trk-a1b2c3d4
 ```
 
 ### 3. Document Decisions
@@ -219,7 +219,7 @@ htmlgraph feature create "Phase 2" --priority high --track trk-a1b2c3d4
 Always record important decisions:
 
 ```bash
-htmlgraph spike create "Chose PostgreSQL over MongoDB: better transactions, team familiarity"
+wipnote spike create "Chose PostgreSQL over MongoDB: better transactions, team familiarity"
 ```
 
 ### 4. One Feature at a Time
@@ -227,9 +227,9 @@ htmlgraph spike create "Chose PostgreSQL over MongoDB: better transactions, team
 Focus on single features for clear attribution:
 
 ```bash
-htmlgraph feature start feature-001
+wipnote feature start feature-001
 # Complete all work
-htmlgraph feature complete feature-001
+wipnote feature complete feature-001
 ```
 
 ## Next Steps

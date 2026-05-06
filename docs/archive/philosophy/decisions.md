@@ -259,4 +259,4 @@ The 8-character hash is derived from SHA256 of (title + microsecond timestamp + 
 
 - [Why HTML?](why-html.md) - Core philosophy
 - [Comparisons](comparisons.md) - vs alternatives
-- [Contributing](../contributing/index.md) - Help improve HtmlGraph
+- [Contributing](../contributing/index.md) - Help improve Wipnote

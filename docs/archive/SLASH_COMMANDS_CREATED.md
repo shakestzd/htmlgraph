@@ -1,7 +1,7 @@
 # Slash Commands Created
 
 **Date**: 2025-12-25
-**Commands**: `/htmlgraph:git-commit` and `/htmlgraph:deploy`
+**Commands**: `/wipnote:git-commit` and `/wipnote:deploy`
 
 ---
 
@@ -9,31 +9,31 @@
 
 Two new slash commands for the deployment scripts:
 
-### 1. `/htmlgraph:git-commit`
+### 1. `/wipnote:git-commit`
 
 **Script**: `./scripts/git-commit-push.sh`
 
 **Usage**:
 ```
-/htmlgraph:git-commit "feat: add new feature"
-/htmlgraph:git-commit "fix(parser): handle edge case"
+/wipnote:git-commit "feat: add new feature"
+/wipnote:git-commit "fix(parser): handle edge case"
 ```
 
 **Features**:
 - Commits and pushes in one command
 - Conventional commit format
-- Auto-includes HtmlGraph footer
+- Auto-includes Wipnote footer
 - Supports multi-line messages
 
-### 2. `/htmlgraph:deploy`
+### 2. `/wipnote:deploy`
 
 **Script**: `./scripts/deploy-all.sh`
 
 **Usage**:
 ```
-/htmlgraph:deploy 0.12.1    # Patch release
-/htmlgraph:deploy 0.13.0    # Minor release
-/htmlgraph:deploy 1.0.0     # Major release
+/wipnote:deploy 0.12.1    # Patch release
+/wipnote:deploy 0.13.0    # Minor release
+/wipnote:deploy 1.0.0     # Major release
 ```
 
 **Features**:
@@ -81,10 +81,10 @@ Two new slash commands for the deployment scripts:
 
 ```bash
 # Commit and push changes
-/htmlgraph:git-commit "feat: add OAuth support"
+/wipnote:git-commit "feat: add OAuth support"
 
 # Deploy new version
-/htmlgraph:deploy 0.12.2
+/wipnote:deploy 0.12.2
 ```
 
 ### For Developers (Updating Commands)
@@ -120,7 +120,7 @@ git commit -m "feat: add /git-commit and /deploy slash commands"
 1. **Test the commands**:
    ```bash
    # In Claude Code, try:
-   /htmlgraph:git-commit "test: verify slash command"
+   /wipnote:git-commit "test: verify slash command"
    ```
 
 2. **Deploy updated plugin**:

@@ -1,11 +1,11 @@
 # Quick Start
 
-Get up and running with HtmlGraph in 5 minutes.
+Get up and running with Wipnote in 5 minutes.
 
 ## Installation
 
 ```bash
-pip install htmlgraph
+pip install wipnote
 ```
 
 ## Initialize Your Project
@@ -14,23 +14,23 @@ pip install htmlgraph
 # Create project directory
 mkdir my-project && cd my-project
 
-# Initialize HtmlGraph
-htmlgraph init --install-hooks
+# Initialize Wipnote
+wipnote init --install-hooks
 
 # Start the dashboard
-htmlgraph serve
+wipnote serve
 ```
 
-This creates a `.htmlgraph/` directory with features, sessions, tracks, and events.
+This creates a `.wipnote/` directory with features, sessions, tracks, and events.
 
 ## Basic Usage
 
 ### Create a Feature
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
-# Initialize SDK (auto-discovers .htmlgraph directory)
+# Initialize SDK (auto-discovers .wipnote directory)
 sdk = SDK(agent="claude")
 
 # Create a feature with fluent API
@@ -100,26 +100,26 @@ track = sdk.tracks.builder() \
     .create()
 
 print(f"Created track: {track.track_id}")
-# View at: .htmlgraph/tracks/{track.track_id}/index.html
+# View at: .wipnote/tracks/{track.track_id}/index.html
 ```
 
 ## CLI Usage
 
 ```bash
 # List features
-htmlgraph feature list
+wipnote feature list
 
 # Create feature
-htmlgraph feature create "Add OAuth support" --priority high
+wipnote feature create "Add OAuth support" --priority high
 
 # Start feature
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 
 # Mark complete
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 
 # View status
-htmlgraph status
+wipnote status
 ```
 
 ## View Your Graph
@@ -128,10 +128,10 @@ All graph nodes are standard HTML files:
 
 ```bash
 # Open feature in browser
-open .htmlgraph/features/feat-a1b2c3d4.html
+open .wipnote/features/feat-a1b2c3d4.html
 
 # Open track
-open .htmlgraph/tracks/trk-a1b2c3d4/index.html
+open .wipnote/tracks/trk-a1b2c3d4/index.html
 
 # Dashboard
 open index.html
@@ -161,7 +161,7 @@ with sdk.features.edit("feature-123") as f:
     f.status = "done"
 
 # ❌ WRONG - bypasses validation
-with open(".htmlgraph/features/feature-123.html", "w") as f:
+with open(".wipnote/features/feature-123.html", "w") as f:
     f.write("<html>...</html>")
 ```
 

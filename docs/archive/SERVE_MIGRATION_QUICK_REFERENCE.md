@@ -1,4 +1,4 @@
-# HtmlGraph `serve` Migration - Quick Reference
+# Wipnote `serve` Migration - Quick Reference
 
 ## Current Status at a Glance
 
@@ -13,7 +13,7 @@
 ## What's Working NOW ✅
 
 ```
-htmlgraph serve --port 8080 --auto-port
+wipnote serve --port 8080 --auto-port
     ↓
 FastAPI (uvicorn) starts
     ↓
@@ -53,7 +53,7 @@ FastAPI (uvicorn) starts
 
 ### Active (In Use)
 ```
-src/python/htmlgraph/
+src/python/wipnote/
 ├── api/
 │   └── main.py                    (2,300 lines) ← FastAPI app
 ├── operations/
@@ -69,7 +69,7 @@ pyproject.toml
 
 ### Inactive (Legacy, Can Remove)
 ```
-src/python/htmlgraph/
+src/python/wipnote/
 ├── server.py                      (1,600 lines) ← LEGACY
 └── operations/server.py           (300 lines)   ← LEGACY
 
@@ -104,7 +104,7 @@ Tasks:
   ☐ Write comprehensive tests
 
 Files:
-  • src/python/htmlgraph/api/main.py (add ~500 lines)
+  • src/python/wipnote/api/main.py (add ~500 lines)
   • tests/api/test_rest_api.py (new, ~400 lines)
 
 Effort: 2-3 days
@@ -119,8 +119,8 @@ Tasks:
   ☐ Implement graph reload on file changes
 
 Files:
-  • src/python/htmlgraph/operations/fastapi_server.py (add ~100 lines)
-  • src/python/htmlgraph/cli.py (update arg parser)
+  • src/python/wipnote/operations/fastapi_server.py (add ~100 lines)
+  • src/python/wipnote/cli.py (update arg parser)
 
 Effort: 1-2 days
 Risk: Low (GraphWatcher already implemented)
@@ -134,8 +134,8 @@ Tasks:
   ☐ Update argument validation
 
 Files:
-  • src/python/htmlgraph/cli.py (update)
-  • src/python/htmlgraph/operations/fastapi_server.py (update)
+  • src/python/wipnote/cli.py (update)
+  • src/python/wipnote/operations/fastapi_server.py (update)
 
 Effort: 1 day
 Risk: Low (straightforward changes)
@@ -144,16 +144,16 @@ Risk: Low (straightforward changes)
 ### Phase 4: Remove Legacy Server (BREAKING)
 ```
 Tasks:
-  ☐ Delete src/python/htmlgraph/server.py (1,600 lines)
-  ☐ Delete src/python/htmlgraph/operations/server.py (300 lines)
+  ☐ Delete src/python/wipnote/server.py (1,600 lines)
+  ☐ Delete src/python/wipnote/operations/server.py (300 lines)
   ☐ Delete tests/operations/test_server.py
   ☐ Update any imports/references
   ☐ Update documentation
   ☐ Release as major version bump
 
 Files to DELETE:
-  × src/python/htmlgraph/server.py
-  × src/python/htmlgraph/operations/server.py
+  × src/python/wipnote/server.py
+  × src/python/wipnote/operations/server.py
   × tests/operations/test_server.py
 
 Effort: 0.5 days (cleanup only)
@@ -175,10 +175,10 @@ Week 4:  Phase 4 (Remove Legacy)        [░░░░░░░░░]  0% (next 
 ### For Users Upgrading
 ```
 OLD COMMAND:
-  $ htmlgraph serve --port 8080 --graph-dir .htmlgraph --watch
+  $ wipnote serve --port 8080 --graph-dir .wipnote --watch
 
 NEW EQUIVALENT:
-  $ htmlgraph serve --port 8080 --db .htmlgraph/index.sqlite --watch
+  $ wipnote serve --port 8080 --db .wipnote/index.sqlite --watch
 ```
 
 ### REST API Changes
@@ -276,10 +276,10 @@ Migration is complete when:
    - Implementation guide
 
 2. **THEN:** These key files
-   - `src/python/htmlgraph/api/main.py` - FastAPI app (2,300 lines)
-   - `src/python/htmlgraph/server.py` - Legacy server (1,600 lines, reference)
-   - `src/python/htmlgraph/cli.py` - CLI commands (around line 140)
-   - `src/python/htmlgraph/operations/fastapi_server.py` - Server ops (230 lines)
+   - `src/python/wipnote/api/main.py` - FastAPI app (2,300 lines)
+   - `src/python/wipnote/server.py` - Legacy server (1,600 lines, reference)
+   - `src/python/wipnote/cli.py` - CLI commands (around line 140)
+   - `src/python/wipnote/operations/fastapi_server.py` - Server ops (230 lines)
 
 ---
 
@@ -287,28 +287,28 @@ Migration is complete when:
 
 ### If Starting Phase 1 (REST API):
 1. Read `SERVE_MIGRATION_ANALYSIS.md` section "Preserving Legacy REST API in FastAPI"
-2. Review `src/python/htmlgraph/server.py` lines 236-896 (API handlers)
-3. Port handler logic to FastAPI routes in `src/python/htmlgraph/api/main.py`
+2. Review `src/python/wipnote/server.py` lines 236-896 (API handlers)
+3. Port handler logic to FastAPI routes in `src/python/wipnote/api/main.py`
 4. Add comprehensive tests in `tests/api/test_rest_api.py`
 5. Verify with: `uv run pytest tests/api/test_rest_api.py -v`
 
 ### If Starting Phase 2 (File Watching):
-1. Review `src/python/htmlgraph/file_watcher.py` (already implemented)
-2. Update `src/python/htmlgraph/operations/fastapi_server.py`
-3. Add `--watch` argument to `src/python/htmlgraph/cli.py`
-4. Test with: `htmlgraph serve --watch --port 8080`
+1. Review `src/python/wipnote/file_watcher.py` (already implemented)
+2. Update `src/python/wipnote/operations/fastapi_server.py`
+3. Add `--watch` argument to `src/python/wipnote/cli.py`
+4. Test with: `wipnote serve --watch --port 8080`
 
 ### If Starting Phase 3 (CLI Arguments):
-1. Update argument parser in `src/python/htmlgraph/cli.py`
+1. Update argument parser in `src/python/wipnote/cli.py`
 2. Make `--graph-dir` work with FastAPI database detection
 3. Add `--quiet` flag support
-4. Test all combinations: `htmlgraph serve --help`
+4. Test all combinations: `wipnote serve --help`
 
 ### If Starting Phase 4 (Cleanup):
-1. Delete: `src/python/htmlgraph/server.py`
-2. Delete: `src/python/htmlgraph/operations/server.py`
+1. Delete: `src/python/wipnote/server.py`
+2. Delete: `src/python/wipnote/operations/server.py`
 3. Delete: `tests/operations/test_server.py`
-4. Search for imports: `grep -r "from htmlgraph.server import\|from htmlgraph.operations.server import"`
+4. Search for imports: `grep -r "from wipnote.server import\|from wipnote.operations.server import"`
 5. Update any remaining references
 6. Run full test suite: `uv run pytest`
 
@@ -319,5 +319,5 @@ Migration is complete when:
 - **FastAPI Docs:** https://fastapi.tiangolo.com/
 - **Uvicorn Docs:** https://www.uvicorn.org/
 - **WebSocket Guide:** https://fastapi.tiangolo.com/advanced/websockets/
-- **GraphWatcher Implementation:** `src/python/htmlgraph/file_watcher.py`
-- **Analytics Index:** `src/python/htmlgraph/analytics_index.py`
+- **GraphWatcher Implementation:** `src/python/wipnote/file_watcher.py`
+- **Analytics Index:** `src/python/wipnote/analytics_index.py`

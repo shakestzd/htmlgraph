@@ -125,7 +125,7 @@ track-event.py
 **Execution Chain 2** (posttooluse-integrator.py):
 ```
 posttooluse-integrator.py
-  → htmlgraph.hooks.posttooluse.main()
+  → wipnote.hooks.posttooluse.main()
     → posttooluse_hook("PostToolUse", hook_input)
       → run_event_tracking("PostToolUse", hook_input)
         → event_tracker.track_event("PostToolUse", hook_input)
@@ -166,7 +166,7 @@ posttooluse-integrator.py
 ```
 
 **Issue**: Both hooks handle Task() routing independently
-- `pretooluse-integrator.py`: Line 18 calls `htmlgraph.hooks.pretooluse.main()`
+- `pretooluse-integrator.py`: Line 18 calls `wipnote.hooks.pretooluse.main()`
 - `pretooluse-spawner-router.py`: Line 562 implements separate spawner routing logic
 
 **Result**: Task() calls may be routed twice or handled by both hooks
@@ -275,7 +275,7 @@ uv run pytest tests/hooks/ -v
 uv run pytest tests/integration/ -v
 
 # Check for duplicate events
-sqlite3 .htmlgraph/htmlgraph.db << 'EOF'
+sqlite3 .wipnote/wipnote.db << 'EOF'
 SELECT input_summary, COUNT(*) as count
 FROM agent_events
 GROUP BY input_summary
@@ -290,7 +290,7 @@ Expected output: Empty (no duplicates)
 1. Submit a user query
 2. Check database:
    ```bash
-   sqlite3 .htmlgraph/htmlgraph.db \
+   sqlite3 .wipnote/wipnote.db \
      "SELECT COUNT(*) FROM agent_events WHERE tool_name='UserQuery'"
    ```
    Expected: 1 event (not 2)
@@ -312,11 +312,11 @@ packages/claude-plugin/.claude-plugin/hooks/hooks.json
 ## Files to Review (But Not Modify)
 
 ```
-src/python/htmlgraph/hooks/event_tracker.py
+src/python/wipnote/hooks/event_tracker.py
   - Verify record_event_to_sqlite() only called once per event
   - OK - just a utility function
 
-src/python/htmlgraph/hooks/posttooluse.py
+src/python/wipnote/hooks/posttooluse.py
   - Verify run_event_tracking() is the single source for PostToolUse events
   - OK - unified implementation
 

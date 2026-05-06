@@ -15,7 +15,7 @@ The API refactor should significantly reduce the size and complexity of `main.py
 
 | Metric | Before | Target | Verification |
 |--------|--------|--------|--------------|
-| `main.py` line count | 2761 | <500 | `wc -l src/python/htmlgraph/api/main.py` |
+| `main.py` line count | 2761 | <500 | `wc -l src/python/wipnote/api/main.py` |
 | Database queries in `main.py` | 50+ | 0 | Grep for `SELECT`, `INSERT`, etc. |
 | Business logic functions in `main.py` | 30+ | <5 | Grep for complex functions |
 | Model classes in `main.py` | 3+ | 0 | Grep for `class.*Model` |
@@ -26,24 +26,24 @@ The API refactor should significantly reduce the size and complexity of `main.py
 
 ```bash
 # 1. Check main.py size
-wc -l src/python/htmlgraph/api/main.py
+wc -l src/python/wipnote/api/main.py
 # Expected: <500 lines
 
 # 2. Verify no queries in main.py
 grep -E "SELECT|INSERT|UPDATE|DELETE|execute\(" \
-  src/python/htmlgraph/api/main.py | grep -v "app\|get_app\|# " | wc -l
+  src/python/wipnote/api/main.py | grep -v "app\|get_app\|# " | wc -l
 # Expected: 0 occurrences
 
 # 3. Check repositories exist and are used
-ls -1 src/python/htmlgraph/api/repositories/*.py
+ls -1 src/python/wipnote/api/repositories/*.py
 # Expected: base_repository.py, events_repository.py, etc.
 
 # 4. Check services exist and are used
-ls -1 src/python/htmlgraph/api/services/*.py
+ls -1 src/python/wipnote/api/services/*.py
 # Expected: base_service.py, activity_service.py, etc.
 
 # 5. Verify schemas module
-test -f src/python/htmlgraph/api/schemas.py && echo "OK" || echo "FAIL"
+test -f src/python/wipnote/api/schemas.py && echo "OK" || echo "FAIL"
 # Expected: OK
 ```
 
@@ -140,19 +140,19 @@ The database layer should use FastSQLA exclusively with proper connection poolin
 
 ```bash
 # 1. Find all aiosqlite imports
-grep -r "import aiosqlite" src/python/htmlgraph/api/
+grep -r "import aiosqlite" src/python/wipnote/api/
 # Expected: Only in repositories/base_repository.py
 
 # 2. Verify FastSQLA usage in main.py
-grep -c "FastSQLA\|get_session" src/python/htmlgraph/api/main.py
+grep -c "FastSQLA\|get_session" src/python/wipnote/api/main.py
 # Expected: >0 (using FastSQLA sessions)
 
 # 3. Check connection pool configuration
-grep -A 10 "FastSQLA\|pool_size" src/python/htmlgraph/api/db.py
+grep -A 10 "FastSQLA\|pool_size" src/python/wipnote/api/db.py
 # Expected: pool_size configured
 
 # 4. Verify busy timeout setting
-grep "busy_timeout\|PRAGMA" src/python/htmlgraph/api/repositories/base_repository.py
+grep "busy_timeout\|PRAGMA" src/python/wipnote/api/repositories/base_repository.py
 # Expected: 5000ms timeout configured
 ```
 
@@ -198,15 +198,15 @@ HTTP caching should use fastapi-cache2 exclusively. Cache TTL should be configur
 
 ```bash
 # 1. Count @cache decorators on routes
-grep -c "@cache" src/python/htmlgraph/api/main.py
+grep -c "@cache" src/python/wipnote/api/main.py
 # Expected: >10 (for cached endpoints)
 
 # 2. Verify QueryCache removed from routes
-grep "QueryCache(" src/python/htmlgraph/api/main.py | grep -v "# " | wc -l
+grep "QueryCache(" src/python/wipnote/api/main.py | grep -v "# " | wc -l
 # Expected: 0
 
 # 3. Check CACHE_TTL configurable
-grep "CACHE_TTL\|cache_ttl" src/python/htmlgraph/api/cache.py
+grep "CACHE_TTL\|cache_ttl" src/python/wipnote/api/cache.py
 # Expected: CACHE_TTL = ... (configurable constant)
 
 # 4. Monitor cache hit rate
@@ -255,7 +255,7 @@ All endpoints should use bulk queries to prevent N+1 query patterns. Performance
 
 ```bash
 # 1. Enable query logging
-SQLALCHEMY_ECHO=true python -m htmlgraph serve
+SQLALCHEMY_ECHO=true python -m wipnote serve
 
 # 2. Count queries per endpoint
 curl http://localhost:8000/api/events?limit=100
@@ -269,7 +269,7 @@ time curl http://localhost:8000/api/events?limit=100
 # Expected: 1 query per cycle, not 1 per event
 
 # 5. Profile with py-spy
-py-spy record -o profile.svg -- python -m htmlgraph serve
+py-spy record -o profile.svg -- python -m wipnote serve
 # Expected: Bulk query operations visible in flame graph
 ```
 
@@ -317,7 +317,7 @@ WebSocket handlers should reuse database connections efficiently using connectio
 
 ```bash
 # 1. Monitor connection pool
-sqlite3 .htmlgraph/htmlgraph.db "PRAGMA database_list;"
+sqlite3 .wipnote/wipnote.db "PRAGMA database_list;"
 
 # 2. Connect WebSocket and monitor
 python tests/websockets/monitor_connections.py

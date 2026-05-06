@@ -1,6 +1,6 @@
 # Multi-Agent Workflow: Real-World Example
 
-Implementing user authentication with HtmlGraph orchestration: parallel delegation of backend, frontend, and testing work with automatic session tracking.
+Implementing user authentication with Wipnote orchestration: parallel delegation of backend, frontend, and testing work with automatic session tracking.
 
 ## Scenario: Feature Implementation with Parallel Tasks
 
@@ -20,7 +20,7 @@ Without delegation, this sequential work fills your context with intermediate re
 │ - Spawns 3 subagents (Task tool)                            │
 │ - Monitors progress                                         │
 │ - Consolidates results                                      │
-│ - HtmlGraph automatically captures all session relationships │
+│ - Wipnote automatically captures all session relationships │
 └─────────────────────────────────────────────────────────────┘
          │                    │                    │
          ▼                    ▼                    ▼
@@ -39,7 +39,7 @@ Without delegation, this sequential work fills your context with intermediate re
 ## Orchestrator Implementation
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize orchestrator
 sdk = SDK(agent="claude-orchestrator")
@@ -92,7 +92,7 @@ print(f"   Track: {auth_track.id}")
 # SUBAGENT 1 - Backend Developer
 # Spawned with Task() by orchestrator
 
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-subagent-backend")
 
@@ -145,7 +145,7 @@ print("✅ Backend OAuth implementation complete")
 # SUBAGENT 2 - Frontend Developer
 # Spawned with Task() by orchestrator
 
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-subagent-frontend")
 
@@ -206,7 +206,7 @@ print("✅ Frontend UI implementation complete")
 # SUBAGENT 3 - QA/Testing Developer
 # Spawned with Task() by orchestrator
 
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-subagent-testing")
 
@@ -269,7 +269,7 @@ print("✅ Testing suite complete")
 # ORCHESTRATOR - Back to consolidation
 # Called after all three subagents complete
 
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-orchestrator")
 
@@ -334,13 +334,13 @@ print("   vs 11 hours (sequential)")
 print("   Savings: 7 hours (64% faster)")
 ```
 
-## HtmlGraph Automatic Tracking
+## Wipnote Automatic Tracking
 
-HtmlGraph's hook system automatically captures all of this:
+Wipnote's hook system automatically captures all of this:
 
 ```bash
 # View orchestration structure
-ls .htmlgraph/sessions/
+ls .wipnote/sessions/
 # Shows:
 # - sess-orchestrator-123.html (parent session)
 # - sess-subagent-backend-456.html (child 1)
@@ -348,12 +348,12 @@ ls .htmlgraph/sessions/
 # - sess-subagent-testing-012.html (child 3)
 
 # View feature tracking
-ls .htmlgraph/features/
+ls .wipnote/features/
 # Shows:
 # - feat-abc123.html (auth feature, with child events)
 
 # View in dashboard
-uv run htmlgraph serve
+uv run wipnote serve
 # Navigate to:
 # - Sessions tab → View parent-child hierarchy
 # - Features tab → See auth feature with all work items
@@ -434,7 +434,7 @@ Savings: 12,300 tokens + 7 hours of wall-clock time
 2. **Poor prompt specification** - Vague prompts lead to failed delegations
 3. **Expecting immediate context** - Subagents need all context in their prompt
 4. **Over-delegation** - Don't delegate trivial tasks (overhead cost > benefit)
-5. **Lost tracking** - Always log events so HtmlGraph captures relationships
+5. **Lost tracking** - Always log events so Wipnote captures relationships
 
 ## Next Steps
 

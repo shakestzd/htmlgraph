@@ -1,6 +1,6 @@
 # Optimal Planning Workflow Template
 
-Complete guide to optimal planning workflows in HtmlGraph, covering general-purpose patterns, subagent selection, and platform-specific integration.
+Complete guide to optimal planning workflows in Wipnote, covering general-purpose patterns, subagent selection, and platform-specific integration.
 
 ---
 
@@ -11,13 +11,13 @@ Complete guide to optimal planning workflows in HtmlGraph, covering general-purp
 3. [Subagent Selection Decision Tree](#subagent-selection-decision-tree)
 4. [Batch API Operations](#batch-api-operations)
 5. [Performance Metrics](#performance-metrics)
-6. [HtmlGraph Integration](#htmlgraph-integration)
+6. [Wipnote Integration](#wipnote-integration)
 
 ---
 
 ## Overview
 
-HtmlGraph provides two planning approaches:
+Wipnote provides two planning approaches:
 
 ### 1. **General Optimal Workflow** (This Document)
 The universal 3-phase pattern applicable to ANY planning task:
@@ -25,7 +25,7 @@ The universal 3-phase pattern applicable to ANY planning task:
 - **Phase 2: Design** → Architecture decisions, approach selection
 - **Phase 3: Implement** → Execute with checkpoints
 
-### 2. **HtmlGraph-Specific Workflow** (Integration)
+### 2. **Wipnote-Specific Workflow** (Integration)
 The platform's integrated spike/track/feature system:
 - **Strategic Analytics** → What should we work on?
 - **Planning Spikes** → How should we build it?
@@ -63,7 +63,7 @@ For complex features (authentication, security, real-time, integrations), you MU
 **Activities:**
 
 1. **External Research (For Complex Features)**
-   - Use `/htmlgraph:research` or WebSearch
+   - Use `/wipnote:research` or WebSearch
    - Gather industry best practices
    - Identify proven patterns and libraries
    - Document anti-patterns to avoid
@@ -100,7 +100,7 @@ For complex features (authentication, security, real-time, integrations), you MU
 
 Record your research findings as a spike:
 ```bash
-htmlgraph spike create "OAuth research: Use Auth0 (PKCE + token rotation). External sources: OWASP auth cheat sheet, OAuth 2.0 security best practices. Codebase: Redis sessions, FastAPI, PostgreSQL. Decision: Auth0 for managed security + backward compatibility."
+wipnote spike create "OAuth research: Use Auth0 (PKCE + token rotation). External sources: OWASP auth cheat sheet, OAuth 2.0 security best practices. Codebase: Redis sessions, FastAPI, PostgreSQL. Decision: Auth0 for managed security + backward compatibility."
 ```
 
 ### Phase 2: Design
@@ -125,7 +125,7 @@ htmlgraph spike create "OAuth research: Use Auth0 (PKCE + token rotation). Exter
 
 **Tools:**
 - Plan subagent for complex architecture decisions
-- `htmlgraph analytics bottlenecks` for dependency analysis
+- `wipnote analytics bottlenecks` for dependency analysis
 - Mental models for system design
 
 **Output:**
@@ -138,7 +138,7 @@ htmlgraph spike create "OAuth research: Use Auth0 (PKCE + token rotation). Exter
 
 Document the design decision as a spike:
 ```bash
-htmlgraph spike create "Auth design: OAuth 2.0 with Auth0. Rationale: security critical, tight timeline, team unfamiliar with OAuth internals. Components: OAuth Integration Layer, JWT Token Service, User Profile Service. 3 phases: OAuth Setup (4h), JWT Integration (5h), User Integration (6h)."
+wipnote spike create "Auth design: OAuth 2.0 with Auth0. Rationale: security critical, tight timeline, team unfamiliar with OAuth internals. Components: OAuth Integration Layer, JWT Token Service, User Profile Service. 3 phases: OAuth Setup (4h), JWT Integration (5h), User Integration (6h)."
 ```
 
 ### Phase 3: Implement
@@ -165,7 +165,7 @@ htmlgraph spike create "Auth design: OAuth 2.0 with Auth0. Rationale: security c
 - General-purpose subagents for implementation
 - Edit/Write for code changes
 - Bash for testing and validation
-- `htmlgraph` CLI for tracking progress
+- `wipnote` CLI for tracking progress
 
 **Output:**
 - Working implementation
@@ -176,22 +176,22 @@ htmlgraph spike create "Auth design: OAuth 2.0 with Auth0. Rationale: security c
 **Example:**
 ```bash
 # Create track for the implementation
-htmlgraph track new "OAuth Authentication" --priority high
+wipnote track new "OAuth Authentication" --priority high
 # Note the track ID (e.g. trk-a1b2c3d4)
 
 # Create features for each phase
-htmlgraph feature create "OAuth Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "JWT Token Service" --priority high --track trk-a1b2c3d4
+wipnote feature create "OAuth Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "JWT Token Service" --priority high --track trk-a1b2c3d4
 
 # Start working on the first phase
-htmlgraph feature start feat-oauth-id
+wipnote feature start feat-oauth-id
 # ... implement ...
-htmlgraph feature complete feat-oauth-id
+wipnote feature complete feat-oauth-id
 
 # Then the second phase
-htmlgraph feature start feat-jwt-id
+wipnote feature start feat-jwt-id
 # ... implement ...
-htmlgraph feature complete feat-jwt-id
+wipnote feature complete feat-jwt-id
 ```
 
 ### Workflow Summary
@@ -320,19 +320,19 @@ Use EXPLORE agent
 
 ## Batch CLI Operations
 
-HtmlGraph CLI supports efficient workflows. Here are common patterns.
+Wipnote CLI supports efficient workflows. Here are common patterns.
 
 ### Pattern 1: Feature Creation
 
 ```bash
 # Create a feature
-htmlgraph feature create "OAuth Integration" --priority high
+wipnote feature create "OAuth Integration" --priority high
 
 # Start working on it
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 
 # Complete when done
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 ```
 
 ### Pattern 2: Parallel Dispatch
@@ -371,24 +371,24 @@ tasks = [
 
 ```bash
 # Get recommendations
-htmlgraph analytics recommend --agent-count 3
+wipnote analytics recommend --agent-count 3
 
 # Find bottlenecks
-htmlgraph analytics bottlenecks --top 3
+wipnote analytics bottlenecks --top 3
 
 # Get overall project status
-htmlgraph snapshot --summary
+wipnote snapshot --summary
 ```
 
 ### Pattern 4: Track Creation
 
 ```bash
 # Create track with linked features
-htmlgraph track new "User Authentication" --priority high
+wipnote track new "User Authentication" --priority high
 # Note track ID (e.g. trk-a1b2c3d4)
 
-htmlgraph feature create "Phase 1: OAuth" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2: JWT" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 1: OAuth" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2: JWT" --priority high --track trk-a1b2c3d4
 ```
 
 ---
@@ -493,13 +493,13 @@ Time savings: 30-40% (3-5 hours saved)
 
 ---
 
-## HtmlGraph Integration
+## Wipnote Integration
 
-How the 3-phase optimal workflow integrates with HtmlGraph's spike/track/feature system.
+How the 3-phase optimal workflow integrates with Wipnote's spike/track/feature system.
 
-### Mapping Phases to HtmlGraph Features
+### Mapping Phases to Wipnote Features
 
-| Optimal Workflow Phase | HtmlGraph Feature | Purpose |
+| Optimal Workflow Phase | Wipnote Feature | Purpose |
 |------------------------|-------------------|---------|
 | **Phase 1: Research** | Planning Spike | Document findings, constraints, options |
 | **Phase 2: Design** | Track + Spec + Plan | Capture architecture decision and implementation phases |
@@ -514,7 +514,7 @@ How the 3-phase optimal workflow integrates with HtmlGraph's spike/track/feature
 │                                                           │
 │  PHASE 1: RESEARCH                                       │
 │  ┌─────────────────────────────────────────┐            │
-│  │ HtmlGraph: Create planning spike         │            │
+│  │ Wipnote: Create planning spike         │            │
 │  │ Tool: Explore subagent (codebase)        │            │
 │  │ Output: Spike with findings              │            │
 │  └─────────────────────────────────────────┘            │
@@ -522,7 +522,7 @@ How the 3-phase optimal workflow integrates with HtmlGraph's spike/track/feature
 │                      ▼                                    │
 │  PHASE 2: DESIGN                                         │
 │  ┌─────────────────────────────────────────┐            │
-│  │ HtmlGraph: Create track from spike       │            │
+│  │ Wipnote: Create track from spike       │            │
 │  │ Tool: Plan subagent (architecture)       │            │
 │  │ Output: Track + Spec + Plan              │            │
 │  └─────────────────────────────────────────┘            │
@@ -530,7 +530,7 @@ How the 3-phase optimal workflow integrates with HtmlGraph's spike/track/feature
 │                      ▼                                    │
 │  PHASE 3: IMPLEMENT                                      │
 │  ┌─────────────────────────────────────────┐            │
-│  │ HtmlGraph: Create features from track    │            │
+│  │ Wipnote: Create features from track    │            │
 │  │ Tool: General-purpose agents             │            │
 │  │ Output: Completed features + Sessions    │            │
 │  └─────────────────────────────────────────┘            │
@@ -543,38 +543,38 @@ How the 3-phase optimal workflow integrates with HtmlGraph's spike/track/feature
 **Step 1: Research Phase (Create Spike)**
 ```bash
 # Get recommendations first
-htmlgraph analytics recommend --agent-count 1
+wipnote analytics recommend --agent-count 1
 
 # Document research findings as a spike
-htmlgraph spike create "User Authentication System research: Auth0 OAuth 2.0 recommended. Current stack: Redis sessions, FastAPI, PostgreSQL. Decision: Auth0 for security + speed, backward compatible."
+wipnote spike create "User Authentication System research: Auth0 OAuth 2.0 recommended. Current stack: Redis sessions, FastAPI, PostgreSQL. Decision: Auth0 for security + speed, backward compatible."
 ```
 
 **Step 2: Design Phase (Create Track)**
 ```bash
 # Create a track for the multi-phase implementation
-htmlgraph track new "User Authentication System" --priority high
+wipnote track new "User Authentication System" --priority high
 # Note the track ID (e.g. trk-a1b2c3d4)
 
 # Create features for each phase
-htmlgraph feature create "Phase 1: OAuth Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2: JWT Integration" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 3: User Integration" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 1: OAuth Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2: JWT Integration" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 3: User Integration" --priority high --track trk-a1b2c3d4
 ```
 
 **Step 3: Implement Phase (Execute Features)**
 ```bash
 # Work through features in dependency order
-htmlgraph feature start feat-oauth-id
+wipnote feature start feat-oauth-id
 # ... implement OAuth ...
-htmlgraph feature complete feat-oauth-id
+wipnote feature complete feat-oauth-id
 
-htmlgraph feature start feat-jwt-id
+wipnote feature start feat-jwt-id
 # ... implement JWT ...
-htmlgraph feature complete feat-jwt-id
+wipnote feature complete feat-jwt-id
 
-htmlgraph feature start feat-profile-id
+wipnote feature start feat-profile-id
 # ... implement user integration ...
-htmlgraph feature complete feat-profile-id
+wipnote feature complete feat-profile-id
 ```
 
 ---
@@ -585,11 +585,11 @@ htmlgraph feature complete feat-profile-id
 
 | Scenario | Use Workflow | Rationale |
 |----------|--------------|-----------|
-| Complex new feature | **Both**: 3-Phase + HtmlGraph | Need research, architecture, and tracking |
+| Complex new feature | **Both**: 3-Phase + Wipnote | Need research, architecture, and tracking |
 | Simple bug fix | **Neither** | Just fix, test, commit |
 | Explore codebase | **3-Phase only** | Phase 1 research with Explore agent |
-| Multi-feature initiative | **Both**: 3-Phase + HtmlGraph | Track coordinates features, phases guide execution |
-| One-off task | **3-Phase only** | Lightweight structure without HtmlGraph overhead |
+| Multi-feature initiative | **Both**: 3-Phase + Wipnote | Track coordinates features, phases guide execution |
+| One-off task | **3-Phase only** | Lightweight structure without Wipnote overhead |
 
 ### Subagent Selection by Phase
 
@@ -601,11 +601,11 @@ htmlgraph feature complete feat-profile-id
 
 ### CLI Operations Checklist
 
-- [ ] Create track first for multi-phase work (`htmlgraph track new`)
+- [ ] Create track first for multi-phase work (`wipnote track new`)
 - [ ] Link features to tracks with `--track` flag
 - [ ] Dispatch parallel tasks in single message (list of Task calls)
-- [ ] Use `htmlgraph analytics recommend` for planning context
-- [ ] Use `htmlgraph analytics bottlenecks` before parallelizing
+- [ ] Use `wipnote analytics recommend` for planning context
+- [ ] Use `wipnote analytics bottlenecks` before parallelizing
 
 ---
 
@@ -615,14 +615,14 @@ htmlgraph feature complete feat-profile-id
 ┌─────────────────────────────────────────────────────────────┐
 │  1. STRATEGIC ANALYSIS                                       │
 │  Get recommendations from dependency analytics               │
-│  → /htmlgraph:recommend                                     │
+│  → /wipnote:recommend                                     │
 └────────────────┬────────────────────────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  2. START PLANNING                                           │
 │  Create spike or track depending on complexity               │
-│  → /htmlgraph:plan "description"                            │
+│  → /wipnote:plan "description"                            │
 └────────────────┬────────────────────────────────────────────┘
                  │
       ┌──────────┴──────────┐
@@ -670,16 +670,16 @@ Use strategic analytics to identify what to work on:
 
 **Slash Command:**
 ```bash
-/htmlgraph:recommend
+/wipnote:recommend
 ```
 
 **CLI:**
 ```bash
 # Get recommendations
-htmlgraph analytics recommend --agent-count 3
+wipnote analytics recommend --agent-count 3
 
 # Check bottlenecks
-htmlgraph analytics bottlenecks --top 3
+wipnote analytics bottlenecks --top 3
 ```
 
 **Output:**
@@ -699,12 +699,12 @@ For non-trivial work, start with a research spike:
 
 **Slash Command:**
 ```bash
-/htmlgraph:plan "User authentication system"
+/wipnote:plan "User authentication system"
 ```
 
 **CLI:**
 ```bash
-htmlgraph spike create "Planning: User authentication system - research needed before implementation"
+wipnote spike create "Planning: User authentication system - research needed before implementation"
 ```
 
 **What This Creates:**
@@ -716,7 +716,7 @@ htmlgraph spike create "Planning: User authentication system - research needed b
 If you already know the approach, skip spike:
 
 ```bash
-htmlgraph track new "Fix login bug" --priority medium
+wipnote track new "Fix login bug" --priority medium
 ```
 
 ### Step 3: Document Research Findings
@@ -725,7 +725,7 @@ Document what you learned during research:
 
 ```bash
 # Record findings in the spike
-htmlgraph spike create "Auth research complete: OAuth 2.0 with Google/GitHub providers, JWT for session management, Redis for token storage. Decision: Use Auth0 for OAuth, custom JWT signing."
+wipnote spike create "Auth research complete: OAuth 2.0 with Google/GitHub providers, JWT for session management, Redis for token storage. Decision: Use Auth0 for OAuth, custom JWT signing."
 ```
 
 ### Step 4: Create Track with Phases
@@ -733,7 +733,7 @@ htmlgraph spike create "Auth research complete: OAuth 2.0 with Google/GitHub pro
 Create a track for the implementation:
 
 ```bash
-htmlgraph track new "User Authentication System" --priority high
+wipnote track new "User Authentication System" --priority high
 # Note the track ID (e.g. trk-a1b2c3d4)
 ```
 
@@ -743,9 +743,9 @@ Break down track phases into features:
 
 ```bash
 # Create features for each phase
-htmlgraph feature create "Phase 1: OAuth Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2: JWT Token Management" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 3: User Management" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 1: OAuth Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2: JWT Token Management" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 3: User Management" --priority high --track trk-a1b2c3d4
 ```
 
 ### Step 6: Implement Features
@@ -754,61 +754,61 @@ Execute the plan:
 
 ```bash
 # Start first feature
-htmlgraph feature start feat-oauth-id
+wipnote feature start feat-oauth-id
 
 # Work on it, complete when done
-htmlgraph feature complete feat-oauth-id
+wipnote feature complete feat-oauth-id
 
 # Continue with next phase
-htmlgraph feature start feat-jwt-id
-htmlgraph feature complete feat-jwt-id
+wipnote feature start feat-jwt-id
+wipnote feature complete feat-jwt-id
 ```
 
 ## Slash Commands Reference
 
-### `/htmlgraph:recommend`
+### `/wipnote:recommend`
 
 Get strategic recommendations on what to work on.
 
 ```bash
 # Get top 3 recommendations
-/htmlgraph:recommend
+/wipnote:recommend
 
 # Get more recommendations
-/htmlgraph:recommend --count 5
+/wipnote:recommend --count 5
 
 # Skip bottleneck check
-/htmlgraph:recommend --no-check-bottlenecks
+/wipnote:recommend --no-check-bottlenecks
 ```
 
-### `/htmlgraph:plan`
+### `/wipnote:plan`
 
 Start planning new work (creates spike or track).
 
 ```bash
 # Create planning spike (recommended)
-/htmlgraph:plan "User authentication system"
+/wipnote:plan "User authentication system"
 
 # With custom timebox
-/htmlgraph:plan "Real-time notifications" --timebox 3
+/wipnote:plan "Real-time notifications" --timebox 3
 
 # Create track directly (skip spike)
-/htmlgraph:plan "Simple bug fix" --no-spike
+/wipnote:plan "Simple bug fix" --no-spike
 ```
 
-### `/htmlgraph:spike`
+### `/wipnote:spike`
 
 Create a research/planning spike directly.
 
 ```bash
 # Basic spike
-/htmlgraph:spike "Research caching strategies"
+/wipnote:spike "Research caching strategies"
 
 # With context
-/htmlgraph:spike "Investigate OAuth providers" --context "Need Google + GitHub support"
+/wipnote:spike "Investigate OAuth providers" --context "Need Google + GitHub support"
 
 # With custom timebox
-/htmlgraph:spike "Plan data migration" --timebox 2
+/wipnote:spike "Plan data migration" --timebox 2
 ```
 
 ## Complete Example
@@ -817,30 +817,30 @@ Here's a complete workflow from recommendation to implementation:
 
 ```bash
 # 1. Get recommendations
-htmlgraph analytics recommend --agent-count 1
+wipnote analytics recommend --agent-count 1
 
 # 2. Create planning spike to document research
-htmlgraph spike create "Planning: User Authentication System - research Auth0 OAuth 2.0"
+wipnote spike create "Planning: User Authentication System - research Auth0 OAuth 2.0"
 
 # 3. After research, document findings
-htmlgraph spike create "Auth research complete: Use OAuth 2.0 + JWT. Decision: Implement with Auth0 for security + speed."
+wipnote spike create "Auth research complete: Use OAuth 2.0 + JWT. Decision: Implement with Auth0 for security + speed."
 
 # 4. Create track with the implementation plan
-htmlgraph track new "User Authentication System" --priority high
+wipnote track new "User Authentication System" --priority high
 # Note track ID: trk-a1b2c3d4
 
 # 5. Create features from each phase
-htmlgraph feature create "Phase 1: OAuth Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2: JWT Integration" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 1: OAuth Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2: JWT Integration" --priority high --track trk-a1b2c3d4
 
 # 6. Start implementation
-htmlgraph feature start feat-phase1-id
+wipnote feature start feat-phase1-id
 # ... implement ...
-htmlgraph feature complete feat-phase1-id
+wipnote feature complete feat-phase1-id
 
-htmlgraph feature start feat-phase2-id
+wipnote feature start feat-phase2-id
 # ... implement ...
-htmlgraph feature complete feat-phase2-id
+wipnote feature complete feat-phase2-id
 ```
 
 ## Best Practices
@@ -855,7 +855,7 @@ htmlgraph feature complete feat-phase2-id
 ## Platform Availability
 
 All commands work on:
-- ✅ Claude Code (`/htmlgraph:command`)
+- ✅ Claude Code (`/wipnote:command`)
 - ✅ Codex (via slash commands)
 - ✅ Gemini (via extension commands)
 

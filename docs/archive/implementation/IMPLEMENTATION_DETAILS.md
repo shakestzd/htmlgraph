@@ -115,7 +115,7 @@ This creates:
 
 ## Code Changes
 
-### File: `src/python/htmlgraph/api/templates/dashboard-redesign.html`
+### File: `src/python/wipnote/api/templates/dashboard-redesign.html`
 
 #### Change 1: New Function (Lines 381-428)
 
@@ -385,7 +385,7 @@ Potential improvements (out of scope for this fix):
 ## Files Modified
 
 ```
-src/python/htmlgraph/api/templates/dashboard-redesign.html
+src/python/wipnote/api/templates/dashboard-redesign.html
   Lines 381-428: calculateEventDepth() function (NEW)
   Line 466: Updated insertChildEvent() to use new function
 

@@ -304,8 +304,8 @@ When Phase 2 is complete, start Phase 3a with:
 
 ```bash
 # 1. Verify Phase 2 complete
-ls -1 src/python/htmlgraph/api/repositories/*.py
-ls -1 src/python/htmlgraph/api/services/*.py
+ls -1 src/python/wipnote/api/repositories/*.py
+ls -1 src/python/wipnote/api/services/*.py
 
 # 2. Run baseline tests
 uv run pytest --tb=short
@@ -315,7 +315,7 @@ uv run pytest tests/unit/api/test_repositories.py -v
 uv run pytest tests/unit/api/test_services.py -v
 
 # 4. Check coverage
-uv run pytest tests/unit/api/ --cov=src/python/htmlgraph/api
+uv run pytest tests/unit/api/ --cov=src/python/wipnote/api
 ```
 
 ---

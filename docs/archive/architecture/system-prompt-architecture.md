@@ -191,14 +191,14 @@ def session_start_with_recovery():
         return read_file('.claude/system-prompt.md')
 
     # 2. Try backup copy
-    if exists('.htmlgraph/.system-prompt-backup.md'):
-        return read_file('.htmlgraph/.system-prompt-backup.md')
+    if exists('.wipnote/.system-prompt-backup.md'):
+        return read_file('.wipnote/.system-prompt-backup.md')
 
     # 3. Try environment variable
     if os.getenv('CLAUDE_SYSTEM_PROMPT'):
         return os.getenv('CLAUDE_SYSTEM_PROMPT')
 
-    # 4. Use plugin default (shipped with htmlgraph)
+    # 4. Use plugin default (shipped with wipnote)
     return PLUGIN_DEFAULT_SYSTEM_PROMPT
 ```
 
@@ -206,8 +206,8 @@ def session_start_with_recovery():
 ```python
 # After successful Layer 1 injection
 if layer1_success:
-    # Create backup in .htmlgraph/ directory
-    backup_path = Path('.htmlgraph/.system-prompt-backup.md')
+    # Create backup in .wipnote/ directory
+    backup_path = Path('.wipnote/.system-prompt-backup.md')
     backup_path.write_text(system_prompt)
     backup_path.chmod(0o644)
 ```
@@ -257,7 +257,7 @@ def inject_system_prompt():
         os.environ['CLAUDE_SYSTEM_PROMPT'] = system_prompt
 
         # Create backup for recovery
-        backup_path = Path('.htmlgraph/.system-prompt-backup.md')
+        backup_path = Path('.wipnote/.system-prompt-backup.md')
         backup_path.parent.mkdir(parents=True, exist_ok=True)
         backup_path.write_text(system_prompt)
 
@@ -278,7 +278,7 @@ except Exception as e:
 
 ### SessionStateManager (SDK)
 
-**Location:** `src/python/htmlgraph/session.py`
+**Location:** `src/python/wipnote/session.py`
 
 **Responsibilities:**
 1. Detect post-compact sessions (new session ID)
@@ -368,12 +368,12 @@ Hook injects via additionalContext (Layer 1)
         ↓
 Hook sets environment variables (Layer 2)
         ↓
-Hook creates backup in .htmlgraph/ (Layer 3)
+Hook creates backup in .wipnote/ (Layer 3)
         ↓
 Agent can now access system prompt
     ├─ In context (additionalContext)
     ├─ In environment ($CLAUDE_SYSTEM_PROMPT)
-    └─ In backup (.htmlgraph/.system-prompt-backup.md)
+    └─ In backup (.wipnote/.system-prompt-backup.md)
         ↓
 Agent sees delegation guidance
         ↓
@@ -443,7 +443,7 @@ Layer 1 still fails (file not back)
         ↓
 Layer 2 tries (environment might not persist)
         ↓
-Layer 3 engages: Use backup file from .htmlgraph/
+Layer 3 engages: Use backup file from .wipnote/
         ↓
 Backup file exists (created in earlier session)
         ↓
@@ -545,7 +545,7 @@ def idempotent_injection():
     os.environ['CLAUDE_SYSTEM_PROMPT'] = system_prompt
 
     # 3. Backup once (overwrite if exists)
-    backup_path = Path('.htmlgraph/.system-prompt-backup.md')
+    backup_path = Path('.wipnote/.system-prompt-backup.md')
     backup_path.write_text(system_prompt)  # Overwrites safely
 
     # 4. Track one session
@@ -709,7 +709,7 @@ uv run pytest tests/ --durations=10  # Show slowest tests
 **Mitigation:**
 - Set variables in CI/CD configuration explicitly
 - Use Layer 1 (file) as primary in these contexts
-- Create `.htmlgraph/.env-backup` for recovery
+- Create `.wipnote/.env-backup` for recovery
 
 **When it matters:** CI/CD pipelines with sandboxed shells
 
@@ -728,13 +728,13 @@ uv run pytest tests/ --durations=10  # Show slowest tests
 
 ### Limitation 4: Plugin Availability
 
-**Issue:** Requires HtmlGraph plugin installed in Claude Code.
+**Issue:** Requires Wipnote plugin installed in Claude Code.
 
 **Impact:** Users without plugin don't get automatic injection.
 
 **Mitigation:**
 - Plugin auto-installs on first use
-- Manual installation: `claude plugin install htmlgraph`
+- Manual installation: `claude plugin install wipnote`
 - Fallback: Copy system prompt to context manually (one-time)
 
 **When it matters:** Plugin not installed or installation fails
@@ -818,7 +818,7 @@ cp system-prompt.md system-prompt-backup.md
 
 **New way:**
 ```python
-# Automatic backup in .htmlgraph/
+# Automatic backup in .wipnote/
 # Created by hook on every session start
 # No manual management
 ```
@@ -829,7 +829,7 @@ cp system-prompt.md system-prompt-backup.md
 # Delete: system-prompt-backup.md from project root
 
 # 2. Let hook create automatic backup
-# First session will create: .htmlgraph/.system-prompt-backup.md
+# First session will create: .wipnote/.system-prompt-backup.md
 
 # 3. If you need custom backup location
 # Edit hook to use your path
@@ -854,7 +854,7 @@ cp system-prompt.md system-prompt-backup.md
 **Phase 3 (Week 3): Team rollout**
 ```bash
 # Commit .claude/system-prompt.md to git
-# Team updates plugins: claude plugin install htmlgraph@latest
+# Team updates plugins: claude plugin install wipnote@latest
 # Run in their projects
 ```
 
@@ -916,7 +916,7 @@ Not measurable by user (dominated by Claude Code's context operations).
 ls -lh .claude/system-prompt.md
 
 # Check plugin installed
-claude plugin list | grep htmlgraph
+claude plugin list | grep wipnote
 
 # Check environment variable
 echo $CLAUDE_SYSTEM_PROMPT | head -50
@@ -924,7 +924,7 @@ echo $CLAUDE_SYSTEM_PROMPT | head -50
 
 **Solutions:**
 1. **File missing** → Create it: `touch .claude/system-prompt.md`
-2. **Plugin not installed** → Install: `claude plugin install htmlgraph@latest`
+2. **Plugin not installed** → Install: `claude plugin install wipnote@latest`
 3. **Hook not running** → Verify: `ls -lh .claude/hooks/scripts/session-start.py`
 4. **File too large** → Reduce size to <1000 tokens
 
@@ -942,7 +942,7 @@ echo "After: $CLAUDE_DELEGATION_ENABLED"
 ```
 
 **Solutions:**
-1. **File deleted** → Restore from backup: `cp .htmlgraph/.system-prompt-backup.md .claude/system-prompt.md`
+1. **File deleted** → Restore from backup: `cp .wipnote/.system-prompt-backup.md .claude/system-prompt.md`
 2. **Environment not persisting** → Use file-based recovery (Layer 3)
 3. **Hook not re-running** → Reinstall plugin
 
@@ -959,14 +959,14 @@ echo $CLAUDE_ORCHESTRATOR_ACTIVE
 
 **Solutions:**
 1. **Variable not set** → Hook should set it. Verify hook ran.
-2. **Plugin not installed** → Install: `claude plugin install htmlgraph@latest`
-3. **Plugin needs update** → Update: `claude plugin update htmlgraph`
+2. **Plugin not installed** → Install: `claude plugin install wipnote@latest`
+3. **Plugin needs update** → Update: `claude plugin update wipnote`
 
 ### Agent Attribution Missing
 
 **Diagnosis:**
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Check if agent parameter used
 sdk = SDK()  # WRONG - no agent
@@ -984,7 +984,7 @@ For complete troubleshooting workflows, see [System Prompt Architecture](../SYST
 1. **Quick Start**: Follow [System Prompt Quick Start](../SYSTEM_PROMPT_QUICK_START.md) (5-minute setup)
 2. **Admin Setup**: Follow [Delegation Enforcement Guide](../contributing/DELEGATION_ENFORCEMENT_ADMIN_GUIDE.md)
 3. **Testing**: Run `uv run pytest tests/hooks/ tests/integration/ -v`
-4. **Monitoring**: Use HtmlGraph SDK to track delegation patterns
+4. **Monitoring**: Use Wipnote SDK to track delegation patterns
 5. **Troubleshooting**: See [System Prompt Architecture](../SYSTEM_PROMPT_ARCHITECTURE.md#troubleshooting-common-issues) for issues
 
 For extending the system, see [System Prompt Developer Guide](../SYSTEM_PROMPT_DEVELOPER_GUIDE.md).

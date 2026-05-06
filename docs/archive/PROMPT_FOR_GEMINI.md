@@ -4,7 +4,7 @@ Copy this and paste it into Gemini:
 
 ---
 
-Please analyze HtmlGraph's dependencies to maximize value for AI agents and human users.
+Please analyze Wipnote's dependencies to maximize value for AI agents and human users.
 
 **Task Details:**
 - Read the comprehensive instructions: `GEMINI_TASK_DEPENDENCY_ANALYSIS.md`
@@ -43,7 +43,7 @@ Please analyze HtmlGraph's dependencies to maximize value for AI agents and huma
 5. **Deliverable:**
    Update spike `spk-f1bf9a98` with:
    ```python
-   from htmlgraph import SDK
+   from wipnote import SDK
 
    sdk = SDK(agent='gemini')
 

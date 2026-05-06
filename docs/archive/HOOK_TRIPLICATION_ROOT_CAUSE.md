@@ -13,7 +13,7 @@ Claude Code loads and **MERGES** hooks from **3 different locations**:
 |---|----------|--------|---------|
 | 1 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | ✅ CORRECT SOURCE | Single UserPromptSubmit hook |
 | 2 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/hooks.json` | ❌ DUPLICATE FILE | Identical copy of Source 1 |
-| 3 | `/Users/shakes/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | ⚠️ CACHED/OUTDATED | Includes extra track-event.py hook |
+| 3 | `/Users/shakes/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | ⚠️ CACHED/OUTDATED | Includes extra track-event.py hook |
 
 When Claude Code encounters the same hook type from multiple sources, it **merges the hooks** instead of deduplicating them. Each UserPromptSubmit registration executes independently, resulting in 3 executions.
 
@@ -88,7 +88,7 @@ When Claude Code encounters the same hook type from multiple sources, it **merge
 ---
 
 ### Hook Source #3: GLOBAL MARKETPLACE CACHE (OUTDATED)
-**Path:** `/Users/shakes/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json`
+**Path:** `/Users/shakes/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json`
 
 **Problem:** Contains DIFFERENT hooks than current source
 
@@ -159,7 +159,7 @@ When Claude Code encounters the same hook type from multiple sources, it **merge
    └─ Hook 2: From packages/claude-plugin/.claude-plugin/hooks/hooks.json
    ↓
 5. Also loads from global marketplace cache:
-   └─ ~/.claude/plugins/marketplaces/htmlgraph/...
+   └─ ~/.claude/plugins/marketplaces/wipnote/...
    ↓
 6. MERGES all three sources together
    ↓
@@ -185,8 +185,8 @@ Result: user-prompt-submit.py runs 3 TIMES
 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | UserPromptSubmit | 3-13 | ✅ CORRECT | KEEP |
 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | PreToolUse | 48-57 | ✅ CORRECT | KEEP |
 | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | PostToolUse | 60-68 | ✅ CORRECT | KEEP |
-| `~/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | UserPromptSubmit | 3-17 | ⚠️ OUTDATED | AUTO-FIX |
-| `~/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | PreToolUse | 53-68 | ⚠️ OUTDATED | AUTO-FIX |
+| `~/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | UserPromptSubmit | 3-17 | ⚠️ OUTDATED | AUTO-FIX |
+| `~/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json` | PreToolUse | 53-68 | ⚠️ OUTDATED | AUTO-FIX |
 
 ---
 
@@ -195,7 +195,7 @@ Result: user-prompt-submit.py runs 3 TIMES
 ### Before (Current - Broken)
 ```bash
 # Count UserPromptSubmit registrations across all sources
-find /Users/shakes -path "*htmlgraph*" -name "hooks.json" -type f -exec grep -l "UserPromptSubmit" {} \; 2>/dev/null | wc -l
+find /Users/shakes -path "*wipnote*" -name "hooks.json" -type f -exec grep -l "UserPromptSubmit" {} \; 2>/dev/null | wc -l
 # Output: 3 (three files have UserPromptSubmit)
 
 # Test: Submit a prompt in Claude Code
@@ -206,7 +206,7 @@ find /Users/shakes -path "*htmlgraph*" -name "hooks.json" -type f -exec grep -l 
 ```bash
 # After deleting packages/claude-plugin/hooks/hooks.json
 # After deploying to update marketplace cache
-find /Users/shakes -path "*htmlgraph*" -name "hooks.json" -type f -exec grep -l "UserPromptSubmit" {} \; 2>/dev/null | wc -l
+find /Users/shakes -path "*wipnote*" -name "hooks.json" -type f -exec grep -l "UserPromptSubmit" {} \; 2>/dev/null | wc -l
 # Output: 2 (only two remain - source and marketplace cache)
 # But since marketplace cache syncs from source, effectively 1
 
@@ -253,12 +253,12 @@ Project Root: /Users/shakes/DevProjects/htmlgraph/
 Hook Registration Sources:
 ├── ✅ packages/claude-plugin/.claude-plugin/hooks/hooks.json (SOURCE - KEEP)
 ├── ❌ packages/claude-plugin/hooks/hooks.json (DUPLICATE - DELETE)
-└── ⚠️ ~/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json (CACHE - AUTO-FIXES)
+└── ⚠️ ~/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json (CACHE - AUTO-FIXES)
 
 Other Cache Locations (Safe to ignore, auto-cleaned):
-├── ~/.claude/plugins/cache/htmlgraph/htmlgraph/0.24.1/hooks/hooks.json
-├── ~/.claude/plugins/cache/htmlgraph/htmlgraph/0.9.6/hooks/hooks.json
-└── ~/.claude/plugins/cache/htmlgraph/htmlgraph/0.25.0/hooks/hooks.json
+├── ~/.claude/plugins/cache/wipnote/wipnote/0.24.1/hooks/hooks.json
+├── ~/.claude/plugins/cache/wipnote/wipnote/0.9.6/hooks/hooks.json
+└── ~/.claude/plugins/cache/wipnote/wipnote/0.25.0/hooks/hooks.json
 ```
 
 ---
@@ -281,7 +281,7 @@ Other Cache Locations (Safe to ignore, auto-cleaned):
 |------|---------|----------|
 | `.claude-plugin/hooks/hooks.json` | Source of truth for hooks | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json` |
 | `hooks/hooks.json` | DUPLICATE - DELETE | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/hooks.json` |
-| Marketplace cache | Auto-synced from source | `~/.claude/plugins/marketplaces/htmlgraph/...` |
+| Marketplace cache | Auto-synced from source | `~/.claude/plugins/marketplaces/wipnote/...` |
 | Hook scripts | Actual executable scripts | `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/scripts/` |
 
 ---
@@ -308,8 +308,8 @@ The marketplace version has an extra `pretooluse-spawner-router.py` hook registe
 
 **AUTO-UPDATES (Marketplace Cache):**
 ```
-/Users/shakes/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/hooks.json
-/Users/shakes/.claude/plugins/marketplaces/htmlgraph/packages/claude-plugin/hooks/hooks.json
+/Users/shakes/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/.claude-plugin/hooks/hooks.json
+/Users/shakes/.claude/plugins/marketplaces/wipnote/packages/claude-plugin/hooks/hooks.json
 ```
 
 ---

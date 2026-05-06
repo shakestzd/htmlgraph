@@ -7,7 +7,7 @@ Spec and Plan models for track planning.
 The Spec model defines requirements and success criteria for a track.
 
 ```python
-from htmlgraph.planning import Spec, Requirement, AcceptanceCriterion
+from wipnote.planning import Spec, Requirement, AcceptanceCriterion
 
 spec = Spec(
     overview="Add OAuth 2.0 support for user authentication",
@@ -44,7 +44,7 @@ spec = Spec(
 The Plan model defines phased implementation tasks.
 
 ```python
-from htmlgraph.planning import Plan, Phase, Task
+from wipnote.planning import Plan, Phase, Task
 
 plan = Plan(
     phases=[
@@ -74,7 +74,7 @@ plan = Plan(
 ## Requirement
 
 ```python
-from htmlgraph.planning import Requirement, RequirementPriority
+from wipnote.planning import Requirement, RequirementPriority
 
 req = Requirement(
     description="Implement OAuth 2.0 flow",
@@ -90,7 +90,7 @@ req = Requirement(
 ## AcceptanceCriterion
 
 ```python
-from htmlgraph.planning import AcceptanceCriterion
+from wipnote.planning import AcceptanceCriterion
 
 criterion = AcceptanceCriterion(
     description="Users can log in with Google",
@@ -106,7 +106,7 @@ criterion = AcceptanceCriterion(
 ## Phase
 
 ```python
-from htmlgraph.planning import Phase, Task
+from wipnote.planning import Phase, Task
 
 phase = Phase(
     name="Phase 1: Setup",
@@ -125,7 +125,7 @@ phase = Phase(
 ## Task
 
 ```python
-from htmlgraph.planning import Task
+from wipnote.planning import Task
 
 task = Task(
     description="Implement OAuth flow",
@@ -142,4 +142,4 @@ task = Task(
 
 ## Complete API Reference
 
-For detailed API documentation with type signatures and validation rules, see the Python source code in `src/python/htmlgraph/planning.py`.
+For detailed API documentation with type signatures and validation rules, see the Python source code in `src/python/wipnote/planning.py`.

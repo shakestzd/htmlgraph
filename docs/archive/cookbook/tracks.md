@@ -7,7 +7,7 @@
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -57,7 +57,7 @@ print(f"  Plan: {len(track.plan.phases)} phases, {sum(len(p.tasks) for p in trac
 
 **What Gets Created**:
 ```
-.htmlgraph/tracks/track-20241224-120000/
+.wipnote/tracks/track-20241224-120000/
 ├── index.html   # Track metadata
 ├── spec.html    # Specification with requirements
 └── plan.html    # Implementation plan with phases
@@ -79,7 +79,7 @@ print(f"  Plan: {len(track.plan.phases)} phases, {sum(len(p.tasks) for p in trac
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -126,7 +126,7 @@ print(f"Linked {len(feature_ids)} features to track {track_id}")
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -181,7 +181,7 @@ Step Progress:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -216,7 +216,7 @@ print(f"\nCreated {len(track.plan.phases)} features from plan phases")
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -255,7 +255,7 @@ for track in all_tracks:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -295,7 +295,7 @@ with sdk.tracks.edit(track.id) as t:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 import re
 
 sdk = SDK(agent="claude")

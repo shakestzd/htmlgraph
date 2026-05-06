@@ -1,6 +1,6 @@
 # User Guide
 
-Welcome to the HtmlGraph user guide. This section provides in-depth documentation for all HtmlGraph features.
+Welcome to the Wipnote user guide. This section provides in-depth documentation for all Wipnote features.
 
 ## What You'll Learn
 
@@ -12,7 +12,7 @@ This guide covers:
 - **[Skills](skills.md)** - Specialized guides for orchestration, deployment, and debugging
 - **[Session Hierarchies](session-hierarchies.md)** - Understanding parent-child session relationships
 - **[Sessions](sessions.md)** - Understanding session tracking and attribution
-- **[Agents](agents.md)** - Integrating HtmlGraph with AI agents
+- **[Agents](agents.md)** - Integrating Wipnote with AI agents
 - **[Dashboard](dashboard.md)** - Using the interactive dashboard
 
 ## Quick Navigation
@@ -52,7 +52,7 @@ Advanced topics:
 ### Creating a Simple Feature
 
 ```bash
-htmlgraph feature create "Add login page" --priority high
+wipnote feature create "Add login page" --priority high
 ```
 
 [Learn more →](features-tracks.md#creating-features)
@@ -60,7 +60,7 @@ htmlgraph feature create "Add login page" --priority high
 ### Creating a Complex Track
 
 ```bash
-htmlgraph track new "User Authentication" --priority high
+wipnote track new "User Authentication" --priority high
 # Note the track ID (e.g. trk-a1b2c3d4)
 ```
 
@@ -70,25 +70,25 @@ htmlgraph track new "User Authentication" --priority high
 
 ```bash
 # Create features linked to the track
-htmlgraph feature create "OAuth Setup" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "JWT Middleware" --priority high --track trk-a1b2c3d4
+wipnote feature create "OAuth Setup" --priority high --track trk-a1b2c3d4
+wipnote feature create "JWT Middleware" --priority high --track trk-a1b2c3d4
 ```
 
 [Learn more →](features-tracks.md#linking-features-to-tracks)
 
 ### Starting a Session
 
-Sessions are automatically managed by HtmlGraph hooks:
+Sessions are automatically managed by Wipnote hooks:
 
 ```bash
 # Session starts automatically when you begin working
-htmlgraph feature start feature-001
+wipnote feature start feature-001
 
 # View session status
-htmlgraph status
+wipnote status
 
 # Session ends automatically when you complete the feature
-htmlgraph feature complete feature-001
+wipnote feature complete feature-001
 ```
 
 [Learn more →](sessions.md)
@@ -98,4 +98,4 @@ htmlgraph feature complete feature-001
 - Check the [API Reference](../api/index.md) for detailed SDK documentation
 - Browse [Examples](../examples/index.md) for real-world use cases
 - Read the [Philosophy](../philosophy/why-html.md) to understand design decisions
-- Visit [GitHub Discussions](https://github.com/shakestzd/htmlgraph/discussions) for community support
+- Visit [GitHub Discussions](https://github.com/shakestzd/wipnote/discussions) for community support

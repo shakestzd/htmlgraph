@@ -1,8 +1,8 @@
-# Initial Prompt: Build HtmlGraph - "HTML is All You Need"
+# Initial Prompt: Build Wipnote - "HTML is All You Need"
 
 ## Project Overview
 
-You are building **HtmlGraph**, a lightweight graph database framework that uses HTML files as nodes, hyperlinks as edges, and CSS selectors as the query language. The goal is to provide AI agents with a simple, human-readable, version-control-friendly alternative to traditional graph databases like Neo4j.
+You are building **Wipnote**, a lightweight graph database framework that uses HTML files as nodes, hyperlinks as edges, and CSS selectors as the query language. The goal is to provide AI agents with a simple, human-readable, version-control-friendly alternative to traditional graph databases like Neo4j.
 
 **Tagline**: "HTML is All You Need"
 
@@ -32,13 +32,13 @@ Read CLAUDE.md carefully before beginning implementation.
 ### 1. Project Setup
 ```bash
 # Create directory structure
-mkdir -p htmlgraph/{src/python/htmlgraph,src/js,examples,tests,docs,dashboard}
+mkdir -p wipnote/{src/python/wipnote,src/js,examples,tests,docs,dashboard}
 
 # Initialize Python package
-cd htmlgraph
+cd wipnote
 cat > pyproject.toml << EOF
 [project]
-name = "htmlgraph"
+name = "wipnote"
 version = "0.1.0"
 description = "HTML is All You Need - Graph database on web standards"
 authors = [{name = "Shakes", email = "your@email.com"}]
@@ -65,7 +65,7 @@ EOF
 
 ### 2. Core Python Implementation
 
-**Priority 1: HTML Parser (src/python/htmlgraph/parser.py)**
+**Priority 1: HTML Parser (src/python/wipnote/parser.py)**
 ```python
 """
 Create a wrapper around justhtml that:
@@ -76,7 +76,7 @@ Create a wrapper around justhtml that:
 """
 ```
 
-**Priority 2: Pydantic Models (src/python/htmlgraph/models.py)**
+**Priority 2: Pydantic Models (src/python/wipnote/models.py)**
 ```python
 """
 Define Pydantic models for:
@@ -92,7 +92,7 @@ Each model should have:
 """
 ```
 
-**Priority 3: Graph Operations (src/python/htmlgraph/graph.py)**
+**Priority 3: Graph Operations (src/python/wipnote/graph.py)**
 ```python
 """
 Implement core graph operations:
@@ -106,7 +106,7 @@ Implement core graph operations:
 """
 ```
 
-**Priority 4: Converters (src/python/htmlgraph/converter.py)**
+**Priority 4: Converters (src/python/wipnote/converter.py)**
 ```python
 """
 Bidirectional conversion:
@@ -119,11 +119,11 @@ Bidirectional conversion:
 
 ### 3. JavaScript Implementation
 
-**Priority 1: Core Library (src/js/htmlgraph.js)**
+**Priority 1: Core Library (src/js/wipnote.js)**
 ```javascript
 """
 Create vanilla JS library with:
-1. HtmlGraph class
+1. Wipnote class
 2. loadFrom(directory) - Load all HTML files
 3. query(css_selector) - Query nodes
 4. getNode(id) - Get specific node

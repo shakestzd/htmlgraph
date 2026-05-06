@@ -7,7 +7,7 @@
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -64,7 +64,7 @@ The same applies to `recommend_next_work`, `get_parallel_work`, and `assess_risk
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -112,7 +112,7 @@ RECOMMENDED NEXT TASK:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -162,7 +162,7 @@ CAN WORK ON 4 TASKS IN PARALLEL:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -236,7 +236,7 @@ RECOMMENDATIONS:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -288,7 +288,7 @@ UNLOCKS 5 TASKS:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 from datetime import datetime
 
 sdk = SDK(agent="claude")
@@ -345,7 +345,7 @@ print(f"Generated: {datetime.now().isoformat()}")
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 from datetime import datetime, timedelta
 
 sdk = SDK(agent="claude")

@@ -30,16 +30,16 @@ Successfully refactored system prompt persistence into a publishable plugin feat
 - Session startup instructions
 
 ### 2. System Prompts SDK Module
-**File:** `/src/python/htmlgraph/system_prompts.py`
+**File:** `/src/python/wipnote/system_prompts.py`
 
 Provides complete system prompt lifecycle management:
 
 ```python
 # Import
-from htmlgraph.system_prompts import SystemPromptManager, SystemPromptValidator
+from wipnote.system_prompts import SystemPromptManager, SystemPromptValidator
 
 # Via SDK (recommended)
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="claude")
 
 # Get active prompt (project override OR plugin default)
@@ -86,7 +86,7 @@ sdk.system_prompts.delete()
 - Two-tier system: Project override takes precedence over plugin default
 
 ### 3. SDK Integration
-**File:** `/src/python/htmlgraph/sdk.py`
+**File:** `/src/python/wipnote/sdk.py`
 
 Added `system_prompts` property to SDK class:
 
@@ -101,7 +101,7 @@ def system_prompts(self) -> SystemPromptManager:
 
 Updated imports:
 ```python
-from htmlgraph.system_prompts import SystemPromptManager
+from wipnote.system_prompts import SystemPromptManager
 ```
 
 Updated SDK docstring to document system prompt management capabilities.
@@ -243,13 +243,13 @@ if system_prompt:
 
 ### Created
 1. `/packages/claude-plugin/.claude-plugin/system-prompt-default.md` - Plugin default prompt
-2. `/src/python/htmlgraph/system_prompts.py` - SDK module (650+ lines)
+2. `/src/python/wipnote/system_prompts.py` - SDK module (650+ lines)
 3. `/docs/system-prompt-architecture-refactoring.md` - Technical design (500+ lines)
 4. `/docs/system-prompt-customization-guide.md` - User guide (800+ lines)
 5. `/SYSTEM_PROMPT_REFACTORING_SUMMARY.md` - This summary
 
 ### Modified
-1. `/src/python/htmlgraph/sdk.py` - Added SystemPromptManager import and system_prompts property
+1. `/src/python/wipnote/sdk.py` - Added SystemPromptManager import and system_prompts property
 
 ---
 
@@ -274,7 +274,7 @@ find packages/claude-plugin/.claude-plugin -name "system-prompt-default.md"
 
 ### Example 1: Get Active Prompt
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 prompt = sdk.system_prompts.get_active()
@@ -285,7 +285,7 @@ if prompt:
 
 ### Example 2: Create Project Override
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -303,7 +303,7 @@ print(result['message'])
 
 ### Example 3: Validate and Report
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 result = sdk.system_prompts.validate()
@@ -318,7 +318,7 @@ for warning in result['warnings']:
 
 ### Example 4: Get Statistics
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 stats = sdk.system_prompts.get_stats()

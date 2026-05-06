@@ -102,18 +102,18 @@ CREATE INDEX idx_im_agent ON ingested_messages(agent_id);
 **Dependencies:** none
 
 **Files to CREATE:**
-- `src/python/htmlgraph/ingest/__init__.py`
-- `src/python/htmlgraph/ingest/base.py` (BaseIngester, IngestedMessage, SessionInfo, IngestResult)
-- `src/python/htmlgraph/ingest/models.py` (dataclasses)
-- `src/python/htmlgraph/ingest/claude_code.py` (ClaudeCodeIngester)
-- `src/python/htmlgraph/ingest/registry.py` (ingester registry)
+- `src/python/wipnote/ingest/__init__.py`
+- `src/python/wipnote/ingest/base.py` (BaseIngester, IngestedMessage, SessionInfo, IngestResult)
+- `src/python/wipnote/ingest/models.py` (dataclasses)
+- `src/python/wipnote/ingest/claude_code.py` (ClaudeCodeIngester)
+- `src/python/wipnote/ingest/registry.py` (ingester registry)
 - `tests/ingest/__init__.py`
 - `tests/ingest/test_base.py`
 - `tests/ingest/test_claude_code.py`
 
 **Files to MODIFY:**
-- `src/python/htmlgraph/db/schema.py` (add ingested_sessions + ingested_messages tables)
-- `src/python/htmlgraph/cli/` (add `htmlgraph ingest` command skeleton)
+- `src/python/wipnote/db/schema.py` (add ingested_sessions + ingested_messages tables)
+- `src/python/wipnote/cli/` (add `wipnote ingest` command skeleton)
 - `pyproject.toml` (if any new deps needed)
 
 **Claude Code Parser Details:**
@@ -134,7 +134,7 @@ CREATE INDEX idx_im_agent ON ingested_messages(agent_id);
 - [ ] ClaudeCodeIngester discovers sessions from sessions-index.json
 - [ ] ClaudeCodeIngester parses JSONL with correct hierarchy
 - [ ] Incremental ingestion (tracks source_mtime)
-- [ ] `uv run htmlgraph ingest --tool claude` works
+- [ ] `uv run wipnote ingest --tool claude` works
 - [ ] Tests pass: `uv run pytest tests/ingest/`
 
 ---
@@ -150,12 +150,12 @@ CREATE INDEX idx_im_agent ON ingested_messages(agent_id);
 
 **Files to MODIFY:**
 - `packages/claude-plugin/hooks/hooks.json` (add SubagentStart entry)
-- `src/python/htmlgraph/hooks/constants.py` (remove SUBAGENT_SUFFIXES hack)
-- `src/python/htmlgraph/hooks/context.py` (read agent_id/agent_type from stdin JSON)
+- `src/python/wipnote/hooks/constants.py` (remove SUBAGENT_SUFFIXES hack)
+- `src/python/wipnote/hooks/context.py` (read agent_id/agent_type from stdin JSON)
 - `packages/claude-plugin/hooks/scripts/posttooluse-integrator.py` (use agent_id for parent linkage)
 - `packages/claude-plugin/hooks/scripts/pretooluse-integrator.py` (use agent_id)
 - `packages/claude-plugin/hooks/scripts/subagent-stop.py` (capture last_assistant_message, agent_transcript_path)
-- `src/python/htmlgraph/db/schema.py` (ensure agent_id/agent_type columns exist on agent_events)
+- `src/python/wipnote/db/schema.py` (ensure agent_id/agent_type columns exist on agent_events)
 
 **Implementation Details:**
 - Claude Code now injects `agent_id` and `agent_type` into ALL hook inputs when inside a subagent
@@ -187,7 +187,7 @@ CREATE INDEX idx_im_agent ON ingested_messages(agent_id);
 **Dependencies:** [task-0]
 
 **Files to CREATE:**
-- `src/python/htmlgraph/ingest/gemini_cli.py`
+- `src/python/wipnote/ingest/gemini_cli.py`
 - `tests/ingest/test_gemini_cli.py`
 
 **Gemini CLI Parser Details:**
@@ -217,8 +217,8 @@ CREATE INDEX idx_im_agent ON ingested_messages(agent_id);
 **Dependencies:** [task-0]
 
 **Files to CREATE:**
-- `src/python/htmlgraph/ingest/copilot_cli.py`
-- `src/python/htmlgraph/ingest/codex_cli.py`
+- `src/python/wipnote/ingest/copilot_cli.py`
+- `src/python/wipnote/ingest/codex_cli.py`
 - `tests/ingest/test_copilot_cli.py`
 - `tests/ingest/test_codex_cli.py`
 
@@ -245,15 +245,15 @@ CREATE INDEX idx_im_agent ON ingested_messages(agent_id);
 
 ---
 
-### Task 4: HtmlGraph MCP Server
+### Task 4: Wipnote MCP Server
 **Feature:** feat-4c3fc1fa
 **Branch:** feature/mcp-server
 **Priority:** high
 **Dependencies:** none (fully independent)
 
 **Files to CREATE:**
-- `src/python/htmlgraph/mcp/__init__.py`
-- `src/python/htmlgraph/mcp/server.py`
+- `src/python/wipnote/mcp/__init__.py`
+- `src/python/wipnote/mcp/server.py`
 - `tests/mcp/__init__.py`
 - `tests/mcp/test_server.py`
 
@@ -267,11 +267,11 @@ Tools to expose:
 - `query_sessions(tool_source?, project_path?, limit?)` — List sessions
 - `search_messages(query, tool_source?, limit?)` — Full-text search
 - `get_session_tree(session_id)` — Get message hierarchy for a session
-- `get_status()` — Current HtmlGraph status (features, sessions, etc.)
+- `get_status()` — Current Wipnote status (features, sessions, etc.)
 
 Resources to expose:
-- `htmlgraph://sessions` — List of recent sessions
-- `htmlgraph://features` — Active features
+- `wipnote://sessions` — List of recent sessions
+- `wipnote://features` — Active features
 
 Implementation: Use `mcp` Python package with stdio transport.
 
@@ -299,7 +299,7 @@ Implementation: Use `mcp` Python package with stdio transport.
 
 **Files to MODIFY:**
 - `packages/claude-plugin/hooks/hooks.json` (add entries for new events)
-- `src/python/htmlgraph/hooks/event_recording.py` (handle new event types)
+- `src/python/wipnote/hooks/event_recording.py` (handle new event types)
 
 **Hook Events to Add:**
 1. **PreCompact** — Archive conversation before compaction. Matcher: `auto|manual`. Input has `transcript_path`.
@@ -324,8 +324,8 @@ Implementation: Use `mcp` Python package with stdio transport.
 **Dependencies:** [task-0]
 
 **Files to CREATE:**
-- `src/python/htmlgraph/ingest/opencode.py`
-- `src/python/htmlgraph/ingest/cursor.py`
+- `src/python/wipnote/ingest/opencode.py`
+- `src/python/wipnote/ingest/cursor.py`
 - `tests/ingest/test_opencode.py`
 - `tests/ingest/test_cursor.py`
 
@@ -361,13 +361,13 @@ Implementation: Use `mcp` Python package with stdio transport.
 **Dependencies:** [task-0, task-2] (needs data model + at least one parser)
 
 **Files to CREATE:**
-- `src/python/htmlgraph/search.py`
+- `src/python/wipnote/search.py`
 - `tests/test_search.py`
 
 **Files to MODIFY:**
-- `src/python/htmlgraph/db/schema.py` (add FTS5 virtual table)
-- `src/python/htmlgraph/cli/` (add `htmlgraph search` command)
-- `src/python/htmlgraph/ingest/base.py` (index messages after ingestion)
+- `src/python/wipnote/db/schema.py` (add FTS5 virtual table)
+- `src/python/wipnote/cli/` (add `wipnote search` command)
+- `src/python/wipnote/ingest/base.py` (index messages after ingestion)
 
 **FTS5 Schema:**
 ```sql
@@ -384,7 +384,7 @@ CREATE VIRTUAL TABLE messages_fts USING fts5(
 **Acceptance Criteria:**
 - [ ] FTS5 virtual table created in schema migration
 - [ ] Messages indexed on ingest
-- [ ] `htmlgraph search "query"` returns ranked results
+- [ ] `wipnote search "query"` returns ranked results
 - [ ] Results include session context and source tool
 - [ ] Tests pass
 
@@ -397,17 +397,17 @@ CREATE VIRTUAL TABLE messages_fts USING fts5(
 **Dependencies:** [task-1, task-5]
 
 **Files to CREATE:**
-- `src/python/htmlgraph/server/api.py` (HTTP event receiver)
-- `src/python/htmlgraph/otel.py` (OTel receiver/processor)
+- `src/python/wipnote/server/api.py` (HTTP event receiver)
+- `src/python/wipnote/otel.py` (OTel receiver/processor)
 - `tests/test_api.py`
 - `tests/test_otel.py`
 
 **Files to MODIFY:**
-- `src/python/htmlgraph/cli/` (add `htmlgraph serve --api` mode)
+- `src/python/wipnote/cli/` (add `wipnote serve --api` mode)
 - `packages/claude-plugin/hooks/hooks.json` (add type:http alternatives)
 
 **Implementation:**
-- `htmlgraph serve --api` starts HTTP server on localhost:8081
+- `wipnote serve --api` starts HTTP server on localhost:8081
 - Convert select hooks to `type:"http"` for reduced subprocess overhead
 - Add OTel receiver endpoint that accepts OTLP JSON for cost/token data
 - SSE endpoint for real-time dashboard streaming
@@ -473,23 +473,23 @@ echo "Wave 2 (after Wave 1): worktrees/fts5-search, worktrees/http-hooks-otel"
 ### Wave 0 (2 parallel agents)
 ```bash
 # Both launched simultaneously via Agent tool
-Agent(prompt="Task 0: Base Ingester + Claude Parser...", subagent_type="htmlgraph:sonnet-coder", isolation="worktree")
-Agent(prompt="Task 1: Hook Hierarchy Fix...", subagent_type="htmlgraph:sonnet-coder", isolation="worktree")
+Agent(prompt="Task 0: Base Ingester + Claude Parser...", subagent_type="wipnote:sonnet-coder", isolation="worktree")
+Agent(prompt="Task 1: Hook Hierarchy Fix...", subagent_type="wipnote:sonnet-coder", isolation="worktree")
 ```
 
 ### Wave 1 (5 parallel agents, after Wave 0 merges)
 ```bash
-Agent(prompt="Task 2: Gemini CLI Parser...", subagent_type="htmlgraph:haiku-coder", isolation="worktree")
-Agent(prompt="Task 3: Copilot + Codex Parsers...", subagent_type="htmlgraph:haiku-coder", isolation="worktree")
-Agent(prompt="Task 4: MCP Server...", subagent_type="htmlgraph:sonnet-coder", isolation="worktree")
-Agent(prompt="Task 5: Missing Hook Events...", subagent_type="htmlgraph:haiku-coder", isolation="worktree")
-Agent(prompt="Task 6: OpenCode + Cursor Parsers...", subagent_type="htmlgraph:haiku-coder", isolation="worktree")
+Agent(prompt="Task 2: Gemini CLI Parser...", subagent_type="wipnote:haiku-coder", isolation="worktree")
+Agent(prompt="Task 3: Copilot + Codex Parsers...", subagent_type="wipnote:haiku-coder", isolation="worktree")
+Agent(prompt="Task 4: MCP Server...", subagent_type="wipnote:sonnet-coder", isolation="worktree")
+Agent(prompt="Task 5: Missing Hook Events...", subagent_type="wipnote:haiku-coder", isolation="worktree")
+Agent(prompt="Task 6: OpenCode + Cursor Parsers...", subagent_type="wipnote:haiku-coder", isolation="worktree")
 ```
 
 ### Wave 2 (2 parallel agents, after Wave 1 merges)
 ```bash
-Agent(prompt="Task 7: FTS5 Search...", subagent_type="htmlgraph:sonnet-coder", isolation="worktree")
-Agent(prompt="Task 8: HTTP Hooks + OTel...", subagent_type="htmlgraph:sonnet-coder", isolation="worktree")
+Agent(prompt="Task 7: FTS5 Search...", subagent_type="wipnote:sonnet-coder", isolation="worktree")
+Agent(prompt="Task 8: HTTP Hooks + OTel...", subagent_type="wipnote:sonnet-coder", isolation="worktree")
 ```
 
 ## Merge Strategy

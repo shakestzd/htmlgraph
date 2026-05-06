@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Hybrid Event Capture System provides full traceability of delegated work by creating proper parent-child event relationships in HtmlGraph. When you delegate work to a subagent using `Task()`, the system creates a complete trace showing:
+The Hybrid Event Capture System provides full traceability of delegated work by creating proper parent-child event relationships in Wipnote. When you delegate work to a subagent using `Task()`, the system creates a complete trace showing:
 
 1. **Parent Event**: The Task() delegation itself (created by PreToolUse hook)
 2. **Child Events**: Work performed by the subagent (captured by SubagentStop hook)
@@ -38,7 +38,7 @@ evt-123 Task(gemini-spawner) STARTED [16:40:54]
 
 ### 1. PreToolUse Hook (Create Parent Event)
 
-**File**: `src/python/htmlgraph/hooks/pretooluse.py`
+**File**: `src/python/wipnote/hooks/pretooluse.py`
 
 When a Task() call is detected, creates parent event:
 - Extracts subagent type from Task() parameters
@@ -48,7 +48,7 @@ When a Task() call is detected, creates parent event:
 
 ### 2. SubagentStop Hook (Close Trace)
 
-**File**: `src/python/htmlgraph/hooks/subagent_stop.py`
+**File**: `src/python/wipnote/hooks/subagent_stop.py`
 
 When a subagent completes:
 - Reads HTMLGRAPH_PARENT_EVENT from environment
@@ -73,7 +73,7 @@ agent_events table:
 
 ### 4. API Endpoint: /api/event-traces
 
-**Location**: `src/python/htmlgraph/api/main.py` (lines 573-754)
+**Location**: `src/python/wipnote/api/main.py` (lines 573-754)
 
 Retrieves parent-child event traces with full hierarchy and metadata.
 
@@ -82,7 +82,7 @@ Retrieves parent-child event traces with full hierarchy and metadata.
 ### Basic Task Delegation
 
 ```python
-from htmlgraph import Task
+from wipnote import Task
 
 Task(
     prompt="""
@@ -154,8 +154,8 @@ Features:
 
 ## References
 
-- Schema: `src/python/htmlgraph/db/schema.py`
-- PreToolUse Hook: `src/python/htmlgraph/hooks/pretooluse.py`
-- SubagentStop Hook: `src/python/htmlgraph/hooks/subagent_stop.py`
-- API Endpoint: `src/python/htmlgraph/api/main.py`
-- Dashboard Template: `src/python/htmlgraph/api/templates/partials/event-traces.html`
+- Schema: `src/python/wipnote/db/schema.py`
+- PreToolUse Hook: `src/python/wipnote/hooks/pretooluse.py`
+- SubagentStop Hook: `src/python/wipnote/hooks/subagent_stop.py`
+- API Endpoint: `src/python/wipnote/api/main.py`
+- Dashboard Template: `src/python/wipnote/api/templates/partials/event-traces.html`

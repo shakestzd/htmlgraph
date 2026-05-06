@@ -2,7 +2,7 @@
 
 ## Overview
 
-The FeatureRepository interface unifies all data access patterns for Features in HtmlGraph. Currently, Features are accessed through three separate code paths:
+The FeatureRepository interface unifies all data access patterns for Features in Wipnote. Currently, Features are accessed through three separate code paths:
 
 1. **SDK Collections** (`sdk/collections/features.py`)
 2. **CLI Work Commands** (`cli/work/snapshot.py`)
@@ -321,7 +321,7 @@ Create optimized implementation combining HTML + SQLite:
 ### Using the Repository (Once Implemented)
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -367,7 +367,7 @@ exists = repo.exists("feat-001")
 ### Implementing the Interface
 
 ```python
-from htmlgraph.repositories import FeatureRepository
+from wipnote.repositories import FeatureRepository
 
 class GraphFeatureRepository(FeatureRepository):
     def __init__(self, sdk):
@@ -414,9 +414,9 @@ pytest tests/
 
 ## See Also
 
-- `src/python/htmlgraph/repositories/feature_repository.py` - Interface
+- `src/python/wipnote/repositories/feature_repository.py` - Interface
 - `tests/unit/repositories/test_feature_repository_compliance.py` - Compliance tests
-- `src/python/htmlgraph/collections/base.py` - Current implementation to adapt
+- `src/python/wipnote/collections/base.py` - Current implementation to adapt
 - `AGENTS.md` - SDK usage documentation
 
 ## Questions?

@@ -1,24 +1,24 @@
 # Cost Dashboard Command - Phase 1 Feature 3
 
-Make cost visibility trivial with `htmlgraph costs` - one command shows token/cost breakdown by session, feature, tool, or agent.
+Make cost visibility trivial with `wipnote costs` - one command shows token/cost breakdown by session, feature, tool, or agent.
 
 ## Quick Start
 
 ```bash
 # View last week's costs by session (default)
-htmlgraph costs
+wipnote costs
 
 # View today's costs by feature
-htmlgraph costs --period today --by feature
+wipnote costs --period today --by feature
 
 # View all costs grouped by tool
-htmlgraph costs --by tool --period all
+wipnote costs --by tool --period all
 
 # Export as CSV for spreadsheet analysis
-htmlgraph costs --format csv --by tool > costs.csv
+wipnote costs --format csv --by tool > costs.csv
 
 # Use Sonnet pricing instead of Opus
-htmlgraph costs --model sonnet
+wipnote costs --model sonnet
 ```
 
 ## Features
@@ -33,7 +33,7 @@ htmlgraph costs --model sonnet
 ## Command Syntax
 
 ```
-htmlgraph costs [OPTIONS]
+wipnote costs [OPTIONS]
 
 Options:
   --period {today|day|week|month|all}
@@ -44,7 +44,7 @@ Options:
   --model {opus|sonnet|haiku|auto}
                                   Claude model for pricing (default: auto)
   --limit N                       Maximum rows to display (default: 10)
-  -g, --graph-dir PATH            Graph directory (default: .htmlgraph)
+  -g, --graph-dir PATH            Graph directory (default: .wipnote)
 ```
 
 ## Examples
@@ -52,7 +52,7 @@ Options:
 ### View Weekly Session Costs (Terminal)
 
 ```bash
-$ htmlgraph costs --period week
+$ wipnote costs --period week
 
 LAST 7 DAYS - COST SUMMARY
 ═══════════════════════════════════════════════════════════════════
@@ -80,7 +80,7 @@ Insights & Recommendations
 ### View Costs by Feature
 
 ```bash
-$ htmlgraph costs --by feature --period week
+$ wipnote costs --by feature --period week
 
 LAST 7 DAYS - COST SUMMARY
 ═══════════════════════════════════════════════════════════════════
@@ -107,7 +107,7 @@ Insights & Recommendations
 ### View Costs by Tool
 
 ```bash
-$ htmlgraph costs --by tool --period today
+$ wipnote costs --by tool --period today
 
 TODAY - COST SUMMARY
 ═══════════════════════════════════════════════════════════════════
@@ -136,7 +136,7 @@ Insights & Recommendations
 ### Export as CSV
 
 ```bash
-$ htmlgraph costs --by tool --format csv
+$ wipnote costs --by tool --format csv
 
 Tool,Events,Tokens,Estimated Cost (USD)
 Bash,15,600000,9.00
@@ -150,16 +150,16 @@ TOTAL,,1400000,21.00
 
 ```bash
 # Default (Opus pricing - highest cost)
-htmlgraph costs --model opus
+wipnote costs --model opus
 
 # Sonnet pricing (mid-tier)
-htmlgraph costs --model sonnet
+wipnote costs --model sonnet
 
 # Haiku pricing (cheapest)
-htmlgraph costs --model haiku
+wipnote costs --model haiku
 
 # Auto-detect (uses Opus for conservative estimates)
-htmlgraph costs --model auto
+wipnote costs --model auto
 ```
 
 ## Cost Calculation
@@ -209,28 +209,28 @@ LIMIT ?
 ### Cost Optimization
 ```bash
 # Find most expensive features
-htmlgraph costs --by feature --period month
+wipnote costs --by feature --period month
 
 # Identify expensive tools
-htmlgraph costs --by tool --period week
+wipnote costs --by tool --period week
 ```
 
 ### Budget Tracking
 ```bash
 # Weekly cost review
-htmlgraph costs --period week
+wipnote costs --period week
 
 # Monthly cost report
-htmlgraph costs --period month --format csv > monthly-costs.csv
+wipnote costs --period month --format csv > monthly-costs.csv
 ```
 
 ### Feature Planning
 ```bash
 # Compare feature costs
-htmlgraph costs --by feature --period all
+wipnote costs --by feature --period all
 
 # See which agents are most expensive
-htmlgraph costs --by agent --period month
+wipnote costs --by agent --period month
 ```
 
 ## Troubleshooting
@@ -244,15 +244,15 @@ htmlgraph costs --by agent --period month
 - Check that you're analyzing the right graph directory with `-g`
 
 ### Missing database
-**Problem:** "No HtmlGraph database found"
+**Problem:** "No Wipnote database found"
 
 **Solution:**
 ```bash
-# Initialize HtmlGraph first
-htmlgraph init
+# Initialize Wipnote first
+wipnote init
 
 # Or specify the correct graph directory
-htmlgraph costs -g /path/to/.htmlgraph
+wipnote costs -g /path/to/.wipnote
 ```
 
 ### Unexpected costs
@@ -268,27 +268,27 @@ htmlgraph costs -g /path/to/.htmlgraph
 ### Pipe to other commands
 ```bash
 # Find sessions over $20
-htmlgraph costs --format csv | awk -F',' '$4 > 20'
+wipnote costs --format csv | awk -F',' '$4 > 20'
 
 # Sort by cost descending
-htmlgraph costs --by feature --format csv | sort -t',' -k4 -rn
+wipnote costs --by feature --format csv | sort -t',' -k4 -rn
 ```
 
 ### Create custom reports
 ```bash
 # Weekly email report
-htmlgraph costs --period week --format csv | \
-  mail -s "Weekly HtmlGraph Costs" team@example.com
+wipnote costs --period week --format csv | \
+  mail -s "Weekly Wipnote Costs" team@example.com
 ```
 
 ### Track over time
 ```bash
 # Log costs daily
-htmlgraph costs --period day >> costs-log.csv
+wipnote costs --period day >> costs-log.csv
 ```
 
 ## See Also
 
-- `htmlgraph analytics` - Broader analytics dashboard
-- `htmlgraph cigs cost-dashboard` - Interactive HTML dashboard
-- `htmlgraph cigs roi-analysis` - ROI analysis of delegations
+- `wipnote analytics` - Broader analytics dashboard
+- `wipnote cigs cost-dashboard` - Interactive HTML dashboard
+- `wipnote cigs roi-analysis` - ROI analysis of delegations

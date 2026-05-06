@@ -2,7 +2,7 @@
 
 ## Overview
 
-HtmlGraph uses a collision-resistant hash-based ID system for multi-agent collaboration. This design document explains the architecture, implementation, and rationale behind this approach.
+Wipnote uses a collision-resistant hash-based ID system for multi-agent collaboration. This design document explains the architecture, implementation, and rationale behind this approach.
 
 ## Problem Statement
 
@@ -77,7 +77,7 @@ Supports unlimited nesting depth.
 
 ## Implementation
 
-### Core Module: `htmlgraph/ids.py`
+### Core Module: `wipnote/ids.py`
 
 #### Key Functions
 
@@ -305,27 +305,27 @@ assert len(set(ids)) == 10000  # All unique
 
 ## Integration Points
 
-### CLI (`htmlgraph/cli.py`)
+### CLI (`wipnote/cli.py`)
 
 ```bash
-htmlgraph feature create "Auth System" --priority high
+wipnote feature create "Auth System" --priority high
 # Created: feat-9e8d7c6b
 ```
 
-### Builders (`htmlgraph/builders/feature.py`)
+### Builders (`wipnote/builders/feature.py`)
 
 ```python
-from htmlgraph.builders import FeatureBuilder
+from wipnote.builders import FeatureBuilder
 
 feature = FeatureBuilder("Auth System").set_priority("high").save()
 print(feature.id)  # → "feat-a1b2c3d4" (auto-generated)
 ```
 
-### Models (`htmlgraph/models.py`)
+### Models (`wipnote/models.py`)
 
 ```python
-from htmlgraph.models import Feature
-from htmlgraph.ids import generate_id
+from wipnote.models import Feature
+from wipnote.ids import generate_id
 
 feature = Feature(
     id=generate_id("feature", "Auth System"),
@@ -352,7 +352,7 @@ generate_hierarchical_id("feat-a1b2c3d4")  # → feat-a1b2c3d4.2
 ```
 
 **Implementation:**
-- Scan `.htmlgraph/features/` for existing children
+- Scan `.wipnote/features/` for existing children
 - Find max index + 1
 - Atomic file creation to prevent races
 
@@ -376,7 +376,7 @@ generate_id("custom_type", "Title", prefix="cust")
 create_alias("feat-a1b2c3d4", "auth")
 
 # Use in commands
-htmlgraph feature show auth  # → Resolves to feat-a1b2c3d4
+wipnote feature show auth  # → Resolves to feat-a1b2c3d4
 ```
 
 ## References
@@ -402,5 +402,5 @@ htmlgraph feature show auth  # → Resolves to feat-a1b2c3d4
 ---
 
 **Last Updated:** 2025-12-26
-**Author:** HtmlGraph Development Team
+**Author:** Wipnote Development Team
 **Status:** Stable

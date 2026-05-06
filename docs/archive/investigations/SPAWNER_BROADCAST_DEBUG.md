@@ -42,7 +42,7 @@ Added three logging points in the WebSocket streaming handler:
 ### 1. Start Dashboard Server
 ```bash
 # Terminal 1: Start server with logging
-uv run htmlgraph serve
+uv run wipnote serve
 ```
 
 Watch for startup logs and WebSocket connection messages.
@@ -68,7 +68,7 @@ WebSocket connected for real-time events
 
 **Option B: Manual insert**
 ```bash
-sqlite3 .htmlgraph/index.sqlite << EOF
+sqlite3 .wipnote/index.sqlite << EOF
 INSERT INTO live_events (event_type, event_data, spawner_type, parent_event_id, session_id)
 VALUES (
     'spawner_start',
@@ -98,7 +98,7 @@ INFO:     [WebSocket] Marking 1 events as broadcast: [1]
 
 ### 5. Verify Event Was Marked Broadcast
 ```bash
-sqlite3 .htmlgraph/index.sqlite "SELECT id, event_type, broadcast_at FROM live_events ORDER BY id DESC LIMIT 5;"
+sqlite3 .wipnote/index.sqlite "SELECT id, event_type, broadcast_at FROM live_events ORDER BY id DESC LIMIT 5;"
 ```
 
 Expected: `broadcast_at` should have a timestamp (not NULL).
@@ -117,7 +117,7 @@ Expected: `broadcast_at` should have a timestamp (not NULL).
 **Debug**:
 ```bash
 # Check if events exist and are pending
-sqlite3 .htmlgraph/index.sqlite "SELECT * FROM live_events WHERE broadcast_at IS NULL;"
+sqlite3 .wipnote/index.sqlite "SELECT * FROM live_events WHERE broadcast_at IS NULL;"
 
 # Check WebSocket connections
 # Should see connection in server logs when browser opens dashboard
@@ -192,10 +192,10 @@ window.handleSpawnerEvent({
 To reset for fresh testing:
 ```bash
 # Clear all live_events
-sqlite3 .htmlgraph/index.sqlite "DELETE FROM live_events;"
+sqlite3 .wipnote/index.sqlite "DELETE FROM live_events;"
 
 # Or just reset broadcast status
-sqlite3 .htmlgraph/index.sqlite "UPDATE live_events SET broadcast_at = NULL;"
+sqlite3 .wipnote/index.sqlite "UPDATE live_events SET broadcast_at = NULL;"
 ```
 
 ## Next Steps After Debugging
@@ -209,7 +209,7 @@ Once logs show the full pipeline working:
 
 ## File Locations
 
-- Server code: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py` (lines 2134-2200)
-- Client WebSocket handler: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/dashboard.html` (lines 161-204)
-- Spawner event handler: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/activity-feed.html` (lines 818-842)
+- Server code: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/main.py` (lines 2134-2200)
+- Client WebSocket handler: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/templates/dashboard.html` (lines 161-204)
+- Spawner event handler: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/templates/partials/activity-feed.html` (lines 818-842)
 - Test script: `/Users/shakes/DevProjects/htmlgraph/test_spawner_broadcast.sh`

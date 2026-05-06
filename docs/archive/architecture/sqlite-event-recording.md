@@ -4,7 +4,7 @@
 
 ## Overview
 
-Claude Code tool execution events are now automatically recorded to SQLite database via HtmlGraph hooks, enabling the FastAPI dashboard to display live activity feeds and orchestration metrics.
+Claude Code tool execution events are now automatically recorded to SQLite database via Wipnote hooks, enabling the FastAPI dashboard to display live activity feeds and orchestration metrics.
 
 ## Architecture
 
@@ -21,23 +21,23 @@ Claude Code Tool Execution
     │       event_tracker.py (hook script)       │
     └────────────────────────────────────────────┘
          ↓                              ↓
-    SessionManager               HtmlGraphDB
+    SessionManager               WipnoteDB
     (HTML files)                (SQLite DB)
          ↓                              ↓
-    .htmlgraph/               .htmlgraph/
-    sessions/*.html           htmlgraph.db
+    .wipnote/               .wipnote/
+    sessions/*.html           wipnote.db
     activities/               (Queryable)
 ```
 
 ### Key Components
 
-**1. Event Tracker Hook** (`src/python/htmlgraph/hooks/event_tracker.py`)
+**1. Event Tracker Hook** (`src/python/wipnote/hooks/event_tracker.py`)
 - Intercepts tool calls via PostToolUse hook
 - Records to both HTML (existing) and SQLite (new)
 - Handles special case: Task() delegations → agent_collaboration table
 - Gracefully degrades if SQLite unavailable
 
-**2. Database Schema** (`src/python/htmlgraph/db/schema.py`)
+**2. Database Schema** (`src/python/wipnote/db/schema.py`)
 - `agent_events` - All tool calls, queries, delegations
 - `agent_collaboration` - Task delegations between agents
 - Indexed for dashboard queries
@@ -47,7 +47,7 @@ Claude Code Tool Execution
 ```python
 # In event_tracker.py
 def record_event_to_sqlite(
-    db: HtmlGraphDB,
+    db: WipnoteDB,
     session_id: str,
     tool_name: str,
     tool_input: dict,
@@ -59,7 +59,7 @@ def record_event_to_sqlite(
     """Record tool call event to SQLite for dashboard queries."""
 
 def record_delegation_to_sqlite(
-    db: HtmlGraphDB,
+    db: WipnoteDB,
     session_id: str,
     from_agent: str,
     to_agent: str,
@@ -158,7 +158,7 @@ hook_input = {
 }
 
 # Event Tracker processes:
-1. Initialize SessionManager (HTML) + HtmlGraphDB (SQLite)
+1. Initialize SessionManager (HTML) + WipnoteDB (SQLite)
 2. Get active session ID
 3. Extract file paths from tool_input
 4. Format input/output summaries
@@ -254,7 +254,7 @@ If SQLite initialization fails:
 
 ```python
 try:
-    db = HtmlGraphDB(str(graph_dir / "htmlgraph.db"))
+    db = WipnoteDB(str(graph_dir / "wipnote.db"))
 except Exception as e:
     print(f"Warning: Could not initialize SQLite: {e}")
     db = None  # Continue without SQLite
@@ -299,9 +299,9 @@ The system continues working with HTML-only tracking, so Claude Code execution i
 ### Querying Events Programmatically
 
 ```python
-from htmlgraph.db.schema import HtmlGraphDB
+from wipnote.db.schema import WipnoteDB
 
-db = HtmlGraphDB(".htmlgraph/htmlgraph.db")
+db = WipnoteDB(".wipnote/wipnote.db")
 
 # Get all events for a session
 sql, params = "SELECT * FROM agent_events WHERE session_id = ? ORDER BY timestamp DESC"
@@ -345,7 +345,7 @@ WS /api/sessions/{session_id}/events/stream
 
 ```bash
 # Check SQLite database directly
-sqlite3 .htmlgraph/htmlgraph.db
+sqlite3 .wipnote/wipnote.db
 
 # Count events for a session
 sqlite> SELECT COUNT(*) FROM agent_events WHERE session_id = 'sess-123';
@@ -365,7 +365,7 @@ export HTMLGRAPH_DEBUG=1
 claude "your prompt"
 
 # Check hook logs
-tail -f /var/log/htmlgraph-hooks.log
+tail -f /var/log/wipnote-hooks.log
 ```
 
 ## Future Enhancements
@@ -397,11 +397,11 @@ tail -f /var/log/htmlgraph-hooks.log
 **Solution:**
 ```bash
 # Check permissions
-ls -la .htmlgraph/
-chmod 755 .htmlgraph/
+ls -la .wipnote/
+chmod 755 .wipnote/
 
 # Rebuild database
-rm .htmlgraph/htmlgraph.db
+rm .wipnote/wipnote.db
 # Re-run a tool to recreate schema
 ```
 
@@ -416,13 +416,13 @@ claude hook list
 # Should show: PostToolUse, Stop, UserPromptSubmit hooks
 
 # Check database exists
-ls -la .htmlgraph/htmlgraph.db
+ls -la .wipnote/wipnote.db
 
 # Run a test tool
 claude -p "List files: pwd"
 
 # Query database
-sqlite3 .htmlgraph/htmlgraph.db "SELECT COUNT(*) FROM agent_events;"
+sqlite3 .wipnote/wipnote.db "SELECT COUNT(*) FROM agent_events;"
 ```
 
 ### Performance degradation
@@ -432,20 +432,20 @@ sqlite3 .htmlgraph/htmlgraph.db "SELECT COUNT(*) FROM agent_events;"
 **Solution:**
 ```bash
 # Analyze query performance
-sqlite3 .htmlgraph/htmlgraph.db ".indices"
+sqlite3 .wipnote/wipnote.db ".indices"
 
 # Rebuild indexes if corrupted
-sqlite3 .htmlgraph/htmlgraph.db "REINDEX;"
+sqlite3 .wipnote/wipnote.db "REINDEX;"
 
 # Vacuum database (optional)
-sqlite3 .htmlgraph/htmlgraph.db "VACUUM;"
+sqlite3 .wipnote/wipnote.db "VACUUM;"
 ```
 
 ## References
 
-- **Schema Definition:** `src/python/htmlgraph/db/schema.py`
-- **Event Recording:** `src/python/htmlgraph/hooks/event_tracker.py`
-- **Dashboard API:** `src/python/htmlgraph/api/main.py`
+- **Schema Definition:** `src/python/wipnote/db/schema.py`
+- **Event Recording:** `src/python/wipnote/hooks/event_tracker.py`
+- **Dashboard API:** `src/python/wipnote/api/main.py`
 - **Hook Configuration:** `.claude/hooks.json`
 
 ## Testing

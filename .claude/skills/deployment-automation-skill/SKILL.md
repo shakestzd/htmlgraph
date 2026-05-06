@@ -1,6 +1,6 @@
 # Deployment Automation Skill
 
-Use this skill for deployment, versioning, and release workflows in the HtmlGraph project.
+Use this skill for deployment, versioning, and release workflows in the Wipnote project.
 
 **Trigger keywords:** deployment, release, publish, version, pypi, package, build, distribute
 
@@ -36,7 +36,7 @@ Use this skill for deployment, versioning, and release workflows in the HtmlGrap
 
 ### Version Numbering
 
-HtmlGraph follows [Semantic Versioning](https://semver.org/):
+Wipnote follows [Semantic Versioning](https://semver.org/):
 - **MAJOR.MINOR.PATCH** (e.g., 0.9.4)
 - **MAJOR**: Breaking changes
 - **MINOR**: New features (backward compatible)
@@ -53,7 +53,7 @@ HtmlGraph follows [Semantic Versioning](https://semver.org/):
 2. **Build Package** - Create wheel and source distributions
 3. **Publish to PyPI** - Upload package to PyPI
 4. **Local Install** - Install latest version locally
-5. **Update Claude Plugin** - Run `claude plugin update htmlgraph`
+5. **Update Claude Plugin** - Run `claude plugin update wipnote`
 6. **Update Gemini Extension** - Update version in gemini-extension.json
 7. **Update Codex Skill** - Check for Codex and update if present
 8. **Create GitHub Release** - Create release with distribution files
@@ -75,8 +75,8 @@ HtmlGraph follows [Semantic Versioning](https://semver.org/):
 ./scripts/deploy-all.sh 0.9.4 --build-only
 
 # Install and test locally
-uv pip install dist/htmlgraph-0.9.4-py3-none-any.whl --force-reinstall
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+uv pip install dist/wipnote-0.9.4-py3-none-any.whl --force-reinstall
+python -c "import wipnote; print(wipnote.__version__)"
 ```
 
 **Documentation-only updates:**
@@ -94,7 +94,7 @@ uv run pytest
 ./scripts/deploy-all.sh 0.9.4 --no-confirm
 
 # 3. Verify publication
-open https://pypi.org/project/htmlgraph/
+open https://pypi.org/project/wipnote/
 ```
 
 ### PyPI Credentials
@@ -146,12 +146,12 @@ For deployment script internals and options:
 
 ---
 
-## Integration with HtmlGraph SDK
+## Integration with Wipnote SDK
 
 Track deployment activities:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent='deployment-automation')
 
 # Track deployment

@@ -20,7 +20,7 @@
      - Spawner Selection Logic (5 decision points + special cases)
      - 6 Detailed Routing Examples
      - Contextualized Permission Modes
-     - HtmlGraph Integration Patterns
+     - Wipnote Integration Patterns
      - Cost Optimization Rules
      - Validation Checklist
    - **Integration:** Copy content to system prompt configuration
@@ -69,7 +69,7 @@
      - Token efficiency breakdown
      - Routing clarity improvements (6 dimensions)
      - Spawner selection enhancements
-     - HtmlGraph integration verification
+     - Wipnote integration verification
      - Before/after comparisons
      - Enhancement recommendations
    - **Audience:** Technical reviewers, architects
@@ -138,7 +138,7 @@
 ```
 → Read OPTIMIZATION_ANALYSIS.md
 → Review before/after comparisons
-→ Check HtmlGraph integration verification
+→ Check Wipnote integration verification
 → Note all enhancement recommendations
 ```
 

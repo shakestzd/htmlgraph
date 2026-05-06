@@ -1,11 +1,11 @@
 # Basic Usage
 
-Simple examples to get started with HtmlGraph.
+Simple examples to get started with Wipnote.
 
 ## Creating Your First Feature
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize SDK
 sdk = SDK(agent="me")
@@ -77,30 +77,30 @@ for feature in urgent_tasks:
 import webbrowser
 
 feature = sdk.features.get("feature-20241216-103045")
-webbrowser.open(f".htmlgraph/features/{feature.id}.html")
+webbrowser.open(f".wipnote/features/{feature.id}.html")
 ```
 
 ## Using the CLI
 
 ```bash
 # Create a feature
-htmlgraph feature create "Add user login" --priority high
+wipnote feature create "Add user login" --priority high
 
 # List all features
-htmlgraph feature list
+wipnote feature list
 
 # Start working on a feature
-htmlgraph feature start feature-20241216-103045
+wipnote feature start feature-20241216-103045
 
 # Mark complete
-htmlgraph feature complete feature-20241216-103045
+wipnote feature complete feature-20241216-103045
 ```
 
 ## Launching the Dashboard
 
 ```bash
 # Start the server
-htmlgraph serve
+wipnote serve
 
 # Open http://localhost:8080 in your browser
 # See Kanban board, graph view, timeline, etc.
@@ -110,7 +110,7 @@ htmlgraph serve
 
 ```python
 #!/usr/bin/env python3
-from htmlgraph import SDK
+from wipnote import SDK
 
 def main():
     # Initialize
@@ -158,7 +158,7 @@ def main():
 
     print(f"Created {len(features)} features")
     print("\nNext steps:")
-    print(f"  1. htmlgraph serve")
+    print(f"  1. wipnote serve")
     print(f"  2. Open http://localhost:8080")
     print(f"  3. View your features in the dashboard")
 
@@ -170,7 +170,7 @@ Run it:
 
 ```bash
 python example.py
-htmlgraph serve
+wipnote serve
 ```
 
 ## Next Steps

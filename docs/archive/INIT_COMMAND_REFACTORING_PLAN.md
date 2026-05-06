@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The `InitCommand` in `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/core.py` currently delegates to a **non-existent** `cli_legacy.py` file, causing runtime failures. This document provides a complete analysis and refactoring plan to extract and modernize the init functionality.
+The `InitCommand` in `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli/core.py` currently delegates to a **non-existent** `cli_legacy.py` file, causing runtime failures. This document provides a complete analysis and refactoring plan to extract and modernize the init functionality.
 
 **Current Status:** ❌ **BROKEN** - `cli_legacy.py` has been deleted but `InitCommand.execute()` still imports it.
 
@@ -10,10 +10,10 @@ The `InitCommand` in `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/c
 
 ## 1. Analysis Summary: What Init Should Do
 
-Based on analysis of existing HtmlGraph codebase, the `init` command should:
+Based on analysis of existing Wipnote codebase, the `init` command should:
 
 ### Core Directory Structure Creation
-- ✅ Create `.htmlgraph/` root directory
+- ✅ Create `.wipnote/` root directory
 - ✅ Create subdirectories:
   - `features/` - Feature tracking HTML files
   - `sessions/` - Session HTML files
@@ -26,7 +26,7 @@ Based on analysis of existing HtmlGraph codebase, the `init` command should:
   - `logs/errors/` - Error logs (gitignored)
 
 ### Database Initialization
-- ✅ Create `htmlgraph.db` SQLite database with full schema
+- ✅ Create `wipnote.db` SQLite database with full schema
 - ✅ Create `index.sqlite` analytics cache (gitignored)
 - ✅ Initialize all tables:
   - `agent_events` - Tool calls and results
@@ -38,14 +38,14 @@ Based on analysis of existing HtmlGraph codebase, the `init` command should:
   - `event_log_archive` - Historical events
 
 ### Configuration Files
-- ✅ Create `.htmlgraph/hooks-config.json` (if `--install-hooks`)
-- ✅ Create `.htmlgraph/agents.json` (agent registry)
-- ✅ Update `.gitignore` with HtmlGraph patterns (unless `--no-update-gitignore`)
+- ✅ Create `.wipnote/hooks-config.json` (if `--install-hooks`)
+- ✅ Create `.wipnote/agents.json` (agent registry)
+- ✅ Update `.gitignore` with Wipnote patterns (unless `--no-update-gitignore`)
 
 ### Git Hooks Installation (Optional)
 - ✅ Install git hooks if `--install-hooks` flag provided
 - ✅ Supported hooks: `post-commit`, `post-checkout`, `post-merge`, `pre-push`
-- ✅ Use symlinks from `.htmlgraph/hooks/` to `.git/hooks/`
+- ✅ Use symlinks from `.wipnote/hooks/` to `.git/hooks/`
 - ✅ Backup existing hooks and chain them
 
 ### Validation
@@ -63,7 +63,7 @@ Based on analysis of existing HtmlGraph codebase, the `init` command should:
 
 ## 2. Function Breakdown: Logical Components
 
-Extract `cmd_init()` into these focused functions in `src/python/htmlgraph/cli/operations/initialization.py`:
+Extract `cmd_init()` into these focused functions in `src/python/wipnote/cli/operations/initialization.py`:
 
 ### 2.1 Core Initialization Functions
 
@@ -73,7 +73,7 @@ def create_directory_structure(
     include_events_keep: bool = True
 ) -> dict[str, Path]:
     """
-    Create .htmlgraph directory structure.
+    Create .wipnote directory structure.
 
     Args:
         base_dir: Base directory (project root)
@@ -86,16 +86,16 @@ def create_directory_structure(
         PermissionError: If directory creation fails
     """
     # Creates:
-    # - .htmlgraph/
-    # - .htmlgraph/features/
-    # - .htmlgraph/sessions/
-    # - .htmlgraph/events/
-    # - .htmlgraph/spikes/
-    # - .htmlgraph/tracks/
-    # - .htmlgraph/bugs/
-    # - .htmlgraph/chores/
-    # - .htmlgraph/archives/
-    # - .htmlgraph/logs/errors/
+    # - .wipnote/
+    # - .wipnote/features/
+    # - .wipnote/sessions/
+    # - .wipnote/events/
+    # - .wipnote/spikes/
+    # - .wipnote/tracks/
+    # - .wipnote/bugs/
+    # - .wipnote/chores/
+    # - .wipnote/archives/
+    # - .wipnote/logs/errors/
 ```
 
 ```python
@@ -107,7 +107,7 @@ def initialize_database(
     Initialize SQLite databases with full schema.
 
     Args:
-        db_path: Path to htmlgraph.db
+        db_path: Path to wipnote.db
         skip_analytics_cache: Skip creating index.sqlite
 
     Returns:
@@ -117,21 +117,21 @@ def initialize_database(
         sqlite3.Error: If database creation fails
     """
     # Creates:
-    # - htmlgraph.db (unified event database)
+    # - wipnote.db (unified event database)
     # - index.sqlite (analytics cache, optional)
-    # Initializes all tables via HtmlGraphDB.create_tables()
+    # Initializes all tables via WipnoteDB.create_tables()
 ```
 
 ```python
 def create_default_config_files(
-    htmlgraph_dir: Path,
+    wipnote_dir: Path,
     install_hooks: bool = False
 ) -> dict[str, Path]:
     """
     Create default configuration files.
 
     Args:
-        htmlgraph_dir: Path to .htmlgraph directory
+        wipnote_dir: Path to .wipnote directory
         install_hooks: Whether to create hooks-config.json
 
     Returns:
@@ -150,7 +150,7 @@ def update_gitignore(
     patterns: list[str] | None = None
 ) -> tuple[bool, str]:
     """
-    Update .gitignore with HtmlGraph patterns.
+    Update .gitignore with Wipnote patterns.
 
     Args:
         project_dir: Project root directory
@@ -160,11 +160,11 @@ def update_gitignore(
         Tuple of (updated, message)
 
     Default patterns:
-        - .htmlgraph/index.sqlite*
-        - .htmlgraph/sessions/*.jsonl
-        - .htmlgraph/events/*.jsonl
-        - .htmlgraph/parent-activity.json
-        - .htmlgraph/logs/errors/
+        - .wipnote/index.sqlite*
+        - .wipnote/sessions/*.jsonl
+        - .wipnote/events/*.jsonl
+        - .wipnote/parent-activity.json
+        - .wipnote/logs/errors/
     """
 ```
 
@@ -209,20 +209,20 @@ def validate_init_prerequisites(
     Checks:
         - Directory exists and is writable
         - Git repository exists (if install_hooks)
-        - No conflicting .htmlgraph directory
+        - No conflicting .wipnote directory
     """
 ```
 
 ```python
 def verify_initialization(
-    htmlgraph_dir: Path,
+    wipnote_dir: Path,
     check_database: bool = True
 ) -> tuple[bool, list[str]]:
     """
     Verify initialization completed successfully.
 
     Args:
-        htmlgraph_dir: Path to .htmlgraph directory
+        wipnote_dir: Path to .wipnote directory
         check_database: Verify database schema
 
     Returns:
@@ -261,7 +261,7 @@ def run_interactive_wizard(
 ### 2.5 Orchestration Function
 
 ```python
-def initialize_htmlgraph(
+def initialize_wipnote(
     config: InitConfig,
     verbose: bool = False
 ) -> CommandResult:
@@ -291,11 +291,11 @@ def initialize_htmlgraph(
 
 ## 3. InitConfig Model (ALREADY EXISTS!)
 
-The `InitConfig` model already exists in `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli/models.py` (lines 120-138):
+The `InitConfig` model already exists in `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli/models.py` (lines 120-138):
 
 ```python
 class InitConfig(BaseModel):
-    """Configuration for htmlgraph init command.
+    """Configuration for wipnote init command.
 
     Attributes:
         dir: Directory to initialize (default: .)
@@ -303,7 +303,7 @@ class InitConfig(BaseModel):
         interactive: Interactive setup wizard
         no_index: Do not create the analytics cache (index.sqlite)
         no_update_gitignore: Do not update/create .gitignore for cache files
-        no_events_keep: Do not create .htmlgraph/events/.gitkeep
+        no_events_keep: Do not create .wipnote/events/.gitkeep
     """
 
     dir: str = Field(default=".")
@@ -327,29 +327,29 @@ class InitConfig(BaseModel):
 - `shutil` - File copying (hooks)
 - `subprocess` - Git command execution
 
-### Internal HtmlGraph Modules
-- `htmlgraph.db.schema.HtmlGraphDB` - Database initialization
-- `htmlgraph.hooks.installer.HookInstaller` - Git hooks installation
-- `htmlgraph.hooks.installer.HookConfig` - Hook configuration
-- `htmlgraph.config.get_database_path` - Database path resolution
-- `htmlgraph.config.get_analytics_cache_path` - Cache path resolution
-- `htmlgraph.cli.models.InitConfig` - Configuration model (exists)
-- `htmlgraph.cli.base.CommandResult` - Return type
+### Internal Wipnote Modules
+- `wipnote.db.schema.WipnoteDB` - Database initialization
+- `wipnote.hooks.installer.HookInstaller` - Git hooks installation
+- `wipnote.hooks.installer.HookConfig` - Hook configuration
+- `wipnote.config.get_database_path` - Database path resolution
+- `wipnote.config.get_analytics_cache_path` - Cache path resolution
+- `wipnote.cli.models.InitConfig` - Configuration model (exists)
+- `wipnote.cli.base.CommandResult` - Return type
 
 ### Git Hooks Source
 - Hooks are distributed with the Python package
-- Located in `htmlgraph/hooks/` directory
-- Copied to `.htmlgraph/hooks/` during initialization
-- Symlinked from `.git/hooks/` to `.htmlgraph/hooks/`
+- Located in `wipnote/hooks/` directory
+- Copied to `.wipnote/hooks/` during initialization
+- Symlinked from `.git/hooks/` to `.wipnote/hooks/`
 
 ---
 
 ## 5. Directory Structure
 
-### New File: `src/python/htmlgraph/cli/operations/initialization.py`
+### New File: `src/python/wipnote/cli/operations/initialization.py`
 
 ```
-src/python/htmlgraph/cli/operations/
+src/python/wipnote/cli/operations/
 ├── __init__.py           # Export public functions
 └── initialization.py     # All init logic (new file, ~300 lines)
 ```
@@ -357,8 +357,8 @@ src/python/htmlgraph/cli/operations/
 ### Functions Exported from `operations/__init__.py`:
 
 ```python
-from htmlgraph.cli.operations.initialization import (
-    initialize_htmlgraph,  # Main entry point
+from wipnote.cli.operations.initialization import (
+    initialize_wipnote,  # Main entry point
     create_directory_structure,
     initialize_database,
     create_default_config_files,
@@ -370,7 +370,7 @@ from htmlgraph.cli.operations.initialization import (
 )
 
 __all__ = [
-    "initialize_htmlgraph",
+    "initialize_wipnote",
     "create_directory_structure",
     "initialize_database",
     "create_default_config_files",
@@ -395,7 +395,7 @@ __all__ = [
 
 2. **Validation Errors**
    - Not a git repository (when `--install-hooks` used)
-   - .htmlgraph already exists (conflict)
+   - .wipnote already exists (conflict)
    - Invalid directory path
 
 3. **Database Errors**
@@ -437,10 +437,10 @@ Git hooks can only be installed in git repositories.
 
 Next steps:
   1. Initialize git: git init
-  2. Re-run: htmlgraph init --install-hooks
+  2. Re-run: wipnote init --install-hooks
 
 Alternatively, skip hooks:
-  htmlgraph init
+  wipnote init
 ```
 
 ---
@@ -458,16 +458,16 @@ def test_create_directory_structure_creates_all_dirs(tmp_path):
     """Test directory structure creation."""
     dirs = create_directory_structure(tmp_path, include_events_keep=True)
 
-    assert (tmp_path / ".htmlgraph").exists()
-    assert (tmp_path / ".htmlgraph" / "features").exists()
-    assert (tmp_path / ".htmlgraph" / "sessions").exists()
-    assert (tmp_path / ".htmlgraph" / "events").exists()
-    assert (tmp_path / ".htmlgraph" / "spikes").exists()
+    assert (tmp_path / ".wipnote").exists()
+    assert (tmp_path / ".wipnote" / "features").exists()
+    assert (tmp_path / ".wipnote" / "sessions").exists()
+    assert (tmp_path / ".wipnote" / "events").exists()
+    assert (tmp_path / ".wipnote" / "spikes").exists()
     assert len(dirs) == 9  # All expected directories
 
 def test_initialize_database_creates_schema(tmp_path):
     """Test database initialization."""
-    db_path = tmp_path / "htmlgraph.db"
+    db_path = tmp_path / "wipnote.db"
     success, message = initialize_database(db_path, skip_analytics_cache=False)
 
     assert success is True
@@ -492,14 +492,14 @@ def test_update_gitignore_appends_patterns(tmp_path):
 
     assert updated is True
     content = gitignore.read_text()
-    assert ".htmlgraph/index.sqlite" in content
+    assert ".wipnote/index.sqlite" in content
     assert "*.pyc" in content  # Preserves existing
 
 def test_validate_init_prerequisites_detects_conflicts(tmp_path):
     """Test prerequisite validation."""
-    # Create conflicting .htmlgraph directory
-    (tmp_path / ".htmlgraph").mkdir()
-    (tmp_path / ".htmlgraph" / "existing.txt").write_text("conflict")
+    # Create conflicting .wipnote directory
+    (tmp_path / ".wipnote").mkdir()
+    (tmp_path / ".wipnote" / "existing.txt").write_text("conflict")
 
     errors = validate_init_prerequisites(tmp_path, install_hooks=False)
 
@@ -509,11 +509,11 @@ def test_validate_init_prerequisites_detects_conflicts(tmp_path):
 def test_verify_initialization_detects_incomplete_setup(tmp_path):
     """Test initialization verification."""
     # Create partial structure
-    (tmp_path / ".htmlgraph").mkdir()
-    (tmp_path / ".htmlgraph" / "features").mkdir()
+    (tmp_path / ".wipnote").mkdir()
+    (tmp_path / ".wipnote" / "features").mkdir()
     # Missing database
 
-    success, issues = verify_initialization(tmp_path / ".htmlgraph")
+    success, issues = verify_initialization(tmp_path / ".wipnote")
 
     assert success is False
     assert any("database" in issue.lower() for issue in issues)
@@ -524,7 +524,7 @@ def test_verify_initialization_detects_incomplete_setup(tmp_path):
 Test full initialization workflow:
 
 ```python
-def test_initialize_htmlgraph_full_workflow(tmp_path):
+def test_initialize_wipnote_full_workflow(tmp_path):
     """Test complete initialization."""
     config = InitConfig(
         dir=str(tmp_path),
@@ -535,15 +535,15 @@ def test_initialize_htmlgraph_full_workflow(tmp_path):
         no_events_keep=False,
     )
 
-    result = initialize_htmlgraph(config, verbose=True)
+    result = initialize_wipnote(config, verbose=True)
 
     assert result.success is True
-    assert (tmp_path / ".htmlgraph").exists()
-    assert (tmp_path / ".htmlgraph" / "htmlgraph.db").exists()
-    assert (tmp_path / ".htmlgraph" / "index.sqlite").exists()
+    assert (tmp_path / ".wipnote").exists()
+    assert (tmp_path / ".wipnote" / "wipnote.db").exists()
+    assert (tmp_path / ".wipnote" / "index.sqlite").exists()
     assert (tmp_path / ".gitignore").exists()
 
-def test_initialize_htmlgraph_with_hooks(tmp_path, git_repo):
+def test_initialize_wipnote_with_hooks(tmp_path, git_repo):
     """Test initialization with git hooks."""
     config = InitConfig(
         dir=str(git_repo),
@@ -554,7 +554,7 @@ def test_initialize_htmlgraph_with_hooks(tmp_path, git_repo):
         no_events_keep=False,
     )
 
-    result = initialize_htmlgraph(config, verbose=True)
+    result = initialize_wipnote(config, verbose=True)
 
     assert result.success is True
     assert (git_repo / ".git" / "hooks" / "post-commit").exists()
@@ -568,18 +568,18 @@ Ensure migration from legacy:
 def test_init_command_matches_legacy_behavior(tmp_path):
     """Verify new implementation matches old behavior."""
     config = InitConfig(dir=str(tmp_path))
-    result = initialize_htmlgraph(config)
+    result = initialize_wipnote(config)
 
     # Check that all directories match legacy structure
     expected_dirs = [
-        ".htmlgraph/features",
-        ".htmlgraph/sessions",
-        ".htmlgraph/events",
-        ".htmlgraph/spikes",
-        ".htmlgraph/tracks",
-        ".htmlgraph/bugs",
-        ".htmlgraph/chores",
-        ".htmlgraph/archives",
+        ".wipnote/features",
+        ".wipnote/sessions",
+        ".wipnote/events",
+        ".wipnote/spikes",
+        ".wipnote/tracks",
+        ".wipnote/bugs",
+        ".wipnote/chores",
+        ".wipnote/archives",
     ]
 
     for dir_path in expected_dirs:
@@ -591,9 +591,9 @@ def test_init_command_matches_legacy_behavior(tmp_path):
 ## 8. Migration Checklist
 
 ### Phase 1: Create New Implementation
-- [ ] Create `src/python/htmlgraph/cli/operations/` directory
-- [ ] Create `src/python/htmlgraph/cli/operations/__init__.py`
-- [ ] Create `src/python/htmlgraph/cli/operations/initialization.py`
+- [ ] Create `src/python/wipnote/cli/operations/` directory
+- [ ] Create `src/python/wipnote/cli/operations/__init__.py`
+- [ ] Create `src/python/wipnote/cli/operations/initialization.py`
 - [ ] Implement all 9 functions listed in Section 2
 - [ ] Add comprehensive docstrings with type hints
 - [ ] Add logging statements for debugging
@@ -607,21 +607,21 @@ def test_init_command_matches_legacy_behavior(tmp_path):
 - [ ] Achieve >90% code coverage
 
 ### Phase 3: Update InitCommand
-- [ ] Modify `src/python/htmlgraph/cli/core.py`
+- [ ] Modify `src/python/wipnote/cli/core.py`
 - [ ] Remove import of `cli_legacy` (lines 400)
-- [ ] Import `initialize_htmlgraph` from operations
+- [ ] Import `initialize_wipnote` from operations
 - [ ] Update `InitCommand.execute()` to call new function
 - [ ] Handle interactive mode if needed
 
 ```python
 # Updated InitCommand.execute()
 def execute(self) -> CommandResult:
-    """Initialize the .htmlgraph directory."""
-    from htmlgraph.cli.operations import initialize_htmlgraph
+    """Initialize the .wipnote directory."""
+    from wipnote.cli.operations import initialize_wipnote
 
     # Run interactive wizard if requested
     if self.interactive:
-        from htmlgraph.cli.operations import run_interactive_wizard
+        from wipnote.cli.operations import run_interactive_wizard
         config = run_interactive_wizard(Path(self.dir))
     else:
         config = InitConfig(
@@ -633,16 +633,16 @@ def execute(self) -> CommandResult:
             no_events_keep=self.no_events_keep,
         )
 
-    return initialize_htmlgraph(config, verbose=True)
+    return initialize_wipnote(config, verbose=True)
 ```
 
 ### Phase 4: Verify & Validate
 - [ ] Run all tests: `uv run pytest tests/cli/operations/`
-- [ ] Run type checking: `uv run mypy src/python/htmlgraph/cli/operations/`
+- [ ] Run type checking: `uv run mypy src/python/wipnote/cli/operations/`
 - [ ] Run linting: `uv run ruff check --fix`
-- [ ] Test in real project: `uv run htmlgraph init`
-- [ ] Test with flags: `uv run htmlgraph init --install-hooks`
-- [ ] Test interactive mode: `uv run htmlgraph init --interactive`
+- [ ] Test in real project: `uv run wipnote init`
+- [ ] Test with flags: `uv run wipnote init --install-hooks`
+- [ ] Test interactive mode: `uv run wipnote init --interactive`
 
 ### Phase 5: Documentation
 - [ ] Update CLI help text in `core.py`
@@ -691,7 +691,7 @@ def execute(self) -> CommandResult:
 
 ### High Risk
 - ❌ **Database schema changes** - Could break existing installations
-  - **Mitigation:** Use `HtmlGraphDB.create_tables()` which handles migrations
+  - **Mitigation:** Use `WipnoteDB.create_tables()` which handles migrations
 
 ### Medium Risk
 - ⚠️  **Hook installation conflicts** - Overwriting user hooks
@@ -742,19 +742,19 @@ def execute(self) -> CommandResult:
 2. ✅ **Add temporary stub** - Make init command not crash:
    ```python
    def execute(self) -> CommandResult:
-       """Initialize the .htmlgraph directory."""
-       from htmlgraph.config import HtmlGraphConfig
-       from htmlgraph.db.schema import HtmlGraphDB
+       """Initialize the .wipnote directory."""
+       from wipnote.config import WipnoteConfig
+       from wipnote.db.schema import WipnoteDB
 
        # Temporary implementation until full refactor
-       config = HtmlGraphConfig(graph_dir=Path(self.dir) / ".htmlgraph")
+       config = WipnoteConfig(graph_dir=Path(self.dir) / ".wipnote")
        config.ensure_directories()
 
-       db = HtmlGraphDB(str(config.graph_dir / "htmlgraph.db"))
+       db = WipnoteDB(str(config.graph_dir / "wipnote.db"))
 
        return CommandResult(
            success=True,
-           text=f"Initialized .htmlgraph at {self.dir}"
+           text=f"Initialized .wipnote at {self.dir}"
        )
    ```
 
@@ -768,7 +768,7 @@ def execute(self) -> CommandResult:
 1. Add interactive wizard
 2. Improve error messages with rich formatting
 3. Add progress indicators for long-running operations
-4. Consider adding `htmlgraph init --upgrade` for migrations
+4. Consider adding `wipnote init --upgrade` for migrations
 
 ---
 
@@ -776,7 +776,7 @@ def execute(self) -> CommandResult:
 
 ### Current State (BROKEN)
 ```
-src/python/htmlgraph/cli/
+src/python/wipnote/cli/
 ├── core.py              # InitCommand.execute() imports cli_legacy ❌
 ├── models.py            # InitConfig exists ✅
 └── base.py             # CommandResult base class ✅
@@ -784,8 +784,8 @@ src/python/htmlgraph/cli/
 
 ### Target State (WORKING)
 ```
-src/python/htmlgraph/cli/
-├── core.py              # InitCommand.execute() calls initialize_htmlgraph() ✅
+src/python/wipnote/cli/
+├── core.py              # InitCommand.execute() calls initialize_wipnote() ✅
 ├── models.py            # InitConfig (no changes) ✅
 ├── base.py             # CommandResult (no changes) ✅
 └── operations/
@@ -797,12 +797,12 @@ src/python/htmlgraph/cli/
 ```
 InitCommand.execute()
     ↓
-initialize_htmlgraph(config)
+initialize_wipnote(config)
     ↓
 ├── validate_init_prerequisites()
 ├── create_directory_structure()
 ├── initialize_database()
-│   └── HtmlGraphDB.create_tables()
+│   └── WipnoteDB.create_tables()
 ├── create_default_config_files()
 ├── update_gitignore()
 ├── install_git_hooks()
@@ -815,23 +815,23 @@ initialize_htmlgraph(config)
 ## Appendix B: Default .gitignore Patterns
 
 ```gitignore
-# HtmlGraph analytics index (rebuildable cache)
-.htmlgraph/index.sqlite
-.htmlgraph/index.sqlite-wal
-.htmlgraph/index.sqlite-shm
+# Wipnote analytics index (rebuildable cache)
+.wipnote/index.sqlite
+.wipnote/index.sqlite-wal
+.wipnote/index.sqlite-shm
 
-# HtmlGraph session tracking artifacts (regenerable observability data)
-.htmlgraph/sessions/*.jsonl
-.htmlgraph/events/*.jsonl
-.htmlgraph/parent-activity.json
-.htmlgraph/logs/errors/
+# Wipnote session tracking artifacts (regenerable observability data)
+.wipnote/sessions/*.jsonl
+.wipnote/events/*.jsonl
+.wipnote/parent-activity.json
+.wipnote/logs/errors/
 
 # Keep these (source of truth):
-# - .htmlgraph/features/
-# - .htmlgraph/bugs/
-# - .htmlgraph/chores/
-# - .htmlgraph/spikes/
-# - .htmlgraph/agents.json
+# - .wipnote/features/
+# - .wipnote/bugs/
+# - .wipnote/chores/
+# - .wipnote/spikes/
+# - .wipnote/agents.json
 ```
 
 ---
@@ -840,48 +840,48 @@ initialize_htmlgraph(config)
 
 ### Successful Initialization
 ```bash
-$ htmlgraph init --install-hooks
+$ wipnote init --install-hooks
 
-🚀 Initializing HtmlGraph...
+🚀 Initializing Wipnote...
 
 ✅ Created directory structure
-   - .htmlgraph/features
-   - .htmlgraph/sessions
-   - .htmlgraph/events
-   - .htmlgraph/spikes
-   - .htmlgraph/tracks
-   - .htmlgraph/bugs
-   - .htmlgraph/chores
-   - .htmlgraph/archives
+   - .wipnote/features
+   - .wipnote/sessions
+   - .wipnote/events
+   - .wipnote/spikes
+   - .wipnote/tracks
+   - .wipnote/bugs
+   - .wipnote/chores
+   - .wipnote/archives
 
 ✅ Initialized databases
-   - htmlgraph.db (unified event database)
+   - wipnote.db (unified event database)
    - index.sqlite (analytics cache)
 
 ✅ Updated .gitignore
-   - Added 8 HtmlGraph patterns
+   - Added 8 Wipnote patterns
 
 ✅ Installed git hooks
-   - post-commit → .htmlgraph/hooks/post-commit.sh
-   - post-checkout → .htmlgraph/hooks/post-checkout.sh
-   - post-merge → .htmlgraph/hooks/post-merge.sh
-   - pre-push → .htmlgraph/hooks/pre-push.sh
+   - post-commit → .wipnote/hooks/post-commit.sh
+   - post-checkout → .wipnote/hooks/post-checkout.sh
+   - post-merge → .wipnote/hooks/post-merge.sh
+   - pre-push → .wipnote/hooks/pre-push.sh
 
-🎉 HtmlGraph initialized successfully!
+🎉 Wipnote initialized successfully!
 
 Next steps:
   1. Start tracking: git commit (hooks will track automatically)
-  2. View dashboard: htmlgraph serve
-  3. Check status: htmlgraph status
+  2. View dashboard: wipnote serve
+  3. Check status: wipnote status
 
-Documentation: https://github.com/shakestzd/htmlgraph
+Documentation: https://github.com/shakestzd/wipnote
 ```
 
 ### Error Handling Example
 ```bash
-$ htmlgraph init --install-hooks
+$ wipnote init --install-hooks
 
-🚀 Initializing HtmlGraph...
+🚀 Initializing Wipnote...
 
 ✅ Created directory structure
 ✅ Initialized databases
@@ -893,12 +893,12 @@ Git hooks can only be installed in git repositories.
 
 Next steps:
   1. Initialize git: git init
-  2. Re-run: htmlgraph init --install-hooks
+  2. Re-run: wipnote init --install-hooks
 
 Alternatively, skip hooks:
-  htmlgraph init
+  wipnote init
 
-⚠️  HtmlGraph initialized (without hooks)
+⚠️  Wipnote initialized (without hooks)
 ```
 
 ---

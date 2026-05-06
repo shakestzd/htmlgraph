@@ -22,7 +22,7 @@ The parent-child event linking system has **2 critical design flaws**:
 
 ## Current Architecture
 
-### Database Schema (src/python/htmlgraph/db/schema.py)
+### Database Schema (src/python/wipnote/db/schema.py)
 
 **agent_events table** (lines 202-228):
 ```sql
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 )
 ```
 
-### Event Tracking Flow (src/python/htmlgraph/sdk.py)
+### Event Tracking Flow (src/python/wipnote/sdk.py)
 
 **_log_event()** (lines 602-665):
 ```python
@@ -74,7 +74,7 @@ def _ensure_session_exists(self, session_id: str, parent_event_id: str | None = 
     )
 ```
 
-### Insert Methods (src/python/htmlgraph/db/schema.py)
+### Insert Methods (src/python/wipnote/db/schema.py)
 
 **insert_event()** (lines 476-546):
 - Takes `parent_event_id` parameter
@@ -185,7 +185,7 @@ insert_event() -> "FOREIGN KEY constraint failed"
 
 **Problem**:
 - event_tracker.py has `load_parent_activity()` and `save_parent_activity()` functions
-- These work with `parent-activity.json` file in .htmlgraph/
+- These work with `parent-activity.json` file in .wipnote/
 - But SDK._log_event() only reads `HTMLGRAPH_PARENT_ACTIVITY` environment variable
 - SDK never uses the parent-activity.json file mechanism
 
@@ -232,7 +232,7 @@ insert_event() -> "FOREIGN KEY constraint failed"
 
 ### Phase 1: Fix FOREIGN KEY Constraints (CRITICAL)
 
-**File**: `src/python/htmlgraph/db/schema.py`
+**File**: `src/python/wipnote/db/schema.py`
 
 **Option A - Remove Foreign Key (Recommended)**:
 ```sql
@@ -264,7 +264,7 @@ DEFERRABLE INITIALLY DEFERRED
 
 ### Phase 2: Add Graceful Error Handling in Insert Methods
 
-**File**: `src/python/htmlgraph/db/schema.py`
+**File**: `src/python/wipnote/db/schema.py`
 
 **Changes to insert_event()** (lines 515-546):
 ```python
@@ -288,7 +288,7 @@ except sqlite3.IntegrityError as e:
 
 ### Phase 3: Integrate Parent Activity State File with SDK
 
-**File**: `src/python/htmlgraph/sdk.py`
+**File**: `src/python/wipnote/sdk.py`
 
 **Changes to _log_event()** (lines 602-665):
 ```python
@@ -300,7 +300,7 @@ parent_event_id = os.getenv("HTMLGRAPH_PARENT_ACTIVITY")
 parent_event_id = os.getenv("HTMLGRAPH_PARENT_ACTIVITY")
 if not parent_event_id:
     # Fall back to parent-activity.json state file
-    from htmlgraph.hooks.event_tracker import load_parent_activity
+    from wipnote.hooks.event_tracker import load_parent_activity
     state = load_parent_activity(self._directory)
     parent_event_id = state.get("parent_id")
 ```
@@ -331,10 +331,10 @@ os.environ["HTMLGRAPH_PARENT_ACTIVITY"] = parent_id
 
 | File | Changes | Priority | Risk |
 |------|---------|----------|------|
-| src/python/htmlgraph/db/schema.py | Remove/relax FOREIGN KEY on parent_event_id | P0 | High |
-| src/python/htmlgraph/db/schema.py | Add graceful error handling in insert_event() | P0 | Medium |
-| src/python/htmlgraph/db/schema.py | Add graceful error handling in insert_session() | P0 | Medium |
-| src/python/htmlgraph/sdk.py | Integrate parent-activity.json state file | P1 | Low |
+| src/python/wipnote/db/schema.py | Remove/relax FOREIGN KEY on parent_event_id | P0 | High |
+| src/python/wipnote/db/schema.py | Add graceful error handling in insert_event() | P0 | Medium |
+| src/python/wipnote/db/schema.py | Add graceful error handling in insert_session() | P0 | Medium |
+| src/python/wipnote/sdk.py | Integrate parent-activity.json state file | P1 | Low |
 | tests/python/test_parent_child_event_linking.py | Fix test setup to ensure parent exists | P0 | Low |
 | tests/python/test_parent_child_linking.py | Verify environment variable handling | P0 | Low |
 | tests/python/test_parent_linking_integration.py | Integration test coverage | P1 | Low |
@@ -381,7 +381,7 @@ uv run mypy src/
 ## Related Issues
 
 - Claude Code Hook #10373 - Session management edge cases
-- HtmlGraph Feature: Enhanced parent-child tracing
+- Wipnote Feature: Enhanced parent-child tracing
 - Event capture diagnostic: Parent event ID propagation
 
 ---

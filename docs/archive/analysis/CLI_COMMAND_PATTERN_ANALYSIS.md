@@ -1,14 +1,14 @@
-# HtmlGraph CLI Command Pattern Analysis
+# Wipnote CLI Command Pattern Analysis
 
 **Date:** 2026-01-05
 **Scope:** Command structure, initialization, development mode, session continuation, and configuration patterns
-**Focus:** Understanding how `htmlgraph claude --init/--dev/--continue` works and system prompt management
+**Focus:** Understanding how `wipnote claude --init/--dev/--continue` works and system prompt management
 
 ---
 
 ## Executive Summary
 
-HtmlGraph uses **argparse-based CLI** with a sophisticated multi-level command hierarchy. The `claude` command is a specialized integration for Claude Code that supports:
+Wipnote uses **argparse-based CLI** with a sophisticated multi-level command hierarchy. The `claude` command is a specialized integration for Claude Code that supports:
 
 1. **`--init`** - Install plugin + inject orchestrator system prompt
 2. **`--dev`** - Load plugin from local development directory
@@ -26,23 +26,23 @@ The system prompt management uses:
 
 ### Entry Point
 
-**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli.py`
+**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli.py`
 
 **pyproject.toml configuration:**
 ```toml
 [project.scripts]
-htmlgraph = "htmlgraph.cli:main"
-htmlgraph-deploy = "htmlgraph.scripts.deploy:main"
+wipnote = "wipnote.cli:main"
+wipnote-deploy = "wipnote.scripts.deploy:main"
 ```
 
-This routes `htmlgraph` command → `cli.py:main()` function.
+This routes `wipnote` command → `cli.py:main()` function.
 
 ### Parser Architecture
 
 The CLI uses **nested argparse with subparsers**:
 
 ```python
-parser = argparse.ArgumentParser(description="HtmlGraph - HTML is All You Need")
+parser = argparse.ArgumentParser(description="Wipnote - HTML is All You Need")
 
 # Global flags (work across ALL commands)
 parser.add_argument("--format", choices=["text", "json"], default="text")
@@ -61,12 +61,12 @@ subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
 ### Location & Definition
 
-**Line 4150-4395** in `/src/python/htmlgraph/cli.py`
+**Line 4150-4395** in `/src/python/wipnote/cli.py`
 
 **Parser setup (line 5869-5889):**
 ```python
 claude_parser = subparsers.add_parser(
-    "claude", help="Start Claude Code with HtmlGraph integration"
+    "claude", help="Start Claude Code with Wipnote integration"
 )
 claude_group = claude_parser.add_mutually_exclusive_group()
 claude_group.add_argument("--init", action="store_true", ...)
@@ -79,10 +79,10 @@ claude_parser.set_defaults(func=cmd_claude)
 
 | Command | Purpose | What It Does |
 |---------|---------|--------------|
-| `htmlgraph claude` | Default start | Launches Claude + injects orchestrator rules only |
-| `htmlgraph claude --init` | Fresh setup | Install/upgrade plugin + inject orchestrator system prompt |
-| `htmlgraph claude --continue` | Resume session | Reload plugin + inject orchestrator rules |
-| `htmlgraph claude --dev` | Dev mode | Load plugin from `packages/claude-plugin/.claude-plugin` |
+| `wipnote claude` | Default start | Launches Claude + injects orchestrator rules only |
+| `wipnote claude --init` | Fresh setup | Install/upgrade plugin + inject orchestrator system prompt |
+| `wipnote claude --continue` | Resume session | Reload plugin + inject orchestrator rules |
+| `wipnote claude --dev` | Dev mode | Load plugin from `packages/claude-plugin/.claude-plugin` |
 
 ---
 
@@ -92,7 +92,7 @@ claude_parser.set_defaults(func=cmd_claude)
 
 **Primary system prompt file:**
 ```
-src/python/htmlgraph/orchestrator-system-prompt-optimized.txt
+src/python/wipnote/orchestrator-system-prompt-optimized.txt
 ```
 
 **Location in code:**
@@ -143,12 +143,12 @@ If `orchestrator-system-prompt-optimized.txt` doesn't exist (for installations w
 else:
     # Fallback: provide minimal orchestrator guidance
     system_prompt = textwrap.dedent("""
-        You are an AI orchestrator for HtmlGraph project development.
+        You are an AI orchestrator for Wipnote project development.
 
         CRITICAL DIRECTIVES:
         1. DELEGATE to subagents - do not implement directly
         2. CREATE work items before delegating (features, bugs, spikes)
-        3. USE SDK for tracking - all work must be tracked in .htmlgraph/
+        3. USE SDK for tracking - all work must be tracked in .wipnote/
         4. RESPECT dependencies - check blockers before starting
         ...
     """)
@@ -184,7 +184,7 @@ if orchestration_rules:
 
 **With `--init`:**
 ```python
-install_htmlgraph_plugin(args)  # Step 1: Install plugin
+install_wipnote_plugin(args)  # Step 1: Install plugin
 system_prompt = # Load from file
 combined_prompt = f"{system_prompt}\n\n---\n\n{orchestration_rules}"
 cmd = ["claude", "--append-system-prompt", combined_prompt]
@@ -192,7 +192,7 @@ cmd = ["claude", "--append-system-prompt", combined_prompt]
 
 **With `--continue`:**
 ```python
-install_htmlgraph_plugin(args)  # Step 1: Install plugin
+install_wipnote_plugin(args)  # Step 1: Install plugin
 cmd = ["claude", "--resume"]
 if orchestration_rules:
     cmd.extend(["--append-system-prompt", orchestration_rules])
@@ -220,17 +220,17 @@ cmd = [
 
 1. **Update marketplace** (non-blocking):
    ```bash
-   claude plugin marketplace update htmlgraph
+   claude plugin marketplace update wipnote
    ```
 
 2. **Try update first** (for already-installed plugins):
    ```bash
-   claude plugin update htmlgraph
+   claude plugin update wipnote
    ```
 
 3. **Fallback to install** (if not installed):
    ```bash
-   claude plugin install htmlgraph
+   claude plugin install wipnote
    ```
 
 ---
@@ -244,11 +244,11 @@ cmd = [
 ### Initialization Flow
 
 ```
-htmlgraph init [DIR] [FLAGS]
-    ├── Create .htmlgraph directory structure
+wipnote init [DIR] [FLAGS]
+    ├── Create .wipnote directory structure
     ├── Initialize features/, spikes/, sessions/, events/, tracks/ subdirectories
     ├── Create analytics index (index.sqlite)
-    ├── Update .gitignore with HtmlGraph cache entries
+    ├── Update .gitignore with Wipnote cache entries
     ├── Install Git hooks (optional: --install-hooks)
     ├── Generate documentation (AGENTS.md, CLAUDE.md, GEMINI.md)
     └── Create initial configuration
@@ -258,7 +258,7 @@ htmlgraph init [DIR] [FLAGS]
 
 **Directory structure:**
 ```
-.htmlgraph/
+.wipnote/
 ├── features/              # Feature tracking
 ├── spikes/               # Research spikes
 ├── sessions/             # Session tracking
@@ -281,11 +281,11 @@ htmlgraph init [DIR] [FLAGS]
 ### Configuration Options
 
 ```bash
-htmlgraph init [DIR]                    # Basic init
-htmlgraph init --interactive            # Interactive wizard
-htmlgraph init --no-index               # Skip analytics cache
-htmlgraph init --no-update-gitignore    # Don't update .gitignore
-htmlgraph init --install-hooks          # Install Git hooks
+wipnote init [DIR]                    # Basic init
+wipnote init --interactive            # Interactive wizard
+wipnote init --no-index               # Skip analytics cache
+wipnote init --no-update-gitignore    # Don't update .gitignore
+wipnote init --install-hooks          # Install Git hooks
 ```
 
 ---
@@ -300,7 +300,7 @@ Load the Claude plugin from **local development directory** instead of installed
 
 ```python
 plugin_dir = (
-    Path(__file__).parent.parent.parent.parent  # src/python/htmlgraph/
+    Path(__file__).parent.parent.parent.parent  # src/python/wipnote/
     / "packages"
     / "claude-plugin"
     / ".claude-plugin"
@@ -339,7 +339,7 @@ if args.dev:
 When starting in dev mode:
 ```
 ============================================================
-🔧 HtmlGraph Development Mode
+🔧 Wipnote Development Mode
 ============================================================
 
 Loading plugin from: packages/claude-plugin/.claude-plugin
@@ -364,7 +364,7 @@ Resume the last Claude Code session with:
 
 ```python
 elif args.continue_session:
-    install_htmlgraph_plugin(args)  # Step 1: Ensure plugin is up-to-date
+    install_wipnote_plugin(args)  # Step 1: Ensure plugin is up-to-date
 
     plugin_dir = ... / "packages" / "claude-plugin" / ".claude-plugin"
 
@@ -385,14 +385,14 @@ elif args.continue_session:
 
 ## 8. Configuration & State Management
 
-### `.htmlgraph/` Directory
+### `.wipnote/` Directory
 
-**Central state directory** for all HtmlGraph operations.
+**Central state directory** for all Wipnote operations.
 
 **Key files:**
 
 ```
-.htmlgraph/
+.wipnote/
 ├── orchestrator-mode.json     # Orchestrator configuration
 ├── index.sqlite               # Analytics cache (rebuilt daily)
 ├── features/                  # Feature files (.html)
@@ -406,23 +406,23 @@ elif args.continue_session:
 
 1. **Command-line arguments** (highest priority)
    - `--format json`, `--quiet`, `--verbose`
-   - `--graph-dir .htmlgraph` (default)
+   - `--graph-dir .wipnote` (default)
 
 2. **Environment variables** (medium priority)
    - Set by hooks for parent-child session linking
    - Used for orchestrator mode detection
 
 3. **File defaults** (lowest priority)
-   - `.htmlgraph/orchestrator-mode.json`
+   - `.wipnote/orchestrator-mode.json`
    - `.claude/` directory (Claude Code plugin settings)
 
 ### State Persistence
 
-**Sessions are tracked via HtmlGraph SDK:**
+**Sessions are tracked via Wipnote SDK:**
 
 ```python
-from htmlgraph import SDK
-sdk = SDK(directory=".htmlgraph", agent="claude-code")
+from wipnote import SDK
+sdk = SDK(directory=".wipnote", agent="claude-code")
 
 # Track session start
 session = sdk.session_manager.start(
@@ -498,10 +498,10 @@ def cmd_claude(args: argparse.Namespace) -> None:
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `src/python/htmlgraph/cli.py` | Main CLI module | ~6000 |
-| `src/python/htmlgraph/cli_framework.py` | BaseCommand class | ~116 |
-| `src/python/htmlgraph/cli_commands/feature.py` | Feature commands | 152 |
-| `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt` | System prompt | 299 |
+| `src/python/wipnote/cli.py` | Main CLI module | ~6000 |
+| `src/python/wipnote/cli_framework.py` | BaseCommand class | ~116 |
+| `src/python/wipnote/cli_commands/feature.py` | Feature commands | 152 |
+| `src/python/wipnote/orchestrator-system-prompt-optimized.txt` | System prompt | 299 |
 
 ### Plugin Files
 
@@ -518,7 +518,7 @@ def cmd_claude(args: argparse.Namespace) -> None:
 
 | Location | Purpose |
 |----------|---------|
-| `.htmlgraph/orchestrator-mode.json` | Project orchestrator config |
+| `.wipnote/orchestrator-mode.json` | Project orchestrator config |
 | `.claude/settings.json` | Claude Code plugin settings |
 | `.claude/hooks/` | Custom hooks directory |
 | `.gitignore` | Excludes session tracking files |
@@ -554,7 +554,7 @@ def cmd_claude(args: argparse.Namespace) -> None:
 The prompt is synchronized across platforms via `sync-docs` command:
 
 ```bash
-uv run htmlgraph sync-docs
+uv run wipnote sync-docs
 ```
 
 This keeps three files in sync:
@@ -605,12 +605,12 @@ This keeps three files in sync:
 
 ```bash
 # Initialize project and start Claude with orchestrator mode
-htmlgraph init
-htmlgraph claude --init
+wipnote init
+wipnote claude --init
 ```
 
 **What happens:**
-1. `init` creates `.htmlgraph/` structure
+1. `init` creates `.wipnote/` structure
 2. `claude --init` installs/upgrades plugin
 3. Claude starts with orchestrator system prompt + rules
 
@@ -618,26 +618,26 @@ htmlgraph claude --init
 
 ```bash
 # Start dev mode (load plugin from local files)
-htmlgraph claude --dev
+wipnote claude --dev
 
 # Make changes to plugin files in packages/claude-plugin/
 # Restart Claude to reload changes
 
-htmlgraph claude --dev  # Changes take effect
+wipnote claude --dev  # Changes take effect
 ```
 
 ### Example: Resuming Work
 
 ```bash
 # Resume last session with plugin and rules
-htmlgraph claude --continue
+wipnote claude --continue
 ```
 
 ### Example: JSON Output
 
 ```bash
 # Get session info in JSON format
-htmlgraph session start-info --format json
+wipnote session start-info --format json
 ```
 
 ---
@@ -660,29 +660,29 @@ Location: `tests/python/test_orchestrator_cli.py`
 
 ```bash
 # Test --init
-uv run htmlgraph init --interactive
+uv run wipnote init --interactive
 
 # Test --dev
-uv run htmlgraph claude --dev
+uv run wipnote claude --dev
 
 # Test --continue
-uv run htmlgraph claude --continue
+uv run wipnote claude --continue
 
 # Test default (no flags)
-uv run htmlgraph claude
+uv run wipnote claude
 
 # Test with JSON output
-uv run htmlgraph session start-info --format json
+uv run wipnote session start-info --format json
 
 # Test verbose
-uv run htmlgraph claude --init --verbose
+uv run wipnote claude --init --verbose
 ```
 
 ---
 
 ## Conclusion
 
-HtmlGraph's CLI uses a **sophisticated but maintainable architecture** based on argparse with:
+Wipnote's CLI uses a **sophisticated but maintainable architecture** based on argparse with:
 
 1. **Multi-level command hierarchy** - Main command + subcommands + nested subcommands
 2. **Global flags** - `--format`, `--quiet`, `--verbose` work everywhere
@@ -690,7 +690,7 @@ HtmlGraph's CLI uses a **sophisticated but maintainable architecture** based on 
 4. **File-based configuration** - System prompts, orchestration rules stored on filesystem
 5. **Subprocess delegation** - Claude Code invoked via subprocess with full context
 6. **Plugin integration** - Plugin installed/upgraded via `claude plugin` commands
-7. **Session tracking** - All work tracked in `.htmlgraph/` via HtmlGraph SDK
+7. **Session tracking** - All work tracked in `.wipnote/` via Wipnote SDK
 
 The system prompt management pattern is **clean and extensible**, supporting:
 - File-based persistence
@@ -699,4 +699,4 @@ The system prompt management pattern is **clean and extensible**, supporting:
 - Platform-specific adaptation
 - Development mode with local files
 
-This design allows HtmlGraph to bootstrap orchestrator mode effectively while maintaining flexibility for different use cases.
+This design allows Wipnote to bootstrap orchestrator mode effectively while maintaining flexibility for different use cases.

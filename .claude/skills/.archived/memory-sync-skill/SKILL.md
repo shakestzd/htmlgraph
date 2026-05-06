@@ -139,7 +139,7 @@ git commit -m "docs: add Claude orchestrator patterns"
 ### File Structure
 
 ```
-htmlgraph/
+wipnote/
 ├── AGENTS.md              # Single source of truth
 ├── CLAUDE.md              # Platform-specific + refs to AGENTS.md
 ├── GEMINI.md              # Platform-specific + refs to AGENTS.md

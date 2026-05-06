@@ -2,7 +2,7 @@
 
 **Status**: ✅ Complete and Production Ready
 **Date**: 2025-01-11
-**File Modified**: `src/python/htmlgraph/api/templates/dashboard-redesign.html`
+**File Modified**: `src/python/wipnote/api/templates/dashboard-redesign.html`
 
 ## Quick Summary
 
@@ -163,7 +163,7 @@ UserQuery
 ## Files Modified
 
 ```
-src/python/htmlgraph/api/templates/dashboard-redesign.html
+src/python/wipnote/api/templates/dashboard-redesign.html
 ├─ Lines 381-428: NEW calculateEventDepth() function
 └─ Line 466: Updated insertChildEvent() to use new function
 ```
@@ -211,7 +211,7 @@ To verify the fix works:
 
 1. Start the dashboard:
    ```bash
-   uv run htmlgraph serve
+   uv run wipnote serve
    ```
 
 2. Open browser: `http://localhost:8000`

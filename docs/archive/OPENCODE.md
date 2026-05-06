@@ -1,6 +1,6 @@
-# HtmlGraph for OpenCode
+# Wipnote for OpenCode
 
-**MANDATORY instructions for OpenCode AI agents working with HtmlGraph projects.**
+**MANDATORY instructions for OpenCode AI agents working with Wipnote projects.**
 
 ---
 
@@ -24,18 +24,18 @@ The AGENTS.md file contains ALL core documentation:
 
 ### ABSOLUTE RULE: Use SDK, Never Direct File Edits
 
-**CRITICAL: NEVER use file operations on `.htmlgraph/` HTML files.**
+**CRITICAL: NEVER use file operations on `.wipnote/` HTML files.**
 
 ❌ **FORBIDDEN:**
 ```python
 # NEVER DO THIS
-Write('/path/to/.htmlgraph/features/feature-123.html', ...)
-Edit('/path/to/.htmlgraph/sessions/session-456.html', ...)
+Write('/path/to/.wipnote/features/feature-123.html', ...)
+Edit('/path/to/.wipnote/sessions/session-456.html', ...)
 ```
 
 ✅ **REQUIRED - Use SDK:**
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # ALWAYS initialize with agent="opencode"
 sdk = SDK(agent="opencode")
@@ -64,21 +64,21 @@ print(f"Created: {feature.id}")
 ### Installation & Setup
 
 ```bash
-# Install htmlgraph in your project
-pip install htmlgraph
+# Install wipnote in your project
+pip install wipnote
 # or
-uv pip install htmlgraph
+uv pip install wipnote
 
-# Initialize HtmlGraph in your project
-htmlgraph init
+# Initialize Wipnote in your project
+wipnote init
 ```
 
 ### Basic Workflow
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
-# Initialize (auto-discovers .htmlgraph directory)
+# Initialize (auto-discovers .wipnote directory)
 sdk = SDK(agent="opencode")
 
 # Get project status and recommendations
@@ -146,21 +146,21 @@ else:
 
 ## CLI Commands (When SDK isn't available)
 
-**IMPORTANT:** Always use `uv run` when running htmlgraph commands.
+**IMPORTANT:** Always use `uv run` when running wipnote commands.
 
 ```bash
 # Check project status
-uv run htmlgraph status
-uv run htmlgraph feature list
-uv run htmlgraph session list
+uv run wipnote status
+uv run wipnote feature list
+uv run wipnote session list
 
 # Work with features
-uv run htmlgraph feature start <feature-id>
-uv run htmlgraph feature complete <feature-id>
-uv run htmlgraph feature create "Title"
+uv run wipnote feature start <feature-id>
+uv run wipnote feature complete <feature-id>
+uv run wipnote feature create "Title"
 
 # Dashboard
-uv run htmlgraph serve
+uv run wipnote serve
 # Open http://localhost:8080
 ```
 
@@ -171,7 +171,7 @@ uv run htmlgraph serve
 OpenCode automatically runs hooks at key events:
 
 ### SessionStart Hook
-- Automatically initializes HtmlGraph session tracking
+- Automatically initializes Wipnote session tracking
 - Provides project status and feature context
 - Shows handoff information from previous agents
 
@@ -186,7 +186,7 @@ OpenCode automatically runs hooks at key events:
 
 **Hook Scripts Location:** `packages/opencode-extension/hooks/scripts/`
 - All hooks use Python scripts with `uv run` for dependency management
-- Core functionality defined in htmlgraph Python package
+- Core functionality defined in wipnote Python package
 - Hooks are just execution layer calling into the package
 
 ---
@@ -195,7 +195,7 @@ OpenCode automatically runs hooks at key events:
 
 ### Agent Detection
 
-HtmlGraph automatically detects OpenCode environment:
+Wipnote automatically detects OpenCode environment:
 
 ```python
 # Agent detection happens automatically
@@ -238,7 +238,7 @@ Implement **DIRECTLY** if ALL apply:
 ## Complete Workflow Example
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 def opencode_workflow():
     """Complete OpenCode agent workflow."""
@@ -303,10 +303,10 @@ if __name__ == "__main__":
 
 ### Common Issues
 
-**SDK not finding .htmlgraph directory:**
+**SDK not finding .wipnote directory:**
 ```python
 # Specify path explicitly
-sdk = SDK(directory="/path/to/project/.htmlgraph", agent="opencode")
+sdk = SDK(directory="/path/to/project/.wipnote", agent="opencode")
 ```
 
 **Changes not persisting:**
@@ -367,7 +367,7 @@ sdk.features.mark_done([auth_feature.id, session_feature.id])
 
 ## Deployment Integration
 
-When you need to deploy HtmlGraph changes:
+When you need to deploy Wipnote changes:
 
 ```bash
 # Full deployment (includes OpenCode extension)
@@ -390,9 +390,9 @@ OpenCode extension configuration in `packages/opencode-extension/opencode-extens
 
 ```json
 {
-  "name": "htmlgraph",
+  "name": "wipnote",
   "version": "0.22.0",
-  "description": "HtmlGraph session tracking for OpenCode",
+  "description": "Wipnote session tracking for OpenCode",
   "contextFileName": "OPENCODE.md",
   "agent": "opencode"
 }
@@ -409,11 +409,11 @@ Hooks configuration in `hooks/hooks.json` defines the three main hooks:
 
 ```python
 # Test OpenCode detection
-from htmlgraph.agent_detection import detect_agent_name
+from wipnote.agent_detection import detect_agent_name
 print(f"Detected agent: {detect_agent_name()}")  # Should be "opencode"
 
 # Test SDK initialization
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="opencode")
 print(f"Agent: {sdk.agent}")
 print(f"Summary: {sdk.summary()}")
@@ -426,6 +426,6 @@ print(f"Summary: {sdk.summary()}")
 - **Documentation:** [AGENTS.md](./AGENTS.md) - Complete reference
 - **API Reference:** `docs/api-reference.md`
 - **Quickstart:** `docs/quickstart.md`
-- **Dashboard:** Run `uv run htmlgraph serve` and open http://localhost:8080
+- **Dashboard:** Run `uv run wipnote serve` and open http://localhost:8080
 
-**Remember:** HtmlGraph is tracking this session. All your work will be automatically attributed to the appropriate features and sessions.
+**Remember:** Wipnote is tracking this session. All your work will be automatically attributed to the appropriate features and sessions.

@@ -4,7 +4,7 @@ Status: Draft
 
 ## Purpose
 
-Define how HtmlGraph coordinates work across:
+Define how Wipnote coordinates work across:
 
 - Multiple terminal-native AI sessions
 - Multiple human-operated terminals
@@ -43,7 +43,7 @@ The orchestrator is a scheduling and integration role, not a global parent proce
 
 ### 2. Shared state over chat state
 
-Durable work state must live in HtmlGraph artifacts and events, not only inside a session transcript.
+Durable work state must live in Wipnote artifacts and events, not only inside a session transcript.
 
 ### 3. Provenance is not authority
 
@@ -462,7 +462,7 @@ Illustrative claim record:
   "intended_output": "Implement feature flag parser and tests",
   "write_scope": {
     "paths": [
-      "src/python/htmlgraph/flags.py",
+      "src/python/wipnote/flags.py",
       "tests/python/test_flags.py"
     ],
     "branch": "worktree-agent-1234",
@@ -518,7 +518,7 @@ Reassign when:
 - A different model is better suited for the remaining work
 - Integration authority requests a narrower or corrected implementation
 
-## Relationship to Existing HtmlGraph Concepts
+## Relationship to Existing Wipnote Concepts
 
 This spec extends, rather than replaces:
 

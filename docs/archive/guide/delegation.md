@@ -2,7 +2,7 @@
 
 ## What is Delegation?
 
-Delegation is HtmlGraph's orchestrator pattern for distributing work to specialized subagents. Instead of a single agent handling multiple sequential operations (which fills context with intermediate results), you spawn parallel subagents to work on focused tasks and receive summaries only.
+Delegation is Wipnote's orchestrator pattern for distributing work to specialized subagents. Instead of a single agent handling multiple sequential operations (which fills context with intermediate results), you spawn parallel subagents to work on focused tasks and receive summaries only.
 
 **Key insight:** Parallel delegation is faster AND preserves orchestrator context for high-level decisions.
 
@@ -233,7 +233,7 @@ exploration_task = Task(
 
 ## Handling Results
 
-HtmlGraph automatically tracks parent-child session relationships when you delegate.
+Wipnote automatically tracks parent-child session relationships when you delegate.
 
 ### Getting Results
 
@@ -241,10 +241,10 @@ After `Task()` completes, the subagent's output is available in the task result.
 
 ```bash
 # View session tree for current session
-htmlgraph session tree
+wipnote session tree
 
 # Find all sessions that worked on a feature
-htmlgraph session find-feature feat-a1b2c3d4
+wipnote session find-feature feat-a1b2c3d4
 ```
 
 ### Session Linking
@@ -253,7 +253,7 @@ All work on a feature is automatically linked:
 
 ```bash
 # Find all sessions that worked on a feature
-htmlgraph session find-feature feature-auth-001
+wipnote session find-feature feature-auth-001
 
 # Includes:
 # - Initial orchestrator session
@@ -350,10 +350,10 @@ See what subagent actually executed:
 
 ```bash
 # Show a specific session's details
-htmlgraph session show <session-id>
+wipnote session show <session-id>
 
 # View session tree to see parent-child relationships
-htmlgraph session tree
+wipnote session tree
 ```
 
 ## Best Practices
@@ -363,7 +363,7 @@ htmlgraph session tree
 Learn delegation patterns before strict enforcement:
 
 ```bash
-uv run htmlgraph orchestrator enable --mode guidance
+uv run wipnote orchestrator enable --mode guidance
 ```
 
 Monitor warnings to understand when delegation helps.
@@ -408,9 +408,9 @@ Output format: [Structured result format]
 Task(prompt=DELEGATION_TEMPLATE.format(...))
 ```
 
-### 4. Review Patterns in HtmlGraph
+### 4. Review Patterns in Wipnote
 
-See examples in `.htmlgraph/spikes/` of real delegation patterns from HtmlGraph development.
+See examples in `.wipnote/spikes/` of real delegation patterns from Wipnote development.
 
 ### 5. Combine with Analytics
 
@@ -418,10 +418,10 @@ Use orchestrator analytics to find optimization opportunities:
 
 ```bash
 # Find bottlenecks before dispatching parallel work
-htmlgraph analytics bottlenecks --top 5
+wipnote analytics bottlenecks --top 5
 
 # Get smart recommendations for what to work on
-htmlgraph analytics recommend --agent-count 3
+wipnote analytics recommend --agent-count 3
 ```
 
 ## Common Delegation Patterns

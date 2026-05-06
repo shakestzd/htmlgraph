@@ -6,7 +6,7 @@
 
 ## Overview
 
-This implementation adds internal activity tracking to spawner agents, making work performed in isolated spawned sessions visible in HtmlGraph with proper parent-child event linking.
+This implementation adds internal activity tracking to spawner agents, making work performed in isolated spawned sessions visible in Wipnote with proper parent-child event linking.
 
 ## Problem Statement
 
@@ -22,7 +22,7 @@ A utility class that:
 - Records phase transitions during spawner execution
 - Links child events to parent delegation events
 - Tracks timing and execution metrics
-- Integrates with HtmlGraphDB for persistence
+- Integrates with WipnoteDB for persistence
 
 **Key Features:**
 - Parent-child event linking via `parent_event_id`
@@ -177,17 +177,17 @@ Checks:
 
 ```bash
 # Test Gemini spawner
-python -m htmlgraph.spawner gemini \
+python -m wipnote.spawner gemini \
   -p "Write hello world" \
   -m gemini-2.0-flash
 
 # Test Codex spawner
-python -m htmlgraph.spawner codex \
+python -m wipnote.spawner codex \
   -p "Implement feature" \
   --sandbox read-only
 
 # Test Copilot spawner
-python -m htmlgraph.spawner copilot \
+python -m wipnote.spawner copilot \
   -p "Debug this" \
   --allow-all-tools
 ```
@@ -197,8 +197,8 @@ python -m htmlgraph.spawner copilot \
 ```bash
 # Query parent-child relationships
 uv run python3 << 'EOF'
-from htmlgraph.db.schema import HtmlGraphDB
-db = HtmlGraphDB()
+from wipnote.db.schema import WipnoteDB
+db = WipnoteDB()
 cursor = db.connection.cursor()
 
 # Get delegations with child count
@@ -234,7 +234,7 @@ EOF
    - Error tracking by phase
 
 4. **Dashboard Integration**
-   - Events visible in HtmlGraph
+   - Events visible in Wipnote
    - Hierarchical display
    - Filtering by spawner type
 
@@ -242,7 +242,7 @@ EOF
 
 - Tracking is optional (graceful degradation)
 - Existing spawner APIs unchanged
-- Works with or without HtmlGraphDB
+- Works with or without WipnoteDB
 - No performance impact if tracking disabled
 
 ## Future Enhancements
@@ -312,6 +312,6 @@ Delegation Event (event-9910cd38)
 
 ## References
 
-- HtmlGraphDB schema: `src/python/htmlgraph/db/schema.py`
+- WipnoteDB schema: `src/python/wipnote/db/schema.py`
 - Agent events table: `agent_events` with `parent_event_id` foreign key
 - Environment variables: Set by spawner wrapper, read by tracker

@@ -1,8 +1,8 @@
-# Concurrency Patterns for HtmlGraph
+# Concurrency Patterns for Wipnote
 
 ## Overview
 
-HtmlGraph provides transaction and snapshot patterns for safe concurrent access to graph data. These patterns enable multiple agents to read and write the graph without data corruption or race conditions.
+Wipnote provides transaction and snapshot patterns for safe concurrent access to graph data. These patterns enable multiple agents to read and write the graph without data corruption or race conditions.
 
 ## GraphSnapshot: Immutable State Views
 
@@ -18,9 +18,9 @@ A `GraphSnapshot` is a frozen, read-only copy of the graph at a specific point i
 ### Usage
 
 ```python
-from htmlgraph import HtmlGraph
+from wipnote import Wipnote
 
-graph = HtmlGraph("features/")
+graph = Wipnote("features/")
 
 # Create snapshot
 snapshot = graph.snapshot()
@@ -109,10 +109,10 @@ A `transaction()` context manager batches multiple operations and applies them a
 ### Usage
 
 ```python
-from htmlgraph import HtmlGraph
-from htmlgraph.models import Node
+from wipnote import Wipnote
+from wipnote.models import Node
 
-graph = HtmlGraph("features/")
+graph = Wipnote("features/")
 
 # Basic transaction
 with graph.transaction() as tx:
@@ -276,10 +276,10 @@ except Exception as e:
 ## Example: Multi-Agent Coordination
 
 ```python
-from htmlgraph import HtmlGraph
-from htmlgraph.models import Node
+from wipnote import Wipnote
+from wipnote.models import Node
 
-graph = HtmlGraph("features/")
+graph = Wipnote("features/")
 
 # Agent 1: Analyze bottlenecks (uses snapshot for stable view)
 def agent1_analyze():
@@ -354,10 +354,10 @@ class GraphSnapshot:
         """All nodes as dict (returns copies)."""
 ```
 
-### HtmlGraph Transaction Methods
+### Wipnote Transaction Methods
 
 ```python
-class HtmlGraph:
+class Wipnote:
     def snapshot(self) -> GraphSnapshot:
         """Create immutable snapshot of current state."""
 

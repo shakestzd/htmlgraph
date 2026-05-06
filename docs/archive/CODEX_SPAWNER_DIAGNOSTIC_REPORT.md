@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-CodexSpawner implementation is **working correctly**. All HtmlGraph integration components are functioning as designed. The failure occurs at the **OpenAI API access layer** due to ChatGPT account tier limitations.
+CodexSpawner implementation is **working correctly**. All Wipnote integration components are functioning as designed. The failure occurs at the **OpenAI API access layer** due to ChatGPT account tier limitations.
 
 ### Quick Facts
 
@@ -18,7 +18,7 @@ CodexSpawner implementation is **working correctly**. All HtmlGraph integration 
 | CodexSpawner Implementation | ✅ WORKING | All code paths correct |
 | SpawnerEventTracker | ✅ WORKING | Creates `subprocess.codex` events |
 | Parent Event Linking | ✅ WORKING | All events have valid `parent_event_id` |
-| Database Recording | ✅ WORKING | Events properly stored in HtmlGraph |
+| Database Recording | ✅ WORKING | Events properly stored in Wipnote |
 | OpenAI API Access | ❌ BLOCKED | ChatGPT account limitation |
 
 ---
@@ -180,7 +180,7 @@ try:
         prompt="Generate Python code",
         sandbox="workspace-write",
         output_json=True,
-        track_in_htmlgraph=True,
+        track_in_wipnote=True,
         tracker=tracker,
         parent_event_id=parent_event_id,
         timeout=120
@@ -213,10 +213,10 @@ Task(
 ```
 
 **Pros:**
-- Already available in HtmlGraph setup
+- Already available in Wipnote setup
 - Claude Sonnet 4.5 provides excellent code generation
 - No additional cost or configuration
-- Full HtmlGraph tracking included
+- Full Wipnote tracking included
 
 **Cons:**
 - Uses Claude instead of GPT-4 (different model characteristics)
@@ -269,7 +269,7 @@ LIMIT 5;
 
 ### What's Working ✅
 
-1. **CodexSpawner Class** (`src/python/htmlgraph/orchestration/spawners/codex.py`)
+1. **CodexSpawner Class** (`src/python/wipnote/orchestration/spawners/codex.py`)
    - Command building logic correct
    - JSONL parsing working
    - Event tracking integration complete
@@ -322,7 +322,7 @@ Task(
 This provides:
 - Immediate code generation capability
 - No additional cost
-- Full HtmlGraph tracking
+- Full Wipnote tracking
 - Claude Sonnet 4.5 quality
 
 ### For Long-Term
@@ -386,7 +386,7 @@ Root Cause: ❌ ChatGPT account tier limitation
 **CodexSpawner is fully functional and production-ready.** The implementation correctly:
 
 1. Executes Codex CLI commands
-2. Tracks subprocess invocations in HtmlGraph
+2. Tracks subprocess invocations in Wipnote
 3. Links events to parent delegation context
 4. Handles errors gracefully
 5. Provides fallback patterns
@@ -399,4 +399,4 @@ The only issue is **external API access** due to ChatGPT account limitations. Th
 
 **Report Generated:** 2026-01-12
 **Test Script:** `/Users/shakes/DevProjects/htmlgraph/test_codex_spawner.py`
-**Database:** `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/htmlgraph.db`
+**Database:** `/Users/shakes/DevProjects/htmlgraph/.wipnote/wipnote.db`

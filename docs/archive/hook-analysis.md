@@ -1,4 +1,4 @@
-# HtmlGraph Claude Code Hook Usage Analysis
+# Wipnote Claude Code Hook Usage Analysis
 
 ## COMPLETE HOOK INVENTORY
 
@@ -36,7 +36,7 @@
 **Effectiveness:** ⭐⭐⭐⭐⭐ **HIGH**
 - Catches ~80% of workflow violations before they happen
 - Prevents direct implementation without work items
-- Guides users to proper HtmlGraph patterns
+- Guides users to proper Wipnote patterns
 
 ---
 
@@ -46,8 +46,8 @@
 **Category:** Activity Tracking + UX
 
 **What It Does:**
-- Creates or resumes HtmlGraph session for agent
-- Checks for HtmlGraph version updates (PyPI comparison)
+- Creates or resumes Wipnote session for agent
+- Checks for Wipnote version updates (PyPI comparison)
 - Activates orchestrator mode (default enabled)
 - Generates comprehensive session context
 
@@ -68,7 +68,7 @@
 ---
 
 ### 4. PreToolUse Hook
-**File:** `pretooluse-integrator.py` → `htmlgraph.hooks.pretooluse`
+**File:** `pretooluse-integrator.py` → `wipnote.hooks.pretooluse`
 **Purpose:** Pre-execution validation and enforcement
 **Category:** Workflow Enforcement
 
@@ -77,7 +77,7 @@
 ---
 
 ### 5. PostToolUse Hook
-**File:** `posttooluse-integrator.py` → `htmlgraph.hooks.posttooluse`
+**File:** `posttooluse-integrator.py` → `wipnote.hooks.posttooluse`
 **Purpose:** Activity tracking and orchestrator reflection
 **Category:** Activity Tracking + Workflow Enforcement
 
@@ -123,7 +123,7 @@
 
 **Use Cases:**
 - Result Collection - Capture subagent findings
-- Auto-Save to HtmlGraph - Save results as spikes
+- Auto-Save to Wipnote - Save results as spikes
 - Success Tracking - Record delegation outcomes
 - Error Escalation - Bubble up subagent errors
 

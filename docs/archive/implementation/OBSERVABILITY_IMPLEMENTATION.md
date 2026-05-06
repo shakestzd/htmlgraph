@@ -19,18 +19,18 @@ Child Events (spawner execution creates activities)
 ```
 
 ### 2. Hook Execution Environment
-**Problem**: Hooks couldn't import htmlgraph package when executed by Claude Code.
+**Problem**: Hooks couldn't import wipnote package when executed by Claude Code.
 
-**Solution**: Updated shebang to use `uv run --with htmlgraph`:
+**Solution**: Updated shebang to use `uv run --with wipnote`:
 ```python
-#!/usr/bin/env -S uv run --with htmlgraph
+#!/usr/bin/env -S uv run --with wipnote
 ```
 
-This ensures hooks have access to the development htmlgraph package.
+This ensures hooks have access to the development wipnote package.
 
 **Publishing Note**: When publishing plugin, change to:
 ```python
-#!/usr/bin/env -S uv run --with htmlgraph>=0.9.6
+#!/usr/bin/env -S uv run --with wipnote>=0.9.6
 ```
 
 ### 3. Database Session Creation
@@ -85,15 +85,15 @@ cursor.execute(
 
 ### Plugin Hooks (Source of Truth)
 1. **packages/claude-plugin/.claude-plugin/hooks/scripts/session-start.py**
-   - Updated shebang: `#!/usr/bin/env -S uv run --with htmlgraph`
+   - Updated shebang: `#!/usr/bin/env -S uv run --with wipnote`
    - Added database session creation
 
 2. **packages/claude-plugin/.claude-plugin/hooks/scripts/user-prompt-submit.py**
-   - Updated shebang: `#!/usr/bin/env -S uv run --with htmlgraph`
+   - Updated shebang: `#!/usr/bin/env -S uv run --with wipnote`
    - Ensures UserQuery events are created with proper foreign key handling
 
 3. **packages/claude-plugin/.claude-plugin/hooks/scripts/track-event.py**
-   - Updated shebang: `#!/usr/bin/env -S uv run --with htmlgraph`
+   - Updated shebang: `#!/usr/bin/env -S uv run --with wipnote`
    - Records all tool calls to database
 
 ### Tests
@@ -115,7 +115,7 @@ cursor.execute(
 
 ### User Submits Prompt
 1. Claude Code triggers SessionStart hook
-   - Creates HTML session in `.htmlgraph/sessions/`
+   - Creates HTML session in `.wipnote/sessions/`
    - Creates database session entry
 2. User submits prompt
    - UserPromptSubmit hook fires
@@ -226,7 +226,7 @@ To verify observability is working:
 uv run pytest tests/integration/test_spawner_observability_e2e.py -v
 
 # Check real database
-sqlite3 .htmlgraph/index.sqlite << 'EOF'
+sqlite3 .wipnote/index.sqlite << 'EOF'
 SELECT COUNT(*) as userquery_events FROM agent_events
 WHERE event_type='tool_call' AND tool_name='UserQuery';
 
@@ -245,7 +245,7 @@ EOF
 
 Before deploying version 0.9.7:
 
-- [ ] Update hook shebangs from `--with htmlgraph` to `--with htmlgraph>=0.9.6`
+- [ ] Update hook shebangs from `--with wipnote` to `--with wipnote>=0.9.6`
 - [ ] Verify hook paths use `${CLAUDE_PLUGIN_ROOT}` variable
 - [ ] Run full test suite: `uv run pytest`
 - [ ] Test end-to-end: Spawn agent and verify dashboard shows nested events

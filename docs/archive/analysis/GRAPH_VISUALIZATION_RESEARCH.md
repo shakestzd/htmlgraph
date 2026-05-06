@@ -4,7 +4,7 @@
 
 ### Current Layout Issues
 
-The HtmlGraph dashboard graph visualization displays a "jumbled mess" with the following identified problems:
+The Wipnote dashboard graph visualization displays a "jumbled mess" with the following identified problems:
 
 1. **Overlapping Nodes**: Hundreds of nodes overlap due to inadequate spatial distribution, making it difficult to read individual node titles and see which nodes are which
 2. **Unclear Relationships**: Edge lines cross over nodes and other edges, making relationship tracing nearly impossible
@@ -52,7 +52,7 @@ Users cannot:
 - Convergence can be slow with large graphs
 - No natural grouping of related nodes
 
-**Fit for HtmlGraph**:
+**Fit for Wipnote**:
 - **Acceptable for medium graphs (100-300 nodes)**, but problematic at current scale (600+ nodes)
 - Would need significant enhancements: adjust force strength, increase collision radius, add clustering
 - Better as secondary view alongside status-filtered views
@@ -66,7 +66,7 @@ Users cannot:
 
 ---
 
-### 2. Hierarchical Layout (Recommended for HtmlGraph)
+### 2. Hierarchical Layout (Recommended for Wipnote)
 
 **What it is**: Sugiyama algorithm that organizes nodes into horizontal layers with edges pointing downward, creating clear hierarchy and flow.
 
@@ -84,13 +84,13 @@ Users cannot:
 - Less suitable for undirected graphs
 - May require "dummy nodes" for spanning edges
 
-**Fit for HtmlGraph**:
+**Fit for Wipnote**:
 - **Excellent fit for dependency/blocking relationships**
 - Perfect for showing feature → tasks → completed work flow
 - Great for "Track" visualization (work dependencies)
 - Can separate completed items into bottom layer(s)
 
-**HtmlGraph Application**:
+**Wipnote Application**:
 - Layer 1: Active/High Priority items
 - Layer 2: In-Progress items
 - Layer 3: To-Do items
@@ -115,7 +115,7 @@ Users cannot:
 - Less suitable for showing multiple relationship types
 - Can create bottlenecks in inner circles
 
-**Fit for HtmlGraph**:
+**Fit for Wipnote**:
 - **Moderate fit** - useful as optional view
 - Good for "Agent-centric view" (show work by agent)
 - Could work for single feature with all related items
@@ -139,7 +139,7 @@ Users cannot:
 - Edges can be confusing with many cross-column dependencies
 - Doesn't work for pure dependency visualization
 
-**Fit for HtmlGraph**:
+**Fit for Wipnote**:
 - **Excellent complementary view** (already exists in "Work" tab)
 - Best combined with hierarchical or force-directed for graph view
 - Use as default view for everyday work
@@ -161,7 +161,7 @@ Users cannot:
 - Not ideal for showing complex dependencies
 - Wide graphs (can exceed viewport width)
 
-**Fit for HtmlGraph**:
+**Fit for Wipnote**:
 - **Good complementary view**
 - Could show time-based progress (created date → due date → completed date)
 - Useful for project overview and burn-down visualization
@@ -282,7 +282,7 @@ Users cannot:
 **Why this combination**:
 - Hierarchical layout provides clarity for 400+ node graphs
 - Status filtering reduces cognitive load
-- Matches HtmlGraph's core use case (workflow/project tracking)
+- Matches Wipnote's core use case (workflow/project tracking)
 - Complements existing Kanban view
 - Relatively quick to implement
 
@@ -470,7 +470,7 @@ simulation.force('charge', d3.forceManyBody().strength(-800));
 
 ---
 
-## COMPARISON TABLE: Layout Algorithms for HtmlGraph
+## COMPARISON TABLE: Layout Algorithms for Wipnote
 
 | Algorithm | Clarity | Speed | Implementation | Best For | Rating |
 |-----------|---------|-------|-----------------|----------|--------|
@@ -540,7 +540,7 @@ How to measure improvement:
 
 ## CONCLUSION
 
-HtmlGraph's graph visualization problem is solvable with a 3-phase approach:
+Wipnote's graph visualization problem is solvable with a 3-phase approach:
 
 1. **Phase 1 (1-2 weeks)**: Quick wins (status filtering, parameter tuning) → 70% improvement
 2. **Phase 2 (2-3 weeks)**: Medium enhancements (hierarchical layout, grouping) → 90% improvement
@@ -548,7 +548,7 @@ HtmlGraph's graph visualization problem is solvable with a 3-phase approach:
 
 **Immediate recommendation**: Start with Phase 1 (status-based filtering + force parameter tuning) for fastest ROI. This addresses the core problem (node density) without major architectural changes.
 
-**Long-term recommendation**: Plan for hierarchical layout (Phase 2) as the primary graph view, with force-directed as alternative. This matches HtmlGraph's core workflow/dependency tracking use case.
+**Long-term recommendation**: Plan for hierarchical layout (Phase 2) as the primary graph view, with force-directed as alternative. This matches Wipnote's core workflow/dependency tracking use case.
 
 **Future consideration**: Phase 3 WebGL migration when dataset reaches 5000+ nodes or performance becomes critical.
 

@@ -1,7 +1,7 @@
 # Claude Code Hooks in Subagent Contexts - Research Findings
 
 **Research Date**: January 8, 2026
-**Status**: Complete research documented in HtmlGraph spike
+**Status**: Complete research documented in Wipnote spike
 **Critical Finding**: Hook propagation to subagents is NOT supported by design.
 
 ---
@@ -12,7 +12,7 @@ This research answers the critical question: **Do Claude Code hooks fire in suba
 
 **Answer: NO.** PreToolUse and PostToolUse hooks do NOT fire in Task() subagents. This is an intentional architectural decision to prevent settings pollution and recursive loops.
 
-### Impact for HtmlGraph
+### Impact for Wipnote
 - ✅ Main orchestrator session activity captured via PreToolUse hooks
 - ❌ Task() delegated subagent activity NOT captured (no hook events)
 - ⚠️ Subagent completion tracked via SubagentStop (but limited info)
@@ -127,7 +127,7 @@ Only hook that fires for subagent events:
 
 ---
 
-## Recommended Solutions for HtmlGraph
+## Recommended Solutions for Wipnote
 
 ### Option A: Current Best Practice (Immediate)
 
@@ -177,7 +177,7 @@ When Anthropic implements hook enhancements:
 ### Option D: Alternative - SDK Event Logging
 
 Instead of relying on hooks for subagent activity:
-- Use HtmlGraph SDK to log explicit operations
+- Use Wipnote SDK to log explicit operations
 - Track features, tracks, spikes created
 - Log Task() invocations programmatically
 - Build observability outside hook system
@@ -186,7 +186,7 @@ Instead of relying on hooks for subagent activity:
 
 ---
 
-## Implementation Recommendation for HtmlGraph
+## Implementation Recommendation for Wipnote
 
 ### Short Term (Now)
 ```python
@@ -225,7 +225,7 @@ Main Session (Orchestrator)
 ```
 
 ### Result
-HtmlGraph dashboard shows:
+Wipnote dashboard shows:
 - All orchestrator tool calls
 - Subagent start/stop
 - BUT: Individual subagent tool calls invisible
@@ -270,7 +270,7 @@ Main Session (Orchestrator)
 
 1. **Hooks are session-scoped** - They don't propagate to Task() subagents by design
 2. **Why not?** - Prevents recursive loops, settings pollution, and context contamination
-3. **Current limitation** - HtmlGraph can't capture delegated task activity
+3. **Current limitation** - Wipnote can't capture delegated task activity
 4. **Workaround** - SubagentStop hook captures completion (limited info)
 5. **Future solution** - GitHub issue #14859 proposes agent hierarchy fields
 6. **Timeline** - Unknown (under review by Anthropic)
@@ -307,7 +307,7 @@ Main Session (Orchestrator)
 
 ## Conclusion
 
-**Hook propagation to subagents is not supported by design.** This is an intentional architectural decision by Anthropic to prevent settings pollution and recursive loops. HtmlGraph's event capture is currently limited to the main orchestrator session.
+**Hook propagation to subagents is not supported by design.** This is an intentional architectural decision by Anthropic to prevent settings pollution and recursive loops. Wipnote's event capture is currently limited to the main orchestrator session.
 
 Full multi-agent observability requires the enhancement proposed in GitHub issue #14859 (SubagentStart hook + agent_id/parent_id fields), which is currently under review but not yet implemented.
 
@@ -315,4 +315,4 @@ Full multi-agent observability requires the enhancement proposed in GitHub issue
 
 ---
 
-**Research Spike**: `.htmlgraph/spikes/` contains full detailed findings with code examples and implementation guidance.
+**Research Spike**: `.wipnote/spikes/` contains full detailed findings with code examples and implementation guidance.

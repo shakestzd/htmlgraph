@@ -1,8 +1,8 @@
-# HtmlGraph SQLite Schema Design - Phase 1
+# Wipnote SQLite Schema Design - Phase 1
 
 ## Overview
 
-This document describes the comprehensive SQLite schema designed for HtmlGraph agent observability backend. The schema replaces HTML file storage with a structured relational database while maintaining full observability capabilities.
+This document describes the comprehensive SQLite schema designed for Wipnote agent observability backend. The schema replaces HTML file storage with a structured relational database while maintaining full observability capabilities.
 
 **Status**: Phase 1 Complete - Schema designed, implemented, and tested
 **Test Coverage**: 36/37 tests pass (97%), 1 skipped (foreign key constraint)
@@ -20,7 +20,7 @@ This document describes the comprehensive SQLite schema designed for HtmlGraph a
 ### Key Components
 
 ```
-HtmlGraphDB
+WipnoteDB
 ├── Tables (7)
 │   ├── agent_events (core event tracking)
 │   ├── features (work items: features, bugs, spikes)
@@ -401,14 +401,14 @@ The migration script (`scripts/migrate_html_to_sqlite.py`) provides automated co
 ```bash
 # Preview migration (dry-run)
 uv run python scripts/migrate_html_to_sqlite.py \
-    --htmlgraph-dir .htmlgraph \
-    --db-path .htmlgraph/htmlgraph.db \
+    --wipnote-dir .wipnote \
+    --db-path .wipnote/wipnote.db \
     --dry-run
 
 # Execute migration with backup
 uv run python scripts/migrate_html_to_sqlite.py \
-    --htmlgraph-dir .htmlgraph \
-    --db-path .htmlgraph/htmlgraph.db
+    --wipnote-dir .wipnote \
+    --db-path .wipnote/wipnote.db
 
 # Verbose output
 uv run python scripts/migrate_html_to_sqlite.py \
@@ -416,7 +416,7 @@ uv run python scripts/migrate_html_to_sqlite.py \
 ```
 
 **Migration Process**:
-1. Parses all HTML files in `.htmlgraph/features/` and `.htmlgraph/sessions/`
+1. Parses all HTML files in `.wipnote/features/` and `.wipnote/sessions/`
 2. Extracts metadata from `data-*` attributes
 3. Extracts relationships from hyperlinks
 4. Validates data integrity
@@ -438,10 +438,10 @@ Migration Summary:
 ### Initialize Database
 
 ```python
-from htmlgraph.db.schema import HtmlGraphDB
+from wipnote.db.schema import WipnoteDB
 
 # Create and initialize
-db = HtmlGraphDB(".htmlgraph/htmlgraph.db")
+db = WipnoteDB(".wipnote/wipnote.db")
 db.connect()
 db.create_tables()
 ```
@@ -516,7 +516,7 @@ db.update_feature_status("feat-001", status="done")
 ### Query Sessions and Events
 
 ```python
-from htmlgraph.db.queries import Queries
+from wipnote.db.queries import Queries
 
 # Get session metrics
 sql, params = Queries.get_session_metrics("sess-123")
@@ -721,9 +721,9 @@ After Phase 1 (schema design) is complete, Phase 2 will implement:
 ## Files
 
 ### Core Files
-- `/src/python/htmlgraph/db/schema.py` - HtmlGraphDB class with schema creation
-- `/src/python/htmlgraph/db/queries.py` - Query builders (25+ pre-built queries)
-- `/src/python/htmlgraph/db/__init__.py` - Package exports
+- `/src/python/wipnote/db/schema.py` - WipnoteDB class with schema creation
+- `/src/python/wipnote/db/queries.py` - Query builders (25+ pre-built queries)
+- `/src/python/wipnote/db/__init__.py` - Package exports
 
 ### Migration
 - `/scripts/migrate_html_to_sqlite.py` - HTML to SQLite migration tool
@@ -736,7 +736,7 @@ After Phase 1 (schema design) is complete, Phase 2 will implement:
 
 ## Summary
 
-The SQLite schema provides a robust, performant foundation for HtmlGraph agent observability:
+The SQLite schema provides a robust, performant foundation for Wipnote agent observability:
 
 - **7 tables** with normalized design and flexible JSON metadata
 - **21+ indexes** for fast queries on frequently accessed fields

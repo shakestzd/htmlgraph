@@ -4,7 +4,7 @@ The TrackBuilder provides a fluent API for creating tracks with specs and plans 
 
 ## Overview
 
-TrackBuilder is the recommended way to create tracks in HtmlGraph. It:
+TrackBuilder is the recommended way to create tracks in Wipnote. It:
 
 - Auto-generates track IDs and timestamps
 - Creates HTML files in the correct directory structure
@@ -18,8 +18,8 @@ TrackBuilder is the recommended way to create tracks in HtmlGraph. It:
 
 ```bash
 # Create a simple track via CLI
-htmlgraph track new "Simple Feature" --priority medium
-# Creates: .htmlgraph/tracks/trk-xxxxxxxx/index.html
+wipnote track new "Simple Feature" --priority medium
+# Creates: .wipnote/tracks/trk-xxxxxxxx/index.html
 ```
 
 ### Track with Specification
@@ -27,23 +27,23 @@ htmlgraph track new "Simple Feature" --priority medium
 The TrackBuilder fluent API is available via the Python library for programmatic track creation with spec and plan. For most workflows, use the CLI or dashboard:
 
 ```bash
-htmlgraph track new "User Authentication" --priority high
-# Then open .htmlgraph/tracks/trk-xxxxxxxx/ to add spec and plan HTML files
+wipnote track new "User Authentication" --priority high
+# Then open .wipnote/tracks/trk-xxxxxxxx/ to add spec and plan HTML files
 ```
 
 ### Track with Implementation Plan
 
 ```bash
-htmlgraph track new "Database Migration" --priority critical
+wipnote track new "Database Migration" --priority critical
 # Add phases by editing plan.html in the track directory
 ```
 
 ### Complete Track (Spec + Plan)
 
 ```bash
-htmlgraph track new "API Rate Limiting" --priority high
+wipnote track new "API Rate Limiting" --priority high
 # ✓ Created track: trk-a1b2c3d4
-# Open .htmlgraph/tracks/trk-a1b2c3d4/ to add spec and plan
+# Open .wipnote/tracks/trk-a1b2c3d4/ to add spec and plan
 ```
 
 ## API Reference
@@ -51,9 +51,9 @@ htmlgraph track new "API Rate Limiting" --priority high
 ### CLI Options
 
 ```bash
-htmlgraph track new "Title" --priority <low|medium|high|critical>
-htmlgraph track list
-htmlgraph track show trk-<id>
+wipnote track new "Title" --priority <low|medium|high|critical>
+wipnote track list
+wipnote track show trk-<id>
 ```
 
 ### TrackBuilder (Python Library)
@@ -77,7 +77,7 @@ The TrackBuilder fluent API is available in the Python library for programmatic 
 TrackBuilder creates a directory with up to three HTML files:
 
 ```
-.htmlgraph/tracks/trk-xxxxxxxx/
+.wipnote/tracks/trk-xxxxxxxx/
 ├── index.html    # Track metadata with links to spec/plan
 ├── spec.html     # Specification (if with_spec() used)
 └── plan.html     # Implementation plan (if with_plan_phases() used)
@@ -105,7 +105,7 @@ All files are fully styled and can be opened in any browser.
 ### 1. Create the Track
 
 ```bash
-htmlgraph track new "Multi-Agent Collaboration" --priority high
+wipnote track new "Multi-Agent Collaboration" --priority high
 # Note the track ID: trk-a1b2c3d4
 ```
 
@@ -113,16 +113,16 @@ htmlgraph track new "Multi-Agent Collaboration" --priority high
 
 ```bash
 # Create a feature for each phase, linked to the track
-htmlgraph feature create "Phase 1: Agent Claiming" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 2: Agent Handoffs" --priority high --track trk-a1b2c3d4
-htmlgraph feature create "Phase 3: Testing" --priority medium --track trk-a1b2c3d4
+wipnote feature create "Phase 1: Agent Claiming" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 2: Agent Handoffs" --priority high --track trk-a1b2c3d4
+wipnote feature create "Phase 3: Testing" --priority medium --track trk-a1b2c3d4
 ```
 
 ### 3. Work on Features
 
 ```bash
 # Start working on Phase 1
-htmlgraph feature start {phase1.id}
+wipnote feature start {phase1.id}
 
 # Complete steps as you go
 # Features are automatically attributed to the track

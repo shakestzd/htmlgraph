@@ -6,7 +6,7 @@ Run this to test if spawner events are being broadcast:
 
 ```bash
 # Terminal 1: Start server
-uv run htmlgraph serve
+uv run wipnote serve
 
 # Terminal 2: Run test (while dashboard is open in browser with console visible)
 ./test_spawner_broadcast.sh
@@ -51,8 +51,8 @@ Quick checks:
 
 ## Files Changed
 
-- `src/python/htmlgraph/api/main.py` - Server-side logging
-- `src/python/htmlgraph/api/templates/dashboard.html` - Client-side logging
+- `src/python/wipnote/api/main.py` - Server-side logging
+- `src/python/wipnote/api/templates/dashboard.html` - Client-side logging
 - `index.html` - Synced from dashboard.html
 
 ## Test Status

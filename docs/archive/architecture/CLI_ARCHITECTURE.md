@@ -8,7 +8,7 @@
 
 ## Overview
 
-The HtmlGraph CLI has been refactored from a monolithic 500+ line module into a modular, hierarchical command structure. This document explains the architecture, design patterns, and how to extend it.
+The Wipnote CLI has been refactored from a monolithic 500+ line module into a modular, hierarchical command structure. This document explains the architecture, design patterns, and how to extend it.
 
 ---
 
@@ -25,7 +25,7 @@ Each module handles a single responsibility:
 ### 2. **Hierarchical Commands**
 Commands are organized by domain with a tree structure:
 ```
-htmlgraph
+wipnote
 ├── status
 ├── serve
 ├── sync-docs
@@ -168,7 +168,7 @@ Defines `BaseCommand` abstract class and `CLIContext`.
 
 **Usage**:
 ```python
-from htmlgraph.cli.base import BaseCommand, CLIContext
+from wipnote.cli.base import BaseCommand, CLIContext
 
 class MyCommand(BaseCommand):
     async def execute(self, args, ctx: CLIContext):
@@ -177,7 +177,7 @@ class MyCommand(BaseCommand):
 ```
 
 ### `cli/core.py` - Core Commands
-Essential commands for HtmlGraph operation.
+Essential commands for Wipnote operation.
 
 **Commands**:
 - `StatusCommand` - Show project status
@@ -229,7 +229,7 @@ class EnableCommand(BaseCommand):
 ```
 
 ### `cli/work/features.py` - Feature Commands
-Manage features in HtmlGraph.
+Manage features in Wipnote.
 
 **Commands**:
 - `FeatureCommand` - Parent command
@@ -291,7 +291,7 @@ Templates for consistent output.
 
 ```
 1. User Input
-   $ htmlgraph feature create "New Feature"
+   $ wipnote feature create "New Feature"
 
 2. Parse Arguments
    → command: "feature"
@@ -339,7 +339,7 @@ class CLIContext:
 ```python
 # cli/work/my_commands.py
 
-from htmlgraph.cli.base import BaseCommand, CLIContext
+from wipnote.cli.base import BaseCommand, CLIContext
 
 class MyCommand(BaseCommand):
     name = "my-command"
@@ -355,7 +355,7 @@ class MyCommand(BaseCommand):
 ```python
 # cli/main.py
 
-from htmlgraph.cli.work.my_commands import MyCommand
+from wipnote.cli.work.my_commands import MyCommand
 
 command_registry = {
     # ... other commands
@@ -369,8 +369,8 @@ command_registry = {
 # tests/python/test_my_command.py
 
 import pytest
-from htmlgraph.cli.work.my_commands import MyCommand
-from htmlgraph.cli.base import CLIContext
+from wipnote.cli.work.my_commands import MyCommand
+from wipnote.cli.base import CLIContext
 
 @pytest.mark.asyncio
 async def test_my_command():
@@ -385,7 +385,7 @@ async def test_my_command():
 ### Step 4: Command Available
 
 ```bash
-$ htmlgraph my-command
+$ wipnote my-command
 What my command does
 result: success
 ```
@@ -429,16 +429,16 @@ def load_orchestrator_config() -> OrchestratorConfig:
 
 ```bash
 # Enable enforcement
-htmlgraph orchestrator enable
+wipnote orchestrator enable
 # → Updates orchestrator-config.yaml
 # → Effective immediately
 
 # Set enforcement level
-htmlgraph orchestrator set-level enforce
+wipnote orchestrator set-level enforce
 # → Changes mode to "enforce"
 
 # Reset violations
-htmlgraph orchestrator reset-violations
+wipnote orchestrator reset-violations
 # → Clears violation counter
 ```
 
@@ -470,7 +470,7 @@ async def execute(self, args, ctx: CLIContext):
 ### Error Display
 
 ```bash
-$ htmlgraph my-command
+$ wipnote my-command
 Error: Missing required argument: name
 exit code: 1
 ```
@@ -527,7 +527,7 @@ Test command-line interface.
 def test_cli_command(capsys):
     # Execute CLI
     result = subprocess.run(
-        ["htmlgraph", "status"],
+        ["wipnote", "status"],
         capture_output=True,
         text=True
     )
@@ -588,8 +588,8 @@ class ParentCommand(BaseCommand):
     }
 
 # Usage:
-# $ htmlgraph parent child1
-# $ htmlgraph parent child2
+# $ wipnote parent child1
+# $ wipnote parent child2
 ```
 
 ### Adding Aliases
@@ -600,15 +600,15 @@ class StatusCommand(BaseCommand):
     aliases = ["st", "check", "health"]
 
 # Usage:
-# $ htmlgraph status
-# $ htmlgraph st
-# $ htmlgraph check
+# $ wipnote status
+# $ wipnote st
+# $ wipnote check
 ```
 
 ### Custom Output Formatting
 
 ```python
-from htmlgraph.cli.templates import TableFormatter
+from wipnote.cli.templates import TableFormatter
 
 class MyCommand(BaseCommand):
     async def execute(self, args, ctx):
@@ -627,30 +627,30 @@ class MyCommand(BaseCommand):
 
 ### Command Not Found
 ```bash
-$ htmlgraph unknown-command
+$ wipnote unknown-command
 Unknown command: unknown-command
 
 # Check available commands
-$ htmlgraph --help
+$ wipnote --help
 ```
 
 ### Command Execution Error
 ```bash
-$ htmlgraph feature create
+$ wipnote feature create
 Error: Missing required argument: name
 
 # Check command help
-$ htmlgraph feature create --help
+$ wipnote feature create --help
 ```
 
 ### Configuration Issues
 ```bash
 # Check current configuration
-$ htmlgraph orchestrator status
+$ wipnote orchestrator status
 
 # Reset to defaults
 $ rm orchestrator-config.yaml
-$ htmlgraph orchestrator status
+$ wipnote orchestrator status
 ```
 
 ---

@@ -72,7 +72,7 @@ Task() for git: $5-10 per workflow
 Copilot for git: $2-3 per workflow (60% savings + better results)
 
 **IMPERATIVE Delegation pattern:**
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 spawner = HeadlessSpawner()
 
 # ✅ CORRECT - Use Copilot for git
@@ -109,7 +109,7 @@ Task(prompt="commit changes...", subagent_type="general-purpose")
 - ✅ Single file quick lookup (OK to do directly)
 
 **IMPERATIVE Delegation pattern:**
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 spawner = HeadlessSpawner()
 
 # ✅ CORRECT - Use Gemini for exploration (FREE!)
@@ -146,7 +146,7 @@ Task(prompt="analyze codebase...", subagent_type="explorer")
 - ✅ Single-line typo fixes (OK to do directly)
 
 **IMPERATIVE Delegation pattern:**
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 spawner = HeadlessSpawner()
 
 # ✅ CORRECT - Use Codex for code
@@ -275,7 +275,7 @@ Task(prompt="Commit and push...", subagent_type="general-purpose")
 
 **AFTER (using cost-first delegation)**:
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 spawner = HeadlessSpawner()
 
 # Step 1: Research patterns (FREE!)

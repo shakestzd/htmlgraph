@@ -17,7 +17,7 @@ Successfully updated the three spawner skills to execute external CLIs via the H
 - Checks if `gemini` CLI is installed via `which gemini`
 - If available: Invokes `spawner.spawn_gemini()` with default settings
 - If not available: Prints helpful installation instructions
-- Tracks execution in HtmlGraph with `track_in_htmlgraph=True`
+- Tracks execution in Wipnote with `track_in_wipnote=True`
 - Displays formatted output with token usage and tracked events
 
 **Invocation**:
@@ -35,7 +35,7 @@ Skill(skill=".claude-plugin:gemini", args="Analyze authentication patterns in th
 - If available: Invokes `spawner.spawn_codex()` with sandbox mode
 - Configured for workspace-write sandbox (safe execution)
 - Full auto mode enabled for headless operation
-- Tracks execution in HtmlGraph with `track_in_htmlgraph=True`
+- Tracks execution in Wipnote with `track_in_wipnote=True`
 - Displays formatted output with token usage and tracked events
 
 **Invocation**:
@@ -52,7 +52,7 @@ Skill(skill=".claude-plugin:codex", args="Generate FastAPI endpoint with authent
 - Checks if `copilot` CLI is installed via `which copilot`
 - If available: Invokes `spawner.spawn_copilot()` with tool permissions
 - Auto-allows all tools for headless operation
-- Tracks execution in HtmlGraph with `track_in_htmlgraph=True`
+- Tracks execution in Wipnote with `track_in_wipnote=True`
 - Displays formatted output with token usage and tracked events
 
 **Invocation**:
@@ -68,7 +68,7 @@ Each skill follows this pattern:
 <python>
 import subprocess
 import sys
-from htmlgraph.orchestration.headless_spawner import HeadlessSpawner
+from wipnote.orchestration.headless_spawner import HeadlessSpawner
 
 # 1. Extract task prompt from skill arguments
 task_prompt = skill_args if 'skill_args' in dir() else ""
@@ -92,14 +92,14 @@ try:
     result = spawner.spawn_<cli_name>(
         prompt=task_prompt,
         # ... CLI-specific options ...
-        track_in_htmlgraph=True,
+        track_in_wipnote=True,
         timeout=120
     )
 
     if result.success:
         print("✅ Execution successful")
         print(result.response)
-        print(f"📈 Tracked {len(result.tracked_events)} events in HtmlGraph")
+        print(f"📈 Tracked {len(result.tracked_events)} events in Wipnote")
     else:
         print(f"❌ Execution failed: {result.error}")
         sys.exit(1)
@@ -119,14 +119,14 @@ spawner.spawn_gemini(
     output_format: str = "stream-json",
     model: str | None = None,
     include_directories: list[str] | None = None,
-    track_in_htmlgraph: bool = True,
+    track_in_wipnote: bool = True,
     timeout: int = 120,
 ) -> AIResult
 ```
 
 **Configuration**:
 - `output_format="stream-json"` - Enables real-time event tracking
-- `track_in_htmlgraph=True` - Records activity in HtmlGraph
+- `track_in_wipnote=True` - Records activity in Wipnote
 - `timeout=120` - 2-minute execution limit
 
 ### spawn_codex()
@@ -137,7 +137,7 @@ spawner.spawn_codex(
     model: str | None = None,
     sandbox: str | None = None,
     full_auto: bool = True,
-    track_in_htmlgraph: bool = True,
+    track_in_wipnote: bool = True,
     timeout: int = 120,
 ) -> AIResult
 ```
@@ -146,7 +146,7 @@ spawner.spawn_codex(
 - `sandbox="workspace-write"` - Safe code generation with file writes
 - `full_auto=True` - Headless mode (auto-approve operations)
 - `output_json=True` - Machine-readable output with events
-- `track_in_htmlgraph=True` - Records activity in HtmlGraph
+- `track_in_wipnote=True` - Records activity in Wipnote
 
 ### spawn_copilot()
 ```python
@@ -155,14 +155,14 @@ spawner.spawn_copilot(
     allow_tools: list[str] | None = None,
     allow_all_tools: bool = False,
     deny_tools: list[str] | None = None,
-    track_in_htmlgraph: bool = True,
+    track_in_wipnote: bool = True,
     timeout: int = 120,
 ) -> AIResult
 ```
 
 **Configuration**:
 - `allow_all_tools=True` - Auto-approve all GitHub/git operations
-- `track_in_htmlgraph=True` - Records activity in HtmlGraph
+- `track_in_wipnote=True` - Records activity in Wipnote
 - `timeout=120` - 2-minute execution limit
 
 ## Return Type: AIResult
@@ -177,7 +177,7 @@ class AIResult:
     tokens_used: int | None                     # Token count (if available)
     error: str | None                           # Error message (if failed)
     raw_output: dict | list | str | None        # Raw CLI output
-    tracked_events: list[dict] | None = None    # HtmlGraph tracked events
+    tracked_events: list[dict] | None = None    # Wipnote tracked events
 ```
 
 ## Behavior When CLI Unavailable
@@ -192,20 +192,20 @@ Each skill gracefully handles missing external CLIs:
    - Codex: "Use Task(subagent_type='general-purpose', prompt='...')"
    - Copilot: "Use gh CLI directly or Bash for git operations"
 
-## HtmlGraph Integration
+## Wipnote Integration
 
-All three skills automatically track execution in HtmlGraph when available:
+All three skills automatically track execution in Wipnote when available:
 
 ```python
 result = spawner.spawn_gemini(
     prompt="Your task",
-    track_in_htmlgraph=True,  # Enabled by default
+    track_in_wipnote=True,  # Enabled by default
     timeout=120
 )
 
 # Result includes tracked events
 if result.tracked_events:
-    print(f"Tracked {len(result.tracked_events)} events in HtmlGraph")
+    print(f"Tracked {len(result.tracked_events)} events in Wipnote")
 ```
 
 **Tracked Activities**:
@@ -225,7 +225,7 @@ Skill(skill=".claude-plugin:gemini", args="List all Python files and their impor
 # ✅ Gemini execution successful
 # 📊 Tokens used: 1234
 # [Gemini response content]
-# 📈 Tracked X events in HtmlGraph
+# 📈 Tracked X events in Wipnote
 ```
 
 ### 2. Test Codex Skill
@@ -238,7 +238,7 @@ Skill(skill=".claude-plugin:codex", args="Generate a REST API endpoint for user 
 # ✅ Codex execution successful
 # 📊 Tokens used: 5678
 # [Generated code]
-# 📈 Tracked X events in HtmlGraph
+# 📈 Tracked X events in Wipnote
 ```
 
 ### 3. Test Copilot Skill
@@ -250,7 +250,7 @@ Skill(skill=".claude-plugin:copilot", args="Create a pull request for new authen
 # ✅ Copilot CLI found, executing spawner...
 # ✅ Copilot execution successful
 # [PR creation confirmation]
-# 📈 Tracked X events in HtmlGraph
+# 📈 Tracked X events in Wipnote
 ```
 
 ### 4. Test CLI Not Found Behavior
@@ -271,13 +271,13 @@ Skill(skill=".claude-plugin:gemini", args="Test task")
 - Invoked via `Skill()` just loaded markdown text
 - Users had to manually run spawner or Task() commands
 - No actual CLI execution
-- No HtmlGraph tracking
+- No Wipnote tracking
 
 ### After (Executable Skills)
 - Skills execute external CLIs automatically
 - CLI availability checked before execution
 - HeadlessSpawner SDK handles all subprocess management
-- HtmlGraph tracks all activity automatically
+- Wipnote tracks all activity automatically
 - Clear success/error messages with actionable next steps
 - Token usage reported when available
 - Full integration with orchestration system
@@ -302,7 +302,7 @@ packages/claude-plugin/.claude-plugin/skills/
 ## Next Steps
 
 1. **Test with Real CLIs**: Install external CLIs and test execution
-2. **Monitor HtmlGraph Events**: Verify events are properly tracked
+2. **Monitor Wipnote Events**: Verify events are properly tracked
 3. **Handle Auth Issues**: Codex and Copilot may need auth configuration
 4. **Document CLI Setup**: Add setup instructions to main docs
 5. **User Communication**: Announce skill execution capability in release notes
@@ -313,7 +313,7 @@ packages/claude-plugin/.claude-plugin/skills/
 - **Codex**: May require OpenAI API key configuration
 - **Copilot**: May require GitHub CLI authentication (`gh auth login`)
 - All skills timeout at 120 seconds (configurable in code)
-- All skills support HtmlGraph tracking (optional, enabled by default)
+- All skills support Wipnote tracking (optional, enabled by default)
 
 ---
 

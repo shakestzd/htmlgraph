@@ -19,8 +19,8 @@ Detailed comparisons with alternative approaches.
 - License costs for enterprise
 - Complex deployment
 
-**HtmlGraph Approach:**
-- Straightforward install (`pip install htmlgraph`) — 14 runtime dependencies, no native extensions
+**Wipnote Approach:**
+- Straightforward install (`pip install wipnote`) — 14 runtime dependencies, no native extensions
 - No infrastructure (no Docker, JVM, or database servers)
 - CSS selectors (already know them)
 - Plain text HTML files
@@ -29,7 +29,7 @@ Detailed comparisons with alternative approaches.
 
 **When to use Neo4j:** Large-scale production systems with complex graph queries, enterprise support requirements.
 
-**When to use HtmlGraph:** Rapid prototyping, AI agent coordination, personal projects, Git-friendly workflows.
+**When to use Wipnote:** Rapid prototyping, AI agent coordination, personal projects, Git-friendly workflows.
 
 ### Memgraph
 
@@ -37,7 +37,7 @@ Similar trade-offs to Neo4j, with emphasis on real-time analytics.
 
 **Use Memgraph when:** You need streaming graph analytics, real-time pattern matching.
 
-**Use HtmlGraph when:** You need simplicity, portability, human readability.
+**Use Wipnote when:** You need simplicity, portability, human readability.
 
 ## vs Document Databases
 
@@ -54,7 +54,7 @@ Similar trade-offs to Neo4j, with emphasis on real-time analytics.
 - No built-in presentation
 - Needs custom UI
 
-**HtmlGraph Advantages:**
+**Wipnote Advantages:**
 - Native hyperlinks (graph edges)
 - Built-in rendering with CSS
 - CSS selector queries
@@ -80,7 +80,7 @@ Similar to JSON, with more readable syntax but same limitations for graph data.
 - Vendor lock-in
 - Limited AI agent access
 
-**HtmlGraph Advantages:**
+**Wipnote Advantages:**
 - Fully offline
 - Unlimited API access
 - Git native
@@ -99,7 +99,7 @@ Similar to JSON, with more readable syntax but same limitations for graph data.
 - Proprietary graph format
 - Markdown limitations for structured data
 
-**HtmlGraph Advantages:**
+**Wipnote Advantages:**
 - Typed relationships (`data-relationship="blocks"`)
 - Native web format
 - Structured data with Pydantic
@@ -128,7 +128,7 @@ Similar to Notion but with better graph features. Still cloud-based with same li
 - JSONL storage format
 - Needs viewer tools
 
-**HtmlGraph Approach:**
+**Wipnote Approach:**
 
 - Adopted hash-based IDs (inspired by Beads)
 - 14 runtime Python dependencies including pydantic, justhtml, rich, jinja2, networkx
@@ -139,11 +139,11 @@ Similar to Notion but with better graph features. Still cloud-based with same li
 
 **Shared Design Goals:**
 
-Both projects aim to give AI agents persistent, structured memory beyond a single context window. HtmlGraph's hash-based ID system was directly inspired by Beads' approach to multi-agent collision resistance.
+Both projects aim to give AI agents persistent, structured memory beyond a single context window. Wipnote's hash-based ID system was directly inspired by Beads' approach to multi-agent collision resistance.
 
 **When to use Beads:** CLI-first workflow, multiple frontends needed, semantic memory decay.
 
-**When to use HtmlGraph:** Browser-first workflow, minimal infrastructure, web standards preference.
+**When to use Wipnote:** Browser-first workflow, minimal infrastructure, web standards preference.
 
 ## vs AI Agent Frameworks
 
@@ -160,7 +160,7 @@ Both projects aim to give AI agents persistent, structured memory beyond a singl
 - Python/JS specific
 - No built-in observability
 
-**HtmlGraph Advantages:**
+**Wipnote Advantages:**
 - Simple, web-standards based
 - Language agnostic (any language can parse HTML)
 - Built-in observability (view in browser)
@@ -177,14 +177,14 @@ Both projects aim to give AI agents persistent, structured memory beyond a singl
 - Limited observability
 - No multi-agent coordination
 
-**HtmlGraph Advantages:**
+**Wipnote Advantages:**
 - Graph-based state (HTML)
 - Full observability (dashboard)
 - Multi-agent coordination built-in
 
 ## Feature Comparison Matrix
 
-| Feature | Neo4j | JSON | Notion | Obsidian | HtmlGraph |
+| Feature | Neo4j | JSON | Notion | Obsidian | Wipnote |
 |---------|-------|------|--------|----------|-----------|
 | Setup complexity | High | Low | None (cloud) | Low | Low |
 | Query language | Cypher | jq/custom | UI only | Search | CSS selectors |
@@ -220,7 +220,7 @@ Both projects aim to give AI agents persistent, structured memory beyond a singl
 - Markdown preference
 - Plugin ecosystem needed
 
-### Use HtmlGraph when:
+### Use Wipnote when:
 - AI agent coordination
 - Git-based workflows
 - Offline-first required

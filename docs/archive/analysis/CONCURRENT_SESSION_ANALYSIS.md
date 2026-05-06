@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-HtmlGraph has implemented database-only storage for parent-child event linking, making the database the single source of truth. This analysis explores how to leverage this for concurrent session awareness—enabling all parallel orchestrator sessions to know about each other, coordinate work, and avoid duplicates.
+Wipnote has implemented database-only storage for parent-child event linking, making the database the single source of truth. This analysis explores how to leverage this for concurrent session awareness—enabling all parallel orchestrator sessions to know about each other, coordinate work, and avoid duplicates.
 
 **Current State**: Sessions are tracked in the database but **no cross-session awareness exists**. Each session operates independently.
 
@@ -226,11 +226,11 @@ WHERE status = 'active'
 ORDER BY created_at DESC;
 ```
 
-**Implementation Location**: New module `htmlgraph/hooks/concurrent_sessions.py`
+**Implementation Location**: New module `wipnote/hooks/concurrent_sessions.py`
 
 ```python
 def get_concurrent_sessions(
-    db: HtmlGraphDB,
+    db: WipnoteDB,
     current_session_id: str,
     window_minutes: int = 15,
 ) -> list[dict]:
@@ -274,7 +274,7 @@ def get_concurrent_sessions(
     return concurrent
 
 
-def _get_last_user_query(db: HtmlGraphDB, session_id: str) -> dict | None:
+def _get_last_user_query(db: WipnoteDB, session_id: str) -> dict | None:
     """Get most recent user query event in a session."""
     cursor = db.connection.cursor()
     cursor.execute("""
@@ -326,7 +326,7 @@ def handle_session_start(context: HookContext, session: Any | None) -> dict:
 
     # NEW: Load concurrent sessions
     try:
-        from htmlgraph.hooks.concurrent_sessions import get_concurrent_sessions
+        from wipnote.hooks.concurrent_sessions import get_concurrent_sessions
 
         concurrent = get_concurrent_sessions(
             db=context.database,
@@ -380,7 +380,7 @@ def main():
 def main():
     try:
         manager = SessionManager(graph_dir)
-        db = HtmlGraphDB(str(Path(graph_dir) / "htmlgraph.db"))
+        db = WipnoteDB(str(Path(graph_dir) / "wipnote.db"))
         active = manager.get_active_session()
 
         # Existing: Link transcript, capture notes
@@ -440,7 +440,7 @@ If this session finds other active sessions:
 1. **Check their work** - What are they focused on? (shown in SessionStart context)
 2. **Avoid duplicates** - Don't start work already in progress in another session
 3. **Coordinate via Task()** - If you need results from another session, use Task()
-4. **Share findings** - Record discoveries in .htmlgraph/concurrent-findings.md
+4. **Share findings** - Record discoveries in .wipnote/concurrent-findings.md
 
 **Cross-Window Scenarios:**
 - Window A: Implementing feature X; Window B: Researching feature Y
@@ -488,7 +488,7 @@ CREATE INDEX idx_concurrent_events_type ON concurrent_events(event_type, timesta
 
 ```python
 def update_session_last_query(
-    db: HtmlGraphDB,
+    db: WipnoteDB,
     session_id: str,
     query_text: str,
     event_id: str | None = None
@@ -658,7 +658,7 @@ db.update_session_last_query(
 3. **No Concurrent Session Awareness Module**
    - Query exists in `queries.py` but no utility module wraps it
    - session-start.py doesn't use it
-   - **Fix**: Create `htmlgraph/hooks/concurrent_sessions.py`
+   - **Fix**: Create `wipnote/hooks/concurrent_sessions.py`
 
 4. **System Prompt Doesn't Mention Coordination**
    - Orchestrator has no guidance on cross-window work
@@ -722,7 +722,7 @@ db.update_session_last_query(
 **Objective**: Detect and surface concurrent sessions
 
 **Tasks**:
-1. Create `htmlgraph/hooks/concurrent_sessions.py`
+1. Create `wipnote/hooks/concurrent_sessions.py`
    - Implement `get_concurrent_sessions()`
    - Implement `_get_last_user_query()`
    - Add helper for formatting context
@@ -793,10 +793,10 @@ db.update_session_last_query(
 ### Example 1: Get Concurrent Sessions
 
 ```python
-from htmlgraph.db.schema import HtmlGraphDB
-from htmlgraph.hooks.concurrent_sessions import get_concurrent_sessions
+from wipnote.db.schema import WipnoteDB
+from wipnote.hooks.concurrent_sessions import get_concurrent_sessions
 
-db = HtmlGraphDB()
+db = WipnoteDB()
 current_session = "sess-abc123"
 
 concurrent = get_concurrent_sessions(
@@ -856,9 +856,9 @@ def handle_session_start(context: HookContext, session: Any | None) -> dict:
 
 ```python
 from datetime import datetime, timezone
-from htmlgraph.db.schema import HtmlGraphDB
+from wipnote.db.schema import WipnoteDB
 
-db = HtmlGraphDB()
+db = WipnoteDB()
 
 # Mark session as completed
 db.update_session_status(
@@ -883,7 +883,7 @@ db.update_session_last_query(
 **Test: get_concurrent_sessions()**
 ```python
 def test_get_concurrent_sessions():
-    db = HtmlGraphDB(":memory:")  # In-memory test DB
+    db = WipnoteDB(":memory:")  # In-memory test DB
 
     # Create 3 sessions: 2 active, 1 completed
     db.insert_session("sess-1", "claude")
@@ -1057,7 +1057,7 @@ def check_schema_version():
     if missing:
         raise SchemaError(
             f"Schema missing columns: {missing}. "
-            "Run migrations first: htmlgraph migrate"
+            "Run migrations first: wipnote migrate"
         )
 ```
 

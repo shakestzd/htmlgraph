@@ -1,13 +1,13 @@
 # Dashboard
 
-The HtmlGraph dashboard provides real-time observability into agent activity, session history, and work item attribution.
+The Wipnote dashboard provides real-time observability into agent activity, session history, and work item attribution.
 
 ## Accessing the Dashboard
 
 Start the local server:
 
 ```bash
-htmlgraph serve
+wipnote serve
 ```
 
 Then open [http://localhost:4000](http://localhost:4000) in your browser.
@@ -43,7 +43,7 @@ The dashboard identifies which AI agents are active (e.g., `claude`, `haiku-code
 
 ## Session Files
 
-Individual session HTML files are stored at `.htmlgraph/sessions/` and can be opened directly in a browser for offline review.
+Individual session HTML files are stored at `.wipnote/sessions/` and can be opened directly in a browser for offline review.
 
 ## Next Steps
 

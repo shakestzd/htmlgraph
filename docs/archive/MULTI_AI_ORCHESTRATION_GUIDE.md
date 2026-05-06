@@ -1,6 +1,6 @@
 # Multi-AI Orchestration Guide
 
-**HtmlGraph enables seamless orchestration across multiple AI platforms** using specialized spawner agents. This guide explains the architecture, how to use each agent, and comprehensive troubleshooting.
+**Wipnote enables seamless orchestration across multiple AI platforms** using specialized spawner agents. This guide explains the architecture, how to use each agent, and comprehensive troubleshooting.
 
 ---
 
@@ -23,7 +23,7 @@
 
 ### How It Works
 
-HtmlGraph uses a **Task delegation pattern** to route work to specialized agents:
+Wipnote uses a **Task delegation pattern** to route work to specialized agents:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -42,7 +42,7 @@ HtmlGraph uses a **Task delegation pattern** to route work to specialized agents
                         └──→ gemini-spawner.py
                              ├─ Initialize spawner
                              ├─ Execute Gemini CLI
-                             ├─ Track events in HtmlGraph
+                             ├─ Track events in Wipnote
                              └─ Return JSON result
                                  {
                                    "success": true,
@@ -56,7 +56,7 @@ HtmlGraph uses a **Task delegation pattern** to route work to specialized agents
 1. **Capability-Based Routing** - Task description determines agent selection
 2. **Cost Optimization** - Prefer FREE > INCLUDED > PAID
 3. **Transparent Error Handling** - Clear errors when CLI unavailable
-4. **Event Tracking** - All delegations recorded in HtmlGraph
+4. **Event Tracking** - All delegations recorded in Wipnote
 5. **Session Continuity** - Parent-child session linking via environment variables
 
 ---
@@ -222,7 +222,7 @@ Task(
 **Use this when task doesn't fit standard categories:**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="orchestrator")
 
@@ -365,7 +365,7 @@ fi
 ### Example 1: Exploratory Analysis
 
 ```python
-from htmlgraph import SDK, Task
+from wipnote import SDK, Task
 
 sdk = SDK(agent="orchestrator")
 
@@ -436,7 +436,7 @@ else:
 ### Example 4: Cost-Optimized Multi-Task
 
 ```python
-from htmlgraph import Task
+from wipnote import Task
 
 # Phase 1: Exploration (FREE with Gemini)
 exploration = Task(
@@ -562,7 +562,7 @@ for chunk in large_codebase:
 ### Strategy 1: Cost-Optimized Fallback
 
 ```python
-from htmlgraph import Task
+from wipnote import Task
 
 def delegate_with_cost_optimization(prompt, task_type="general"):
     """Try agents in cost order: FREE → INCLUDED → PAID"""
@@ -600,7 +600,7 @@ result = delegate_with_cost_optimization(
 ### Strategy 2: Capability-Based Fallback
 
 ```python
-from htmlgraph import Task
+from wipnote import Task
 import json
 
 def delegate_with_capability_matching(prompt, required_capabilities):
@@ -650,7 +650,7 @@ result = delegate_with_capability_matching(
 def delegate_with_recovery(agent_type, prompt, max_retries=2):
     """Delegate with intelligent error handling and recovery"""
 
-    from htmlgraph import Task
+    from wipnote import Task
     import time
 
     for attempt in range(max_retries):
@@ -715,7 +715,7 @@ result = delegate_with_recovery("gemini", "Analyze the codebase")
 
 ### Understanding Event Records
 
-Every spawner delegation creates an event record in HtmlGraph:
+Every spawner delegation creates an event record in Wipnote:
 
 ```python
 {
@@ -754,7 +754,7 @@ Every spawner delegation creates an event record in HtmlGraph:
 ### Query Events
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="orchestrator")
 
@@ -854,7 +854,7 @@ Task(
 
 ```python
 from functools import lru_cache
-from htmlgraph import Task
+from wipnote import Task
 
 @lru_cache(maxsize=10)
 def analyze_codebase_pattern(pattern: str):
@@ -969,10 +969,10 @@ Spawner agents run ON TOP OF Claude Code (via the plugin infrastructure).
 
 ### Q: How do I monitor spawner costs?
 
-**A:** Query HtmlGraph events:
+**A:** Query Wipnote events:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="orchestrator")
 
@@ -995,4 +995,4 @@ for session in sdk.sessions.all():
 - [CLAUDE.md - Multi-AI Orchestration Section](../CLAUDE.md#multi-ai-orchestration-via-spawner-agents)
 - [AGENTS.md - Complete SDK Documentation](../AGENTS.md)
 - [plugin.json - Agent Configuration](../packages/claude-plugin/.claude-plugin/plugin.json)
-- [HtmlGraph Architecture](./ARCHITECTURE.md)
+- [Wipnote Architecture](./ARCHITECTURE.md)

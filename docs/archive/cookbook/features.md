@@ -7,7 +7,7 @@
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -35,7 +35,7 @@ print(f"Steps: {len(feature.steps)}")
 **Explanation**:
 - Fluent API for building features
 - Auto-generates ID with timestamp
-- Creates HTML file in `.htmlgraph/features/`
+- Creates HTML file in `.wipnote/features/`
 - Ready to start working immediately
 
 ---
@@ -47,7 +47,7 @@ print(f"Steps: {len(feature.steps)}")
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -85,7 +85,7 @@ with sdk.features.edit("feature-123") as f:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -125,7 +125,7 @@ feature = sdk.features.create("API Endpoints") \
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -169,7 +169,7 @@ print(f"{count} todo features")
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -178,8 +178,8 @@ with sdk.features.edit("feature-123") as f:
     f.status = "in-progress"
 
 # Method 2: Use CLI
-# htmlgraph feature start feature-123
-# htmlgraph feature complete feature-123
+# wipnote feature start feature-123
+# wipnote feature complete feature-123
 
 # Method 3: Batch update multiple features
 sdk.features.batch_update(
@@ -210,7 +210,7 @@ with sdk.features.edit("feature-123") as f:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 from datetime import datetime
 
 sdk = SDK(agent="claude")
@@ -249,7 +249,7 @@ with sdk.features.edit("feature-123") as f:
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -281,14 +281,14 @@ print(f"Cloned to: {new_feature.id}")
 **Solution**:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 import shutil
 import os
 
 sdk = SDK(agent="claude")
 
 # Create archive directory
-os.makedirs(".htmlgraph/archive/features", exist_ok=True)
+os.makedirs(".wipnote/archive/features", exist_ok=True)
 
 # Get completed features older than 30 days
 from datetime import datetime, timedelta
@@ -298,13 +298,13 @@ done_features = sdk.features.where(status="done")
 for f in done_features:
     if f.updated < cutoff:
         # Move to archive
-        src = f".htmlgraph/features/{f.id}.html"
-        dst = f".htmlgraph/archive/features/{f.id}.html"
+        src = f".wipnote/features/{f.id}.html"
+        dst = f".wipnote/archive/features/{f.id}.html"
         shutil.move(src, dst)
         print(f"Archived: {f.id}")
 
 # Rebuild index
-# htmlgraph index rebuild
+# wipnote index rebuild
 ```
 
 **Caution**:

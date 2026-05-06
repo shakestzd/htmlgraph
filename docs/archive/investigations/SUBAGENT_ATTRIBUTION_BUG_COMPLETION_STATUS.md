@@ -29,7 +29,7 @@ The subagent event attribution bug documented in `SUBAGENT_ATTRIBUTION_BUG_SUMMA
 
 ### ✅ Fix #2: Track Event Hook Subagent Detection
 **Status**: IMPLEMENTED & VERIFIED
-- File: `src/python/htmlgraph/hooks/event_tracker.py`
+- File: `src/python/wipnote/hooks/event_tracker.py`
 - Lines: 714-756
 - Checks environment variables BEFORE `get_active_session()`
 - Creates separate subagent session with `is_subagent=True` and `parent_session_id` link
@@ -37,7 +37,7 @@ The subagent event attribution bug documented in `SUBAGENT_ATTRIBUTION_BUG_SUMMA
 
 ### ✅ Fix #3: Documentation
 **Status**: IMPLEMENTED & VERIFIED
-- File: `src/python/htmlgraph/hooks/context.py`
+- File: `src/python/wipnote/hooks/context.py`
 - Lines: 107-122
 - Explains session separation hazards and database fallback strategy
 - Verification: Clear documentation present
@@ -121,7 +121,7 @@ All verification and summary documents have been created and committed:
 
 ### 1. Check Subagent Sessions Exist
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT session_id, agent_assigned, is_subagent
 FROM sessions
 WHERE is_subagent = 1
@@ -132,7 +132,7 @@ LIMIT 5;
 
 ### 2. Check Events in Correct Session
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT DISTINCT session_id, agent_assigned
 FROM agent_events
 ORDER BY session_id;
@@ -142,7 +142,7 @@ ORDER BY session_id;
 
 ### 3. Check Parent-Child Linkage
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT s1.session_id as subagent, s1.parent_session_id as parent
 FROM sessions s1
 WHERE s1.is_subagent = 1
@@ -153,7 +153,7 @@ LIMIT 5;
 
 ### 4. Check Event Linkage
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT event_id, parent_event_id, tool_name
 FROM agent_events
 WHERE parent_event_id IS NOT NULL
@@ -194,8 +194,8 @@ All related documentation is now available:
 | File | Lines Changed | Purpose |
 |------|---------------|---------|
 | `packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-spawner-router.py` | 432-446 | Set environment variables |
-| `src/python/htmlgraph/hooks/event_tracker.py` | 714-756 | Detect subagent context |
-| `src/python/htmlgraph/hooks/context.py` | 107-122 | Document design |
+| `src/python/wipnote/hooks/event_tracker.py` | 714-756 | Detect subagent context |
+| `src/python/wipnote/hooks/context.py` | 107-122 | Document design |
 
 ### Total Code Changes
 - **Lines Added**: ~85 (across three files)
@@ -212,10 +212,10 @@ All related documentation is now available:
 **How Users Get the Fix**:
 ```bash
 # Update to latest version
-pip install --upgrade htmlgraph
+pip install --upgrade wipnote
 
 # Update Claude plugin
-claude plugin update htmlgraph
+claude plugin update wipnote
 ```
 
 **Backward Compatibility**: ✅ FULLY COMPATIBLE
@@ -269,13 +269,13 @@ This fix enables several downstream improvements:
 ### How to Monitor in Production
 ```bash
 # Check for subagent sessions being created
-watch -n 5 "sqlite3 .htmlgraph/htmlgraph.db 'SELECT COUNT(*) FROM sessions WHERE is_subagent=1;'"
+watch -n 5 "sqlite3 .wipnote/wipnote.db 'SELECT COUNT(*) FROM sessions WHERE is_subagent=1;'"
 
 # Check for events in subagent sessions
-sqlite3 .htmlgraph/htmlgraph.db "SELECT session_id, COUNT(*) FROM agent_events GROUP BY session_id;"
+sqlite3 .wipnote/wipnote.db "SELECT session_id, COUNT(*) FROM agent_events GROUP BY session_id;"
 
 # Verify parent-child linkage
-sqlite3 .htmlgraph/htmlgraph.db "SELECT COUNT(*) FROM sessions WHERE is_subagent=1 AND parent_session_id IS NULL;"
+sqlite3 .wipnote/wipnote.db "SELECT COUNT(*) FROM sessions WHERE is_subagent=1 AND parent_session_id IS NULL;"
 # Should return 0 (all subagents have parent)
 ```
 

@@ -16,11 +16,11 @@ Before starting Phase 3, verify Phase 2 is complete:
 
 ```bash
 # 1. Verify repositories exist
-ls -1 src/python/htmlgraph/api/repositories/*.py
+ls -1 src/python/wipnote/api/repositories/*.py
 # Expected: base_repository.py, events_repository.py, features_repository.py, sessions_repository.py
 
 # 2. Verify services exist
-ls -1 src/python/htmlgraph/api/services/*.py
+ls -1 src/python/wipnote/api/services/*.py
 # Expected: base_service.py, activity_service.py, orchestration_service.py, analytics_service.py
 
 # 3. Run existing tests to establish baseline
@@ -64,7 +64,7 @@ cp docs/api/test_repositories.py tests/unit/api/
 uv run pytest tests/unit/api/test_repositories.py -v
 
 # 3. Check coverage
-uv run pytest tests/unit/api/test_repositories.py --cov=src/python/htmlgraph/api/repositories
+uv run pytest tests/unit/api/test_repositories.py --cov=src/python/wipnote/api/repositories
 
 # Expected coverage targets:
 # - EventsRepository: 85%+
@@ -92,7 +92,7 @@ cp docs/api/test_services.py tests/unit/api/
 uv run pytest tests/unit/api/test_services.py -v
 
 # 3. Check coverage
-uv run pytest tests/unit/api/test_services.py --cov=src/python/htmlgraph/api/services
+uv run pytest tests/unit/api/test_services.py --cov=src/python/wipnote/api/services
 
 # Expected coverage targets:
 # - ActivityService: 90%+
@@ -108,7 +108,7 @@ uv run pytest tests/unit/api/test_services.py --cov=src/python/htmlgraph/api/ser
 uv run pytest tests/unit/api/ -v
 
 # 2. Generate coverage report
-uv run pytest tests/unit/api/ --cov=src/python/htmlgraph/api \
+uv run pytest tests/unit/api/ --cov=src/python/wipnote/api \
   --cov-report=html --cov-report=term-missing
 
 # 3. Review coverage report
@@ -245,7 +245,7 @@ Manually verify dashboard functionality and measure performance improvements.
 
 ```bash
 # 1. Start dashboard
-uv run htmlgraph serve
+uv run wipnote serve
 
 # 2. Measure endpoint latencies (before refactor baseline)
 python tests/benchmarks/measure_baseline.py
@@ -257,7 +257,7 @@ python tests/benchmarks/measure_baseline.py
 # WebSocket cycle: 50ms
 
 # 3. Record query counts (to detect N+1)
-SQLALCHEMY_ECHO=true uv run htmlgraph serve 2>&1 | tee query_log.txt
+SQLALCHEMY_ECHO=true uv run wipnote serve 2>&1 | tee query_log.txt
 
 # 4. Measure cache hit rates
 curl -H "X-Cache-Metrics: true" http://localhost:8000/api/events
@@ -275,7 +275,7 @@ curl -H "X-Cache-Metrics: true" http://localhost:8000/api/events
 
 ```bash
 # 1. Enable query logging
-SQLALCHEMY_ECHO=true uv run htmlgraph serve 2>&1 | tee queries.log
+SQLALCHEMY_ECHO=true uv run wipnote serve 2>&1 | tee queries.log
 
 # 2. Analyze queries for N+1 patterns
 grep "SELECT" queries.log | wc -l
@@ -384,8 +384,8 @@ uv run ruff check src/
 
 ```bash
 # 1. Generate detailed coverage report
-uv run pytest --cov=src/python/htmlgraph/api/ \
-  --cov=src/python/htmlgraph/db/ \
+uv run pytest --cov=src/python/wipnote/api/ \
+  --cov=src/python/wipnote/db/ \
   --cov-report=html --cov-report=term-missing:skip-covered
 
 # 2. Review coverage by module:
@@ -478,7 +478,7 @@ Create summary document:
 **Duration**: 2 hours
 
 ```markdown
-# HtmlGraph 0.29.0 Release Notes
+# Wipnote 0.29.0 Release Notes
 
 ## What's New
 - API refactored with repository and service patterns

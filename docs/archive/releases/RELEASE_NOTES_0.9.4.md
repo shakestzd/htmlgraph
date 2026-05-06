@@ -13,23 +13,23 @@
 **Orchestrator Control Commands**
 ```bash
 # Enable strict delegation enforcement
-htmlgraph orchestrator enable
+wipnote orchestrator enable
 
 # Set enforcement level (warn, enforce, block)
-htmlgraph orchestrator set-level enforce
+wipnote orchestrator set-level enforce
 
 # Clear violation history
-htmlgraph orchestrator reset-violations
+wipnote orchestrator reset-violations
 
 # Check current status
-htmlgraph orchestrator status
+wipnote orchestrator status
 ```
 
 **Git Event Tracking**
 ```bash
 # Install hooks for automatic event logging
-htmlgraph install-hooks
-# → Logs commits, merges, branch switches to HtmlGraph
+wipnote install-hooks
+# → Logs commits, merges, branch switches to Wipnote
 ```
 
 **Enhanced Dashboard**
@@ -71,16 +71,16 @@ htmlgraph install-hooks
 ✅ **No breaking changes** - Your existing commands work exactly the same:
 
 ```bash
-htmlgraph status          # Still works
-htmlgraph serve           # Still works
-htmlgraph sync-docs       # Still works
-htmlgraph feature list    # Still works
+wipnote status          # Still works
+wipnote serve           # Still works
+wipnote sync-docs       # Still works
+wipnote feature list    # Still works
 ```
 
 **New optional commands**:
 ```bash
-htmlgraph orchestrator enable      # Control enforcement
-htmlgraph install-hooks             # Setup git tracking
+wipnote orchestrator enable      # Control enforcement
+wipnote install-hooks             # Setup git tracking
 ```
 
 ---
@@ -105,7 +105,7 @@ class MyCommand(BaseCommand):
 
 ### Integration Points
 - Database: All commands use same SDK session tracking
-- Events: Automatically recorded in HtmlGraph
+- Events: Automatically recorded in Wipnote
 - Configuration: Loaded from `orchestrator-config.yaml`
 - Output: Consistent formatting via templates
 
@@ -154,7 +154,7 @@ cli/                          # CLI commands package
 config = load_orchestrator_config()
 
 # Modify via CLI
-htmlgraph orchestrator set-level enforce
+wipnote orchestrator set-level enforce
 # → Updates orchestrator-config.yaml
 
 # Query via SDK
@@ -168,12 +168,12 @@ sdk.config.orchestrator.level  # "enforce"
 
 ### Install
 ```bash
-pip install htmlgraph==0.9.4
+pip install wipnote==0.9.4
 ```
 
 ### Upgrade from 0.9.3
 ```bash
-pip install --upgrade htmlgraph
+pip install --upgrade wipnote
 ```
 
 No breaking changes - existing projects work as-is.
@@ -181,13 +181,13 @@ No breaking changes - existing projects work as-is.
 ### Configure (Optional)
 ```bash
 # Enable orchestrator enforcement
-htmlgraph orchestrator enable
+wipnote orchestrator enable
 
 # Setup git tracking
-htmlgraph install-hooks
+wipnote install-hooks
 
 # Verify configuration
-htmlgraph orchestrator status
+wipnote orchestrator status
 ```
 
 ---
@@ -211,16 +211,16 @@ None - All tests passing, no known issues.
 ## Feedback
 
 Found an issue? Have a suggestion?
-→ Open an issue on [GitHub](https://github.com/anthropics/htmlgraph/issues)
+→ Open an issue on [GitHub](https://github.com/anthropics/wipnote/issues)
 
 ---
 
 ## Contributors
 
-Claude Development Team (HtmlGraph Dogfooding)
+Claude Development Team (Wipnote Dogfooding)
 
 ---
 
 ## License
 
-Same as HtmlGraph project
+Same as Wipnote project

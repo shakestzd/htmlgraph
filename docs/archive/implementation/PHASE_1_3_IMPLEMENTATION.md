@@ -4,11 +4,11 @@
 
 ## Overview
 
-Phase 1.3 implements atomic file operations with crash-safety guarantees for the Session File Tracking System. This is a foundational component that enables safe, parallel writes to the `.htmlgraph/sessions/registry/` directory without requiring locks.
+Phase 1.3 implements atomic file operations with crash-safety guarantees for the Session File Tracking System. This is a foundational component that enables safe, parallel writes to the `.wipnote/sessions/registry/` directory without requiring locks.
 
 ## Implementation Summary
 
-### Core Module: `src/python/htmlgraph/atomic_ops.py`
+### Core Module: `src/python/wipnote/atomic_ops.py`
 
 **Size:** 553 lines of production code
 **Tests:** 47 unit tests (all passing)
@@ -30,7 +30,7 @@ Context manager for atomic file writes using temp-file-and-rename pattern.
 
 **Usage:**
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 
 # Context manager style
 with AtomicFileWriter(Path("target.txt")) as f:
@@ -54,7 +54,7 @@ Lightweight coordination using marker files (no OS locks).
 
 **Usage:**
 ```python
-from htmlgraph import DirectoryLocker
+from wipnote import DirectoryLocker
 
 locker = DirectoryLocker(Path("locks"))
 if locker.acquire_exclusive_lock(timeout=5.0):
@@ -243,7 +243,7 @@ def atomic_json_write(data: dict[str, object]) -> None
 ### SessionRegistry Integration
 ```python
 # From session_registry.py
-from htmlgraph.atomic_ops import AtomicFileWriter
+from wipnote.atomic_ops import AtomicFileWriter
 
 def register_session(self, session_id: str, ...):
     # Atomically write instance registration file
@@ -254,7 +254,7 @@ def register_session(self, session_id: str, ...):
 ### Export from Main Module
 ```python
 # From __init__.py
-from htmlgraph import (
+from wipnote import (
     AtomicFileWriter,
     DirectoryLocker,
     atomic_rename,
@@ -301,7 +301,7 @@ from htmlgraph import (
 
 ## Files Created
 
-1. **src/python/htmlgraph/atomic_ops.py** (553 lines)
+1. **src/python/wipnote/atomic_ops.py** (553 lines)
    - Core implementation
    - Comprehensive docstrings
    - Type hints (strict mode)

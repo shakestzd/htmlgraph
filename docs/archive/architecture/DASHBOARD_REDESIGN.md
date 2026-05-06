@@ -1,4 +1,4 @@
-# HtmlGraph Dashboard Redesign - Design Document
+# Wipnote Dashboard Redesign - Design Document
 
 ## Aesthetic Direction: Maximalist with Technical Sophistication
 
@@ -257,7 +257,7 @@ font-size: 0.875rem;
 ## File Structure
 
 ```
-src/python/htmlgraph/api/templates/
+src/python/wipnote/api/templates/
 ├── dashboard.html                    ← New main dashboard
 ├── partials/
 │   ├── nav-tabs.html                ← Navigation component
@@ -269,7 +269,7 @@ src/python/htmlgraph/api/templates/
 │   ├── activity-feed-hierarchical.html ← Keep for backward compat
 │   └── event-traces.html
 
-src/python/htmlgraph/api/static/
+src/python/wipnote/api/static/
 ├── style.css                         ← New comprehensive stylesheet
 ├── animations.css                    ← Keyframe animations
 ├── dashboard.js                      ← Interactive features (NEW)

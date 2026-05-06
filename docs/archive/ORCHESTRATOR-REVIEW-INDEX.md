@@ -1,6 +1,6 @@
 # Orchestrator System Prompt Review & Optimization - Complete Index
 
-**Project:** HtmlGraph Orchestrator System Prompt Optimization
+**Project:** Wipnote Orchestrator System Prompt Optimization
 **Date:** 2025-01-03
 **Status:** ✅ COMPLETE - Ready for Immediate Deployment
 **Spike ID:** `spk-1a6ad4d9`
@@ -15,7 +15,7 @@ Successfully reviewed and optimized the orchestrator system prompt for:
 - **2.3x token ROI** - Prevents cascading corrections (880 tokens expansion → 2,000-3,000 tokens saved)
 - **Complete spawner selection matrix** - Eliminated conflicts, added decision aids
 - **6 common routing scenarios** - Copy-paste reference patterns
-- **HtmlGraph integration** - Fully verified and enhanced
+- **Wipnote integration** - Fully verified and enhanced
 
 ---
 
@@ -37,7 +37,7 @@ Successfully reviewed and optimized the orchestrator system prompt for:
 - 12+ concrete examples (vs 0 original)
 - 6 common routing scenarios with code
 - Anti-patterns section (7 explicit "don'ts")
-- HtmlGraph integration patterns
+- Wipnote integration patterns
 - Cost analysis transparency
 - Permission modes guidance
 
@@ -59,7 +59,7 @@ cp orchestrator-system-prompt-optimized.txt orchestrator-system-prompt-condensed
 5. Task() vs spawn_*() Cost Analysis
 6. Common Routing Scenarios (6 detailed examples)
 7. Integration Patterns (4 types)
-8. HtmlGraph Integration Pattern
+8. Wipnote Integration Pattern
 9. Permission Modes Reference
 10. Quick Reference Spawner Capabilities
 11. Success Metrics & Cost Optimization Rules
@@ -100,11 +100,11 @@ Change: +100% words, 3x decision clarity, 2.3x token ROI
 
 ---
 
-### 3. Detailed Analysis Report (HtmlGraph Spike)
+### 3. Detailed Analysis Report (Wipnote Spike)
 
 **ID:** `spk-1a6ad4d9`
 **Title:** "Orchestrator System Prompt Optimization - Complete Review"
-**Status:** ✅ Saved to HtmlGraph
+**Status:** ✅ Saved to Wipnote
 **Priority:** High
 
 **Purpose:** Deep technical analysis of optimization with enhancement roadmap
@@ -113,7 +113,7 @@ Change: +100% words, 3x decision clarity, 2.3x token ROI
 - Context efficiency improvements
 - Smart task routing enhancements
 - Clarity & precision additions
-- HtmlGraph integration verification
+- Wipnote integration verification
 - Spawner configuration clarity
 - Specific changes made (5 categories)
 - Token count analysis
@@ -121,9 +121,9 @@ Change: +100% words, 3x decision clarity, 2.3x token ROI
 - Implementation questions (5 items)
 - Conclusion and status
 
-**Access:** HtmlGraph `spk-1a6ad4d9` or via SDK:
+**Access:** Wipnote `spk-1a6ad4d9` or via SDK:
 ```python
-from src.python.htmlgraph import SDK
+from src.python.wipnote import SDK
 sdk = SDK()
 spike = sdk.spikes.get('spk-1a6ad4d9')
 print(spike.findings)
@@ -266,7 +266,7 @@ Parallel spawn_codex():
 - `/Users/shakes/DevProjects/htmlgraph/ORCHESTRATOR-OPTIMIZATION-SUMMARY.md` - Executive summary and deployment guide
 - `/Users/shakes/DevProjects/htmlgraph/ORCHESTRATOR-REVIEW-INDEX.md` - This index document
 
-### HtmlGraph Integration
+### Wipnote Integration
 
 - **Spike ID:** `spk-1a6ad4d9` - Detailed technical analysis and findings
 
@@ -335,7 +335,7 @@ claude --append-system-prompt orchestrator-system-prompt-optimized.txt
 - Links to correct approaches
 - Success criteria defined
 
-### ✅ HtmlGraph Integration
+### ✅ Wipnote Integration
 - Full integration example provided
 - SDK patterns verified correct
 - Permission modes explained
@@ -362,7 +362,7 @@ claude --append-system-prompt orchestrator-system-prompt-optimized.txt
 ✅ 6 common routing scenarios
 ✅ Complete spawner matrix
 ✅ Anti-patterns section
-✅ HtmlGraph integration verified
+✅ Wipnote integration verified
 
 ### Quality Assurance
 ✅ SDK APIs verified correct
@@ -406,7 +406,7 @@ claude --append-system-prompt orchestrator-system-prompt-optimized.txt
 
 ## Related Documentation
 
-### Within HtmlGraph
+### Within Wipnote
 - **Spike:** `spk-1a6ad4d9` - Detailed technical analysis
 - **CLAUDE.md** - Project orchestrator directives
 - **`.claude/rules/orchestration.md`** - Orchestrator rules documentation
@@ -436,7 +436,7 @@ claude --append-system-prompt orchestrator-system-prompt-optimized.txt
 **Questions?** Review the detailed files:
 - `ORCHESTRATOR-OPTIMIZATION-SUMMARY.md` - Executive overview
 - `orchestrator-system-prompt-optimized.txt` - Full prompt
-- `spk-1a6ad4d9` (HtmlGraph Spike) - Technical deep-dive
+- `spk-1a6ad4d9` (Wipnote Spike) - Technical deep-dive
 
 ---
 

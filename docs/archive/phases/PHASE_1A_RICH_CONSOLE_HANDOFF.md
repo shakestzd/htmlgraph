@@ -10,7 +10,7 @@
 
 ### Deploy.py - 100% Complete
 
-**File:** `src/python/htmlgraph/deploy.py`
+**File:** `src/python/wipnote/deploy.py`
 
 **Changes:**
 - Line 204: Converted `print(e.stderr, file=sys.stderr)` → `console.print(e.stderr, style="red")`
@@ -36,7 +36,7 @@ feat: convert deploy.py error output to Rich Console (feat-4d5b889e)
 
 ## CLI.py Analysis & Handoff
 
-**File:** `src/python/htmlgraph/cli.py` (6,505 lines)
+**File:** `src/python/wipnote/cli.py` (6,505 lines)
 
 ### Summary Statistics
 
@@ -69,7 +69,7 @@ if args.format == "json":
 **Examples:**
 ```python
 # Line 943-954: Status output
-print(f"HtmlGraph Status: {args.graph_dir}")
+print(f"Wipnote Status: {args.graph_dir}")
 print(f"{'=' * 40}")
 print(f"Total nodes: {total}")
 print("\nBy Collection:")
@@ -77,7 +77,7 @@ for coll, count in sorted(by_collection.items()):
     print(f"  {coll}: {count}")
 
 # Line 978-997: Debug help output
-print("🔍 HtmlGraph Debugging Resources\n")
+print("🔍 Wipnote Debugging Resources\n")
 print("=" * 60)
 print("\n📚 Documentation:")
 print("  - DEBUGGING.md - Complete debugging guide")
@@ -86,11 +86,11 @@ print("  - DEBUGGING.md - Complete debugging guide")
 **Conversion Pattern:**
 ```python
 # BEFORE (current)
-print(f"HtmlGraph Status: {args.graph_dir}")
+print(f"Wipnote Status: {args.graph_dir}")
 print(f"{'=' * 40}")
 
 # AFTER (target)
-console.print(f"[bold cyan]HtmlGraph Status: {args.graph_dir}[/bold cyan]")
+console.print(f"[bold cyan]Wipnote Status: {args.graph_dir}[/bold cyan]")
 console.print("[dim]" + "=" * 40 + "[/dim]")
 ```
 
@@ -171,16 +171,16 @@ console.print(f"  {marker} [cyan]{coll_name}: {count}[/cyan]")
 
 ```bash
 # Find status output commands
-grep -n "def cmd_status" src/python/htmlgraph/cli.py
+grep -n "def cmd_status" src/python/wipnote/cli.py
 
 # Find debug commands
-grep -n "def cmd_debug\|def cmd_doctor" src/python/htmlgraph/cli.py
+grep -n "def cmd_debug\|def cmd_doctor" src/python/wipnote/cli.py
 
 # Find verbose sections
-grep -n "if args.verbose" src/python/htmlgraph/cli.py
+grep -n "if args.verbose" src/python/wipnote/cli.py
 
 # Find all non-JSON print statements
-grep -n "^[[:space:]]*print(" src/python/htmlgraph/cli.py | grep -v "json.dumps"
+grep -n "^[[:space:]]*print(" src/python/wipnote/cli.py | grep -v "json.dumps"
 ```
 
 ---
@@ -228,7 +228,7 @@ All other print statements in remaining commands.
   - `[red]` for errors
   - `[green]` for success messages
 - [ ] Run `ruff check --fix && ruff format` on file
-- [ ] Run `mypy src/python/htmlgraph/cli.py`
+- [ ] Run `mypy src/python/wipnote/cli.py`
 - [ ] Run relevant tests: `pytest tests/ -k <command_name>`
 - [ ] Commit with message: `feat: convert <command> to Rich Console (feat-4d5b889e)`
 
@@ -236,14 +236,14 @@ All other print statements in remaining commands.
 
 ```bash
 # After converting each command group
-uv run ruff check --fix src/python/htmlgraph/cli.py
-uv run ruff format src/python/htmlgraph/cli.py
-uv run mypy src/python/htmlgraph/cli.py
+uv run ruff check --fix src/python/wipnote/cli.py
+uv run ruff format src/python/wipnote/cli.py
+uv run mypy src/python/wipnote/cli.py
 uv run pytest tests/ -xvs  # Run full test suite
 
 # Before committing
-git diff src/python/htmlgraph/cli.py
-git add src/python/htmlgraph/cli.py
+git diff src/python/wipnote/cli.py
+git add src/python/wipnote/cli.py
 git commit -m "feat: convert <command> to Rich Console (feat-4d5b889e)"
 ```
 
@@ -309,7 +309,7 @@ with Progress(
 ## Key Imports Already in place
 
 ```python
-# Top of src/python/htmlgraph/cli.py
+# Top of src/python/wipnote/cli.py
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
@@ -359,11 +359,11 @@ By completion of Phase 1A/1B:
 
 ## Files Modified
 
-1. ✅ `src/python/htmlgraph/deploy.py` - COMPLETE
+1. ✅ `src/python/wipnote/deploy.py` - COMPLETE
    - 1 statement converted
    - Committed: `5b96ce2`
 
-2. `src/python/htmlgraph/cli.py` - READY FOR CONVERSION
+2. `src/python/wipnote/cli.py` - READY FOR CONVERSION
    - 512+ statements to convert
    - 44 statements to preserve (JSON)
 

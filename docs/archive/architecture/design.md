@@ -1,6 +1,6 @@
-# HtmlGraph SDK Architecture
+# Wipnote SDK Architecture
 
-Design philosophy and architectural decisions behind the HtmlGraph SDK.
+Design philosophy and architectural decisions behind the Wipnote SDK.
 
 ---
 
@@ -19,7 +19,7 @@ Design philosophy and architectural decisions behind the HtmlGraph SDK.
 
 ### Core Principles
 
-HtmlGraph's SDK is built on four foundational principles:
+Wipnote's SDK is built on four foundational principles:
 
 1. **Immutability by Design** - Nodes are data models, not state machines
 2. **Centralized State Management** - Collections manage state transitions
@@ -92,7 +92,7 @@ sdk.features.complete('feat-123')
 #### Example Usage
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -169,7 +169,7 @@ sdk.features.complete('feat-123')
 #### Example Usage
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -207,7 +207,7 @@ in_progress = sdk.features.filter(lambda f: f.status == 'in-progress')
 
 ```python
 # ❌ ANTI-PATTERN - Without builders
-from htmlgraph.models import Node
+from wipnote.models import Node
 
 feature = Node(
     id='feat-123',
@@ -263,7 +263,7 @@ feature = sdk.features.create("User Authentication") \
 #### Example Usage
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -299,7 +299,7 @@ except Exception as e:
 
 ### Django ORM Influence
 
-HtmlGraph's Collections follow **Django ORM naming conventions** for familiarity.
+Wipnote's Collections follow **Django ORM naming conventions** for familiarity.
 
 #### Why `.all()` not `.list()`?
 
@@ -325,7 +325,7 @@ features = sdk.features.all()   # ✅ Correct
    features = Feature.objects.all()
    high_priority = Feature.objects.filter(priority='high')
 
-   # HtmlGraph Collection API (same pattern!)
+   # Wipnote Collection API (same pattern!)
    features = sdk.features.all()
    high_priority = sdk.features.where(priority='high')
    ```
@@ -363,8 +363,8 @@ high_priority = Feature.objects.filter(priority='high')
 
 # ─────────────────────────────────────────────────
 
-# HtmlGraph SDK (same pattern!)
-from htmlgraph import SDK
+# Wipnote SDK (same pattern!)
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -410,7 +410,7 @@ sdk.features.complete()
 #### Event Types
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -450,7 +450,7 @@ sdk.features.complete('feat-123')
 **The Error:**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 feature = sdk.features.get('feat-123')
@@ -484,7 +484,7 @@ sdk.features.complete('feat-123')
 # - Saves atomically
 ```
 
-**Reference:** See [bug-3a2bf73c](../.htmlgraph/bugs/bug-3a2bf73c.html) - Node objects have no `.complete()` instance method
+**Reference:** See [bug-3a2bf73c](../.wipnote/bugs/bug-3a2bf73c.html) - Node objects have no `.complete()` instance method
 
 ---
 
@@ -493,7 +493,7 @@ sdk.features.complete('feat-123')
 **The Error:**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -522,7 +522,7 @@ todos = sdk.features.where(status='todo')
 custom = sdk.features.filter(lambda f: f.priority == 'high')
 ```
 
-**Reference:** See [bug-8b6e9736](../.htmlgraph/bugs/bug-8b6e9736.html) - Collection objects use `.all()` not `.list()`
+**Reference:** See [bug-8b6e9736](../.wipnote/bugs/bug-8b6e9736.html) - Collection objects use `.all()` not `.list()`
 
 ---
 
@@ -531,7 +531,7 @@ custom = sdk.features.filter(lambda f: f.priority == 'high')
 **The Error:**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 feature = sdk.features.get('feat-123')
@@ -568,7 +568,7 @@ sdk.features.update('feat-123', status='done', priority='high')
 **The Confusion:**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -621,7 +621,7 @@ sdk.features.start(feature.id)
 
 ### Event Schema
 
-All HtmlGraph events follow a consistent schema:
+All Wipnote events follow a consistent schema:
 
 ```python
 {
@@ -642,17 +642,17 @@ All HtmlGraph events follow a consistent schema:
 
 Events are stored in multiple locations for different use cases:
 
-1. **JSONL event log** - `.htmlgraph/events/*.jsonl`
+1. **JSONL event log** - `.wipnote/events/*.jsonl`
    - Append-only log
    - Time-ordered
    - Fast sequential reads
 
-2. **SQLite database** - `.htmlgraph/graph.db`
+2. **SQLite database** - `.wipnote/graph.db`
    - Indexed for queries
    - Fast lookups
    - Aggregations
 
-3. **Session HTML** - `.htmlgraph/sessions/*.html`
+3. **Session HTML** - `.wipnote/sessions/*.html`
    - Human-readable
    - Visualizable in dashboard
    - Shareable
@@ -660,7 +660,7 @@ Events are stored in multiple locations for different use cases:
 ### Event Query API
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -684,10 +684,10 @@ print(f"Features completed: {velocity['features_completed']}")
 
 ### Claims and Ownership
 
-HtmlGraph supports **multi-agent coordination** through claims:
+Wipnote supports **multi-agent coordination** through claims:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -715,7 +715,7 @@ sdk.features.release('feat-123')
 SessionManager enforces **work-in-progress limits** to prevent overload:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude')
 
@@ -732,10 +732,10 @@ sdk.features.start('feat-004')  # ✅ OK now (3 in progress)
 
 ### Parallel Work Recommendations
 
-HtmlGraph can **recommend parallelizable work** for multi-agent teams:
+Wipnote can **recommend parallelizable work** for multi-agent teams:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='orchestrator')
 
@@ -802,7 +802,7 @@ for rec in recommendations:
                 │                       │
                 ▼                       ▼
         ┌──────────────┐        ┌──────────────┐
-        │  HtmlGraph   │        │  EventLog    │
+        │  Wipnote   │        │  EventLog    │
         │  (Storage)   │        │  (JSONL)     │
         └──────────────┘        └──────────────┘
 ```
@@ -839,7 +839,7 @@ create("title")
 
 ## Summary
 
-HtmlGraph's architecture follows three key principles:
+Wipnote's architecture follows three key principles:
 
 1. **Immutable Nodes** - Data models are read-only, preventing silent mutations
 2. **Centralized State** - Collections manage all state transitions with events

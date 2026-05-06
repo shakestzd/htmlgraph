@@ -3,28 +3,28 @@
 ## Issue 1: Cross-Project Pollution (CRITICAL)
 
 ### Symptom
-Gemini was working in the **contextune project** (`/Users/shakes/DevProjects/contextune`) but saw a feature `feat-4cec1d2e` titled "Cross-Session Continuity Enhancement" which is an **htmlgraph project** feature (about modifying `.htmlgraph/` schema and MCP server).
+Gemini was working in the **contextune project** (`/Users/shakes/DevProjects/contextune`) but saw a feature `feat-4cec1d2e` titled "Cross-Session Continuity Enhancement" which is an **wipnote project** feature (about modifying `.wipnote/` schema and MCP server).
 
 ### Evidence
 ```
 Current working directory: /Users/shakes/DevProjects/contextune
 
-# Gemini ran htmlgraph status and saw:
+# Gemini ran wipnote status and saw:
 feat-4cec1d2e: Cross-Session Continuity Enhancement
-- Steps about modifying .htmlgraph/ schema
+- Steps about modifying .wipnote/ schema
 - Steps about updating MCP server
 ```
 
 ### Why This is Critical
-- Projects should be isolated - contextune features should not see htmlgraph features
-- This breaks the fundamental assumption that `.htmlgraph/` is project-local
+- Projects should be isolated - contextune features should not see wipnote features
+- This breaks the fundamental assumption that `.wipnote/` is project-local
 - Agents will get confused about which project they're working on
-- Attribution will be wrong (contextune work attributed to htmlgraph features)
+- Attribution will be wrong (contextune work attributed to wipnote features)
 
 ### Possible Root Causes
 
 1. **SDK initialization bug** - SDK(agent='gemini') might be looking in wrong directory
-2. **Missing .htmlgraph/ in contextune** - If contextune doesn't have `.htmlgraph/`, SDK might fall back to parent or home directory
+2. **Missing .wipnote/ in contextune** - If contextune doesn't have `.wipnote/`, SDK might fall back to parent or home directory
 3. **Shared state** - Some global config or cache leaking between projects
 4. **Virtual env confusion** - Gemini output showed:
    ```
@@ -33,15 +33,15 @@ feat-4cec1d2e: Cross-Session Continuity Enhancement
 
 ### Investigation Needed
 
-1. Check if `/Users/shakes/DevProjects/contextune/.htmlgraph/` exists
+1. Check if `/Users/shakes/DevProjects/contextune/.wipnote/` exists
 2. Check SDK.__init__() - does it properly detect current project directory?
 3. Check if there's any global state or caching in SDK
-4. Test: Create fresh project, run `htmlgraph status`, verify it doesn't see other projects' features
+4. Test: Create fresh project, run `wipnote status`, verify it doesn't see other projects' features
 
 ### Expected Behavior
-- Each project has its own `.htmlgraph/` directory
-- SDK should auto-detect the current project's `.htmlgraph/`
-- If no `.htmlgraph/` exists, should error or offer to run `htmlgraph init`
+- Each project has its own `.wipnote/` directory
+- SDK should auto-detect the current project's `.wipnote/`
+- If no `.wipnote/` exists, should error or offer to run `wipnote init`
 - NEVER show features from other projects
 
 ---
@@ -50,7 +50,7 @@ feat-4cec1d2e: Cross-Session Continuity Enhancement
 
 ### Symptom
 Gemini wanted to delete `feat-4cec1d2e` (the misplaced feature) but found:
-- ❌ No `htmlgraph feature delete` CLI command
+- ❌ No `wipnote feature delete` CLI command
 - ❌ No obvious SDK method to delete features
 - ❌ Manual `rm` is forbidden (bypasses index, event log, validation)
 
@@ -59,7 +59,7 @@ Gemini wanted to delete `feat-4cec1d2e` (the misplaced feature) but found:
 Gemini's investigation:
 ```bash
 # Checked help
-uv run htmlgraph feature --help
+uv run wipnote feature --help
 # Found: create, start, complete, primary, claim, release, auto-release, list, step-complete
 # Missing: delete, remove, archive
 
@@ -105,7 +105,7 @@ None. Agents must:
 
 2. **CLI Command:**
    ```bash
-   htmlgraph feature delete feat-001
+   wipnote feature delete feat-001
    # Should prompt: "Delete feat-001? This cannot be undone. [y/N]"
    ```
 
@@ -156,7 +156,7 @@ Gemini eventually gave up on finding delete and just ignored the issue.
 
    ### Runtime Introspection
    ```python
-   from htmlgraph import SDK
+   from wipnote import SDK
    sdk = SDK(agent="claude")
 
    # List all methods on a collection
@@ -180,7 +180,7 @@ Gemini eventually gave up on finding delete and just ignored the issue.
 
 3. **Improve CLI Help:**
    ```bash
-   htmlgraph feature --help
+   wipnote feature --help
    # Should mention: "For programmatic access, use Python SDK: sdk.features.create(...)"
    # Should mention: "See docs/SDK_FOR_AI_AGENTS.md for complete API reference"
    ```
@@ -192,7 +192,7 @@ Gemini eventually gave up on finding delete and just ignored the issue.
    # ['bugs', 'chores', 'dep_analytics', 'epics', 'features', 'phases', 'spikes', 'tracks']
 
    # Explore a collection
-   from htmlgraph.collections import BaseCollection
+   from wipnote.collections import BaseCollection
    print(BaseCollection.__dict__.keys())
    ```
 
@@ -203,10 +203,10 @@ Gemini eventually gave up on finding delete and just ignored the issue.
 ### Critical (Fix Now)
 1. **Investigate cross-project pollution** - This breaks fundamental assumptions
    - Test: Does SDK properly isolate to current project?
-   - Test: What happens if `.htmlgraph/` doesn't exist in current dir?
+   - Test: What happens if `.wipnote/` doesn't exist in current dir?
 2. **Implement delete functionality** - Agents need this for cleanup
    - Add `sdk.collections.delete(id)`
-   - Add `htmlgraph feature delete` CLI command
+   - Add `wipnote feature delete` CLI command
 
 ### Important (Next)
 1. **Add SDK method discoverability to AGENTS.md**
@@ -222,8 +222,8 @@ Gemini eventually gave up on finding delete and just ignored the issue.
 ### Cross-Project Isolation
 ```python
 def test_sdk_isolates_to_current_project():
-    """SDK should only see features from current project's .htmlgraph/"""
-    # Create two projects with .htmlgraph/
+    """SDK should only see features from current project's .wipnote/"""
+    # Create two projects with .wipnote/
     # Create features in each
     # Initialize SDK in project A
     # Verify it ONLY sees project A features
@@ -264,7 +264,7 @@ def test_runtime_introspection():
 
 ## Related Issues
 
-- **Issue #42**: SDK should error if no `.htmlgraph/` found (instead of falling back)
+- **Issue #42**: SDK should error if no `.wipnote/` found (instead of falling back)
 - **Issue #89**: Need archive functionality (soft delete with status="archived")
 - **Feature Request**: Batch delete for cleanup operations
 

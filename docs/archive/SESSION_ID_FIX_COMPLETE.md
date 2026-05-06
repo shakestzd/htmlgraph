@@ -4,7 +4,7 @@
 PostToolUse hooks were creating separate sessions because they didn't receive `session_id` in hook_input from Claude Code, breaking parent-child event linking.
 
 ## Solution Implemented
-Added database fallback to `src/python/htmlgraph/hooks/context.py`:
+Added database fallback to `src/python/wipnote/hooks/context.py`:
 - When `session_id` is not found in hook_input or environment variables
 - Query database for most recent active session
 - Use that session_id instead of falling back to "unknown"
@@ -24,7 +24,7 @@ After restarting Claude Code, new sessions will:
 ## Verification Steps (Next Session)
 ```bash
 # After restart, run a few commands, then check:
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT session_id, tool_name, COUNT(*) 
 FROM agent_events 
 WHERE session_id = (SELECT session_id FROM sessions ORDER BY created_at DESC LIMIT 1)
@@ -41,7 +41,7 @@ ORDER BY COUNT(*) DESC;
 - Old session distribution: sess-550f9aca (757 events), sess-f1dbfc0f (168 events), etc.
 
 ## Files Changed
-- `src/python/htmlgraph/hooks/context.py` (lines 98-155)
+- `src/python/wipnote/hooks/context.py` (lines 98-155)
 
 ## Next Steps
 1. Restart Claude Code to load the new code

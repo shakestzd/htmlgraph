@@ -1,4 +1,4 @@
-# HtmlGraph Dashboard UI Testing Report
+# Wipnote Dashboard UI Testing Report
 **Date:** January 9, 2026
 **Tester:** dashboard-tester (automated)
 **Test Environment:** Playwright + Chrome on macOS
@@ -60,7 +60,7 @@ return templates.TemplateResponse(
 )
 ```
 
-**Recommendation:** Create `/src/python/htmlgraph/api/templates/partials/activity-feed-hierarchical.html` with proper hierarchical rendering.
+**Recommendation:** Create `/src/python/wipnote/api/templates/partials/activity-feed-hierarchical.html` with proper hierarchical rendering.
 
 ---
 
@@ -381,7 +381,7 @@ All screenshots saved to: `/.playwright-mcp/`
 
 ## Conclusion
 
-The redesigned HtmlGraph dashboard shows excellent design quality and solid implementation for 2 out of 3 core components (Orchestration Graph and Smart Kanban). However, the Activity Feed - arguably the most important component - is missing its hierarchical implementation entirely.
+The redesigned Wipnote dashboard shows excellent design quality and solid implementation for 2 out of 3 core components (Orchestration Graph and Smart Kanban). However, the Activity Feed - arguably the most important component - is missing its hierarchical implementation entirely.
 
 **Key Takeaways:**
 - ✅ Visual design is professional and information-dense

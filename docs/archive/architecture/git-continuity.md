@@ -2,7 +2,7 @@
 
 ## Overview
 
-HtmlGraph uses Git as a universal continuity spine that enables agent-agnostic session tracking and event logging. This architecture eliminates dependence on platform-specific hooks (like Claude Code plugin hooks) and makes HtmlGraph work with ANY coding agent.
+Wipnote uses Git as a universal continuity spine that enables agent-agnostic session tracking and event logging. This architecture eliminates dependence on platform-specific hooks (like Claude Code plugin hooks) and makes Wipnote work with ANY coding agent.
 
 **Core Principle**: Git commits are universal continuity points that work regardless of which agent wrote the code.
 
@@ -10,7 +10,7 @@ HtmlGraph uses Git as a universal continuity spine that enables agent-agnostic s
 
 ### 1. Git Hooks as Continuity Anchors
 
-Git provides universal hooks that work regardless of which agent/tool is writing code. HtmlGraph leverages these to create a continuity spine:
+Git provides universal hooks that work regardless of which agent/tool is writing code. Wipnote leverages these to create a continuity spine:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -32,7 +32,7 @@ Git provides universal hooks that work regardless of which agent/tool is writing
                          │
                 ┌────────▼─────────┐
                 │  Event Log       │
-                │  (.htmlgraph/    │
+                │  (.wipnote/    │
                 │   events/)       │
                 └──────────────────┘
 ```
@@ -46,7 +46,7 @@ Git provides universal hooks that work regardless of which agent/tool is writing
   - Explicit references in commit message (`feature-xyz`)
   - Active features from session state
   - File pattern matching to feature file patterns
-- Creates GitCommit events in `.htmlgraph/events/`
+- Creates GitCommit events in `.wipnote/events/`
 
 **`post-checkout`** - Branch continuity
 - Tracks branch switches (`main` → `feature/auth`)
@@ -67,7 +67,7 @@ Git provides universal hooks that work regardless of which agent/tool is writing
 - Can trigger team notifications
 
 **`pre-commit`** - Quality gates (blocking)
-- Enforces SDK usage (blocks direct `.htmlgraph/` edits)
+- Enforces SDK usage (blocks direct `.wipnote/` edits)
 - Runs code quality checks (ruff, mypy)
 - Can be bypassed with `git commit --no-verify`
 
@@ -214,7 +214,7 @@ The architecture works with ANY agent because it relies on universal primitives:
 
 ### How Sessions Link Across Agents
 
-HtmlGraph reconstructs session continuity using multiple signals:
+Wipnote reconstructs session continuity using multiple signals:
 
 **1. Explicit Continuation**
 ```python
@@ -292,7 +292,7 @@ Day 1, 2pm (Codex):
 
 Day 2, 9am (Claude):
   session-s3-ghi = manager.start_session(agent="claude")
-  # HtmlGraph automatically detects continuation via:
+  # Wipnote automatically detects continuation via:
   #   1. Same feature (feature-auth-001)
   #   2. Commit graph (abc123 → def456 → current)
   #   3. Session summary handoff notes
@@ -334,7 +334,7 @@ for session in sessions:
 
 ### How Events Link to Features
 
-HtmlGraph uses multiple strategies to attribute events to features:
+Wipnote uses multiple strategies to attribute events to features:
 
 **1. Active Features (Session State)**
 ```python
@@ -417,32 +417,32 @@ def attribute_commit(commit_hash: str) -> list[str]:
 
 ### Git Hook Installation
 
-**Location**: `.htmlgraph/hooks/` (versioned) → `.git/hooks/` (symlinked)
+**Location**: `.wipnote/hooks/` (versioned) → `.git/hooks/` (symlinked)
 
 ```bash
 # Install hooks
-htmlgraph install-hooks
+wipnote install-hooks
 
 # Creates:
-.git/hooks/post-commit    → .htmlgraph/hooks/post-commit.sh
-.git/hooks/post-checkout  → .htmlgraph/hooks/post-checkout.sh
-.git/hooks/post-merge     → .htmlgraph/hooks/post-merge.sh
-.git/hooks/pre-push       → .htmlgraph/hooks/pre-push.sh
-.git/hooks/pre-commit     → .htmlgraph/hooks/pre-commit.sh
+.git/hooks/post-commit    → .wipnote/hooks/post-commit.sh
+.git/hooks/post-checkout  → .wipnote/hooks/post-checkout.sh
+.git/hooks/post-merge     → .wipnote/hooks/post-merge.sh
+.git/hooks/pre-push       → .wipnote/hooks/pre-push.sh
+.git/hooks/pre-commit     → .wipnote/hooks/pre-commit.sh
 ```
 
 **Hook Script Structure**:
 ```bash
 #!/bin/bash
-# .htmlgraph/hooks/post-commit.sh
+# .wipnote/hooks/post-commit.sh
 
 # Exit early if disabled
-if [ "$(git config --bool htmlgraph.hooks)" = "false" ]; then
+if [ "$(git config --bool wipnote.hooks)" = "false" ]; then
     exit 0
 fi
 
-# Call HtmlGraph event logger
-uv run python -m htmlgraph.git_events commit
+# Call Wipnote event logger
+uv run python -m wipnote.git_events commit
 
 # Always succeed (non-blocking)
 exit 0
@@ -452,7 +452,7 @@ exit 0
 
 **Directory Structure**:
 ```
-.htmlgraph/
+.wipnote/
 ├── events/
 │   ├── session-s1-abc.jsonl        # Events for session S1
 │   ├── session-s2-def.jsonl        # Events for session S2
@@ -467,9 +467,9 @@ exit 0
 
 **Querying Events**:
 ```python
-from htmlgraph.event_log import JsonlEventLog
+from wipnote.event_log import JsonlEventLog
 
-log = JsonlEventLog(".htmlgraph/events")
+log = JsonlEventLog(".wipnote/events")
 
 # Get all events for a session
 events = log.get_session_events("session-s1-abc")
@@ -665,14 +665,14 @@ class CommitGraphAnalytics:
 **Mitigation**:
 - Pre-commit hooks can scan for patterns (API keys, passwords)
 - Event payloads stored locally only (not pushed by default)
-- `.htmlgraph/events/` should be in `.gitignore`
+- `.wipnote/events/` should be in `.gitignore`
 
 ### Multi-Tenancy
 
 **Risk**: Multiple projects in one repository
 
 **Solution**:
-- HtmlGraph per project (`.htmlgraph/` at project root)
+- Wipnote per project (`.wipnote/` at project root)
 - Hooks respect working directory
 - No cross-project leakage
 
@@ -681,7 +681,7 @@ class CommitGraphAnalytics:
 **Risk**: Malicious users disable hooks
 
 **Detection**:
-- Hook installation status command: `htmlgraph install-hooks --list`
+- Hook installation status command: `wipnote install-hooks --list`
 - Periodic verification in CI/CD
 - Team policy enforcement
 
@@ -760,7 +760,7 @@ Track work across multiple repositories:
 class MultiRepoAnalytics:
     def get_agent_activity_across_repos(self, agent: str, days: int = 7):
         """Get agent activity across all repositories."""
-        repos = discover_htmlgraph_repos()
+        repos = discover_wipnote_repos()
 
         all_activity = []
         for repo in repos:

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Phase 1 of HtmlGraph implementation uses Pydantic v2 models for type-safe CLI argument validation. This ensures all CLI inputs are validated before being passed to SDK operations.
+Phase 1 of Wipnote implementation uses Pydantic v2 models for type-safe CLI argument validation. This ensures all CLI inputs are validated before being passed to SDK operations.
 
 ## Why Pydantic?
 
@@ -17,7 +17,7 @@ Phase 1 of HtmlGraph implementation uses Pydantic v2 models for type-safe CLI ar
 ### Feature Commands
 
 ```python
-from htmlgraph.pydantic_models import FeatureCreateInput
+from wipnote.pydantic_models import FeatureCreateInput
 
 # Valid input
 input = FeatureCreateInput(
@@ -35,7 +35,7 @@ input = FeatureCreateInput(priority="critical")  # Invalid priority
 ### Session Commands
 
 ```python
-from htmlgraph.pydantic_models import SessionStartInput, SessionEndInput
+from wipnote.pydantic_models import SessionStartInput, SessionEndInput
 
 # Start session with minimal input
 session_input = SessionStartInput()
@@ -117,7 +117,7 @@ end_input = SessionEndInput(
 Validation errors are displayed with Rich formatting and helpful context:
 
 ```python
-from htmlgraph.pydantic_models import FeatureCreateInput
+from wipnote.pydantic_models import FeatureCreateInput
 from pydantic import ValidationError
 
 try:
@@ -130,14 +130,14 @@ except ValidationError as e:
 
 ## Configuration Management
 
-HtmlGraph uses `pydantic-settings` (BaseSettings) for configuration management:
+Wipnote uses `pydantic-settings` (BaseSettings) for configuration management:
 
 ```python
-from htmlgraph.config import config
+from wipnote.config import config
 
 # Access configuration
-print(config.graph_dir)        # ~/.htmlgraph
-print(config.features_dir)     # ~/.htmlgraph/features
+print(config.graph_dir)        # ~/.wipnote
+print(config.features_dir)     # ~/.wipnote/features
 print(config.debug)            # False by default
 
 # Configuration from environment variables
@@ -157,12 +157,12 @@ CLI commands use Pydantic models for argument validation:
 
 ```bash
 # Valid command
-htmlgraph feature create "My Feature" --priority high
+wipnote feature create "My Feature" --priority high
 
 # Invalid command (caught by Pydantic validation)
-htmlgraph feature create ""           # Error: title required
-htmlgraph feature create "x" * 201    # Error: title max 200 chars
-htmlgraph feature start --id ""       # Error: feature_id required
+wipnote feature create ""           # Error: title required
+wipnote feature create "x" * 201    # Error: title max 200 chars
+wipnote feature start --id ""       # Error: feature_id required
 ```
 
 ## Testing Pydantic Models
@@ -208,7 +208,7 @@ See Phase 2 documentation for:
 
 ## Related Files
 
-- Source: `src/python/htmlgraph/pydantic_models.py`
-- Config: `src/python/htmlgraph/config.py`
+- Source: `src/python/wipnote/pydantic_models.py`
+- Config: `src/python/wipnote/config.py`
 - Tests: `tests/python/test_cli_pydantic_models.py`
 - Integration: `tests/python/test_error_handling.py`

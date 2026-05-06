@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Research is complete and findings have been documented in HtmlGraph. The SessionStart hook mechanism is **proven, stable, and ready for system prompt injection implementation**.
+Research is complete and findings have been documented in Wipnote. The SessionStart hook mechanism is **proven, stable, and ready for system prompt injection implementation**.
 
 ### Key Research Outcomes
 
@@ -17,7 +17,7 @@ Research is complete and findings have been documented in HtmlGraph. The Session
 |---------|--------|------------|
 | SessionStart fires at session boundaries (startup, resume, compact, clear) | Perfect for persistent context | 99% |
 | additionalContext JSON mechanism is native, proven, stable | Implementation ready | 99% |
-| HtmlGraph already injects 1000+ tokens/session via this mechanism | De-risked implementation | 99% |
+| Wipnote already injects 1000+ tokens/session via this mechanism | De-risked implementation | 99% |
 | 3-layer fallback strategy provides 99.99% reliability | Production-quality solution | 95% |
 | Token cost is negligible (0.25-0.5% overhead) | No performance impact | 98% |
 | Current implementation has graceful error handling | Can be extended safely | 95% |
@@ -37,7 +37,7 @@ Research is complete and findings have been documented in HtmlGraph. The Session
 ## Research Deliverables
 
 ### 1. Comprehensive Spike Report
-**Location:** `.htmlgraph/spikes/` (auto-saved by SDK)
+**Location:** `.wipnote/spikes/` (auto-saved by SDK)
 **Content:** 15-section complete research findings with technical details
 
 ### 2. Executive Summary Document
@@ -93,7 +93,7 @@ Research is complete and findings have been documented in HtmlGraph. The Session
 5. Multiple hooks' context values are concatenated
 6. Claude sees injected context before conversation
 
-**Proof of Concept:** HtmlGraph's current `session-start.py` already does this successfully, injecting 1000+ tokens per session for:
+**Proof of Concept:** Wipnote's current `session-start.py` already does this successfully, injecting 1000+ tokens per session for:
 - Orchestrator directives
 - Feature summary
 - Strategic insights
@@ -163,7 +163,7 @@ All edge cases have defined handling strategies.
 
 ---
 
-## Current HtmlGraph Implementation
+## Current Wipnote Implementation
 
 **Existing Code:** `packages/claude-plugin/hooks/scripts/session-start.py`
 
@@ -237,7 +237,7 @@ All edge cases have defined handling strategies.
 ## Why This Is Safe
 
 1. **Native Feature:** Uses only Claude Code's standard `additionalContext` mechanism
-2. **Proven:** HtmlGraph already uses this with 1000+ tokens per session
+2. **Proven:** Wipnote already uses this with 1000+ tokens per session
 3. **Graceful Degradation:** Multiple fallback layers, non-blocking hooks
 4. **Reversible:** Delete `.claude/system-prompt.md` to disable
 5. **No Breaking Changes:** Purely additive feature
@@ -273,10 +273,10 @@ All edge cases have defined handling strategies.
 
 ## Documentation Generated
 
-### 1. Research Spike (HtmlGraph)
-- Location: `.htmlgraph/spikes/` (auto-saved)
+### 1. Research Spike (Wipnote)
+- Location: `.wipnote/spikes/` (auto-saved)
 - Content: 15-section complete analysis
-- Format: HTML (HtmlGraph native)
+- Format: HTML (Wipnote native)
 
 ### 2. Executive Summary
 - Location: `.claude/SESSIONSTART_RESEARCH_FINDINGS.md`
@@ -316,11 +316,11 @@ All edge cases have defined handling strategies.
 
 ### Documentation Created
 - `.claude/SESSIONSTART_RESEARCH_FINDINGS.md` - Complete implementation guide
-- `.htmlgraph/spikes/` - Research findings spike
+- `.wipnote/spikes/` - Research findings spike
 
 ### Source Documents Analyzed
 - `hook-documentation.md` - Claude Code hook reference
-- `hook-analysis.md` - Current HtmlGraph hook inventory
+- `hook-analysis.md` - Current Wipnote hook inventory
 - `session-start.py` - Current implementation
 - `.claude/SYSTEM_PROMPT_PERSISTENCE_QUICKREF.md` - Previous analysis
 
@@ -334,7 +334,7 @@ All edge cases have defined handling strategies.
 
 | Aspect | Confidence | Reasoning |
 |--------|-----------|-----------|
-| **Hook Mechanism** | 99% | Native feature, documented, HtmlGraph uses it |
+| **Hook Mechanism** | 99% | Native feature, documented, Wipnote uses it |
 | **Implementation Approach** | 95% | Clear specifications, working examples |
 | **Error Handling** | 95% | Edge cases identified, fallbacks planned |
 | **Token Budget** | 98% | Analyzed, overhead negligible |
@@ -353,7 +353,7 @@ All edge cases have defined handling strategies.
 - Research is complete and thorough
 - Implementation path is clear
 - Risk is low, benefits are high
-- Technology is proven (HtmlGraph uses it successfully)
+- Technology is proven (Wipnote uses it successfully)
 - Can be done in 1-2 days
 - Solves critical problem (system prompt loss post-compact)
 
@@ -384,7 +384,7 @@ A: Yes, uses native Claude Code feature with no injection vulnerabilities
 **Q: What about remote environments?**
 A: Layer 1 (additionalContext) works everywhere; Layer 2/3 are additional fallbacks
 
-**Q: What if HtmlGraph isn't installed?**
+**Q: What if Wipnote isn't installed?**
 A: Hook handles gracefully with minimal fallback context
 
 ---

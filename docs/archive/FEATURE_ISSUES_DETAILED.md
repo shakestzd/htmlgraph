@@ -14,7 +14,7 @@
 | Feature ID | Title | Steps | Status | Issue |
 |-----------|-------|-------|--------|-------|
 | feat-0a49152e | Add SDK wrappers for operations layer | 0/3 | done | Missing 3 steps |
-| feat-2fb22d44 | Deploy HtmlGraph with CLI orchestration injection | 0/3 | done | Missing 3 steps |
+| feat-2fb22d44 | Deploy Wipnote with CLI orchestration injection | 0/3 | done | Missing 3 steps |
 | feat-c00bc6c0 | Commit CLI orchestration rules injection | 0/3 | done | Missing 3 steps |
 | feat-dca81f7c | Refactor CLI to use SDK/operations backend | 0/3 | done | Missing 3 steps |
 | feat-0888e0f1 | Inject orchestration rules via CLI --append-system-prompt | 0/4 | done | Missing 4 steps |
@@ -39,7 +39,7 @@
 | feat-2e724483 | Add CLI integration tests for output modes | UNTRACKED | Test coverage needed |
 | feat-48b88f74 | Add PreCompact Workarounds for Work Preservation | UNTRACKED | Session preservation issue |
 | feat-4d2a6e2f | Add Systematic Change Checklist to PR Template | UNTRACKED | Process improvement |
-| feat-385e17e2 | Add htmlgraph claude --init/--continue CLI commands | UNTRACKED | CLI feature |
+| feat-385e17e2 | Add wipnote claude --init/--continue CLI commands | UNTRACKED | CLI feature |
 | feat-c3d11521 | Auto-sync dashboard.html to index.html in serve command | UNTRACKED | Deployment automation |
 | feat-64467b2c | Convert list commands to Rich tables | UNTRACKED | UX improvement |
 | feat-66d73d8c | Create Systematic Refactoring Scripts | UNTRACKED | Developer tools |
@@ -80,7 +80,7 @@
 |-----------|-------|-------|--------|-------|
 | feat-bda2afc3 | Packageable auto-updating agent documentation system | 10/10 | done | No agent |
 | feat-d50a0e5e | Restore project-specific knowledge to CLAUDE.md | 10/10 | done | No agent |
-| feat-23928549 | Enhance system prompt with HtmlGraph, layered planning, and testing | 8/8 | done | No agent |
+| feat-23928549 | Enhance system prompt with Wipnote, layered planning, and testing | 8/8 | done | No agent |
 | feat-3b3acc91 | Fix orchestrator delegation: Make imperatives cost-first, add testing scripts | 8/8 | done | No agent |
 | feat-71a3be23 | Deploy enhanced system prompt and updated SessionStart hook (v0.23.1) | 8/8 | done | No agent |
 | feat-150b5351 | Publish orchestrator system to plugin | 7/7 | done | No agent |
@@ -89,11 +89,11 @@
 | feat-8c539996 | Fix SessionStart hook - remove forced skill activation | 6/6 | done | No agent |
 | feat-aa5530bd | Update orchestrator directives: strict git delegation | 6/6 | done | No agent |
 | feat-f72b89e7 | Create Phase 1 Final Documentation and Handoff | 5/5 | done | No agent |
-| feat-2fb22d44 | Deploy HtmlGraph with CLI orchestration injection | 5/5 | done | No agent |
+| feat-2fb22d44 | Deploy Wipnote with CLI orchestration injection | 5/5 | done | No agent |
 | feat-edb6d638 | Phase 1-A: Session-Scoped Tracking & Hook Debugger | 5/5 | done | No agent |
 | feat-0de33d85 | Create comprehensive testing strategy | 4/4 | done | No agent |
 | feat-fcc652d6 | Document system prompt architecture and integration patterns | 4/4 | done | No agent |
-| feat-f1923b61 | Setup HtmlGraph GitHub integration for issue tracking | 4/4 | done | No agent |
+| feat-f1923b61 | Setup Wipnote GitHub integration for issue tracking | 4/4 | done | No agent |
 | feat-0837f319 | Create spike system for research and exploration | 4/4 | done | No agent |
 | feat-c3d11521 | Auto-sync dashboard.html to index.html in serve command | 3/3 | done | No agent |
 
@@ -182,8 +182,8 @@ These planned features have no agent attribution:
 ## Files Affected
 
 - **Analysis report:** `/Users/shakes/DevProjects/htmlgraph/FEATURE_INTEGRITY_ANALYSIS.md`
-- **Spike document:** `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/spikes/spk-49db2a13.html`
-- **Feature files:** 65 features in `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/features/`
+- **Spike document:** `/Users/shakes/DevProjects/htmlgraph/.wipnote/spikes/spk-49db2a13.html`
+- **Feature files:** 65 features in `/Users/shakes/DevProjects/htmlgraph/.wipnote/features/`
 - **Analysis scripts:** `analyze_features.py`, `create_integrity_spike.py`
 
 ---

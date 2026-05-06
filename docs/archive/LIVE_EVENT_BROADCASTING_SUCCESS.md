@@ -14,7 +14,7 @@ SQLite's `busy_timeout` was set to 0 (default), meaning any concurrent database 
 
 ## Solution
 
-Added `PRAGMA busy_timeout = 5000` to the `get_db()` function in `src/python/htmlgraph/api/main.py`:
+Added `PRAGMA busy_timeout = 5000` to the `get_db()` function in `src/python/wipnote/api/main.py`:
 
 ```python
 async def get_db() -> aiosqlite.Connection:
@@ -54,7 +54,7 @@ async def get_db() -> aiosqlite.Connection:
 
 ## Files Modified
 
-- `src/python/htmlgraph/api/main.py` - Added busy_timeout to get_db()
+- `src/python/wipnote/api/main.py` - Added busy_timeout to get_db()
 - Logging added throughout WebSocket handler (for debugging)
 - Client-side logging in dashboard.html and activity-feed.html
 

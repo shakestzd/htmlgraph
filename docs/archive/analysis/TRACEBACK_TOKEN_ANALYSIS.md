@@ -2,27 +2,27 @@
 
 **Analysis Date:** 2026-01-04
 **Analyst:** Claude Code (Haiku 4.5)
-**Project:** HtmlGraph CLI
+**Project:** Wipnote CLI
 **Status:** Complete Research & Recommendations
 
 ---
 
 ## Executive Summary
 
-Rich.Traceback is globally installed in HtmlGraph CLI (line 60-63 of cli.py) with `show_locals=True`, causing **extreme token overhead** for error scenarios:
+Rich.Traceback is globally installed in Wipnote CLI (line 60-63 of cli.py) with `show_locals=True`, causing **extreme token overhead** for error scenarios:
 
 - **Standard traceback:** ~3 tokens
 - **Rich traceback (show_locals=True):** ~794 tokens
 - **Rich traceback (show_locals=False):** ~163 tokens
 - **Size multiplier:** 211x with locals, 43x without locals
 
-**Recommendation:** Implement **Option C (Hybrid Approach)** with intelligent error handling that logs full tracebacks to HtmlGraph session while displaying minimal summaries to console.
+**Recommendation:** Implement **Option C (Hybrid Approach)** with intelligent error handling that logs full tracebacks to Wipnote session while displaying minimal summaries to console.
 
 ---
 
 ## 1. Current Rich.Traceback Usage
 
-### Location: `/src/python/htmlgraph/cli.py`
+### Location: `/src/python/wipnote/cli.py`
 
 ```python
 # Line 60
@@ -47,7 +47,7 @@ install_traceback(show_locals=True)
 **Current implementation:** Exception handlers exist throughout CLI but rely on Rich.Traceback globally:
 
 ```bash
-grep "except" /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli.py
+grep "except" /Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli.py
 # Results: 30+ exception handlers across 6232 lines
 # Pattern: except Exception as e: pass (silent failures)
 # OR: except Exception: pass (swallowed exceptions)
@@ -80,7 +80,7 @@ grep "except" /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli.py
 
 **Scenario 1: Simple File Not Found Error**
 ```
-Standard: "FileNotFoundError: No such file or directory: '.htmlgraph/sessions.html'"
+Standard: "FileNotFoundError: No such file or directory: '.wipnote/sessions.html'"
 Tokens: ~15
 Token overhead: ~2%
 ```
@@ -137,10 +137,10 @@ Token overhead: ~2000-3000% over error message
 **Concept:** Catch exceptions → log full traceback to session → display minimal to console → add --verbose flag
 
 **Pros:**
-- Full traceback preserved in HtmlGraph session for debugging
+- Full traceback preserved in Wipnote session for debugging
 - Minimal console output (low token cost)
 - Verbose flag for detailed investigation
-- Matches HtmlGraph design philosophy (HTML = persistent record)
+- Matches Wipnote design philosophy (HTML = persistent record)
 
 **Cons:**
 - Requires changes to all exception handlers
@@ -182,7 +182,7 @@ Token overhead: ~2000-3000% over error message
 ### Option C: Hybrid Approach (RECOMMENDED)
 
 **Concept:**
-- Always log full traceback to HtmlGraph session HTML
+- Always log full traceback to Wipnote session HTML
 - Display minimal summary to console (error type + message + 1-2 lines)
 - Provide command to retrieve full traceback from session
 - Optional --debug flag for full console output
@@ -203,7 +203,7 @@ def handle_error(error: Exception, session_id: str | None = None):
 
     # 3. Offer retrieval
     if session_id:
-        console.print(f"[cyan]See full traceback:[/cyan] htmlgraph session debug {session_id}")
+        console.print(f"[cyan]See full traceback:[/cyan] wipnote session debug {session_id}")
 
     # 4. Verbose flag for immediate display
     if args.debug:
@@ -213,7 +213,7 @@ def handle_error(error: Exception, session_id: str | None = None):
 **Pros:**
 - Full traceback always available in session (persistent)
 - Minimal console output (low token cost ~163 tokens)
-- Matches HtmlGraph design (HTML = source of truth)
+- Matches Wipnote design (HTML = source of truth)
 - Works without session initialization
 - Debug flag for advanced users
 - No breaking changes to CLI
@@ -261,7 +261,7 @@ def handle_error(error: Exception, session_id: str | None = None):
 
 #### Phase 1: Session Error Logging (1-2 hours)
 
-**File: `/src/python/htmlgraph/session_manager.py`**
+**File: `/src/python/wipnote/session_manager.py`**
 
 Add error logging method to SessionManager:
 
@@ -294,12 +294,12 @@ def log_error(
     self.update(session)
 ```
 
-**File: `/src/python/htmlgraph/exceptions.py`**
+**File: `/src/python/wipnote/exceptions.py`**
 
-Extend HtmlGraphError with session awareness:
+Extend WipnoteError with session awareness:
 
 ```python
-class HtmlGraphError(Exception):
+class WipnoteError(Exception):
     """Base exception with session logging support."""
 
     def __init__(self, message: str, session_id: str | None = None):
@@ -310,7 +310,7 @@ class HtmlGraphError(Exception):
 
 #### Phase 2: Console Output Wrapper (1-2 hours)
 
-**File: `/src/python/htmlgraph/cli.py`**
+**File: `/src/python/wipnote/cli.py`**
 
 Replace global `install_traceback()` with custom error handler:
 
@@ -343,7 +343,7 @@ def setup_error_handling(args: argparse.Namespace) -> None:
             console.print_exception()
         elif session_id:
             console.print(
-                f"[cyan]Run:[/cyan] htmlgraph session debug {session_id} "
+                f"[cyan]Run:[/cyan] wipnote session debug {session_id} "
                 f"[cyan]for full traceback[/cyan]"
             )
 
@@ -359,7 +359,7 @@ setup_error_handling(args)
 
 #### Phase 3: Debug Command (1-2 hours)
 
-**File: `/src/python/htmlgraph/cli.py`**
+**File: `/src/python/wipnote/cli.py`**
 
 Add session debug subcommand:
 
@@ -443,7 +443,7 @@ def test_minimal_console_output(capsys):
 
 ---
 
-## 5. HtmlGraph Integration Points
+## 5. Wipnote Integration Points
 
 ### Session HTML Structure Extension
 
@@ -471,7 +471,7 @@ def test_minimal_console_output(capsys):
         <ul>
             <li data-error-type="FileNotFoundError"
                 data-ts="2026-01-04T10:30:15">
-                File not found: .htmlgraph/config.json
+                File not found: .wipnote/config.json
                 <details data-traceback>
                     <!-- Full traceback here -->
                 </details>
@@ -487,7 +487,7 @@ def test_minimal_console_output(capsys):
 
 ### EventRecord Extension
 
-**File: `/src/python/htmlgraph/event_log.py`**
+**File: `/src/python/wipnote/event_log.py`**
 
 ```python
 @dataclass(frozen=True)
@@ -507,17 +507,17 @@ class EventRecord:
 
 ```bash
 # Show errors for session
-htmlgraph session errors SESS_ID [--format json|text]
+wipnote session errors SESS_ID [--format json|text]
 
 # Show error with full traceback
-htmlgraph session debug SESS_ID [--error N]
+wipnote session debug SESS_ID [--error N]
 
 # List sessions with errors
-htmlgraph session list --errors-only
-htmlgraph session list --with-errors
+wipnote session list --errors-only
+wipnote session list --with-errors
 
 # Export error reports
-htmlgraph session errors SESS_ID --export report.html
+wipnote session errors SESS_ID --export report.html
 ```
 
 ### Storage Strategy
@@ -529,7 +529,7 @@ htmlgraph session errors SESS_ID --export report.html
 - Query via CSS selectors
 
 **Option 2: Separate Error Log File**
-- Errors in `.htmlgraph/errors.jsonl` (already exists!)
+- Errors in `.wipnote/errors.jsonl` (already exists!)
 - Linked to sessions by session_id
 - Good for cross-session analysis
 - Separates concerns
@@ -571,7 +571,7 @@ htmlgraph session errors SESS_ID --export report.html
 
 1. **Token Efficiency:** 163 tokens/error vs 794 (80% reduction)
 2. **Preserves Context:** Full traceback available in session
-3. **Aligns with HtmlGraph:** HTML is source of truth for debugging
+3. **Aligns with Wipnote:** HTML is source of truth for debugging
 4. **Non-Breaking:** Works without session initialization
 5. **Progressive:** Users can investigate with --debug or via session
 6. **Enterprise-Ready:** Separate debugging from immediate output
@@ -591,7 +591,7 @@ htmlgraph session errors SESS_ID --export report.html
 **Week 3: Testing & Refinement**
 - Integration tests
 - Documentation
-- Real-world testing with HtmlGraph development
+- Real-world testing with Wipnote development
 - ~4 hours testing + refinement
 
 **Total:** ~12 hours implementation + testing
@@ -615,7 +615,7 @@ htmlgraph session errors SESS_ID --export report.html
 | **Session Integration** | Good | Poor | Excellent | None |
 | **Development Effort** | 8h | 16h | 12h | 2h |
 | **Debugging Experience** | Good | Fair | Excellent | Fair |
-| **Alignment with HtmlGraph** | High | Low | Very High | Low |
+| **Alignment with Wipnote** | High | Low | Very High | Low |
 
 ---
 
@@ -625,7 +625,7 @@ htmlgraph session errors SESS_ID --export report.html
 - Rich.Traceback installed globally with `show_locals=True`
 - No error context preservation beyond console output
 - 30+ exception handlers throughout CLI
-- Existing error log file (`.htmlgraph/errors.jsonl`) unused
+- Existing error log file (`.wipnote/errors.jsonl`) unused
 
 ### Token Cost Breakdown
 - Standard Python traceback: 231 chars (~3 tokens)
@@ -649,10 +649,10 @@ htmlgraph session errors SESS_ID --export report.html
 ## 10. Implementation Files Checklist
 
 **Core Changes:**
-- [ ] `/src/python/htmlgraph/session_manager.py` - Error logging method
-- [ ] `/src/python/htmlgraph/exceptions.py` - Session-aware exceptions
-- [ ] `/src/python/htmlgraph/cli.py` - Custom error handler + debug command
-- [ ] `/src/python/htmlgraph/event_log.py` - EventRecord extension
+- [ ] `/src/python/wipnote/session_manager.py` - Error logging method
+- [ ] `/src/python/wipnote/exceptions.py` - Session-aware exceptions
+- [ ] `/src/python/wipnote/cli.py` - Custom error handler + debug command
+- [ ] `/src/python/wipnote/event_log.py` - EventRecord extension
 
 **Testing:**
 - [ ] `/tests/python/test_error_handling.py` - Error logging tests
@@ -673,21 +673,21 @@ htmlgraph session errors SESS_ID --export report.html
 The recommended **Hybrid Approach (Option C)** provides:
 
 ✅ **80% token reduction** (163 vs 794 tokens)
-✅ **Full traceback preservation** in HtmlGraph sessions
+✅ **Full traceback preservation** in Wipnote sessions
 ✅ **Non-breaking implementation** with --debug fallback
-✅ **Alignment with HtmlGraph design philosophy** (HTML = source of truth)
+✅ **Alignment with Wipnote design philosophy** (HTML = source of truth)
 ✅ **Enterprise-ready debugging** with session integration
 ✅ **Low implementation effort** (~12 hours)
 
-This approach transforms error handling from a token-expensive liability into an asset for multi-session debugging and pattern analysis, fully utilizing HtmlGraph's persistent session tracking capabilities.
+This approach transforms error handling from a token-expensive liability into an asset for multi-session debugging and pattern analysis, fully utilizing Wipnote's persistent session tracking capabilities.
 
 ---
 
 ## References
 
 - Rich.Traceback Documentation: https://rich.readthedocs.io/en/stable/traceback.html
-- Current HtmlGraph CLI: `/src/python/htmlgraph/cli.py` (6232 lines)
-- HtmlGraph Session Structure: `/.htmlgraph/sessions/` (example: `sess-0ceb50b7.html`)
-- Error Log: `/.htmlgraph/errors.jsonl` (359KB, exists but unused)
+- Current Wipnote CLI: `/src/python/wipnote/cli.py` (6232 lines)
+- Wipnote Session Structure: `/.wipnote/sessions/` (example: `sess-0ceb50b7.html`)
+- Error Log: `/.wipnote/errors.jsonl` (359KB, exists but unused)
 - Current Version: 0.24.1 (pyproject.toml)
 

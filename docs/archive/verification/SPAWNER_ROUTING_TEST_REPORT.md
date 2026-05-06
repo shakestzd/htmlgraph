@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The agent spawner routing workflow has been thoroughly tested and verified as **production-ready**. All three spawner types (Gemini, Codex, Copilot) are correctly configured, routable through the PreToolUse hook, and event-tracked through HtmlGraph's distributed system.
+The agent spawner routing workflow has been thoroughly tested and verified as **production-ready**. All three spawner types (Gemini, Codex, Copilot) are correctly configured, routable through the PreToolUse hook, and event-tracked through Wipnote's distributed system.
 
 **Key Finding**: The spawner routing infrastructure is working correctly with no issues detected.
 
@@ -216,7 +216,7 @@ All events follow correct JSON schema:
    ↓
 3. .claude/hooks/scripts/pretooluse-integrator.py runs
    ↓
-4. htmlgraph.hooks.pretooluse.main() executes
+4. wipnote.hooks.pretooluse.main() executes
    ↓
 5. Router detects spawner type
    ↓
@@ -227,9 +227,9 @@ All events follow correct JSON schema:
    ↓
 8. Spawner creates delegation_event_id
    ↓
-9. Result recorded to .htmlgraph/sessions
+9. Result recorded to .wipnote/sessions
    ↓
-10. Event visible in HtmlGraph dashboard
+10. Event visible in Wipnote dashboard
 ```
 
 ### Router Hook Implementation
@@ -344,16 +344,16 @@ All mandatory checks verified:
 | CLI detection working | ✅ | All 3 CLIs detected, missing ones return explicit errors |
 | Event tracking enabled | ✅ | 22+ delegation events in session logs |
 | Error handling robust | ✅ | No silent fallbacks, explicit error messages |
-| Dashboard integration | ✅ | Events visible in .htmlgraph/sessions |
+| Dashboard integration | ✅ | Events visible in .wipnote/sessions |
 | No test failures | ✅ | 84+ tests passing |
 | Documentation complete | ✅ | Code comments, docstrings, test coverage |
 
 ---
 
-## HtmlGraph Spike Created
+## Wipnote Spike Created
 
-Research findings documented in HtmlGraph spike:
-- **File**: `.htmlgraph/spikes/spk-74627972.html`
+Research findings documented in Wipnote spike:
+- **File**: `.wipnote/spikes/spk-74627972.html`
 - **Title**: "Spawner Routing Test Results - Complete Report"
 - **Content**: Full findings with architecture overview, test results, recommendations
 
@@ -387,7 +387,7 @@ The agent spawner routing workflow is **fully functional, well-tested, and produ
 1. ✅ Tested Task() calls with all three spawner types (gemini, codex, copilot)
 2. ✅ Verified router hook intercepts and routes correctly
 3. ✅ Confirmed event tracking captured delegations (22+ events in session logs)
-4. ✅ Reported findings to HtmlGraph spike
+4. ✅ Reported findings to Wipnote spike
 5. ✅ Verified routing infrastructure is working without issues
 
 **Final Verdict**: SPAWNER ROUTING WORKFLOW IS FULLY OPERATIONAL ✅
@@ -404,7 +404,7 @@ Generated during testing:
 - Integration tests: `tests/integration/test_spawner_integration.py` (17 tests)
 - Live test script: `test_spawner_routing_live.py`
 - This report: `SPAWNER_ROUTING_TEST_REPORT.md`
-- HtmlGraph spike: `.htmlgraph/spikes/spk-74627972.html`
+- Wipnote spike: `.wipnote/spikes/spk-74627972.html`
 
 ---
 

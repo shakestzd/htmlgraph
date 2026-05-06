@@ -5,7 +5,7 @@ Examples of creating tracks with specs and plans.
 ## Simple Track
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -157,9 +157,9 @@ track = sdk.tracks.builder() \
 
 # View the created files
 print(f"\nCreated track: {track.track_id}")
-print(f"  - Spec: .htmlgraph/tracks/{track.track_id}/spec.html")
-print(f"  - Plan: .htmlgraph/tracks/{track.track_id}/plan.html")
-print(f"  - Index: .htmlgraph/tracks/{track.track_id}/index.html")
+print(f"  - Spec: .wipnote/tracks/{track.track_id}/spec.html")
+print(f"  - Plan: .wipnote/tracks/{track.track_id}/plan.html")
+print(f"  - Index: .wipnote/tracks/{track.track_id}/index.html")
 ```
 
 ## Creating Features from Track
@@ -207,13 +207,13 @@ print(f"Created {len(all_features)} features for track {track.track_id}")
 
 # Open in browser
 import webbrowser
-webbrowser.open(f".htmlgraph/tracks/{track.track_id}/index.html")
+webbrowser.open(f".wipnote/tracks/{track.track_id}/index.html")
 ```
 
 ## Track-Driven Development Workflow
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 def create_project_track(title, phases):
     """Create a track with features for each phase"""

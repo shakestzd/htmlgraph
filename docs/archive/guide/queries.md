@@ -1,6 +1,6 @@
 # Query Cookbook
 
-HtmlGraph provides multiple ways to query your graph data. This cookbook covers all query methods with practical examples.
+Wipnote provides multiple ways to query your graph data. This cookbook covers all query methods with practical examples.
 
 ## Query Methods Overview
 
@@ -17,16 +17,16 @@ The simplest way to query - uses familiar CSS selector syntax.
 
 ```bash
 # Use CLI to query by status
-htmlgraph find features --status blocked
-htmlgraph find features --status done
+wipnote find features --status blocked
+wipnote find features --status done
 ```
 
-Or using the HtmlGraph Python library directly:
+Or using the Wipnote Python library directly:
 
 ```python
-from htmlgraph import HtmlGraph
+from wipnote import Wipnote
 
-graph = HtmlGraph(".htmlgraph")
+graph = Wipnote(".wipnote")
 
 # Status-based queries
 blocked = graph.query('[data-status="blocked"]')

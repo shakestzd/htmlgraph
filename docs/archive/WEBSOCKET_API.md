@@ -2,7 +2,7 @@
 
 ## Overview
 
-The WebSocket API provides real-time event streaming for HtmlGraph agent observability. It enables low-latency (<100ms) delivery of events to multiple concurrent clients with intelligent filtering and cost monitoring.
+The WebSocket API provides real-time event streaming for Wipnote agent observability. It enables low-latency (<100ms) delivery of events to multiple concurrent clients with intelligent filtering and cost monitoring.
 
 ## Quick Start
 
@@ -130,7 +130,7 @@ const ws = new WebSocket(`ws://localhost:8000/ws/events/session-123${query}`);
 Subscribe to specific event types:
 
 ```python
-from htmlgraph.api.websocket import EventSubscriptionFilter
+from wipnote.api.websocket import EventSubscriptionFilter
 
 filter = EventSubscriptionFilter(
     event_types=["tool_call", "completion", "error"]
@@ -284,10 +284,10 @@ if event['execution_duration_seconds'] > 5:
 ### Server Configuration
 
 ```python
-from htmlgraph.api.websocket import WebSocketManager
+from wipnote.api.websocket import WebSocketManager
 
 manager = WebSocketManager(
-    db_path="/path/to/htmlgraph.db",
+    db_path="/path/to/wipnote.db",
     max_clients_per_session=10,      # Max clients per session
     event_batch_size=50,              # Events per batch
     event_batch_window_ms=50.0,       # Batching window (ms)
@@ -593,4 +593,4 @@ For issues or questions:
 
 1. Check [Troubleshooting](#troubleshooting) section
 2. Review [Performance Characteristics](#performance-characteristics)
-3. Open issue on GitHub: https://github.com/anthropics/htmlgraph/issues
+3. Open issue on GitHub: https://github.com/anthropics/wipnote/issues

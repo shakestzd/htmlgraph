@@ -30,7 +30,7 @@ ISSUES BY CATEGORY:
    - feat-2e724483: Add CLI integration tests for output modes [UNTRACKED]
    - feat-48b88f74: Add PreCompact Workarounds for Work Preservation [UNTRACKED]
    - feat-4d2a6e2f: Add Systematic Change Checklist to PR Template [UNTRACKED]
-   - feat-385e17e2: Add htmlgraph claude --init/--continue CLI commands [UNTRACKED]
+   - feat-385e17e2: Add wipnote claude --init/--continue CLI commands [UNTRACKED]
    - feat-c3d11521: Auto-sync dashboard.html to index.html in serve command [UNTRACKED]
    - feat-64467b2c: Convert list commands to Rich tables [UNTRACKED]
    - feat-66d73d8c: Create Systematic Refactoring Scripts [UNTRACKED]
@@ -44,7 +44,7 @@ ISSUES BY CATEGORY:
    - feat-0a49152e: 0/3 steps (missing 3)
      Title: Add SDK wrappers for operations layer
    - feat-2fb22d44: 0/3 steps (missing 3)
-     Title: Deploy HtmlGraph with CLI orchestration injection
+     Title: Deploy Wipnote with CLI orchestration injection
    - feat-c00bc6c0: 0/3 steps (missing 3)
      Title: Commit CLI orchestration rules injection
    - feat-dca81f7c: 0/3 steps (missing 3)
@@ -70,7 +70,7 @@ ISSUES BY CATEGORY:
    - feat-d50a0e5e: 10/10 steps completed - status=done
      Title: Restore project-specific knowledge to CLAUDE.md
    - feat-23928549: 8/8 steps completed - status=done
-     Title: Enhance system prompt with HtmlGraph, layered planning, and testing
+     Title: Enhance system prompt with Wipnote, layered planning, and testing
    - feat-3b3acc91: 8/8 steps completed - status=done
      Title: Fix orchestrator delegation: Make imperatives cost-first, add testing scripts
    - feat-71a3be23: 8/8 steps completed - status=done

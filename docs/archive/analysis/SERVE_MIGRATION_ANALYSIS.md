@@ -1,13 +1,13 @@
-# HtmlGraph `serve` Command Migration Analysis
+# Wipnote `serve` Command Migration Analysis
 
 ## Executive Summary
 
-The `htmlgraph serve` command has **already been migrated** to use FastAPI/uvicorn as of the current codebase. However, there are architectural inconsistencies and a legacy SimpleHTTPRequestHandler-based server still exists alongside the new FastAPI implementation.
+The `wipnote serve` command has **already been migrated** to use FastAPI/uvicorn as of the current codebase. However, there are architectural inconsistencies and a legacy SimpleHTTPRequestHandler-based server still exists alongside the new FastAPI implementation.
 
 **Current Status:**
-- ✅ FastAPI app with WebSocket support exists (`src/python/htmlgraph/api/main.py`)
+- ✅ FastAPI app with WebSocket support exists (`src/python/wipnote/api/main.py`)
 - ✅ CLI command uses FastAPI/uvicorn (`cmd_serve` in `cli.py`)
-- ⚠️ Legacy SimpleHTTPRequestHandler server still exists (`src/python/htmlgraph/server.py`)
+- ⚠️ Legacy SimpleHTTPRequestHandler server still exists (`src/python/wipnote/server.py`)
 - ⚠️ Two separate server implementations create confusion and duplication
 
 **Recommendation:** Complete the migration by consolidating both server implementations and removing the legacy SimpleHTTPRequestHandler entirely.
@@ -18,7 +18,7 @@ The `htmlgraph serve` command has **already been migrated** to use FastAPI/uvico
 
 ### 1. Legacy Server Implementation (SimpleHTTPRequestHandler)
 
-**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/server.py`
+**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/server.py`
 
 **Key Characteristics:**
 - Uses Python standard library `http.server.HTTPServer` and `SimpleHTTPRequestHandler`
@@ -50,7 +50,7 @@ The `htmlgraph serve` command has **already been migrated** to use FastAPI/uvico
 
 ### 2. FastAPI Implementation
 
-**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py`
+**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/main.py`
 
 **Key Characteristics:**
 - Modern async-first architecture using FastAPI
@@ -81,7 +81,7 @@ The `htmlgraph serve` command has **already been migrated** to use FastAPI/uvico
 
 ### 3. Server Operations Module
 
-**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/server.py`
+**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/operations/server.py`
 
 **Purpose:** High-level server start/stop operations
 
@@ -93,7 +93,7 @@ The `htmlgraph serve` command has **already been migrated** to use FastAPI/uvico
 
 ### 4. FastAPI Server Operations Module
 
-**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py`
+**Location:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/operations/fastapi_server.py`
 
 **Purpose:** FastAPI-specific server operations
 
@@ -107,16 +107,16 @@ The `htmlgraph serve` command has **already been migrated** to use FastAPI/uvico
 
 ## CLI Command Implementation
 
-**Location:** `src/python/htmlgraph/cli.py` (lines 140-194)
+**Location:** `src/python/wipnote/cli.py` (lines 140-194)
 
 **Current Implementation:**
 
 ```python
 def cmd_serve(args: argparse.Namespace) -> None:
-    """Start the HtmlGraph server (FastAPI-based)."""
+    """Start the Wipnote server (FastAPI-based)."""
     import asyncio
 
-    from htmlgraph.operations.fastapi_server import (
+    from wipnote.operations.fastapi_server import (
         run_fastapi_server,
         start_fastapi_server,
     )
@@ -142,7 +142,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
 **CLI Arguments:**
 - `--port` - Port to listen on (default: 8080)
 - `--host` - Host to bind to (default: localhost)
-- `--graph-dir` - Graph data directory (default: .htmlgraph)
+- `--graph-dir` - Graph data directory (default: .wipnote)
 - `--auto-port` - Automatically find available port if in use
 - `--reload` - Enable auto-reload on file changes
 - `--db` - Database path (default: {graph_dir}/index.sqlite)
@@ -175,10 +175,10 @@ All FastAPI dependencies are already included in the base package.
 - **Impact:** Code duplication, maintenance burden, confusion about which to use
 - **Current:** CLI uses FastAPI; legacy server still exists but unused
 - **Files Involved:**
-  - `/src/python/htmlgraph/server.py` (1,600+ lines, unused)
-  - `/src/python/htmlgraph/operations/server.py` (300 lines, unused)
-  - `/src/python/htmlgraph/api/main.py` (2,300+ lines, active)
-  - `/src/python/htmlgraph/operations/fastapi_server.py` (230 lines, active)
+  - `/src/python/wipnote/server.py` (1,600+ lines, unused)
+  - `/src/python/wipnote/operations/server.py` (300 lines, unused)
+  - `/src/python/wipnote/api/main.py` (2,300+ lines, active)
+  - `/src/python/wipnote/operations/fastapi_server.py` (230 lines, active)
 
 ### Issue 2: Missing REST API Endpoints in FastAPI
 The legacy REST API endpoints are **not** exposed in the FastAPI implementation:
@@ -187,7 +187,7 @@ The legacy REST API endpoints are **not** exposed in the FastAPI implementation:
 - `/api/analytics/{endpoint}` - ❌ Missing
 - `/api/{collection}` - ❌ Missing (only partial dashboard views exist)
 
-**Impact:** Users running `htmlgraph serve` cannot use the REST API that was previously available.
+**Impact:** Users running `wipnote serve` cannot use the REST API that was previously available.
 
 ### Issue 3: Database Dependency
 - Legacy server: Works directly with HTML files (graph database)
@@ -225,7 +225,7 @@ The legacy REST API endpoints are **not** exposed in the FastAPI implementation:
 
 ### Current Behavior (FastAPI)
 ```bash
-$ htmlgraph serve --port 8080
+$ wipnote serve --port 8080
 ```
 - Starts FastAPI server on port 8080
 - Serves dashboard UI with real-time activity feed
@@ -235,7 +235,7 @@ $ htmlgraph serve --port 8080
 
 ### Expected Behavior (Post-Migration)
 ```bash
-$ htmlgraph serve --port 8080
+$ wipnote serve --port 8080
 ```
 - Starts FastAPI server with uvicorn
 - Serves dashboard UI with real-time activity feed
@@ -276,8 +276,8 @@ $ htmlgraph serve --port 8080
 4. Document REST API for FastAPI
 
 **Files to modify:**
-- `/src/python/htmlgraph/api/main.py` - Add REST endpoints
-- `/src/python/htmlgraph/operations/fastapi_server.py` - Update if needed
+- `/src/python/wipnote/api/main.py` - Add REST endpoints
+- `/src/python/wipnote/operations/fastapi_server.py` - Update if needed
 
 ### Phase 2: Restore File Watching
 1. Add file watching integration to FastAPI server
@@ -285,8 +285,8 @@ $ htmlgraph serve --port 8080
 3. Restore `--watch` flag functionality
 
 **Files to modify:**
-- `/src/python/htmlgraph/operations/fastapi_server.py`
-- `/src/python/htmlgraph/api/main.py`
+- `/src/python/wipnote/operations/fastapi_server.py`
+- `/src/python/wipnote/api/main.py`
 
 ### Phase 3: Restore CLI Argument Compatibility
 1. Add `--watch` and `--quiet` flags
@@ -294,17 +294,17 @@ $ htmlgraph serve --port 8080
 3. Update argument parser
 
 **Files to modify:**
-- `/src/python/htmlgraph/cli.py`
+- `/src/python/wipnote/cli.py`
 
 ### Phase 4: Remove Legacy Server (Breaking Change)
-1. Delete `/src/python/htmlgraph/server.py` (1,600+ lines)
-2. Delete `/src/python/htmlgraph/operations/server.py` (300 lines)
+1. Delete `/src/python/wipnote/server.py` (1,600+ lines)
+2. Delete `/src/python/wipnote/operations/server.py` (300 lines)
 3. Update tests to use FastAPI server only
 4. Document breaking change in release notes
 
 **Files to delete:**
-- `/src/python/htmlgraph/server.py`
-- `/src/python/htmlgraph/operations/server.py`
+- `/src/python/wipnote/server.py`
+- `/src/python/wipnote/operations/server.py`
 - `tests/operations/test_server.py` (use FastAPI tests instead)
 
 ---
@@ -316,7 +316,7 @@ $ htmlgraph serve --port 8080
 The legacy REST endpoints can be preserved by creating a compatibility layer:
 
 ```python
-# In src/python/htmlgraph/api/main.py
+# In src/python/wipnote/api/main.py
 
 @app.get("/api/status")
 async def api_status(db: aiosqlite.Connection = Depends(get_db)):
@@ -344,7 +344,7 @@ async def api_get(collection: str, node_id: str, db: aiosqlite.Connection = Depe
 ### Adding File Watching to FastAPI
 
 ```python
-# In src/python/htmlgraph/operations/fastapi_server.py
+# In src/python/wipnote/operations/fastapi_server.py
 
 async def run_fastapi_with_watcher(
     handle: FastAPIServerHandle,
@@ -388,19 +388,19 @@ async def run_fastapi_with_watcher(
 ## Files Summary
 
 ### Active (Currently Used)
-- ✅ `/src/python/htmlgraph/api/main.py` (2,300 lines) - FastAPI app
-- ✅ `/src/python/htmlgraph/operations/fastapi_server.py` (230 lines) - FastAPI ops
-- ✅ `/src/python/htmlgraph/cli.py` (4,700+ lines) - CLI commands
+- ✅ `/src/python/wipnote/api/main.py` (2,300 lines) - FastAPI app
+- ✅ `/src/python/wipnote/operations/fastapi_server.py` (230 lines) - FastAPI ops
+- ✅ `/src/python/wipnote/cli.py` (4,700+ lines) - CLI commands
 
 ### Inactive (Legacy, Can Be Removed)
-- ❌ `/src/python/htmlgraph/server.py` (1,600 lines) - Legacy HTTPServer
-- ❌ `/src/python/htmlgraph/operations/server.py` (300 lines) - Legacy ops
+- ❌ `/src/python/wipnote/server.py` (1,600 lines) - Legacy HTTPServer
+- ❌ `/src/python/wipnote/operations/server.py` (300 lines) - Legacy ops
 - ❌ `tests/operations/test_server.py` (300+ lines) - Legacy tests
 
 ### Related
 - `pyproject.toml` - Dependencies (already has FastAPI/uvicorn)
-- `src/python/htmlgraph/file_watcher.py` - GraphWatcher (still used)
-- `src/python/htmlgraph/analytics_index.py` - Analytics (used by both)
+- `src/python/wipnote/file_watcher.py` - GraphWatcher (still used)
+- `src/python/wipnote/analytics_index.py` - Analytics (used by both)
 
 ---
 

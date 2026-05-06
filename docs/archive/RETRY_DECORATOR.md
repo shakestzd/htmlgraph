@@ -5,7 +5,7 @@ A production-grade Python decorator for adding automatic retry logic with expone
 ## Quick Start
 
 ```python
-from htmlgraph import retry
+from wipnote import retry
 
 @retry()
 def fetch_data_from_api():
@@ -31,16 +31,16 @@ def fetch_data_from_api():
 
 ## Installation
 
-The retry decorator is included in the htmlgraph package:
+The retry decorator is included in the wipnote package:
 
 ```bash
-uv pip install htmlgraph
+uv pip install wipnote
 ```
 
 Or use directly in your project:
 
 ```python
-from htmlgraph import retry, retry_async, RetryError
+from wipnote import retry, retry_async, RetryError
 ```
 
 ## Core Features
@@ -133,7 +133,7 @@ def failing_operation():
 ### Exhausted Retries
 
 ```python
-from htmlgraph import RetryError
+from wipnote import RetryError
 
 @retry(max_attempts=2)
 def always_fails():
@@ -208,7 +208,7 @@ The `retry_async` decorator works with async/await without blocking:
 
 ```python
 import asyncio
-from htmlgraph import retry_async
+from wipnote import retry_async
 
 @retry_async(max_attempts=3, initial_delay=0.1)
 async def async_api_call():
@@ -581,7 +581,7 @@ Total time: 1s + 2s + 4s = 7 seconds to exhaust retries
 
 ```python
 import pytest
-from htmlgraph import retry, RetryError
+from wipnote import retry, RetryError
 
 def test_retry_succeeds_immediately():
     @retry()

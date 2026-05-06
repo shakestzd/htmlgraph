@@ -1,6 +1,6 @@
 # Plugin Synchronization
 
-Documentation for synchronizing HtmlGraph plugin components between source and distribution.
+Documentation for synchronizing Wipnote plugin components between source and distribution.
 
 ## Overview
 
@@ -8,7 +8,7 @@ The plugin synchronization process ensures that all plugin components (hooks, sk
 
 ## Plugin Architecture
 
-HtmlGraph maintains two synchronized copies of plugin source:
+Wipnote maintains two synchronized copies of plugin source:
 
 1. **Plugin Source:** `packages/claude-plugin/.claude-plugin/`
    - Official source of truth for all plugin components
@@ -24,10 +24,10 @@ HtmlGraph maintains two synchronized copies of plugin source:
 
 ### Automatic Sync During Development
 
-When running HtmlGraph in dev mode, plugin components are loaded directly from the source:
+When running Wipnote in dev mode, plugin components are loaded directly from the source:
 
 ```bash
-uv run htmlgraph claude --dev
+uv run wipnote claude --dev
 ```
 
 This loads:
@@ -42,10 +42,10 @@ Before deploying, ensure all components are synced:
 
 ```bash
 # Check sync status
-uv run htmlgraph sync-plugins --check
+uv run wipnote sync-plugins --check
 
 # Perform sync
-uv run htmlgraph sync-plugins
+uv run wipnote sync-plugins
 
 # Verify results
 ls -la .claude/hooks/
@@ -127,7 +127,7 @@ agents/
 ls -la packages/claude-plugin/.claude-plugin/hooks/scripts/your-hook.py
 
 # 2. Sync distribution
-uv run htmlgraph sync-plugins
+uv run wipnote sync-plugins
 
 # 3. Restart Claude Code
 claude --restart
@@ -138,12 +138,12 @@ claude --restart
 
 ### Issue: Sync reports out-of-sync files
 
-**Problem:** `uv run htmlgraph sync-plugins --check` shows mismatches
+**Problem:** `uv run wipnote sync-plugins --check` shows mismatches
 
 **Solution:**
 ```bash
 # 1. Run full sync
-uv run htmlgraph sync-plugins
+uv run wipnote sync-plugins
 
 # 2. Commit synced changes
 git add .claude/
@@ -161,14 +161,14 @@ git diff .claude/
 
 2. **Sync before deployment**
    - Run `./scripts/deploy-all.sh` which auto-syncs
-   - Or manually sync: `uv run htmlgraph sync-plugins`
+   - Or manually sync: `uv run wipnote sync-plugins`
 
 3. **Commit synced files**
    - Include `.claude/` changes in deployment commits
    - Ensures users get latest components
 
 4. **Test in dev mode**
-   - Use `uv run htmlgraph claude --dev` for testing
+   - Use `uv run wipnote claude --dev` for testing
    - Loads from plugin source directly
    - No need to manually sync during development
 

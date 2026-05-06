@@ -1,6 +1,6 @@
 # Quick Start
 
-Get up and running with HtmlGraph in 5 minutes.
+Get up and running with Wipnote in 5 minutes.
 
 ## Initialize a Project
 
@@ -9,14 +9,14 @@ Get up and running with HtmlGraph in 5 minutes.
 mkdir my-project
 cd my-project
 
-# Initialize HtmlGraph
-htmlgraph init
+# Initialize Wipnote
+wipnote init
 ```
 
-This creates a `.htmlgraph/` directory with the following structure:
+This creates a `.wipnote/` directory with the following structure:
 
 ```
-.htmlgraph/
+.wipnote/
 ├── features/       # Feature nodes
 ├── sessions/       # Session activity logs
 ├── tracks/         # Multi-feature tracks
@@ -29,9 +29,9 @@ This creates a `.htmlgraph/` directory with the following structure:
 ### Basic Feature Creation
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
-# Initialize SDK (auto-discovers .htmlgraph directory)
+# Initialize SDK (auto-discovers .wipnote directory)
 sdk = SDK(agent="claude")
 
 # Create a feature
@@ -84,29 +84,29 @@ feature.save()
 
 ```bash
 # List all features
-htmlgraph feature list
+wipnote feature list
 
 # Create a new feature
-htmlgraph feature create "Add OAuth support" --priority high
+wipnote feature create "Add OAuth support" --priority high
 
 # Start working on a feature
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 
 # Mark a feature as complete
-htmlgraph feature complete feat-a1b2c3d4
+wipnote feature complete feat-a1b2c3d4
 ```
 
 ### Session Management
 
 ```bash
 # View session status
-htmlgraph status
+wipnote status
 
 # List all sessions
-htmlgraph session list
+wipnote session list
 
 # View session details
-htmlgraph session show session-abc-123
+wipnote session show session-abc-123
 ```
 
 ### Dashboard
@@ -114,7 +114,7 @@ htmlgraph session show session-abc-123
 Launch the interactive dashboard:
 
 ```bash
-htmlgraph serve
+wipnote serve
 ```
 
 Then open [http://localhost:8080](http://localhost:8080) in your browser.
@@ -124,7 +124,7 @@ Then open [http://localhost:8080](http://localhost:8080) in your browser.
 For multi-feature projects, create a track with spec and plan:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -163,7 +163,7 @@ track = sdk.tracks.builder() \
     .create()
 
 print(f"Created track: {track.track_id}")
-# View at: .htmlgraph/tracks/{track.track_id}/index.html
+# View at: .wipnote/tracks/{track.track_id}/index.html
 ```
 
 ## View Your Graph
@@ -172,10 +172,10 @@ All graph nodes are HTML files that you can open in any browser:
 
 ```bash
 # Open a feature in your browser
-open .htmlgraph/features/feat-a1b2c3d4.html
+open .wipnote/features/feat-a1b2c3d4.html
 
 # Open a track
-open .htmlgraph/tracks/trk-a1b2c3d4/index.html
+open .wipnote/tracks/trk-a1b2c3d4/index.html
 
 # Open the dashboard
 open index.html

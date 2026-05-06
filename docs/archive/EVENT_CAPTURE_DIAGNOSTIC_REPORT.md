@@ -26,7 +26,7 @@ The event capture system is **fully functional and working correctly**. All infr
 ```
 ✓ Database Status
   - Total events: 3
-  - Database file: .htmlgraph/index.sqlite (420 KB)
+  - Database file: .wipnote/index.sqlite (420 KB)
   - All required tables present
 
 ✓ Dashboard API
@@ -37,7 +37,7 @@ The event capture system is **fully functional and working correctly**. All infr
 ✓ Hook Configuration
   - PreToolUse hook: Registered
   - SubagentStop hook: Registered
-  - Debug log: .htmlgraph/hook-debug.jsonl (1101 entries)
+  - Debug log: .wipnote/hook-debug.jsonl (1101 entries)
 
 ✓ Test Suite
   - Event capture tests: 8/8 PASSING
@@ -64,7 +64,7 @@ Task(
 # Automatically triggers hooks → Creates event in database
 
 # ✗ NOT available in direct Python scripts:
-from htmlgraph import Task  # ImportError!
+from wipnote import Task  # ImportError!
 # Task in SDK is a planning model class, not the tool function
 ```
 
@@ -75,7 +75,7 @@ from htmlgraph import Task  # ImportError!
 4. **Database remains unchanged** (only contains old test data)
 
 ### The Integration Gap
-- **Task in htmlgraph SDK:** Planning model class for data structure
+- **Task in wipnote SDK:** Planning model class for data structure
 - **Task() in Claude Code:** Tool function that triggers event hooks
 - **They are different things** - one is not importable from the other
 
@@ -240,7 +240,7 @@ uv run pytest tests/hooks/test_hybrid_event_capture.py -v
 ### Option C: Manual Event Creation (Testing Only)
 
 ```python
-from htmlgraph.hooks.event_tracker import track_tool_execution
+from wipnote.hooks.event_tracker import track_tool_execution
 
 track_tool_execution(
     tool_name="ManualTest",
@@ -267,13 +267,13 @@ curl http://localhost:9999/api/events | jq . | head -50
 
 ### 2. Verify Database Contains Events
 ```bash
-sqlite3 .htmlgraph/index.sqlite "SELECT COUNT(*) FROM agent_events"
+sqlite3 .wipnote/index.sqlite "SELECT COUNT(*) FROM agent_events"
 ```
 **Expected:** `3` (or higher if you created new ones)
 
 ### 3. Check Event Types
 ```bash
-sqlite3 .htmlgraph/index.sqlite "SELECT event_type, COUNT(*) FROM agent_events GROUP BY event_type"
+sqlite3 .wipnote/index.sqlite "SELECT event_type, COUNT(*) FROM agent_events GROUP BY event_type"
 ```
 **Expected:**
 ```
@@ -286,7 +286,7 @@ Follow Option A above (Task() delegation)
 
 ### 5. Verify New Event in Database
 ```bash
-sqlite3 .htmlgraph/index.sqlite "SELECT MAX(timestamp) FROM agent_events"
+sqlite3 .wipnote/index.sqlite "SELECT MAX(timestamp) FROM agent_events"
 ```
 **Expected:** Current timestamp (within last few minutes)
 
@@ -356,12 +356,12 @@ curl http://localhost:9999/api/events | jq '.[-1]'
 ### "Where are the hooks running?"
 **Answer:** Hooks are configured and registered. They execute whenever their trigger conditions are met (PreToolUse on every tool, SubagentStop on subagent completion).
 
-**Solution:** Check `.htmlgraph/hook-debug.jsonl` to see hook execution history.
+**Solution:** Check `.wipnote/hook-debug.jsonl` to see hook execution history.
 
 ### "How do I know if a new event was captured?"
 **Answer:** Query the database and check the timestamp:
 ```bash
-sqlite3 .htmlgraph/index.sqlite "SELECT MAX(timestamp) FROM agent_events"
+sqlite3 .wipnote/index.sqlite "SELECT MAX(timestamp) FROM agent_events"
 ```
 
 ---
@@ -393,11 +393,11 @@ The event capture system is **fully functional and working as designed**. All co
 
 ### Additional Resources
 
-- Detailed diagnostic data: `.htmlgraph/EVENT_CAPTURE_DIAGNOSTIC.md`
+- Detailed diagnostic data: `.wipnote/EVENT_CAPTURE_DIAGNOSTIC.md`
 - Test results: `tests/hooks/test_hybrid_event_capture.py`
 - Hook configuration: `.claude/hooks/scripts/`
-- Dashboard code: `src/python/htmlgraph/api/main.py`
-- Event schema: `src/python/htmlgraph/models.py`
+- Dashboard code: `src/python/wipnote/api/main.py`
+- Event schema: `src/python/wipnote/models.py`
 
 ---
 

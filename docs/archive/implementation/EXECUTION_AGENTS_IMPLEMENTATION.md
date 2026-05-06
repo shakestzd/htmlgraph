@@ -65,7 +65,7 @@ Added `agents` section:
 
 ### 3. Orchestrator System Prompt Updates
 
-**Updated:** `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt`
+**Updated:** `src/python/wipnote/orchestrator-system-prompt-optimized.txt`
 
 Added comprehensive **"Complexity Assessment for Code Execution"** section with:
 
@@ -189,7 +189,7 @@ The orchestrator:
 
 ### Modified (2 files)
 1. `packages/claude-plugin/.claude-plugin/plugin.json` - Registered agents
-2. `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt` - Added complexity assessment section
+2. `src/python/wipnote/orchestrator-system-prompt-optimized.txt` - Added complexity assessment section
 
 ---
 
@@ -219,7 +219,7 @@ The orchestrator:
 ## Next Steps
 
 1. **Test the complexity assessment** in a fresh orchestrator session
-2. **Monitor model selection patterns** in HtmlGraph analytics
+2. **Monitor model selection patterns** in Wipnote analytics
 3. **Adjust thresholds** if needed based on real usage
 4. **Deploy to PyPI** with new agent definitions:
    ```bash

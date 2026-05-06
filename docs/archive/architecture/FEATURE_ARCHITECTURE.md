@@ -1,4 +1,4 @@
-# HtmlGraph Feature Architecture & Exposure Review
+# Wipnote Feature Architecture & Exposure Review
 
 **Document Version:** 1.0
 **Date:** 2026-01-05
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-HtmlGraph exposes work tracking features through three integrated layers:
+Wipnote exposes work tracking features through three integrated layers:
 
 1. **Python SDK** - Fluent API for programmatic access (primary interface)
 2. **Claude Code Plugin** - CLI commands for interactive use (secondary interface)
@@ -31,9 +31,9 @@ The architecture separates **exposure mechanisms** (SDK/Plugin/CLI) from **state
 │  Data Access Layer (Collections + Builders)            │
 ├─────────────────────────────────────────────────────────┤
 │  Storage Layer                                          │
-│  - HTML files (.htmlgraph/features/*.html)             │
-│  - JSONL events (.htmlgraph/events/*.jsonl)            │
-│  - SQLite index (.htmlgraph/index.sqlite - cached)     │
+│  - HTML files (.wipnote/features/*.html)             │
+│  - JSONL events (.wipnote/events/*.jsonl)            │
+│  - SQLite index (.wipnote/index.sqlite - cached)     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -41,7 +41,7 @@ The architecture separates **exposure mechanisms** (SDK/Plugin/CLI) from **state
 
 | Exposure Method | Primary Use | State Source | Default Behavior | Customization |
 |---|---|---|---|---|
-| **SDK (Python)** | Automation, scripts, hooks | Direct file I/O | Auto-discovers `.htmlgraph` | Full control via builders |
+| **SDK (Python)** | Automation, scripts, hooks | Direct file I/O | Auto-discovers `.wipnote` | Full control via builders |
 | **Plugin (CLI)** | Interactive session work | SDK → File I/O | Project-scoped defaults | Command arguments + config |
 | **Hook Scripts** | Automatic tracking | Event log writer | Real-time attribution | Event matcher + config files |
 | **HTML Direct** | Manual inspection, dashboards | Read-only parsing | Rendered in `index.html` | None (immutable on disk) |
@@ -80,7 +80,7 @@ class BaseCollection(Generic[CollectionT]):
 
 Each collection lazy-loads its graph from:
 ```
-.htmlgraph/
+.wipnote/
 ├── features/          # Feature nodes (HTML files)
 ├── bugs/              # Bug nodes
 ├── spikes/            # Spike nodes
@@ -142,7 +142,7 @@ with sdk.features.edit("feat-001") as feature:
 
 ### 3.1 Primary Storage: HTML Files
 
-**Location:** `.htmlgraph/{type}/{id}.html`
+**Location:** `.wipnote/{type}/{id}.html`
 
 **Example Feature Node:**
 ```html
@@ -205,7 +205,7 @@ with sdk.features.edit("feat-001") as feature:
 
 ### 3.2 Event Log: JSONL (Append-Only)
 
-**Location:** `.htmlgraph/events/{date}.jsonl`
+**Location:** `.wipnote/events/{date}.jsonl`
 
 **Design:** Git-friendly event tracking
 - Append-only (one event per line)
@@ -246,13 +246,13 @@ class EventRecord:
 
 ### 3.3 Cached Index: SQLite
 
-**Location:** `.htmlgraph/index.sqlite` (git-ignored, rebuildable)
+**Location:** `.wipnote/index.sqlite` (git-ignored, rebuildable)
 
 **Purpose:** Fast analytics queries without parsing HTML each time
 
 **Rebuild Command:**
 ```bash
-uv run htmlgraph reindex  # Rebuilds from HTML + JSONL
+uv run wipnote reindex  # Rebuilds from HTML + JSONL
 ```
 
 ---
@@ -280,26 +280,26 @@ uv run htmlgraph reindex  # Rebuilds from HTML + JSONL
 #!/usr/bin/env -S uv run
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["htmlgraph"]
+# dependencies = ["wipnote"]
 # ///
 """
 Hook integration with minimal logic.
-Delegates to htmlgraph package modules.
+Delegates to wipnote package modules.
 """
 
-from htmlgraph.hooks.{module} import main
+from wipnote.hooks.{module} import main
 
 if __name__ == "__main__":
     main()
 ```
 
-**Design:** Hooks are thin wrappers around package logic in `htmlgraph.hooks/`
+**Design:** Hooks are thin wrappers around package logic in `wipnote.hooks/`
 
 **Key Modules:**
-- `htmlgraph.hooks.event_tracker` - Core event logging
-- `htmlgraph.hooks.pretooluse` - Work validation
-- `htmlgraph.hooks.task_validator` - Task classification
-- `htmlgraph.hooks.orchestrator_reflector` - Orchestrator mode support
+- `wipnote.hooks.event_tracker` - Core event logging
+- `wipnote.hooks.pretooluse` - Work validation
+- `wipnote.hooks.task_validator` - Task classification
+- `wipnote.hooks.orchestrator_reflector` - Orchestrator mode support
 
 ### 4.3 Session Tracking Flow
 
@@ -307,7 +307,7 @@ if __name__ == "__main__":
 Claude Code Session Start
     ↓
 [SessionStart Hook]
-    ├─ Load .htmlgraph/
+    ├─ Load .wipnote/
     ├─ Create session record
     ├─ Check version (warn if outdated)
     └─ Return feature context to Claude
@@ -339,43 +339,43 @@ Claude Code Session Start
 ### 5.1 Available Commands
 
 **Work Item Management:**
-- `/htmlgraph:feature-add [title]` - Create feature
-- `/htmlgraph:feature-start [id]` - Start working on feature
-- `/htmlgraph:feature-complete [id]` - Mark feature done
-- `/htmlgraph:feature-primary [id]` - Set primary focus
-- `/htmlgraph:spike <title>` - Create research spike
-- `/htmlgraph:init` - Initialize `.htmlgraph/` for project
+- `/wipnote:feature-add [title]` - Create feature
+- `/wipnote:feature-start [id]` - Start working on feature
+- `/wipnote:feature-complete [id]` - Mark feature done
+- `/wipnote:feature-primary [id]` - Set primary focus
+- `/wipnote:spike <title>` - Create research spike
+- `/wipnote:init` - Initialize `.wipnote/` for project
 
 **Workflow:**
-- `/htmlgraph:start` - Begin session (manual)
-- `/htmlgraph:end` - End session (manual)
-- `/htmlgraph:plan [--track ID]` - Show next work plan
-- `/htmlgraph:track <title>` - Create work track
+- `/wipnote:start` - Begin session (manual)
+- `/wipnote:end` - End session (manual)
+- `/wipnote:plan [--track ID]` - Show next work plan
+- `/wipnote:track <title>` - Create work track
 
 **Analytics & Insights:**
-- `/htmlgraph:recommend` - Smart recommendations (what to work on)
-- `/htmlgraph:status` - Session/project status
-- `/htmlgraph:research [query]` - Research a topic
-- `/htmlgraph:deploy [version]` - Deployment workflow
+- `/wipnote:recommend` - Smart recommendations (what to work on)
+- `/wipnote:status` - Session/project status
+- `/wipnote:research [query]` - Research a topic
+- `/wipnote:deploy [version]` - Deployment workflow
 
 **Infrastructure:**
-- `/htmlgraph:serve` - Start dashboard (local HTTP)
-- `/htmlgraph:help [topic]` - Get help
+- `/wipnote:serve` - Start dashboard (local HTTP)
+- `/wipnote:help [topic]` - Get help
 
 ### 5.2 Command Structure
 
 **YAML Frontmatter** (per command file)
 ```yaml
 ---
-# /htmlgraph:feature-add
+# /wipnote:feature-add
 
 title: "Add a new feature to the backlog"
 description: "Create a feature and optionally start working on it"
 category: "work-management"
 default_args: []  # Default if no args provided
 examples:
-  - "/htmlgraph:feature-add User Authentication"
-  - "/htmlgraph:feature-add"  # Prompts for title
+  - "/wipnote:feature-add User Authentication"
+  - "/wipnote:feature-add"  # Prompts for title
 ---
 
 # Instructions for Claude
@@ -395,7 +395,7 @@ examples:
 
 | Feature | Default | Source |
 |---|---|---|
-| `.htmlgraph` location | Current project directory | Auto-discovery |
+| `.wipnote` location | Current project directory | Auto-discovery |
 | Work item types | feature, bug, spike, chore, epic, phase | SDK enums |
 | Feature status values | todo, in-progress, blocked, done | Node model defaults |
 | Session auto-tracking | Enabled (via hooks) | Plugin hooks active |
@@ -427,7 +427,7 @@ examples:
 **2. Plugin Settings** (`.claude/plugin-name.local.md`)
 ```yaml
 ---
-# .claude/htmlgraph.local.md
+# .claude/wipnote.local.md
 version: "0.24.1"
 enabled: true
 wip_limit: 5
@@ -435,7 +435,7 @@ session_timeout_minutes: 60
 auto_track_sessions: true
 ---
 
-Project-specific settings for HtmlGraph
+Project-specific settings for Wipnote
 ```
 
 **3. Programmatic Configuration** (SDK)
@@ -478,7 +478,7 @@ feature.save()
 ### 7.1 State Files Map
 
 ```
-.htmlgraph/
+.wipnote/
 ├── features/                      # Feature work items
 │   ├── feat-001.html
 │   ├── feat-002.html
@@ -515,7 +515,7 @@ feature.save()
 ├── drift-queue.json               # Pending drift classifications
 ├── parent-activity.json           # Active parent session tracking
 ├── index.sqlite                   # Cached SQLite index (git-ignored)
-├── .htmlgraph/                    # Nested tracking
+├── .wipnote/                    # Nested tracking
 │   ├── sessions/*.html
 │   └── events/*.jsonl
 └── config/
@@ -531,7 +531,7 @@ feature.save()
 │   ├── drift-config.json          # Drift detection thresholds
 │   ├── validation-config.json     # Work item validation
 │   └── classification-prompt.md   # Drift classification prompt
-├── htmlgraph.local.md             # Plugin settings (user/project-specific)
+├── wipnote.local.md             # Plugin settings (user/project-specific)
 ├── hooks/
 │   ├── hooks.json                 # Hook configuration
 │   └── scripts/
@@ -586,7 +586,7 @@ Each hook receives:
 
 | Variable | Effect |
 |---|---|
-| `HTMLGRAPH_DISABLE_TRACKING` | Disable all HtmlGraph tracking |
+| `HTMLGRAPH_DISABLE_TRACKING` | Disable all Wipnote tracking |
 | `HTMLGRAPH_HOOK_TYPE` | Current hook being executed |
 | `HTMLGRAPH_PARENT_SESSION` | Parent session ID for nested spawning |
 | `HTMLGRAPH_PARENT_AGENT` | Parent agent name |
@@ -652,13 +652,13 @@ result = spawner.spawn_gemini(...)
 **Sample System Prompt Sections:**
 
 ```markdown
-## HtmlGraph Work Tracking
+## Wipnote Work Tracking
 
 You have access to a work tracking system that organizes work by type:
 
 ### Creating Work
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -771,19 +771,19 @@ sdk.features.assign("feat-004", agent="claude")
 
 **Pattern 1: Create from CLI**
 ```bash
-/htmlgraph:feature-add User Authentication
+/wipnote:feature-add User Authentication
 ```
 
 **Pattern 2: Set Primary Focus**
 ```bash
-/htmlgraph:feature-primary feat-001
-/htmlgraph:feature-start feat-001
+/wipnote:feature-primary feat-001
+/wipnote:feature-start feat-001
 ```
 
 **Pattern 3: Get Recommendations**
 ```bash
-/htmlgraph:recommend --count 5
-/htmlgraph:plan --track trk-001
+/wipnote:recommend --count 5
+/wipnote:plan --track trk-001
 ```
 
 ### 11.3 Hook Integration Patterns
@@ -849,7 +849,7 @@ Hooks automatically track sessions; no configuration needed
 
 **Scenario 3: Index Rebuild**
 ```bash
-uv run htmlgraph reindex  # Rebuilds from scratch
+uv run wipnote reindex  # Rebuilds from scratch
 ```
 
 ---
@@ -865,8 +865,8 @@ uv run htmlgraph reindex  # Rebuilds from scratch
 
 **SDK Version:**
 ```python
-import htmlgraph
-print(htmlgraph.__version__)
+import wipnote
+print(wipnote.__version__)
 ```
 
 ### 14.2 Backward Compatibility
@@ -885,9 +885,9 @@ print(htmlgraph.__version__)
 
 **1. Feature Progress** (HTML visualization)
 ```
-.htmlgraph/features/feat-001.html
+.wipnote/features/feat-001.html
 → Rendered in index.html
-→ Viewable in browser via `uv run htmlgraph serve`
+→ Viewable in browser via `uv run wipnote serve`
 ```
 
 **2. Analytics Dashboard** (SQLite-backed)
@@ -899,7 +899,7 @@ Provides insights on velocity, drift, efficiency
 
 **3. Session Summaries** (HTML)
 ```
-.htmlgraph/sessions/sess-001.html
+.wipnote/sessions/sess-001.html
 Shows work done in session
 Links to features, bugs, spikes worked on
 ```
@@ -927,7 +927,7 @@ Links to features, bugs, spikes worked on
 | No database ACID guarantees | File-based storage | Use event log for audit trail, idempotent operations |
 | CSS selector queries only | No SQL engine | Use Python graph API for complex queries |
 | Hook execution overhead | Every tool invocation | Pre-flight checks could cache results |
-| SQLite index rebuild needed | HTML changes don't update index | Run `uv run htmlgraph reindex` after major changes |
+| SQLite index rebuild needed | HTML changes don't update index | Run `uv run wipnote reindex` after major changes |
 | Single-agent assumption | Current design | Parent session support for nested agents (Phase 1) |
 
 ---
@@ -939,7 +939,7 @@ Links to features, bugs, spikes worked on
 Plugin command internally uses SDK:
 ```bash
 # User runs
-/htmlgraph:feature-add "New Feature"
+/wipnote:feature-add "New Feature"
 
 # Plugin script executes
 sdk = SDK(agent="claude")
@@ -979,11 +979,11 @@ result = spawner.spawn_gemini(...)
 
 **Example integration:**
 ```markdown
-## Work Tracking (HtmlGraph SDK)
+## Work Tracking (Wipnote SDK)
 
-You can organize work using HtmlGraph:
+You can organize work using Wipnote:
 
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="your-name")
 
 # Create features
@@ -1092,7 +1092,7 @@ next_tasks = sdk.dep_analytics.recommend_next_tasks(agent_count=1)
 ### B.1 SDK Quick Start
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize
 sdk = SDK(agent="your-name")
@@ -1115,24 +1115,24 @@ recommendations = sdk.dep_analytics.recommend_next_tasks()
 ### B.2 Plugin Commands Quick Start
 
 ```bash
-/htmlgraph:feature-add "New Feature"
-/htmlgraph:feature-start feat-001
-/htmlgraph:feature-primary feat-001
-/htmlgraph:spike "Research topic"
-/htmlgraph:recommend
-/htmlgraph:status
-/htmlgraph:serve
+/wipnote:feature-add "New Feature"
+/wipnote:feature-start feat-001
+/wipnote:feature-primary feat-001
+/wipnote:spike "Research topic"
+/wipnote:recommend
+/wipnote:status
+/wipnote:serve
 ```
 
 ### B.3 State Locations Quick Reference
 
 ```
-Python SDK      → .htmlgraph/
-Plugin Commands → .htmlgraph/ (via SDK)
-Hook Scripts    → .htmlgraph/ (via SDK)
-Events          → .htmlgraph/events/*.jsonl
-Features        → .htmlgraph/features/*.html
-Sessions        → .htmlgraph/sessions/*.html
+Python SDK      → .wipnote/
+Plugin Commands → .wipnote/ (via SDK)
+Hook Scripts    → .wipnote/ (via SDK)
+Events          → .wipnote/events/*.jsonl
+Features        → .wipnote/features/*.html
+Sessions        → .wipnote/sessions/*.html
 Config          → .claude/config/*.json
 ```
 
@@ -1140,7 +1140,7 @@ Config          → .claude/config/*.json
 
 **Document Complete**
 
-This architecture document represents HtmlGraph's feature exposure strategy as of v0.24.1. For the latest information, refer to:
-- `src/python/htmlgraph/sdk.py` - SDK API
+This architecture document represents Wipnote's feature exposure strategy as of v0.24.1. For the latest information, refer to:
+- `src/python/wipnote/sdk.py` - SDK API
 - `packages/claude-plugin/README.md` - Plugin installation
 - Source code comments for implementation details

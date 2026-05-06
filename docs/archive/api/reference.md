@@ -1,6 +1,6 @@
-# HtmlGraph SDK API Reference
+# Wipnote SDK API Reference
 
-Complete reference for the HtmlGraph Python SDK.
+Complete reference for the Wipnote Python SDK.
 
 ## Table of Contents
 
@@ -21,13 +21,13 @@ Complete reference for the HtmlGraph Python SDK.
 ### Basic Usage
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
-# Auto-discovers .htmlgraph directory
+# Auto-discovers .wipnote directory
 sdk = SDK(agent='my-agent')
 
 # Explicit directory
-sdk = SDK(directory='/path/to/.htmlgraph', agent='my-agent')
+sdk = SDK(directory='/path/to/.wipnote', agent='my-agent')
 
 # Auto-detect agent name (Claude, Gemini, etc.)
 sdk = SDK()  # Detects agent automatically
@@ -38,11 +38,11 @@ sdk = SDK()  # Detects agent automatically
 **Signature**: `SDK(directory=None, agent=None)`
 
 **Parameters**:
-- `directory` (optional): Path to .htmlgraph directory. Auto-discovers if not provided.
+- `directory` (optional): Path to .wipnote directory. Auto-discovers if not provided.
 - `agent` (optional): Agent identifier. Auto-detects if not provided.
 
 **Auto-Discovery**:
-- Searches current directory and parents for `.htmlgraph/`
+- Searches current directory and parents for `.wipnote/`
 - Defaults to current directory if not found
 
 ---
@@ -253,7 +253,7 @@ with sdk.features.edit('feat-abc123') as feature:
 # Auto-saved on exit
 
 # Handle missing nodes
-from htmlgraph.exceptions import NodeNotFoundError
+from wipnote.exceptions import NodeNotFoundError
 try:
     with sdk.features.edit('nonexistent') as feature:
         feature.status = 'done'
@@ -400,7 +400,7 @@ Claim a node for an agent.
 feature = sdk.features.claim('feat-abc123')
 
 # Handle conflicts
-from htmlgraph.exceptions import ClaimConflictError
+from wipnote.exceptions import ClaimConflictError
 try:
     feature = sdk.features.claim('feat-abc123')
 except ClaimConflictError as e:
@@ -816,7 +816,7 @@ sdk.set_session_handoff(
 Use `QueryBuilder` for complex queries:
 
 ```python
-from htmlgraph import QueryBuilder
+from wipnote import QueryBuilder
 
 # Build complex query
 query = QueryBuilder() \
@@ -849,7 +849,7 @@ SDK methods follow consistent error handling by operation type:
 ### Available Exceptions
 
 ```python
-from htmlgraph.exceptions import (
+from wipnote.exceptions import (
     NodeNotFoundError,      # Node with ID not found
     ValidationError,        # Invalid input parameters
     ClaimConflictError,     # Node already claimed by another agent
@@ -879,7 +879,7 @@ for r in results:  # Empty iteration is safe
 #### Edit Operations (Raise Exception)
 
 ```python
-from htmlgraph.exceptions import NodeNotFoundError
+from wipnote.exceptions import NodeNotFoundError
 try:
     with sdk.features.edit("nonexistent") as f:
         f.status = "done"
@@ -890,7 +890,7 @@ except NodeNotFoundError:
 #### Create Operations (Raise on Validation)
 
 ```python
-from htmlgraph.exceptions import ValidationError
+from wipnote.exceptions import ValidationError
 try:
     sdk.features.create("")  # Empty title
 except ValidationError:
@@ -1039,7 +1039,7 @@ parallel = sdk.dep_analytics.get_parallel_work()
 recommendations = sdk.dep_analytics.recommend_next_tasks()
 
 # Error handling
-from htmlgraph.exceptions import NodeNotFoundError, ClaimConflictError
+from wipnote.exceptions import NodeNotFoundError, ClaimConflictError
 try:
     with sdk.features.edit('feat-123') as f:
         f.status = 'done'

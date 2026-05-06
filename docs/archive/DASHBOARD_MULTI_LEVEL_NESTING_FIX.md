@@ -1,7 +1,7 @@
 # Dashboard Multi-Level Event Nesting Fix
 
 **Date**: 2025-01-11
-**File**: `src/python/htmlgraph/api/templates/dashboard-redesign.html`
+**File**: `src/python/wipnote/api/templates/dashboard-redesign.html`
 **Status**: ✅ Complete and tested
 
 ## Problem Statement
@@ -170,7 +170,7 @@ This creates proper visual nesting without requiring complex CSS selectors or Ja
 
 ## Files Changed
 
-- **`src/python/htmlgraph/api/templates/dashboard-redesign.html`**
+- **`src/python/wipnote/api/templates/dashboard-redesign.html`**
   - Added `calculateEventDepth()` function (lines 381-428)
   - Updated `insertChildEvent()` to use new function (line 466)
 

@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The HtmlGraph CLI has 576 remaining plain `print()` statements that need conversion to the Rich API for beautiful, formatted output.
+The Wipnote CLI has 576 remaining plain `print()` statements that need conversion to the Rich API for beautiful, formatted output.
 
 | Metric | Value |
 |--------|-------|
@@ -93,7 +93,7 @@ console.print(f"[green]✅ Restored {args.entity_id} from archive[/green]")
 
 **Examples:**
 ```python
-print("🔍 HtmlGraph Debugging Resources\n")
+print("🔍 Wipnote Debugging Resources\n")
 print("=" * 60)
 print("\n📚 Documentation:")
 print("  - DEBUGGING.md - Complete debugging guide")
@@ -106,7 +106,7 @@ print(f"Features: {len(features)}")
 
 **Conversion Pattern (Simple):**
 ```python
-console.print("[bold cyan]🔍 HtmlGraph Debugging Resources[/bold cyan]")
+console.print("[bold cyan]🔍 Wipnote Debugging Resources[/bold cyan]")
 console.print("[dim]" + "=" * 60 + "[/dim]")
 console.print("\n[bold]📚 Documentation:[/bold]")
 ```
@@ -338,7 +338,7 @@ console.print(table)
 5. Documentation & Commit
    - Update CLAUDE.md with completion status
    - Create git commit with all changes
-   - Tag as complete in HtmlGraph feature
+   - Tag as complete in Wipnote feature
 
 **Success Criteria:**
 - All tests pass
@@ -407,14 +407,14 @@ console.print(table)
 ### Pattern 6: Help Text with Sections
 ```python
 # BEFORE
-print("🔍 HtmlGraph Debugging Resources\n")
+print("🔍 Wipnote Debugging Resources\n")
 print("=" * 60)
 print("\n📚 Documentation:")
 print("  - DEBUGGING.md - Complete debugging guide")
 print("  - AGENTS.md - SDK and agent documentation")
 
 # AFTER
-console.print("[bold cyan]🔍 HtmlGraph Debugging Resources[/bold cyan]")
+console.print("[bold cyan]🔍 Wipnote Debugging Resources[/bold cyan]")
 console.print("[dim]" + "=" * 60 + "[/dim]")
 console.print("\n[bold]📚 Documentation:[/bold]")
 docs = Table(show_header=False, box=None, padding=(0, 2))
@@ -473,9 +473,9 @@ git commit -m "feat: convert remaining print() statements to Rich API"
 
 | File | Lines | Statements | Priority | Status |
 |------|-------|-----------|----------|--------|
-| src/python/htmlgraph/cli.py | 6,505 | 554 | Mixed | Ready |
-| src/python/htmlgraph/deploy.py | 531 | 2 | LOW | Ready |
-| src/python/htmlgraph/analytics/cli.py | 433 | 0 | - | Complete |
+| src/python/wipnote/cli.py | 6,505 | 554 | Mixed | Ready |
+| src/python/wipnote/deploy.py | 531 | 2 | LOW | Ready |
+| src/python/wipnote/analytics/cli.py | 433 | 0 | - | Complete |
 | **TOTAL** | **7,469** | **556** | | **Ready** |
 
 ---
@@ -517,7 +517,7 @@ All of the following must be true before marking as complete:
 ✅ Mypy check passes: `uv run mypy src/`
 ✅ Pytest passes: `uv run pytest`
 ✅ Manual E2E testing of all CLI commands passes
-✅ Feature marked complete in HtmlGraph
+✅ Feature marked complete in Wipnote
 
 ---
 

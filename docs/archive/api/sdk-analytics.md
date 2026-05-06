@@ -14,7 +14,7 @@ The Analytics API provides methods to analyze work patterns across sessions and 
 ## Quick Start
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -34,7 +34,7 @@ print(f"Maintenance burden: {burden:.1f}%")
 # Maintenance burden: 18.5%
 
 # Find all exploratory sessions
-from htmlgraph import WorkType
+from wipnote import WorkType
 spike_sessions = sdk.analytics.get_sessions_by_work_type(WorkType.SPIKE.value)
 print(f"Found {len(spike_sessions)} exploratory sessions")
 ```
@@ -204,7 +204,7 @@ List of session IDs matching the criteria.
 
 **Example:**
 ```python
-from htmlgraph import WorkType
+from wipnote import WorkType
 
 # Find all exploratory sessions
 spike_sessions = sdk.analytics.get_sessions_by_work_type(WorkType.SPIKE.value)
@@ -292,7 +292,7 @@ elif primary == WorkType.FEATURE.value:
 ### 1. Project Health Dashboard
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 from datetime import datetime, timedelta
 
 sdk = SDK(agent="claude")
@@ -349,7 +349,7 @@ else:
 ### 3. Find Similar Sessions
 
 ```python
-from htmlgraph import WorkType
+from wipnote import WorkType
 
 # Find all exploratory sessions
 spike_sessions = sdk.analytics.get_sessions_by_work_type(WorkType.SPIKE.value)
@@ -388,7 +388,7 @@ for date, burden in reversed(intervals):
 
 ## Work Type Reference
 
-Work types are defined in `htmlgraph.models.WorkType`:
+Work types are defined in `wipnote.models.WorkType`:
 
 - `FEATURE` = "feature-implementation" - Building new functionality
 - `SPIKE` = "spike-investigation" - Research and exploration
@@ -475,7 +475,7 @@ If ratios seem off:
 
 2. **Verify work type inference**:
    ```python
-   from htmlgraph import infer_work_type_from_id
+   from wipnote import infer_work_type_from_id
 
    work_type = infer_work_type_from_id("feat-123")
    print(f"Feature ID 'feat-123' → {work_type}")

@@ -16,7 +16,7 @@ Events were being inserted into `live_events` table and marked as broadcast, but
 
 Added logging at every step of the event pipeline to identify the failure point.
 
-### Server-Side Changes (`src/python/htmlgraph/api/main.py`)
+### Server-Side Changes (`src/python/wipnote/api/main.py`)
 
 **Line 2148** - Log when pending events are found:
 ```python
@@ -38,7 +38,7 @@ logger.info(f"[WebSocket] Marking {len(broadcast_ids)} events as broadcast: {bro
 live_rows = list(await live_cursor.fetchall())  # Convert to list for len()
 ```
 
-### Client-Side Changes (`src/python/htmlgraph/api/templates/dashboard.html`)
+### Client-Side Changes (`src/python/wipnote/api/templates/dashboard.html`)
 
 **Line 164** - Log all incoming WebSocket message types:
 ```javascript
@@ -74,7 +74,7 @@ Comprehensive troubleshooting guide with:
 
 ## Testing Procedure
 
-1. **Start server**: `uv run htmlgraph serve`
+1. **Start server**: `uv run wipnote serve`
 2. **Open dashboard**: http://localhost:8888 (open console with F12)
 3. **Insert test event**: `./test_spawner_broadcast.sh` or manual SQL insert
 4. **Observe logs**: Check both server terminal and browser console
@@ -107,10 +107,10 @@ Logs now reveal exactly where events are getting lost:
 
 ## Files Modified
 
-1. `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py`
+1. `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/main.py`
    - Lines 2145, 2148, 2182, 2192
 
-2. `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/dashboard.html`
+2. `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/templates/dashboard.html`
    - Lines 164, 193, 198
 
 3. `/Users/shakes/DevProjects/htmlgraph/index.html`

@@ -4,7 +4,7 @@ Sessions automatically track all activity during an agent's work, providing comp
 
 ## What is a Session?
 
-A **session** is a period of continuous work by an agent. HtmlGraph automatically:
+A **session** is a period of continuous work by an agent. Wipnote automatically:
 
 - Creates a session when work begins
 - Logs all tool calls and interactions
@@ -12,7 +12,7 @@ A **session** is a period of continuous work by an agent. HtmlGraph automaticall
 - Generates a session summary when work ends
 - Preserves full context for future sessions
 
-Each session is stored as an HTML file in `.htmlgraph/sessions/`.
+Each session is stored as an HTML file in `.wipnote/sessions/`.
 
 ## Session Lifecycle
 
@@ -21,19 +21,19 @@ Each session is stored as an HTML file in `.htmlgraph/sessions/`.
 Sessions start automatically when:
 
 - An agent begins working (via hooks)
-- You run `htmlgraph feature start <id>`
+- You run `wipnote feature start <id>`
 
 ```bash
 # Start working on a feature (creates a session)
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature start feat-a1b2c3d4
 
 # View current session status
-htmlgraph status
+wipnote status
 ```
 
 ### 2. Activity Logging
 
-During the session, HtmlGraph logs:
+During the session, Wipnote logs:
 
 - **Tool calls**: Every Read, Write, Edit, Bash command
 - **User prompts**: Questions and requests
@@ -58,18 +58,18 @@ The session end hook generates a summary of all work performed.
 
 ```bash
 # List all sessions
-htmlgraph session list
+wipnote session list
 
 # Show specific session
-htmlgraph session show session-abc-123
+wipnote session show session-abc-123
 
 # View current session status
-htmlgraph status
+wipnote status
 ```
 
 ### Browser
 
-Open `.htmlgraph/sessions/session-abc-123.html` in any browser to view:
+Open `.wipnote/sessions/session-abc-123.html` in any browser to view:
 
 - Session timeline
 - Activity log with timestamps
@@ -81,7 +81,7 @@ Open `.htmlgraph/sessions/session-abc-123.html` in any browser to view:
 
 Activities are attributed to features based on:
 
-1. **Current feature**: Set via `htmlgraph feature start <id>`
+1. **Current feature**: Set via `wipnote feature start <id>`
 2. **Primary feature**: If multiple features are active
 3. **Drift detection**: Alerts if activity doesn't match the current feature
 
@@ -89,16 +89,16 @@ Activities are attributed to features based on:
 
 ```bash
 # Create and start a feature (attributes all subsequent activity to it)
-htmlgraph feature create "Add login page" --priority high
-htmlgraph feature start feat-a1b2c3d4
+wipnote feature create "Add login page" --priority high
+wipnote feature start feat-a1b2c3d4
 
 # Record decisions and notes as spikes
-htmlgraph spike create "Implementing OAuth flow: chose Passport.js for simpler API"
+wipnote spike create "Implementing OAuth flow: chose Passport.js for simpler API"
 ```
 
 ## Drift Detection
 
-HtmlGraph monitors activity to detect "drift" - when work diverges from the assigned feature.
+Wipnote monitors activity to detect "drift" - when work diverges from the assigned feature.
 
 ### How It Works
 
@@ -120,23 +120,23 @@ If drift is detected (score > 0.7), you'll see a warning:
 When you see drift warnings:
 
 1. **Expected drift**: Work naturally spans features (ignore)
-2. **Switch features**: Use `htmlgraph feature primary <id>`
+2. **Switch features**: Use `wipnote feature primary <id>`
 3. **Wrong feature**: Update the feature's scope or file patterns
 
 ## Session Continuity
 
 ### Across Sessions
 
-HtmlGraph preserves context between sessions:
+Wipnote preserves context between sessions:
 
 ```bash
 # End of Session 1
-htmlgraph feature start feature-001
+wipnote feature start feature-001
 # Work on feature...
 # Session ends
 
 # Start of Session 2
-htmlgraph status
+wipnote status
 # Shows: Previous session worked on feature-001
 #        Feature is 60% complete
 #        Last activity: "Implemented OAuth callback"
@@ -144,7 +144,7 @@ htmlgraph status
 
 ### Session Summaries
 
-At session end, HtmlGraph generates a summary:
+At session end, Wipnote generates a summary:
 
 ```markdown
 Session: session-abc-123
@@ -170,7 +170,7 @@ Next Steps:
 
 ```bash
 # Record decisions as spikes linked to the current feature
-htmlgraph spike create "Decided to use Passport.js instead of Auth0 (simpler API)"
+wipnote spike create "Decided to use Passport.js instead of Auth0 (simpler API)"
 ```
 
 ### Set Primary Feature
@@ -178,7 +178,7 @@ htmlgraph spike create "Decided to use Passport.js instead of Auth0 (simpler API
 When multiple features are active:
 
 ```bash
-htmlgraph feature primary feature-001
+wipnote feature primary feature-001
 ```
 
 ## Session Files
@@ -223,9 +223,9 @@ Each session creates an HTML file with:
 Focus on a single feature per session for clear attribution:
 
 ```bash
-htmlgraph feature start feature-001
+wipnote feature start feature-001
 # Work only on this feature
-htmlgraph feature complete feature-001
+wipnote feature complete feature-001
 ```
 
 ### 2. Document Decisions
@@ -233,7 +233,7 @@ htmlgraph feature complete feature-001
 Record important decisions as you make them:
 
 ```bash
-htmlgraph spike create "Chose PostgreSQL over MongoDB for better transaction support"
+wipnote spike create "Chose PostgreSQL over MongoDB for better transaction support"
 ```
 
 ### 3. Complete Sessions
@@ -241,7 +241,7 @@ htmlgraph spike create "Chose PostgreSQL over MongoDB for better transaction sup
 Mark features as complete to trigger session summaries:
 
 ```bash
-htmlgraph feature complete feature-001
+wipnote feature complete feature-001
 ```
 
 ### 4. Review Previous Sessions
@@ -249,8 +249,8 @@ htmlgraph feature complete feature-001
 Before starting new work, review what happened last:
 
 ```bash
-htmlgraph status
-htmlgraph session list --recent 5
+wipnote status
+wipnote session list --recent 5
 ```
 
 ## Integration with Claude Code
@@ -258,7 +258,7 @@ htmlgraph session list --recent 5
 When using the Claude Code plugin, sessions are managed automatically via hooks bundled in the plugin. Install the plugin with:
 
 ```bash
-claude plugin install htmlgraph
+claude plugin install wipnote
 ```
 
 The plugin registers hooks (configured in `hooks.json` inside the plugin) that:

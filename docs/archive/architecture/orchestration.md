@@ -22,7 +22,7 @@
 
 ### Component 1: Orchestrator Mode State Management
 
-**File**: `.htmlgraph/orchestrator-mode.json`
+**File**: `.wipnote/orchestrator-mode.json`
 
 ```json
 {
@@ -35,8 +35,8 @@
 
 **Activation Methods**:
 1. SessionStart hook sets `enabled: true` when features exist
-2. Skill activation (`/htmlgraph:orchestrator`) sets `enabled: true`
-3. User can disable: `uv run htmlgraph orchestrator disable`
+2. Skill activation (`/wipnote:orchestrator`) sets `enabled: true`
+3. User can disable: `uv run wipnote orchestrator disable`
 4. Auto-disables when no features exist
 
 ### Component 2: Smart PreToolUse Hook
@@ -48,7 +48,7 @@
 ```python
 def is_orchestrator_mode_active() -> bool:
     """Check if orchestrator mode is enabled."""
-    mode_file = Path(".htmlgraph/orchestrator-mode.json")
+    mode_file = Path(".wipnote/orchestrator-mode.json")
     if mode_file.exists():
         data = json.loads(mode_file.read_text())
         return data.get("enabled", False)
@@ -56,7 +56,7 @@ def is_orchestrator_mode_active() -> bool:
 
 def get_enforcement_level() -> str:
     """Get enforcement level: strict or guidance."""
-    mode_file = Path(".htmlgraph/orchestrator-mode.json")
+    mode_file = Path(".wipnote/orchestrator-mode.json")
     if mode_file.exists():
         data = json.loads(mode_file.read_text())
         return data.get("enforcement_level", "guidance")
@@ -75,7 +75,7 @@ def is_allowed_orchestrator_operation(tool: str, params: dict) -> tuple[bool, st
     # Category 2: SDK Operations - Always allowed
     if tool == "Bash":
         command = params.get("command", "")
-        if command.startswith("uv run htmlgraph ") or command.startswith("htmlgraph "):
+        if command.startswith("uv run wipnote ") or command.startswith("wipnote "):
             return True, ""
         # Allow git status/diff (read-only)
         if command.startswith("git status") or command.startswith("git diff"):
@@ -93,7 +93,7 @@ def is_allowed_orchestrator_operation(tool: str, params: dict) -> tuple[bool, st
             return False, f"Multiple {tool} calls detected. Delegate to Explorer subagent using Task tool."
 
     # Category 4: Work Item Creation - Allowed via Python inline
-    if tool == "Bash" and "from htmlgraph import SDK" in params.get("command", ""):
+    if tool == "Bash" and "from wipnote import SDK" in params.get("command", ""):
         return True, "SDK work item creation"
 
     # Category 5: BLOCKED - Implementation tools
@@ -150,7 +150,7 @@ def enforce_orchestrator_mode(tool: str, params: dict) -> dict:
             "decision": "block",
             "reason": f"🎯 ORCHESTRATOR MODE: {reason}\n\n"
                      f"Use: Task(prompt='...', subagent_type='general-purpose')\n\n"
-                     f"To disable orchestrator mode: uv run htmlgraph orchestrator disable",
+                     f"To disable orchestrator mode: uv run wipnote orchestrator disable",
             "suggestion": create_task_suggestion(tool, params)
         }
     else:
@@ -190,20 +190,20 @@ def create_task_suggestion(tool: str, params: dict) -> str:
 
 ### Component 3: Orchestrator Mode CLI Commands
 
-**Add to htmlgraph CLI**:
+**Add to wipnote CLI**:
 
 ```bash
 # Enable orchestrator mode (strict)
-uv run htmlgraph orchestrator enable
+uv run wipnote orchestrator enable
 
 # Enable orchestrator mode (guidance only)
-uv run htmlgraph orchestrator enable --level=guidance
+uv run wipnote orchestrator enable --level=guidance
 
 # Disable orchestrator mode
-uv run htmlgraph orchestrator disable
+uv run wipnote orchestrator disable
 
 # Check status
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 ```
 
 ### Component 4: SessionStart Hook Integration
@@ -251,7 +251,7 @@ When activated:
 - ✅ Work item management is allowed
 - ❌ Direct Edit/Write operations are BLOCKED
 
-To disable: `uv run htmlgraph orchestrator disable`
+To disable: `uv run wipnote orchestrator disable`
 ```
 
 ## Operation Classification Matrix
@@ -261,9 +261,9 @@ To disable: `uv run htmlgraph orchestrator disable`
 | Task | Any | ✅ ALWAYS | Core orchestration tool |
 | AskUserQuestion | Any | ✅ ALWAYS | Decision making |
 | TodoWrite | Any | ✅ ALWAYS | Progress tracking |
-| Bash | `uv run htmlgraph ...` | ✅ ALWAYS | SDK operations |
+| Bash | `uv run wipnote ...` | ✅ ALWAYS | SDK operations |
 | Bash | `git status/diff` | ✅ ALWAYS | Read-only status |
-| Bash | `from htmlgraph ...` | ✅ ALWAYS | Work item creation |
+| Bash | `from wipnote ...` | ✅ ALWAYS | Work item creation |
 | Read | First use | ✅ SINGLE | Quick lookup allowed |
 | Read | 2+ in sequence | ❌ DELEGATE | Explorer subagent |
 | Grep | First use | ✅ SINGLE | Quick search allowed |
@@ -297,7 +297,7 @@ Session Start
 Check for features
     ↓
 Features exist? → YES → Activate orchestrator mode (strict)
-    ↓                    Write .htmlgraph/orchestrator-mode.json
+    ↓                    Write .wipnote/orchestrator-mode.json
     ↓
 PreToolUse hook runs
     ↓
@@ -313,12 +313,12 @@ Allow operation
 
 1. **Disable for emergency fixes**:
    ```bash
-   uv run htmlgraph orchestrator disable
+   uv run wipnote orchestrator disable
    ```
 
 2. **Guidance mode for learning**:
    ```bash
-   uv run htmlgraph orchestrator enable --level=guidance
+   uv run wipnote orchestrator enable --level=guidance
    ```
 
 3. **Per-session override**:

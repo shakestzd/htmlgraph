@@ -1,14 +1,14 @@
-# HtmlGraph Parent Session Linking Research
+# Wipnote Parent Session Linking Research
 
 ## Executive Summary
 
-HtmlGraph has a **complete, working parent-child session linking system** using environment variables to connect Task() delegations across session boundaries. The system is implemented but **not fully integrated into the dashboard visualization**, which is why subagent events appear disconnected on the UI.
+Wipnote has a **complete, working parent-child session linking system** using environment variables to connect Task() delegations across session boundaries. The system is implemented but **not fully integrated into the dashboard visualization**, which is why subagent events appear disconnected on the UI.
 
 ## What Works: The Environment Variable System
 
 ### 1. Environment Variables Used
 
-HtmlGraph uses three environment variables to link parent and child sessions:
+Wipnote uses three environment variables to link parent and child sessions:
 
 | Variable | Purpose | Set By | Read By |
 |----------|---------|--------|---------|
@@ -34,7 +34,7 @@ if active and active.id:
 
 **Step 2: Task Tool Call (task_enforcer.py)**
 ```python
-# Line 130-170 in src/python/htmlgraph/hooks/task_enforcer.py
+# Line 130-170 in src/python/wipnote/hooks/task_enforcer.py
 parent_session = os.environ.get("HTMLGRAPH_PARENT_SESSION")
 if parent_session:
     # Create activity entry in parent session to track Task invocation
@@ -61,10 +61,10 @@ if parent_session:
 **Step 3: Child Session Receives Parent Context**
 
 ```python
-# Line 265 in src/python/htmlgraph/sdk.py
+# Line 265 in src/python/wipnote/sdk.py
 self._parent_session = parent_session or os.getenv("HTMLGRAPH_PARENT_SESSION")
 
-# Line 901 in src/python/htmlgraph/sdk.py
+# Line 901 in src/python/wipnote/sdk.py
 if not parent_activity_id:
     parent_activity_id = os.getenv("HTMLGRAPH_PARENT_ACTIVITY")
 ```
@@ -77,7 +77,7 @@ if not parent_activity_id:
 **Step 4: Activity Routing (track_activity)**
 
 ```python
-# Line 885-897 in src/python/htmlgraph/sdk.py
+# Line 885-897 in src/python/wipnote/sdk.py
 def track_activity(...):
     # Determine target session: explicit > parent > active
     if not session_id:
@@ -117,7 +117,7 @@ Sessions and activities store parent information in HTML data attributes:
 
 **Current session HTML shows this working**:
 - `data-parent="evt-4cf9978e"` - Links activities to their parent activity ID
-- Found in `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/sessions/sess-529faa2c.html`
+- Found in `/Users/shakes/DevProjects/htmlgraph/.wipnote/sessions/sess-529faa2c.html`
 - Activities are properly linked to their parent activities
 
 ### 4. Test Coverage
@@ -142,7 +142,7 @@ Comprehensive tests exist to verify the system:
 
 ### Current State: Events ARE Linked in HTML
 
-Looking at `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/sessions/sess-529faa2c.html`:
+Looking at `/Users/shakes/DevProjects/htmlgraph/.wipnote/sessions/sess-529faa2c.html`:
 
 ```html
 <li data-parent="evt-4cf9978e">Grep: ...</li>
@@ -218,19 +218,19 @@ Task: Invoke subagent task
 ### Key Files Implementing Parent Session Linking
 
 **SDK Initialization** (reads parent from environment):
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk.py` - Line 265
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/sdk.py` - Line 265
 
 **Activity Tracking** (routes to parent session):
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/sdk.py` - Lines 885-912
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/sdk.py` - Lines 885-912
 
 **Task Enforcer Hook** (sets up parent context):
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/task_enforcer.py` - Lines 101-217
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/task_enforcer.py` - Lines 101-217
 
 **Session Start Hook** (initializes parent for root session):
 - `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/hooks/scripts/session-start.py` - Lines 1248-1260
 
 **Session Model** (stores parent metadata):
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/models.py` - Lines 974, 1443-1449
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/models.py` - Lines 974, 1443-1449
 
 **Tests** (verify linking works):
 - `/Users/shakes/DevProjects/htmlgraph/tests/python/test_sdk_parent_session.py` - 11 test cases

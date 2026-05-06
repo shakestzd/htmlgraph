@@ -1,8 +1,8 @@
-# Dogfooding Context - Using HtmlGraph to Build HtmlGraph
+# Dogfooding Context - Using Wipnote to Build Wipnote
 
-**THIS PROJECT USES HTMLGRAPH TO DEVELOP HTMLGRAPH.**
+**THIS PROJECT USES WIPNOTE TO DEVELOP WIPNOTE.**
 
-We are dogfooding our own tool. The `.htmlgraph/` directory in this repo tracks:
+We are dogfooding our own tool. The `.wipnote/` directory in this repo tracks:
 - ✅ **Features** - New capabilities we're building (e.g., strategic analytics, track planning)
 - ✅ **Sessions** - Our development work (tracked automatically via hooks)
 - ✅ **Tracks** - Multi-feature initiatives (e.g., "Planning Workflow")
@@ -13,12 +13,12 @@ We are dogfooding our own tool. The `.htmlgraph/` directory in this repo tracks:
 ### 1. Dual Purpose - Examples ARE Real Usage
 
 When you see workflows in this project:
-- ✅ They're **real examples** of HtmlGraph usage
-- ✅ They're **actual tracking** of HtmlGraph development
+- ✅ They're **real examples** of Wipnote usage
+- ✅ They're **actual tracking** of Wipnote development
 - ✅ Learn from them for YOUR projects
 
 ```python
-# This IS real - we use this to track HtmlGraph development
+# This IS real - we use this to track Wipnote development
 sdk = SDK(agent="claude")
 feature = sdk.features.create("Add deployment automation")  # Real feature!
 ```
@@ -33,9 +33,9 @@ feature = sdk.features.create("Add deployment automation")  # Real feature!
 - ⚠️ **Deployment automation** → Should package `deploy-all.sh` pattern
 - ⚠️ **Memory file sync** → Should package `sync_memory_files.py` pattern
 
-**PROJECT-SPECIFIC** (only for HtmlGraph development):
-- ❌ Publishing to PyPI (specific to HtmlGraph package)
-- ❌ The specific features in `.htmlgraph/features/` (our roadmap)
+**PROJECT-SPECIFIC** (only for Wipnote development):
+- ❌ Publishing to PyPI (specific to Wipnote package)
+- ❌ The specific features in `.wipnote/features/` (our roadmap)
 - ❌ Phase 1-6 implementation plan (our project structure)
 
 ### 3. Workflows to Package for Users
@@ -43,7 +43,7 @@ feature = sdk.features.create("Add deployment automation")  # Real feature!
 **TODO - Extract these into the package:**
 1. **Deployment Script Pattern** - Generalize `deploy-all.sh` for any Python package
 2. **Memory File Sync** - Include `sync_memory_files.py` in the package
-3. **Project Initialization** - `htmlgraph init` should set up `.htmlgraph/`
+3. **Project Initialization** - `wipnote init` should set up `.wipnote/`
 4. **Pre-commit Hooks** - Package the git hooks for automatic tracking
 
 **Current Status:**
@@ -53,7 +53,7 @@ feature = sdk.features.create("Add deployment automation")  # Real feature!
 
 ### 4. How to Read This Codebase
 
-When you see `.htmlgraph/` in this repo:
+When you see `.wipnote/` in this repo:
 - **It's a live example** - This is real usage, not a demo
 - **It's our roadmap** - Features here are what we're building
 - **Learn from it** - Use these patterns in your projects
@@ -61,12 +61,12 @@ When you see `.htmlgraph/` in this repo:
 **Example:**
 ```bash
 # In THIS repo
-ls .htmlgraph/features/
+ls .wipnote/features/
 # → feature-20251221-211348.html  # Real feature we're tracking
 # → feat-5f0fca41.html            # Another real feature
 
-# In YOUR project (after using HtmlGraph)
-ls .htmlgraph/features/
+# In YOUR project (after using Wipnote)
+ls .wipnote/features/
 # → Your features will look the same!
 ```
 
@@ -74,10 +74,10 @@ ls .htmlgraph/features/
 
 ### Feature Tracking in Practice
 
-HtmlGraph features are tracked using the SDK:
+Wipnote features are tracked using the SDK:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -103,7 +103,7 @@ feature.set_status("done").save()
 ```
 
 **Real Examples:**
-- Browse `.htmlgraph/features/feat-*.html` to see actual features
+- Browse `.wipnote/features/feat-*.html` to see actual features
 - Each file shows current status, steps completed, and relationships
 - Learn from the structure and adapt for your projects
 
@@ -118,11 +118,11 @@ Sessions are automatically tracked via git hooks:
 # 3. Complete work (mark feature done)
 
 # Sessions link to parent features
-# View: .htmlgraph/sessions/sess-*.html
+# View: .wipnote/sessions/sess-*.html
 ```
 
 **Real Examples:**
-- Browse `.htmlgraph/sessions/sess-*.html` for real work sessions
+- Browse `.wipnote/sessions/sess-*.html` for real work sessions
 - See how commits are tracked
 - Understand parent-child relationships (session → feature)
 
@@ -131,7 +131,7 @@ Sessions are automatically tracked via git hooks:
 Tracks group related features:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -149,7 +149,7 @@ track.get_progress()  # 60% complete (2/3 features done)
 ```
 
 **Real Examples:**
-- Browse `.htmlgraph/tracks/` to see multi-feature initiatives
+- Browse `.wipnote/tracks/` to see multi-feature initiatives
 - Study how we group related work
 - Apply same planning strategies to your projects
 
@@ -158,7 +158,7 @@ track.get_progress()  # 60% complete (2/3 features done)
 Strategic analytics help prioritize work:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -177,14 +177,14 @@ for feature in recommendations[:3]:  # Top 3
 
 **Real Examples:**
 - We use these analytics to decide what to build next
-- Check `.htmlgraph/spikes/` for research findings
+- Check `.wipnote/spikes/` for research findings
 - See how recommendations change as work progresses
 
 ## Patterns to Extract and Package
 
 ### 1. Deployment Script Pattern
 
-**Current:** `scripts/deploy-all.sh` (HtmlGraph-specific)
+**Current:** `scripts/deploy-all.sh` (Wipnote-specific)
 
 **TODO:** Generalize for any Python package:
 ```bash
@@ -207,11 +207,11 @@ git tag "v$VERSION"
 git push origin main --tags
 ```
 
-**Package as:** `htmlgraph deploy` command or template script
+**Package as:** `wipnote deploy` command or template script
 
 ### 2. Memory File Sync Pattern
 
-**Current:** `scripts/sync_memory_files.py` (HtmlGraph-specific)
+**Current:** `scripts/sync_memory_files.py` (Wipnote-specific)
 
 **TODO:** Generalize for any project with multiple memory files:
 ```python
@@ -230,24 +230,24 @@ def sync_memory_files(source: Path, targets: list[Path]):
 
 ### 3. Project Initialization Pattern
 
-**Current:** Manual setup of `.htmlgraph/` directory
+**Current:** Manual setup of `.wipnote/` directory
 
 **TODO:** Automated initialization:
 ```bash
 # Desired workflow
-htmlgraph init
+wipnote init
 
 # Creates:
-# .htmlgraph/
+# .wipnote/
 #   features/
 #   sessions/
 #   tracks/
 #   spikes/
-# .htmlgraph.json (config)
+# .wipnote.json (config)
 # index.html (dashboard)
 ```
 
-**Package as:** `htmlgraph init` CLI command
+**Package as:** `wipnote init` CLI command
 
 ### 4. Pre-commit Hooks Pattern
 
@@ -256,7 +256,7 @@ htmlgraph init
 **TODO:** Packaged hooks with installation:
 ```bash
 # Install hooks
-htmlgraph install-hooks
+wipnote install-hooks
 
 # Hooks automatically:
 # 1. Track sessions on commit
@@ -265,20 +265,20 @@ htmlgraph install-hooks
 # 4. Generate activity logs
 ```
 
-**Package as:** `htmlgraph install-hooks` CLI command
+**Package as:** `wipnote install-hooks` CLI command
 
 ## Learning Checklist
 
-Use this checklist to fully understand HtmlGraph's dogfooding:
+Use this checklist to fully understand Wipnote's dogfooding:
 
 ### Exploration
 
-- [ ] Browse `.htmlgraph/features/` directory
+- [ ] Browse `.wipnote/features/` directory
 - [ ] Open a feature HTML file in browser
 - [ ] View `index.html` dashboard
-- [ ] Check `.htmlgraph/sessions/` for work sessions
-- [ ] Explore `.htmlgraph/tracks/` for multi-feature planning
-- [ ] Review `.htmlgraph/spikes/` for research findings
+- [ ] Check `.wipnote/sessions/` for work sessions
+- [ ] Explore `.wipnote/tracks/` for multi-feature planning
+- [ ] Review `.wipnote/spikes/` for research findings
 
 ### Understanding
 
@@ -304,17 +304,17 @@ Use this checklist to fully understand HtmlGraph's dogfooding:
 
 ## Common Dogfooding Questions
 
-**Q: Why dogfood HtmlGraph?**
+**Q: Why dogfood Wipnote?**
 A: To validate the tool works in real development, to provide authentic examples, and to surface issues early.
 
 **Q: What makes dogfooding effective?**
-A: Using the tool for its intended purpose (project tracking) on a real project (HtmlGraph development).
+A: Using the tool for its intended purpose (project tracking) on a real project (Wipnote development).
 
 **Q: How do I know if something is a demo or real?**
-A: If it's in `.htmlgraph/`, it's real. We don't maintain fake examples.
+A: If it's in `.wipnote/`, it's real. We don't maintain fake examples.
 
-**Q: Can I use HtmlGraph workflows without dogfooding?**
-A: Yes! Dogfooding is our process. You can use HtmlGraph without eating your own dog food.
+**Q: Can I use Wipnote workflows without dogfooding?**
+A: Yes! Dogfooding is our process. You can use Wipnote without eating your own dog food.
 
 **Q: What if I find issues while dogfooding?**
 A: Create a spike to document the issue, then a feature to fix it. That's the process!
@@ -333,15 +333,15 @@ A: If feasible, yes. It validates your tool and provides authentic examples.
 
 ### Live Examples
 
-- `.htmlgraph/features/` - Real features in development
-- `.htmlgraph/sessions/` - Real work sessions
-- `.htmlgraph/tracks/` - Real multi-feature planning
-- `.htmlgraph/spikes/` - Real research and findings
+- `.wipnote/features/` - Real features in development
+- `.wipnote/sessions/` - Real work sessions
+- `.wipnote/tracks/` - Real multi-feature planning
+- `.wipnote/spikes/` - Real research and findings
 - `index.html` - Live dashboard showing everything
 
 ### Code
 
-- `src/python/htmlgraph/` - SDK implementation
+- `src/python/wipnote/` - SDK implementation
 - `scripts/deploy-all.sh` - Deployment automation
 - `scripts/sync_memory_files.py` - Memory file sync
 - `.git/hooks/` - Git hooks for automatic tracking

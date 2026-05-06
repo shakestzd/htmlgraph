@@ -1,4 +1,4 @@
-# HtmlGraph SDK Modularization Journey
+# Wipnote SDK Modularization Journey
 
 **From monolithic 2,492-line file to maintainable modular architecture**
 
@@ -19,7 +19,7 @@
 
 ### The Monolithic `sdk.py`
 
-The original HtmlGraph SDK lived in a single file: `src/python/htmlgraph/sdk.py`
+The original Wipnote SDK lived in a single file: `src/python/wipnote/sdk.py`
 
 **Stats:**
 - 2,492 lines of code
@@ -186,11 +186,11 @@ Made mixins delegate to specialized modules instead of implementing logic:
 # Mixin delegates to module
 class PlanningMixin:
     def find_bottlenecks(self, top_n: int = 5):
-        from htmlgraph.sdk.planning.bottlenecks import find_bottlenecks
+        from wipnote.sdk.planning.bottlenecks import find_bottlenecks
         return find_bottlenecks(self, top_n=top_n)
 
 # Logic lives in pure function
-# src/python/htmlgraph/sdk/planning/bottlenecks.py
+# src/python/wipnote/sdk/planning/bottlenecks.py
 def find_bottlenecks(sdk: SDK, top_n: int = 5) -> list[BottleneckDict]:
     """Pure function implementing bottleneck detection."""
     graph = sdk._graph
@@ -228,7 +228,7 @@ Ensured all existing code works unchanged:
 
 ```python
 # Old code still works
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="claude")
 sdk.analytics.work_type_distribution()  # ✅
 sdk.find_bottlenecks(top_n=5)  # ✅
@@ -243,14 +243,14 @@ sdk.start_server()  # ✅
 
 **Before:**
 ```
-src/python/htmlgraph/
+src/python/wipnote/
 ├── sdk.py (2,492 lines)
 └── ... other files
 ```
 
 **After:**
 ```
-src/python/htmlgraph/sdk/
+src/python/wipnote/sdk/
 ├── __init__.py (398 lines - SDK composition)
 ├── base.py (485 lines - core initialization)
 ├── constants.py (217 lines)
@@ -442,7 +442,7 @@ src/python/htmlgraph/sdk/
 
 ```python
 # All existing code works unchanged
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 sdk.analytics.work_type_distribution()  # ✅
@@ -465,7 +465,7 @@ sdk.start_server()  # ✅
 # 1. Add to mixin (sdk/planning/mixin.py)
 class PlanningMixin:
     def new_planning_method(self, arg: str) -> Result:
-        from htmlgraph.sdk.planning.new_module import new_planning_method
+        from wipnote.sdk.planning.new_module import new_planning_method
         return new_planning_method(self, arg)
 
 # 2. Implement in module (sdk/planning/new_module.py)

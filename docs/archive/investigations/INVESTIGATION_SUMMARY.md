@@ -52,8 +52,8 @@ When you delegate work to a subagent (e.g., Codex), their events are invisible o
 
 1. **Subagent spawned** via `Task(prompt="...", subagent_type="codex")`
 2. **Runs in isolated process** with unique session_id: `0e6fd1e4-bc71-4424-88d4-3e88562ba5ed`
-3. **Creates 2,962 events** - all recorded to `.htmlgraph/events/0e6fd1e4-bc...jsonl`
-4. **Creates 10 features** - visible in `.htmlgraph/features/`
+3. **Creates 2,962 events** - all recorded to `.wipnote/events/0e6fd1e4-bc...jsonl`
+4. **Creates 10 features** - visible in `.wipnote/features/`
 5. **Subagent completes** and returns to main orchestrator
 6. **Main session logs** only "Task completed successfully"
 7. **Dashboard queries** main session only: `WHERE session_id='sess-fd50862f'`
@@ -181,7 +181,7 @@ def session_events(self, session_id: str):
 
 ✓ **Features Work**
 - 10 features created successfully
-- All visible in `.htmlgraph/features/`
+- All visible in `.wipnote/features/`
 - Data is there
 - Just not connected to creation events
 
@@ -243,12 +243,12 @@ def session_events(self, session_id: str):
 - `INVESTIGATION_SUMMARY.md` - This document
 
 ### Core System Files
-- `src/python/htmlgraph/event_log.py` - Event recording
-- `src/python/htmlgraph/analytics_index.py` - SQLite indexing
-- `src/python/htmlgraph/dashboard.html` - Activity Feed display
-- `src/python/htmlgraph/server.py` - API endpoints
-- `.htmlgraph/index.sqlite` - Database with all events
-- `.htmlgraph/events/*.jsonl` - Event log files
+- `src/python/wipnote/event_log.py` - Event recording
+- `src/python/wipnote/analytics_index.py` - SQLite indexing
+- `src/python/wipnote/dashboard.html` - Activity Feed display
+- `src/python/wipnote/server.py` - API endpoints
+- `.wipnote/index.sqlite` - Database with all events
+- `.wipnote/events/*.jsonl` - Event log files
 
 ---
 
@@ -304,7 +304,7 @@ After fixes are implemented:
 **A:** Yes, via direct SQLite query or if you know the session_id. But the dashboard doesn't know about them.
 
 ### Q: Are features broken?
-**A:** No. 10 features were created successfully. They're visible in `.htmlgraph/features/`. Only the event history of their creation is hidden.
+**A:** No. 10 features were created successfully. They're visible in `.wipnote/features/`. Only the event history of their creation is hidden.
 
 ### Q: Is this a data loss bug?
 **A:** No. This is an architectural limitation, not a bug. The dashboard design assumes single-session views.
@@ -313,7 +313,7 @@ After fixes are implemented:
 **A:**
 ```bash
 # Query the subagent session directly
-sqlite3 .htmlgraph/index.sqlite \
+sqlite3 .wipnote/index.sqlite \
   "SELECT COUNT(*) FROM events WHERE session_id='0e6fd1e4-bc71-4424-88d4-3e88562ba5ed';"
 # Returns: 2962
 ```

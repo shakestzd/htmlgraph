@@ -73,7 +73,7 @@ shutil.copy2(transcript_path, backup_dir / f"backup_{timestamp}.jsonl")
 result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True)
 has_uncommitted = len(result.stdout.strip()) > 0
 
-# Detect in-progress HtmlGraph features
+# Detect in-progress Wipnote features
 sdk = SDK()
 in_progress = [f for f in sdk.features.list() if f.status == 'in-progress']
 ```
@@ -92,7 +92,7 @@ if has_uncommitted or in_progress:
 ```python
 # Auto-save in-progress features to snapshot
 for feature in in_progress:
-    snapshot_path = f".htmlgraph/snapshots/pre-compact-{timestamp}/{feature.id}.json"
+    snapshot_path = f".wipnote/snapshots/pre-compact-{timestamp}/{feature.id}.json"
     save_snapshot(feature, snapshot_path)
 ```
 
@@ -182,9 +182,9 @@ Resume from: [last checkpoint]
     Path(".context-refresh").write_text(refresh_instructions)
 ```
 
-**Example 3: HtmlGraph Integration**
+**Example 3: Wipnote Integration**
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='pre-compact-hook')
 input_data = json.loads(sys.stdin.read())
@@ -291,12 +291,12 @@ elif input_data['trigger'] == 'auto':
 
 ---
 
-## Integration Plan for HtmlGraph
+## Integration Plan for Wipnote
 
 **Approach 1: PreCompact Hook (When Bugs Fixed)**
 ```python
-# .claude/hooks/htmlgraph_precompact.py
-from htmlgraph import SDK
+# .claude/hooks/wipnote_precompact.py
+from wipnote import SDK
 
 sdk = SDK(agent='pre-compact-hook')
 input_data = json.loads(sys.stdin.read())
@@ -306,7 +306,7 @@ git_status = subprocess.run(['git', 'status', '--porcelain'],
                            capture_output=True, text=True)
 has_uncommitted = bool(git_status.stdout.strip())
 
-# 2. Find in-progress HtmlGraph items
+# 2. Find in-progress Wipnote items
 in_progress_features = [f for f in sdk.features.list()
                        if f.status == 'in-progress']
 in_progress_spikes = [s for s in sdk.spikes.list()
@@ -348,7 +348,7 @@ elif input_data['trigger'] == 'auto':
 
 **Approach 2: /compact Instruction Template (Immediate)**
 
-Add to HtmlGraph CLI: `htmlgraph compact-prep`
+Add to Wipnote CLI: `wipnote compact-prep`
 
 Outputs template for manual /compact command with current work state.
 
@@ -372,11 +372,11 @@ Outputs template for manual /compact command with current work state.
 
 ---
 
-## Recommendations for HtmlGraph
+## Recommendations for Wipnote
 
 **Immediate (Use Now):**
 1. ✅ Implement `/compact` instruction template via CLI
-2. ✅ Add `htmlgraph compact-prep` command
+2. ✅ Add `wipnote compact-prep` command
 3. ✅ Document manual compaction workflow
 
 **Short-term (When Bugs Fixed):**

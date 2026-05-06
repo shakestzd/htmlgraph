@@ -2,11 +2,11 @@
 
 ## Overview
 
-Successfully implemented the WebSocket live event insertion mechanism in the HtmlGraph dashboard to work with the grouped conversation turn structure. The solution handles both UserQuery events (creating new conversation turns) and child events (tool calls nested under parent turns).
+Successfully implemented the WebSocket live event insertion mechanism in the Wipnote dashboard to work with the grouped conversation turn structure. The solution handles both UserQuery events (creating new conversation turns) and child events (tool calls nested under parent turns).
 
 ## File Modified
 
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/dashboard-redesign.html`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/templates/dashboard-redesign.html`
 
 ## Implementation Details
 

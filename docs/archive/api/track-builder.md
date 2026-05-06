@@ -9,7 +9,7 @@ The TrackBuilder provides a chainable API for creating complex tracks in a singl
 ## Basic Usage
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -123,4 +123,4 @@ Execute the build and create all files. Returns Track object.
 
 ## Complete API Reference
 
-For detailed API documentation with method signatures and builder pattern implementation, see the Python source code in `src/python/htmlgraph/track_builder.py`.
+For detailed API documentation with method signatures and builder pattern implementation, see the Python source code in `src/python/wipnote/track_builder.py`.

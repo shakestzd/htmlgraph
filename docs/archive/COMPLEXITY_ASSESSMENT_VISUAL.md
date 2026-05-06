@@ -1,4 +1,4 @@
-# HtmlGraph Orchestrator - Complexity Assessment Visual Guide
+# Wipnote Orchestrator - Complexity Assessment Visual Guide
 
 ## Decision Flow Diagram
 
@@ -373,7 +373,7 @@ Design Philosophy:
 ### Example 1: Direct Model Selection
 
 ```python
-from htmlgraph.orchestration import select_model
+from wipnote.orchestration import select_model
 
 # Simple task
 model = select_model(
@@ -403,7 +403,7 @@ model = select_model(
 ### Example 2: With Fallback Chain
 
 ```python
-from htmlgraph.orchestration import select_model, get_fallback_chain
+from wipnote.orchestration import select_model, get_fallback_chain
 
 primary_model = select_model("implementation", "high", "balanced")
 # Returns: "claude-opus"
@@ -423,7 +423,7 @@ for model in [primary_model] + fallbacks:
 ### Example 3: Token Estimation
 
 ```python
-from htmlgraph.orchestration import ModelSelection
+from wipnote.orchestration import ModelSelection
 
 task_desc = "Implement user authentication with JWT tokens"
 

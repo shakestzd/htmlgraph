@@ -2,9 +2,9 @@
 
 ## Problem Statement
 
-The WebSocket event broadcast in HtmlGraph was hardcoded to send `parent_event_id: None`, which prevented child events (Bash, Read, Edit, etc.) from appearing under their parent conversation turns (UserQuery events) in the real-time live dashboard.
+The WebSocket event broadcast in Wipnote was hardcoded to send `parent_event_id: None`, which prevented child events (Bash, Read, Edit, etc.) from appearing under their parent conversation turns (UserQuery events) in the real-time live dashboard.
 
-**Affected File:** `/src/python/htmlgraph/api/main.py`
+**Affected File:** `/src/python/wipnote/api/main.py`
 **Affected Endpoint:** `/ws/events` (WebSocket endpoint at line 2133-2310)
 **Issue:** Line 2195 was hardcoding `"parent_event_id": None`
 
@@ -188,7 +188,7 @@ No database migrations required. The fix simply queries columns that already exi
 ## Files Modified
 
 **Single file change:**
-- `/src/python/htmlgraph/src/python/htmlgraph/api/main.py` (lines 2159-2210)
+- `/src/python/wipnote/src/python/wipnote/api/main.py` (lines 2159-2210)
   - Updated SQL query (lines 2163-2172)
   - Added context JSON parsing (lines 2185-2191)
   - Updated event_data mapping (lines 2193-2210)

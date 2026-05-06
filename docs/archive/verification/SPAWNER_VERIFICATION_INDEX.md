@@ -31,10 +31,10 @@ This directory contains comprehensive spawner verification documentation and rep
    - Sign-off confirmation
    - Quick start guide
 
-4. **HtmlGraph Spike: spk-37a3ee1b**
+4. **Wipnote Spike: spk-37a3ee1b**
    - Title: "Spawner Quality Verification - All Production-Ready"
    - Findings: Comprehensive summary
-   - Status: Recorded in HtmlGraph
+   - Status: Recorded in Wipnote
 
 ---
 
@@ -78,7 +78,7 @@ This directory contains comprehensive spawner verification documentation and rep
 ## Implementation Files
 
 ### Source Code
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/headless_spawner.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestration/headless_spawner.py`
   - 1057 lines
   - 4 spawner methods: spawn_gemini, spawn_codex, spawn_copilot, spawn_claude
   - 3 event parser methods
@@ -112,7 +112,7 @@ This directory contains comprehensive spawner verification documentation and rep
 3. Failure Handling & Error Recovery (5 scenarios)
 4. Edge Cases Verification (4 types)
 5. Cost Tracking Accuracy (token counting methods)
-6. HtmlGraph Integration Verification (activity tracking)
+6. Wipnote Integration Verification (activity tracking)
 7. Production Readiness Checklist (10 categories)
 8. Success Metrics (all verified)
 9. Deployment Recommendations (setup, config, best practices)
@@ -127,7 +127,7 @@ This directory contains comprehensive spawner verification documentation and rep
 - 100% coverage of spawners and edge cases
 - Cost tracking methods verified
 - Error handling comprehensive
-- HtmlGraph integration working
+- Wipnote integration working
 
 ---
 
@@ -141,7 +141,7 @@ This directory contains comprehensive spawner verification documentation and rep
 4. Edge Cases
 5. Cost Tracking
 6. Error Recovery & Fallback Patterns
-7. HtmlGraph Integration
+7. Wipnote Integration
 8. Documentation
 9. Testing Coverage
 10. Security & Safety
@@ -168,7 +168,7 @@ This directory contains comprehensive spawner verification documentation and rep
 5. Spawner Capabilities Verified
 6. Error Handling Verified
 7. Cost Tracking Accuracy
-8. HtmlGraph Integration
+8. Wipnote Integration
 9. Fallback Patterns Documented
 10. Documentation Status
 11. Security & Safety Verification
@@ -309,7 +309,7 @@ test_cost_comparison_documentation           ✅ Cost data documented
 
 ---
 
-## HtmlGraph Integration
+## Wipnote Integration
 
 ### Activity Tracking Verified ✅
 
@@ -380,7 +380,7 @@ All patterns implemented and tested.
 - [x] Error messages clear
 - [x] Fallback patterns documented
 - [x] Cost tracking verified
-- [x] HtmlGraph integration working
+- [x] Wipnote integration working
 - [x] Security checks passed
 - [x] Performance acceptable
 
@@ -395,14 +395,14 @@ npm install -g @openai/codex-cli
 ```
 
 **Optional:**
-- HtmlGraph SDK (graceful fallback if unavailable)
+- Wipnote SDK (graceful fallback if unavailable)
 
 ### Configuration
 
 - Timeout values (adjustable per environment)
 - Sandbox modes (for Codex)
 - Tool permissions (for Copilot)
-- Tracking enable/disable (for HtmlGraph)
+- Tracking enable/disable (for Wipnote)
 
 ---
 
@@ -445,27 +445,27 @@ All checks passed. Deploy to production with confidence.
 2. Monitor timeout frequency
 3. Watch for fallback activations
 4. Track cost per spawner
-5. Log results in HtmlGraph
+5. Log results in Wipnote
 
 ### Implement Best Practices
 1. Always check result.success before using response
 2. Detect empty responses (success=True but response empty)
 3. Use fallback patterns for resilience
 4. Monitor token usage for cost optimization
-5. Log results in HtmlGraph for tracking
+5. Log results in Wipnote for tracking
 
 ### Configure Environment
 1. Set timeout values appropriate for your environment
 2. Configure sandbox modes for Codex
 3. Configure tool permissions for Copilot
-4. Enable HtmlGraph tracking (optional but recommended)
+4. Enable Wipnote tracking (optional but recommended)
 
 ---
 
 ## File References
 
 ### Source Code
-- **HeadlessSpawner:** /Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/headless_spawner.py
+- **HeadlessSpawner:** /Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestration/headless_spawner.py
 
 ### Tests
 - **Test Suite:** /Users/shakes/DevProjects/htmlgraph/tests/python/test_headless_spawner.py
@@ -481,7 +481,7 @@ All checks passed. Deploy to production with confidence.
 - **Checklist:** /Users/shakes/DevProjects/htmlgraph/SPAWNER_PRODUCTION_READINESS_CHECKLIST.md
 - **Index:** /Users/shakes/DevProjects/htmlgraph/SPAWNER_VERIFICATION_INDEX.md (this file)
 
-### HtmlGraph Spike
+### Wipnote Spike
 - **ID:** spk-37a3ee1b
 - **Title:** "Spawner Quality Verification - All Production-Ready"
 - **Status:** Recorded with comprehensive findings
@@ -494,7 +494,7 @@ All checks passed. Deploy to production with confidence.
 1. Read [SPAWNER_VERIFICATION_SUMMARY.md](./SPAWNER_VERIFICATION_SUMMARY.md)
 2. Choose appropriate spawner for your task
 3. Implement fallback pattern
-4. Monitor results in HtmlGraph
+4. Monitor results in Wipnote
 
 ### For Developers
 1. Read [SPAWNER_VERIFICATION_REPORT.md](./SPAWNER_VERIFICATION_REPORT.md)

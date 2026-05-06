@@ -4,10 +4,10 @@ The SQLite index is an **optional** performance feature that accelerates queries
 
 ## Overview
 
-HtmlGraph stores all data as HTML files (the source of truth). For performance, it optionally maintains a SQLite index that mirrors this data for fast queries.
+Wipnote stores all data as HTML files (the source of truth). For performance, it optionally maintains a SQLite index that mirrors this data for fast queries.
 
 **Key Points:**
-- ✅ **Optional** - HtmlGraph works without it
+- ✅ **Optional** - Wipnote works without it
 - ✅ **Rebuildable** - Can be regenerated from HTML files anytime
 - ✅ **Gitignored** - Not committed to version control
 - ✅ **Automatic** - Maintained automatically by the SDK
@@ -16,9 +16,9 @@ HtmlGraph stores all data as HTML files (the source of truth). For performance, 
 
 ```
 HTML Files (source of truth)    SQLite Index (performance cache)
-.htmlgraph/features/*.html  →   .htmlgraph/htmlgraph.db
-.htmlgraph/sessions/*.html  →
-.htmlgraph/tracks/*/*.html  →
+.wipnote/features/*.html  →   .wipnote/wipnote.db
+.wipnote/sessions/*.html  →
+.wipnote/tracks/*/*.html  →
 ```
 
 The SDK automatically:
@@ -48,7 +48,7 @@ The SQLite index is enabled by default:
 
 ```bash
 # Index is used automatically by CLI queries
-htmlgraph feature list
+wipnote feature list
 ```
 
 ### Disable
@@ -59,7 +59,7 @@ To disable the index, use the environment variable:
 
 ```bash
 export HTMLGRAPH_USE_INDEX=false
-htmlgraph status  # Queries HTML files only
+wipnote status  # Queries HTML files only
 ```
 
 ## Index Maintenance
@@ -70,7 +70,7 @@ If the index becomes out of sync:
 
 ```bash
 # Rebuild from HTML files
-htmlgraph index rebuild
+wipnote index rebuild
 ```
 
 ### Clear Index
@@ -78,7 +78,7 @@ htmlgraph index rebuild
 To remove the index entirely:
 
 ```bash
-rm .htmlgraph/htmlgraph.db
+rm .wipnote/wipnote.db
 
 # It will be recreated on next use
 ```
@@ -87,17 +87,17 @@ rm .htmlgraph/htmlgraph.db
 
 ```bash
 # View index statistics
-htmlgraph index stats
+wipnote index stats
 ```
 
 ## Performance Comparison
 
 | Operation | Without Index | With Index | Speedup |
 |-----------|--------------|------------|---------|
-| `htmlgraph feature list` (100 nodes) | 250ms | 15ms | 16x |
-| `htmlgraph find features --status todo` | 200ms | 8ms | 25x |
-| `htmlgraph analytics bottlenecks` | 800ms | 45ms | 18x |
-| `htmlgraph analytics recommend` | 1.2s | 65ms | 18x |
+| `wipnote feature list` (100 nodes) | 250ms | 15ms | 16x |
+| `wipnote find features --status todo` | 200ms | 8ms | 25x |
+| `wipnote analytics bottlenecks` | 800ms | 45ms | 18x |
+| `wipnote analytics recommend` | 1.2s | 65ms | 18x |
 
 *Benchmarks on M1 MacBook Pro with 100 features, 50 sessions*
 
@@ -121,7 +121,7 @@ If queries return unexpected results:
 
 ```bash
 # Rebuild index from HTML source of truth
-htmlgraph index rebuild --force
+wipnote index rebuild --force
 ```
 
 ### Disk Space
@@ -130,26 +130,26 @@ The index typically uses 10-20% of HTML file size:
 
 ```bash
 # Check database size
-du -sh .htmlgraph/htmlgraph.db
+du -sh .wipnote/wipnote.db
 
 # Compare to HTML size
-du -sh .htmlgraph/features/
-du -sh .htmlgraph/sessions/
+du -sh .wipnote/features/
+du -sh .wipnote/sessions/
 ```
 
 To reduce size, archive old features/sessions:
 
 ```bash
 # Move completed features older than 90 days
-htmlgraph archive --older-than 90d
+wipnote archive --older-than 90d
 ```
 
 ### Performance Still Slow
 
 If queries are slow even with indexing:
 
-1. **Rebuild index**: `htmlgraph index rebuild`
-2. **Check disk I/O**: Use SSD for `.htmlgraph/` if possible
+1. **Rebuild index**: `wipnote index rebuild`
+2. **Check disk I/O**: Use SSD for `.wipnote/` if possible
 3. **Analyze query**: Use `EXPLAIN QUERY PLAN` in SQLite
 4. **Reduce data**: Archive old nodes
 
@@ -158,13 +158,13 @@ If queries are slow even with indexing:
 1. **Gitignore index**: Already in `.gitignore`, never commit
 2. **Rebuild after git pull**: If HTML changed, rebuild index
 3. **Monitor index size**: Keep under 100MB for best performance
-4. **Use for analytics**: Essential for `htmlgraph analytics bottlenecks`, `htmlgraph analytics recommend`
+4. **Use for analytics**: Essential for `wipnote analytics bottlenecks`, `wipnote analytics recommend`
 
 ## FAQ
 
 ### Is the index required?
 
-No. HtmlGraph works perfectly without it, just slower on large graphs.
+No. Wipnote works perfectly without it, just slower on large graphs.
 
 ### Can I commit the index to git?
 
@@ -187,4 +187,4 @@ Yes. All CLI operations use SQLite transactions for consistency.
 - [Performance Optimization Guide](../cookbook/analytics.md)
 - [Architecture Overview](../philosophy/why-html.md)
 
-For troubleshooting help, run `htmlgraph --help` or `htmlgraph index --help` for CLI reference.
+For troubleshooting help, run `wipnote --help` or `wipnote index --help` for CLI reference.

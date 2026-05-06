@@ -99,7 +99,7 @@ ws.onmessage = (event) => {
 
 ```python
 # Backend: Emit sync status on push/pull completion
-from htmlgraph.api.sync_routes import sync_manager
+from wipnote.api.sync_routes import sync_manager
 
 # After push operation completes
 sync_result = await sync_manager.push()
@@ -275,7 +275,7 @@ All Subscribed Dashboards
 
 ```
 GitSyncManager (Background Task)
-  ↓ Runs every 5 minutes: git add .htmlgraph → commit → push
+  ↓ Runs every 5 minutes: git add .wipnote → commit → push
   ↓ On push completion: SyncResult created
   ↓ Broadcasts SyncResult event to all clients
 
@@ -321,7 +321,7 @@ const ws = new WebSocket('ws://localhost:8000/ws/broadcasts');
 
 ```python
 # Backend: When feature status changes
-from htmlgraph.api.broadcast import CrossSessionBroadcaster
+from wipnote.api.broadcast import CrossSessionBroadcaster
 
 await broadcaster.broadcast_event(
   event_type="feature_updated",
@@ -345,7 +345,7 @@ await broadcaster.broadcast_event(
 
 ```python
 # When feature status changes, invalidate dependent queries
-from htmlgraph.api.reactive import ReactiveQueryManager
+from wipnote.api.reactive import ReactiveQueryManager
 
 query_mgr = ReactiveQueryManager()
 
@@ -365,11 +365,11 @@ query_mgr.record_dependency(
 
 ## Running the Demo
 
-### Start the HtmlGraph Server
+### Start the Wipnote Server
 
 ```bash
 cd /Users/shakes/DevProjects/htmlgraph
-uv run htmlgraph serve
+uv run wipnote serve
 ```
 
 The server starts on `http://localhost:8000`
@@ -388,8 +388,8 @@ open http://localhost:8000/views/presence-widget
 
 ```bash
 python3 << 'EOF'
-from htmlgraph import SDK
-from htmlgraph.api.presence import PresenceManager
+from wipnote import SDK
+from wipnote.api.presence import PresenceManager
 from datetime import datetime
 
 # Initialize
@@ -442,7 +442,7 @@ EOF
 2. Open dashboard in Tab B: Same URL
 3. In a third terminal, trigger presence event:
    ```bash
-   python3 -c "from htmlgraph import SDK; SDK('test').features.create('Test Feature').save()"
+   python3 -c "from wipnote import SDK; SDK('test').features.create('Test Feature').save()"
    ```
 4. **Observe**: Both Tab A and Tab B update simultaneously (<100ms)
 
@@ -507,9 +507,9 @@ EOF
 
 - [Phase 5 Broadcast API](./BROADCAST_SYNC.md) - Cross-session feature updates
 - [Phase 5 Reactive API](./PHASE_4_OFFLINE_MERGE.md) - Auto-updating queries
-- [Phase 5 Presence API](../src/python/htmlgraph/api/presence.py) - Agent status tracking
-- [Phase 5 Sync API](../src/python/htmlgraph/api/sync_routes.py) - Multi-device git sync
-- [Dashboard Demo](../src/python/htmlgraph/api/static/presence-widget-demo.html) - Working example
+- [Phase 5 Presence API](../src/python/wipnote/api/presence.py) - Agent status tracking
+- [Phase 5 Sync API](../src/python/wipnote/api/sync_routes.py) - Multi-device git sync
+- [Dashboard Demo](../src/python/wipnote/api/static/presence-widget-demo.html) - Working example
 
 ---
 

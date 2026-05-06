@@ -1,6 +1,6 @@
 ---
 name: parallel-orchestrator
-description: Orchestrate parallel agent workflows using HtmlGraph's ParallelWorkflow. Activate when planning multi-agent work, using Task tool for sub-agents, or coordinating concurrent feature implementation.
+description: Orchestrate parallel agent workflows using Wipnote's ParallelWorkflow. Activate when planning multi-agent work, using Task tool for sub-agents, or coordinating concurrent feature implementation.
 ---
 
 # Parallel Orchestrator Skill
@@ -23,7 +23,7 @@ description: Orchestrate parallel agent workflows using HtmlGraph's ParallelWork
 
 ## Core Principle: 6-Phase Parallel Workflow
 
-HtmlGraph provides `ParallelWorkflow` for optimal parallel agent execution:
+Wipnote provides `ParallelWorkflow` for optimal parallel agent execution:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -43,7 +43,7 @@ HtmlGraph provides `ParallelWorkflow` for optimal parallel agent execution:
 **Always run analysis before dispatching agents!**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="orchestrator")
 
@@ -266,7 +266,7 @@ else:
 
 ## Integration with Other Skills
 
-### With `htmlgraph-tracker`
+### With `wipnote-tracker`
 - Parallel agents each track their own session
 - Activities attributed to features automatically
 - Drift detection per agent
@@ -281,7 +281,7 @@ else:
 ## Quick Reference
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="orchestrator")
 

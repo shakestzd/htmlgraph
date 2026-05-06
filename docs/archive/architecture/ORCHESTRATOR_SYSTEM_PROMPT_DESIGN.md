@@ -1,7 +1,7 @@
 # Comprehensive Orchestrator System Prompt Design Report
 
 **Date:** 2025-01-03
-**Project:** HtmlGraph
+**Project:** Wipnote
 **Designer:** Claude Code
 **Status:** Complete
 **Spike ID:** spk-2bae747e
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This report documents the design of a comprehensive orchestrator system prompt that leverages HtmlGraph's HeadlessSpawner capabilities to create a unified multi-agent coordination framework. The design enables strategic AI agents to intelligently spawn specialized workers (Claude, Gemini, Copilot, Codex) while maintaining high-level decision-making authority.
+This report documents the design of a comprehensive orchestrator system prompt that leverages Wipnote's HeadlessSpawner capabilities to create a unified multi-agent coordination framework. The design enables strategic AI agents to intelligently spawn specialized workers (Claude, Gemini, Copilot, Codex) while maintaining high-level decision-making authority.
 
 **Key Insight:** Delegation > Direct Execution. Cascading tool failures consume more context than structured delegation with error handling in subagents.
 
@@ -218,7 +218,7 @@ DELEGATION CHOICE:
 | Decision Framework | 300 | Direct vs Delegate vs Spawn |
 | Multi-Agent Strategy | 400 | spawn_* vs Task() comparison |
 | Spawner Selection | 250 | Decision tree + matrix |
-| HtmlGraph Integration | 300 | SDK patterns + tracking |
+| Wipnote Integration | 300 | SDK patterns + tracking |
 | Spawning Patterns | 350 | Code examples for each spawner |
 | Integration Patterns | 250 | 4 usage patterns |
 | Operational Guidelines | 200 | Responsibilities + success metrics |
@@ -244,7 +244,7 @@ Provides:
 
 Ensures developer picks optimal agent for task.
 
-#### C. HtmlGraph Integration Section
+#### C. Wipnote Integration Section
 Includes:
 - Python code examples for SDK usage
 - Tracking delegation work
@@ -273,7 +273,7 @@ Clarifies:
 - Strategic decisions (what to build)
 - Planning and design
 - Single tool calls (read file, simple command)
-- SDK operations (HtmlGraph tracking)
+- SDK operations (Wipnote tracking)
 
 **Rule 2: When to Use Task()**
 - Sequential steps with shared context
@@ -400,7 +400,7 @@ with ThreadPoolExecutor(max_workers=3) as executor:
 ### 4.4 Task Coordination Pattern
 
 ```python
-from htmlgraph.orchestration import delegate_with_id, save_task_results, get_results_by_task_id
+from wipnote.orchestration import delegate_with_id, save_task_results, get_results_by_task_id
 
 # Step 1: Create task IDs
 impl_id, impl_prompt = delegate_with_id(
@@ -476,7 +476,7 @@ else:
 
 ---
 
-## Part 6: Integration with HtmlGraph
+## Part 6: Integration with Wipnote
 
 ### 6.1 SDK Integration Points
 
@@ -526,10 +526,10 @@ track = sdk.tracks.create("OAuth Initiative") \
 ### 6.2 Orchestrator Workflow
 
 1. **Analyze** - Break down work into tasks
-2. **Create Features** - Track in HtmlGraph
+2. **Create Features** - Track in Wipnote
 3. **Delegate** - Task() or spawn_* with task IDs
 4. **Capture** - Get results from delegated work
-5. **Save** - Store in HtmlGraph spikes
+5. **Save** - Store in Wipnote spikes
 6. **Coordinate** - Use results for next decisions
 7. **Complete** - Mark features as done
 
@@ -552,7 +552,7 @@ Before spawning:
 Before committing:
 - [ ] Validation passed
 - [ ] Results linked to work items
-- [ ] HtmlGraph updated
+- [ ] Wipnote updated
 - [ ] Next steps identified
 - [ ] Quality gates met
 - [ ] Spike saved
@@ -563,7 +563,7 @@ Before committing:
 - Delegation reduces tool calls by 5-8x
 - Parallel work completes faster (vs sequential)
 - Strategic context maintained throughout
-- All work tracked in HtmlGraph
+- All work tracked in Wipnote
 - Decision clarity improved
 
 **Anti-Patterns to Avoid:**
@@ -706,7 +706,7 @@ if result.success:
 
 ### Q: How do I handle spawn failures?
 
-**A:** Check `result.success` and `result.error`. Log to HtmlGraph spike, then either retry or escalate to human review.
+**A:** Check `result.success` and `result.error`. Log to Wipnote spike, then either retry or escalate to human review.
 
 ---
 
@@ -716,7 +716,7 @@ The comprehensive orchestrator system prompt (2500 tokens) provides:
 
 1. **Clear Decision Framework** - When to execute, delegate, or spawn
 2. **Spawner Selection Guide** - Choose right tool for each task
-3. **HtmlGraph Integration** - Track all work systematically
+3. **Wipnote Integration** - Track all work systematically
 4. **Cost Optimization** - 5-8x savings through smart delegation
 5. **Operational Patterns** - 4 architectural patterns for different scenarios
 6. **Implementation Ready** - Copy-paste code examples
@@ -727,14 +727,14 @@ The comprehensive orchestrator system prompt (2500 tokens) provides:
 - Reduce token costs by 85% through delegation
 - Parallelize independent work for speed
 - Maintain strategic context throughout
-- Track all work in HtmlGraph
+- Track all work in Wipnote
 - Make optimal spawner choices systematically
 
 **Next Steps:**
 1. Deploy prompt via `--system-prompt` flag
 2. Use decision framework for task classification
 3. Leverage SpawningPatterns for common scenarios
-4. Track results in HtmlGraph
+4. Track results in Wipnote
 5. Monitor cost savings and refine patterns
 
 ---

@@ -15,7 +15,7 @@
 ### For Project Managers
 1. **Overview:** [`PHASE_1AB_IMPLEMENTATION_SUMMARY.md`](PHASE_1AB_IMPLEMENTATION_SUMMARY.md) (10 min)
 2. **Status:** [`QUALITY_GATES_VALIDATION_REPORT.md`](QUALITY_GATES_VALIDATION_REPORT.md)
-3. **Progress:** `.htmlgraph/features/feat-4d5b889e.html`
+3. **Progress:** `.wipnote/features/feat-4d5b889e.html`
 4. **Metrics:** Track in validation report
 
 ### For Quality Assurance
@@ -159,9 +159,9 @@
 ### Before Every Commit
 ```bash
 # Run ALL of these - they MUST all pass
-uv run ruff check --fix src/python/htmlgraph/cli.py
-uv run ruff format src/python/htmlgraph/cli.py
-uv run mypy src/python/htmlgraph/cli.py --strict
+uv run ruff check --fix src/python/wipnote/cli.py
+uv run ruff format src/python/wipnote/cli.py
+uv run mypy src/python/wipnote/cli.py --strict
 uv run pytest tests/python/test_cli_rich_output.py -v
 uv run pytest tests/python/test_cli_commands.py -v
 ```
@@ -169,7 +169,7 @@ uv run pytest tests/python/test_cli_commands.py -v
 ### Quick Status Check
 ```bash
 # Count remaining plain print() statements
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "console.print" | grep -v "# " | wc -l
 
 # Should DECREASE (currently ~550)
@@ -190,9 +190,9 @@ uv run pytest tests/ -v --tb=short
 ### Manual Testing
 ```bash
 # Test with your changes
-uv run htmlgraph feature list      # Verify table formatting
-uv run htmlgraph session list      # Verify colors
-uv run htmlgraph analytics         # Verify progress bar
+uv run wipnote feature list      # Verify table formatting
+uv run wipnote session list      # Verify colors
+uv run wipnote analytics         # Verify progress bar
 ```
 
 ---
@@ -244,7 +244,7 @@ TEST RESULTS:
 → Verify with test results
 
 **Track progress**
-→ Check `.htmlgraph/features/feat-4d5b889e.html`
+→ Check `.wipnote/features/feat-4d5b889e.html`
 → Review metrics in `QUALITY_GATES_VALIDATION_REPORT.md`
 → Run regression check (see Quick Command Reference)
 
@@ -274,8 +274,8 @@ TEST RESULTS:
 ### Implementation (Write Here)
 | File | Type | Task |
 |------|------|------|
-| `src/python/htmlgraph/cli.py` | Python | Convert print() to Rich |
-| `.htmlgraph/features/feat-4d5b889e.html` | HTML | Track implementation |
+| `src/python/wipnote/cli.py` | Python | Convert print() to Rich |
+| `.wipnote/features/feat-4d5b889e.html` | HTML | Track implementation |
 
 ### Tests (Run These)
 | File | Tests | Purpose |
@@ -421,7 +421,7 @@ Track:
 - **Tests:** `tests/python/test_cli_rich_output.py`
 
 ### Progress Tracking
-- **Feature:** `.htmlgraph/features/feat-4d5b889e.html`
+- **Feature:** `.wipnote/features/feat-4d5b889e.html`
 - **Metrics:** `QUALITY_GATES_VALIDATION_REPORT.md`
 - **Status:** Run regression check command
 
@@ -446,7 +446,7 @@ Track:
 | **Review metrics** | `QUALITY_GATES_VALIDATION_REPORT.md` |
 | **Understand scope** | `PHASE_1AB_IMPLEMENTATION_SUMMARY.md` |
 | **Navigate docs** | `PHASE_1AB_INDEX.md` (this file) |
-| **Track progress** | `.htmlgraph/features/feat-4d5b889e.html` |
+| **Track progress** | `.wipnote/features/feat-4d5b889e.html` |
 | **Run tests** | `tests/python/test_cli_rich_output.py` |
 
 ---

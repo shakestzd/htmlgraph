@@ -102,9 +102,9 @@ if Confirm.ask("Continue?"):
 
 ```bash
 # Run ALL of these - they must ALL pass
-uv run ruff check --fix src/python/htmlgraph/cli.py
-uv run ruff format src/python/htmlgraph/cli.py
-uv run mypy src/python/htmlgraph/cli.py --strict
+uv run ruff check --fix src/python/wipnote/cli.py
+uv run ruff format src/python/wipnote/cli.py
+uv run mypy src/python/wipnote/cli.py --strict
 uv run pytest tests/python/test_cli_rich_output.py -v
 uv run pytest tests/python/test_cli_commands.py -v
 ```
@@ -119,7 +119,7 @@ uv run pytest tests/python/test_cli_commands.py -v
 # Count remaining plain print() statements
 # Should DECREASE or stay same, NEVER INCREASE
 
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "console.print" | grep -v "# " | wc -l
 
 # Current baseline: ~550
@@ -181,7 +181,7 @@ console.print(f"[green]✓[/green] Feature [bold]{name}[/bold] created")
 
 ```python
 console.print(f"[red]✗ Error:[/red] Feature not found")
-console.print("[dim cyan]Hint: Use 'htmlgraph feature list' to see available[/dim cyan]")
+console.print("[dim cyan]Hint: Use 'wipnote feature list' to see available[/dim cyan]")
 ```
 
 ### Pattern: Long Operation
@@ -223,7 +223,7 @@ else:
 
 ```bash
 # Run a command that uses your changes
-uv run htmlgraph feature list
+uv run wipnote feature list
 
 # Verify:
 # ✓ Colors display correctly
@@ -273,7 +273,7 @@ Tracked by: feat-4d5b889e (Phase 1A/1B: Maximize Rich Console)
 
 ### "Mypy errors"
 ```bash
-uv run mypy src/python/htmlgraph/cli.py --show-error-context --pretty
+uv run mypy src/python/wipnote/cli.py --show-error-context --pretty
 # Fix type hints or add comments like: # type: ignore
 ```
 
@@ -310,9 +310,9 @@ if args.format == "json":
 | Rich Output Guide | `docs/RICH_OUTPUT_GUIDE.md` |
 | Quality Gates | `QUALITY_GATES_PHASE_1AB.md` |
 | Validation Report | `QUALITY_GATES_VALIDATION_REPORT.md` |
-| Feature Tracking | `.htmlgraph/features/feat-4d5b889e.html` |
+| Feature Tracking | `.wipnote/features/feat-4d5b889e.html` |
 | Rich Documentation | https://rich.readthedocs.io/ |
-| CLI Implementation | `src/python/htmlgraph/cli.py` |
+| CLI Implementation | `src/python/wipnote/cli.py` |
 
 ---
 
@@ -335,9 +335,9 @@ STATUS: On track, ready for implementation
 ```bash
 # Quick status (run before and after coding)
 echo "=== Print() Count ===" && \
-grep -c "console.print(" src/python/htmlgraph/cli.py && \
+grep -c "console.print(" src/python/wipnote/cli.py && \
 echo "=== Remaining print() ===" && \
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "console.print" | grep -v "# " | wc -l && \
 echo "=== Tests ===" && \
 uv run pytest tests/python/test_cli_rich_output.py -q

@@ -48,7 +48,7 @@ An actionable recommendation or warning derived from pattern analysis.
 ### Pattern Detection
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -213,7 +213,7 @@ User feedback refines future recommendations.
 ### Detect Patterns and Get Insights
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize SDK
 sdk = SDK(agent="claude")
@@ -244,7 +244,7 @@ for anti in anti_patterns[:3]:
     print(f"   Impact: {anti.impact_score:.1f}")
 
 # Export report for team
-sdk.pattern_learning.export_learnings(".htmlgraph/pattern_report.md")
+sdk.pattern_learning.export_learnings(".wipnote/pattern_report.md")
 ```
 
 ### Provide Feedback
@@ -448,7 +448,7 @@ Pattern 'Read → Read → Read → Edit' contains 3 Read operations. Consider d
 
 ## References
 
-- **Source**: `src/python/htmlgraph/analytics/pattern_learning.py`
+- **Source**: `src/python/wipnote/analytics/pattern_learning.py`
 - **Tests**: `tests/python/test_pattern_learning.py`
 - **Demo**: `examples/pattern_learning_demo.py`
 - **Phase 2 Plan**: See project roadmap for Pattern Learning feature

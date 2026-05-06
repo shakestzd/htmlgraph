@@ -2,7 +2,7 @@
 
 ## Overview
 
-HtmlGraph SDK now provides automatic session state detection and environment variable management through the `SessionStateManager` class. This enables the SessionStart hook to automatically detect post-compact sessions, determine delegation status, and set up environment variables without manual configuration.
+Wipnote SDK now provides automatic session state detection and environment variable management through the `SessionStateManager` class. This enables the SessionStart hook to automatically detect post-compact sessions, determine delegation status, and set up environment variables without manual configuration.
 
 ## Key Features
 
@@ -52,9 +52,9 @@ Stores session state metadata for future reference:
 ### Using SessionStateManager Directly
 
 ```python
-from htmlgraph.session_state import SessionStateManager
+from wipnote.session_state import SessionStateManager
 
-manager = SessionStateManager(".htmlgraph")
+manager = SessionStateManager(".wipnote")
 
 # Get current session state (auto-detects everything)
 state = manager.get_current_state()
@@ -74,7 +74,7 @@ is_compact = manager.detect_compact_automatically()
 ### Using SDK Sessions Collection
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-code")
 
@@ -100,7 +100,7 @@ sdk.sessions.record_state(
 #!/usr/bin/env -S uv run
 # .claude/hooks/scripts/session-start.py
 
-from htmlgraph import SDK
+from wipnote import SDK
 
 def setup_session_state_and_environment():
     """Automatically set up session state and environment variables."""
@@ -151,10 +151,10 @@ The system uses several heuristics to detect post-compact sessions:
 
 2. **Session End Detection**
    - If previous session marked as `is_ended`: confirms post-compact
-   - Checks `.htmlgraph/sessions/session_state.json`
+   - Checks `.wipnote/sessions/session_state.json`
 
 3. **Compact Marker File**
-   - If `.htmlgraph/sessions/.compacted` exists: post-compact
+   - If `.wipnote/sessions/.compacted` exists: post-compact
    - Marker can be created by `/clear` command or manual compaction
 
 4. **Delegation Auto-Enable**
@@ -206,7 +206,7 @@ Result:
 
 ```
 CLAUDE_SESSION_ID=sess-new789 (new)
-Clear marker file exists: .htmlgraph/sessions/.compacted
+Clear marker file exists: .wipnote/sessions/.compacted
 
 Result:
 - session_source: "clear"
@@ -222,14 +222,14 @@ Result:
 
 2. **Automatic Post-Compact Detection**
    - No need to manually track session IDs
-   - HtmlGraph detects compaction automatically
+   - Wipnote detects compaction automatically
 
 3. **Intelligent Delegation Status**
    - Automatically enable delegation when needed (post-compact)
    - Can be overridden via environment variable
 
 4. **Persistent State**
-   - Session metadata stored in `.htmlgraph/sessions/session_state.json`
+   - Session metadata stored in `.wipnote/sessions/session_state.json`
    - Available for future reference and debugging
 
 5. **Zero User Friction**
@@ -267,7 +267,7 @@ export HTMLGRAPH_DELEGATION_DISABLE=1
 
 ```bash
 # View current session state
-cat .htmlgraph/sessions/session_state.json
+cat .wipnote/sessions/session_state.json
 
 # Check environment variables
 echo $CLAUDE_SESSION_ID
@@ -290,7 +290,7 @@ echo $CLAUDE_SESSION_COMPACTED
 **After (automatic):**
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-code")
 state = sdk.sessions.get_current_state()
@@ -303,7 +303,7 @@ env_vars = sdk.sessions.setup_environment_variables(state)
 No changes needed! The SDK automatically initializes `SessionStateManager` on first access to `sdk.sessions`:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude-code")
 
@@ -313,14 +313,14 @@ state = sdk.sessions.get_current_state()
 
 ## Implementation Details
 
-### SessionStateManager (`src/python/htmlgraph/session_state.py`)
+### SessionStateManager (`src/python/wipnote/session_state.py`)
 
 - **Core class** for session state detection and management
 - Detects session source by comparing session IDs and metadata
 - Manages environment variables (set, retrieve, record)
 - Stores session metadata in JSON file
 
-### SessionCollection (`src/python/htmlgraph/collections/session.py`)
+### SessionCollection (`src/python/wipnote/collections/session.py`)
 
 - **SDK integration layer** for session state operations
 - Wraps SessionStateManager with SDK context
@@ -340,7 +340,7 @@ state = sdk.sessions.get_current_state()
 Check file permissions:
 
 ```bash
-ls -la .htmlgraph/sessions/session_state.json
+ls -la .wipnote/sessions/session_state.json
 ```
 
 ### Delegation not being enabled after compact
@@ -348,7 +348,7 @@ ls -la .htmlgraph/sessions/session_state.json
 Verify post-compact detection:
 
 ```bash
-python -c "from htmlgraph import SDK; sdk = SDK(); state = sdk.sessions.get_current_state(); print(f\"Post-compact: {state['is_post_compact']}\")"
+python -c "from wipnote import SDK; sdk = SDK(); state = sdk.sessions.get_current_state(); print(f\"Post-compact: {state['is_post_compact']}\")"
 ```
 
 ### Environment variables not set

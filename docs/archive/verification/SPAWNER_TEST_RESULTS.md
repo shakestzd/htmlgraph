@@ -204,10 +204,10 @@ Multiple historical failures: All recent Gemini subprocess events show "failed" 
 
 ### Python Environment
 - Python 3.10.7
-- Project: HtmlGraph (v0.9.4)
+- Project: Wipnote (v0.9.4)
 
 ### Database
-- Path: `.htmlgraph/htmlgraph.db`
+- Path: `.wipnote/wipnote.db`
 - Schema: agent_events table with full hierarchy support
 - Recent events: 5016 total, 159 completed, 46 started, 55 failed
 
@@ -299,10 +299,10 @@ ORDER BY created_at DESC LIMIT 30
 ## Test Files & References
 
 ### Agent Output Locations
-- CopilotSpawner: `/tmp/claude/-Users-shakes-DevProjects-htmlgraph/tasks/adf969b.output`
-- Codex CLI: `/tmp/claude/-Users-shakes-DevProjects-htmlgraph/tasks/a218df1.output`
-- Gemini CLI: `/tmp/claude/-Users-shakes-DevProjects-htmlgraph/tasks/ac48157.output`
-- Dashboard: `/tmp/claude/-Users-shakes-DevProjects-htmlgraph/tasks/aaddb0d.output`
+- CopilotSpawner: `/tmp/claude/-Users-shakes-DevProjects-wipnote/tasks/adf969b.output`
+- Codex CLI: `/tmp/claude/-Users-shakes-DevProjects-wipnote/tasks/a218df1.output`
+- Gemini CLI: `/tmp/claude/-Users-shakes-DevProjects-wipnote/tasks/ac48157.output`
+- Dashboard: `/tmp/claude/-Users-shakes-DevProjects-wipnote/tasks/aaddb0d.output`
 
 ### Database Queries Used
 ```sql

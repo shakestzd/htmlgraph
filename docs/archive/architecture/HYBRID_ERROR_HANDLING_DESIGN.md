@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Your Proposal:** Log full tracebacks to HtmlGraph and show minimal console output.
+**Your Proposal:** Log full tracebacks to Wipnote and show minimal console output.
 
 **Status:** ✅ **DESIGNED & READY FOR IMPLEMENTATION**
 
@@ -132,7 +132,7 @@ except Exception as e:
 
 # New command:
 def cmd_session_debug(args):
-    """htmlgraph session debug [--filter TYPE] [--recent N] [--pattern STR]"""
+    """wipnote session debug [--filter TYPE] [--recent N] [--pattern STR]"""
 ```
 
 ---
@@ -141,7 +141,7 @@ def cmd_session_debug(args):
 
 ### Example 1: Normal Run (Typo)
 ```bash
-$ htmlgraph analtics    # typo
+$ wipnote analtics    # typo
 
 Console Output:
 ❌ ERROR: unrecognized command 'analtics'
@@ -151,14 +151,14 @@ Console Output:
 
 Behind the scenes:
 - Full Rich traceback captured (794 tokens of info)
-- Stored in HtmlGraph session
+- Stored in Wipnote session
 - User sees only 163 tokens of output
 - Net result: 80% token savings
 ```
 
 ### Example 2: Verbose Mode
 ```bash
-$ htmlgraph feature create "My Feature" --verbose
+$ wipnote feature create "My Feature" --verbose
 
 Console Output:
 ERROR: Invalid feature title
@@ -175,7 +175,7 @@ Tokens: 300 (62% reduction)
 
 ### Example 3: Debug Mode (Immediate Full Output)
 ```bash
-$ htmlgraph feature create "My Feature" --debug
+$ wipnote feature create "My Feature" --debug
 
 Console Output:
 ╭─ Traceback (most recent call last) ─────────────────────╮
@@ -196,7 +196,7 @@ Tokens: 794 (0% reduction, but intentional)
 
 ### Example 4: Retrieve Later
 ```bash
-$ htmlgraph session debug sess-abc123 --filter ValueError
+$ wipnote session debug sess-abc123 --filter ValueError
 
 Session: sess-abc123
 Errors: 2
@@ -281,7 +281,7 @@ def log_error_safely(error):
 - [ ] Integration tests (50 lines)
 
 ### Phase 3: Session Debug Command (Day 3-4)
-- [ ] Implement `htmlgraph session debug` command (50 lines)
+- [ ] Implement `wipnote session debug` command (50 lines)
 - [ ] Add filtering: `--filter <type>`, `--recent <N>`, `--pattern <str>`
 - [ ] Add pagination and formatting
 - [ ] Command tests (75 lines)
@@ -317,7 +317,7 @@ def log_error_safely(error):
 
 ## Feature Tracking
 
-**HtmlGraph Feature:** `feat-6b120fe6`
+**Wipnote Feature:** `feat-6b120fe6`
 **Title:** Implement Hybrid Error Handling System
 **Priority:** High
 **Status:** Ready for implementation
@@ -328,8 +328,8 @@ def log_error_safely(error):
 
 When implementation is complete:
 - ✅ Default error display: 163 tokens
-- ✅ Full traceback stored in HtmlGraph: 100% capture
-- ✅ Retrieval via `htmlgraph session debug`: Working
+- ✅ Full traceback stored in Wipnote: 100% capture
+- ✅ Retrieval via `wipnote session debug`: Working
 - ✅ `--debug` flag: Full traceback shown
 - ✅ `--verbose` flag: Stack trace without locals
 - ✅ All quality gates passing

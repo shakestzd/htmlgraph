@@ -1,6 +1,6 @@
 # Deployment Automation - Complete Reference
 
-This document provides comprehensive deployment and release workflows for HtmlGraph.
+This document provides comprehensive deployment and release workflows for Wipnote.
 
 ---
 
@@ -54,9 +54,9 @@ uv run pytest
 **Excluded from git (regenerable):**
 ```
 .gitignore now excludes regenerable session tracking:
-- .htmlgraph/sessions/*.jsonl
-- .htmlgraph/events/*.jsonl
-- .htmlgraph/parent-activity.json
+- .wipnote/sessions/*.jsonl
+- .wipnote/events/*.jsonl
+- .wipnote/parent-activity.json
 
 This eliminates the multi-commit cycle problem.
 ```
@@ -105,7 +105,7 @@ This eliminates the multi-commit cycle problem.
 
 ### What the Script Does (9 Steps)
 
-- **Pre-flight: Dashboard Sync** - Sync `src/python/htmlgraph/dashboard.html` → `index.html` **[NEW]**
+- **Pre-flight: Dashboard Sync** - Sync `src/python/wipnote/dashboard.html` → `index.html` **[NEW]**
 - **Pre-flight: Code Quality** - Run linters (ruff, mypy) and tests
 - **Pre-flight: Plugin Sync** - Verify packages/claude-plugin and .claude are synced
 0. **Update & Commit Versions** - Auto-update version numbers in all files and commit
@@ -113,7 +113,7 @@ This eliminates the multi-commit cycle problem.
 2. **Build Package** - Create wheel and source distributions
 3. **Publish to PyPI** - Upload package to PyPI
 4. **Local Install** - Install latest version locally
-5. **Update Claude Plugin** - Run `claude plugin update htmlgraph`
+5. **Update Claude Plugin** - Run `claude plugin update wipnote`
 6. **Update Gemini Extension** - Update version in gemini-extension.json
 7. **Update Codex Skill** - Check for Codex and update if present
 8. **Create GitHub Release** - Create release with distribution files
@@ -122,7 +122,7 @@ This eliminates the multi-commit cycle problem.
 
 ## Version Numbering
 
-HtmlGraph follows [Semantic Versioning](https://semver.org/):
+Wipnote follows [Semantic Versioning](https://semver.org/):
 - **MAJOR.MINOR.PATCH** (e.g., 0.3.0)
 - **MAJOR**: Breaking changes
 - **MINOR**: New features (backward compatible)
@@ -132,7 +132,7 @@ HtmlGraph follows [Semantic Versioning](https://semver.org/):
 
 **Automatically updated by deploy-all.sh:**
 1. `pyproject.toml` - Package version
-2. `src/python/htmlgraph/__init__.py` - `__version__` variable
+2. `src/python/wipnote/__init__.py` - `__version__` variable
 3. `packages/claude-plugin/.claude-plugin/plugin.json` - Claude plugin version
 4. `packages/gemini-extension/gemini-extension.json` - Gemini extension version
 
@@ -147,7 +147,7 @@ VERSION="0.3.0"
 sed -i '' "s/version = \".*\"/version = \"$VERSION\"/" pyproject.toml
 
 # Update Python __init__.py
-sed -i '' "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" src/python/htmlgraph/__init__.py
+sed -i '' "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" src/python/wipnote/__init__.py
 
 # Update Claude plugin
 sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" packages/claude-plugin/.claude-plugin/plugin.json
@@ -181,7 +181,7 @@ sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" packages/gemini-ext
 ./scripts/deploy-all.sh 0.3.0 --build-only
 
 # 2. Commit version bump
-git add pyproject.toml src/python/htmlgraph/__init__.py \
+git add pyproject.toml src/python/wipnote/__init__.py \
   packages/claude-plugin/.claude-plugin/plugin.json \
   packages/gemini-extension/gemini-extension.json
 git commit -m "chore: bump version to 0.3.0"
@@ -192,15 +192,15 @@ git push origin main --tags
 
 # 4. Build distributions
 uv build
-# Creates: dist/htmlgraph-0.3.0-py3-none-any.whl
-#          dist/htmlgraph-0.3.0.tar.gz
+# Creates: dist/wipnote-0.3.0-py3-none-any.whl
+#          dist/wipnote-0.3.0.tar.gz
 
 # 5. Publish to PyPI
 source .env  # Load PyPI_API_TOKEN
-uv publish dist/htmlgraph-0.3.0* --token "$PyPI_API_TOKEN"
+uv publish dist/wipnote-0.3.0* --token "$PyPI_API_TOKEN"
 
 # 6. Verify publication
-open https://pypi.org/project/htmlgraph/
+open https://pypi.org/project/wipnote/
 ```
 
 ---
@@ -239,10 +239,10 @@ uv publish dist/* --username YOUR_USERNAME --password YOUR_PASSWORD
 
 ```bash
 # Users update with:
-claude plugin update htmlgraph
+claude plugin update wipnote
 
 # Or fresh install:
-claude plugin install htmlgraph@0.3.0
+claude plugin install wipnote@0.3.0
 ```
 
 ### Update Gemini Extension
@@ -256,11 +256,11 @@ claude plugin install htmlgraph@0.3.0
 
 ```bash
 # Test PyPI package
-pip install htmlgraph==0.3.0
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+pip install wipnote==0.3.0
+python -c "import wipnote; print(wipnote.__version__)"
 
 # Check PyPI page
-curl -s https://pypi.org/pypi/htmlgraph/json | \
+curl -s https://pypi.org/pypi/wipnote/json | \
   python -c "import sys, json; print(json.load(sys.stdin)['info']['version'])"
 ```
 
@@ -276,7 +276,7 @@ curl -s https://pypi.org/pypi/htmlgraph/json | \
 gh release create v0.3.0 \
   --title "Release v0.3.0" \
   --notes "See CHANGELOG.md for details" \
-  dist/htmlgraph-0.3.0*
+  dist/wipnote-0.3.0*
 ```
 
 ---
@@ -285,8 +285,8 @@ gh release create v0.3.0 \
 
 **AUTOMATIC: Dashboard sync happens automatically during deployment.**
 
-HtmlGraph maintains two versions of the dashboard HTML file:
-- **Source of Truth**: `src/python/htmlgraph/dashboard.html` (packaged with Python library)
+Wipnote maintains two versions of the dashboard HTML file:
+- **Source of Truth**: `src/python/wipnote/dashboard.html` (packaged with Python library)
 - **Project Root**: `index.html` (for easy viewing in development)
 
 ### Automatic Sync Behavior
@@ -300,7 +300,7 @@ HtmlGraph maintains two versions of the dashboard HTML file:
 
 ```bash
 # Sync manually (rare - deployment handles this)
-cp src/python/htmlgraph/dashboard.html index.html
+cp src/python/wipnote/dashboard.html index.html
 
 # Check if files are in sync
 git diff --quiet index.html && echo "In sync" || echo "Out of sync"
@@ -319,7 +319,7 @@ git diff --quiet index.html && echo "In sync" || echo "Out of sync"
 
 **CRITICAL: Use `# sync-docs not yet in Go CLI` to maintain documentation consistency.**
 
-HtmlGraph uses a centralized documentation pattern:
+Wipnote uses a centralized documentation pattern:
 - **AGENTS.md** - Single source of truth (SDK, API, CLI, workflows)
 - **CLAUDE.md** - Platform-specific notes + references AGENTS.md
 - **GEMINI.md** - Platform-specific notes + references AGENTS.md
@@ -360,8 +360,8 @@ VERSION="0.3.0"
 # Run deploy-all.sh (handles version updates, commit, tag, build, publish)
 ./scripts/deploy-all.sh "$VERSION" --no-confirm
 
-echo "✅ Published htmlgraph $VERSION to PyPI"
-echo "📦 https://pypi.org/project/htmlgraph/$VERSION/"
+echo "✅ Published wipnote $VERSION to PyPI"
+echo "📦 https://pypi.org/project/wipnote/$VERSION/"
 ```
 
 ### Testing a Build Locally
@@ -371,14 +371,14 @@ echo "📦 https://pypi.org/project/htmlgraph/$VERSION/"
 ./scripts/deploy-all.sh 0.3.0 --build-only
 
 # Install locally
-uv pip install dist/htmlgraph-0.3.0-py3-none-any.whl --force-reinstall
+uv pip install dist/wipnote-0.3.0-py3-none-any.whl --force-reinstall
 
 # Test import
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+python -c "import wipnote; print(wipnote.__version__)"
 
 # Test CLI
-htmlgraph --help
-htmlgraph status
+wipnote --help
+wipnote status
 ```
 
 ### Documentation-Only Updates
@@ -395,8 +395,8 @@ htmlgraph status
 ./scripts/deploy-all.sh 0.3.0 --skip-pypi
 
 # Test locally installed package
-htmlgraph status
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+wipnote status
+python -c "import wipnote; print(wipnote.__version__)"
 ```
 
 ---
@@ -426,7 +426,7 @@ Mark as unavailable (doesn't delete, just warns users):
 ```bash
 # Use twine to yank (uv doesn't support this yet)
 pip install twine
-twine yank htmlgraph 0.3.0 -r pypi
+twine yank wipnote 0.3.0 -r pypi
 ```
 
 **What yank does:**
@@ -457,13 +457,13 @@ gh release edit v0.3.1 --notes "Fixes critical bug in v0.3.0 (yanked)"
 
 **Symptom:**
 ```
-Error: Must be run from project root (htmlgraph/)
+Error: Must be run from project root (wipnote/)
 ```
 
 **Solution:**
 ```bash
 # Navigate to project root
-cd /Users/shakes/DevProjects/htmlgraph
+cd /Users/shakes/DevProjects/wipnote
 
 # Verify you're in correct directory
 ls -la scripts/deploy-all.sh  # Should exist
@@ -563,7 +563,7 @@ Warning: Dashboard files out of sync
 ./scripts/deploy-all.sh 0.3.0
 
 # Or sync manually
-cp src/python/htmlgraph/dashboard.html index.html
+cp src/python/wipnote/dashboard.html index.html
 git add index.html
 git commit -m "chore: sync index.html with dashboard.html"
 ```
@@ -578,11 +578,11 @@ Error: Claude plugin update failed
 **Solution:**
 ```bash
 # Update plugin manually
-claude plugin update htmlgraph
+claude plugin update wipnote
 
 # Or reinstall
-claude plugin uninstall htmlgraph
-claude plugin install htmlgraph@0.3.0
+claude plugin uninstall wipnote
+claude plugin install wipnote@0.3.0
 ```
 
 ---

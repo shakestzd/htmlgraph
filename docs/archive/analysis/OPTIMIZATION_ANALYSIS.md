@@ -266,7 +266,7 @@ With optimization heuristics:
 | SDK patterns | ✓ Complete | ✓ Refined | OK |
 | delegate_with_id() | ✓ Present | ✓ Present | OK |
 | save_task_results() | ✓ Present | ✓ Integrated | OK |
-| HtmlGraph tracking | ✓ Full pattern | ✓ Condensed | OK |
+| Wipnote tracking | ✓ Full pattern | ✓ Condensed | OK |
 | Spawner names | ✓ spawn_claude | ✓ All 4 spawners | OK |
 | Permission modes | ✓ All 6 modes | ✓ Contextualized | IMPROVED |
 
@@ -283,7 +283,7 @@ With optimization heuristics:
 **Enhanced:**
 - Added concurrent.futures pattern for parallel spawning
 - Added task ID tracking for parallel coordination
-- Clarified HtmlGraph SDK imports and usage
+- Clarified Wipnote SDK imports and usage
 
 ---
 
@@ -430,7 +430,7 @@ for request, expected_spawner in test_cases:
 ### 3. Integration Points
 
 - **Claude Code CLI:** Use optimized prompt as default orchestrator mode
-- **HtmlGraph SDK:** Include in `spawn_orchestrator()` initialization
+- **Wipnote SDK:** Include in `spawn_orchestrator()` initialization
 - **Plugin system:** Reference in orchestrator plugin documentation
 - **Gemini extension:** Include as appendix for multi-provider orchestration
 

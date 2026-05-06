@@ -1,6 +1,6 @@
 # Comprehensive Orchestrator System Prompt - Complete Index
 
-**Project:** HtmlGraph
+**Project:** Wipnote
 **Date:** 2025-01-03
 **Status:** ✅ COMPLETE & PRODUCTION-READY
 **Primary Spike:** spk-029055fd
@@ -41,7 +41,7 @@
 - Part 3: The 2500-Token System Prompt
 - Part 4: Implementation Guidance
 - Part 5: Cost Analysis & Optimization
-- Part 6: HtmlGraph Integration
+- Part 6: Wipnote Integration
 - Part 7: Validation & Testing
 - Part 8: Quick Reference Tables
 - Part 9: Real-World Example Workflows
@@ -73,7 +73,7 @@
 - Multi-Agent Spawning Strategy
 - Spawner Selection (Decision Tree)
 - Spawner Comparison Table
-- HtmlGraph SDK Integration
+- Wipnote SDK Integration
 - Spawning Individual AI Agents (API Reference)
 - Integration Patterns (4 types)
 - Operational Guidelines
@@ -105,7 +105,7 @@ claude --system-prompt "$(cat orchestrator-system-prompt.txt)" -p "your task"
 - Spawner selection (80 words)
 - spawn_claude() vs Task() (50 words)
 - Quick code examples (150 words)
-- HtmlGraph integration (50 words)
+- Wipnote integration (50 words)
 - Cost optimization rules (40 words)
 
 **How to Deploy:**
@@ -133,7 +133,7 @@ claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" 
 - Option 2: Append Mode (Quick Setup)
 - Option 3: Plugin Integration
 - Common Deployment Scenarios (4 examples)
-- Integration with HtmlGraph Workflows
+- Integration with Wipnote Workflows
 - Decision-Making Walkthrough (3 real examples)
 - Measuring Orchestrator Effectiveness
 - Troubleshooting Common Issues (5 scenarios)
@@ -143,7 +143,7 @@ claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" 
 **Deployment Options Covered:**
 1. **Full Replacement** - Maximum orchestrator behavior (Section 1)
 2. **Append Mode** - Hybrid behavior (Section 2)
-3. **Plugin Integration** - HtmlGraph plugin (Section 3)
+3. **Plugin Integration** - Wipnote plugin (Section 3)
 4. **Single Project** - Project-specific setup (Section 4.1)
 5. **Global Setup** - All projects use orchestrator (Section 4.2)
 6. **Hybrid Mode** - Project override with global fallback (Section 4.3)
@@ -154,7 +154,7 @@ claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" 
 - Team setup and training
 - Troubleshooting issues
 - Metrics and measurement
-- Integration with HtmlGraph
+- Integration with Wipnote
 
 ---
 
@@ -163,7 +163,7 @@ claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" 
 ### When to Execute Directly
 ✅ Strategic activities (planning, design, decisions)
 ✅ Single tool calls (read file, simple command)
-✅ SDK operations (HtmlGraph tracking)
+✅ SDK operations (Wipnote tracking)
 ✅ Clarifying requirements
 
 ### When to Delegate
@@ -237,13 +237,13 @@ claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" 
 
 ---
 
-## HtmlGraph Integration
+## Wipnote Integration
 
 ### Standard Pattern
 
 ```python
-from htmlgraph import SDK
-from htmlgraph.orchestration import (
+from wipnote import SDK
+from wipnote.orchestration import (
     HeadlessSpawner,
     delegate_with_id,
     save_task_results,
@@ -262,7 +262,7 @@ task_id, prompt = delegate_with_id("Subtask", "Details...", "general-purpose")
 # 3. Execute (Task or spawn)
 result = Task(prompt=prompt, description=f"{task_id}: {feature.id}")
 
-# 4. Save to HtmlGraph
+# 4. Save to Wipnote
 save_task_results(sdk, task_id, "Subtask", result, feature_id=feature.id)
 ```
 
@@ -313,7 +313,7 @@ results = {task_id: get_results_by_task_id(sdk, task_id) for task_id, _ in ids}
 - Tool calls reduced by 5-8x
 - Parallel work completes faster
 - Strategic context maintained
-- All work tracked in HtmlGraph
+- All work tracked in Wipnote
 - Token costs reduced 80%+
 
 ❌ **Problems to Watch:**
@@ -400,16 +400,16 @@ source ~/.zshrc
 
 ## Related Documentation
 
-### In HtmlGraph Codebase
+### In Wipnote Codebase
 - `.claude/rules/orchestration.md` - Orchestration rules
-- `src/python/htmlgraph/orchestration/headless_spawner.py` - HeadlessSpawner implementation
-- `src/python/htmlgraph/orchestration/task_coordination.py` - Task coordination helpers
+- `src/python/wipnote/orchestration/headless_spawner.py` - HeadlessSpawner implementation
+- `src/python/wipnote/orchestration/task_coordination.py` - Task coordination helpers
 - `CLAUDE.md` - Project orchestrator directives
 
-### HtmlGraph Spikes
+### Wipnote Spikes
 - `spk-029055fd` - Complete design summary (THIS spike)
 - `spk-2bae747e` - Original comprehensive design
-- Other orchestration spikes in `.htmlgraph/spikes/`
+- Other orchestration spikes in `.wipnote/spikes/`
 
 ---
 
@@ -424,7 +424,7 @@ source ~/.zshrc
 ### Q: How much can I save with proper delegation?
 **A:** 75-90% token reduction typical. Example: 20K tokens → 3K tokens for feature implementation.
 
-### Q: Does this work with HtmlGraph?
+### Q: Does this work with Wipnote?
 **A:** Yes! Deep integration via SDK. Use `delegate_with_id()` and `save_task_results()` to track all work.
 
 ### Q: Can I customize the prompt?
@@ -443,12 +443,12 @@ source ~/.zshrc
 - [ ] Measure baseline metrics
 
 ### Short Term (This Month)
-- [ ] Integrate with HtmlGraph SDK
+- [ ] Integrate with Wipnote SDK
 - [ ] Establish team patterns
 - [ ] Document learnings
 
 ### Long Term (Q1 2025)
-- [ ] Package in HtmlGraph plugin
+- [ ] Package in Wipnote plugin
 - [ ] Create specialized agents
 - [ ] Build metrics dashboard
 
@@ -484,7 +484,7 @@ source ~/.zshrc
 - 2500-token system prompt
 - 600-token condensed version
 - Complete implementation guide
-- All HtmlGraph integrations covered
+- All Wipnote integrations covered
 - Ready for team deployment
 
 ---
@@ -511,7 +511,7 @@ This comprehensive orchestrator system prompt design delivers:
 - Step-by-step guides
 - Troubleshooting included
 
-✅ **HtmlGraph Integration**
+✅ **Wipnote Integration**
 - SDK patterns included
 - Task coordination examples
 - Parallel coordination patterns

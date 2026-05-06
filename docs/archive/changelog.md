@@ -1,8 +1,8 @@
 # Changelog
 
-> **Note:** This changelog covers early releases. For recent changes (v0.34.x), see the [GitHub Releases](https://github.com/shakestzd/htmlgraph/releases) page.
+> **Note:** This changelog covers early releases. For recent changes (v0.34.x), see the [GitHub Releases](https://github.com/shakestzd/wipnote/releases) page.
 
-All notable changes to HtmlGraph will be documented in this file.
+All notable changes to Wipnote will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hierarchical sub-task support (e.g., `feat-a1b2c3d4.1.2`)
   - Type-specific prefixes for visual identification
   - Inspired by [Beads](https://github.com/steveyegge/beads)
-- **New `htmlgraph.ids` module**: `generate_id()`, `parse_id()`, `is_valid_id()`, etc.
+- **New `wipnote.ids` module**: `generate_id()`, `parse_id()`, `is_valid_id()`, etc.
 - **ID Generation API documentation**: Complete guide with examples
 
 ### Changed
@@ -118,8 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **CLI Commands**: `htmlgraph` command-line interface
-- **Dashboard Server**: `htmlgraph serve` for local development
+- **CLI Commands**: `wipnote` command-line interface
+- **Dashboard Server**: `wipnote serve` for local development
 - **Feature Relationships**: Typed edges (blocks, related, etc.)
 
 ### Changed
@@ -163,10 +163,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Git Integration**: Text-based storage for version control
 - **Minimal Dependencies**: Pure Python with justhtml
 
-[0.3.0]: https://github.com/shakestzd/htmlgraph/compare/v0.2.2...v0.3.0
-[0.2.2]: https://github.com/shakestzd/htmlgraph/compare/v0.2.0...v0.2.2
-[0.2.0]: https://github.com/shakestzd/htmlgraph/compare/v0.1.3...v0.2.0
-[0.1.3]: https://github.com/shakestzd/htmlgraph/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/shakestzd/htmlgraph/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/shakestzd/htmlgraph/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/shakestzd/htmlgraph/releases/tag/v0.1.0
+[0.3.0]: https://github.com/shakestzd/wipnote/compare/v0.2.2...v0.3.0
+[0.2.2]: https://github.com/shakestzd/wipnote/compare/v0.2.0...v0.2.2
+[0.2.0]: https://github.com/shakestzd/wipnote/compare/v0.1.3...v0.2.0
+[0.1.3]: https://github.com/shakestzd/wipnote/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/shakestzd/wipnote/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/shakestzd/wipnote/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/shakestzd/wipnote/releases/tag/v0.1.0

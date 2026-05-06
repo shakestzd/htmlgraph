@@ -1,27 +1,27 @@
-# HtmlGraph
+# Wipnote
 
 <div class="hero-subtitle" style="text-align: center; margin: 2rem 0 3rem; font-size: 1.5rem; font-weight: 300; letter-spacing: 0.02em;">
 Local-first observability and coordination platform for AI-assisted development
 </div>
 
 <div style="text-align: center; margin: 2rem 0;">
-<img src="assets/graph-hero.png" alt="HtmlGraph - AI-assisted development observability" style="width: 100%; max-width: 1200px; border-radius: 8px; box-shadow: 0 4px 20px rgba(205, 255, 0, 0.2);">
+<img src="assets/graph-hero.png" alt="Wipnote - AI-assisted development observability" style="width: 100%; max-width: 1200px; border-radius: 8px; box-shadow: 0 4px 20px rgba(205, 255, 0, 0.2);">
 </div>
 
 <div class="quick-start">
 
-## Install HtmlGraph
+## Install Wipnote
 
 ```bash
-pip install htmlgraph
+pip install wipnote
 ```
 
 ## Start Tracking Your Work
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
-# Initialize SDK (auto-discovers .htmlgraph directory)
+# Initialize SDK (auto-discovers .wipnote directory)
 sdk = SDK(agent="claude")
 
 # Create a feature with fluent API
@@ -103,7 +103,7 @@ Fluent Python SDK with Pydantic validation. TrackBuilder for deterministic workf
 
 ---
 
-## Why HtmlGraph?
+## Why Wipnote?
 
 AI-assisted development creates an observability gap: multiple agents running across sessions, no unified view of what was done, why, or by whom.
 
@@ -127,9 +127,9 @@ AI-assisted development creates an observability gap: multiple agents running ac
 
 ### vs External Tracking Tools
 
-| Feature | External Tools | HtmlGraph |
+| Feature | External Tools | Wipnote |
 |---------|---------------|-----------|
-| Setup | Accounts, APIs, cloud config | `pip install htmlgraph` |
+| Setup | Accounts, APIs, cloud config | `pip install wipnote` |
 | Offline | ❌ Requires internet | ✅ Fully offline |
 | Human readable | 🟡 Web UI only | ✅ Any browser or text editor |
 | Version control | ❌ Not git-native | ✅ Git diff works perfectly |
@@ -137,7 +137,7 @@ AI-assisted development creates an observability gap: multiple agents running ac
 
 ### vs JSON/YAML Files
 
-| Feature | JSON | HtmlGraph |
+| Feature | JSON | Wipnote |
 |---------|------|-----------|
 | Human readable | 🟡 Text editor | ✅ Browser with styling |
 | Query | ❌ jq or custom | ✅ SQLite + CSS selectors |

@@ -158,10 +158,10 @@ PostToolUse Hook:
 
 **Storage Format:**
 
-CIGS stores all data in HtmlGraph format (JSONL + JSON):
+CIGS stores all data in Wipnote format (JSONL + JSON):
 
 ```
-.htmlgraph/cigs/
+.wipnote/cigs/
 ├── violations.jsonl          # Violation records (1 per line)
 ├── patterns.json             # Detected patterns (anti + good)
 ├── session-summaries/        # Per-session analytics
@@ -286,10 +286,10 @@ need for mandatory intervention.
 - Efficiency score: 45/100
 
 **REQUIRED:** Acknowledge this violation before proceeding:
-uv run htmlgraph orchestrator acknowledge-violation
+uv run wipnote orchestrator acknowledge-violation
 
 OR disable enforcement:
-uv run htmlgraph orchestrator set-level guidance
+uv run wipnote orchestrator set-level guidance
 ```
 
 ### Message Components
@@ -570,12 +570,12 @@ Reason: "Moderate compliance with persistent anti-patterns"
 
 1. **Enable CIGS** (if not already enabled)
    ```bash
-   uv run htmlgraph cigs enable
+   uv run wipnote cigs enable
    ```
 
 2. **Check your autonomy level**
    ```bash
-   uv run htmlgraph cigs status
+   uv run wipnote cigs status
    ```
 
 3. **Work normally** - guidance appears automatically
@@ -586,7 +586,7 @@ Reason: "Moderate compliance with persistent anti-patterns"
 
 4. **Check session summary at end**
    ```bash
-   uv run htmlgraph cigs summary
+   uv run wipnote cigs summary
    ```
 
 ### Daily Workflow
@@ -632,7 +632,7 @@ As you attempt tools:
 4. **If circuit breaker triggered** - requires acknowledgment
    ```
    🚨 CIRCUIT BREAKER: You have 3 violations this session.
-   Run: uv run htmlgraph orchestrator acknowledge-violation
+   Run: uv run wipnote orchestrator acknowledge-violation
    ```
 
 #### End of Session (Summary)
@@ -703,7 +703,7 @@ This indicates the pattern is getting serious. The next violation will trigger c
 **Option 1: Acknowledge and adjust (recommended)**
 ```bash
 # Acknowledge the violation
-uv run htmlgraph orchestrator acknowledge-violation
+uv run wipnote orchestrator acknowledge-violation
 
 # Then switch to delegation strategy
 # This resets the counter for the session
@@ -712,20 +712,20 @@ uv run htmlgraph orchestrator acknowledge-violation
 **Option 2: Temporarily disable CIGS**
 ```bash
 # Lower enforcement level for this session
-uv run htmlgraph cigs set-level guidance
+uv run wipnote cigs set-level guidance
 
 # Later, review why you needed to disable:
-uv run htmlgraph cigs summary
-# Then re-enable: uv run htmlgraph cigs set-level strict
+uv run wipnote cigs summary
+# Then re-enable: uv run wipnote cigs set-level strict
 ```
 
 **Option 3: Understand and improve**
 ```bash
 # Check what patterns triggered it
-uv run htmlgraph cigs violations --session-id <current>
+uv run wipnote cigs violations --session-id <current>
 
 # Review examples of correct behavior
-uv run htmlgraph cigs examples --pattern exploration_sequence --successful
+uv run wipnote cigs examples --pattern exploration_sequence --successful
 
 # Return to work with delegation focus
 ```
@@ -742,13 +742,13 @@ Control guidance intensity globally:
 
 ```bash
 # Set autonomy level
-uv run htmlgraph cigs set-level [observer|consultant|collaborator|operator]
+uv run wipnote cigs set-level [observer|consultant|collaborator|operator]
 
 # Example: Strict mode during critical work
-uv run htmlgraph cigs set-level operator
+uv run wipnote cigs set-level operator
 
 # Example: Light mode for experimentation
-uv run htmlgraph cigs set-level observer
+uv run wipnote cigs set-level observer
 ```
 
 #### Messaging Intensity
@@ -757,11 +757,11 @@ Control how verbose CIGS messages are:
 
 ```bash
 # Set messaging style
-uv run htmlgraph cigs set-messaging [minimal|moderate|high|maximal]
+uv run wipnote cigs set-messaging [minimal|moderate|high|maximal]
 
 # Examples:
-uv run htmlgraph cigs set-messaging minimal  # Just core message
-uv run htmlgraph cigs set-messaging maximal  # Full explanation with examples
+uv run wipnote cigs set-messaging minimal  # Just core message
+uv run wipnote cigs set-messaging maximal  # Full explanation with examples
 ```
 
 #### Pattern Detection Sensitivity
@@ -770,7 +770,7 @@ Control how aggressively patterns are detected:
 
 ```bash
 # Set pattern sensitivity
-uv run htmlgraph cigs set-sensitivity [low|medium|high]
+uv run wipnote cigs set-sensitivity [low|medium|high]
 
 # low: Only obvious anti-patterns detected
 # medium: Standard patterns (default)
@@ -783,13 +783,13 @@ Control when circuit breaker triggers:
 
 ```bash
 # Set violation threshold
-uv run htmlgraph cigs set-threshold [violations-count]
+uv run wipnote cigs set-threshold [violations-count]
 
 # Example: Trigger at 5 violations instead of 3
-uv run htmlgraph cigs set-threshold 5
+uv run wipnote cigs set-threshold 5
 
 # Example: More aggressive at 2
-uv run htmlgraph cigs set-threshold 2
+uv run wipnote cigs set-threshold 2
 ```
 
 ### Per-Session Overrides
@@ -798,18 +798,18 @@ uv run htmlgraph cigs set-threshold 2
 
 ```bash
 # Start session with guidance disabled
-uv run htmlgraph cigs session --no-enforcement
+uv run wipnote cigs session --no-enforcement
 
 # Work normally (no messages)
 # At end of session, you can review data:
-uv run htmlgraph cigs summary
+uv run wipnote cigs summary
 ```
 
 #### Enable Strict Mode for a Session
 
 ```bash
 # Start session with maximal enforcement
-uv run htmlgraph cigs session --strict
+uv run wipnote cigs session --strict
 
 # Circuit breaker triggers at 1 violation instead of 3
 ```
@@ -818,7 +818,7 @@ uv run htmlgraph cigs session --strict
 
 ```bash
 # Enable only specific pattern detection
-uv run htmlgraph cigs session --focus exploration_sequence
+uv run wipnote cigs session --focus exploration_sequence
 
 # Only get guidance about exploration patterns
 # Other operations allowed without guidance
@@ -835,22 +835,22 @@ uv run htmlgraph cigs session --focus exploration_sequence
 **Solutions:**
 1. Lower messaging intensity
    ```bash
-   uv run htmlgraph cigs set-messaging minimal
+   uv run wipnote cigs set-messaging minimal
    ```
 
 2. Switch to lower autonomy level
    ```bash
-   uv run htmlgraph cigs set-level observer
+   uv run wipnote cigs set-level observer
    ```
 
 3. Increase circuit breaker threshold
    ```bash
-   uv run htmlgraph cigs set-threshold 5
+   uv run wipnote cigs set-threshold 5
    ```
 
 4. Check if you've improved compliance - autonomy might auto-adjust
    ```bash
-   uv run htmlgraph cigs status
+   uv run wipnote cigs status
    ```
 
 ### Issue: Not getting guidance when I expect it
@@ -861,19 +861,19 @@ uv run htmlgraph cigs session --focus exploration_sequence
 
 1. **You're already compliant** - Check your status
    ```bash
-   uv run htmlgraph cigs status
+   uv run wipnote cigs status
    # If "observer" level, minimal guidance is expected
    ```
 
 2. **Tool is in allowed list** - Some operations don't need delegation
    ```bash
-   uv run htmlgraph cigs allowed-tools
+   uv run wipnote cigs allowed-tools
    # Shows which tools are always allowed
    ```
 
 3. **Pattern sensitivity too low** - Increase it
    ```bash
-   uv run htmlgraph cigs set-sensitivity high
+   uv run wipnote cigs set-sensitivity high
    ```
 
 4. **First occurrence of pattern** - Level 0 guidance is subtle
@@ -889,14 +889,14 @@ uv run htmlgraph cigs session --focus exploration_sequence
 
 1. **Acknowledge and reset**
    ```bash
-   uv run htmlgraph orchestrator acknowledge-violation
+   uv run wipnote orchestrator acknowledge-violation
    # Counter resets to 0 for this session
    # Proceed with delegation focus
    ```
 
 2. **Lower autonomy level temporarily**
    ```bash
-   uv run htmlgraph cigs set-level guidance
+   uv run wipnote cigs set-level guidance
    # Guidance mode allows all operations
    # Circuit breaker deactivated
    # Review patterns afterward to understand why needed
@@ -904,7 +904,7 @@ uv run htmlgraph cigs session --focus exploration_sequence
 
 3. **Understand the pattern**
    ```bash
-   uv run htmlgraph cigs explain [pattern-name]
+   uv run wipnote cigs explain [pattern-name]
    # Get detailed explanation of why it's problematic
    # Review correct examples
    # Return with better understanding
@@ -918,13 +918,13 @@ uv run htmlgraph cigs session --focus exploration_sequence
 
 ```bash
 # Check recent violation history
-uv run htmlgraph cigs violations --limit 10
+uv run wipnote cigs violations --limit 10
 
 # Check compliance calculation
-uv run htmlgraph cigs compliance --sessions 5
+uv run wipnote cigs compliance --sessions 5
 
 # Check detected patterns
-uv run htmlgraph cigs patterns --active
+uv run wipnote cigs patterns --active
 
 # Manual review
 # If you disagree with assessment, review specific violations
@@ -937,13 +937,13 @@ uv run htmlgraph cigs patterns --active
 
 ```bash
 # Warning: This deletes all tracking data
-uv run htmlgraph cigs reset
+uv run wipnote cigs reset
 
 # Or just reset violations (keep patterns)
-uv run htmlgraph cigs reset --violations-only
+uv run wipnote cigs reset --violations-only
 
 # Or reset specific session
-uv run htmlgraph cigs reset --session-id [session-id]
+uv run wipnote cigs reset --session-id [session-id]
 ```
 
 ---
@@ -979,7 +979,7 @@ It does NOT record:
 - Search terms
 - Sensitive business logic
 
-Storage location: `.htmlgraph/cigs/` (local, not shared)
+Storage location: `.wipnote/cigs/` (local, not shared)
 
 ---
 
@@ -989,17 +989,17 @@ A: You have full control:
 
 1. **For a single operation:** Acknowledge the violation and continue
    ```bash
-   uv run htmlgraph orchestrator acknowledge-violation
+   uv run wipnote orchestrator acknowledge-violation
    ```
 
 2. **For a session:** Lower enforcement level
    ```bash
-   uv run htmlgraph cigs set-level guidance
+   uv run wipnote cigs set-level guidance
    ```
 
 3. **Permanently:** Disable CIGS
    ```bash
-   uv run htmlgraph cigs disable
+   uv run wipnote cigs disable
    ```
 
 The system is designed to guide, not restrict. You can always override.
@@ -1012,18 +1012,18 @@ A: Check these indicators:
 
 ```bash
 # 1. Verify it's active
-uv run htmlgraph cigs status
+uv run wipnote cigs status
 # Should show: "CIGS Status: Enabled"
 
 # 2. Check autonomy level is set
 # Should show: "Autonomy Level: [observer|consultant|collaborator|operator]"
 
 # 3. Review recent messages
-uv run htmlgraph cigs messages --recent 10
+uv run wipnote cigs messages --recent 10
 # Should show guidance messages from recent sessions
 
 # 4. Verify hook integration
-uv run htmlgraph hooks list
+uv run wipnote hooks list
 # Should show CIGS hooks in hook list
 ```
 
@@ -1051,13 +1051,13 @@ A: Yes, for specific patterns:
 
 ```bash
 # Whitelist specific operations
-uv run htmlgraph cigs whitelist-operation [operation-type]
+uv run wipnote cigs whitelist-operation [operation-type]
 
 # Example: Allow direct git commits
-uv run htmlgraph cigs whitelist-operation direct_git
+uv run wipnote cigs whitelist-operation direct_git
 
 # Remove whitelist
-uv run htmlgraph cigs remove-whitelist [operation-type]
+uv run wipnote cigs remove-whitelist [operation-type]
 ```
 
 Use sparingly - whitelisting defeats the learning system.
@@ -1109,7 +1109,7 @@ A: Yes, but it will auto-correct on next session:
 
 ```bash
 # Manually override
-uv run htmlgraph cigs set-level observer
+uv run wipnote cigs set-level observer
 
 # Next session start: System analyzes compliance
 # If you're actually at 65%, system updates back to "collaborator"
@@ -1243,16 +1243,16 @@ A: Yes, multiple ways:
 
 ```bash
 # Recent violations
-uv run htmlgraph cigs violations --limit 20
+uv run wipnote cigs violations --limit 20
 
 # Pattern history
-uv run htmlgraph cigs patterns --history
+uv run wipnote cigs patterns --history
 
 # Compliance trend
-uv run htmlgraph cigs compliance --graph
+uv run wipnote cigs compliance --graph
 
 # Full session analysis
-uv run htmlgraph cigs analyze-sessions --limit 10
+uv run wipnote cigs analyze-sessions --limit 10
 ```
 
 ---
@@ -1315,16 +1315,16 @@ They work together:
 You can use one or both:
 ```bash
 # Orchestrator only
-uv run htmlgraph orchestrator enable
-uv run htmlgraph cigs disable
+uv run wipnote orchestrator enable
+uv run wipnote cigs disable
 
 # CIGS only
-uv run htmlgraph cigs enable
-uv run htmlgraph orchestrator disable
+uv run wipnote cigs enable
+uv run wipnote orchestrator disable
 
 # Both (recommended)
-uv run htmlgraph cigs enable
-uv run htmlgraph orchestrator enable
+uv run wipnote cigs enable
+uv run wipnote orchestrator enable
 ```
 
 ---
@@ -1344,10 +1344,10 @@ No noticeable slowdown in typical workflows.
 
 **Q: Can CIGS be integrated into my own project?**
 
-A: Yes! CIGS is part of the HtmlGraph package:
+A: Yes! CIGS is part of the Wipnote package:
 
 ```python
-from htmlgraph.cigs import (
+from wipnote.cigs import (
     ViolationTracker,
     PatternAnalyzer,
     CostCalculator,
@@ -1378,7 +1378,7 @@ A: Messages are personalized based on:
 Documentation shows examples, actual messages adapt to your situation. If you think a message is incorrect, report it:
 
 ```bash
-uv run htmlgraph cigs report-issue [issue-type]
+uv run wipnote cigs report-issue [issue-type]
 ```
 
 ---
@@ -1392,12 +1392,12 @@ A: CIGS has two independent modes:
 
 To completely stop tracking:
 ```bash
-uv run htmlgraph cigs disable --include-tracking
+uv run wipnote cigs disable --include-tracking
 ```
 
 To resume:
 ```bash
-uv run htmlgraph cigs enable
+uv run wipnote cigs enable
 ```
 
 ---
@@ -1408,13 +1408,13 @@ A: Provide diagnostic information:
 
 ```bash
 # Collect diagnostics
-uv run htmlgraph cigs diagnostics > cigs-diagnostics.txt
+uv run wipnote cigs diagnostics > cigs-diagnostics.txt
 
 # Include in bug report:
 # - What happened
 # - What you expected
 # - cigs-diagnostics.txt output
-# - Recent violations (uv run htmlgraph cigs violations --limit 5)
+# - Recent violations (uv run wipnote cigs violations --limit 5)
 ```
 
 ---
@@ -1426,43 +1426,43 @@ uv run htmlgraph cigs diagnostics > cigs-diagnostics.txt
 - **Quick Start:** See "How to Use CIGS" above
 - **Integration Guide:** `docs/CIGS_INTEGRATION.md`
 - **API Reference:** `docs/api/cigs.md`
-- **Design Document:** `.htmlgraph/spikes/computational-imperative-guidance-system-design.md`
+- **Design Document:** `.wipnote/spikes/computational-imperative-guidance-system-design.md`
 
 ### Commands
 
 ```bash
 # Core status and info
-uv run htmlgraph cigs enable                  # Enable CIGS
-uv run htmlgraph cigs disable                 # Disable CIGS
-uv run htmlgraph cigs status                  # Check current status
-uv run htmlgraph cigs summary                 # Session summary
+uv run wipnote cigs enable                  # Enable CIGS
+uv run wipnote cigs disable                 # Disable CIGS
+uv run wipnote cigs status                  # Check current status
+uv run wipnote cigs summary                 # Session summary
 
 # Configuration
-uv run htmlgraph cigs set-level [level]       # Set autonomy level
-uv run htmlgraph cigs set-messaging [style]   # Set messaging intensity
-uv run htmlgraph cigs set-threshold [count]   # Set circuit breaker threshold
+uv run wipnote cigs set-level [level]       # Set autonomy level
+uv run wipnote cigs set-messaging [style]   # Set messaging intensity
+uv run wipnote cigs set-threshold [count]   # Set circuit breaker threshold
 
 # Analysis & Learning
-uv run htmlgraph cigs violations --limit N    # View recent violations
-uv run htmlgraph cigs patterns --active       # View active patterns
-uv run htmlgraph cigs compliance --sessions N # View compliance trend
-uv run htmlgraph cigs explain [pattern]       # Explain a pattern
+uv run wipnote cigs violations --limit N    # View recent violations
+uv run wipnote cigs patterns --active       # View active patterns
+uv run wipnote cigs compliance --sessions N # View compliance trend
+uv run wipnote cigs explain [pattern]       # Explain a pattern
 
 # Session Management
-uv run htmlgraph cigs session --no-enforcement # Run without guidance
-uv run htmlgraph cigs session --strict         # Run with strict guidance
-uv run htmlgraph cigs reset                   # Clear all data (warning!)
+uv run wipnote cigs session --no-enforcement # Run without guidance
+uv run wipnote cigs session --strict         # Run with strict guidance
+uv run wipnote cigs reset                   # Clear all data (warning!)
 ```
 
 ### Getting Help
 
 1. **Check FAQ** - Most common questions answered above
 2. **Review examples** - See message examples in Imperative Messaging System section
-3. **Check diagnostics** - `uv run htmlgraph cigs diagnostics`
-4. **Report issue** - `uv run htmlgraph cigs report-issue`
+3. **Check diagnostics** - `uv run wipnote cigs diagnostics`
+4. **Report issue** - `uv run wipnote cigs report-issue`
 
 ---
 
 **CIGS User Guide - Complete**
 
-This guide covers all aspects of using the Computational Imperative Guidance System. For deeper technical details, see the design document in `.htmlgraph/spikes/`.
+This guide covers all aspects of using the Computational Imperative Guidance System. For deeper technical details, see the design document in `.wipnote/spikes/`.

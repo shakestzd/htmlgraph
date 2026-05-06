@@ -19,7 +19,7 @@ All spawners (Gemini, Codex, Copilot, Claude/Haiku) have been comprehensively ve
 | Linting | PASSED ✅ | Clean code (ruff check) |
 | Error Handling | COMPREHENSIVE ✅ | CLI, timeout, parse, quota, empty response |
 | Documentation | COMPLETE ✅ | Docstrings, agent scaffolds, examples |
-| HtmlGraph Integration | WORKING ✅ | Activity tracking with parent session context |
+| Wipnote Integration | WORKING ✅ | Activity tracking with parent session context |
 | Fallback Patterns | DOCUMENTED ✅ | Automatic fallback for each spawner |
 | Cost Tracking | ACCURATE ✅ | Token counting verified in tests |
 
@@ -38,7 +38,7 @@ All spawners (Gemini, Codex, Copilot, Claude/Haiku) have been comprehensively ve
   - Failure case verification (3 categories)
   - Edge case handling (7 types)
   - Cost tracking accuracy analysis
-  - HtmlGraph integration verification
+  - Wipnote integration verification
   - Production readiness checklist
 
 #### SPAWNER_PRODUCTION_READINESS_CHECKLIST.md
@@ -50,7 +50,7 @@ All spawners (Gemini, Codex, Copilot, Claude/Haiku) have been comprehensively ve
   - Edge cases (5 types)
   - Cost tracking (2 sections)
   - Error recovery & fallback (4 patterns)
-  - HtmlGraph integration (2 sections)
+  - Wipnote integration (2 sections)
   - Documentation (3 subsections)
   - Security & safety (6 items)
   - Performance & reliability (4 items)
@@ -58,10 +58,10 @@ All spawners (Gemini, Codex, Copilot, Claude/Haiku) have been comprehensively ve
   - Final sign-off
   - Quick start guide
 
-#### HtmlGraph Spike: spk-37a3ee1b
+#### Wipnote Spike: spk-37a3ee1b
 - Title: "Spawner Quality Verification - All Production-Ready"
 - Findings: Comprehensive summary with all verification details
-- Status: Recorded in HtmlGraph for tracking
+- Status: Recorded in Wipnote for tracking
 
 ---
 
@@ -275,7 +275,7 @@ Test Coverage: 1/1 passed ✅
 
 ---
 
-## HtmlGraph Integration
+## Wipnote Integration
 
 ### Activity Tracking Verified ✅
 
@@ -399,7 +399,7 @@ All patterns documented in agent scaffolds with examples.
 - [x] Error messages clear
 - [x] Fallback patterns documented
 - [x] Cost tracking verified
-- [x] HtmlGraph integration working
+- [x] Wipnote integration working
 - [x] Security checks passed
 - [x] Performance acceptable
 
@@ -412,13 +412,13 @@ All patterns documented in agent scaffolds with examples.
 - Claude CLI: Built into Claude Code
 
 **Optional:**
-- HtmlGraph SDK (graceful fallback if unavailable)
+- Wipnote SDK (graceful fallback if unavailable)
 
 ### Configuration Needed
 - Timeout values (adjust per environment)
 - Sandbox modes (Codex)
 - Tool permissions (Copilot)
-- Tracking enable/disable (HtmlGraph)
+- Tracking enable/disable (Wipnote)
 
 ---
 
@@ -500,7 +500,7 @@ All spawners are **production-ready and reliable**. Deploy with confidence.
    - Key results
    - Deployment status
 
-4. **HtmlGraph Spike: spk-37a3ee1b**
+4. **Wipnote Spike: spk-37a3ee1b**
    - Verification findings
    - Test results
    - Recommendations
@@ -517,7 +517,7 @@ All spawners are **production-ready and reliable**. Deploy with confidence.
 2. **Deploy to Production**
    - Install required CLI tools
    - Configure timeout values
-   - Enable HtmlGraph tracking
+   - Enable Wipnote tracking
    - Test in staging first
 
 3. **Monitor in Production**
@@ -529,7 +529,7 @@ All spawners are **production-ready and reliable**. Deploy with confidence.
 4. **Implement Fallback Patterns**
    - Use documented patterns in agent scaffolds
    - Add monitoring/alerting
-   - Log results in HtmlGraph
+   - Log results in Wipnote
 
 ---
 

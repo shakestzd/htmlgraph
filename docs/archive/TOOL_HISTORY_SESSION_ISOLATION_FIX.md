@@ -6,7 +6,7 @@
 
 ## Problem
 
-Tool history was stored in `/tmp/htmlgraph-tool-history.json`, a single file shared across all Claude Code sessions. This caused:
+Tool history was stored in `/tmp/wipnote-tool-history.json`, a single file shared across all Claude Code sessions. This caused:
 
 1. **Cross-Session Contamination**: Session A's tool calls appeared in Session B's history
 2. **False Positive Anti-Patterns**: Session B triggered anti-pattern warnings for Session A's tools
@@ -17,10 +17,10 @@ Tool history was stored in `/tmp/htmlgraph-tool-history.json`, a single file sha
 
 ```bash
 # Session A: User runs 4 consecutive Bash commands
-Bash, Bash, Bash, Bash → Stored in /tmp/htmlgraph-tool-history.json
+Bash, Bash, Bash, Bash → Stored in /tmp/wipnote-tool-history.json
 
 # Session B: User runs 1 Bash command
-Bash → Reads history from /tmp/htmlgraph-tool-history.json
+Bash → Reads history from /tmp/wipnote-tool-history.json
      → Sees [Bash, Bash, Bash, Bash, Bash] (5 consecutive!)
      → Triggers false anti-pattern warning ⚠️
 ```
@@ -35,7 +35,7 @@ Bash → Reads history from /tmp/htmlgraph-tool-history.json
 
 **Before:**
 ```python
-TOOL_HISTORY_FILE = Path("/tmp/htmlgraph-tool-history.json")
+TOOL_HISTORY_FILE = Path("/tmp/wipnote-tool-history.json")
 
 def load_tool_history() -> list[dict]:
     """Load recent tool history from temp file."""
@@ -55,7 +55,7 @@ MAX_HISTORY = 20
 
 def load_tool_history(session_id: str) -> list[dict]:
     """Load recent tool history from database (session-isolated)."""
-    db = HtmlGraphDB(str(graph_dir / "htmlgraph.db"))
+    db = WipnoteDB(str(graph_dir / "wipnote.db"))
     cursor = db.connection.cursor()
     cursor.execute("""
         SELECT tool_name, timestamp
@@ -99,7 +99,7 @@ def main() -> None:
 
 #### 4. Removed File-Based Code
 
-- ❌ Deleted `/tmp/htmlgraph-tool-history.json`
+- ❌ Deleted `/tmp/wipnote-tool-history.json`
 - ❌ Removed `TOOL_HISTORY_FILE` constant
 - ❌ Removed `save_tool_history()` function
 - ❌ Removed `add_to_tool_history()` function
@@ -144,7 +144,7 @@ uv run pytest tests/hooks/ -k "not test_classify_read_only_commands and not test
 uv run ruff check --fix && uv run ruff format
 # ✅ Found 6 errors (6 fixed, 0 remaining). 5 files reformatted
 
-uv run mypy src/python/htmlgraph/hooks/validator.py src/python/htmlgraph/hooks/orchestrator.py
+uv run mypy src/python/wipnote/hooks/validator.py src/python/wipnote/hooks/orchestrator.py
 # ✅ Success: no issues found in 2 source files
 ```
 
@@ -169,7 +169,7 @@ To verify session isolation works correctly:
 
 3. **Check database:**
    ```bash
-   sqlite3 .htmlgraph/htmlgraph.db "
+   sqlite3 .wipnote/wipnote.db "
    SELECT session_id, tool_name, COUNT(*)
    FROM agent_events
    GROUP BY session_id, tool_name
@@ -203,8 +203,8 @@ To verify session isolation works correctly:
 ## Files Modified
 
 ```
-src/python/htmlgraph/hooks/validator.py        (70 lines changed)
-src/python/htmlgraph/hooks/orchestrator.py     (65 lines changed)
+src/python/wipnote/hooks/validator.py        (70 lines changed)
+src/python/wipnote/hooks/orchestrator.py     (65 lines changed)
 tests/python/test_orchestrator_enforce_hook.py (15 lines changed)
 tests/hooks/test_git_commands.py               (7 lines changed)
 ```
@@ -258,11 +258,11 @@ No action required. The fix is automatic on next deployment.
 If you've written custom hooks that use tool history:
 ```python
 # OLD (broken)
-from htmlgraph.hooks.validator import load_tool_history
+from wipnote.hooks.validator import load_tool_history
 history = load_tool_history()
 
 # NEW (fixed)
-from htmlgraph.hooks.validator import load_tool_history
+from wipnote.hooks.validator import load_tool_history
 session_id = hook_input.get("session_id", "unknown")
 history = load_tool_history(session_id)
 ```

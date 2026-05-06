@@ -1,4 +1,4 @@
-# HtmlGraph Refactoring Strategy: Rich + Pydantic Integration
+# Wipnote Refactoring Strategy: Rich + Pydantic Integration
 
 **Last Updated:** 2026-01-04
 **Status:** Phase 1A IN PROGRESS (33% complete)
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-HtmlGraph is executing a **3-week, 4-phase refactoring strategy** to maximize dependency integration and unlock advanced capabilities.
+Wipnote is executing a **3-week, 4-phase refactoring strategy** to maximize dependency integration and unlock advanced capabilities.
 
 **Key Metrics:**
 - Total Features: 82 | Completed: 53 (64.6%) | In Progress: 1 | To Do: 28
@@ -204,7 +204,7 @@ TOTAL: 3 weeks to full refactoring
 - Error panels display with proper formatting
 - No breaking changes to existing commands
 - All tests pass (unit + integration)
-- Feature marked DONE in HtmlGraph
+- Feature marked DONE in Wipnote
 
 ### Phase 1B Success
 - Errors display with context in Rich panels
@@ -212,7 +212,7 @@ TOTAL: 3 weeks to full refactoring
 - Traceback filtering works correctly
 - --verbose flag shows full traces
 - All tests pass
-- Feature marked DONE in HtmlGraph
+- Feature marked DONE in Wipnote
 
 ### Phase 1 Success (CRITICAL)
 - Pydantic models integrated and working
@@ -265,7 +265,7 @@ TOTAL: 3 weeks to full refactoring
 
 ## References
 
-### HtmlGraph Spikes (Auto-generated)
+### Wipnote Spikes (Auto-generated)
 1. **Refactoring Strategy Review: Rich + Pydantic Integration Roadmap**
    - Complete analysis of all phases
    - Dependency integration status
@@ -313,7 +313,7 @@ TOTAL: 3 weeks to full refactoring
 4. Quality is paramount
 
 ### ONGOING
-1. Update HtmlGraph spikes as phases complete
+1. Update Wipnote spikes as phases complete
 2. Track actual vs. estimated effort
 3. Adjust timeline if blockers emerge
 4. Maintain documentation
@@ -334,6 +334,6 @@ TOTAL: 3 weeks to full refactoring
 ---
 
 **Generated:** 2026-01-04
-**Analysis Tool:** HtmlGraph SDK
+**Analysis Tool:** Wipnote SDK
 **Documents:** 2 spikes + 2 detailed analysis documents
 **Confidence Level:** HIGH

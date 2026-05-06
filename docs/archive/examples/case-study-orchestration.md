@@ -126,7 +126,7 @@ Quality Risk: Developer fatigue, context switching overhead
 ### Delegation Pattern
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize orchestrator context
 sdk = SDK(agent='orchestrator')
@@ -222,7 +222,7 @@ Task(
     Phase 4: Hooks
     1. Pre-tool hook for spawner detection
     2. Post-tool hook for result capture
-    3. Integration with HtmlGraph tracking
+    3. Integration with Wipnote tracking
 
     Phase 5: Model Selection
     1. Complexity detection system
@@ -230,9 +230,9 @@ Task(
     3. Cost optimization patterns
 
     Phase 6: CLI Implementation
-    1. htmlgraph spawn-explorer command
-    2. htmlgraph spawn-analyzer command
-    3. htmlgraph spawn-coordinator command
+    1. wipnote spawn-explorer command
+    2. wipnote spawn-analyzer command
+    3. wipnote spawn-coordinator command
     4. Help text and documentation
 
     Requirements:
@@ -260,7 +260,7 @@ Task(
 For more complex scenarios requiring result aggregation:
 
 ```python
-from htmlgraph.orchestration import delegate_with_id, get_results_by_task_id
+from wipnote.orchestration import delegate_with_id, get_results_by_task_id
 
 # Generate unique task IDs for tracking
 opus_id, opus_prompt = delegate_with_id(
@@ -715,8 +715,8 @@ Use this template for projects with 3+ distinct phases
 requiring different complexity levels.
 """
 
-from htmlgraph import SDK
-from htmlgraph.orchestration import delegate_with_id, get_results_by_task_id
+from wipnote import SDK
+from wipnote.orchestration import delegate_with_id, get_results_by_task_id
 
 # 1. ANALYZE PROJECT STRUCTURE
 def analyze_project_phases(project_description: str) -> list:
@@ -1019,20 +1019,20 @@ for task in tasks:
 
 ---
 
-### Template: HtmlGraph Tracking Integration
+### Template: Wipnote Tracking Integration
 
 ```python
 """
-HtmlGraph Integration Template
+Wipnote Integration Template
 
-Track orchestrated work in HtmlGraph for observability and analytics.
+Track orchestrated work in Wipnote for observability and analytics.
 """
 
-from htmlgraph import SDK
+from wipnote import SDK
 
 def orchestrate_with_tracking(project_name: str, phases: list):
     """
-    Orchestrate multi-phase project with full HtmlGraph tracking.
+    Orchestrate multi-phase project with full Wipnote tracking.
     """
     sdk = SDK(agent='orchestrator')
 
@@ -1497,7 +1497,7 @@ This case study demonstrates a **fundamental shift** in how complex software pro
 **Phase 4: Hooks (Haiku)**
 1. ✅ Create PreToolUse hook for spawner detection
 2. ✅ Create PostToolUse hook for result capture
-3. ✅ Integrate with HtmlGraph tracking
+3. ✅ Integrate with Wipnote tracking
 4. ✅ Add comprehensive error handling
 5. ✅ Test hook activation and data flow
 6. ✅ Document hook behavior and configuration
@@ -1511,9 +1511,9 @@ This case study demonstrates a **fundamental shift** in how complex software pro
 6. ✅ Test model selection logic
 
 **Phase 6: CLI Implementation (Haiku)**
-1. ✅ Implement `htmlgraph spawn-explorer` command
-2. ✅ Implement `htmlgraph spawn-analyzer` command
-3. ✅ Implement `htmlgraph spawn-coordinator` command
+1. ✅ Implement `wipnote spawn-explorer` command
+2. ✅ Implement `wipnote spawn-analyzer` command
+3. ✅ Implement `wipnote spawn-coordinator` command
 4. ✅ Add help text and documentation
 5. ✅ Create integration tests
 6. ✅ Update CLI documentation
@@ -1531,6 +1531,6 @@ This case study demonstrates a **fundamental shift** in how complex software pro
 
 **Document Version:** 1.0
 **Date:** 2026-01-03
-**Project:** HtmlGraph HeadlessSpawner Implementation
-**Author:** HtmlGraph Development Team
+**Project:** Wipnote HeadlessSpawner Implementation
+**Author:** Wipnote Development Team
 **License:** MIT

@@ -4,13 +4,13 @@ Agent integration interface.
 
 ## AgentInterface
 
-Simplified API for AI agents to interact with HtmlGraph.
+Simplified API for AI agents to interact with Wipnote.
 
 ```python
-from htmlgraph.agents import AgentInterface
+from wipnote.agents import AgentInterface
 
 agent = AgentInterface(
-    graph_dir=".htmlgraph",
+    graph_dir=".wipnote",
     agent_id="claude"
 )
 ```
@@ -68,4 +68,4 @@ agent.complete_task(
 
 ## Complete API Reference
 
-For detailed API documentation with method signatures, see the Python source code in `src/python/htmlgraph/agents.py`.
+For detailed API documentation with method signatures, see the Python source code in `src/python/wipnote/agents.py`.

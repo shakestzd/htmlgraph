@@ -6,7 +6,7 @@
 |-------|------|-------|---------|
 | Missing env vars | `pretooluse-spawner-router.py` | 412-430 | Not setting `HTMLGRAPH_SUBAGENT_TYPE`, `HTMLGRAPH_PARENT_SESSION`, `HTMLGRAPH_PARENT_AGENT` |
 | No subagent detection | `event_tracker.py` | 710-723 | Doesn't check for subagent environment before using global cache |
-| Global cache bug | `event_tracker.py` | 711 | `manager.get_active_session()` uses shared `.htmlgraph/session.json` |
+| Global cache bug | `event_tracker.py` | 711 | `manager.get_active_session()` uses shared `.wipnote/session.json` |
 
 ---
 
@@ -58,10 +58,10 @@ Insert after line 430 (before `result = subprocess.run(...)`):
 
         # Get current orchestrator session to link as parent
         try:
-            from htmlgraph.session_manager import SessionManager
+            from wipnote.session_manager import SessionManager
             from pathlib import Path
 
-            graph_dir = Path(project_root) / ".htmlgraph"
+            graph_dir = Path(project_root) / ".wipnote"
             manager = SessionManager(graph_dir)
             current_session = manager.get_active_session()
             if current_session:
@@ -83,7 +83,7 @@ Insert after line 430 (before `result = subprocess.run(...)`):
 
 ### Issue #2: Track Event Hook Not Detecting Subagent
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 
 **Current Code (Lines 702-723)**:
 ```python
@@ -98,7 +98,7 @@ Insert after line 430 (before `result = subprocess.run(...)`):
 710 |    # Get active session ID
 711 |    active_session = manager.get_active_session()
 712 |    if not active_session:
-713 |        # No active HtmlGraph session yet; start one (stable internal id).
+713 |        # No active Wipnote session yet; start one (stable internal id).
 714 |        try:
 715 |            active_session = manager.start_session(
 716 |                session_id=None,
@@ -157,7 +157,7 @@ Replace lines 710-723 with:
 744 |        # Normal orchestrator flow: get or create normal session
 744 |        active_session = manager.get_active_session()
 745 |        if not active_session:
-746 |            # No active HtmlGraph session yet; start one
+746 |            # No active Wipnote session yet; start one
 747 |            try:
 748 |                active_session = manager.start_session(
 749 |                    session_id=None,
@@ -174,7 +174,7 @@ Replace lines 710-723 with:
 
 ### Issue #3: Need to Add os import for environment variables
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 
 **Current Imports (Top of file)**:
 ```python
@@ -192,7 +192,7 @@ Replace lines 710-723 with:
 
 ### Addition to context.py - Documentation Comment
 
-**File**: `src/python/htmlgraph/hooks/context.py`
+**File**: `src/python/wipnote/hooks/context.py`
 
 **Location**: Around line 98-108 where `session_id` is extracted
 
@@ -209,7 +209,7 @@ Replace lines 710-723 with:
 106 |        # IMPORTANT: This is extracted but NOT used in track_event.py
 107 |        # for session ID selection. Here's why:
 108 |        #
-109 |        # The global .htmlgraph/session.json is shared across ALL Claude
+109 |        # The global .wipnote/session.json is shared across ALL Claude
 110 |        # Code windows (for multi-window support). If we used it to look
 111 |        # up sessions in track_event(), subagents would incorrectly reuse
 112 |        # the parent's session instead of creating a new one.
@@ -254,7 +254,7 @@ def test_track_event_detects_subagent_from_environment():
     assert response["continue"] is True
 
     # Check database for subagent session
-    manager = SessionManager(".htmlgraph")
+    manager = SessionManager(".wipnote")
     subagent_sessions = [s for s in manager._list_active_sessions()
                         if s.is_subagent]
     assert len(subagent_sessions) > 0
@@ -283,7 +283,7 @@ def test_pretooluse_sets_subagent_environment():
 class TestSubagentSessionAttribution:
     """Test that subagent events are attributed to subagent session."""
 
-    def test_orchestrator_to_gemini_session_attribution(self, temp_htmlgraph_dir):
+    def test_orchestrator_to_gemini_session_attribution(self, temp_wipnote_dir):
         """End-to-end: Orchestrator → Gemini → session attribution."""
         # Test implementation here
         pass
@@ -293,7 +293,7 @@ class TestSubagentSessionAttribution:
 
 ## Database Schema Verification
 
-**File**: `src/python/htmlgraph/db/schema.py`
+**File**: `src/python/wipnote/db/schema.py`
 
 **Verify These Columns Exist**:
 
@@ -332,7 +332,7 @@ FOREIGN KEY (parent_event_id) REFERENCES agent_events(event_id)
 
 If columns are missing, add migration:
 
-**File to Create**: `src/python/htmlgraph/db/migrations/add_subagent_columns.py`
+**File to Create**: `src/python/wipnote/db/migrations/add_subagent_columns.py`
 
 ```python
 def migrate_up(db_connection):
@@ -418,19 +418,19 @@ def migrate_up(db_connection):
 
 **Verify Subagent Session Created**:
 ```bash
-sqlite3 .htmlgraph/index.sqlite \
+sqlite3 .wipnote/index.sqlite \
   "SELECT session_id, agent_assigned, is_subagent, parent_session_id FROM sessions;"
 ```
 
 **Check Event Attribution**:
 ```bash
-sqlite3 .htmlgraph/index.sqlite \
+sqlite3 .wipnote/index.sqlite \
   "SELECT session_id, tool_name, model, parent_event_id FROM agent_events LIMIT 10;"
 ```
 
 **Verify Parent-Child Links**:
 ```bash
-sqlite3 .htmlgraph/index.sqlite \
+sqlite3 .wipnote/index.sqlite \
   "SELECT s.session_id, s.parent_session_id, COUNT(ae.event_id) as event_count
    FROM sessions s
    LEFT JOIN agent_events ae ON s.session_id = ae.session_id

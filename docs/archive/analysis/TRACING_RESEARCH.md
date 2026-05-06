@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Industry observability platforms (Logfire, Langfuse, OpenTelemetry) use a **Pre-Hook + Post-Hook pattern with correlation IDs** to track tool call lifecycles. This enables accurate duration measurement, context propagation, and parent-child span relationships. HtmlGraph currently uses PostToolUse only, missing critical pre-execution context and precise timing data.
+Industry observability platforms (Logfire, Langfuse, OpenTelemetry) use a **Pre-Hook + Post-Hook pattern with correlation IDs** to track tool call lifecycles. This enables accurate duration measurement, context propagation, and parent-child span relationships. Wipnote currently uses PostToolUse only, missing critical pre-execution context and precise timing data.
 
 ---
 
@@ -20,7 +20,7 @@ Industry observability platforms (Logfire, Langfuse, OpenTelemetry) use a **Pre-
 - Captures token counts: `gen_ai.usage.prompt_tokens`, `gen_ai.usage.completion_tokens`
 - Measures cost with input/output pricing breakdown
 
-### What HtmlGraph Can Learn
+### What Wipnote Can Learn
 - Semantic conventions provide standardized attribute naming
 - Cost tracking requires both token counts and pricing metadata
 - Token usage (prompt vs completion) is essential for cost analysis
@@ -172,7 +172,7 @@ Duration = t2 - t1
 
 ---
 
-## 6. HtmlGraph Current State
+## 6. Wipnote Current State
 
 ### What We Track
 - **PostToolUse only**: Tool name, input, output, success/error
@@ -228,7 +228,7 @@ Duration = t2 - t1
 
 ---
 
-## 8. Recommended Pattern for HtmlGraph
+## 8. Recommended Pattern for Wipnote
 
 ### Phase 1: Dual Hook Capture (PreToolUse + PostToolUse)
 
@@ -452,7 +452,7 @@ ORDER BY count DESC;
 
 ---
 
-## 13. Implementation Roadmap for HtmlGraph
+## 13. Implementation Roadmap for Wipnote
 
 ### Immediate (Sprint 1)
 - [ ] Add PreToolUse hook capture
@@ -481,7 +481,7 @@ ORDER BY count DESC;
 
 ---
 
-## Key Differences from Current HtmlGraph
+## Key Differences from Current Wipnote
 
 | Aspect | Current (PostToolUse Only) | Recommended (Pre+Post) |
 |--------|--------------------------|----------------------|
@@ -506,7 +506,7 @@ Industry observability platforms universally use a **Pre-Hook + Post-Hook patter
 5. ✅ Maintains hierarchical relationships
 6. ✅ Provides complete lifecycle visibility
 
-HtmlGraph should implement this pattern to provide:
+Wipnote should implement this pattern to provide:
 - Accurate performance metrics
 - Better cost analysis
 - Nested call relationships

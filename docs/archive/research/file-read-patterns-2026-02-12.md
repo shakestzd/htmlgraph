@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Analysis of HtmlGraph database reveals significant file read patterns that present opportunities for caching and optimization.
+Analysis of Wipnote database reveals significant file read patterns that present opportunities for caching and optimization.
 
 **Key Findings:**
 - 1,378 total Read events across 54 unique sessions
@@ -109,7 +109,7 @@ Other                      139     2.2%
 | `d62c4f67...` | (empty path) | 53 |
 | `76ace32b...` | (empty path) | 52 |
 | `ce37a5ff...` | `api/main.py` | 22 |
-| `97e4f1d4...-htmlgraph:haiku-coder` | `api/main.py` | 17 |
+| `97e4f1d4...-wipnote:haiku-coder` | `api/main.py` | 17 |
 | `6d85f8bb...` | `hooks/pretooluse.py` | 15 |
 | `ce37a5ff...` | `api/templates/partials/activity-feed.html` | 15 |
 | `6d85f8bb...` | `hooks/event_tracker.py` | 13 |
@@ -144,8 +144,8 @@ This prefix may indicate a different tool or display format.
 - **Most active subagents:**
   - `7d98e1b7...-general-purpose`: 286 events
   - `d62c4f67...-general-purpose`: 269 events
-  - `97e4f1d4...-htmlgraph:researcher`: 263 events
-  - `97e4f1d4...-htmlgraph:sonnet-coder`: 242 events
+  - `97e4f1d4...-wipnote:researcher`: 263 events
+  - `97e4f1d4...-wipnote:sonnet-coder`: 242 events
 
 ### Files Most Read by Subagents
 
@@ -188,11 +188,11 @@ Most grep searches are for database queries (ORDER BY, datetime) and class/funct
 ```
 Pattern                                                     Count
 ================================================================
-src/python/htmlgraph/api/services/**/*.py                     3
+src/python/wipnote/api/services/**/*.py                     3
 **/event_tracker.py                                           3
-src/python/htmlgraph/cli/*.py                                 2
-src/python/htmlgraph/api/services*.py                         2
-src/python/htmlgraph/**/*.py                                  2
+src/python/wipnote/cli/*.py                                 2
+src/python/wipnote/api/services*.py                         2
+src/python/wipnote/**/*.py                                  2
 packages/claude-plugin/hooks/scripts/*.py                     2
 packages/claude-plugin/**/*.md                                2
 **/dashboard.html                                             2
@@ -350,4 +350,4 @@ ORDER BY date DESC;
 
 **Generated:** 2026-02-12
 **Analysis Period:** 2026-01-13 to 2026-02-13 (31 days)
-**Data Source:** `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/htmlgraph.db`
+**Data Source:** `/Users/shakes/DevProjects/htmlgraph/.wipnote/wipnote.db`

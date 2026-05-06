@@ -16,7 +16,7 @@
   - Spawner selection with 5 decision points + special cases
   - 6 detailed routing examples with reasoning
   - Contextualized permission modes
-  - HtmlGraph integration patterns
+  - Wipnote integration patterns
   - Cost optimization rules
   - Validation checklist
 
@@ -261,7 +261,7 @@ Measure these once integrated:
 ### Long-Term (1 month)
 1. Build decision flow diagram visualizing routing tree
 2. Create interactive routing decision tool
-3. Integrate metrics dashboard into HtmlGraph
+3. Integrate metrics dashboard into Wipnote
 4. Document learned patterns and update guidance
 
 ---
@@ -296,7 +296,7 @@ Measure these once integrated:
 - ✅ 12+ concrete examples
 - ✅ Quantified cost guidance
 - ✅ Production-ready documentation
-- ✅ HtmlGraph integration verified
+- ✅ Wipnote integration verified
 
 **How to use it:**
 - Quick reference: Print ORCHESTRATOR_QUICK_REFERENCE.txt

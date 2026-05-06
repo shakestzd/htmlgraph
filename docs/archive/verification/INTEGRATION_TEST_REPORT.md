@@ -96,7 +96,7 @@ Tests verify Claude Code hook JSON specification compliance:
 ✓ **test_hook_output_json_structure** - JSON structure matches spec
 ✓ **test_additionalcontext_contains_prompt** - Prompt in additionalContext
 ✓ **test_additionalcontext_json_serializable** - JSON serializable output
-✓ **test_additionalcontext_with_htmlgraph_context** - Combined context works
+✓ **test_additionalcontext_with_wipnote_context** - Combined context works
 ✓ **test_injection_json_structure** - Valid JSON structure
 ✓ **test_additionalcontext_field_present** - Field present in output
 ✓ **test_hook_event_name_correct** - hookEventName is "SessionStart"
@@ -159,7 +159,7 @@ Tests verify complete hook execution:
 ✓ **test_complete_hook_execution_flow** - Full pipeline works
 ✓ **test_hook_with_missing_prompt_fallback** - Fallback works
 ✓ **test_complete_hook_execution** - Full execution succeeds
-✓ **test_hook_with_minimal_htmlgraph_context** - Minimal context works
+✓ **test_hook_with_minimal_wipnote_context** - Minimal context works
 ✓ **test_hook_with_empty_prompt_fallback** - Empty prompt fallback works
 ✓ **test_full_injection_flow_startup** - Startup flow works
 ✓ **test_injection_with_different_sources** - Multiple sources work
@@ -280,10 +280,10 @@ uv run pytest tests/hooks/ -v --cov=packages/claude-plugin/hooks/scripts
 
 2. **Prompt Loading**
    - Hook script loads `.claude/system-prompt.md`
-   - Falls back to HtmlGraph context if missing
+   - Falls back to Wipnote context if missing
 
 3. **Context Building**
-   - System prompt combined with HtmlGraph context
+   - System prompt combined with Wipnote context
    - Token counting to ensure within budget
    - Truncation at newline boundaries if needed
 
@@ -294,7 +294,7 @@ uv run pytest tests/hooks/ -v --cov=packages/claude-plugin/hooks/scripts
      "continue": true,
      "hookSpecificOutput": {
        "hookEventName": "SessionStart",
-       "additionalContext": "system prompt + htmlgraph context",
+       "additionalContext": "system prompt + wipnote context",
        "source": "startup|resume|compact|clear",
        "session_id": "session-id"
      }

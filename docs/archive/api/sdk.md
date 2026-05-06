@@ -1,6 +1,6 @@
 # SDK
 
-The SDK is the main interface for interacting with HtmlGraph.
+The SDK is the main interface for interacting with Wipnote.
 
 ## Overview
 
@@ -15,13 +15,13 @@ The SDK provides a high-level API for:
 ## Initialization
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Basic initialization
 sdk = SDK(agent="claude")
 
 # Custom graph directory
-sdk = SDK(agent="claude", graph_dir="/path/to/.htmlgraph")
+sdk = SDK(agent="claude", graph_dir="/path/to/.wipnote")
 
 # Disable auto-session management
 sdk = SDK(agent="claude", auto_session=False)
@@ -225,7 +225,7 @@ bottlenecks = sdk.graph.find_bottlenecks()
 The SDK is organized into modular components for better maintainability and separation of concerns:
 
 ```
-htmlgraph/
+wipnote/
 ├── builders/          # Fluent builders for node creation
 │   ├── base.py       # BaseBuilder with common methods
 │   ├── feature.py    # FeatureBuilder
@@ -248,15 +248,15 @@ htmlgraph/
 **Recommended imports:**
 
 ```python
-from htmlgraph import SDK, Analytics, DependencyAnalytics
-from htmlgraph.builders import FeatureBuilder, SpikeBuilder, TrackBuilder
-from htmlgraph.collections import BaseCollection, FeatureCollection
-from htmlgraph.models import SpikeType, MaintenanceType, WorkType
+from wipnote import SDK, Analytics, DependencyAnalytics
+from wipnote.builders import FeatureBuilder, SpikeBuilder, TrackBuilder
+from wipnote.collections import BaseCollection, FeatureCollection
+from wipnote.models import SpikeType, MaintenanceType, WorkType
 
 # Direct module imports (advanced usage)
-from htmlgraph.analytics import Analytics, DependencyAnalytics
-from htmlgraph.analytics.work_type import Analytics
-from htmlgraph.analytics.dependency import DependencyAnalytics
+from wipnote.analytics import Analytics, DependencyAnalytics
+from wipnote.analytics.work_type import Analytics
+from wipnote.analytics.dependency import DependencyAnalytics
 ```
 
 ### SDK Components
@@ -335,4 +335,4 @@ sdk.end_session(session_id="...", handoff_notes="...")
 
 ## Complete API Reference
 
-For detailed API documentation with type signatures and docstrings, see the Python source code in `src/python/htmlgraph/sdk.py`.
+For detailed API documentation with type signatures and docstrings, see the Python source code in `src/python/wipnote/sdk.py`.

@@ -153,7 +153,7 @@ The fix works with the existing CSS depth classes:
 
 ## Files Modified
 
-- `src/python/htmlgraph/api/templates/dashboard-redesign.html` - Lines 388-426
+- `src/python/wipnote/api/templates/dashboard-redesign.html` - Lines 388-426
   - Changed `calculateEventDepth()` function to correctly walk ancestor chain
   - Now properly counts all ancestor event rows (child-event-row elements)
   - No changes to HTML structure or CSS required

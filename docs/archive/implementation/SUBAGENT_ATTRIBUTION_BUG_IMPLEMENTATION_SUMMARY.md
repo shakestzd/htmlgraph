@@ -19,7 +19,7 @@ Orchestrator Session: session-abc123
 └── Edit (from Gemini) ❌ Wrong - attributed to orchestrator
 ```
 
-**Root Cause**: The event tracking hook was calling `manager.get_active_session()`, which reads from a shared global cache (`.htmlgraph/session.json`) and returns the parent's session ID.
+**Root Cause**: The event tracking hook was calling `manager.get_active_session()`, which reads from a shared global cache (`.wipnote/session.json`) and returns the parent's session ID.
 
 ---
 
@@ -41,7 +41,7 @@ env["HTMLGRAPH_PARENT_AGENT"] = parent_agent        # "orchestrator" or "claude-
 **Result**: Subagent process has all information needed to identify itself as a subagent.
 
 ### Fix #2: Track Event Hook Detects Subagent Context
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 
 When recording tool events, the hook now:
 
@@ -67,7 +67,7 @@ if subagent_type and parent_session_id:
 **Result**: Subagent tool calls are recorded to a separate, properly-linked session.
 
 ### Fix #3: Documentation Explains the Design
-**File**: `src/python/htmlgraph/hooks/context.py`
+**File**: `src/python/wipnote/hooks/context.py`
 
 Added documentation explaining why the global session cache is hazardous and how database-based fallback works instead.
 
@@ -149,7 +149,7 @@ Subsequent tool calls reuse the same session (no duplicates).
 
 **Check subagent sessions exist:**
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT session_id, agent_assigned, is_subagent, parent_session_id
 FROM sessions
 WHERE is_subagent = 1
@@ -159,7 +159,7 @@ LIMIT 5;
 
 **Check subagent events are in correct session:**
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT session_id, tool_name, model
 FROM agent_events
 WHERE session_id LIKE '%-gemini' OR session_id LIKE '%-codex'
@@ -169,7 +169,7 @@ LIMIT 10;
 
 **Check parent-child event links:**
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT e.event_id, e.parent_event_id, e.tool_name, e.session_id
 FROM agent_events e
 WHERE e.parent_event_id IS NOT NULL
@@ -184,8 +184,8 @@ LIMIT 5;
 | File | Change | Lines |
 |------|--------|-------|
 | `packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-spawner-router.py` | Set environment variables | 432-446 |
-| `src/python/htmlgraph/hooks/event_tracker.py` | Detect subagent context and create separate sessions | 714-756 |
-| `src/python/htmlgraph/hooks/context.py` | Document session separation hazards | 107-122 |
+| `src/python/wipnote/hooks/event_tracker.py` | Detect subagent context and create separate sessions | 714-756 |
+| `src/python/wipnote/hooks/context.py` | Document session separation hazards | 107-122 |
 
 ---
 
@@ -226,9 +226,9 @@ LIMIT 5;
 
 ### Manual Testing Steps
 
-1. **Start orchestrator with HtmlGraph enabled**
+1. **Start orchestrator with Wipnote enabled**
    ```bash
-   uv run htmlgraph claude --dev
+   uv run wipnote claude --dev
    ```
 
 2. **Run a Task() delegation to spawner**
@@ -242,7 +242,7 @@ LIMIT 5;
 
 3. **Check sessions created**
    ```bash
-   sqlite3 .htmlgraph/htmlgraph.db "
+   sqlite3 .wipnote/wipnote.db "
    SELECT session_id, agent_assigned, is_subagent
    FROM sessions
    ORDER BY created_at DESC
@@ -258,7 +258,7 @@ LIMIT 5;
 
 4. **Check events in correct session**
    ```bash
-   sqlite3 .htmlgraph/htmlgraph.db "
+   sqlite3 .wipnote/wipnote.db "
    SELECT session_id, tool_name, COUNT(*) as count
    FROM agent_events
    GROUP BY session_id, tool_name

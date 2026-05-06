@@ -1,4 +1,4 @@
-# HtmlGraph Initialization Verification Report
+# Wipnote Initialization Verification Report
 
 **Date**: 2026-01-11
 **Verification Status**: ✅ PASSED
@@ -7,11 +7,11 @@
 
 ### Test Performed
 ```bash
-uv run htmlgraph init /tmp/htmlgraph-test
+uv run wipnote init /tmp/wipnote-test
 ```
 
 ### Expected Directories (18 total)
-Based on `src/python/htmlgraph/operations/initialization.py`:
+Based on `src/python/wipnote/operations/initialization.py`:
 
 **DEFAULT_COLLECTIONS (13):**
 - features, bugs, chores, spikes, epics, tracks
@@ -22,11 +22,11 @@ Based on `src/python/htmlgraph/operations/initialization.py`:
 - events, logs, archive-index, archives
 
 **Root (1):**
-- .htmlgraph
+- .wipnote
 
 ### Actual Directories Created (18 total)
 ```
-.htmlgraph/
+.wipnote/
 ├── archive-index/
 ├── archives/
 ├── bugs/
@@ -57,21 +57,21 @@ Based on `src/python/htmlgraph/operations/initialization.py`:
 ## Task 2: Verify agents vs agents/ Confusion
 
 ### SDK Expectation
-**File**: `src/python/htmlgraph/agent_registry.py`
+**File**: `src/python/wipnote/agent_registry.py`
 ```python
 # Line 99: Expects a FILE, not a directory
-self.registry_file = self.htmlgraph_dir / "agents.json"
+self.registry_file = self.wipnote_dir / "agents.json"
 ```
 
 ### Current Implementation
-**File**: `src/python/htmlgraph/operations/initialization.py`
+**File**: `src/python/wipnote/operations/initialization.py`
 - ✅ `agents` is NOT in DEFAULT_COLLECTIONS
 - ✅ `agents` is NOT in ADDITIONAL_DIRECTORIES
 - ✅ SDK creates `agents.json` file on first use
 
 ### Project State
 ```bash
-$ ls -la .htmlgraph/agents.json
+$ ls -la .wipnote/agents.json
 -rw-r--r-- shakes staff 1.4 KB Tue Dec 23 10:47:05 2025 agents.json
 ```
 
@@ -82,18 +82,18 @@ $ ls -la .htmlgraph/agents.json
 
 ---
 
-## Task 3: Check for Nested .htmlgraph Bug
+## Task 3: Check for Nested .wipnote Bug
 
 ### Validation Check
-**File**: `src/python/htmlgraph/operations/initialization.py` (lines 79-88)
+**File**: `src/python/wipnote/operations/initialization.py` (lines 79-88)
 ```python
-# Check for nested .htmlgraph directory (initialization corruption bug)
-nested_graph = graph_dir / ".htmlgraph"
+# Check for nested .wipnote directory (initialization corruption bug)
+nested_graph = graph_dir / ".wipnote"
 if nested_graph.exists():
     result.errors.append(
-        f"ERROR: Nested .htmlgraph directory detected at {nested_graph}\n"
+        f"ERROR: Nested .wipnote directory detected at {nested_graph}\n"
         "  This indicates initialization corruption.\n"
-        "  Fix: Remove nested directory with: rm -rf .htmlgraph/.htmlgraph/"
+        "  Fix: Remove nested directory with: rm -rf .wipnote/.wipnote/"
     )
     result.valid = False
     return result
@@ -102,18 +102,18 @@ if nested_graph.exists():
 ### Test Performed
 ```bash
 # Create nested structure manually
-mkdir -p /tmp/htmlgraph-nesting-test/.htmlgraph/.htmlgraph
+mkdir -p /tmp/wipnote-nesting-test/.wipnote/.wipnote
 
 # Try to initialize
-uv run htmlgraph init /tmp/htmlgraph-nesting-test
+uv run wipnote init /tmp/wipnote-nesting-test
 ```
 
 ### Test Result
 ```
-Error: ERROR: Nested .htmlgraph directory detected at 
-/private/tmp/htmlgraph-nesting-test/.htmlgraph/.htmlgraph
+Error: ERROR: Nested .wipnote directory detected at 
+/private/tmp/wipnote-nesting-test/.wipnote/.wipnote
   This indicates initialization corruption.
-  Fix: Remove nested directory with: rm -rf .htmlgraph/.htmlgraph/
+  Fix: Remove nested directory with: rm -rf .wipnote/.wipnote/
 ```
 
 ### ✅ Result: VALIDATION WORKING
@@ -193,7 +193,7 @@ __pycache__/
 | **Init creates correct directories** | ✅ PASS | All 18 directories match expected |
 | **No agents/ directory** | ✅ PASS | Correctly uses agents.json file |
 | **No phases/ directory** | ✅ PASS | Deprecated directory not created |
-| **Nested .htmlgraph validation** | ✅ PASS | Detection and error message working |
+| **Nested .wipnote validation** | ✅ PASS | Detection and error message working |
 | **Plugin structure clean** | ✅ PASS | No nested .claude-plugin directories |
 | **Total size reasonable** | ✅ PASS | 144KB for init, 688KB for plugin |
 
@@ -214,20 +214,20 @@ All checks passed. No bugs found.
 
 ```bash
 # Test 1: Clean initialization
-mkdir -p /tmp/test-init && uv run htmlgraph init /tmp/test-init
-find /tmp/test-init/.htmlgraph -maxdepth 1 -type d | sort
+mkdir -p /tmp/test-init && uv run wipnote init /tmp/test-init
+find /tmp/test-init/.wipnote -maxdepth 1 -type d | sort
 
 # Test 2: Nested directory detection
-mkdir -p /tmp/test-nested/.htmlgraph/.htmlgraph
-uv run htmlgraph init /tmp/test-nested
-# Should error: "Nested .htmlgraph directory detected"
+mkdir -p /tmp/test-nested/.wipnote/.wipnote
+uv run wipnote init /tmp/test-nested
+# Should error: "Nested .wipnote directory detected"
 
 # Test 3: Plugin structure check
 find packages/claude-plugin -name ".claude-plugin" -type d | wc -l
 # Should return: 1
 
 # Test 4: Verify no unwanted directories
-ls -la .htmlgraph/ | grep -E "(agents/|phases/)"
+ls -la .wipnote/ | grep -E "(agents/|phases/)"
 # Should return nothing (agents.json is a file)
 ```
 
@@ -240,7 +240,7 @@ ls -la .htmlgraph/ | grep -E "(agents/|phases/)"
 The initialization process correctly:
 - Creates 18 expected directories
 - Avoids creating unwanted `agents/` or `phases/` directories
-- Detects and prevents nested `.htmlgraph` corruption
+- Detects and prevents nested `.wipnote` corruption
 - Maintains clean plugin structure without nesting
 
 The original nesting bug (which affected the dashboard) has been properly fixed and validated.

@@ -1,6 +1,6 @@
 # ID Generation
 
-HtmlGraph provides collision-resistant, hash-based ID generation for multi-agent collaboration. This system prevents conflicts when multiple agents create tasks concurrently.
+Wipnote provides collision-resistant, hash-based ID generation for multi-agent collaboration. This system prevents conflicts when multiple agents create tasks concurrently.
 
 > **📖 Design Document:** For detailed architecture, implementation details, and rationale, see [Hash-Based IDs Design Document](../design/hash-based-ids.md).
 
@@ -34,7 +34,7 @@ IDs follow the format `{prefix}-{hash}`:
 ### Generating IDs
 
 ```python
-from htmlgraph import generate_id
+from wipnote import generate_id
 
 # Generate a feature ID
 feature_id = generate_id("feature", "User Authentication")
@@ -54,7 +54,7 @@ track_id = generate_id("track", "OAuth Integration")
 When using the SDK or CLI, IDs are generated automatically:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -68,7 +68,7 @@ print(feature.id)  # → "feat-7f3a2b1c"
 
 ```bash
 # CLI also generates hash-based IDs
-htmlgraph feature create "User Authentication" --priority high
+wipnote feature create "User Authentication" --priority high
 # Created: feat-9e8d7c6b
 ```
 
@@ -77,7 +77,7 @@ htmlgraph feature create "User Authentication" --priority high
 For sub-tasks, use hierarchical IDs:
 
 ```python
-from htmlgraph import generate_hierarchical_id
+from wipnote import generate_hierarchical_id
 
 # Create parent feature
 parent_id = generate_id("feature", "Auth System")  # → "feat-a1b2c3d4"
@@ -95,7 +95,7 @@ nested = generate_hierarchical_id(subtask1, 1)     # → "feat-a1b2c3d4.1.1"
 Extract components from any ID:
 
 ```python
-from htmlgraph import parse_id
+from wipnote import parse_id
 
 # Parse a hash-based ID
 result = parse_id("feat-a1b2c3d4.1.2")
@@ -123,7 +123,7 @@ result = parse_id("feature-20241222-143022")
 Check if IDs are valid:
 
 ```python
-from htmlgraph import is_valid_id, is_legacy_id
+from wipnote import is_valid_id, is_legacy_id
 
 # Hash-based IDs
 is_valid_id("feat-a1b2c3d4")      # → True
@@ -146,7 +146,7 @@ is_legacy_id("feat-a1b2c3d4")            # → False
 Navigate hierarchical IDs:
 
 ```python
-from htmlgraph.ids import get_parent_id, get_root_id, get_depth
+from wipnote.ids import get_parent_id, get_root_id, get_depth
 
 id = "feat-a1b2c3d4.1.2"
 
@@ -181,18 +181,18 @@ Legacy timestamp-based IDs remain fully supported:
 
 ## API Reference
 
-::: htmlgraph.ids.generate_id
+::: wipnote.ids.generate_id
 
-::: htmlgraph.ids.generate_hierarchical_id
+::: wipnote.ids.generate_hierarchical_id
 
-::: htmlgraph.ids.parse_id
+::: wipnote.ids.parse_id
 
-::: htmlgraph.ids.is_valid_id
+::: wipnote.ids.is_valid_id
 
-::: htmlgraph.ids.is_legacy_id
+::: wipnote.ids.is_legacy_id
 
-::: htmlgraph.ids.get_parent_id
+::: wipnote.ids.get_parent_id
 
-::: htmlgraph.ids.get_root_id
+::: wipnote.ids.get_root_id
 
-::: htmlgraph.ids.get_depth
+::: wipnote.ids.get_depth

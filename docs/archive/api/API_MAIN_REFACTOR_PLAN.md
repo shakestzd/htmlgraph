@@ -2,10 +2,10 @@
 
 Date: 2026-02-03
 Owner: Codex (with user approval)
-Scope: `src/python/htmlgraph/api/main.py` and related API modules
+Scope: `src/python/wipnote/api/main.py` and related API modules
 
 **Goals**
-1. Split `src/python/htmlgraph/api/main.py` into focused modules with clear boundaries.
+1. Split `src/python/wipnote/api/main.py` into focused modules with clear boundaries.
 2. Adopt FastSQLA to standardize async DB sessions and reduce boilerplate.
 3. Replace the homegrown cache with a maintained caching dependency.
 4. Improve behavior and performance in high-traffic endpoints and WebSocket loops.
@@ -22,14 +22,14 @@ Scope: `src/python/htmlgraph/api/main.py` and related API modules
 3. JSON speed: evaluate `orjson` for response serialization where appropriate.
 
 **Proposed Module Layout**
-1. `src/python/htmlgraph/api/app.py` for app factory, lifespan events, router registration, and dependency wiring.
-2. `src/python/htmlgraph/api/db.py` for DB initialization, session factory, and `get_db()` dependency.
-3. `src/python/htmlgraph/api/cache.py` for cache initialization and shared key building.
-4. `src/python/htmlgraph/api/templates.py` for Jinja environment and filters.
-5. `src/python/htmlgraph/api/schemas.py` for Pydantic response models.
-6. `src/python/htmlgraph/api/repositories/` for SQL queries and DB access helpers.
-7. `src/python/htmlgraph/api/services/` for aggregation logic and grouping rules.
-8. `src/python/htmlgraph/api/routers/` for per-area endpoints.
+1. `src/python/wipnote/api/app.py` for app factory, lifespan events, router registration, and dependency wiring.
+2. `src/python/wipnote/api/db.py` for DB initialization, session factory, and `get_db()` dependency.
+3. `src/python/wipnote/api/cache.py` for cache initialization and shared key building.
+4. `src/python/wipnote/api/templates.py` for Jinja environment and filters.
+5. `src/python/wipnote/api/schemas.py` for Pydantic response models.
+6. `src/python/wipnote/api/repositories/` for SQL queries and DB access helpers.
+7. `src/python/wipnote/api/services/` for aggregation logic and grouping rules.
+8. `src/python/wipnote/api/routers/` for per-area endpoints.
 
 **Behavior Improvements (Targeted)**
 1. Replace N+1 child event queries with a bulk prefetch and in-memory grouping for the activity feed.
@@ -63,7 +63,7 @@ Scope: `src/python/htmlgraph/api/main.py` and related API modules
 3. Add feature flags for cache backends so local dev uses in-memory by default.
 
 **Acceptance Criteria**
-1. `src/python/htmlgraph/api/main.py` is reduced to app creation and exports only.
+1. `src/python/wipnote/api/main.py` is reduced to app creation and exports only.
 2. All endpoints respond with the same shapes as before (verified via tests or fixtures).
 3. FastSQLA is the only DB session lifecycle used in API routes.
 4. Cached endpoints use `fastapi-cache2` and no longer use `QueryCache`.

@@ -1,4 +1,4 @@
-# HtmlGraph Orchestrator - Complexity Assessment System Test Report
+# Wipnote Orchestrator - Complexity Assessment System Test Report
 
 **Date**: 2026-01-12
 **Test Suite**: `test_complexity_assessment.py`
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The HtmlGraph orchestrator implements a sophisticated **4-factor complexity assessment framework** to intelligently select the optimal AI model (Haiku, Sonnet, Opus) for different task types. This report documents the assessment logic, verifies the implementation, and provides test results.
+The Wipnote orchestrator implements a sophisticated **4-factor complexity assessment framework** to intelligently select the optimal AI model (Haiku, Sonnet, Opus) for different task types. This report documents the assessment logic, verifies the implementation, and provides test results.
 
 **Key Findings:**
 - ✅ 4-factor framework fully implemented and operational
@@ -26,9 +26,9 @@ The HtmlGraph orchestrator implements a sophisticated **4-factor complexity asse
 
 | File | Location | Purpose |
 |------|----------|---------|
-| **model_selection.py** | `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/model_selection.py` | Core model selection logic, decision matrix, fallback chains |
-| **orchestrator-system-prompt-optimized.txt** | `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestrator-system-prompt-optimized.txt` | Human-readable 4-factor framework guidelines (lines 98-224) |
-| **__init__.py** | `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/orchestration/__init__.py` | Exports ModelSelection, ComplexityLevel, TaskType, BudgetMode |
+| **model_selection.py** | `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestration/model_selection.py` | Core model selection logic, decision matrix, fallback chains |
+| **orchestrator-system-prompt-optimized.txt** | `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestrator-system-prompt-optimized.txt` | Human-readable 4-factor framework guidelines (lines 98-224) |
+| **__init__.py** | `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/orchestration/__init__.py` | Exports ModelSelection, ComplexityLevel, TaskType, BudgetMode |
 
 ### 1.2 Architecture Overview
 
@@ -530,7 +530,7 @@ QUALITY:  Opus for all
 
 ### 10.1 Summary
 
-The HtmlGraph orchestrator implements a **robust and well-designed** complexity assessment system:
+The Wipnote orchestrator implements a **robust and well-designed** complexity assessment system:
 
 ✅ **4-factor framework verified** - All factors (files, clarity, load, risk) guide model selection
 ✅ **Decision matrix complete** - 75 combinations cover all scenarios
@@ -560,7 +560,7 @@ Add the test suite to official tests and monitor model distribution in productio
 ## Appendix A: Test Execution Log
 
 ```
-HtmlGraph Orchestrator - Complexity Assessment Test Suite
+Wipnote Orchestrator - Complexity Assessment Test Suite
 ======================================================================
 ✓ Default model selection: claude-sonnet
 ✓ Complexity levels defined correctly
@@ -674,8 +674,8 @@ COMPLEXITY ASSESSMENT SYSTEM - TEST SUMMARY
   ✓ Risk level (Low → Haiku, Medium → Sonnet, High → Opus)
 
 📁 IMPLEMENTATION LOCATION:
-  - Model selection: src/python/htmlgraph/orchestration/model_selection.py
-  - Orchestrator prompt: src/python/htmlgraph/orchestrator-system-prompt-optimized.txt
+  - Model selection: src/python/wipnote/orchestration/model_selection.py
+  - Orchestrator prompt: src/python/wipnote/orchestrator-system-prompt-optimized.txt
   - Decision matrix: 75 combinations (5 task types × 3 complexity × 3 budgets)
 
 ======================================================================

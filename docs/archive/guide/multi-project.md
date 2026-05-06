@@ -1,6 +1,6 @@
 # Multi-Project Dashboard
 
-Run a single Phoenix LiveView dashboard serving multiple HtmlGraph projects simultaneously.
+Run a single Phoenix LiveView dashboard serving multiple Wipnote projects simultaneously.
 
 ## Quick Start
 
@@ -16,17 +16,17 @@ docker compose up -d
 
 ## How It Works
 
-The dashboard scans your workspace root for directories containing `.htmlgraph/htmlgraph.db`. Each discovered project appears in the project selector dropdown.
+The dashboard scans your workspace root for directories containing `.wipnote/wipnote.db`. Each discovered project appears in the project selector dropdown.
 
 ```
 /workspace/
 ├── project-a/
-│   └── .htmlgraph/
-│       └── htmlgraph.db    ← discovered
+│   └── .wipnote/
+│       └── wipnote.db    ← discovered
 ├── project-b/
-│   └── .htmlgraph/
-│       └── htmlgraph.db    ← discovered
-└── project-c/                     ← no .htmlgraph/, ignored
+│   └── .wipnote/
+│       └── wipnote.db    ← discovered
+└── project-c/                     ← no .wipnote/, ignored
 ```
 
 ## Configuration
@@ -35,8 +35,8 @@ The dashboard scans your workspace root for directories containing `.htmlgraph/h
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `HTMLGRAPH_WORKSPACE` | Parent directory of current project | Root directory to scan for `.htmlgraph/` |
-| `HTMLGRAPH_DB_PATH` | `{workspace}/.htmlgraph/htmlgraph.db` | Default DB path when no project selected |
+| `HTMLGRAPH_WORKSPACE` | Parent directory of current project | Root directory to scan for `.wipnote/` |
+| `HTMLGRAPH_DB_PATH` | `{workspace}/.wipnote/wipnote.db` | Default DB path when no project selected |
 | `PHX_HOST` | `localhost` | Phoenix host binding |
 | `PHX_PORT` | `4000` | Phoenix port |
 
@@ -49,7 +49,7 @@ version: '3.8'
 
 services:
   dashboard:
-    image: ghcr.io/shakestzd/htmlgraph-dashboard:latest
+    image: ghcr.io/shakestzd/wipnote-dashboard:latest
     ports:
       - "4000:4000"
     environment:
@@ -75,18 +75,18 @@ docker compose logs -f dashboard
 
 ## Without Docker
 
-Run the dashboard from any HtmlGraph project with workspace support:
+Run the dashboard from any Wipnote project with workspace support:
 
 ```bash
 # From any project directory
 cd /path/to/workspace/my-project
 
 # Serve with workspace scanning
-htmlgraph serve --workspace /path/to/workspace
+wipnote serve --workspace /path/to/workspace
 ```
 
 The dashboard will:
-1. Scan `/path/to/workspace` for all `.htmlgraph/htmlgraph.db` files
+1. Scan `/path/to/workspace` for all `.wipnote/wipnote.db` files
 2. Build a project list
 3. Serve on http://localhost:4000
 
@@ -127,10 +127,10 @@ All dashboard views are automatically scoped to the selected project:
 
 ## Adding New Projects
 
-1. Initialize HtmlGraph in your project:
+1. Initialize Wipnote in your project:
    ```bash
    cd /path/to/new-project
-   htmlgraph init
+   wipnote init
    ```
 
 2. The dashboard automatically discovers it on next scan
@@ -142,9 +142,9 @@ All dashboard views are automatically scoped to the selected project:
 The dashboard uses this search order:
 
 1. **Explicit path**: `HTMLGRAPH_DB_PATH` environment variable
-2. **Project selection**: Selected project's `.htmlgraph/htmlgraph.db`
-3. **Workspace scan**: Find all `.htmlgraph/htmlgraph.db` in `HTMLGRAPH_WORKSPACE`
-4. **Default**: `~/.htmlgraph/htmlgraph.db` (single-project fallback)
+2. **Project selection**: Selected project's `.wipnote/wipnote.db`
+3. **Workspace scan**: Find all `.wipnote/wipnote.db` in `HTMLGRAPH_WORKSPACE`
+4. **Default**: `~/.wipnote/wipnote.db` (single-project fallback)
 
 ## Troubleshooting
 
@@ -153,17 +153,17 @@ The dashboard uses this search order:
 Check that each project has been initialized:
 
 ```bash
-ls -la /workspace/project-*/. htmlgraph/htmlgraph.db
+ls -la /workspace/project-*/. wipnote/wipnote.db
 
 # Or search for all databases
-find /workspace -name "htmlgraph.db" -type f
+find /workspace -name "wipnote.db" -type f
 ```
 
 Initialize missing projects:
 
 ```bash
 cd /workspace/project-name
-htmlgraph init
+wipnote init
 ```
 
 ### Dashboard Not Connecting
@@ -190,7 +190,7 @@ The dashboard scans all projects on startup. For workspaces with 50+ projects:
 
 ## Performance Tips
 
-- **Use SSD storage** for `.htmlgraph/` databases
+- **Use SSD storage** for `.wipnote/` databases
 - **Limit projects** to 20-30 per dashboard (use separate dashboards for larger teams)
 - **Keep databases small** - export old sessions periodically
 - **Mount workspace as read-only** - reduces I/O overhead
@@ -214,9 +214,9 @@ Export all project data:
 
 ```bash
 for project in /workspace/*/; do
-  if [ -f "$project/.htmlgraph/htmlgraph.db" ]; then
+  if [ -f "$project/.wipnote/wipnote.db" ]; then
     name=$(basename "$project")
-    htmlgraph export -o "exports/$name.jsonl" --db "$project/.htmlgraph/htmlgraph.db"
+    wipnote export -o "exports/$name.jsonl" --db "$project/.wipnote/wipnote.db"
   fi
 done
 ```

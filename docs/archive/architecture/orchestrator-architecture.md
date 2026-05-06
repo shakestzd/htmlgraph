@@ -2,7 +2,7 @@
 
 **"Coordination, Not Control" - Flexible Model Selection Based on Task Needs**
 
-Use this document to understand HtmlGraph's orchestrator pattern. MUST coordinate multiple AI agents in parallel. MUST preserve context efficiency while maximizing model flexibility.
+Use this document to understand Wipnote's orchestrator pattern. MUST coordinate multiple AI agents in parallel. MUST preserve context efficiency while maximizing model flexibility.
 
 ---
 
@@ -167,7 +167,7 @@ Task(subagent_type="copilot", prompt="...", allow_tools=["shell", "git"])
 **Best for:** Exploratory research, batch analysis, multimodal tasks, cost-sensitive workflows
 
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 result = spawner.spawn_gemini(
@@ -206,7 +206,7 @@ else:
 **Best for:** GitHub-integrated workflows, git operations, repository management
 
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 
@@ -270,7 +270,7 @@ deny_tools=["shell(rm)"]
 **Best for:** Code generation, Codex platform integration, coding completions
 
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 result = spawner.spawn_codex(
@@ -308,7 +308,7 @@ else:
 **Best for:** Reasoning, analysis, strategic planning, any complex task
 
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 
@@ -410,7 +410,7 @@ Task(subagent_type="sonnet",
 Launch multiple spawners to explore different aspects simultaneously:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="orchestrator")
 

@@ -1,6 +1,6 @@
 # Memory Sync - Complete Reference
 
-Complete documentation for HtmlGraph's centralized documentation synchronization system.
+Complete documentation for Wipnote's centralized documentation synchronization system.
 
 ---
 
@@ -60,7 +60,7 @@ Multi-platform AI tools (Claude Code, Gemini, etc.) need documentation in multip
 ### File Hierarchy
 
 ```
-htmlgraph/
+wipnote/
 ├── AGENTS.md              # Master documentation (SDK, API, CLI)
 │   ├── Complete Python SDK reference
 │   ├── CLI command examples
@@ -86,7 +86,7 @@ htmlgraph/
 
 **AGENTS.md (Master):**
 - ✅ Python SDK (complete API reference)
-- ✅ CLI commands (htmlgraph status, features, tracks, etc.)
+- ✅ CLI commands (wipnote status, features, tracks, etc.)
 - ✅ Deployment guide (PyPI publishing, versioning)
 - ✅ Best practices (dogfooding, quality gates)
 - ✅ Code examples (SDK usage, tracking patterns)
@@ -115,7 +115,7 @@ For complete SDK documentation, see **[AGENTS.md](./AGENTS.md)**.
 
 Quick example:
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent='claude')
 feature = sdk.features.create('Add authentication').save()
 ```
@@ -300,7 +300,7 @@ Task(prompt=explorer["prompt"])
 ```markdown
 ## Project Vision
 
-HtmlGraph: "HTML is All You Need"
+Wipnote: "HTML is All You Need"
 
 Core Philosophy: The web is already a giant graph database.
 
@@ -555,15 +555,15 @@ $ # sync-docs not yet in Go CLI
 Error: Command 'sync-docs' not found
 ```
 
-**Cause:** Old version of htmlgraph package.
+**Cause:** Old version of wipnote package.
 
 **Fix:**
 ```bash
 # Update to latest version
-uv pip install --upgrade htmlgraph
+uv pip install --upgrade wipnote
 
 # Verify version
-htmlgraph --version
+wipnote --version
 ```
 
 ---
@@ -576,7 +576,7 @@ htmlgraph --version
 
 ```python
 # scripts/custom-sync.py
-from htmlgraph.sync import DocumentSync
+from wipnote.sync import DocumentSync
 
 sync = DocumentSync(
     master='AGENTS.md',

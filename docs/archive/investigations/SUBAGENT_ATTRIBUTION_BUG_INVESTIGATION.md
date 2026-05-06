@@ -27,7 +27,7 @@ Subagent (Opus):
   ❌ No session created
   ❌ Events attributed to parent session
   ❌ Model field shows parent model (Sonnet) instead of Opus
-  ❌ Cannot distinguish subagent from orchestrator in HtmlGraph
+  ❌ Cannot distinguish subagent from orchestrator in Wipnote
 ```
 
 ### Expected Behavior
@@ -50,14 +50,14 @@ Subagent (Opus):
 
 ### 1. Session ID Detection Bug in `track_event.py`
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 **Lines**: 711-723
 
 ```python
 # Get active session ID
 active_session = manager.get_active_session()
 if not active_session:
-    # No active HtmlGraph session yet; start one (stable internal id).
+    # No active Wipnote session yet; start one (stable internal id).
     try:
         active_session = manager.start_session(
             session_id=None,
@@ -70,10 +70,10 @@ if not active_session:
 active_session_id = active_session.id
 ```
 
-**Problem**: `manager.get_active_session()` returns the **globally cached active session** stored in `.htmlgraph/session.json`, which is shared across ALL Claude Code windows and agents.
+**Problem**: `manager.get_active_session()` returns the **globally cached active session** stored in `.wipnote/session.json`, which is shared across ALL Claude Code windows and agents.
 
 **Why This Causes Misattribution**:
-1. When orchestrator (Sonnet) starts, it creates `session-abc123` and stores it in `.htmlgraph/session.json`
+1. When orchestrator (Sonnet) starts, it creates `session-abc123` and stores it in `.wipnote/session.json`
 2. When subagent (Opus) spawns, it calls `track_event()` hook for its first tool call
 3. The hook calls `manager.get_active_session()` which returns `session-abc123` (the cached global session)
 4. Subagent's Read/Grep/Edit events are recorded to `session-abc123` instead of creating a new subagent session
@@ -81,7 +81,7 @@ active_session_id = active_session.id
 
 ### 2. Environment Variable Not Checked for Subagent Detection
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 **Lines**: 710-723
 
 The hook **does not check** for environment variables that indicate a subagent context:
@@ -152,7 +152,7 @@ env["HTMLGRAPH_PARENT_AGENT"] = detected_agent  # Parent orchestrator agent
 
 ### 4. Context Manager Not Using Environment Variables
 
-**File**: `src/python/htmlgraph/hooks/context.py`
+**File**: `src/python/wipnote/hooks/context.py`
 **Lines**: 111-126
 
 The `HookContext.from_input()` method checks for `HTMLGRAPH_SESSION_ID` but **the event tracker doesn't use it**:
@@ -180,7 +180,7 @@ But in `track_event()`, the hook **ignores this** and uses the global `manager.g
 │                                                     │
 │ 1. Session Start Hook                              │
 │    → Creates session-abc123                         │
-│    → Stores in .htmlgraph/session.json              │
+│    → Stores in .wipnote/session.json              │
 │                                                     │
 │ 2. User Query                                       │
 │    → UserQuery event in session-abc123              │
@@ -205,7 +205,7 @@ But in `track_event()`, the hook **ignores this** and uses the global `manager.g
 │                                                     │
 │    BUT:                                             │
 │    → manager.get_active_session()                  │
-│    ✗ Reads .htmlgraph/session.json (global cache)  │
+│    ✗ Reads .wipnote/session.json (global cache)  │
 │    ✗ Returns session-abc123 (parent's session!)    │
 │    ✗ No HTMLGRAPH_PARENT_SESSION env var set       │
 │    ✗ No subagent session created                   │
@@ -222,7 +222,7 @@ But in `track_event()`, the hook **ignores this** and uses the global `manager.g
 └─────────────────────────────────────────────────────┘
 ```
 
-**Result**: All subagent events show in HtmlGraph under parent session, making them **indistinguishable from orchestrator events**.
+**Result**: All subagent events show in Wipnote under parent session, making them **indistinguishable from orchestrator events**.
 
 ---
 
@@ -240,8 +240,8 @@ But in `track_event()`, the hook **ignores this** and uses the global `manager.g
 current_session_id = os.environ.get("HTMLGRAPH_SESSION_ID", "")
 if not current_session_id:
     try:
-        from htmlgraph.session_manager import SessionManager
-        manager = SessionManager(Path.cwd() / ".htmlgraph")
+        from wipnote.session_manager import SessionManager
+        manager = SessionManager(Path.cwd() / ".wipnote")
         active = manager.get_active_session()
         if active:
             current_session_id = active.id
@@ -257,7 +257,7 @@ env["HTMLGRAPH_PARENT_AGENT"] = detected_agent or "unknown"
 
 ### Fix 2: Track Event Hook - Check Subagent Environment
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 
 **Location**: `track_event()` function around line 710-723
 
@@ -341,7 +341,7 @@ Update `context.py` to add comment explaining the hazard:
 
 ### Phase 2: Subagent Session Creation (Track Event Hook)
 
-**File**: `src/python/htmlgraph/hooks/event_tracker.py`
+**File**: `src/python/wipnote/hooks/event_tracker.py`
 
 - [ ] Add subagent detection logic (check HTMLGRAPH_SUBAGENT_TYPE)
 - [ ] Add parent session ID retrieval (HTMLGRAPH_PARENT_SESSION)
@@ -353,7 +353,7 @@ Update `context.py` to add comment explaining the hazard:
 
 ### Phase 3: Database Schema Verification
 
-**File**: `src/python/htmlgraph/db/schema.py`
+**File**: `src/python/wipnote/db/schema.py`
 
 - [ ] Verify sessions table has parent_session_id column
 - [ ] Verify sessions table has is_subagent column
@@ -401,7 +401,7 @@ def test_track_event_creates_subagent_session():
     response = track_event("PostToolUse", hook_input)
 
     # Verify subagent session created
-    manager = SessionManager(".htmlgraph")
+    manager = SessionManager(".wipnote")
     subagent_sessions = [s for s in manager._list_active_sessions()
                          if s.is_subagent]
     assert len(subagent_sessions) > 0
@@ -420,7 +420,7 @@ def test_subagent_events_in_subagent_session():
     track_event("PostToolUse", hook_input)
 
     # Verify event in subagent session, NOT parent session
-    db = HtmlGraphDB(".htmlgraph/index.sqlite")
+    db = WipnoteDB(".wipnote/index.sqlite")
     events = db.query_events(session_id=parent_session.id)
     read_events = [e for e in events if e["tool_name"] == "Read"]
     assert len(read_events) == 0  # Should NOT be in parent session
@@ -475,7 +475,7 @@ def test_orchestrator_spawner_attribution_flow():
             assert subagent_session.parent_session == orch_session.id
 
             # Verify Grep event in subagent session
-            db = HtmlGraphDB(".htmlgraph/index.sqlite")
+            db = WipnoteDB(".wipnote/index.sqlite")
             events = db.query_events(session_id=subagent_session.id)
             grep_events = [e for e in events if e["tool_name"] == "Grep"]
             assert len(grep_events) == 1
@@ -501,7 +501,7 @@ def test_orchestrator_spawner_attribution_flow():
 ### Step 3: Verification
 1. Deploy to test environment
 2. Run orchestrator → Gemini spawner workflow
-3. Inspect `.htmlgraph/` to verify:
+3. Inspect `.wipnote/` to verify:
    - Separate subagent session created
    - Events recorded to subagent session
    - Parent-child links established
@@ -550,7 +550,7 @@ After fix implementation, these conditions should all be true:
    -- gemini-2.0-flash (not claude-sonnet)
    ```
 
-5. **HtmlGraph Dashboard**: Visual separation in UI
+5. **Wipnote Dashboard**: Visual separation in UI
    - Orchestrator session shows only Task() calls
    - Subagent session shows Read, Grep, Edit, etc.
    - Parent-child relationship visible in session hierarchy
@@ -582,12 +582,12 @@ After fix implementation, these conditions should all be true:
    - Add environment variable setup in `route_to_spawner()`
    - Extract current session ID before spawning
 
-2. **`src/python/htmlgraph/hooks/event_tracker.py`**
+2. **`src/python/wipnote/hooks/event_tracker.py`**
    - Add subagent detection logic at start of `track_event()`
    - Conditional session creation based on subagent context
    - Add logging for debugging
 
-3. **`src/python/htmlgraph/hooks/context.py`**
+3. **`src/python/wipnote/hooks/context.py`**
    - Add documentation comment about session separation hazard
 
 4. **`tests/integration/test_orchestrator_spawner_delegation.py`**

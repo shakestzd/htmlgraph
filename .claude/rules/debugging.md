@@ -29,4 +29,4 @@ claude --debug <command>   # Verbose output
 2. Implement the minimal fix
 3. Validate with `go build ./... && go vet ./... && go test ./...`
 
-For full methodology, use `/htmlgraph:diagnose`.
+For full methodology, use `/wipnote:diagnose`.

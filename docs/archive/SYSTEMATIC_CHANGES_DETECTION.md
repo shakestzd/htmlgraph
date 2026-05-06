@@ -52,7 +52,7 @@ Commit allowed
 2. **Parse patterns** — Scan for function/class/variable definitions in added vs removed lines
 3. **Find old names** — For each old pattern, search codebase with `grep -rn`
 4. **Filter results** — Exclude:
-   - `.htmlgraph/` directory
+   - `.wipnote/` directory
    - `tests/` directory
    - `.git/` directory
    - Generated files (`.pyc`, `.egg-info`, etc.)
@@ -170,7 +170,7 @@ Potential improvements:
 
 1. **Multi-language support** — Extend to JS, TypeScript, Go, Rust
 2. **Smart filtering** — Reduce false positives with AST parsing
-3. **Configuration** — Allow project-specific patterns via `.htmlgraph-config.yml`
+3. **Configuration** — Allow project-specific patterns via `.wipnote-config.yml`
 4. **Integration** — Hook into CI/CD with optional blocking mode
 5. **Database tracking** — Log systematic changes for project analytics
 

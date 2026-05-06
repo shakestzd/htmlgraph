@@ -18,7 +18,7 @@ FROM agent_events
 
 ## Root Cause
 
-Line 741 in `src/python/htmlgraph/hooks/event_tracker.py` was hardcoded to:
+Line 741 in `src/python/wipnote/hooks/event_tracker.py` was hardcoded to:
 ```python
 parent_event_id=None,  # Parent linking handled after result
 ```
@@ -31,7 +31,7 @@ But the `parent_activity_id` variable was already being calculated correctly fro
 
 ### Changes Made
 
-**File:** `src/python/htmlgraph/hooks/event_tracker.py`
+**File:** `src/python/wipnote/hooks/event_tracker.py`
 
 **Change 1 (Lines 708-713):** Added environment variable fallback
 ```python
@@ -216,7 +216,7 @@ GROUP BY parent_event_id;
 
 ## Files Modified
 
-1. **src/python/htmlgraph/hooks/event_tracker.py** (2 changes)
+1. **src/python/wipnote/hooks/event_tracker.py** (2 changes)
    - Lines 708-713: Added environment variable fallback
    - Line 748: Fixed parent_event_id parameter
 
@@ -232,14 +232,14 @@ GROUP BY parent_event_id;
 uv run pytest tests/python/test_parent_linking_integration.py -v
 
 # Check database statistics
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT
     COUNT(*) as total,
     SUM(CASE WHEN parent_event_id IS NOT NULL THEN 1 ELSE 0 END) as with_parents
 FROM agent_events"
 
 # Show parent-child relationships
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT
     p.event_id as parent,
     p.tool_name,
@@ -260,8 +260,8 @@ GROUP BY p.event_id"
 
 ## References
 
-- **Spike:** `.htmlgraph/spikes/spk-bbddf263.html`
+- **Spike:** `.wipnote/spikes/spk-bbddf263.html`
 - **Tests:** `tests/python/test_parent_linking_integration.py`
-- **PreToolUse Hook:** `src/python/htmlgraph/hooks/pretooluse.py` (line 287)
-- **SubagentStop Hook:** `src/python/htmlgraph/hooks/subagent_stop.py` (line 41)
-- **Database Schema:** `src/python/htmlgraph/db/schema.py` (line 115, 124)
+- **PreToolUse Hook:** `src/python/wipnote/hooks/pretooluse.py` (line 287)
+- **SubagentStop Hook:** `src/python/wipnote/hooks/subagent_stop.py` (line 41)
+- **Database Schema:** `src/python/wipnote/db/schema.py` (line 115, 124)

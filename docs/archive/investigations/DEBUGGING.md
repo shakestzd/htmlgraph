@@ -1,8 +1,8 @@
-# HtmlGraph Debugging Guide
+# Wipnote Debugging Guide
 
 **Philosophy: Research First, Then Debug**
 
-This guide provides practical debugging workflows for HtmlGraph users. It enforces a research-first approach: always investigate documentation before implementing solutions.
+This guide provides practical debugging workflows for Wipnote users. It enforces a research-first approach: always investigate documentation before implementing solutions.
 
 ## Table of Contents
 
@@ -31,8 +31,8 @@ claude --debug          # Enable debug mode
 /doctor                 # System diagnostics
 
 # 3. Run Diagnostics
-uv run htmlgraph status                     # Check HtmlGraph state
-uv run htmlgraph orchestrator status        # Check orchestrator
+uv run wipnote status                     # Check Wipnote state
+uv run wipnote orchestrator status        # Check orchestrator
 uv run ruff check && uv run mypy src/       # Check code quality
 
 # 4. Test Your Fix
@@ -56,7 +56,7 @@ Choose the right tool for your debugging task:
 | Multiple failed attempts | **Researcher Agent** | Stop guessing, start researching |
 | Hook execution issues | `/hooks` command | Inspect active hooks |
 | System health check | `/doctor` command | Overall diagnostics |
-| Feature tracking issues | `htmlgraph status` | Check HtmlGraph state |
+| Feature tracking issues | `wipnote status` | Check Wipnote state |
 | Type/lint errors | `mypy` + `ruff` | Static analysis |
 
 ---
@@ -119,7 +119,7 @@ cat .claude/settings.json
 # Verify hook type (PreToolUse, PostToolUse, etc.)
 
 # 4. Test hook command manually
-uv run htmlgraph session start coder test-hook
+uv run wipnote session start coder test-hook
 # Or whatever command your hook runs
 
 # 5. Check logs for errors
@@ -147,20 +147,20 @@ echo ${CLAUDE_PLUGIN_ROOT}
 **Debugging Steps**:
 
 ```bash
-# 1. Check HtmlGraph initialization
-ls .htmlgraph/
+# 1. Check Wipnote initialization
+ls .wipnote/
 # Should see: features/ sessions/ spikes/ tracks/
 
 # 2. Verify orchestrator status
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 # Should show enabled state
 
 # 3. Check session state
-uv run htmlgraph session list --active
+uv run wipnote session list --active
 # Shows currently active session
 
 # 4. Inspect feature files
-ls .htmlgraph/features/
+ls .wipnote/features/
 # Should see HTML files
 
 # 5. Verify hooks are running
@@ -168,17 +168,17 @@ ls .htmlgraph/features/
 # Look for PreToolUse and PostToolUse hooks
 
 # 6. Check hook execution logs
-cat .htmlgraph/sessions/*.jsonl
+cat .wipnote/sessions/*.jsonl
 # See session event logs
 ```
 
 **Common Issues**:
-- `.htmlgraph/` not initialized
+- `.wipnote/` not initialized
 - Hooks not registered
 - Orchestrator disabled
 - SDK import errors
 
-**Solution**: Run `uv run htmlgraph init` to reinitialize
+**Solution**: Run `uv run wipnote init` to reinitialize
 
 ---
 
@@ -190,11 +190,11 @@ cat .htmlgraph/sessions/*.jsonl
 
 ```bash
 # 1. Check orchestrator status
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 # Expected: "enabled (strict enforcement)"
 
 # 2. Verify configuration file
-cat .htmlgraph/orchestrator-mode.json
+cat .wipnote/orchestrator-mode.json
 # Should show: {"enabled": true, "mode": "strict"}
 
 # 3. Check hook registration
@@ -231,19 +231,19 @@ cat .htmlgraph/orchestrator-mode.json
 claude plugin list
 
 # 3. Check plugin status
-claude plugin show htmlgraph
+claude plugin show wipnote
 
 # 4. Verify plugin structure
-ls ~/.claude/plugins/htmlgraph/
+ls ~/.claude/plugins/wipnote/
 # Should see .claude-plugin/ directory
 
 # 5. Check plugin.json validity
-cat ~/.claude/plugins/htmlgraph/.claude-plugin/plugin.json
+cat ~/.claude/plugins/wipnote/.claude-plugin/plugin.json
 # Validate JSON structure
 
 # 6. Reinstall if needed
-claude plugin uninstall htmlgraph
-claude plugin install htmlgraph
+claude plugin uninstall wipnote
+claude plugin install wipnote
 ```
 
 ---
@@ -345,27 +345,27 @@ claude plugin show <name>             # Show plugin details
 claude plugin update <name>           # Update plugin
 ```
 
-### HtmlGraph Commands
+### Wipnote Commands
 
 ```bash
 # Status & Inspection
-uv run htmlgraph status                # Show all features
-uv run htmlgraph feature show <id>    # Show specific feature
-uv run htmlgraph session list         # List sessions
-uv run htmlgraph session list --active # Active sessions only
+uv run wipnote status                # Show all features
+uv run wipnote feature show <id>    # Show specific feature
+uv run wipnote session list         # List sessions
+uv run wipnote session list --active # Active sessions only
 
 # Orchestrator
-uv run htmlgraph orchestrator status   # Check orchestrator state
-uv run htmlgraph orchestrator enable   # Enable orchestrator
-uv run htmlgraph orchestrator disable  # Disable orchestrator
+uv run wipnote orchestrator status   # Check orchestrator state
+uv run wipnote orchestrator enable   # Enable orchestrator
+uv run wipnote orchestrator disable  # Disable orchestrator
 
 # Analytics
-uv run htmlgraph recommend             # Get work recommendations
-uv run htmlgraph bottlenecks           # Find bottlenecks
+uv run wipnote recommend             # Get work recommendations
+uv run wipnote bottlenecks           # Find bottlenecks
 
 # Maintenance
-uv run htmlgraph init                  # Initialize .htmlgraph/
-uv run htmlgraph sync-docs             # Sync documentation
+uv run wipnote init                  # Initialize .wipnote/
+uv run wipnote sync-docs             # Sync documentation
 ```
 
 ### Testing & Quality
@@ -381,7 +381,7 @@ uv run pytest tests/test_file.py       # Specific file
 # Type Checking
 uv run mypy src/                       # Check all types
 uv run mypy --strict src/              # Strict mode
-uv run mypy src/htmlgraph/hooks.py    # Specific file
+uv run mypy src/wipnote/hooks.py    # Specific file
 
 # Linting
 uv run ruff check                      # Check all files
@@ -400,13 +400,13 @@ uv run pytest
 ```bash
 # File Inspection
 ls -lt .claude/                        # Check Claude config
-ls -lt .htmlgraph/                     # Check HtmlGraph state
+ls -lt .wipnote/                     # Check Wipnote state
 cat .claude/settings.json              # View settings
-cat .htmlgraph/orchestrator-mode.json  # Orchestrator config
+cat .wipnote/orchestrator-mode.json  # Orchestrator config
 
 # Search & Grep
 grep -r "pattern" .claude/             # Search Claude configs
-grep -r "pattern" .htmlgraph/          # Search HtmlGraph files
+grep -r "pattern" .wipnote/          # Search Wipnote files
 
 # Git State
 git status                             # Check working tree
@@ -432,7 +432,7 @@ echo $CLAUDE_PLUGIN_ROOT               # Plugin root path
 - Plugin development: https://code.claude.com/docs/en/plugins.md
 - GitHub: https://github.com/anthropics/claude-code
 
-**HtmlGraph**:
+**Wipnote**:
 - AGENTS.md - SDK, API, CLI reference
 - CLAUDE.md - Project overview, workflows
 - README.md - Quick start guide
@@ -444,7 +444,7 @@ echo $CLAUDE_PLUGIN_ROOT               # Plugin root path
 1. Claude Code GitHub issues: https://github.com/anthropics/claude-code/issues
 2. Check closed issues for solutions
 3. Look for related discussions
-4. Search HtmlGraph spikes: `.htmlgraph/spikes/`
+4. Search Wipnote spikes: `.wipnote/spikes/`
 
 ### Research Checklist
 
@@ -459,7 +459,7 @@ Before implementing ANY fix:
 
 ## Debugging Agents
 
-HtmlGraph plugin provides three specialized debugging agents. Use them systematically:
+Wipnote plugin provides three specialized debugging agents. Use them systematically:
 
 ### 1. Researcher Agent
 
@@ -477,12 +477,12 @@ HtmlGraph plugin provides three specialized debugging agents. Use them systemati
 1. Search official documentation
 2. Check GitHub issues
 3. Use claude-code-guide agent
-4. Document findings in HtmlGraph spike
+4. Document findings in Wipnote spike
 5. Implement solution based on research
 
 **Example**:
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="researcher")
 
 spike = sdk.spikes.create(
@@ -529,7 +529,7 @@ spike = sdk.spikes.create(
 
 **Example**:
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="debugger")
 
 bug = sdk.bugs.create(
@@ -684,7 +684,7 @@ Encountered an issue?
 │  └─ STOP → Use Researcher Agent → Start over with research
 │
 └─ Just need quick diagnostics?
-   └─ Use debug commands → /hooks, /doctor, htmlgraph status
+   └─ Use debug commands → /hooks, /doctor, wipnote status
 ```
 
 ---
@@ -694,7 +694,7 @@ Encountered an issue?
 **Golden Rules**:
 1. **Research FIRST** - Documentation over trial-and-error
 2. **Use Agents** - Researcher, Debugger, Test-runner for systematic work
-3. **Document Everything** - Capture findings in HtmlGraph spikes
+3. **Document Everything** - Capture findings in Wipnote spikes
 4. **Fix ALL Errors** - Code hygiene is non-negotiable
 5. **Test Before Commit** - Quality gates protect production
 
@@ -709,8 +709,8 @@ Encountered an issue?
 - **packages/claude-plugin/agents/researcher.md** - Research methodology
 - **packages/claude-plugin/agents/debugger.md** - Debugging methodology
 - **packages/claude-plugin/agents/test-runner.md** - Testing strategy
-- **.htmlgraph/spikes/** - Past debugging sessions and research
+- **.wipnote/spikes/** - Past debugging sessions and research
 
 ---
 
-*"Evidence > Assumptions | Research > Trial-and-Error"* - HtmlGraph Debugging Philosophy
+*"Evidence > Assumptions | Research > Trial-and-Error"* - Wipnote Debugging Philosophy

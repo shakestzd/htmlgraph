@@ -1,4 +1,4 @@
-# Release Notes - HtmlGraph 0.7.3
+# Release Notes - Wipnote 0.7.3
 
 **Release Date:** December 23, 2025
 **Type:** Patch Release (Infrastructure)
@@ -19,17 +19,17 @@
 
 ### PyPI (Python Package)
 ```bash
-pip install --upgrade htmlgraph==0.7.3
+pip install --upgrade wipnote==0.7.3
 ```
 
 ### Claude Plugin
 ```bash
-claude plugin update htmlgraph
+claude plugin update wipnote
 ```
 
 ### Verify Installation
 ```bash
-python -c "import htmlgraph; print(htmlgraph.__version__)"
+python -c "import wipnote; print(wipnote.__version__)"
 # Should output: 0.7.3
 ```
 
@@ -43,10 +43,10 @@ python -c "import htmlgraph; print(htmlgraph.__version__)"
 
 ## 🔗 Related Links
 
-- **GitHub Release:** https://github.com/shakestzd/htmlgraph/releases/tag/v0.7.3
-- **PyPI Package:** https://pypi.org/project/htmlgraph/0.7.3/
-- **Documentation:** https://shakes-tzd.github.io/htmlgraph/
+- **GitHub Release:** https://github.com/shakestzd/wipnote/releases/tag/v0.7.3
+- **PyPI Package:** https://pypi.org/project/wipnote/0.7.3/
+- **Documentation:** https://shakes-tzd.github.io/wipnote/
 
 ---
 
-**Thank you for using HtmlGraph!** 🎉
+**Thank you for using Wipnote!** 🎉

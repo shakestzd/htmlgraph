@@ -339,8 +339,8 @@ def test_dashboard_event_hierarchy_visualization():
 
 - `packages/claude-plugin/.claude-plugin/hooks/scripts/pretooluse-integrator.py` - Set parent context
 - `packages/claude-plugin/.claude-plugin/hooks/scripts/user-prompt-submit.py` - Initial context setup
-- `src/python/htmlgraph/hooks/context.py` - Environment variable handling
-- `src/python/htmlgraph/db/schema.py` - Event recording logic
+- `src/python/wipnote/hooks/context.py` - Environment variable handling
+- `src/python/wipnote/db/schema.py` - Event recording logic
 
 ---
 

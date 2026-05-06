@@ -1,6 +1,6 @@
 # Cookbook
 
-Practical recipes for common HtmlGraph tasks. Copy, paste, and adapt these patterns to your needs.
+Practical recipes for common Wipnote tasks. Copy, paste, and adapt these patterns to your needs.
 
 ## Quick Navigation
 

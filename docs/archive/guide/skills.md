@@ -2,10 +2,10 @@
 
 ## What Are Skills?
 
-Skills are specialized commands and guides that extend HtmlGraph with focused, reusable capabilities. Think of them as expert consultants you can summon for specific tasks:
+Skills are specialized commands and guides that extend Wipnote with focused, reusable capabilities. Think of them as expert consultants you can summon for specific tasks:
 
 - **Skills provide progressive disclosure** - Start simple, dive deep only when needed
-- **Skills integrate with HtmlGraph** - Seamlessly coordinate with tracking, delegation, and analytics
+- **Skills integrate with Wipnote** - Seamlessly coordinate with tracking, delegation, and analytics
 - **Skills are discoverable** - List, search, and learn at your own pace
 
 When you need guidance on a specific area, invoke a skill to access expert-level documentation and decision frameworks—without overwhelming yourself with unnecessary detail.
@@ -86,7 +86,7 @@ Use this flowchart to find the right skill for your task:
 - Research-first methodology (read docs before guessing)
 - Systematic root cause analysis
 - When to use debugger vs. researcher agents
-- Using HtmlGraph spike documentation
+- Using Wipnote spike documentation
 
 **Example:** "My hooks aren't loading. I've tried 3 fixes already."
 ```bash
@@ -212,7 +212,7 @@ Use this flowchart to find the right skill for your task:
 - Built-in debug tools and agents
 - Systematic error analysis process
 - When to use researcher vs. debugger vs. test-runner agents
-- Integration with HtmlGraph spikes for documentation
+- Integration with Wipnote spikes for documentation
 - Anti-patterns to avoid
 
 **Use this when:**
@@ -281,15 +281,15 @@ You don't need to read everything at once. Start with what you need, dive deeper
 
 ---
 
-## Skill Integration with HtmlGraph
+## Skill Integration with Wipnote
 
 ### Tracking Your Skill Usage
 
-When you use a skill to solve a problem, document it in HtmlGraph:
+When you use a skill to solve a problem, document it in Wipnote:
 
 ```bash
 # Create a spike documenting your learnings
-htmlgraph spike create "Learned debugging workflow - resolved hook loading issue: Research first, check all hook sources, hooks MERGE not replace, verify with /hooks. Fixed by removing duplicate hooks."
+wipnote spike create "Learned debugging workflow - resolved hook loading issue: Research first, check all hook sources, hooks MERGE not replace, verify with /hooks. Fixed by removing duplicate hooks."
 ```
 
 ### Orchestrator Directives Integration
@@ -345,7 +345,7 @@ uv run pytest
 # - How will costs be optimized?
 
 # Step 2: Create feature tracking
-# (Use HtmlGraph SDK as shown in delegation.md)
+# (Use Wipnote SDK as shown in delegation.md)
 
 # Step 3: Execute with proper delegation pattern
 # Task(subagent_type="...", prompt="...")
@@ -365,7 +365,7 @@ uv run pytest
 # - When to use debugging agents
 
 # Step 2: Document findings in spike
-htmlgraph spike create "Debug: test failure in X - [findings here]"
+wipnote spike create "Debug: test failure in X - [findings here]"
 
 # Step 3: Don't guess - research and understand root cause
 ```
@@ -415,7 +415,7 @@ A: Yes! For example, planning a release might use `/deployment-automation` + `/c
 
 **Q: Where are skills defined?**
 
-A: Skills are defined in `packages/claude-plugin/skills/` in the HtmlGraph project.
+A: Skills are defined in `packages/claude-plugin/skills/` in the Wipnote project.
 
 **Q: Do I need to memorize all skills?**
 

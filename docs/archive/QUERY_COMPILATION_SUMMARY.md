@@ -2,13 +2,13 @@
 
 ## Overview
 
-Implemented CSS selector query compilation for HtmlGraph to improve performance when the same selectors are used repeatedly. This addresses **Phase 4, Task 2** of the Technical Debt Resolution track.
+Implemented CSS selector query compilation for Wipnote to improve performance when the same selectors are used repeatedly. This addresses **Phase 4, Task 2** of the Technical Debt Resolution track.
 
 ## Implementation Details
 
 ### 1. CompiledQuery Class
 
-Added a new `CompiledQuery` dataclass in `src/python/htmlgraph/graph.py`:
+Added a new `CompiledQuery` dataclass in `src/python/wipnote/graph.py`:
 
 ```python
 @dataclass
@@ -32,9 +32,9 @@ class CompiledQuery:
 - Counts how many times the compiled query has been used
 - Provides `matches()` and `execute()` methods for query execution
 
-### 2. HtmlGraph Methods
+### 2. Wipnote Methods
 
-Added two new methods to the `HtmlGraph` class:
+Added two new methods to the `Wipnote` class:
 
 #### `compile_query(selector: str) -> CompiledQuery`
 
@@ -95,7 +95,7 @@ metrics = graph.metrics
 Exported `CompiledQuery` from the main module:
 
 ```python
-from htmlgraph import CompiledQuery, HtmlGraph
+from wipnote import CompiledQuery, Wipnote
 ```
 
 ## Performance Benefits
@@ -124,11 +124,11 @@ Created comprehensive test suite in `tests/python/test_query_compilation.py`:
 See `example_query_compilation.py` for a complete demonstration:
 
 ```python
-from htmlgraph import CompiledQuery, HtmlGraph
-from htmlgraph.models import Node
+from wipnote import CompiledQuery, Wipnote
+from wipnote.models import Node
 
 # Create graph and add nodes
-graph = HtmlGraph("features/")
+graph = Wipnote("features/")
 graph.add(Node(id="feat-001", title="Feature 1", status="blocked"))
 
 # Pre-compile a frequently used selector
@@ -163,8 +163,8 @@ Potential improvements for future work:
 
 ## Files Modified
 
-1. `src/python/htmlgraph/graph.py` - Core implementation
-2. `src/python/htmlgraph/__init__.py` - Module exports
+1. `src/python/wipnote/graph.py` - Core implementation
+2. `src/python/wipnote/__init__.py` - Module exports
 3. `tests/python/test_query_compilation.py` - Test suite
 4. `example_query_compilation.py` - Usage example
 
@@ -188,7 +188,7 @@ uv run pytest tests/python/test_models.py tests/python/test_query_builder.py tes
 
 ## Summary
 
-Successfully implemented query compilation for CSS selector reuse in HtmlGraph:
+Successfully implemented query compilation for CSS selector reuse in Wipnote:
 
 - ✅ `CompiledQuery` class for pre-compiled selectors
 - ✅ `compile_query()` method to create compiled queries

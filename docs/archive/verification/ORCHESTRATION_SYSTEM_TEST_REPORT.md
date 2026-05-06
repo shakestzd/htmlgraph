@@ -1,4 +1,4 @@
-# HtmlGraph Orchestration System - Comprehensive Test Report
+# Wipnote Orchestration System - Comprehensive Test Report
 
 **Date:** January 12, 2026
 **Test Scope:** Bug fixes, execution agents, external CLI skills, delegation enforcement
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The HtmlGraph orchestration system has been comprehensively tested across 5 phases, verifying bug fixes, execution agents, external CLI skills, and delegation enforcement. **Core functionality is working correctly** with the following highlights:
+The Wipnote orchestration system has been comprehensively tested across 5 phases, verifying bug fixes, execution agents, external CLI skills, and delegation enforcement. **Core functionality is working correctly** with the following highlights:
 
 - ✅ 4 orchestration bug fixes verified and integrated
 - ✅ Execution agent complexity assessment working (Haiku/Sonnet/Opus routing)
@@ -34,8 +34,8 @@ The HtmlGraph orchestration system has been comprehensively tested across 5 phas
 **Problem Found:** Subagent detection module existed but was NOT called in enforcement hooks.
 
 **Action Taken:** Integrated `is_subagent_context()` checks into both:
-- ✅ `src/python/htmlgraph/hooks/orchestrator.py` - Early return before enforcement
-- ✅ `src/python/htmlgraph/hooks/validator.py` - Early return before validation
+- ✅ `src/python/wipnote/hooks/orchestrator.py` - Early return before enforcement
+- ✅ `src/python/wipnote/hooks/validator.py` - Early return before validation
 
 **Result:** Subagents spawned via Task() now have unrestricted tool access.
 
@@ -191,7 +191,7 @@ Pass rate: 98.1% (excluding circuit breaker failures)
 ❌ **BLOCKED (unless delegated or read-only):**
 - Edit/Write - File modifications
 - Multiple consecutive operations - Anti-pattern detection
-- .htmlgraph/ direct edits - Use SDK instead
+- .wipnote/ direct edits - Use SDK instead
 - Write operations - Must delegate
 
 ### Subagent Bypass - WORKING
@@ -354,7 +354,7 @@ Overall Success Rate: 87-99% depending on component
    - Estimated effort: 30 minutes
 
 2. **Verify CLI Commands**
-   - Check `src/python/htmlgraph/cli/work/orchestration.py` exists
+   - Check `src/python/wipnote/cli/work/orchestration.py` exists
    - Verify `cmd_orchestrator_reset_violations`, `cmd_orchestrator_set_level`, etc. exist
    - Update test imports if paths have changed
    - Estimated effort: 30 minutes
@@ -386,7 +386,7 @@ Overall Success Rate: 87-99% depending on component
 
 ## Conclusion
 
-**The HtmlGraph orchestration system is production-ready** with all core features working correctly:
+**The Wipnote orchestration system is production-ready** with all core features working correctly:
 
 - ✅ Bug fixes properly implemented and integrated
 - ✅ Execution agents correctly assessing complexity
@@ -408,11 +408,11 @@ Overall Success Rate: 87-99% depending on component
 ## Appendix: Files Modified
 
 ### Phase 1 Integration
-- ✅ `src/python/htmlgraph/hooks/orchestrator.py` - Added subagent check
-- ✅ `src/python/htmlgraph/hooks/validator.py` - Added subagent check
+- ✅ `src/python/wipnote/hooks/orchestrator.py` - Added subagent check
+- ✅ `src/python/wipnote/hooks/validator.py` - Added subagent check
 
 ### Phase 3 Fixes
-- ✅ `src/python/htmlgraph/orchestration/prompts.py` - Fixed skill references
+- ✅ `src/python/wipnote/orchestration/prompts.py` - Fixed skill references
 - ✅ `packages/claude-plugin/.claude-plugin/plugin.json` - Added skill registrations
 
 ### Test Reports Generated

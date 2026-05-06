@@ -2,7 +2,7 @@
 
 ## Overview
 
-HtmlGraph uses a shared operations layer that both CLI and SDK call. This eliminates code duplication and ensures consistent behavior across all interfaces.
+Wipnote uses a shared operations layer that both CLI and SDK call. This eliminates code duplication and ensures consistent behavior across all interfaces.
 
 ```
 CLI ────┐
@@ -38,7 +38,7 @@ SDK ────┘
          │
          ▼
 ┌─────────────────────────────────────────────┐
-│         Core HtmlGraph Library              │
+│         Core Wipnote Library              │
 │  • graph.py    - Graph operations           │
 │  • models.py   - Data models                │
 │  • session_manager.py - Session tracking    │
@@ -52,7 +52,7 @@ SDK ────┘
 Server lifecycle operations.
 
 **Functions:**
-- `start_server()` - Start HtmlGraph server with configuration
+- `start_server()` - Start Wipnote server with configuration
 - `stop_server()` - Stop running server gracefully
 - `get_server_status()` - Check server status
 
@@ -63,11 +63,11 @@ Server lifecycle operations.
 
 **Example:**
 ```python
-from htmlgraph.operations import server
+from wipnote.operations import server
 
 result = server.start_server(
     port=8080,
-    graph_dir=Path(".htmlgraph"),
+    graph_dir=Path(".wipnote"),
     static_dir=Path("."),
     watch=True,
     auto_port=False
@@ -83,7 +83,7 @@ if result.warnings:
 Git hooks management operations.
 
 **Functions:**
-- `install_hooks()` - Install HtmlGraph git hooks
+- `install_hooks()` - Install Wipnote git hooks
 - `list_hooks()` - List enabled/disabled/missing hooks
 - `validate_hook_config()` - Validate hook configuration
 
@@ -94,7 +94,7 @@ Git hooks management operations.
 
 **Example:**
 ```python
-from htmlgraph.operations import hooks
+from wipnote.operations import hooks
 from pathlib import Path
 
 result = hooks.install_hooks(
@@ -124,10 +124,10 @@ Event log indexing and querying operations.
 
 **Example:**
 ```python
-from htmlgraph.operations import events
+from wipnote.operations import events
 from pathlib import Path
 
-stats = events.get_event_stats(graph_dir=Path(".htmlgraph"))
+stats = events.get_event_stats(graph_dir=Path(".wipnote"))
 print(f"Total events: {stats.total_events}")
 print(f"Total sessions: {stats.total_sessions}")
 ```
@@ -146,11 +146,11 @@ Analytics operations for sessions and projects.
 
 **Example:**
 ```python
-from htmlgraph.operations import analytics
+from wipnote.operations import analytics
 from pathlib import Path
 
 result = analytics.analyze_project(
-    graph_dir=Path(".htmlgraph")
+    graph_dir=Path(".wipnote")
 )
 
 print(f"Total features: {result.total_features}")
@@ -162,10 +162,10 @@ print(f"Recommendations: {len(result.recommendations)}")
 The CLI uses operations internally:
 
 ```python
-# In htmlgraph/cli.py
+# In wipnote/cli.py
 
 def cmd_serve(args):
-    from htmlgraph.operations import server
+    from wipnote.operations import server
 
     result = server.start_server(
         port=args.port,
@@ -185,12 +185,12 @@ def cmd_serve(args):
 The SDK wraps operations with a fluent API:
 
 ```python
-# In htmlgraph/sdk.py
+# In wipnote/sdk.py
 
 class SDK:
     def start_server(self, port: int = 8080, **kwargs) -> ServerHandle:
-        """Start HtmlGraph server."""
-        from htmlgraph.operations import server
+        """Start Wipnote server."""
+        from wipnote.operations import server
 
         result = server.start_server(
             port=port,
@@ -208,8 +208,8 @@ class SDK:
 Operations raise specific exceptions:
 
 ```python
-from htmlgraph.operations.server import PortInUseError, ServerStartError
-from htmlgraph.operations.hooks import HookInstallError, HookConfigError
+from wipnote.operations.server import PortInUseError, ServerStartError
+from wipnote.operations.hooks import HookInstallError, HookConfigError
 
 try:
     result = server.start_server(port=8080, ...)
@@ -225,14 +225,14 @@ If you have custom scripts using the old API:
 
 ### Before (direct imports)
 ```python
-from htmlgraph.server import serve
+from wipnote.server import serve
 
 serve(port=8080)
 ```
 
 ### After (use SDK - recommended)
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK()
 handle = sdk.start_server(port=8080)
@@ -240,12 +240,12 @@ handle = sdk.start_server(port=8080)
 
 ### After (use operations - advanced)
 ```python
-from htmlgraph.operations import server
+from wipnote.operations import server
 from pathlib import Path
 
 result = server.start_server(
     port=8080,
-    graph_dir=Path(".htmlgraph"),
+    graph_dir=Path(".wipnote"),
     static_dir=Path(".")
 )
 
@@ -259,14 +259,14 @@ The operations layer makes testing easier:
 
 ```python
 import pytest
-from htmlgraph.operations import server
+from wipnote.operations import server
 from pathlib import Path
 
 def test_server_start(tmp_path):
     """Test server starts successfully."""
     result = server.start_server(
         port=8081,  # Use different port for tests
-        graph_dir=tmp_path / ".htmlgraph",
+        graph_dir=tmp_path / ".wipnote",
         static_dir=tmp_path,
         watch=False  # Disable watcher in tests
     )
@@ -316,7 +316,7 @@ def create_backup(
     graph_dir: Path,
     backup_dir: Path
 ) -> BackupResult:
-    """Create backup of HtmlGraph data."""
+    """Create backup of Wipnote data."""
     # Implementation
     return BackupResult(...)
 ```

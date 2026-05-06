@@ -52,7 +52,7 @@ feature-old-001             | 1 event
 
 **Event Storage:**
 ```
-.htmlgraph/
+.wipnote/
 ├── events/
 │   ├── sess-fd50862f.jsonl         (main orchestrator: 8,407 events)
 │   ├── 0e6fd1e4-bc71-4424-88d4-3e88562ba5ed.jsonl  (Codex subagent: 2,962 events)
@@ -301,7 +301,7 @@ WHERE parent_session_id='sess-fd50862f'
 ### What Still Works
 
 ✓ Individual subagent sessions ARE fully tracked (2,962 events)
-✓ Features ARE created and visible in `.htmlgraph/features/`
+✓ Features ARE created and visible in `.wipnote/features/`
 ✓ SQLite index HAS all events (queryable directly)
 ✓ Event log JSONL files contain all data
 
@@ -327,7 +327,7 @@ WHERE parent_session_id='sess-fd50862f'
 
 3. **Create Session Linking CLI**
    ```bash
-   htmlgraph link-delegation --parent sess-fd50862f \
+   wipnote link-delegation --parent sess-fd50862f \
                               --child 0e6fd1e4-bc71-4424-88d4-3e88562ba5ed \
                               --task-id task-abc
    ```
@@ -440,16 +440,16 @@ date range: 2025-12-16 10:08:19 to 2025-12-22 07:25:12
 ## Files Involved
 
 ### Event Tracking
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/event_log.py` - JSONL event recording
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/analytics_index.py` - SQLite indexing
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/event_log.py` - JSONL event recording
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/analytics_index.py` - SQLite indexing
 
 ### Dashboard Display
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/dashboard.html` - Activity Feed display (line 5080+)
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/server.py` - API endpoints
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/dashboard.html` - Activity Feed display (line 5080+)
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/server.py` - API endpoints
 
 ### Data Storage
-- `.htmlgraph/events/*.jsonl` - Individual session event logs
-- `.htmlgraph/index.sqlite` - Indexed analytics database
+- `.wipnote/events/*.jsonl` - Individual session event logs
+- `.wipnote/index.sqlite` - Indexed analytics database
 
 ---
 

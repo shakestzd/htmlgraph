@@ -1,47 +1,47 @@
-# HtmlGraph Dogfooding Skill
+# Wipnote Dogfooding Skill
 
-Use this skill to understand how HtmlGraph dogfoofs itself and learn from real examples.
+Use this skill to understand how Wipnote dogfoods itself and learn from real examples.
 
-**Trigger keywords:** dogfooding, examples, learn, patterns, real usage, htmlgraph development, self-tracking
+**Trigger keywords:** dogfooding, examples, learn, patterns, real usage, wipnote development, self-tracking
 
 ---
 
 ## Overview
 
-HtmlGraph uses itself to track its own development. This creates a unique learning opportunity: every workflow you see is both a real-world example AND actual development tracking.
+Wipnote uses itself to track its own development. This creates a unique learning opportunity: every workflow you see is both a real-world example AND actual development tracking.
 
-**Key Insight:** The `.htmlgraph/` directory contains real features, sessions, and tracks we're using to build HtmlGraph. Learn from them!
+**Key Insight:** The `.wipnote/` directory contains real features, sessions, and tracks we're using to build Wipnote. Learn from them!
 
 ---
 
 ## Dual Purpose - Examples ARE Real Usage
 
 When you see workflows in this project:
-- ✅ They're **real examples** of HtmlGraph usage
-- ✅ They're **actual tracking** of HtmlGraph development
+- ✅ They're **real examples** of Wipnote usage
+- ✅ They're **actual tracking** of Wipnote development
 - ✅ Learn from them for YOUR projects
 
 ```python
-# This IS real - we use this to track HtmlGraph development
+# This IS real - we use this to track Wipnote development
 sdk = SDK(agent="claude")
 feature = sdk.features.create("Add deployment automation")  # Real feature!
 ```
 
 **What this means:**
-- Browse `.htmlgraph/features/` to see real features in development
-- Browse `.htmlgraph/sessions/` to see how we track work
-- Browse `.htmlgraph/tracks/` to see multi-feature planning
+- Browse `.wipnote/features/` to see real features in development
+- Browse `.wipnote/sessions/` to see how we track work
+- Browse `.wipnote/tracks/` to see multi-feature planning
 - Copy these patterns for your own projects
 
 ---
 
 ## General vs Project-Specific
 
-Understanding what's reusable vs specific to HtmlGraph development:
+Understanding what's reusable vs specific to Wipnote development:
 
 ### GENERAL WORKFLOWS (package for all users)
 
-These patterns work for ANY project using HtmlGraph:
+These patterns work for ANY project using Wipnote:
 
 - ✅ **Feature creation and tracking** → SDK already provides this
 - ✅ **Track planning with TrackBuilder** → SDK provides this
@@ -50,21 +50,21 @@ These patterns work for ANY project using HtmlGraph:
 - ⚠️ **Deployment automation** → Should package `deploy-all.sh` pattern
 - ⚠️ **Memory file sync** → Should package `sync_memory_files.py` pattern
 
-### PROJECT-SPECIFIC (only for HtmlGraph itself)
+### PROJECT-SPECIFIC (only for Wipnote itself)
 
-These are specific to building HtmlGraph:
+These are specific to building Wipnote:
 
-- ❌ Publishing to PyPI (specific to HtmlGraph package)
-- ❌ The specific features in `.htmlgraph/features/` (our roadmap)
+- ❌ Publishing to PyPI (specific to Wipnote package)
+- ❌ The specific features in `.wipnote/features/` (our roadmap)
 - ❌ Phase 1-6 implementation plan (our project structure)
 
 ---
 
 ## How to Read This Codebase
 
-### The `.htmlgraph/` Directory is a Live Example
+### The `.wipnote/` Directory is a Live Example
 
-When you see `.htmlgraph/` in this repo:
+When you see `.wipnote/` in this repo:
 - **It's a live example** - This is real usage, not a demo
 - **It's our roadmap** - Features here are what we're building
 - **Learn from it** - Use these patterns in your projects
@@ -72,29 +72,29 @@ When you see `.htmlgraph/` in this repo:
 **Example:**
 ```bash
 # In THIS repo
-ls .htmlgraph/features/
+ls .wipnote/features/
 # → feature-20251221-211348.html  # Real feature we're tracking
 # → feat-5f0fca41.html            # Another real feature
 
-# In YOUR project (after using HtmlGraph)
-ls .htmlgraph/features/
+# In YOUR project (after using Wipnote)
+ls .wipnote/features/
 # → Your features will look the same!
 ```
 
 ### What to Learn From
 
 **1. Feature Tracking Patterns**
-- Open any `.htmlgraph/features/feat-*.html` file
+- Open any `.wipnote/features/feat-*.html` file
 - See how we structure features, steps, and status
 - Copy the pattern for your own features
 
 **2. Session Tracking**
-- View `.htmlgraph/sessions/sess-*.html` files
+- View `.wipnote/sessions/sess-*.html` files
 - See how work sessions are automatically tracked
 - Understand the parent-child relationship (sessions → features)
 
 **3. Track Planning**
-- View `.htmlgraph/tracks/` directory
+- View `.wipnote/tracks/` directory
 - See how we group related features into tracks
 - Learn multi-feature planning strategies
 
@@ -113,7 +113,7 @@ These are patterns we need to extract and generalize:
 
 1. **Deployment Script Pattern** - Generalize `deploy-all.sh` for any Python package
 2. **Memory File Sync** - Include `sync_memory_files.py` in the package
-3. **Project Initialization** - `htmlgraph init` should set up `.htmlgraph/`
+3. **Project Initialization** - `wipnote init` should set up `.wipnote/`
 4. **Pre-commit Hooks** - Package the git hooks for automatic tracking
 
 ### Current Status
@@ -130,13 +130,13 @@ These are patterns we need to extract and generalize:
 
 ```bash
 # View all features we're tracking
-ls .htmlgraph/features/
+ls .wipnote/features/
 
 # View recent sessions
-ls -lt .htmlgraph/sessions/ | head
+ls -lt .wipnote/sessions/ | head
 
 # View track planning
-ls .htmlgraph/tracks/
+ls .wipnote/tracks/
 
 # Open the dashboard to see everything
 open index.html
@@ -166,8 +166,8 @@ bottlenecks = sdk.analytics.find_bottlenecks()
 
 ## Common Questions
 
-**Q: Are the features in `.htmlgraph/features/` just examples?**
-A: No! They're the actual features we're building for HtmlGraph. They're real, not demos.
+**Q: Are the features in `.wipnote/features/` just examples?**
+A: No! They're the actual features we're building for Wipnote. They're real, not demos.
 
 **Q: Can I copy these patterns for my project?**
 A: Yes! That's the whole point. The patterns are general-purpose.
@@ -175,7 +175,7 @@ A: Yes! That's the whole point. The patterns are general-purpose.
 **Q: What's the difference between a feature and a session?**
 A: Features are what you're building. Sessions are when you work on them. Sessions link to features.
 
-**Q: How do I know what's reusable vs HtmlGraph-specific?**
+**Q: How do I know what's reusable vs Wipnote-specific?**
 A: Check the "General vs Project-Specific" section above. SDK workflows are general, PyPI publishing is specific.
 
 ---
@@ -185,18 +185,18 @@ A: Check the "General vs Project-Specific" section above. SDK workflows are gene
 - **reference.md** - Full dogfooding context and details
 - **CLAUDE.md** - Project overview with dogfooding section
 - **AGENTS.md** - SDK documentation with workflow examples
-- `.htmlgraph/` - Live examples of real usage
+- `.wipnote/` - Live examples of real usage
 
 ---
 
 ## When to Use This Skill
 
 Activate this skill when:
-- Learning how to use HtmlGraph effectively
+- Learning how to use Wipnote effectively
 - Looking for real-world examples
 - Understanding the difference between demos and real usage
-- Planning your own HtmlGraph workflows
+- Planning your own Wipnote workflows
 - Extracting patterns for your projects
-- Contributing to HtmlGraph development
+- Contributing to Wipnote development
 
 **Remember:** Every example you see is real. Learn from our actual development process!

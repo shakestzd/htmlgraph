@@ -1,10 +1,10 @@
 # Hook Architecture
 
-Complete reference for Claude Code hook system in HtmlGraph.
+Complete reference for Claude Code hook system in Wipnote.
 
 ## Overview
 
-HtmlGraph hooks integrate with Claude Code's hook system to provide:
+Wipnote hooks integrate with Claude Code's hook system to provide:
 - **Event tracking** - Record all agent activities and tool invocations
 - **Validation** - Check work items before execution
 - **Orchestration** - Enforce delegation patterns
@@ -23,7 +23,7 @@ Fires **before** any tool is executed by Claude Code.
 - Initiate event tracing via tool_use_id correlation
 - Validate that tool execution is allowed
 
-**Location:** `src/python/htmlgraph/hooks/pretooluse.py`
+**Location:** `src/python/wipnote/hooks/pretooluse.py`
 
 **Flow:**
 
@@ -70,7 +70,7 @@ def create_start_event(
     sanitized_input = sanitize_tool_input(tool_input)
 
     # 4. Insert into tool_traces
-    db = HtmlGraphDB()
+    db = WipnoteDB()
     cursor = db.connection.cursor()
     cursor.execute("""
         INSERT INTO tool_traces
@@ -110,7 +110,7 @@ Fires **after** any tool completes execution (success or failure).
 - Store tool output and error status
 - Enable performance analysis and debugging
 
-**Location:** `src/python/htmlgraph/hooks/posttooluse.py` and `src/python/htmlgraph/hooks/post_tool_use_handler.py`
+**Location:** `src/python/wipnote/hooks/posttooluse.py` and `src/python/wipnote/hooks/post_tool_use_handler.py`
 
 **Flow:**
 
@@ -150,7 +150,7 @@ def update_tool_trace(
         True if update successful, False otherwise
     """
     # 1. Query for matching pre-event
-    db = HtmlGraphDB()
+    db = WipnoteDB()
     cursor = db.connection.cursor()
     cursor.execute("""
         SELECT start_time FROM tool_traces
@@ -260,14 +260,14 @@ trace = TraceRecord(
 For complete reference on other hooks (SessionStart, Stop, UserPromptSubmit, etc.), see:
 - Claude Code official documentation: https://code.claude.com/docs/en/hooks.md
 - [SYSTEM_PROMPT_ARCHITECTURE.md](./SYSTEM_PROMPT_ARCHITECTURE.md)
-- Hook implementations in `src/python/htmlgraph/hooks/`
+- Hook implementations in `src/python/wipnote/hooks/`
 
 ## Querying Traces
 
 Once events are recorded via PreToolUse and PostToolUse hooks, query using TraceCollection:
 
 ```python
-from htmlgraph.sdk import SDK
+from wipnote.sdk import SDK
 
 sdk = SDK(agent="claude")
 
@@ -316,7 +316,7 @@ Example hook configuration:
 
 ## Hook Environment
 
-Hooks have access to environment variables set by Claude Code and HtmlGraph:
+Hooks have access to environment variables set by Claude Code and Wipnote:
 
 | Variable | Set By | Used By | Value |
 |----------|--------|---------|-------|
@@ -422,4 +422,4 @@ Benefits:
 - [EVENT_TRACING.md](./EVENT_TRACING.md) - Complete event tracing guide
 - [SYSTEM_PROMPT_ARCHITECTURE.md](./SYSTEM_PROMPT_ARCHITECTURE.md) - Hook persistence and loading
 - [Claude Code Hooks Documentation](https://code.claude.com/docs/en/hooks.md) - Official reference
-- Hook implementations in `src/python/htmlgraph/hooks/`
+- Hook implementations in `src/python/wipnote/hooks/`

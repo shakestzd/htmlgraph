@@ -1,12 +1,12 @@
-# HtmlGraph SDK Cheat Sheet
+# Wipnote SDK Cheat Sheet
 
 Quick reference for AI agents and developers.
 
 ## Initialization
 
 ```python
-from htmlgraph import SDK
-sdk = SDK(agent="claude")  # Auto-discovers .htmlgraph directory
+from wipnote import SDK
+sdk = SDK(agent="claude")  # Auto-discovers .wipnote directory
 ```
 
 ## Work Items
@@ -271,7 +271,7 @@ for f in features:  # Empty list if none found
 
 ### Track Building
 ```python
-from htmlgraph import TrackBuilder
+from wipnote import TrackBuilder
 
 track = TrackBuilder(sdk, "Authentication System") \
     .add_phase("Research", spike_ids=["spike-001"]) \

@@ -2,13 +2,13 @@
 
 ## Overview
 
-Successfully generated **15+ real work events** that stream to the HtmlGraph Activity Feed dashboard via WebSocket in real-time.
+Successfully generated **15+ real work events** that stream to the Wipnote Activity Feed dashboard via WebSocket in real-time.
 
 ## Script Details
 
 **File**: `/Users/shakes/DevProjects/htmlgraph/generate_real_events.py`
 
-**Purpose**: Generate authentic development work events using the HtmlGraph SDK to demonstrate real-time Activity Feed streaming.
+**Purpose**: Generate authentic development work events using the Wipnote SDK to demonstrate real-time Activity Feed streaming.
 
 **Run Command**:
 ```bash
@@ -59,12 +59,12 @@ Each feature creation generates an event that appears on the Activity Feed with:
 
 Reading and analyzing source files generates analysis events:
 
-1. **src/python/htmlgraph/server.py**
+1. **src/python/wipnote/server.py**
    - Size: 59,235 bytes
    - Lines: 1,602
    - Type: Server implementation
 
-2. **src/python/htmlgraph/models.py**
+2. **src/python/wipnote/models.py**
    - Size: 86,632 bytes
    - Lines: 2,407
    - Type: Data models
@@ -111,15 +111,15 @@ Feature status update generates modification event:
 Quality checks generate execution events:
 
 1. **Linting check** (`ruff check`)
-   - Command: `uv run ruff check src/python/htmlgraph --select E,W --quiet`
+   - Command: `uv run ruff check src/python/wipnote --select E,W --quiet`
    - Status: SUCCESS
 
 2. **Type checking** (`mypy`)
-   - Command: `uv run mypy src/python/htmlgraph/sdk.py --no-error-summary`
+   - Command: `uv run mypy src/python/wipnote/sdk.py --no-error-summary`
    - Status: SUCCESS
 
 3. **Test discovery** (`pytest`)
-   - Command: `uv run pytest src/python/htmlgraph --collect-only -q`
+   - Command: `uv run pytest src/python/wipnote --collect-only -q`
    - Status: SUCCESS
 
 **Event Type**: `test.executed`, `quality.checked`
@@ -148,7 +148,7 @@ Git queries generate operation events:
 
 ### 7. Session and Stale Reference Cleanup (implicit)
 
-During execution, the HtmlGraph session manager automatically:
+During execution, the Wipnote session manager automatically:
 - Removed stale work item references: `['spk-05ddee15']`
 - Updated session tracking: sess-fd50862f
 - Generated automatic maintenance events
@@ -175,8 +175,8 @@ Total:                     16+ real events
 
 ## How Events Flow to Dashboard
 
-1. **Event Generation**: Each operation in the script triggers HtmlGraph events
-2. **Event Storage**: Events are persisted to `.htmlgraph/events/` directory
+1. **Event Generation**: Each operation in the script triggers Wipnote events
+2. **Event Storage**: Events are persisted to `.wipnote/events/` directory
 3. **WebSocket Stream**: Server broadcasts events to connected dashboard clients
 4. **Real-Time Display**: Activity Feed updates automatically as events arrive
 5. **User Visibility**: User sees work items appear and update in real-time
@@ -184,7 +184,7 @@ Total:                     16+ real events
 ### Event Storage Locations
 
 ```
-.htmlgraph/
+.wipnote/
 ├── features/
 │   ├── feat-4159307f.html    (Feature 1)
 │   ├── feat-0e415f80.html    (Feature 2)
@@ -201,19 +201,19 @@ Total:                     16+ real events
 
 ### 1. Verify Features Were Created
 ```bash
-uv run htmlgraph feature list --all
+uv run wipnote feature list --all
 # Should show feat-4159307f, feat-0e415f80, feat-a9800e99
 ```
 
 ### 2. Verify Events Are Generated
 ```bash
-ls -la .htmlgraph/events/
+ls -la .wipnote/events/
 # Should show recent .jsonl files with timestamps
 ```
 
 ### 3. View on Dashboard
 ```bash
-uv run htmlgraph serve
+uv run wipnote serve
 # Open http://localhost:8080
 # Activity Feed should show all generated events
 ```
@@ -251,7 +251,7 @@ uv run htmlgraph serve
 
 ### Event Hooks
 
-Events are generated via HtmlGraph hooks:
+Events are generated via Wipnote hooks:
 - **PreToolUse**: Tracked before operations
 - **PostToolUse**: Captured after completion
 - **SessionStart**: Session initialization
@@ -296,15 +296,15 @@ uv run python generate_real_events.py    # Adds 15+ more events
 
 - **Execution Time**: ~10-15 seconds per run
 - **Events Generated**: 15+ per run
-- **Event Persistence**: Stored in `.htmlgraph/` (persistent)
+- **Event Persistence**: Stored in `.wipnote/` (persistent)
 - **Memory**: Minimal overhead
 - **Scalability**: Can generate 1000s of events for stress testing
 
 ---
 
-## Integration with HtmlGraph
+## Integration with Wipnote
 
-This script demonstrates real-world usage of HtmlGraph for:
+This script demonstrates real-world usage of Wipnote for:
 - Multi-feature work tracking
 - Activity visibility
 - Real-time event streaming
@@ -313,7 +313,7 @@ This script demonstrates real-world usage of HtmlGraph for:
 - Track management
 - Step completion tracking
 
-All events are **authentic** - not test data or mocks. They follow the exact patterns used in production HtmlGraph usage.
+All events are **authentic** - not test data or mocks. They follow the exact patterns used in production Wipnote usage.
 
 ---
 
@@ -327,7 +327,7 @@ All events are **authentic** - not test data or mocks. They follow the exact pat
 
 ## Next Steps
 
-1. Run the dashboard: `uv run htmlgraph serve`
+1. Run the dashboard: `uv run wipnote serve`
 2. Execute the event generation script: `uv run python generate_real_events.py`
 3. Observe real-time Activity Feed updates
 4. Verify WebSocket streaming is working

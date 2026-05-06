@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This specification details the strategy for integrating Pydantic v2 into HtmlGraph's CLI layer to replace fragmented argparse validation with centralized, type-safe models. Pydantic is already a project dependency (v2.0.0+), and Rich is available for beautiful error formatting.
+This specification details the strategy for integrating Pydantic v2 into Wipnote's CLI layer to replace fragmented argparse validation with centralized, type-safe models. Pydantic is already a project dependency (v2.0.0+), and Rich is available for beautiful error formatting.
 
 **Key Goals:**
 - Replace ad-hoc validation logic with declarative Pydantic models
@@ -146,7 +146,7 @@ Commands used less frequently but important for setup.
 
 #### 3.1 Init & Setup
 **Commands:**
-- `init` - Initialize .htmlgraph directory
+- `init` - Initialize .wipnote directory
 - `install-hooks` - Install git hooks
 
 **Current Validation:**
@@ -197,7 +197,7 @@ Est. Total: 6-8 hours of implementation
 ### 2.1 Base Models & Mixins
 
 ```python
-# src/python/htmlgraph/pydantic_models.py
+# src/python/wipnote/pydantic_models.py
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Literal
@@ -214,7 +214,7 @@ class GraphNode(BaseModel):
     model_config = CommonModelConfig
 
     graph_dir: str = Field(
-        default=".htmlgraph",
+        default=".wipnote",
         description="Graph directory path"
     )
     agent: str = Field(
@@ -663,7 +663,7 @@ cmd_feature_create(input_model)
 ```python
 def cmd_feature_create(args: argparse.Namespace) -> None:
     """Create a new feature."""
-    from htmlgraph.cli_commands.feature import FeatureCreateCommand
+    from wipnote.cli_commands.feature import FeatureCreateCommand
 
     command = FeatureCreateCommand(
         collection=args.collection,
@@ -679,7 +679,7 @@ def cmd_feature_create(args: argparse.Namespace) -> None:
 ```python
 def cmd_feature_create(input_model: FeatureCreateInput) -> None:
     """Create a new feature."""
-    from htmlgraph.cli_commands.feature import FeatureCreateCommand
+    from wipnote.cli_commands.feature import FeatureCreateCommand
 
     command = FeatureCreateCommand(
         collection=input_model.collection,
@@ -842,11 +842,11 @@ Plan for global config via Pydantic Settings:
 
 from pydantic_settings import BaseSettings
 
-class HtmlGraphConfig(BaseSettings):
-    """Global HtmlGraph configuration."""
+class WipnoteConfig(BaseSettings):
+    """Global Wipnote configuration."""
 
     graph_dir: str = Field(
-        default=".htmlgraph",
+        default=".wipnote",
         env="HTMLGRAPH_DIR"
     )
     agent: str = Field(
@@ -861,14 +861,14 @@ class HtmlGraphConfig(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=".htmlgraph.env",
+        env_file=".wipnote.env",
         env_file_encoding="utf-8",
         case_sensitive=False
     )
 ```
 
 This allows:
-- Config file loading (`.htmlgraph.env`)
+- Config file loading (`.wipnote.env`)
 - Environment variable overrides
 - Type coercion
 - Validation of global settings
@@ -882,7 +882,7 @@ This allows:
 **Deliverable:** Core pydantic_models.py with base classes and first 2 command models
 
 **Files to Create:**
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/pydantic_models.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/pydantic_models.py`
 
 **Tasks:**
 1. Create base model classes (GraphNode, CommonModelConfig)
@@ -892,8 +892,8 @@ This allows:
 5. Add comprehensive docstrings and field descriptions
 
 **Code Quality:**
-- Mypy type checking: `uv run mypy src/python/htmlgraph/pydantic_models.py`
-- Ruff linting: `uv run ruff check src/python/htmlgraph/pydantic_models.py`
+- Mypy type checking: `uv run mypy src/python/wipnote/pydantic_models.py`
+- Ruff linting: `uv run ruff check src/python/wipnote/pydantic_models.py`
 
 **Validation:**
 - Create basic unit tests in `tests/python/test_cli_models.py`
@@ -906,7 +906,7 @@ This allows:
 **Deliverable:** CLI utility functions for validation error display
 
 **Files to Create/Modify:**
-- Create: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli_utils.py` (or extend existing)
+- Create: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli_utils.py` (or extend existing)
 
 **Tasks:**
 1. Implement `display_validation_error()` function
@@ -925,7 +925,7 @@ This allows:
 **Deliverable:** Feature commands using Pydantic validation
 
 **Files to Modify:**
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli.py`
   - Add validation wrapper functions for feature commands
   - Modify cmd_feature_create, cmd_feature_start, cmd_feature_complete, cmd_feature_delete
   - Add handler setup in argparse
@@ -941,11 +941,11 @@ This allows:
 **Testing:**
 ```bash
 # Test successful creation
-uv run htmlgraph feature create "Test Feature" --priority high
+uv run wipnote feature create "Test Feature" --priority high
 
 # Test validation errors
-uv run htmlgraph feature create ""  # Empty title
-uv run htmlgraph feature create "x" --priority invalid  # Invalid priority
+uv run wipnote feature create ""  # Empty title
+uv run wipnote feature create "x" --priority invalid  # Invalid priority
 ```
 
 **Code Quality:**
@@ -973,12 +973,12 @@ uv run htmlgraph feature create "x" --priority invalid  # Invalid priority
 **Testing:**
 ```bash
 # Session tests
-uv run htmlgraph session start --id test --title "Test"
-uv run htmlgraph session end test --notes "Long notes..."
+uv run wipnote session start --id test --title "Test"
+uv run wipnote session end test --notes "Long notes..."
 
 # Track tests
-uv run htmlgraph track new "New Track" --priority high
-uv run htmlgraph track delete track-id --yes
+uv run wipnote track new "New Track" --priority high
+uv run wipnote track delete track-id --yes
 ```
 
 ---
@@ -1042,7 +1042,7 @@ def test_feature_create_invalid_priority():
 
 **Code Quality:**
 - All tests pass: `uv run pytest tests/python/test_cli_models.py -v`
-- Coverage: `uv run pytest tests/python/test_cli_models.py --cov=htmlgraph.pydantic_models`
+- Coverage: `uv run pytest tests/python/test_cli_models.py --cov=wipnote.pydantic_models`
 
 ---
 
@@ -1086,7 +1086,7 @@ def test_feature_create_invalid_priority():
 ```python
 def cmd_feature_create(args: argparse.Namespace) -> None:
     """Create a new feature."""
-    from htmlgraph.cli_commands.feature import FeatureCreateCommand
+    from wipnote.cli_commands.feature import FeatureCreateCommand
 
     # Validation scattered across multiple places
     # argparse validates priority choices
@@ -1115,7 +1115,7 @@ def validate_feature_create(args: argparse.Namespace) -> FeatureCreateInput:
 
 def cmd_feature_create(input_model: FeatureCreateInput) -> None:
     """Create a new feature."""
-    from htmlgraph.cli_commands.feature import FeatureCreateCommand
+    from wipnote.cli_commands.feature import FeatureCreateCommand
 
     # All validation already done by Pydantic
     # Type-safe access to all fields
@@ -1188,7 +1188,7 @@ class FeatureCreateInput(GraphNode):
 ### 7.3 Displaying Validation Errors
 
 ```python
-from htmlgraph.pydantic_models import FeatureCreateInput
+from wipnote.pydantic_models import FeatureCreateInput
 from pydantic import ValidationError
 
 def test_display_errors():
@@ -1225,7 +1225,7 @@ def test_display_errors():
 ```python
 import pytest
 from pydantic import ValidationError
-from htmlgraph.pydantic_models import FeatureCreateInput, PriorityEnum
+from wipnote.pydantic_models import FeatureCreateInput, PriorityEnum
 
 def test_feature_create_valid():
     """Valid input should create model."""
@@ -1293,15 +1293,15 @@ def test_feature_create_step_too_long():
 
 | File | Purpose | LOC Est. |
 |------|---------|---------|
-| `src/python/htmlgraph/pydantic_models.py` | All Pydantic model definitions | 400-500 |
-| `src/python/htmlgraph/cli_utils.py` | Error display and validation utilities | 100-150 |
+| `src/python/wipnote/pydantic_models.py` | All Pydantic model definitions | 400-500 |
+| `src/python/wipnote/cli_utils.py` | Error display and validation utilities | 100-150 |
 | `tests/python/test_cli_models.py` | Unit tests for all models | 300-400 |
 
 ### Files to Modify
 
 | File | Changes | Impact |
 |------|---------|--------|
-| `src/python/htmlgraph/cli.py` | Add validation wrappers, modify command handlers | Medium |
+| `src/python/wipnote/cli.py` | Add validation wrappers, modify command handlers | Medium |
 | `pyproject.toml` | No changes (pydantic already a dependency) | None |
 
 ### Dependencies
@@ -1345,7 +1345,7 @@ def test_feature_create_step_too_long():
 - [ ] Pydantic Settings for global configuration
 - [ ] REST API integration (reuse models)
 - [ ] SDK enhancement (use models for type safety)
-- [ ] Config file validation (`.htmlgraph.env`)
+- [ ] Config file validation (`.wipnote.env`)
 - [ ] Nested model validation (complex structures)
 
 ---

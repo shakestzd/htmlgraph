@@ -37,8 +37,8 @@ The Cross-Session Broadcast system enables real-time synchronization of work ite
 
 ```bash
 # Create a feature (broadcasts to all active sessions automatically)
-htmlgraph feature create "User Authentication"
-htmlgraph feature start feat-<id>
+wipnote feature create "User Authentication"
+wipnote feature start feat-<id>
 ```
 
 ### 2. REST API Broadcasting
@@ -151,13 +151,13 @@ Broadcasting is automatically integrated when features change:
 
 ```bash
 # Create feature (broadcasts: feature_created)
-htmlgraph feature create "User Authentication"
+wipnote feature create "User Authentication"
 
 # Start feature (broadcasts: status_changed)
-htmlgraph feature start feat-<id>
+wipnote feature start feat-<id>
 
 # Complete feature (broadcasts: feature_updated + status_changed)
-htmlgraph feature complete feat-<id>
+wipnote feature complete feat-<id>
 ```
 
 ## Performance Characteristics
@@ -182,7 +182,7 @@ htmlgraph feature complete feat-<id>
 **Check Active Connections:**
 ```bash
 # Open dashboard to view active WebSocket connections
-uv run htmlgraph serve
+uv run wipnote serve
 # Then open: http://localhost:8000/
 ```
 
@@ -197,7 +197,7 @@ open http://localhost:8000/static/broadcast-demo.html
 **Debug Logging:**
 ```bash
 # Start dashboard with verbose logging
-uv run htmlgraph serve --verbose
+uv run wipnote serve --verbose
 ```
 
 ## Testing
@@ -208,7 +208,7 @@ uv run pytest tests/integration/test_broadcast.py -v
 ```
 
 **Manual Testing:**
-1. Start dashboard: `uv run htmlgraph serve`
+1. Start dashboard: `uv run wipnote serve`
 2. Open demo: http://localhost:8000/static/broadcast-demo.html
 3. Open multiple browser tabs (simulates multiple sessions)
 4. Click "Update Feature" in one tab
@@ -220,12 +220,12 @@ uv run pytest tests/integration/test_broadcast.py -v
 
 ```bash
 # Agent 1 (Claude) creates and starts feature
-htmlgraph feature create "API Endpoint"
-htmlgraph feature start feat-<id>
+wipnote feature create "API Endpoint"
+wipnote feature start feat-<id>
 
 # Agent 2 (Copilot) immediately sees it via real-time broadcast
 # Agent 2 can view the feature
-htmlgraph feature show feat-<id>
+wipnote feature show feat-<id>
 ```
 
 ### Pattern 2: Status Monitoring
@@ -324,5 +324,5 @@ CREATE INDEX idx_broadcast_resource ON broadcast_events(resource_id);
 
 - **WebSocket RFC**: https://tools.ietf.org/html/rfc6455
 - **FastAPI WebSockets**: https://fastapi.tiangolo.com/advanced/websockets/
-- **HtmlGraph API**: `/docs/API.md`
+- **Wipnote API**: `/docs/API.md`
 - **Phase 3 (Reactive Queries)**: `/docs/REACTIVE_QUERIES.md`

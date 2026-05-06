@@ -18,10 +18,10 @@ Orchestrator Mode helps you **preserve context** and **work faster** by delegati
 
 ```bash
 # Enable orchestrator mode
-uv run htmlgraph orchestrator enable
+uv run wipnote orchestrator enable
 
 # Check if it's working
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 
 # Start working - you'll get guidance when you should delegate
 # Example: After 3 Bash calls, you'll see:
@@ -400,7 +400,7 @@ Task(
 
 ### Default Configuration
 
-Located at `.htmlgraph/orchestrator.json`:
+Located at `.wipnote/orchestrator.json`:
 
 ```json
 {
@@ -427,7 +427,7 @@ Located at `.htmlgraph/orchestrator.json`:
 
 ```bash
 # Edit directly
-vim .htmlgraph/orchestrator.json
+vim .wipnote/orchestrator.json
 
 # Example: Allow 10 file reads instead of 5
 {
@@ -441,21 +441,21 @@ vim .htmlgraph/orchestrator.json
 
 ```bash
 # Not yet implemented, but planned:
-uv run htmlgraph orchestrator set-threshold max_bash_calls 5
-uv run htmlgraph orchestrator set-threshold max_file_reads 10
+uv run wipnote orchestrator set-threshold max_bash_calls 5
+uv run wipnote orchestrator set-threshold max_file_reads 10
 ```
 
 ### Mode Switching
 
 ```bash
 # Strict mode (blocks operations)
-uv run htmlgraph orchestrator enable --mode strict
+uv run wipnote orchestrator enable --mode strict
 
 # Guidance mode (warns only)
-uv run htmlgraph orchestrator enable --mode guidance
+uv run wipnote orchestrator enable --mode guidance
 
 # Disable entirely
-uv run htmlgraph orchestrator disable
+uv run wipnote orchestrator disable
 ```
 
 ### Per-Project Configuration
@@ -465,26 +465,26 @@ Each project can have different settings:
 ```bash
 # Project A: Strict with low thresholds
 cd /path/to/project-a
-uv run htmlgraph orchestrator enable --mode strict
-vim .htmlgraph/orchestrator.json  # Set max_bash_calls=2
+uv run wipnote orchestrator enable --mode strict
+vim .wipnote/orchestrator.json  # Set max_bash_calls=2
 
 # Project B: Guidance with high thresholds
 cd /path/to/project-b
-uv run htmlgraph orchestrator enable --mode guidance
-vim .htmlgraph/orchestrator.json  # Set max_bash_calls=10
+uv run wipnote orchestrator enable --mode guidance
+vim .wipnote/orchestrator.json  # Set max_bash_calls=10
 ```
 
 ### Temporarily Disable for Single Session
 
 ```bash
 # Disable for this task
-uv run htmlgraph orchestrator disable
+uv run wipnote orchestrator disable
 
 # Do your work
 # ...
 
 # Re-enable when done
-uv run htmlgraph orchestrator enable
+uv run wipnote orchestrator enable
 ```
 
 ---
@@ -499,13 +499,13 @@ uv run htmlgraph orchestrator enable
 
 1. **Use Guidance Mode (Recommended)**
    ```bash
-   uv run htmlgraph orchestrator enable --mode guidance
+   uv run wipnote orchestrator enable --mode guidance
    # Now you'll get warnings but not blocks
    ```
 
 2. **Increase Threshold (If justified)**
    ```bash
-   vim .htmlgraph/orchestrator.json
+   vim .wipnote/orchestrator.json
    # Change max_bash_calls from 3 to 5
    ```
 
@@ -517,9 +517,9 @@ uv run htmlgraph orchestrator enable
 
 4. **Temporarily Disable**
    ```bash
-   uv run htmlgraph orchestrator disable
+   uv run wipnote orchestrator disable
    # Run your commands
-   uv run htmlgraph orchestrator enable
+   uv run wipnote orchestrator enable
    ```
 
 ### Problem: "Too many operations blocked"
@@ -535,7 +535,7 @@ uv run htmlgraph orchestrator enable
 
 2. **Switch to Guidance Mode**
    ```bash
-   uv run htmlgraph orchestrator enable --mode guidance
+   uv run wipnote orchestrator enable --mode guidance
    # Learn the patterns without blocks
    ```
 
@@ -580,13 +580,13 @@ Subagents can handle bulk edits and return summaries.
 
 1. **Check status**
    ```bash
-   uv run htmlgraph orchestrator status
+   uv run wipnote orchestrator status
    # Should show: enabled=true
    ```
 
 2. **Verify configuration exists**
    ```bash
-   cat .htmlgraph/orchestrator.json
+   cat .wipnote/orchestrator.json
    # Should have: "enabled": true
    ```
 
@@ -649,7 +649,7 @@ A: No - delegation is actually faster:
 
 A: Yes:
 ```bash
-uv run htmlgraph orchestrator disable
+uv run wipnote orchestrator disable
 ```
 
 ### Mode & Configuration
@@ -664,17 +664,17 @@ A:
 
 A: Start with **guidance mode** to learn patterns:
 ```bash
-uv run htmlgraph orchestrator enable --mode guidance
+uv run wipnote orchestrator enable --mode guidance
 ```
 
 After you understand the patterns, switch to strict:
 ```bash
-uv run htmlgraph orchestrator enable --mode strict
+uv run wipnote orchestrator enable --mode strict
 ```
 
 **Q: Can I customize thresholds?**
 
-A: Yes, edit `.htmlgraph/orchestrator.json`:
+A: Yes, edit `.wipnote/orchestrator.json`:
 ```json
 {
   "thresholds": {
@@ -685,7 +685,7 @@ A: Yes, edit `.htmlgraph/orchestrator.json`:
 
 **Q: Do different projects have different configs?**
 
-A: Yes - each project has its own `.htmlgraph/orchestrator.json`.
+A: Yes - each project has its own `.wipnote/orchestrator.json`.
 
 ### Operations & Thresholds
 
@@ -711,15 +711,15 @@ A: That's fine - 1-3 Bash calls are allowed:
 ```bash
 bash("git status")           # ✅ Allowed
 bash("uv run pytest --co")   # ✅ Allowed
-bash("ls .htmlgraph/")       # ✅ Allowed
+bash("ls .wipnote/")       # ✅ Allowed
 ```
 
 **Q: Why are CLI/tracking operations unlimited?**
 
 A: CLI tracking operations are high-level and context-efficient:
 ```bash
-htmlgraph feature create "Title"  # Minimal context
-htmlgraph feature start <id>      # Minimal context
+wipnote feature create "Title"  # Minimal context
+wipnote feature start <id>      # Minimal context
 ```
 
 ### Delegation
@@ -784,7 +784,7 @@ A: Skip when:
 
 A: Check status:
 ```bash
-uv run htmlgraph orchestrator status
+uv run wipnote orchestrator status
 ```
 
 You should see guidance messages when approaching thresholds.
@@ -816,17 +816,17 @@ A: Not yet, but planned. Future:
 
 A: Not yet, but planned:
 ```bash
-uv run htmlgraph orchestrator stats
+uv run wipnote orchestrator stats
 # Shows: delegations, blocks, time saved
 ```
 
 **Q: Does orchestrator mode work with other AI agents?**
 
-A: Yes - any agent using HtmlGraph respects orchestrator mode (Claude, Gemini, etc.).
+A: Yes - any agent using Wipnote respects orchestrator mode (Claude, Gemini, etc.).
 
 **Q: How do I contribute improvements?**
 
-A: Open issues/PRs at: https://github.com/shakestzd/htmlgraph
+A: Open issues/PRs at: https://github.com/shakestzd/wipnote
 
 ---
 
@@ -836,7 +836,7 @@ A: Open issues/PRs at: https://github.com/shakestzd/htmlgraph
 
 1. **Enable it**
    ```bash
-   uv run htmlgraph orchestrator enable --mode guidance
+   uv run wipnote orchestrator enable --mode guidance
    ```
 
 2. **Learn patterns**
@@ -846,12 +846,12 @@ A: Open issues/PRs at: https://github.com/shakestzd/htmlgraph
 
 3. **Enforce it**
    ```bash
-   uv run htmlgraph orchestrator enable --mode strict
+   uv run wipnote orchestrator enable --mode strict
    ```
 
 **Key Takeaway:** Orchestrator mode helps you **preserve context** and **work faster** by teaching you to delegate effectively.
 
 **Get Help:**
 - Docs: `/Users/shakes/DevProjects/htmlgraph/AGENTS.md#orchestrator-mode`
-- Issues: https://github.com/shakestzd/htmlgraph/issues
+- Issues: https://github.com/shakestzd/wipnote/issues
 - Examples: See "Examples & Patterns" section above

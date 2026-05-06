@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-HtmlGraph has 132,291 lines across 308 Python files. **15 modules exceed 1,000 lines** (the top 3 exceed 2,000 lines), violating industry standards of 300-500 lines per module. Additionally, **5 utility functions are duplicated 2-3x** across the codebase, and several custom implementations can be replaced by existing dependencies or standard library features.
+Wipnote has 132,291 lines across 308 Python files. **15 modules exceed 1,000 lines** (the top 3 exceed 2,000 lines), violating industry standards of 300-500 lines per module. Additionally, **5 utility functions are duplicated 2-3x** across the codebase, and several custom implementations can be replaced by existing dependencies or standard library features.
 
 This track addresses three goals:
 1. **Refactor oversized modules** into focused, single-responsibility files
@@ -35,7 +35,7 @@ This track addresses three goals:
 
 **Goal**: Eliminate duplicated code by creating canonical shared modules.
 
-### 1A. Formatting Utilities → `src/python/htmlgraph/utils/formatting.py`
+### 1A. Formatting Utilities → `src/python/wipnote/utils/formatting.py`
 
 **Problem**: `format_number`, `format_duration`, `format_bytes`, `truncate_text`, `format_timestamp` are implemented **3 times identically** in:
 - `api/templates.py` (lines 44-184)
@@ -47,7 +47,7 @@ Plus similar `_format_duration` in:
 - `transcript_analytics.py:149`
 
 **Action**:
-1. Create `src/python/htmlgraph/utils/formatting.py` with canonical implementations
+1. Create `src/python/wipnote/utils/formatting.py` with canonical implementations
 2. Replace all 5 locations with imports from the shared module
 3. Add unit tests for formatting functions
 
@@ -116,7 +116,7 @@ Plus similar `_format_duration` in:
 
 **Proposed split**:
 ```
-src/python/htmlgraph/session/
+src/python/wipnote/session/
 ├── __init__.py              # Re-exports for backward compat
 ├── manager.py               # Core lifecycle (~600 lines)
 ├── attribution.py           # Smart attribution scoring (~500 lines)
@@ -134,7 +134,7 @@ src/python/htmlgraph/session/
 
 **Proposed split**:
 ```
-src/python/htmlgraph/models/
+src/python/wipnote/models/
 ├── __init__.py              # Re-exports ALL models (backward compat)
 ├── base.py                  # Enums (WorkType, SpikeType, etc.), Node, Edge, Step
 ├── work_items.py            # Spike, Chore, Todo, Graph
@@ -150,7 +150,7 @@ src/python/htmlgraph/models/
 
 **Proposed split**:
 ```
-src/python/htmlgraph/graph/
+src/python/wipnote/graph/
 ├── __init__.py              # Re-exports Graph class
 ├── core.py                  # Graph class: I/O, node/edge CRUD (~700 lines)
 ├── algorithms.py            # Already exists (597 lines) — move BFS/shortest-path here
@@ -258,7 +258,7 @@ Split into:
 - **PyPI**: 100M+ downloads/month, part of Google's ecosystem
 - **What it provides**: `TTLCache`, `LRUCache`, thread-safe decorators
 - **Assessment**: `MemorySharedCache` (396 lines) reimplements TTL+LRU cache with thread safety. `cachetools.TTLCache` provides this in ~5 lines of configuration.
-- **Recommendation**: **Consider adopting.** This would eliminate ~350 lines of custom cache code and provide battle-tested LRU+TTL eviction. However, the custom cache has HtmlGraph-specific features (metrics, namespace isolation). **Evaluate in a spike** — if >80% of features can use `cachetools`, adopt it.
+- **Recommendation**: **Consider adopting.** This would eliminate ~350 lines of custom cache code and provide battle-tested LRU+TTL eviction. However, the custom cache has Wipnote-specific features (metrics, namespace isolation). **Evaluate in a spike** — if >80% of features can use `cachetools`, adopt it.
 
 #### **radon** (for complexity measurement — dev dependency only)
 - **PyPI**: Well-established Python complexity analyzer
@@ -309,7 +309,7 @@ Add to `.pre-commit-config.yaml`:
       entry: uv run python scripts/check-module-size.py
       language: system
       pass_filenames: false
-      files: ^src/python/htmlgraph/
+      files: ^src/python/wipnote/
       stages: [pre-commit]
 ```
 
@@ -428,7 +428,7 @@ Lane E (Enforcement) ────────────────┘
 ### New Files
 - `scripts/check-module-size.py` — Enforcement script
 - `docs/tracks/MODULE_REFACTORING_TRACK.md` — This document
-- `src/python/htmlgraph/utils/formatting.py` — Consolidated formatting
+- `src/python/wipnote/utils/formatting.py` — Consolidated formatting
 - Multiple new split modules (per Phase 2 & 3)
 
 ### Modified Files

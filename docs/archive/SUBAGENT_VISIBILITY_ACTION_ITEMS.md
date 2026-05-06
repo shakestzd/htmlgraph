@@ -18,8 +18,8 @@
 | Subagent Events | 2,962 (invisible) |
 | Features Created by Subagent | 10 |
 | Feature Creation Events | 1,369 (46% of subagent work) |
-| Database | .htmlgraph/index.sqlite |
-| Event Logs | .htmlgraph/events/*.jsonl |
+| Database | .wipnote/index.sqlite |
+| Event Logs | .wipnote/events/*.jsonl |
 
 ---
 
@@ -33,7 +33,7 @@ The dashboard queries a single session via `WHERE session_id=?`, so subagent eve
 
 ### Step 1: Add Task Event Detail to Dashboard
 
-**File:** `src/python/htmlgraph/dashboard.html`
+**File:** `src/python/wipnote/dashboard.html`
 
 **What:** When displaying a `tool="Task"` event, show which session it delegated to
 
@@ -56,7 +56,7 @@ if (tool === "Task") {
 
 ### Step 2: Create Session Lookup Helper
 
-**File:** `src/python/htmlgraph/server.py`
+**File:** `src/python/wipnote/server.py`
 
 **What:** Add API endpoint to find subagent session by parent task_id
 
@@ -83,7 +83,7 @@ GET /api/analytics/task/<task_id>/session
 
 ### Step 3: Add "Related Sessions" Dashboard View
 
-**File:** `src/python/htmlgraph/dashboard.html`
+**File:** `src/python/wipnote/dashboard.html`
 
 **What:** When viewing a session with Task events, show related subagent sessions
 
@@ -107,7 +107,7 @@ Activity Log (8,407 events)
 
 ### Step 1: Extend Events Table Schema
 
-**File:** `src/python/htmlgraph/analytics_index.py`
+**File:** `src/python/wipnote/analytics_index.py`
 
 **What:** Add delegation tracking columns (no migration needed for SQLite)
 
@@ -131,7 +131,7 @@ conn.execute("ALTER TABLE events ADD COLUMN task_status TEXT;")
 
 ### Step 2: Update Event Recording
 
-**File:** `src/python/htmlgraph/event_log.py`
+**File:** `src/python/wipnote/event_log.py`
 
 **What:** Populate new delegation fields when recording events in subagent context
 
@@ -152,7 +152,7 @@ class EventRecord:
 
 ### Step 3: Add Delegation Queries to Analytics
 
-**File:** `src/python/htmlgraph/analytics_index.py`
+**File:** `src/python/wipnote/analytics_index.py`
 
 **What:** New query methods for delegation trees
 
@@ -181,7 +181,7 @@ def get_delegation_tree(self, session_id: str) -> dict:
 
 ### Step 4: Update Dashboard to Show Delegation Tree
 
-**File:** `src/python/htmlgraph/dashboard.html`
+**File:** `src/python/wipnote/dashboard.html`
 
 **What:** Display unified view of session + all subagent delegations
 
@@ -322,14 +322,14 @@ def test_feature_events_visible_in_delegation():
 2. **Event Query:**
    ```bash
    # Query subagent events directly
-   sqlite3 .htmlgraph/index.sqlite \
+   sqlite3 .wipnote/index.sqlite \
      "SELECT COUNT(*) FROM events \
       WHERE session_id='0e6fd1e4-bc71-4424-88d4-3e88562ba5ed';"
    # Should return: 2962
    ```
 
 3. **Feature Visibility:**
-   - Check `.htmlgraph/features/` directory
+   - Check `.wipnote/features/` directory
    - Verify 10 Codex-created features are there
    - Verify events show how they were created
 
@@ -352,18 +352,18 @@ def test_feature_events_visible_in_delegation():
 ## Files to Modify
 
 ### Short-term
-1. `src/python/htmlgraph/dashboard.html` - Add Task detail display
-2. `src/python/htmlgraph/server.py` - Add lookup API endpoint
+1. `src/python/wipnote/dashboard.html` - Add Task detail display
+2. `src/python/wipnote/server.py` - Add lookup API endpoint
 
 ### Medium-term
-1. `src/python/htmlgraph/analytics_index.py` - Add schema + queries
-2. `src/python/htmlgraph/event_log.py` - Populate delegation fields
-3. `src/python/htmlgraph/dashboard.html` - Show delegation tree
+1. `src/python/wipnote/analytics_index.py` - Add schema + queries
+2. `src/python/wipnote/event_log.py` - Populate delegation fields
+3. `src/python/wipnote/dashboard.html` - Show delegation tree
 
 ### Long-term
-1. `src/python/htmlgraph/event_log.py` - Redesign recording
-2. `src/python/htmlgraph/analytics_index.py` - Redesign schema
-3. `src/python/htmlgraph/dashboard.html` - Simplify queries
+1. `src/python/wipnote/event_log.py` - Redesign recording
+2. `src/python/wipnote/analytics_index.py` - Redesign schema
+3. `src/python/wipnote/dashboard.html` - Simplify queries
 
 ---
 
@@ -436,7 +436,7 @@ def test_feature_events_visible_in_delegation():
 
 - Investigation Report: `SUBAGENT_EVENT_TRACKING_INVESTIGATION.md`
 - Diagram: `SUBAGENT_EVENT_VISIBILITY_DIAGRAM.txt`
-- Event Log Code: `src/python/htmlgraph/event_log.py`
-- Analytics Index: `src/python/htmlgraph/analytics_index.py`
-- Dashboard: `src/python/htmlgraph/dashboard.html`
-- Server API: `src/python/htmlgraph/server.py`
+- Event Log Code: `src/python/wipnote/event_log.py`
+- Analytics Index: `src/python/wipnote/analytics_index.py`
+- Dashboard: `src/python/wipnote/dashboard.html`
+- Server API: `src/python/wipnote/server.py`

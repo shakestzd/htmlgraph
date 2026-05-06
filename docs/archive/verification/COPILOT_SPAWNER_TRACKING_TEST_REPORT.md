@@ -32,7 +32,7 @@ Created realistic parent event context simulating PreToolUse hook behavior:
   - Agent: `claude-code`
   - Parent: `event-query-6ff9f85f` (UserQuery)
   - Subagent Type: `copilot`
-  - Summary: "Recommend next semantic version for HtmlGraph"
+  - Summary: "Recommend next semantic version for Wipnote"
 
 ### 2. Environment Configuration
 
@@ -56,7 +56,7 @@ tracker = SpawnerEventTracker(
     spawner_type="copilot",
     session_id="sess-649ffa96"
 )
-tracker.db = db  # Linked to HtmlGraph database
+tracker.db = db  # Linked to Wipnote database
 ```
 
 ### 4. CopilotSpawner Invocation
@@ -66,8 +66,8 @@ Invoked spawner with real task and full tracking:
 ```python
 spawner = CopilotSpawner()
 result = spawner.spawn(
-    prompt="HtmlGraph project status: ...",
-    track_in_htmlgraph=True,      # SDK activity tracking
+    prompt="Wipnote project status: ...",
+    track_in_wipnote=True,      # SDK activity tracking
     tracker=tracker,               # Subprocess event tracking
     parent_event_id="event-fdc1941f",  # Parent linkage
     allow_all_tools=True,
@@ -75,7 +75,7 @@ result = spawner.spawn(
 )
 ```
 
-**Task**: Recommend next semantic version for HtmlGraph after CLI refactoring and spawner modularization.
+**Task**: Recommend next semantic version for Wipnote after CLI refactoring and spawner modularization.
 
 ---
 
@@ -177,7 +177,7 @@ DEBUG: Subprocess event created for Copilot: event-cf68d9cb
 
 **Success**: SpawnerEventTracker correctly:
 - Initializes with parent context from environment
-- Connects to HtmlGraph database
+- Connects to Wipnote database
 - Records subprocess invocations with `record_tool_call()`
 - Links subprocess events to parent via `parent_event_id`
 - Completes events with output summary
@@ -219,7 +219,7 @@ result = spawner.spawn(
     prompt=prompt,
     tracker=tracker,              # Parent context
     parent_event_id=parent_id,    # Event hierarchy
-    track_in_htmlgraph=True       # SDK tracking
+    track_in_wipnote=True       # SDK tracking
 )
 # Complete event chain in database
 ```
@@ -344,7 +344,7 @@ The CopilotSpawner successfully tracks subprocess invocations with full parent e
 
 ### Session Details
 - Session ID: `sess-649ffa96`
-- Database: `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/htmlgraph.db`
+- Database: `/Users/shakes/DevProjects/htmlgraph/.wipnote/wipnote.db`
 - Test Duration: ~5 seconds
 - Copilot Response Time: ~3 seconds
 

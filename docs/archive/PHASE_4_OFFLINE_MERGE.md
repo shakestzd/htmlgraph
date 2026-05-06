@@ -21,26 +21,26 @@ Phase 4 implements offline-first merge with automatic conflict detection and res
 
 ### 1. Core Components
 
-#### OfflineEventLog (`src/python/htmlgraph/api/offline.py`)
+#### OfflineEventLog (`src/python/wipnote/api/offline.py`)
 - Tracks changes made while offline
 - Persists events to `offline_events` table
 - Manages synchronization status (local_only, synced, conflict, resolved)
 - Retrieves unsynced events for merging
 
-#### EventMerger (`src/python/htmlgraph/api/offline.py`)
+#### EventMerger (`src/python/wipnote/api/offline.py`)
 - Merges local and remote events with configurable strategies
 - **Last-Write-Wins**: Most recent timestamp wins (default)
 - **Priority-Based**: Higher priority resource wins
 - **User Choice**: Manual resolution required
 - Detects concurrent modifications and dependency conflicts
 
-#### ConflictTracker (`src/python/htmlgraph/api/offline.py`)
+#### ConflictTracker (`src/python/wipnote/api/offline.py`)
 - Logs detected conflicts to `conflict_log` table
 - Tracks resolution status (pending_review, resolved)
 - Generates conflict reports with statistics
 - Maintains audit trail for all conflicts
 
-#### ReconnectionManager (`src/python/htmlgraph/api/offline.py`)
+#### ReconnectionManager (`src/python/wipnote/api/offline.py`)
 - Coordinates reconnection and synchronization
 - Fetches remote events from server (when implemented)
 - Applies merged events to database
@@ -131,7 +131,7 @@ await tracker.resolve_conflict(event_id, winner="local")
 ### Basic Offline Workflow
 
 ```python
-from htmlgraph.api.offline import (
+from wipnote.api.offline import (
     OfflineEventLog,
     EventMerger,
     ConflictTracker,
@@ -142,7 +142,7 @@ from htmlgraph.api.offline import (
 from datetime import datetime
 
 # 1. Create offline event log
-log = OfflineEventLog(db_path=".htmlgraph/htmlgraph.db")
+log = OfflineEventLog(db_path=".wipnote/wipnote.db")
 
 # 2. Log offline changes
 event = OfflineEvent(
@@ -250,7 +250,7 @@ for conflict in pending:
 ## Files Created/Modified
 
 ### New Files
-1. **`src/python/htmlgraph/api/offline.py`** (685 lines)
+1. **`src/python/wipnote/api/offline.py`** (685 lines)
    - OfflineEventLog
    - EventMerger
    - ConflictTracker
@@ -264,7 +264,7 @@ for conflict in pending:
    - Fixtures for test database
 
 ### Modified Files
-1. **`src/python/htmlgraph/db/schema.py`**
+1. **`src/python/wipnote/db/schema.py`**
    - Added `offline_events` table
    - Added `conflict_log` table
    - Added 6 new indexes for offline queries
@@ -278,7 +278,7 @@ for conflict in pending:
 
 ```python
 # Agent works offline
-log = OfflineEventLog(".htmlgraph/htmlgraph.db")
+log = OfflineEventLog(".wipnote/wipnote.db")
 
 event = OfflineEvent(
     event_id="evt-001",
@@ -381,7 +381,7 @@ assert result["conflicts"][0].winner == "local"
 
 ### Check Unsynced Events
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT event_id, resource_id, operation, status
 FROM offline_events
 WHERE status = 'local_only'
@@ -391,7 +391,7 @@ ORDER BY timestamp DESC;
 
 ### View Conflict Log
 ```bash
-sqlite3 .htmlgraph/htmlgraph.db "
+sqlite3 .wipnote/wipnote.db "
 SELECT resource_id, conflict_type, resolution, status
 FROM conflict_log
 WHERE status = 'pending_review'
@@ -419,10 +419,10 @@ No migration needed - this is a new feature that complements existing functional
 ### Enabling Offline Mode
 ```python
 # In your application startup
-from htmlgraph.api.offline import OfflineEventLog
+from wipnote.api.offline import OfflineEventLog
 
 # Create offline log
-offline_log = OfflineEventLog(".htmlgraph/htmlgraph.db")
+offline_log = OfflineEventLog(".wipnote/wipnote.db")
 
 # In your event handler
 if not is_online():

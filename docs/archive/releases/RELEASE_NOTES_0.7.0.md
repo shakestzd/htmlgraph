@@ -1,4 +1,4 @@
-# HtmlGraph 0.7.0 Release Notes
+# Wipnote 0.7.0 Release Notes
 
 ## 🚀 Major Release: Planning Workflow & Strategic Analytics
 
@@ -8,13 +8,13 @@ Released: December 22, 2025
 
 ```bash
 # Upgrade Python package
-uv pip install --upgrade htmlgraph
+uv pip install --upgrade wipnote
 
 # Or with pip
-pip install --upgrade htmlgraph
+pip install --upgrade wipnote
 
 # Verify version
-python -c "import htmlgraph; print(htmlgraph.__version__)"  # Should show 0.7.0
+python -c "import wipnote; print(wipnote.__version__)"  # Should show 0.7.0
 ```
 
 ### 🆕 New Features
@@ -24,7 +24,7 @@ python -c "import htmlgraph; print(htmlgraph.__version__)"  # Should show 0.7.0
 AI agents can now make data-driven decisions about what to work on:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -132,28 +132,28 @@ uv run python packages/common/generators/generate_commands.py
 
 Available on **all platforms** (Claude Code, Codex, Gemini):
 
-**`/htmlgraph:plan`** - Smart planning workflow
+**`/wipnote:plan`** - Smart planning workflow
 ```bash
-/htmlgraph:plan "User authentication system"
-/htmlgraph:plan "Real-time notifications" --timebox 3
-/htmlgraph:plan "Simple fix" --no-spike
+/wipnote:plan "User authentication system"
+/wipnote:plan "Real-time notifications" --timebox 3
+/wipnote:plan "Simple fix" --no-spike
 ```
 
-**`/htmlgraph:spike`** - Create research spike
+**`/wipnote:spike`** - Create research spike
 ```bash
-/htmlgraph:spike "Research OAuth providers"
-/htmlgraph:spike "Investigate caching" --timebox 2
+/wipnote:spike "Research OAuth providers"
+/wipnote:spike "Investigate caching" --timebox 2
 ```
 
-**`/htmlgraph:recommend`** - Get recommendations
+**`/wipnote:recommend`** - Get recommendations
 ```bash
-/htmlgraph:recommend
-/htmlgraph:recommend --count 5
+/wipnote:recommend
+/wipnote:recommend --count 5
 ```
 
 #### 5. Enhanced Start Command
 
-`/htmlgraph:start` now includes strategic analytics:
+`/wipnote:start` now includes strategic analytics:
 
 **What it shows:**
 - ✅ Basic status (completion %, active features)
@@ -169,7 +169,7 @@ Based on strategic analysis, I recommend:
 1. **User Authentication** (score: 10.0)
    - Why: High priority, Directly unblocks 2 features
 2. Continue current feature
-3. Create new work (`/htmlgraph:plan`)
+3. Create new work (`/wipnote:plan`)
 ```
 
 ### 📊 Statistics
@@ -238,12 +238,12 @@ track = sdk.create_track_from_plan(...)
 
 ```bash
 # New commands available immediately
-/htmlgraph:recommend
-/htmlgraph:plan "New feature"
-/htmlgraph:spike "Research topic"
+/wipnote:recommend
+/wipnote:plan "New feature"
+/wipnote:spike "Research topic"
 
 # Enhanced start command
-/htmlgraph:start  # Now shows analytics!
+/wipnote:start  # Now shows analytics!
 ```
 
 **For Plugin Developers:**
@@ -271,7 +271,7 @@ uv run python packages/common/generators/generate_commands.py
 
 **Python Package:**
 ```bash
-uv pip install --upgrade htmlgraph
+uv pip install --upgrade wipnote
 ```
 
 **Claude Code Plugin:**
@@ -299,10 +299,10 @@ This release demonstrates the power of AI-assisted development:
 
 ### 📞 Support
 
-- GitHub Issues: https://github.com/shakestzd/htmlgraph/issues
+- GitHub Issues: https://github.com/shakestzd/wipnote/issues
 - Documentation: `docs/` directory
 - Examples: `demo_agent_planning.py`, `demo_real_project_analytics.py`
 
 ---
 
-**Full Changelog:** https://github.com/shakestzd/htmlgraph/compare/v0.6.1...v0.7.0
+**Full Changelog:** https://github.com/shakestzd/wipnote/compare/v0.6.1...v0.7.0

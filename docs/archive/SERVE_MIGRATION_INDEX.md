@@ -1,4 +1,4 @@
-# HtmlGraph `serve` Migration - Complete Documentation Index
+# Wipnote `serve` Migration - Complete Documentation Index
 
 ## Quick Navigation
 
@@ -153,9 +153,9 @@ Quick lookup while implementing:
 - Verify backward compatibility
 
 **Files:**
-- Modify: `src/python/htmlgraph/api/main.py`
+- Modify: `src/python/wipnote/api/main.py`
 - Create: `tests/api/test_rest_api.py`
-- Reference: `src/python/htmlgraph/server.py` (lines 398-1268)
+- Reference: `src/python/wipnote/server.py` (lines 398-1268)
 
 **Go to:** SERVE_MIGRATION_QUICK_REFERENCE.md → Phase 1 section
 
@@ -173,8 +173,8 @@ Quick lookup while implementing:
 - Test file watching functionality
 
 **Files:**
-- Modify: `src/python/htmlgraph/operations/fastapi_server.py`
-- Modify: `src/python/htmlgraph/cli.py` (argument parser)
+- Modify: `src/python/wipnote/operations/fastapi_server.py`
+- Modify: `src/python/wipnote/cli.py` (argument parser)
 
 **Go to:** SERVE_MIGRATION_QUICK_REFERENCE.md → Phase 2 section
 
@@ -192,8 +192,8 @@ Quick lookup while implementing:
 - Test all combinations
 
 **Files:**
-- Modify: `src/python/htmlgraph/cli.py`
-- Modify: `src/python/htmlgraph/operations/fastapi_server.py`
+- Modify: `src/python/wipnote/cli.py`
+- Modify: `src/python/wipnote/operations/fastapi_server.py`
 
 **Go to:** SERVE_MIGRATION_QUICK_REFERENCE.md → Phase 3 section
 
@@ -211,8 +211,8 @@ Quick lookup while implementing:
 - Release as major version
 
 **Files to Delete:**
-- `src/python/htmlgraph/server.py` (1,600 lines)
-- `src/python/htmlgraph/operations/server.py` (300 lines)
+- `src/python/wipnote/server.py` (1,600 lines)
+- `src/python/wipnote/operations/server.py` (300 lines)
 - `tests/operations/test_server.py` (300 lines)
 
 **Go to:** SERVE_MIGRATION_QUICK_REFERENCE.md → Phase 4 section
@@ -274,17 +274,17 @@ Users will need to:
 3. SERVE_MIGRATION_CODE_INVENTORY.md - 45 min
 4. SERVE_MIGRATION_QUICK_REFERENCE.md - 20 min
 5. Review key source files:
-   - `src/python/htmlgraph/api/main.py` (FastAPI app)
-   - `src/python/htmlgraph/server.py` (legacy, reference only)
-   - `src/python/htmlgraph/cli.py` (CLI entry point)
+   - `src/python/wipnote/api/main.py` (FastAPI app)
+   - `src/python/wipnote/server.py` (legacy, reference only)
+   - `src/python/wipnote/cli.py` (CLI entry point)
 
 ### For Deep Dive (4+ hours)
 1. All of above
 2. Read complete source files:
-   - `/src/python/htmlgraph/server.py` (1,600 lines - understand legacy implementation)
-   - `/src/python/htmlgraph/api/main.py` (2,300 lines - understand FastAPI implementation)
-   - `/src/python/htmlgraph/operations/fastapi_server.py` (230 lines)
-   - `/src/python/htmlgraph/cli.py` (relevant sections around line 140)
+   - `/src/python/wipnote/server.py` (1,600 lines - understand legacy implementation)
+   - `/src/python/wipnote/api/main.py` (2,300 lines - understand FastAPI implementation)
+   - `/src/python/wipnote/operations/fastapi_server.py` (230 lines)
+   - `/src/python/wipnote/cli.py` (relevant sections around line 140)
 3. Review tests:
    - `tests/operations/test_server.py` (legacy tests)
    - Check for existing FastAPI tests
@@ -361,11 +361,11 @@ INDEX.md (this file)
 - `/Users/shakes/DevProjects/htmlgraph/SERVE_MIGRATION_QUICK_REFERENCE.md`
 
 ### Source Code
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli.py` (line 140)
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py` (FastAPI)
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/server.py` (legacy)
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/fastapi_server.py`
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/operations/server.py` (legacy)
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli.py` (line 140)
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/main.py` (FastAPI)
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/server.py` (legacy)
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/operations/fastapi_server.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/operations/server.py` (legacy)
 
 ### Tests
 - `/Users/shakes/DevProjects/htmlgraph/tests/operations/test_server.py` (legacy)
@@ -414,7 +414,7 @@ INDEX.md (this file)
 
 ## Summary
 
-This is a **complete migration analysis** for the HtmlGraph `serve` command. The migration from SimpleHTTPRequestHandler to FastAPI is **70% complete** but missing critical features:
+This is a **complete migration analysis** for the Wipnote `serve` command. The migration from SimpleHTTPRequestHandler to FastAPI is **70% complete** but missing critical features:
 
 - ❌ REST API endpoints (need to restore)
 - ❌ File watching (need to restore)
@@ -428,7 +428,7 @@ This is a **complete migration analysis** for the HtmlGraph `serve` command. The
 
 ## Quick Links for Common Questions
 
-**Q: Is `htmlgraph serve` working right now?**
+**Q: Is `wipnote serve` working right now?**
 A: Yes, it's functional but missing REST API and file watching. See SERVE_MIGRATION_EXECUTIVE_SUMMARY.txt.
 
 **Q: Should we complete the migration?**

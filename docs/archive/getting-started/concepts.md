@@ -1,16 +1,16 @@
 # Core Concepts
 
-HtmlGraph coordinates AI-assisted development through a local-first stack: HTML files store work items, SQLite indexes them for fast queries, JSONL logs track all events, and a Phoenix LiveView dashboard surfaces observability. This guide explains the core concepts and how they work together.
+Wipnote coordinates AI-assisted development through a local-first stack: HTML files store work items, SQLite indexes them for fast queries, JSONL logs track all events, and a Phoenix LiveView dashboard surfaces observability. This guide explains the core concepts and how they work together.
 
 ## Architecture Layers
 
-HtmlGraph stacks multiple representations of the same data for different purposes:
+Wipnote stacks multiple representations of the same data for different purposes:
 
 | Layer | Format | Purpose | Examples |
 |-------|--------|---------|----------|
-| **Artifact** | HTML files | Durable work items, human-readable | `.htmlgraph/features/feat-123.html` |
+| **Artifact** | HTML files | Durable work items, human-readable | `.wipnote/features/feat-123.html` |
 | **Query Index** | SQLite database | Fast lookups & analytics | Sessions, activities, relationships |
-| **Event Log** | JSONL (append-only) | Immutable history for auditing | `.htmlgraph/events/session-id.jsonl` |
+| **Event Log** | JSONL (append-only) | Immutable history for auditing | `.wipnote/events/session-id.jsonl` |
 | **Observability** | Phoenix LiveView | Live dashboard, activity feeds | `http://localhost:8080` |
 
 The artifact (HTML) is the source of truth for durable work items. SQLite and JSONL are derived, indexed representations that enable fast queries and event tracking.
@@ -19,7 +19,7 @@ The artifact (HTML) is the source of truth for durable work items. SQLite and JS
 
 ### Features
 
-**Features** are the atomic units of work in HtmlGraph. Each feature is an HTML file with:
+**Features** are the atomic units of work in Wipnote. Each feature is an HTML file with:
 
 - **Status**: `todo`, `in-progress`, `blocked`, `done`
 - **Priority**: `low`, `medium`, `high`, `critical`
@@ -28,7 +28,7 @@ The artifact (HTML) is the source of truth for durable work items. SQLite and JS
 - **Edges**: Links to related features (blocks, blocked_by, related)
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -40,7 +40,7 @@ feature = sdk.features.create(
 )
 ```
 
-**File location**: `.htmlgraph/features/feat-{hash8}.html`
+**File location**: `.wipnote/features/feat-{hash8}.html`
 
 ### Tracks
 
@@ -63,7 +63,7 @@ track = sdk.tracks.builder() \
     .create()
 ```
 
-**File location**: `.htmlgraph/tracks/trk-{hash8}/`
+**File location**: `.wipnote/tracks/trk-{hash8}/`
 
 ### Sessions
 
@@ -74,9 +74,9 @@ track = sdk.tracks.builder() \
 - **Timestamps**: Start and end times
 - **Agent**: Which agent did the work
 
-Sessions are automatically created and managed by HtmlGraph hooks.
+Sessions are automatically created and managed by Wipnote hooks.
 
-**File location**: `.htmlgraph/sessions/session-{id}.html`
+**File location**: `.wipnote/sessions/session-{id}.html`
 
 ### Events
 
@@ -88,13 +88,13 @@ Sessions are automatically created and managed by HtmlGraph hooks.
 - **Feature ID**: Which feature receives attribution
 - **Data**: Event-specific payload
 
-**File location**: `.htmlgraph/events/{session-id}.jsonl`
+**File location**: `.wipnote/events/{session-id}.jsonl`
 
 ## Graph Structure
 
 ### Nodes
 
-Every HTML file in HtmlGraph is a graph node. Nodes have:
+Every HTML file in Wipnote is a graph node. Nodes have:
 
 - **ID**: Unique, collision-resistant identifier (e.g., `feat-a1b2c3d4`)
 - **Type**: `feature`, `track`, `session`, or custom
@@ -103,7 +103,7 @@ Every HTML file in HtmlGraph is a graph node. Nodes have:
 
 #### Hash-Based IDs
 
-HtmlGraph uses hash-based IDs for multi-agent collaboration:
+Wipnote uses hash-based IDs for multi-agent collaboration:
 
 | Type | Prefix | Example |
 |------|--------|---------|
@@ -188,7 +188,7 @@ claude_features = sdk.features.query('[data-agent-assigned="claude"]')
                  │
                  ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 3. HTML files written to .htmlgraph/ directory         │
+│ 3. HTML files written to .wipnote/ directory         │
 └────────────────┬────────────────────────────────────────┘
                  │
                  ▼
@@ -223,7 +223,7 @@ No Docker, no JVM, no external database servers. Python dependencies include pyd
 
 ### Offline First
 
-Everything works offline. No server required for core functionality. Copy the `.htmlgraph/` directory anywhere and it works immediately.
+Everything works offline. No server required for core functionality. Copy the `.wipnote/` directory anywhere and it works immediately.
 
 ### Standards-Based Artifact Layer
 
@@ -240,7 +240,7 @@ Styling, layout, and interactivity are built-in using CSS and JavaScript. No sep
 For programmatic access and agent integration:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent="claude")
 feature = sdk.features.create("Task")
 ```
@@ -250,9 +250,9 @@ feature = sdk.features.create("Task")
 For command-line workflows:
 
 ```bash
-htmlgraph feature create "Task"
-htmlgraph feature start feature-001
-htmlgraph serve
+wipnote feature create "Task"
+wipnote feature start feature-001
+wipnote serve
 ```
 
 ### Dashboard (Browser)
@@ -264,7 +264,7 @@ For visual exploration:
 - Timeline view
 - Session history
 
-Open `index.html` in any browser or run `htmlgraph serve`.
+Open `index.html` in any browser or run `wipnote serve`.
 
 ## Next Steps
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides step-by-step instructions to implement industry-standard event tracing for tool calls in HtmlGraph, based on research of Logfire, Langfuse, and OpenTelemetry patterns.
+This guide provides step-by-step instructions to implement industry-standard event tracing for tool calls in Wipnote, based on research of Logfire, Langfuse, and OpenTelemetry patterns.
 
 ---
 
@@ -36,7 +36,7 @@ Duration = end - start
 
 ### Step 1.1: Add PreToolUse Hook Handler
 
-**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/event_log.py`
+**File**: `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/event_log.py`
 
 **What to add**:
 ```python
@@ -167,12 +167,12 @@ def _iso_now(self):
 #!/usr/bin/env python3
 """
 Hook handler for tool call tracing.
-Logs PreToolUse and PostToolUse events to HtmlGraph event log.
+Logs PreToolUse and PostToolUse events to Wipnote event log.
 """
 
 import json
 import sys
-from htmlgraph.event_log import EventLog
+from wipnote.event_log import EventLog
 
 def main():
     # Read hook input from stdin
@@ -203,7 +203,7 @@ if __name__ == '__main__':
 
 ```python
 import pytest
-from htmlgraph.event_log import EventLog
+from wipnote.event_log import EventLog
 
 def test_pre_tool_use_logging():
     """Test PreToolUse event capture."""
@@ -463,14 +463,14 @@ def detect_slow_tools(self, percentile=95):
 - Handler script at `.claude/hooks/tool-call-tracer.py`
 
 ### 2. Event Log Storage
-- Events appended to `.htmlgraph/events/tool_calls.jsonl`
+- Events appended to `.wipnote/events/tool_calls.jsonl`
 - One event per line
 - ISO8601 timestamps
 - Deterministic tool_use_id for correlation
 
 ### 3. SDK Integration
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK()
 

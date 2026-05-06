@@ -50,7 +50,7 @@ except CommandError as exc:
 ```
 
 **Files Modified:**
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli_framework.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli_framework.py`
 
 ### 2. CLI Commands Conversion (`cli_commands/feature.py`)
 
@@ -94,7 +94,7 @@ _console.print(panel)
 ```
 
 **Files Modified:**
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli_commands/feature.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli_commands/feature.py`
 
 ## Quality Assurance
 
@@ -186,7 +186,7 @@ Rich automatically:
 
 2. **Feature Completion**
    - Mark feat-4d5b889e steps 4-5 as complete
-   - Create HtmlGraph spike report with combined results
+   - Create Wipnote spike report with combined results
 
 3. **Integration Testing**
    - Test mixed Rich + print output scenarios
@@ -230,4 +230,4 @@ Rich automatically:
 
 ## Conclusion
 
-Successfully completed parallel Rich CLI implementation for CLI framework and command modules. All quality gates passed, and changes are ready for coordination with Codex's main CLI conversion. The modular approach ensures consistency and provides clear patterns for Rich integration throughout the HtmlGraph CLI ecosystem.
+Successfully completed parallel Rich CLI implementation for CLI framework and command modules. All quality gates passed, and changes are ready for coordination with Codex's main CLI conversion. The modular approach ensures consistency and provides clear patterns for Rich integration throughout the Wipnote CLI ecosystem.

@@ -1,9 +1,9 @@
 # Dashboard Multi-Level Event Nesting Fix - Complete Index
 
-**Project**: HtmlGraph
+**Project**: Wipnote
 **Date**: 2025-01-11
 **Status**: ✅ Production Ready
-**File Modified**: `src/python/htmlgraph/api/templates/dashboard-redesign.html`
+**File Modified**: `src/python/wipnote/api/templates/dashboard-redesign.html`
 
 ---
 
@@ -63,7 +63,7 @@ UserQuery
 ## 📁 Files Modified
 
 ```
-src/python/htmlgraph/api/templates/dashboard-redesign.html
+src/python/wipnote/api/templates/dashboard-redesign.html
   ├─ Lines 381-428: NEW calculateEventDepth() function (+48 lines)
   └─ Line 466: Updated insertChildEvent() to use new function (-11 lines)
 

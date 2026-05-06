@@ -1,8 +1,8 @@
-# HtmlGraph 0.7.1 Release Notes
+# Wipnote 0.7.1 Release Notes
 
 **Released**: December 23, 2025
 **Type**: Minor Release (Feature Addition + Bug Fixes)
-**Package**: https://pypi.org/project/htmlgraph/0.7.1/
+**Package**: https://pypi.org/project/wipnote/0.7.1/
 
 ---
 
@@ -14,14 +14,14 @@ A new CLI command to maintain documentation consistency across AI platforms:
 
 ```bash
 # Check if files are synchronized
-htmlgraph sync-docs --check
+wipnote sync-docs --check
 
 # Generate platform-specific file
-htmlgraph sync-docs --generate gemini
-htmlgraph sync-docs --generate claude
+wipnote sync-docs --generate gemini
+wipnote sync-docs --generate claude
 
 # Synchronize all files (default)
-htmlgraph sync-docs
+wipnote sync-docs
 ```
 
 **Features:**
@@ -73,7 +73,7 @@ The `deploy-all.sh` script now supports flexible deployment modes:
 2. Build Package - Create wheel and source distributions
 3. Publish to PyPI - Upload package to PyPI
 4. Local Install - Install latest version locally
-5. Update Claude Plugin - Run `claude plugin update htmlgraph`
+5. Update Claude Plugin - Run `claude plugin update wipnote`
 6. Update Gemini Extension - Update version in gemini-extension.json
 7. Update Codex Skill - Check for Codex and update if present
 
@@ -126,7 +126,7 @@ All platform documentation now uses imperative language:
 
 **Solution:** Removed all git hooks:
 - Deleted all hook symlinks from `.git/hooks/`
-- Deleted all hook scripts from `.htmlgraph/hooks/`
+- Deleted all hook scripts from `.wipnote/hooks/`
 - Deleted error log file with 21+ failures
 - **Result:** No more annoying warnings on every commit!
 
@@ -150,13 +150,13 @@ Completed SDK with delete operations:
 
 ### New Files
 
-- `src/python/htmlgraph/sync_docs.py` - Memory file sync tool
+- `src/python/wipnote/sync_docs.py` - Memory file sync tool
 - `scripts/README.md` - Comprehensive script documentation
 - `RELEASE_NOTES_0.7.1.md` - This file
 
 ### Enhanced Files
 
-- `src/python/htmlgraph/cli.py` - Added `sync-docs` command
+- `src/python/wipnote/cli.py` - Added `sync-docs` command
 - `scripts/deploy-all.sh` - Added flexible deployment flags
 - `AGENTS.md` - Deployment and memory sync documentation
 - `CLAUDE.md` - Deployment sections and dogfooding context
@@ -164,9 +164,9 @@ Completed SDK with delete operations:
 
 ### Removed Files
 
-- `.htmlgraph/hooks/` - All git hook scripts (non-functional)
+- `.wipnote/hooks/` - All git hook scripts (non-functional)
 - `.git/hooks/pre-commit` - Broken hook causing warnings
-- `.htmlgraph/git-hook-errors.log` - Error log
+- `.wipnote/git-hook-errors.log` - Error log
 
 ---
 
@@ -180,8 +180,8 @@ Completed SDK with delete operations:
 - **4 major documentation files** updated
 
 **Package Size:**
-- Wheel: 222 KB (`htmlgraph-0.7.1-py3-none-any.whl`)
-- Source: 240 KB (`htmlgraph-0.7.1.tar.gz`)
+- Wheel: 222 KB (`wipnote-0.7.1-py3-none-any.whl`)
+- Source: 240 KB (`wipnote-0.7.1.tar.gz`)
 
 ---
 
@@ -191,26 +191,26 @@ Completed SDK with delete operations:
 
 ```bash
 # Update via pip
-pip install --upgrade htmlgraph
+pip install --upgrade wipnote
 
 # Or install specific version
-pip install htmlgraph==0.7.1
+pip install wipnote==0.7.1
 
 # Update Claude plugin
-claude plugin update htmlgraph
+claude plugin update wipnote
 ```
 
 **Breaking Changes:** None
 
 **New Features You Can Use:**
-1. Run `htmlgraph sync-docs --check` to validate your documentation
+1. Run `wipnote sync-docs --check` to validate your documentation
 2. Use `./scripts/deploy-all.sh --docs-only` for doc-only deploys
 3. Use SDK delete methods: `sdk.features.delete(id)`
 
 **What You'll Notice:**
 - No more git hook warnings on commits
 - Cleaner, faster commit experience
-- New `htmlgraph sync-docs` command available
+- New `wipnote sync-docs` command available
 
 ---
 
@@ -220,7 +220,7 @@ claude plugin update htmlgraph
 
 ```bash
 # 1. Check current state
-htmlgraph sync-docs --check
+wipnote sync-docs --check
 
 # Output:
 # ✅ AGENTS.md exists
@@ -229,10 +229,10 @@ htmlgraph sync-docs --check
 # ✅ All files are properly synchronized!
 
 # 2. Generate a new platform file
-htmlgraph sync-docs --generate codex
+wipnote sync-docs --generate codex
 
 # 3. Force overwrite existing file
-htmlgraph sync-docs --generate gemini --force
+wipnote sync-docs --generate gemini --force
 ```
 
 ### Flexible Deployment
@@ -254,7 +254,7 @@ htmlgraph sync-docs --generate gemini --force
 ### SDK Delete Operations
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -273,8 +273,8 @@ sdk.chores.delete("chore-cleanup")
 
 ## 🔗 Links
 
-- **PyPI Package**: https://pypi.org/project/htmlgraph/0.7.1/
-- **GitHub Repository**: https://github.com/shakestzd/htmlgraph
+- **PyPI Package**: https://pypi.org/project/wipnote/0.7.1/
+- **GitHub Repository**: https://github.com/shakestzd/wipnote
 - **Documentation**: See `AGENTS.md` in the repository
 - **Previous Release**: [RELEASE_NOTES_0.7.0.md](./RELEASE_NOTES_0.7.0.md)
 
@@ -296,7 +296,7 @@ Thanks to all users who reported issues with git hooks!
 
 **Upcoming in 0.7.2+:**
 - Package deployment script pattern for all users
-- Improve `htmlgraph init` with better defaults
+- Improve `wipnote init` with better defaults
 - Enhanced drift detection algorithm
 - Additional platform support (Codex skill packaging)
 

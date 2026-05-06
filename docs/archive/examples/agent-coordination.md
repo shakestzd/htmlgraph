@@ -1,15 +1,15 @@
 # Agent Coordination Examples
 
-Real-world patterns for coordinating multiple AI agents using HtmlGraph.
+Real-world patterns for coordinating multiple AI agents using Wipnote.
 
 ## Multi-Agent Workflow with Subagents
 
-HtmlGraph provides `spawn_explorer` and `spawn_coder` for delegating specialized tasks to subagents, preserving main session context for orchestration.
+Wipnote provides `spawn_explorer` and `spawn_coder` for delegating specialized tasks to subagents, preserving main session context for orchestration.
 
 ### Two-Phase Pattern: Explorer → Coder
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -66,7 +66,7 @@ coder_prompt = sdk.spawn_coder(
 Execute multiple features in parallel using orchestration:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -156,7 +156,7 @@ with gemini_sdk.features.edit(feature.id) as f:
 Use the high-level `orchestrate()` method for complete automation:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -190,7 +190,7 @@ coder_prompt = result["coder"]
 Build your own agent wrapper with automatic tracking:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 class CustomAgent:
     def __init__(self, name: str):
@@ -245,7 +245,7 @@ agent.execute_task("Implement payment processing")
 All agent activity is tracked automatically:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="claude")
 
@@ -254,11 +254,11 @@ status = sdk.status()
 print(f"Current session: {status.current_session}")
 print(f"Active features: {status.active_features}")
 
-# All SDK operations are logged to .htmlgraph/events/*.jsonl
+# All SDK operations are logged to .wipnote/events/*.jsonl
 feature = sdk.features.create("New feature")
 
 # View session activity
-# open .htmlgraph/sessions/{session_id}/index.html
+# open .wipnote/sessions/{session_id}/index.html
 ```
 
 ## Best Practices

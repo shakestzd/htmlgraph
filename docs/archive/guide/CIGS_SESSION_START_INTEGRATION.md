@@ -134,14 +134,14 @@ ALL other operations MUST be delegated to subagents.
 
 ### Storage
 
-**Violation Records:** `.htmlgraph/cigs/violations.jsonl`
+**Violation Records:** `.wipnote/cigs/violations.jsonl`
 ```jsonl
 {"id":"viol-001","session_id":"sess-abc","tool":"Read","violation_type":"direct_exploration",...}
 ```
 
-**Pattern Analysis:** In-memory (future: persist to `.htmlgraph/cigs/patterns.json`)
+**Pattern Analysis:** In-memory (future: persist to `.wipnote/cigs/patterns.json`)
 
-**Session Summaries:** In-memory (future: persist to `.htmlgraph/cigs/session-summaries/`)
+**Session Summaries:** In-memory (future: persist to `.wipnote/cigs/session-summaries/`)
 
 ## Testing
 
@@ -181,16 +181,16 @@ python3 packages/claude-plugin/hooks/scripts/session-start.py < /dev/null
 ### With Existing Systems
 
 1. **ViolationTracker**
-   - Already implemented in `src/python/htmlgraph/cigs/tracker.py`
+   - Already implemented in `src/python/wipnote/cigs/tracker.py`
    - Stores violations in JSONL format
    - Thread-safe access
 
 2. **PatternDetector**
-   - Already implemented in `src/python/htmlgraph/cigs/patterns.py`
+   - Already implemented in `src/python/wipnote/cigs/patterns.py`
    - Detects 4 anti-patterns: exploration_sequence, edit_without_test, direct_git_commit, repeated_read_same_file
 
 3. **AutonomyRecommender**
-   - Already implemented in `src/python/htmlgraph/cigs/autonomy.py`
+   - Already implemented in `src/python/wipnote/cigs/autonomy.py`
    - Implements 4-level decision matrix
 
 ### With Future Hooks
@@ -209,7 +209,7 @@ python3 packages/claude-plugin/hooks/scripts/session-start.py < /dev/null
 
 ### Default Behavior
 
-- **Enabled by default** when HtmlGraph plugin is installed
+- **Enabled by default** when Wipnote plugin is installed
 - **Observer mode** for new sessions (no violation history)
 - **Graceful degradation** if CIGS modules unavailable (warning logged, hook continues)
 
@@ -272,8 +272,8 @@ Reason: Moderate compliance (60%), 2 anti-pattern(s). Active guidance needed.
 
 ## References
 
-- **Design Document:** `.htmlgraph/spikes/computational-imperative-guidance-system-design.md`
-- **CIGS Modules:** `src/python/htmlgraph/cigs/`
+- **Design Document:** `.wipnote/spikes/computational-imperative-guidance-system-design.md`
+- **CIGS Modules:** `src/python/wipnote/cigs/`
 - **Hook Script:** `packages/claude-plugin/hooks/scripts/session-start.py`
 - **Tests:** `tests/python/test_session_start_cigs.py`
 - **User Guide:** `docs/CIGS_USER_GUIDE.md`

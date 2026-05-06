@@ -7,7 +7,7 @@ All components of the Hybrid Event Capture System have been implemented and test
 ## What Was Implemented
 
 ### 1. SubagentStop Hook (NEW)
-- **File**: `src/python/htmlgraph/hooks/subagent_stop.py`
+- **File**: `src/python/wipnote/hooks/subagent_stop.py`
 - **Wrapper**: `.claude/hooks/scripts/subagent-stop.py`
 - **Purpose**: Updates parent events when subagents complete execution
 - **Functionality**:
@@ -25,7 +25,7 @@ All components of the Hybrid Event Capture System have been implemented and test
 - Proper foreign key relationships and indexes
 
 ### 3. PreToolUse Hook (Enhanced)
-- **File**: `src/python/htmlgraph/hooks/pretooluse.py`
+- **File**: `src/python/wipnote/hooks/pretooluse.py`
 - **Already Implemented**: Creates parent events for Task() calls
 - **Features**:
   - Detects Task() delegations
@@ -35,7 +35,7 @@ All components of the Hybrid Event Capture System have been implemented and test
   - Non-blocking, graceful error handling
 
 ### 4. API Endpoint (Already Present)
-- **File**: `src/python/htmlgraph/api/main.py` (lines 573-754)
+- **File**: `src/python/wipnote/api/main.py` (lines 573-754)
 - **Endpoint**: `GET /api/event-traces`
 - **Response**: Parent-child event traces with complete hierarchy
 - **Features**:
@@ -45,7 +45,7 @@ All components of the Hybrid Event Capture System have been implemented and test
   - Query caching for performance
 
 ### 5. Dashboard Template (NEW)
-- **File**: `src/python/htmlgraph/api/templates/partials/event-traces.html`
+- **File**: `src/python/wipnote/api/templates/partials/event-traces.html`
 - **Purpose**: Visualize parent-child event relationships
 - **Features**:
   - Hierarchical display with ASCII art connectors
@@ -119,10 +119,10 @@ tests/hooks/test_hybrid_event_capture.py::TestFullWorkflow::test_event_traces_ap
 1. `/Users/shakes/DevProjects/htmlgraph/.claude/hooks/scripts/subagent-stop.py`
    - Hook script wrapper for SubagentStop hook
 
-2. `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/subagent_stop.py`
+2. `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/subagent_stop.py`
    - Complete SubagentStop hook implementation
 
-3. `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/templates/partials/event-traces.html`
+3. `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/templates/partials/event-traces.html`
    - Dashboard template for event traces visualization
 
 4. `/Users/shakes/DevProjects/htmlgraph/tests/hooks/test_hybrid_event_capture.py`
@@ -133,11 +133,11 @@ tests/hooks/test_hybrid_event_capture.py::TestFullWorkflow::test_event_traces_ap
 
 ## Files Enhanced
 
-1. `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/pretooluse.py`
+1. `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/pretooluse.py`
    - Already had parent event creation logic
    - Verified and documented
 
-2. `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/api/main.py`
+2. `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/api/main.py`
    - Already had /api/event-traces endpoint
    - Verified and documented
 
@@ -204,7 +204,7 @@ tests/hooks/test_hybrid_event_capture.py::TestFullWorkflow::test_event_traces_ap
 
 ### Basic Task Delegation
 ```python
-from htmlgraph import Task
+from wipnote import Task
 
 Task(
     prompt="Analyze codebase architecture",
@@ -218,7 +218,7 @@ Task(
     prompt="""
     Research API patterns and create spike.
     
-    from htmlgraph import SDK
+    from wipnote import SDK
     sdk = SDK(agent='researcher')
     spike = sdk.spikes.create('API Patterns').set_findings(...).save()
     """,

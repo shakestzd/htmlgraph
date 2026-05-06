@@ -1,4 +1,4 @@
-# HtmlGraph Phase 1: SQLite Schema Design - Complete Summary
+# Wipnote Phase 1: SQLite Schema Design - Complete Summary
 
 ## Project Overview
 
@@ -10,7 +10,7 @@
 
 ## What Was Built
 
-A comprehensive SQLite schema for HtmlGraph agent observability backend, replacing HTML file storage with a robust relational database while maintaining full observability and enabling new analytical capabilities.
+A comprehensive SQLite schema for Wipnote agent observability backend, replacing HTML file storage with a robust relational database while maintaining full observability and enabling new analytical capabilities.
 
 ### Deliverables Summary
 
@@ -25,7 +25,7 @@ Total Production Code: ~3,100 lines
 
 ## Core Components
 
-### 1. HtmlGraphDB Class (`src/python/htmlgraph/db/schema.py`)
+### 1. WipnoteDB Class (`src/python/wipnote/db/schema.py`)
 
 **Capabilities**:
 - SQLite database connection and lifecycle management
@@ -37,7 +37,7 @@ Total Production Code: ~3,100 lines
 
 **Key Methods**:
 ```python
-db = HtmlGraphDB(".htmlgraph/htmlgraph.db")
+db = WipnoteDB(".wipnote/wipnote.db")
 db.connect()
 db.create_tables()
 
@@ -58,7 +58,7 @@ db.insert_session(session_id, agent_assigned, ...)
 db.record_collaboration(handoff_id, from_agent, to_agent, ...)
 ```
 
-### 2. Query Builders (`src/python/htmlgraph/db/queries.py`)
+### 2. Query Builders (`src/python/wipnote/db/queries.py`)
 
 **25+ Pre-built Queries** organized by domain:
 
@@ -173,7 +173,7 @@ total_tokens, summary, archived_at
 Automated migration from existing HTML files to SQLite:
 
 **Features**:
-- Parse all .htmlgraph/features/*.html and sessions/*.html
+- Parse all .wipnote/features/*.html and sessions/*.html
 - Extract metadata from data-* attributes
 - Extract relationships from hyperlinks
 - Validate data integrity before import
@@ -273,9 +273,9 @@ uv run python scripts/migrate_html_to_sqlite.py --verbose
 ## Files Delivered
 
 ### Core Implementation
-- `/src/python/htmlgraph/db/__init__.py` - Package exports
-- `/src/python/htmlgraph/db/schema.py` - HtmlGraphDB class (560 lines)
-- `/src/python/htmlgraph/db/queries.py` - Query builders (650 lines)
+- `/src/python/wipnote/db/__init__.py` - Package exports
+- `/src/python/wipnote/db/schema.py` - WipnoteDB class (560 lines)
+- `/src/python/wipnote/db/queries.py` - Query builders (650 lines)
 
 ### Migration
 - `/scripts/migrate_html_to_sqlite.py` - HTML→SQLite migration (420 lines)
@@ -291,9 +291,9 @@ uv run python scripts/migrate_html_to_sqlite.py --verbose
 
 ### Initialize Database
 ```python
-from htmlgraph.db.schema import HtmlGraphDB
+from wipnote.db.schema import WipnoteDB
 
-db = HtmlGraphDB(".htmlgraph/htmlgraph.db")
+db = WipnoteDB(".wipnote/wipnote.db")
 db.connect()
 db.create_tables()
 ```
@@ -327,7 +327,7 @@ db.update_feature_status("feat-001", "done", steps_completed=5)
 
 ### Query Session Metrics
 ```python
-from htmlgraph.db.queries import Queries
+from wipnote.db.queries import Queries
 
 sql, params = Queries.get_session_metrics("sess-123")
 cursor = db.connection.cursor()
@@ -412,7 +412,7 @@ for row in cursor.fetchall():
 
 - [x] Analyze existing HTML structure
 - [x] Design normalized schema with 7 tables
-- [x] Implement HtmlGraphDB class
+- [x] Implement WipnoteDB class
 - [x] Implement all CRUD operations
 - [x] Create 25+ query builders
 - [x] Design migration strategy
@@ -485,7 +485,7 @@ for row in cursor.fetchall():
 
 ## Conclusion
 
-Phase 1 successfully delivers a production-ready SQLite schema for HtmlGraph agent observability. The schema provides:
+Phase 1 successfully delivers a production-ready SQLite schema for Wipnote agent observability. The schema provides:
 
 - **Complete observability** of agent activities, features, and collaboration
 - **High performance** with strategic indexing and query optimization
@@ -504,8 +504,8 @@ uv run pytest tests/python/test_sqlite_schema.py -v
 
 # Create database
 python -c "
-from htmlgraph.db.schema import HtmlGraphDB
-db = HtmlGraphDB('.htmlgraph/htmlgraph.db')
+from wipnote.db.schema import WipnoteDB
+db = WipnoteDB('.wipnote/wipnote.db')
 db.connect()
 db.create_tables()
 print('Database created successfully')

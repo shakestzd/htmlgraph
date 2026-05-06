@@ -8,7 +8,7 @@
 
 ## Root Cause (The Critical Bug)
 
-The event tracking hook uses `manager.get_active_session()` which reads the **global session cache** (`.htmlgraph/session.json`), returning the **parent's session ID** instead of creating a new subagent session.
+The event tracking hook uses `manager.get_active_session()` which reads the **global session cache** (`.wipnote/session.json`), returning the **parent's session ID** instead of creating a new subagent session.
 
 ### Three Missing Pieces:
 
@@ -38,7 +38,7 @@ env["HTMLGRAPH_PARENT_AGENT"] = detected_agent
 ```
 
 ### Fix #2: Track Event Hook
-**File**: `src/python/htmlgraph/hooks/event_tracker.py` (line ~710)
+**File**: `src/python/wipnote/hooks/event_tracker.py` (line ~710)
 
 ```python
 # Add BEFORE manager.get_active_session():
@@ -62,7 +62,7 @@ else:
 ```
 
 ### Fix #3: Documentation
-**File**: `src/python/htmlgraph/hooks/context.py` (add comment)
+**File**: `src/python/wipnote/hooks/context.py` (add comment)
 
 Explain why `HTMLGRAPH_SESSION_ID` isn't used in `track_event()` - to avoid cross-contamination between orchestrator and subagent sessions.
 
@@ -116,7 +116,7 @@ Subagent (Gemini) Session: session-xyz789
 | Event attribution | Subagent events in parent session | Subagent events in subagent session |
 | Model field | Shows parent model (Sonnet) | Shows correct subagent model (Opus/Gemini) |
 | Parent-child linking | Task() has no children | Task() → subagent tool calls linked |
-| HtmlGraph dashboard | Confusing mixed events | Clear separation of work |
+| Wipnote dashboard | Confusing mixed events | Clear separation of work |
 | Cost analysis | Cannot distinguish | Can measure subagent costs separately |
 
 ---
@@ -131,12 +131,12 @@ Subagent (Gemini) Session: session-xyz789
 **Integration Tests**:
 - End-to-end orchestrator → Gemini spawner → tool calls
 - Verify correct session/model/parent-child attributes in database
-- Verify HtmlGraph dashboard shows separation
+- Verify Wipnote dashboard shows separation
 
 **Manual Verification**:
 ```bash
 # After running orchestrator → subagent workflow:
-sqlite3 .htmlgraph/index.sqlite
+sqlite3 .wipnote/index.sqlite
 
 # Should show:
 # - Two sessions (parent + subagent)

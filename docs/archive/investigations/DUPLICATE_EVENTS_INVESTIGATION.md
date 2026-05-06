@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The HtmlGraph dashboard displays duplicate events with identical content but different event IDs and timestamps (1 second apart):
+The Wipnote dashboard displays duplicate events with identical content but different event IDs and timestamps (1 second apart):
 
 - Event "this is not how you invoke..." appears twice:
   - `uq-a43a48e4` at 2026-01-11 08:03:15
@@ -99,7 +99,7 @@ The PostToolUse hook has similar duplication:
 ]
 ```
 
-**However**: `posttooluse-integrator.py` delegates to `htmlgraph.hooks.posttooluse`, which calls `track_event()` from within `run_event_tracking()`. This is ALSO creating duplicate events!
+**However**: `posttooluse-integrator.py` delegates to `wipnote.hooks.posttooluse`, which calls `track_event()` from within `run_event_tracking()`. This is ALSO creating duplicate events!
 
 ### PreToolUse Chain (Also Duplicated)
 
@@ -136,14 +136,14 @@ Two separate executables handling Task() routing. This is redundant.
   - Unknown - likely also calls event tracking
 
 - `/Users/shakes/DevProjects/htmlgraph/packages/claude-plugin/.claude-plugin/hooks/scripts/posttooluse-integrator.py`
-  - Thin wrapper calling `htmlgraph.hooks.posttooluse.main()`
+  - Thin wrapper calling `wipnote.hooks.posttooluse.main()`
 
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/posttooluse.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/posttooluse.py`
   - Line 306: Calls `run_event_tracking(hook_type, hook_input)`
   - Which calls `track_event(hook_type, hook_input)` (Line 58)
 
 ### Core Event Tracking
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/event_tracker.py`
   - Lines 857-866: Creates UserQuery events in PostToolUse handling
   - No duplicate detection based on content hash
 

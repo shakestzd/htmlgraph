@@ -15,13 +15,13 @@ When `model=None`, the Gemini CLI automatically selects the best available model
 When you use `model=None`, you automatically benefit from Google's latest model improvements:
 
 ```python
-from htmlgraph.orchestration.spawners import GeminiSpawner
+from wipnote.orchestration.spawners import GeminiSpawner
 
 spawner = GeminiSpawner()
 result = spawner.spawn(
     prompt="Analyze this codebase",
     # model=None is the default - uses latest Gemini models
-    track_in_htmlgraph=True
+    track_in_wipnote=True
 )
 ```
 
@@ -57,7 +57,7 @@ result = spawner.spawn(
 result = spawner.spawn(
     prompt="Analyze code quality",
     model="gemini-2.0-flash",  # DEPRECATED
-    track_in_htmlgraph=True
+    track_in_wipnote=True
 )
 ```
 
@@ -67,7 +67,7 @@ result = spawner.spawn(
 result = spawner.spawn(
     prompt="Analyze code quality",
     # model parameter omitted - uses best available models
-    track_in_htmlgraph=True
+    track_in_wipnote=True
 )
 ```
 
@@ -121,12 +121,12 @@ The Gemini 3 preview model offers enhanced capabilities:
 To verify the upgrade works correctly:
 
 ```python
-from htmlgraph.orchestration.spawners import GeminiSpawner
+from wipnote.orchestration.spawners import GeminiSpawner
 
 spawner = GeminiSpawner()
 result = spawner.spawn(
     prompt="Return a simple confirmation: 'Gemini spawner working correctly'",
-    track_in_htmlgraph=False,
+    track_in_wipnote=False,
     timeout=30
 )
 
@@ -163,9 +163,9 @@ result = spawner.spawn(prompt="...")
 
 ## Related Documentation
 
-- [GeminiSpawner API](/src/python/htmlgraph/orchestration/spawners/gemini.py)
+- [GeminiSpawner API](/src/python/wipnote/orchestration/spawners/gemini.py)
 - [Gemini Skill](/packages/claude-plugin/.claude-plugin/skills/gemini/skill.md)
-- [Orchestration Patterns](/src/python/htmlgraph/docs/ORCHESTRATION_PATTERNS.md)
+- [Orchestration Patterns](/src/python/wipnote/docs/ORCHESTRATION_PATTERNS.md)
 
 ## Changelog
 

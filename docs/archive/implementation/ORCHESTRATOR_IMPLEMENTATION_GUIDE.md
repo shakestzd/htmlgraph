@@ -1,7 +1,7 @@
 # Orchestrator System Prompt - Implementation Guide
 
 **Date:** 2025-01-03
-**Project:** HtmlGraph
+**Project:** Wipnote
 **Version:** 1.0
 
 ---
@@ -50,11 +50,11 @@ export CLAUDE_SYSTEM_PROMPT="$(cat orchestrator-system-prompt.txt)"
 
 # Now use orchestrator-style commands
 claude -p "
-Design a deployment workflow for HtmlGraph considering:
+Design a deployment workflow for Wipnote considering:
 - Multiple AI providers (Claude, Gemini, Copilot, Codex)
 - Cost optimization
 - Parallel execution capability
-- Integration with HtmlGraph SDK
+- Integration with Wipnote SDK
 
 Use the HeadlessSpawner framework. For each major component,
 decide: execute directly, delegate with Task(), or spawn specialized agent.
@@ -72,7 +72,7 @@ decide: execute directly, delegate with Task(), or spawn specialized agent.
 claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" -p "
 Coordinate analysis of 5 Python files for code quality issues.
 Use HeadlessSpawner to spawn parallel Gemini agents.
-Save results to HtmlGraph.
+Save results to Wipnote.
 "
 ```
 
@@ -84,7 +84,7 @@ You are an ORCHESTRATOR. For work:
 - Decompose into tasks
 - Use spawn_codex() for code, spawn_gemini() for analysis
 - Use Task() for sequential dependent work
-- Track results in HtmlGraph using SDK
+- Track results in Wipnote using SDK
 - Delegate everything except strategic decisions
 
 When to delegate:
@@ -103,7 +103,7 @@ Is this strategic? → Execute directly
 
 ## Option 3: Plugin Integration
 
-### For HtmlGraph Plugin Users
+### For Wipnote Plugin Users
 
 ```python
 # In your Claude Code plugin configuration (.claude/settings.json)
@@ -116,22 +116,22 @@ Is this strategic? → Execute directly
         "system_prompt": "orchestrator-system-prompt.txt",
         "mode": "full",
         "spawner_enabled": true,
-        "auto_track_htmlgraph": true
+        "auto_track_wipnote": true
       }
     }
   ]
 }
 ```
 
-### Using with HtmlGraph Plugin
+### Using with Wipnote Plugin
 
 ```bash
 # Plugin automatically loads orchestrator prompt
 claude -p "Your orchestration task..."
 
-# Access HtmlGraph SDK in orchestrator context
-from htmlgraph import SDK
-from htmlgraph.orchestration import HeadlessSpawner
+# Access Wipnote SDK in orchestrator context
+from wipnote import SDK
+from wipnote.orchestration import HeadlessSpawner
 
 sdk = SDK(agent='orchestrator')
 spawner = HeadlessSpawner()
@@ -215,19 +215,19 @@ fi
 
 ---
 
-## Integration with HtmlGraph Workflows
+## Integration with Wipnote Workflows
 
 ### Orchestrator + SDK Pattern
 
 ```python
 #!/usr/bin/env python3
 """
-Orchestrator workflow using HtmlGraph SDK.
+Orchestrator workflow using Wipnote SDK.
 Run with: CLAUDE_SYSTEM_PROMPT="..." python orchestrator.py
 """
 
-from htmlgraph import SDK
-from htmlgraph.orchestration import (
+from wipnote import SDK
+from wipnote.orchestration import (
     HeadlessSpawner,
     delegate_with_id,
     save_task_results,
@@ -341,7 +341,7 @@ Task: "Implement user authentication"
 
 Q1: Is this strategic?
 → YES (what features to build)
-→ Execute directly: Create feature in HtmlGraph
+→ Execute directly: Create feature in Wipnote
 
 Q2: Decompose into work items:
    a) Research existing patterns (independent)
@@ -360,7 +360,7 @@ Q3: For each item:
 ORCHESTRATOR PLAN:
 1. Execute: Create feature, prioritize, decompose (strategic)
 2. Spawn: spawn_claude for research and design (parallel, independent)
-3. Save results to HtmlGraph
+3. Save results to Wipnote
 4. Delegate: Task() for implementation + tests + docs (sequential, shared context)
 5. Track: Update feature status throughout
 ```
@@ -395,7 +395,7 @@ ORCHESTRATOR PLAN:
 1. Execute: Parse file list, set up coordination (strategic)
 2. Spawn: 10 parallel spawn_gemini tasks (one per file)
 3. Collect: Aggregate results as they complete
-4. Save: Store findings in HtmlGraph spike
+4. Save: Store findings in Wipnote spike
 5. Analyze: Orchestrator reviews findings and decides next steps
 6. Delegate: If issues found, Task() to fix them sequentially
 ```
@@ -429,12 +429,12 @@ Q5: Why Task() instead of spawn_codex?
 
 ORCHESTRATOR PLAN:
 1. Execute: Understand the bug (read code, search logs) - strategic
-2. Create: Feature/bug tracking in HtmlGraph
+2. Create: Feature/bug tracking in Wipnote
 3. Delegate: Task() "Analyze token expiry logic and suggest fix"
 4. Delegate: Task() "Implement the fix based on analysis"
 5. Delegate: Task() "Write tests validating token expiry"
 6. Delegate: Task() "Verify fix in staging environment"
-5. Track: Update HtmlGraph with completion
+5. Track: Update Wipnote with completion
 ```
 
 ---
@@ -498,7 +498,7 @@ Key Success Factors:
   ✅ Delegation to Task() for sequential work (cache hits)
   ✅ spawn_gemini for parallel analysis (cost savings)
   ✅ spawn_codex for code generation (specialized)
-  ✅ All work tracked in HtmlGraph
+  ✅ All work tracked in Wipnote
   ✅ Strategic context maintained
 ```
 
@@ -550,7 +550,7 @@ Task(prompt="Implement feature step 2 (building on step 1)")
 
 **Symptom:** Can't find previous analysis or results
 
-**Root Cause:** Not using HtmlGraph SDK to track delegated work
+**Root Cause:** Not using Wipnote SDK to track delegated work
 
 **Fix:**
 ```python
@@ -558,13 +558,13 @@ Task(prompt="Implement feature step 2 (building on step 1)")
 result = Task(prompt="Analyze this")
 # Result is lost, can't find it later
 
-# ✅ Right: Track with HtmlGraph
-from htmlgraph.orchestration import delegate_with_id, save_task_results
+# ✅ Right: Track with Wipnote
+from wipnote.orchestration import delegate_with_id, save_task_results
 
 task_id, prompt = delegate_with_id("Analyze", "...", "general-purpose")
 result = Task(prompt=prompt, description=f"{task_id}: Analyze")
 save_task_results(sdk, task_id, "Analyze", result)
-# Result saved to HtmlGraph spike, always findable
+# Result saved to Wipnote spike, always findable
 ```
 
 ### Issue 4: "Choosing Wrong Spawner"
@@ -629,7 +629,7 @@ export CLAUDE_SYSTEM_PROMPT="$(cat orchestrator-system-prompt.txt)"
 claude --append-system-prompt "$(cat orchestrator-system-prompt-condensed.txt)" -p "task"
 
 # Create task with tracking
-claude -p "Use HtmlGraph SDK to delegate with delegate_with_id()"
+claude -p "Use Wipnote SDK to delegate with delegate_with_id()"
 
 # Check if prompt is loaded
 echo "$CLAUDE_SYSTEM_PROMPT" | head -c 50
@@ -648,11 +648,11 @@ claude -p "How would you approach: [task]?" | head -20
 1. **Lead with Strategy** - Orchestrator makes architectural decisions
 2. **Decompose Work** - Break complex tasks into independent pieces
 3. **Choose Spawner Wisely** - Use decision tree for selection
-4. **Track Everything** - Use HtmlGraph SDK for all work items
+4. **Track Everything** - Use Wipnote SDK for all work items
 5. **Optimize Cost** - Task() for dependent, spawn_* for parallel
 6. **Preserve Context** - Keep strategic context throughout
 7. **Validate Results** - Check quality gates before committing
-8. **Document Decisions** - Save reasoning in HtmlGraph spikes
+8. **Document Decisions** - Save reasoning in Wipnote spikes
 
 ---
 

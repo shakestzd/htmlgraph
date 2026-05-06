@@ -1,10 +1,10 @@
 # Models
 
-Pydantic data models for HtmlGraph entities.
+Pydantic data models for Wipnote entities.
 
 ## Overview
 
-HtmlGraph uses Pydantic models for:
+Wipnote uses Pydantic models for:
 
 - Type safety and validation
 - Serialization to/from HTML
@@ -18,7 +18,7 @@ All models are immutable by default and validate on construction.
 Represents a unit of work.
 
 ```python
-from htmlgraph.models import Feature, FeatureStatus, Priority
+from wipnote.models import Feature, FeatureStatus, Priority
 
 feature = Feature(
     id="feature-20241216-103045",
@@ -56,7 +56,7 @@ feature = Feature(
 Represents a multi-feature project.
 
 ```python
-from htmlgraph.models import Track
+from wipnote.models import Track
 
 track = Track(
     track_id="track-20241216-120000",
@@ -84,7 +84,7 @@ track = Track(
 Represents an agent work session.
 
 ```python
-from htmlgraph.models import Session
+from wipnote.models import Session
 
 session = Session(
     id="session-abc-123",
@@ -108,7 +108,7 @@ session = Session(
 Represents a single implementation step.
 
 ```python
-from htmlgraph.models import Step
+from wipnote.models import Step
 
 step = Step(
     description="Create login endpoint",
@@ -130,7 +130,7 @@ step = Step(
 ### FeatureStatus
 
 ```python
-from htmlgraph.models import FeatureStatus
+from wipnote.models import FeatureStatus
 
 FeatureStatus.TODO         # Not started
 FeatureStatus.IN_PROGRESS  # Currently working
@@ -142,7 +142,7 @@ FeatureStatus.CANCELLED    # Work abandoned
 ### Priority
 
 ```python
-from htmlgraph.models import Priority
+from wipnote.models import Priority
 
 Priority.LOW       # Low priority
 Priority.MEDIUM    # Medium priority (default)
@@ -152,4 +152,4 @@ Priority.CRITICAL  # Critical priority
 
 ## Complete API Reference
 
-For detailed API documentation with type signatures and complete field definitions, see the Python source code in `src/python/htmlgraph/models.py`.
+For detailed API documentation with type signatures and complete field definitions, see the Python source code in `src/python/wipnote/models.py`.

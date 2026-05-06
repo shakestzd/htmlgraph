@@ -1,12 +1,12 @@
 # Git Hooks
 
-Documentation for HtmlGraph git hooks that automate development workflows.
+Documentation for Wipnote git hooks that automate development workflows.
 
 ## Overview
 
-HtmlGraph uses git hooks to:
+Wipnote uses git hooks to:
 - Enforce code quality standards before commits
-- Automatically track work in `.htmlgraph/`
+- Automatically track work in `.wipnote/`
 - Prevent incomplete deployments
 - Maintain clean git history
 
@@ -64,7 +64,7 @@ HtmlGraph uses git hooks to:
 Hooks are installed automatically when you first run:
 
 ```bash
-uv run htmlgraph init
+uv run wipnote init
 ```
 
 ### Manual Installation
@@ -98,10 +98,10 @@ ls -la .git/hooks/
 
 ```bash
 # Make changes
-vim src/python/htmlgraph/api/services.py
+vim src/python/wipnote/api/services.py
 
 # Stage changes
-git add src/python/htmlgraph/api/services.py
+git add src/python/wipnote/api/services.py
 
 # Commit (hooks run automatically)
 git commit -m "fix: improve service error handling"
@@ -134,7 +134,7 @@ uv run pytest
 
 ```bash
 # Make changes with type error
-vim src/python/htmlgraph/api/services.py
+vim src/python/wipnote/api/services.py
 git add .
 git commit -m "add feature"
 
@@ -142,13 +142,13 @@ git commit -m "add feature"
 # Running pre-commit hook...
 # ✗ Type checking with mypy
 # Error: Incompatible types in assignment
-# [1] mypy error in src/python/htmlgraph/api/services.py:42
+# [1] mypy error in src/python/wipnote/api/services.py:42
 #
 # Fix errors and try again
 
 # Fix the type error
-vim src/python/htmlgraph/api/services.py
-git add src/python/htmlgraph/api/services.py
+vim src/python/wipnote/api/services.py
+git add src/python/wipnote/api/services.py
 git commit -m "add feature"
 # ✓ All hooks passed
 # [main xyz7890] add feature
@@ -260,7 +260,7 @@ chmod +x .git/hooks/pre-commit
 head -5 .git/hooks/pre-commit
 
 # 4. Reinstall hooks
-uv run htmlgraph init --force-hooks
+uv run wipnote init --force-hooks
 ```
 
 ### Issue: Hook Fails but Changes Are Important
@@ -335,7 +335,7 @@ Formatting with ruff...
 
 Type checking with mypy...
 ✗ Error: Incompatible types in assignment
-  src/python/htmlgraph/api/services.py:42: error: Incompatible types in assignment
+  src/python/wipnote/api/services.py:42: error: Incompatible types in assignment
     (expression has type "str", variable has type "int")  [assignment]
   Found 1 error in 1 file (checked 15 source files)
 

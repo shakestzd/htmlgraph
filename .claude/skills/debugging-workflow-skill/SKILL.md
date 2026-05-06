@@ -63,7 +63,7 @@ Before implementing any fix, ask yourself:
    - Check quality gates
 
 5. 📝 DOCUMENT
-   - Capture learning in HtmlGraph spike
+   - Capture learning in Wipnote spike
    - Record research findings
    - Share patterns discovered
 ```
@@ -78,11 +78,11 @@ claude --debug <command>        # Verbose output
 /doctor                         # System diagnostics
 claude --verbose               # Detailed logging
 
-# HtmlGraph debugging
-htmlgraph orchestrator status
-htmlgraph status
-htmlgraph feature show <id>
-htmlgraph session list
+# Wipnote debugging
+wipnote orchestrator status
+wipnote status
+wipnote feature show <id>
+wipnote session list
 ```
 
 ## Quality Gates
@@ -166,10 +166,10 @@ uv run pytest
 4. Remove symlinks - Still broken
 5. (Finally research after wasting time)
 
-## Integration with HtmlGraph
+## Integration with Wipnote
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Document debugging findings
 sdk = SDK(agent='debugger')
@@ -192,11 +192,11 @@ spike = sdk.spikes.create('Investigation: Duplicate hooks error') \
 ### What counts toward WIP limit
 - Features (`feat-*`) with `in-progress` status
 - Spikes (`spk-*`) with `in-progress` status
-- Both live in `.htmlgraph/features/` directory
+- Both live in `.wipnote/features/` directory
 
 ### Quick diagnosis
 ```bash
-htmlgraph wip   # Shows all active items with ages
+wipnote wip   # Shows all active items with ages
 ```
 
 Or via SDK:
@@ -221,7 +221,7 @@ The coder can: edit HTML `data-status` directly → start new feature → all in
 - `debugger.md` - Systematic error analysis
 - `test-runner.md` - Quality gates and testing
 
-**Past debugging sessions:** See `.htmlgraph/spikes/`
+**Past debugging sessions:** See `.wipnote/spikes/`
 - Learn from previous debugging workflows
 - Avoid repeating mistakes
 

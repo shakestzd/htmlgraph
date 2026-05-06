@@ -3,7 +3,7 @@
 ## Import
 
 ```python
-from htmlgraph import (
+from wipnote import (
     AtomicFileWriter,
     DirectoryLocker,
     atomic_rename,
@@ -19,7 +19,7 @@ from pathlib import Path
 ### Atomic Text Write
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 from pathlib import Path
 
 # Context manager (streaming)
@@ -37,7 +37,7 @@ assert validate_atomic_write(target)
 ### Atomic JSON Write
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 
 data = {
     "session_id": "sess-abc123",
@@ -51,7 +51,7 @@ AtomicFileWriter.atomic_json_write(Path("session.json"), data)
 ### Safe Read with Retry
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 
 # Retries up to 3 times with exponential backoff
 content = AtomicFileWriter.safe_read_with_retry(
@@ -66,7 +66,7 @@ content = AtomicFileWriter.safe_read_with_retry(
 ### Custom Temp Directory
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 
 target = Path("/data/important.txt")
 temp_dir = Path("/tmp")  # Use different temp location
@@ -78,7 +78,7 @@ with AtomicFileWriter(target, temp_dir=temp_dir) as f:
 ### Directory Locking
 
 ```python
-from htmlgraph import DirectoryLocker
+from wipnote import DirectoryLocker
 from pathlib import Path
 
 lock_dir = Path(".locks")
@@ -106,12 +106,12 @@ if locker.acquire_shared_lock(timeout=5.0):
 ### Cleanup Orphaned Files
 
 ```python
-from htmlgraph import cleanup_orphaned_temp_files
+from wipnote import cleanup_orphaned_temp_files
 from pathlib import Path
 
 # Remove temp files older than 24 hours
 deleted_count = cleanup_orphaned_temp_files(
-    Path(".htmlgraph/sessions"),
+    Path(".wipnote/sessions"),
     age_hours=24
 )
 print(f"Cleaned up {deleted_count} orphaned temp files")
@@ -120,7 +120,7 @@ print(f"Cleaned up {deleted_count} orphaned temp files")
 ### Generate Temp File Paths
 
 ```python
-from htmlgraph import safe_temp_file
+from wipnote import safe_temp_file
 from pathlib import Path
 
 # Generate unique temp path (doesn't create file)
@@ -132,7 +132,7 @@ print(f"Temp path: {temp_path}")
 ### Platform-Aware Atomic Rename
 
 ```python
-from htmlgraph import atomic_rename
+from wipnote import atomic_rename
 from pathlib import Path
 
 src = Path("temp.txt")
@@ -148,7 +148,7 @@ atomic_rename(src, dst)  # Atomic on all platforms
 ### Scenario: Write with Exception
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 from pathlib import Path
 
 target = Path("data.txt")
@@ -168,19 +168,19 @@ assert target.read_text() == "original"
 ### Scenario: Cleanup After Crash
 
 ```python
-from htmlgraph import cleanup_orphaned_temp_files
+from wipnote import cleanup_orphaned_temp_files
 from pathlib import Path
 
 # If process crashed, temp files might remain
 # Cleanup removes them after age threshold
 
-cleanup_orphaned_temp_files(Path(".htmlgraph"), age_hours=24)
+cleanup_orphaned_temp_files(Path(".wipnote"), age_hours=24)
 ```
 
 ## Integration with SessionRegistry
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 from pathlib import Path
 import json
 
@@ -198,7 +198,7 @@ class SessionRegistry:
 ### File Not Found
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 
 try:
     content = AtomicFileWriter.safe_read_with_retry(
@@ -212,7 +212,7 @@ except FileNotFoundError:
 ### Permission Denied
 
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 from pathlib import Path
 
 try:
@@ -225,7 +225,7 @@ except OSError as e:
 ### Validation
 
 ```python
-from htmlgraph import validate_atomic_write
+from wipnote import validate_atomic_write
 from pathlib import Path
 
 path = Path("data.json")
@@ -240,7 +240,7 @@ else:
 
 ### Large Files
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 
 # Streaming write (doesn't load entire file in memory)
 with AtomicFileWriter(Path("large.bin")) as f:
@@ -251,7 +251,7 @@ with AtomicFileWriter(Path("large.bin")) as f:
 
 ### Concurrent Writes
 ```python
-from htmlgraph import AtomicFileWriter
+from wipnote import AtomicFileWriter
 from pathlib import Path
 
 # Safe to do concurrently (different files)
@@ -268,7 +268,7 @@ with AtomicFileWriter(Path("file1.txt")) as f1:
 
 ```python
 import pytest
-from htmlgraph import AtomicFileWriter, validate_atomic_write
+from wipnote import AtomicFileWriter, validate_atomic_write
 from pathlib import Path
 
 def test_atomic_write_rollback(tmp_path):
@@ -319,8 +319,8 @@ def test_atomic_write_rollback(tmp_path):
 4. **Cleanup orphaned files periodically**
    ```python
    # Run on app startup
-   from htmlgraph import cleanup_orphaned_temp_files
-   cleanup_orphaned_temp_files(Path(".htmlgraph"), age_hours=24)
+   from wipnote import cleanup_orphaned_temp_files
+   cleanup_orphaned_temp_files(Path(".wipnote"), age_hours=24)
    ```
 
 5. **Use locks for multi-process writes**
@@ -354,7 +354,7 @@ def test_atomic_write_rollback(tmp_path):
 - Check: Are processes crashing without cleanup?
 - Solution: Run cleanup periodically
   ```python
-  cleanup_orphaned_temp_files(Path(".htmlgraph"), age_hours=24)
+  cleanup_orphaned_temp_files(Path(".wipnote"), age_hours=24)
   ```
 
 ### Locks Timing Out
@@ -367,5 +367,5 @@ def test_atomic_write_rollback(tmp_path):
 ## See Also
 
 - **PHASE_1_3_IMPLEMENTATION.md** - Complete design documentation
-- **src/python/htmlgraph/atomic_ops.py** - Source code with docstrings
+- **src/python/wipnote/atomic_ops.py** - Source code with docstrings
 - **tests/python/test_atomic_ops.py** - Test examples

@@ -2,7 +2,7 @@
 
 ## Mission Accomplished
 
-Successfully generated **15+ real work events** that stream to the HtmlGraph Activity Feed dashboard in real-time via WebSocket.
+Successfully generated **15+ real work events** that stream to the Wipnote Activity Feed dashboard in real-time via WebSocket.
 
 ---
 
@@ -13,7 +13,7 @@ Successfully generated **15+ real work events** that stream to the HtmlGraph Act
 **File**: `/Users/shakes/DevProjects/htmlgraph/generate_real_events.py`
 
 A production-quality Python script that generates authentic development work by:
-- Creating HtmlGraph features using the SDK
+- Creating Wipnote features using the SDK
 - Reading and analyzing source files
 - Searching for code patterns
 - Running quality checks
@@ -37,7 +37,7 @@ The script executed actual operations:
 ```
 
 All features:
-- Linked to existing HtmlGraph tracks
+- Linked to existing Wipnote tracks
 - Assigned to agent "claude-code"
 - Populated with realistic steps
 - Given appropriate priorities
@@ -140,16 +140,16 @@ Details:
 
 2. Event Generation
    │
-   └─→ HtmlGraph hooks capture events
+   └─→ Wipnote hooks capture events
        PreToolUse (before operation)
        PostToolUse (after operation)
        SessionStart/Stop
 
 3. Event Persistence
    │
-   └─→ .htmlgraph/events/ (JSONL format)
-       .htmlgraph/features/ (HTML nodes)
-       .htmlgraph/sessions/ (tracking)
+   └─→ .wipnote/events/ (JSONL format)
+       .wipnote/features/ (HTML nodes)
+       .wipnote/sessions/ (tracking)
 
 4. Real-Time Streaming
    │
@@ -182,7 +182,7 @@ To verify events appear on the Activity Feed:
 
 ```bash
 # 1. Start dashboard server
-uv run htmlgraph serve
+uv run wipnote serve
 
 # 2. Open in browser
 # http://localhost:8080
@@ -212,7 +212,7 @@ uv run python generate_real_events.py
 ### Feature Creation Verification
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent='claude-code')
 features = sdk.features.where(agent_assigned='claude-code')
@@ -227,13 +227,13 @@ features = sdk.features.where(agent_assigned='claude-code')
 
 ```bash
 # Check feature files exist
-ls -la .htmlgraph/features/
+ls -la .wipnote/features/
 # feat-0cf9dec1.html (2.5 KB)
 # feat-0e415f80.html (2.3 KB)
 # feat-6ce78b9a.html (2.3 KB)
 
 # Check event logs exist
-ls -la .htmlgraph/events/
+ls -la .wipnote/events/
 # events-*.jsonl (with timestamps)
 ```
 
@@ -325,7 +325,7 @@ Each execution:
 - Creates new features with unique IDs
 - Generates fresh timestamps
 - Records all operations as events
-- Persists to .htmlgraph/ directory
+- Persists to .wipnote/ directory
 - Streams to Activity Feed dashboard
 
 ---
@@ -336,7 +336,7 @@ Each execution:
 - **Events Generated**: 15+ per run
 - **Files Created**: 3 feature files per run
 - **Disk Space**: ~7 KB per run
-- **Memory Usage**: Minimal (HtmlGraph SDK optimized)
+- **Memory Usage**: Minimal (Wipnote SDK optimized)
 - **Scalability**: Can run 100+ times for stress testing
 
 ---
@@ -372,7 +372,7 @@ The solution is production-ready:
 
 1. **Dashboard Verification**
    ```bash
-   uv run htmlgraph serve
+   uv run wipnote serve
    # Visit http://localhost:8080
    # Verify Activity Feed displays events
    ```
@@ -406,15 +406,15 @@ The solution is production-ready:
 Real work events have been successfully generated and are ready to stream to the Activity Feed dashboard. The implementation:
 
 - Generates 15+ authentic events per execution
-- Uses production HtmlGraph SDK patterns
-- Persists events to .htmlgraph/ directory
+- Uses production Wipnote SDK patterns
+- Persists events to .wipnote/ directory
 - Integrates with WebSocket streaming
 - Passes all code quality checks
 - Is documented and reproducible
 - Can be run unlimited times for testing
 
 Users can now verify Activity Feed real-time streaming by:
-1. Running the dashboard (`uv run htmlgraph serve`)
+1. Running the dashboard (`uv run wipnote serve`)
 2. Executing the script (`uv run python generate_real_events.py`)
 3. Observing real-time updates on the dashboard
 

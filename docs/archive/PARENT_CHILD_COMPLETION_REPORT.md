@@ -42,7 +42,7 @@ Successfully completed the full parent-child event linking implementation enabli
 ## The Fix
 
 ### File Modified
-`/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py`
+`/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/event_tracker.py`
 
 ### Lines Changed
 **Lines 752-759** - Environment variable precedence order reversal
@@ -132,7 +132,7 @@ tests/python/test_parent_linking_integration.py:
    ├─ Calls Task(subagent_type="coder")
    ├─ PreToolUse hook captures parent event ID
    ├─ Sets HTMLGRAPH_PARENT_EVENT env var
-   └─ Saves to .htmlgraph/parent-activity.json
+   └─ Saves to .wipnote/parent-activity.json
 
 2. SUBAGENT (New Process)
    ├─ Executes tool calls (Read, Edit, Bash, etc.)
@@ -165,7 +165,7 @@ When determining parent context for an event:
    - Survives across process boundaries
    - Used for cross-process parent linking
 
-2. **File-Based State** (fallback): `.htmlgraph/parent-activity.json`
+2. **File-Based State** (fallback): `.wipnote/parent-activity.json`
    - Persistent parent context within same process
    - Useful for sequential tool invocations
    - Survives parent process suspension/resume
@@ -191,12 +191,12 @@ The schema already had robust error handling:
 ## Files Involved
 
 ### Modified
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/hooks/event_tracker.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/hooks/event_tracker.py`
   - Lines 752-759: Precedence order fix
   - Comment updates for clarity
 
 ### Already Had Required Logic (No Changes Needed)
-- `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/db/schema.py`
+- `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/db/schema.py`
   - Error handling in insert_event()
   - Error handling in insert_session()
   - FOREIGN KEY constraints with graceful fallback
@@ -206,7 +206,7 @@ The schema already had robust error handling:
 - `/Users/shakes/DevProjects/htmlgraph/tests/python/test_parent_linking_integration.py` (4/4 tests)
 
 ### Documentation
-- `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/spikes/PARENT_CHILD_COMPLETION_SPIKE.md` - Detailed spike report
+- `/Users/shakes/DevProjects/htmlgraph/.wipnote/spikes/PARENT_CHILD_COMPLETION_SPIKE.md` - Detailed spike report
 - This report
 
 ---
@@ -217,7 +217,7 @@ The schema already had robust error handling:
 **Commit Message**: `fix: Complete parent-child event linking implementation - Phase 4 complete`
 
 **Changes Summary**:
-- 145 files changed (includes all .htmlgraph tracking data)
+- 145 files changed (includes all .wipnote tracking data)
 - 43,837 insertions
 - 2,600 deletions
 - Key change: event_tracker.py precedence reversal
@@ -337,4 +337,4 @@ All 4 phases have been successfully executed, with the critical precedence fix c
 
 ---
 
-*Feature feat-fd87099f: Parent-Child Event Linking is now production-ready and available for use in HtmlGraph deployments.*
+*Feature feat-fd87099f: Parent-Child Event Linking is now production-ready and available for use in Wipnote deployments.*

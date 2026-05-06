@@ -93,14 +93,14 @@ Optimizing for human readability has unexpected benefits:
 
 ### 4. Offline First
 
-HtmlGraph works completely offline:
+Wipnote works completely offline:
 
 - No network required
 - No authentication
 - No cloud sync
 - No external services
 
-Copy the `.htmlgraph/` directory anywhere and it just works.
+Copy the `.wipnote/` directory anywhere and it just works.
 
 ### 5. Git Native
 
@@ -124,7 +124,7 @@ HTML is ideal for AI agents:
 
 ### For Developers
 
-- **Fast setup**: `pip install htmlgraph`, done
+- **Fast setup**: `pip install wipnote`, done
 - **No configuration**: Works out of the box
 - **View in browser**: Open any file to see it styled
 - **Standard tools**: Git, text editors, browsers
@@ -208,7 +208,7 @@ Don't reinvent what browsers already do:
 
 ### vs Neo4j
 
-| Feature | Neo4j | HtmlGraph |
+| Feature | Neo4j | Wipnote |
 |---------|-------|-----------|
 | Setup | Docker + JVM + Cypher | `pip install` |
 | Query | Learn Cypher | CSS selectors |
@@ -218,7 +218,7 @@ Don't reinvent what browsers already do:
 
 ### vs JSON/YAML
 
-| Feature | JSON/YAML | HtmlGraph |
+| Feature | JSON/YAML | Wipnote |
 |---------|-----------|-----------|
 | Structure | Manual references | Native hyperlinks |
 | Presentation | Needs separate UI | Built-in rendering |
@@ -227,7 +227,7 @@ Don't reinvent what browsers already do:
 
 ### vs Notion/Roam
 
-| Feature | Notion/Roam | HtmlGraph |
+| Feature | Notion/Roam | Wipnote |
 |---------|-------------|-----------|
 | Ownership | Cloud-hosted | Your filesystem |
 | API | Rate-limited | Direct file access |
@@ -237,7 +237,7 @@ Don't reinvent what browsers already do:
 
 ## The Future
 
-HTML isn't going anywhere. By building on web standards, HtmlGraph will work:
+HTML isn't going anywhere. By building on web standards, Wipnote will work:
 
 - In 10 years
 - On any platform

@@ -31,11 +31,11 @@ Created **subagent context detection** with 5-level detection strategy:
 5. Query database for active session with parent
 
 ### Files Created
-- `src/python/htmlgraph/hooks/subagent_detection.py` (202 lines)
+- `src/python/wipnote/hooks/subagent_detection.py` (202 lines)
 
 ### Files Modified
-- `src/python/htmlgraph/hooks/orchestrator.py` - Added subagent check at start
-- `src/python/htmlgraph/hooks/validator.py` - Added subagent check at start
+- `src/python/wipnote/hooks/orchestrator.py` - Added subagent check at start
+- `src/python/wipnote/hooks/validator.py` - Added subagent check at start
 
 ### Key Function
 ```python
@@ -63,7 +63,7 @@ def is_subagent_context() -> bool:
 **Priority:** HIGH
 
 ### Problem
-Tool history stored in `/tmp/htmlgraph-tool-history.json` was shared across ALL sessions, causing:
+Tool history stored in `/tmp/wipnote-tool-history.json` was shared across ALL sessions, causing:
 - Session A's tool calls affected Session B's anti-pattern detection
 - False positives for "consecutive tool use" when multiple sessions ran in parallel
 - Cross-session contamination of delegation enforcement
@@ -72,16 +72,16 @@ Tool history stored in `/tmp/htmlgraph-tool-history.json` was shared across ALL 
 Replaced shared temp file with **SQLite queries from agent_events table**, filtered by `session_id`.
 
 ### Files Modified
-- `src/python/htmlgraph/hooks/validator.py` - Replaced `load_tool_history()` with database query
-- `src/python/htmlgraph/hooks/orchestrator.py` - Updated all calls to pass `session_id`
+- `src/python/wipnote/hooks/validator.py` - Replaced `load_tool_history()` with database query
+- `src/python/wipnote/hooks/orchestrator.py` - Updated all calls to pass `session_id`
 
 ### Files Removed
-- `/tmp/htmlgraph-tool-history.json` - Deleted shared temp file
+- `/tmp/wipnote-tool-history.json` - Deleted shared temp file
 
 ### Key Changes
 ```python
 # OLD: Shared temp file
-TOOL_HISTORY_FILE = Path("/tmp/htmlgraph-tool-history.json")
+TOOL_HISTORY_FILE = Path("/tmp/wipnote-tool-history.json")
 
 # NEW: Session-isolated database query
 def load_tool_history(session_id: str) -> list[dict]:
@@ -122,12 +122,12 @@ Validator.py and orchestrator.py had DIFFERENT rules for git read/write classifi
 Created **shared git_commands.py module** with centralized classification logic used by both hooks.
 
 ### Files Created
-- `src/python/htmlgraph/hooks/git_commands.py` (150 lines)
+- `src/python/wipnote/hooks/git_commands.py` (150 lines)
 - `tests/hooks/test_git_commands.py` (20 comprehensive tests)
 
 ### Files Modified
-- `src/python/htmlgraph/hooks/validator.py` - Use shared `should_allow_git_command()`
-- `src/python/htmlgraph/hooks/orchestrator.py` - Use shared `should_allow_git_command()`
+- `src/python/wipnote/hooks/validator.py` - Use shared `should_allow_git_command()`
+- `src/python/wipnote/hooks/orchestrator.py` - Use shared `should_allow_git_command()`
 
 ### Key Components
 ```python
@@ -180,17 +180,17 @@ Hardcoded thresholds were too aggressive and inflexible:
 Implemented **configurable YAML-based thresholds** with time decay and rapid sequence collapsing.
 
 ### Files Created
-- `src/python/htmlgraph/orchestrator_config.py` (331 lines)
-- `.htmlgraph/orchestrator-config.yaml` (45 lines)
+- `src/python/wipnote/orchestrator_config.py` (331 lines)
+- `.wipnote/orchestrator-config.yaml` (45 lines)
 - `tests/test_orchestrator_config.py` (324 lines, 19 tests)
 - `CONFIGURABLE_THRESHOLDS_IMPLEMENTATION.md` (comprehensive guide)
 
 ### Files Modified
-- `src/python/htmlgraph/orchestrator_mode.py` - Added `violation_history`, time-based decay
-- `src/python/htmlgraph/hooks/orchestrator.py` - Load config dynamically, use configurable thresholds
-- `src/python/htmlgraph/hooks/validator.py` - Convert hardcoded anti-patterns to config-based
-- `src/python/htmlgraph/cli/work/orchestration.py` - Added config CLI commands
-- `src/python/htmlgraph/orchestrator-system-prompt-optimized.txt` - Documentation
+- `src/python/wipnote/orchestrator_mode.py` - Added `violation_history`, time-based decay
+- `src/python/wipnote/hooks/orchestrator.py` - Load config dynamically, use configurable thresholds
+- `src/python/wipnote/hooks/validator.py` - Convert hardcoded anti-patterns to config-based
+- `src/python/wipnote/cli/work/orchestration.py` - Added config CLI commands
+- `src/python/wipnote/orchestrator-system-prompt-optimized.txt` - Documentation
 
 ### New Default Configuration
 ```yaml
@@ -210,20 +210,20 @@ anti_patterns:
 ### New CLI Commands
 ```bash
 # View configuration
-uv run htmlgraph orchestrator config-show
+uv run wipnote orchestrator config-show
 
 # Adjust thresholds
-uv run htmlgraph orchestrator config-set thresholds.exploration_calls 7
+uv run wipnote orchestrator config-set thresholds.exploration_calls 7
 
 # Reset to defaults
-uv run htmlgraph orchestrator config-reset
+uv run wipnote orchestrator config-reset
 ```
 
 ### Key Features
 - **Time-based decay**: Violations expire after 2 minutes (configurable)
 - **Rapid sequence collapsing**: Multiple violations within 10 seconds count as one
-- **Project-specific tuning**: Config lives in `.htmlgraph/orchestrator-config.yaml`
-- **User defaults**: Personal defaults in `~/.config/htmlgraph/orchestrator-config.yaml`
+- **Project-specific tuning**: Config lives in `.wipnote/orchestrator-config.yaml`
+- **User defaults**: Personal defaults in `~/.config/wipnote/orchestrator-config.yaml`
 - **Type-safe**: Pydantic models with validation
 
 ### Test Results
@@ -342,7 +342,7 @@ Agent completed or was not needed. This was a non-critical test issue that did n
    uv run pytest -v
    ```
 
-2. **Update Bug Status in HtmlGraph**
+2. **Update Bug Status in Wipnote**
    ```python
    sdk.bugs.update(bug_id, status='resolved')
    ```

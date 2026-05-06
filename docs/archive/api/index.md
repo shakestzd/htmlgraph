@@ -1,20 +1,20 @@
 # API Reference
 
-Complete API documentation for HtmlGraph.
+Complete API documentation for Wipnote.
 
 ## Documentation Formats
 
-HtmlGraph provides API documentation in two formats:
+Wipnote provides API documentation in two formats:
 
 - **This site** - Integrated MkDocs documentation with examples and guides
-- **[Standalone API Docs](/htmlgraph/api-pdoc/htmlgraph.html)** - Auto-generated pdoc documentation (alternative view)
+- **[Standalone API Docs](/wipnote/api-pdoc/wipnote.html)** - Auto-generated pdoc documentation (alternative view)
 
 Choose whichever format you prefer!
 
 ## Core Modules
 
 - **[SDK](sdk.md)** - Main SDK interface for agents
-- **[HtmlGraph](graph.md)** - Core graph operations
+- **[Wipnote](graph.md)** - Core graph operations
 - **[Models](models.md)** - Pydantic data models
 - **[Planning](planning.md)** - Spec and Plan models
 - **[Agents](agents.md)** - Agent interface
@@ -27,24 +27,24 @@ Choose whichever format you prefer!
 ### Importing
 
 ```python
-from htmlgraph import SDK, HtmlGraph
-from htmlgraph.models import Feature, Track, Session
-from htmlgraph.planning import Spec, Plan
+from wipnote import SDK, Wipnote
+from wipnote.models import Feature, Track, Session
+from wipnote.planning import Spec, Plan
 
 # ID generation utilities
-from htmlgraph import generate_id, parse_id, is_valid_id
+from wipnote import generate_id, parse_id, is_valid_id
 ```
 
 ### SDK Initialization
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Basic initialization
 sdk = SDK(agent="claude")
 
 # Custom graph directory
-sdk = SDK(agent="claude", graph_dir="/path/to/.htmlgraph")
+sdk = SDK(agent="claude", graph_dir="/path/to/.wipnote")
 
 # Disable auto-session management
 sdk = SDK(agent="claude", auto_session=False)
@@ -72,11 +72,11 @@ status = sdk.status()
 
 ## Type Hints
 
-HtmlGraph is fully typed with Pydantic models:
+Wipnote is fully typed with Pydantic models:
 
 ```python
-from htmlgraph import SDK
-from htmlgraph.models import Feature, FeatureStatus, Priority
+from wipnote import SDK
+from wipnote.models import Feature, FeatureStatus, Priority
 
 def process_feature(feature: Feature) -> None:
     if feature.status == FeatureStatus.IN_PROGRESS:
@@ -88,11 +88,11 @@ feature: Feature = sdk.features.create("Task")
 
 ## Error Handling
 
-HtmlGraph raises specific exceptions:
+Wipnote raises specific exceptions:
 
 ```python
-from htmlgraph import SDK
-from htmlgraph.exceptions import (
+from wipnote import SDK
+from wipnote.exceptions import (
     FeatureNotFoundError,
     TrackNotFoundError,
     ValidationError

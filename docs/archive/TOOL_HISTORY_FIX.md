@@ -8,7 +8,7 @@
 
 ## Problem Description
 
-Two git hooks maintain tool usage history in `/tmp/htmlgraph-tool-history.json`:
+Two git hooks maintain tool usage history in `/tmp/wipnote-tool-history.json`:
 
 1. **orchestrator-enforce.py** - Tracks tool sequences for orchestrator enforcement
 2. **validate-work.py** - Tracks tool patterns for anti-pattern detection
@@ -50,13 +50,13 @@ When validate-work.py runs after orchestrator-enforce.py:
 
 **1. Create shared utility module:**
 ```python
-# src/python/htmlgraph/tool_history.py
+# src/python/wipnote/tool_history.py
 
 from datetime import datetime, timezone
 from pathlib import Path
 import json
 
-TOOL_HISTORY_FILE = Path("/tmp/htmlgraph-tool-history.json")
+TOOL_HISTORY_FILE = Path("/tmp/wipnote-tool-history.json")
 MAX_HISTORY_SIZE = 50
 
 class ToolHistory:
@@ -122,7 +122,7 @@ class ToolHistory:
 ```python
 # Replace lines 55-106 with:
 try:
-    from htmlgraph.tool_history import ToolHistory
+    from wipnote.tool_history import ToolHistory
 except Exception:
     # Fallback if module not available
     class ToolHistory:
@@ -157,7 +157,7 @@ ToolHistory.add(tool)
 ```python
 # Replace lines 71-106 with:
 try:
-    from htmlgraph.tool_history import ToolHistory
+    from wipnote.tool_history import ToolHistory
 except Exception:
     # Fallback if module not available
     class ToolHistory:
@@ -180,10 +180,10 @@ def record_tool(tool: str) -> None:
 
 def test_tool_history_unified_format():
     """Test tool history uses unified format."""
-    from htmlgraph.tool_history import ToolHistory
+    from wipnote.tool_history import ToolHistory
 
     # Clear history
-    TOOL_HISTORY_FILE = Path("/tmp/htmlgraph-tool-history.json")
+    TOOL_HISTORY_FILE = Path("/tmp/wipnote-tool-history.json")
     if TOOL_HISTORY_FILE.exists():
         TOOL_HISTORY_FILE.unlink()
 
@@ -199,7 +199,7 @@ def test_tool_history_unified_format():
 
 def test_tool_history_migration():
     """Test migration from old format to new format."""
-    from htmlgraph.tool_history import ToolHistory
+    from wipnote.tool_history import ToolHistory
 
     # Write old format
     old_data = [{"tool": "Read", "ts": 1767140177.975007}]
@@ -231,10 +231,10 @@ def test_tool_history_migration():
 **Implementation:**
 ```python
 # orchestrator-enforce.py
-TOOL_HISTORY_FILE = Path("/tmp/htmlgraph-orchestrator-history.json")
+TOOL_HISTORY_FILE = Path("/tmp/wipnote-orchestrator-history.json")
 
 # validate-work.py
-TOOL_HISTORY_FILE = Path("/tmp/htmlgraph-validate-history.json")
+TOOL_HISTORY_FILE = Path("/tmp/wipnote-validate-history.json")
 ```
 
 ### Option C: Deprecate validate-work.py

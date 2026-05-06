@@ -131,7 +131,7 @@ Ask these questions IN SEQUENCE:
 **Scenario 6: Unblocking Previous Task (Dependent)**
 - "Continue implementation from spike-xyz findings"
 - Decision: Dependent on prior → Task()
-- Settings: Include HtmlGraph spike ID in prompt
+- Settings: Include Wipnote spike ID in prompt
 - Why: Builds on previous context, cache hits apply
 
 ---
@@ -154,8 +154,8 @@ Use only with `spawn_claude`:
 ## HTMLGRAPH TRACKING PATTERN
 
 ```python
-from htmlgraph import SDK
-from htmlgraph.orchestration import delegate_with_id, save_task_results
+from wipnote import SDK
+from wipnote.orchestration import delegate_with_id, save_task_results
 
 sdk = SDK(agent='orchestrator')
 
@@ -175,7 +175,7 @@ task_id, prompt = delegate_with_id(
 # 3. Execute delegation (Task or spawn)
 result = Task(prompt=prompt, description=f"{task_id}: OAuth implementation")
 
-# 4. Save results to HtmlGraph
+# 4. Save results to Wipnote
 spike = sdk.spikes.create(f"Result: {task_id}") \
     .set_findings(result) \
     .set_feature(feature.id) \
@@ -258,7 +258,7 @@ for task_id, future in futures.items():
 | Task decomposition | Break work into delegatable units | Execute directly (planning) |
 | Spawner selection | Choose right tool for each task | Decision matrix above |
 | Validation | Check results meet quality gates | Read + analyze |
-| HtmlGraph tracking | Record work items and progress | SDK operations |
+| Wipnote tracking | Record work items and progress | SDK operations |
 | Error recovery | Handle delegation failures | Task() with retry logic |
 | Context preservation | Keep ≥90% context for strategy | Delegate tactical work |
 
@@ -272,11 +272,11 @@ Before delegating:
 - [ ] Error scenarios identified and handled
 - [ ] Spawner choice justified by decision matrix
 - [ ] Cost implications understood
-- [ ] Results tracked in HtmlGraph
+- [ ] Results tracked in Wipnote
 
 After delegation:
 - [ ] Results validated against criteria
-- [ ] Work item marked complete in HtmlGraph
+- [ ] Work item marked complete in Wipnote
 - [ ] Session saved for continuity
 - [ ] Next steps identified
 
@@ -317,7 +317,7 @@ Done. 90% of routing covered by this sequence.
 ## APPENDIX: SPAWNER API QUICK REF
 
 ```python
-from htmlgraph.orchestration import HeadlessSpawner
+from wipnote.orchestration import HeadlessSpawner
 
 spawner = HeadlessSpawner()
 

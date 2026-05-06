@@ -7,7 +7,7 @@
 uv run python /Users/shakes/DevProjects/htmlgraph/generate_real_events.py
 
 # Start dashboard to watch events stream in real-time
-uv run htmlgraph serve
+uv run wipnote serve
 
 # Open in browser
 open http://localhost:8080
@@ -88,14 +88,14 @@ Steps: 4
 
 ### 1. Real Operations
 The script executes REAL operations:
-- Creates actual HtmlGraph features via SDK
+- Creates actual Wipnote features via SDK
 - Reads real source files
 - Searches codebase with grep
 - Runs quality checks (linting, type checking, tests)
 - Executes git operations
 
 ### 2. Event Generation
-Each operation automatically generates events via HtmlGraph hooks:
+Each operation automatically generates events via Wipnote hooks:
 - Feature creation events
 - File analysis events
 - Search completion events
@@ -104,9 +104,9 @@ Each operation automatically generates events via HtmlGraph hooks:
 
 ### 3. Event Persistence
 Events are persisted to disk:
-- `.htmlgraph/features/` - Feature definitions (HTML)
-- `.htmlgraph/events/` - Event stream (JSONL)
-- `.htmlgraph/sessions/` - Session tracking (HTML)
+- `.wipnote/features/` - Feature definitions (HTML)
+- `.wipnote/events/` - Event stream (JSONL)
+- `.wipnote/sessions/` - Session tracking (HTML)
 
 ### 4. Real-Time Streaming
 Events stream to the dashboard via WebSocket:
@@ -144,7 +144,7 @@ Total events generated: 15+
 ### Step 2: Query Created Features
 ```bash
 uv run python -c "
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent='claude-code')
 features = sdk.features.where(agent_assigned='claude-code')
 for f in features[:3]:
@@ -162,16 +162,16 @@ feat-6ce78b9a: Activity Feed Event Persistence (todo)
 ### Step 3: Check Event Files
 ```bash
 # View created features
-ls -lh .htmlgraph/features/ | grep feat-
+ls -lh .wipnote/features/ | grep feat-
 
 # View event stream
-ls -lh .htmlgraph/events/ | head -5
+ls -lh .wipnote/events/ | head -5
 ```
 
 ### Step 4: Watch Dashboard
 ```bash
 # Start dashboard
-uv run htmlgraph serve
+uv run wipnote serve
 
 # Open in browser (automatic)
 # http://localhost:8080
@@ -260,7 +260,7 @@ uv run ruff check /Users/shakes/DevProjects/htmlgraph/generate_real_events.py
 # Result: All checks passed
 
 # Type checking
-uv run mypy src/python/htmlgraph/sdk.py
+uv run mypy src/python/wipnote/sdk.py
 # Result: Success: no issues found
 
 # Format checking
@@ -270,12 +270,12 @@ uv run ruff format --check
 
 ---
 
-## Integration with HtmlGraph
+## Integration with Wipnote
 
-The script uses the **HtmlGraph SDK** - the same API users would use:
+The script uses the **Wipnote SDK** - the same API users would use:
 
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 # Initialize SDK
 sdk = SDK(agent="claude-code")
@@ -295,7 +295,7 @@ with sdk.features.edit(feature.id) as f:
 features = sdk.features.where(agent_assigned="claude-code")
 ```
 
-This demonstrates **real production usage** of HtmlGraph.
+This demonstrates **real production usage** of Wipnote.
 
 ---
 
@@ -332,10 +332,10 @@ uv run python -u generate_real_events.py
 ### Features not appearing on dashboard?
 ```bash
 # Verify dashboard is running
-lsof -i :8080  # Should show htmlgraph process
+lsof -i :8080  # Should show wipnote process
 
 # Verify events were created
-ls -la .htmlgraph/events/
+ls -la .wipnote/events/
 
 # Refresh browser (Cmd+R or Ctrl+R)
 
@@ -369,7 +369,7 @@ done
 ### Monitor event generation
 ```bash
 # Watch event files being created in real-time
-watch "ls -lh .htmlgraph/events/ | tail -5"
+watch "ls -lh .wipnote/events/ | tail -5"
 
 # Then in another terminal:
 uv run python generate_real_events.py
@@ -379,7 +379,7 @@ uv run python generate_real_events.py
 ```bash
 # Get all features by agent
 uv run python -c "
-from htmlgraph import SDK
+from wipnote import SDK
 sdk = SDK(agent='claude-code')
 features = sdk.features.where(agent_assigned='claude-code')
 print(f'Total features: {len(features)}')
@@ -416,11 +416,11 @@ For more details, read:
 
 The script is self-contained and requires only:
 - Python 3.8+
-- HtmlGraph SDK (included in project)
+- Wipnote SDK (included in project)
 - uv (Python package manager)
 - Standard library modules (subprocess, sys, pathlib)
 
-No external dependencies beyond HtmlGraph.
+No external dependencies beyond Wipnote.
 
 ---
 

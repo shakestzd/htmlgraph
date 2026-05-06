@@ -52,14 +52,14 @@ All existing CLI tests continue to pass, confirming no regressions introduced by
 **Linting (Ruff):**
 ```
 Status: ✅ PASS
-Command: uv run ruff check src/python/htmlgraph/cli.py
+Command: uv run ruff check src/python/wipnote/cli.py
 Result: All checks passed!
 ```
 
 **Type Checking (Mypy):**
 ```
 Status: ⚠ 4 Type Errors (Pre-existing)
-Command: uv run mypy src/python/htmlgraph/cli.py --strict
+Command: uv run mypy src/python/wipnote/cli.py --strict
 Errors: Missing type parameters for dict/list (lines 71, 73, 76)
 Action: Can be fixed during Rich conversion phase
 ```
@@ -181,11 +181,11 @@ For each commit:
 
 ```bash
 # 1. Linting
-uv run ruff check --fix src/python/htmlgraph/cli.py
-uv run ruff format src/python/htmlgraph/cli.py
+uv run ruff check --fix src/python/wipnote/cli.py
+uv run ruff format src/python/wipnote/cli.py
 
 # 2. Type Checking
-uv run mypy src/python/htmlgraph/cli.py --strict
+uv run mypy src/python/wipnote/cli.py --strict
 
 # 3. Rich Output Tests
 uv run pytest tests/python/test_cli_rich_output.py -v
@@ -201,7 +201,7 @@ uv run pytest tests/ -v --tb=short
 
 ```bash
 # Count remaining plain print() statements
-grep -n "print(" src/python/htmlgraph/cli.py | \
+grep -n "print(" src/python/wipnote/cli.py | \
   grep -v "console.print" | grep -v "# " | wc -l
 
 # Expected: Decreasing from 550
@@ -228,9 +228,9 @@ grep -n "print(" src/python/htmlgraph/cli.py | \
 3. **Testing Before Commit**
    ```bash
    # Full quality gate suite
-   uv run ruff check --fix src/python/htmlgraph/cli.py && \
-   uv run ruff format src/python/htmlgraph/cli.py && \
-   uv run mypy src/python/htmlgraph/cli.py --strict && \
+   uv run ruff check --fix src/python/wipnote/cli.py && \
+   uv run ruff format src/python/wipnote/cli.py && \
+   uv run mypy src/python/wipnote/cli.py --strict && \
    uv run pytest tests/python/test_cli_rich_output.py -v && \
    uv run pytest tests/python/test_cli_commands.py -v
    ```
@@ -375,7 +375,7 @@ Check for:
 
 ```bash
 # See all mypy errors with context
-uv run mypy src/python/htmlgraph/cli.py --show-error-context --pretty
+uv run mypy src/python/wipnote/cli.py --show-error-context --pretty
 
 # Fix type errors before committing
 # Add type hints if needed
@@ -388,8 +388,8 @@ uv run mypy src/python/htmlgraph/cli.py --show-error-context --pretty
 - **Quality Gates:** `/Users/shakes/DevProjects/htmlgraph/QUALITY_GATES_PHASE_1AB.md`
 - **Rich Guide:** `/Users/shakes/DevProjects/htmlgraph/docs/RICH_OUTPUT_GUIDE.md`
 - **Rich Tests:** `/Users/shakes/DevProjects/htmlgraph/tests/python/test_cli_rich_output.py`
-- **CLI Implementation:** `/Users/shakes/DevProjects/htmlgraph/src/python/htmlgraph/cli.py`
-- **Feature Tracking:** `/Users/shakes/DevProjects/htmlgraph/.htmlgraph/features/feat-4d5b889e.html`
+- **CLI Implementation:** `/Users/shakes/DevProjects/htmlgraph/src/python/wipnote/cli.py`
+- **Feature Tracking:** `/Users/shakes/DevProjects/htmlgraph/.wipnote/features/feat-4d5b889e.html`
 
 ---
 

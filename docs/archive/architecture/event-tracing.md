@@ -1,6 +1,6 @@
 # Event Tracing System
 
-Complete guide to HtmlGraph's event tracing system for tracking tool executions with millisecond precision.
+Complete guide to Wipnote's event tracing system for tracking tool executions with millisecond precision.
 
 ## Overview
 
@@ -238,7 +238,7 @@ All errors are **non-blocking** - execution continues regardless.
 ### TraceCollection API
 
 ```python
-from htmlgraph.sdk import SDK
+from wipnote.sdk import SDK
 
 sdk = SDK(agent="claude")
 traces = sdk.traces  # TraceCollection instance
@@ -546,8 +546,8 @@ print(f"Session ID: {os.environ.get('HTMLGRAPH_SESSION_ID')}")
 print(f"Tool Use ID: {os.environ.get('HTMLGRAPH_TOOL_USE_ID')}")
 
 # Check database directly
-from htmlgraph.db.schema import HtmlGraphDB
-db = HtmlGraphDB()
+from wipnote.db.schema import WipnoteDB
+db = WipnoteDB()
 cursor = db.connection.cursor()
 cursor.execute("SELECT COUNT(*) FROM tool_traces")
 count = cursor.fetchone()[0]
@@ -598,8 +598,8 @@ if trace:
 **Debug Steps:**
 ```python
 # Find traces without end_time
-from htmlgraph.db.schema import HtmlGraphDB
-db = HtmlGraphDB()
+from wipnote.db.schema import WipnoteDB
+db = WipnoteDB()
 cursor = db.connection.cursor()
 cursor.execute("""
     SELECT tool_use_id, tool_name, status, start_time
@@ -629,13 +629,13 @@ for row in cursor.fetchall():
 **Debug Steps:**
 ```bash
 # Check database integrity
-sqlite3 ~/.htmlgraph/htmlgraph.db "PRAGMA integrity_check"
+sqlite3 ~/.wipnote/wipnote.db "PRAGMA integrity_check"
 
 # Check disk space
-df -h ~/.htmlgraph/
+df -h ~/.wipnote/
 
 # Check database size
-du -sh ~/.htmlgraph/htmlgraph.db
+du -sh ~/.wipnote/wipnote.db
 ```
 
 ## Performance Tips
@@ -670,7 +670,7 @@ Periodically archive old traces:
 import sqlite3
 from datetime import datetime, timedelta
 
-db = HtmlGraphDB()
+db = WipnoteDB()
 thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
 
 cursor = db.connection.cursor()

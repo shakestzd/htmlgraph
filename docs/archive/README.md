@@ -1,10 +1,10 @@
-# HtmlGraph Documentation
+# Wipnote Documentation
 
-Welcome to HtmlGraph - HTML is All You Need. A lightweight graph database built on web standards for AI agent coordination and human observability.
+Welcome to Wipnote - HTML is All You Need. A lightweight graph database built on web standards for AI agent coordination and human observability.
 
 ## Quick Start
 
-**New to HtmlGraph?** Start here:
+**New to Wipnote?** Start here:
 
 1. **[Installation](getting-started/installation.md)** - Install and setup
 2. **[Quick Start](getting-started/quick-start.md)** - Your first 5 minutes
@@ -14,7 +14,7 @@ Welcome to HtmlGraph - HTML is All You Need. A lightweight graph database built 
 
 ### I Want to...
 
-**Build with HtmlGraph**
+**Build with Wipnote**
 - → [SDK Reference](api/sdk.md) - Complete API documentation
 - → [Basic Examples](examples/basic.md) - Simple code examples
 - → [Features & Tracks Guide](guide/features-tracks.md) - Core concepts
@@ -152,12 +152,12 @@ docs/
 
 ### Installation
 ```bash
-uv pip install htmlgraph
+uv pip install wipnote
 ```
 
 ### Basic Usage
 ```python
-from htmlgraph import SDK
+from wipnote import SDK
 
 sdk = SDK(agent="me")
 feature = sdk.features.create("My Feature")
@@ -165,20 +165,20 @@ feature = sdk.features.create("My Feature")
 
 ### Serve Dashboard
 ```bash
-uv run htmlgraph serve
+uv run wipnote serve
 # Visit http://localhost:8000
 ```
 
 ### Check Status
 ```bash
-uv run htmlgraph status
+uv run wipnote status
 ```
 
 ## Getting Help
 
 - **[FAQ](../docs/FAQ.md)** (if exists) - Common questions
 - **[System Prompt Troubleshooting](SYSTEM_PROMPT_ARCHITECTURE.md#troubleshooting-common-issues)** - Debug issues
-- **[GitHub Issues](https://github.com/anthropics/htmlgraph/issues)** - Report bugs
+- **[GitHub Issues](https://github.com/anthropics/wipnote/issues)** - Report bugs
 
 ## Advanced Topics
 
@@ -192,7 +192,7 @@ uv run htmlgraph status
 
 ## Project Status
 
-HtmlGraph is actively developed. Current version: **0.9.6**
+Wipnote is actively developed. Current version: **0.9.6**
 
 Latest changes:
 - ✅ Parent-child event linking for orchestration
@@ -204,7 +204,7 @@ See [Changelog](changelog.md) for full history.
 
 ## License
 
-HtmlGraph is open source. See LICENSE file for details.
+Wipnote is open source. See LICENSE file for details.
 
 ---
 

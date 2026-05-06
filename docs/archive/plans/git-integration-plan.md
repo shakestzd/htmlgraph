@@ -3,7 +3,7 @@
 ## Summary
 
 Selectively adopt git primitives where they provide concrete improvements over
-htmlgraph's current architecture. This is NOT a replatforming — SQLite remains
+wipnote's current architecture. This is NOT a replatforming — SQLite remains
 the query layer, HTML files remain the canonical store, hooks remain the
 real-time event path. These are five targeted changes that reduce custom code,
 improve accuracy, and unlock ecosystem interoperability.
@@ -12,7 +12,7 @@ improve accuracy, and unlock ecosystem interoperability.
 
 Research into the git-native tooling landscape (git-bug, Git AI, Agent Trace,
 Entire CLI, Backlog.md) confirmed that every project attempting "git as
-database" eventually adds a real query layer alongside it. htmlgraph's current
+database" eventually adds a real query layer alongside it. wipnote's current
 architecture — HTML as canonical store, SQLite as query index — is structurally
 sound. These changes steal the good ideas without the architectural baggage.
 
@@ -83,7 +83,7 @@ Action is the enforcement backstop. Defense in depth.
 
 ### Problem
 
-`reindex.go` globs and parses every HTML file on every run. As `.htmlgraph/`
+`reindex.go` globs and parses every HTML file on every run. As `.wipnote/`
 grows, this gets linearly slower. With 500 work items, reindex parses 500
 files even if only 3 changed.
 
@@ -107,20 +107,20 @@ CREATE TABLE IF NOT EXISTS metadata (
 
 Add `GetMetadata(db, key)` and `SetMetadata(db, key, value)` helpers.
 
-**Modified file:** `packages/go/cmd/htmlgraph/reindex.go`
+**Modified file:** `packages/go/cmd/wipnote/reindex.go`
 
 Before the two-pass reindex loop:
 
 ```go
-func runReindex(database *sql.DB, htmlgraphDir string, fullReindex bool) error {
+func runReindex(database *sql.DB, wipnoteDir string, fullReindex bool) error {
     lastCommit := db.GetMetadata(database, "last_indexed_commit")
-    currentHEAD := headCommit(filepath.Dir(htmlgraphDir))
+    currentHEAD := headCommit(filepath.Dir(wipnoteDir))
 
     var changedFiles []string
     if lastCommit != "" && !fullReindex {
         // Ask git what changed — O(changed) instead of O(all)
         cmd := exec.Command("git", "diff", "--name-only", lastCommit, currentHEAD,
-            "--", ".htmlgraph/")
+            "--", ".wipnote/")
         out, err := cmd.Output()
         if err == nil && len(out) > 0 {
             changedFiles = strings.Split(strings.TrimSpace(string(out)), "\n")
@@ -135,13 +135,13 @@ func runReindex(database *sql.DB, htmlgraphDir string, fullReindex bool) error {
         }
     } else {
         // Full: existing glob-and-parse behavior
-        reindexFeatureDir(database, htmlgraphDir, "tracks")
-        reindexFeatureDir(database, htmlgraphDir, "features")
+        reindexFeatureDir(database, wipnoteDir, "tracks")
+        reindexFeatureDir(database, wipnoteDir, "features")
         // ...
     }
 
     // Purge stale entries (unchanged from current behavior)
-    purgeStaleEntries(database, htmlgraphDir)
+    purgeStaleEntries(database, wipnoteDir)
 
     // Record indexed commit
     db.SetMetadata(database, "last_indexed_commit", currentHEAD)
@@ -149,7 +149,7 @@ func runReindex(database *sql.DB, htmlgraphDir string, fullReindex bool) error {
 }
 ```
 
-**CLI flag:** Add `--full` to force full reparse: `htmlgraph reindex --full`
+**CLI flag:** Add `--full` to force full reparse: `wipnote reindex --full`
 
 ### What Changes
 
@@ -199,7 +199,7 @@ Stop parsing `data-created` and `data-updated` (they won't exist in new files).
 For backwards compatibility during migration, still read them if present and
 treat as fallback.
 
-**Modified file:** `packages/go/cmd/htmlgraph/reindex.go`
+**Modified file:** `packages/go/cmd/wipnote/reindex.go`
 
 At index time, derive timestamps from git:
 
@@ -223,7 +223,7 @@ func gitTimestamps(projectRoot, filePath string) (created, updated time.Time) {
 For batch efficiency during full reindex, use a single git command:
 
 ```bash
-git log --format='%aI %H' --name-only -- .htmlgraph/features/ .htmlgraph/bugs/
+git log --format='%aI %H' --name-only -- .wipnote/features/ .wipnote/bugs/
 ```
 
 Parse the output once to build a map of `filepath → (created, updated)`.
@@ -255,8 +255,8 @@ re-rendered, the attributes disappear. No breaking change.
 The `feature_files` table is populated by hooks (`pretooluse.go`) recording
 which files each tool touches. This misses:
 - Manual edits committed outside a Claude Code session
-- Files touched by agents without htmlgraph hooks
-- Historical work before htmlgraph was installed
+- Files touched by agents without wipnote hooks
+- Historical work before wipnote was installed
 
 ### Solution
 
@@ -271,7 +271,7 @@ commit). Rebuild during reindex instead of appending on every tool call.
 Remove `UpsertFeatureFile` calls from the hot path. Tool calls no longer write
 to `feature_files` on every invocation.
 
-**New function in:** `packages/go/cmd/htmlgraph/reindex.go`
+**New function in:** `packages/go/cmd/wipnote/reindex.go`
 
 ```go
 func reindexFeatureFiles(database *sql.DB, projectRoot string) error {
@@ -303,7 +303,7 @@ func reindexFeatureFiles(database *sql.DB, projectRoot string) error {
 Call `reindexFeatureFiles()` as a third pass in the reindex command, after
 tracks and features.
 
-**Modified file:** `packages/go/cmd/htmlgraph/backfill.go`
+**Modified file:** `packages/go/cmd/wipnote/backfill.go`
 
 Simplify — backfill IS the reindex now. Remove duplicated logic.
 
@@ -326,14 +326,14 @@ Simplify — backfill IS the reindex now. Remove duplicated logic.
 
 ### Problem
 
-htmlgraph uses a custom `traceparentEntry` struct (`attribution.go:15-20`)
+wipnote uses a custom `traceparentEntry` struct (`attribution.go:15-20`)
 with a custom JSON format written to temp files. The Agent Trace RFC (backed by
 Cursor, Cloudflare, Vercel, Google Jules, Git AI, and others) defines a common
-format for AI code attribution. htmlgraph's custom format is an island.
+format for AI code attribution. wipnote's custom format is an island.
 
 ### Solution
 
-Align the attribution data format with Agent Trace. This makes htmlgraph's
+Align the attribution data format with Agent Trace. This makes wipnote's
 attribution data readable by Git AI, Agent Blame (Mesa), and Cursor's tooling —
 and vice versa.
 
@@ -350,7 +350,7 @@ type agentTraceRecord struct {
     Version       string  `json:"version"`        // "0.1.0" (Agent Trace version)
     ContributorID string  `json:"contributor_id"`  // agent identifier
     Tool          string  `json:"tool"`            // "claude-code", "cursor", etc.
-    SessionID     string  `json:"session_id"`      // htmlgraph session ID
+    SessionID     string  `json:"session_id"`      // wipnote session ID
     ParentSession string  `json:"parent_session,omitempty"`
     Timestamp     string  `json:"timestamp"`       // RFC3339
     TraceID       string  `json:"trace_id"`        // correlation ID
@@ -378,7 +378,7 @@ formats. Old temp files are cleaned up within 5 minutes (existing TTL in
 | Before | After |
 |--------|-------|
 | Custom traceparent format | Agent Trace RFC-compatible format |
-| Only htmlgraph can read attribution data | Git AI, Agent Blame, Cursor can read it too |
+| Only wipnote can read attribution data | Git AI, Agent Blame, Cursor can read it too |
 | Attribution is an island | Attribution participates in the ecosystem |
 
 ### Risk

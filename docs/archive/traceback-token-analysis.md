@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Current State:** HtmlGraph CLI installs Rich.Traceback globally with `show_locals=True` (line 60-63 of cli.py), which displays verbose stack traces with local variables for all unhandled exceptions.
+**Current State:** Wipnote CLI installs Rich.Traceback globally with `show_locals=True` (line 60-63 of cli.py), which displays verbose stack traces with local variables for all unhandled exceptions.
 
 **Token Cost Impact:** Rich.Traceback increases token consumption by **3-7x** compared to minimal error messages:
 - Simple error: 40-50 tokens (basic) → 150-200 tokens (Rich)
@@ -22,7 +22,7 @@
 ## 1. Current Rich.Traceback Usage
 
 ### Installation Location
-**File:** `/src/python/htmlgraph/cli.py` (lines 60-63)
+**File:** `/src/python/wipnote/cli.py` (lines 60-63)
 ```python
 from rich.traceback import install as install_traceback
 
@@ -71,9 +71,9 @@ Traceback (most recent call last):
     feature = sdk.features.get("feature-001")
     ╭─────────────────────────────────── locals ───────────────────────────────────╮
     │ self = <argparse.Namespace object at 0x...>                                  │
-    │ args = Namespace(feature_id='feature-001', graph_dir='.htmlgraph', ...)     │
+    │ args = Namespace(feature_id='feature-001', graph_dir='.wipnote', ...)     │
     │ sdk = <SDK object at 0x...>                                                  │
-    │ features_graph = <HtmlGraph object at 0x...>                                 │
+    │ features_graph = <Wipnote object at 0x...>                                 │
     ╰──────────────────────────────────────────────────────────────────────────────╯
   File "graph.py", line 123, in get
     return self._index.lookup(node_id)
@@ -129,14 +129,14 @@ Token multiplier: 100-150x
 
 ### Real-World Impact
 
-In a typical HtmlGraph session with errors:
+In a typical Wipnote session with errors:
 - User makes mistake (invalid feature ID)
 - CLI catches exception and shows Rich traceback
 - **Token cost:** 375-500 tokens to show error message that could be: "Error: Feature not found: feature-xyz"
 - **Wasteful for:** User input errors, missing files, invalid arguments
 - **Useful for:** Unexpected code bugs, integration issues, internal errors
 
-**Monthly Impact Estimate** (100 HtmlGraph users with 5 errors/month):
+**Monthly Impact Estimate** (100 Wipnote users with 5 errors/month):
 - Basic error handling: 100 × 5 × 8 tokens = 4,000 tokens/month
 - Rich.Traceback: 100 × 5 × 400 tokens = 200,000 tokens/month
 - **Overhead:** 196,000 tokens/month (~$0.50/month per user with Claude/Gemini)
@@ -152,8 +152,8 @@ In a typical HtmlGraph session with errors:
 **Pros:**
 - ✅ Full debugging info preserved in session for analysis
 - ✅ Minimal token consumption (user sees 1-2 lines)
-- ✅ Users can retrieve full traceback via `htmlgraph session show` if needed
-- ✅ Integrates with HtmlGraph session tracking
+- ✅ Users can retrieve full traceback via `wipnote session show` if needed
+- ✅ Integrates with Wipnote session tracking
 
 **Cons:**
 - ❌ Requires session context (not all CLI ops start sessions)
@@ -221,18 +221,18 @@ except Exception as e:
 
 **Code Pattern:**
 ```python
-class UserInputError(HtmlGraphError):
+class UserInputError(WipnoteError):
     """User provided invalid input."""
     show_traceback = False
 
-class InternalError(HtmlGraphError):
+class InternalError(WipnoteError):
     """Unexpected code error."""
     show_traceback = True
 
 try:
     if not feature_id:
         raise UserInputError("Feature ID required")
-except HtmlGraphError as e:
+except WipnoteError as e:
     if e.show_traceback:
         console.print(Panel(traceback.format_exc(), title="Error Details"))
     else:
@@ -247,7 +247,7 @@ except HtmlGraphError as e:
 **Concept:** Log full traceback to session always, show minimal summary, provide retrieval command.
 
 **Features:**
-- Full traceback always logged to `.htmlgraph/sessions/<id>.html` as error attachment
+- Full traceback always logged to `.wipnote/sessions/<id>.html` as error attachment
 - Console shows: error type (1 line) + suggestion (1 line)
 - `--verbose/-v` flag shows full traceback
 - Session spike auto-created for errors with full context
@@ -257,7 +257,7 @@ except HtmlGraphError as e:
 - ✅ Minimal token consumption by default
 - ✅ Advanced users can enable verbose mode
 - ✅ Self-documenting (errors tracked in sessions)
-- ✅ Integrates naturally with HtmlGraph workflow
+- ✅ Integrates naturally with Wipnote workflow
 - ✅ Works with existing session management
 
 **Cons:**
@@ -356,56 +356,56 @@ except Exception as e:
 ### Option A: Automatic HTML Logging
 
 **Files to modify:**
-- `src/python/htmlgraph/cli.py` - Wrap exception handlers
-- `src/python/htmlgraph/session_manager.py` - Add error logging method
-- `src/python/htmlgraph/converter.py` - Add error node type
+- `src/python/wipnote/cli.py` - Wrap exception handlers
+- `src/python/wipnote/session_manager.py` - Add error logging method
+- `src/python/wipnote/converter.py` - Add error node type
 
 **Code changes:** 100-150 lines
 **Risk:** Medium (session context not always available)
 **Performance:** Slight I/O overhead (session file writes)
-**Integrates with:** Session tracking, HtmlGraph spikes
+**Integrates with:** Session tracking, Wipnote spikes
 
 ---
 
 ### Option B: Error Classification
 
 **Files to modify:**
-- `src/python/htmlgraph/exceptions.py` - Add exception hierarchy
-- `src/python/htmlgraph/cli.py` - Catch and classify exceptions
+- `src/python/wipnote/exceptions.py` - Add exception hierarchy
+- `src/python/wipnote/cli.py` - Catch and classify exceptions
 - All command handlers - Raise correct exception types
 
 **Code changes:** 200-300 lines
 **Risk:** Low (exception handling isolated)
 **Performance:** No overhead (classification is lightweight)
-**Integrates with:** Existing HtmlGraphError base class
+**Integrates with:** Existing WipnoteError base class
 
 ---
 
 ### Option C: Hybrid Approach (RECOMMENDED)
 
 **Files to modify:**
-- `src/python/htmlgraph/cli.py` - Add --verbose flag, conditional traceback install
-- `src/python/htmlgraph/session_manager.py` - Add error logging
-- `src/python/htmlgraph/cli.py` - Add error handler wrapper
+- `src/python/wipnote/cli.py` - Add --verbose flag, conditional traceback install
+- `src/python/wipnote/session_manager.py` - Add error logging
+- `src/python/wipnote/cli.py` - Add error handler wrapper
 
 **Code changes:** 150-200 lines
 **Risk:** Low (backwards compatible, opt-in)
 **Performance:** Minimal overhead (conditional install)
-**Integrates with:** Session tracking, CLI flags, HtmlGraph workflow
+**Integrates with:** Session tracking, CLI flags, Wipnote workflow
 
 **Implementation Steps:**
 1. Add `--verbose` flag to main parser
 2. Conditionally install Rich.Traceback only if verbose
 3. In exception handlers, call centralized error handler
 4. If session active, log error; show minimal message otherwise
-5. Add `htmlgraph session error-log SESSION_ID` to retrieve errors
+5. Add `wipnote session error-log SESSION_ID` to retrieve errors
 
 ---
 
 ### Option D: Debug Mode
 
 **Files to modify:**
-- `src/python/htmlgraph/cli.py` - Add --debug flag, conditional traceback install
+- `src/python/wipnote/cli.py` - Add --debug flag, conditional traceback install
 
 **Code changes:** 10-15 lines
 **Risk:** Lowest (minimal changes)
@@ -414,7 +414,7 @@ except Exception as e:
 
 ---
 
-## 5. HtmlGraph Integration Points
+## 5. Wipnote Integration Points
 
 ### Session Structure
 
@@ -450,13 +450,13 @@ Current session HTML includes:
 
 ```bash
 # Show all errors in a session
-htmlgraph session show SESSION_ID --errors
+wipnote session show SESSION_ID --errors
 
 # Show error details
-htmlgraph session error SESSION_ID ERROR_INDEX
+wipnote session error SESSION_ID ERROR_INDEX
 
 # Show errors across all sessions
-htmlgraph analytics errors --recent 10
+wipnote analytics errors --recent 10
 ```
 
 ### Spike Integration
@@ -480,7 +480,7 @@ if error_severity >= "critical":
 2. **User Experience:** No changes for normal usage, `--verbose` for debugging
 3. **Debuggability:** Full tracebacks preserved in sessions for analysis
 4. **Implementation:** Low-medium complexity, backwards compatible
-5. **HtmlGraph Integration:** Natural fit with session tracking
+5. **Wipnote Integration:** Natural fit with session tracking
 6. **Scalability:** Works with or without active sessions
 
 **High-Level Implementation Outline:**
@@ -509,7 +509,7 @@ def handle_command_error(exc: Exception, args):
         # Try to log to session
         if session_id:
             try:
-                session = SessionManager(".htmlgraph").get_session(session_id)
+                session = SessionManager(".wipnote").get_session(session_id)
                 session.add_error({
                     'type': type(exc).__name__,
                     'message': str(exc),
@@ -530,9 +530,9 @@ def cmd_feature_start(args):
 ```
 
 **File Changes:**
-- `src/python/htmlgraph/cli.py` (50-80 lines added)
-- `src/python/htmlgraph/session_manager.py` (20-30 lines added)
-- `src/python/htmlgraph/exceptions.py` (10-15 lines added)
+- `src/python/wipnote/cli.py` (50-80 lines added)
+- `src/python/wipnote/session_manager.py` (20-30 lines added)
+- `src/python/wipnote/exceptions.py` (10-15 lines added)
 
 **Testing:**
 - Test with `-v`, `-vv`, `-vvv` flags
@@ -549,7 +549,7 @@ def cmd_feature_start(args):
 | Token Savings | 80-90% | 60-75% | 85-95% | 90% |
 | Complexity | Medium | Medium | Low-Med | Low |
 | Backward Compat. | ✅ | ❌ | ✅ | ✅ |
-| HtmlGraph Integration | ✅✅ | ✅ | ✅✅ | ⚠️ |
+| Wipnote Integration | ✅✅ | ✅ | ✅✅ | ⚠️ |
 | Debuggability | ✅✅ | ✅✅ | ✅✅ | ✅ |
 | User Adoption | ⚠️ | ⚠️ | ✅ | ⚠️ |
 | **Recommendation** | Good | Good | **Best** | Simple |
@@ -560,7 +560,7 @@ def cmd_feature_start(args):
 
 1. **Decision:** Approve Option C (Hybrid)
 2. **Implementation:**
-   - Create feature in `.htmlgraph/features/`
+   - Create feature in `.wipnote/features/`
    - Implement error handler wrapper
    - Add `--verbose` flag support
    - Integrate with session manager
