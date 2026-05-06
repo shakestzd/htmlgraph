@@ -267,6 +267,9 @@ download_and_install() {
     mv "${_tmpdir}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
     chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
 
+    ln -sfn "${INSTALL_DIR}/${BINARY_NAME}" "${INSTALL_DIR}/wn"
+    log_info "Created alias: wn -> wipnote"
+
     log_info "Installed ${BINARY_NAME} to ${INSTALL_DIR}/${BINARY_NAME}"
 }
 
