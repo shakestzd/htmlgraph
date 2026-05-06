@@ -7,7 +7,7 @@ meta:
     created_at: "2026-05-06"
     status: finalized
     created_by: codex
-    version: 8
+    version: 10
 design:
     problem: |
         wipnote currently treats `plugin/skills/**/SKILL.md` and `plugin/agents/*.md` as cross-harness assets, then copies them into the Codex marketplace tree. That is sufficient for Codex skills now that the plugin manifest points at `./skills/`, but it is not sufficient for Codex custom agents: current Codex documentation says custom agents are standalone TOML files under `.codex/agents/` or `~/.codex/agents/`, not plugin-root `agents/*.md` files. The result is a partial port where the skills load but wipnote's named subagents do not appear in Codex. The next architecture must keep business logic in one place while emitting each harness's native packaging format.
@@ -115,6 +115,7 @@ slices:
       approval_status: pending
       execution_status: promoted
     - id: slice-3
+      feature_id: feat-dfbb65f1
       num: 3
       title: Translate wipnote agents into Codex custom-agent TOML
       what: |
@@ -169,7 +170,7 @@ slices:
       approved: false
       comment: ""
       approval_status: pending
-      execution_status: not_started
+      execution_status: promoted
       questions:
         - id: q-agent-install-scope
           text: Should wipnote install generated Codex custom agents globally or project-locally?
@@ -185,6 +186,7 @@ slices:
             - key: project-local
               label: Project local — check in `.codex/agents`, but may pollute repos
     - id: slice-4
+      feature_id: feat-73cd46aa
       num: 4
       title: Install and refresh Codex custom agents during wipnote codex launch
       what: |
@@ -241,7 +243,7 @@ slices:
       approved: false
       comment: ""
       approval_status: pending
-      execution_status: not_started
+      execution_status: promoted
     - id: slice-5
       num: 5
       title: Document and validate cross-harness parity
