@@ -452,7 +452,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v3 · 5 slices · Created 2026-05-06</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v5 · 5 slices · Created 2026-05-06</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -475,7 +475,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <div data-node="1" data-name="Define canonical plugin asset model" data-status="pending" data-deps="" data-files="4"></div>
     <div data-node="2" data-name="Emit Codex-native skills without duplicating business logic" data-status="pending" data-deps="1" data-files="5"></div>
     <div data-node="3" data-name="Translate wipnote agents into Codex custom-agent TOML" data-status="pending" data-deps="1" data-files="8"></div>
-    <div data-node="4" data-name="Install and refresh Codex custom agents during wipnote codex launch" data-status="pending" data-deps="3" data-files="4"></div>
+    <div data-node="4" data-name="Install and refresh Codex custom agents during wipnote codex launch" data-status="pending" data-deps="3" data-files="3"></div>
     <div data-node="5" data-name="Document and validate cross-harness parity" data-status="pending" data-deps="2,3,4" data-files="4"></div>
     
     <!--PLAN_GRAPH_NODES-->
@@ -507,6 +507,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <li data-markdown>Preserve local-first behavior: users should not need network access after installing the wipnote binary and local marketplace.</li>
 <li data-markdown>Keep generated Codex agent files out of project source unless explicitly requested; user-level install under `~/.codex/agents/` is the safest default for shipped plugin agents.</li>
 <li data-markdown>Avoid broad rewrites of all command/skill content in the first implementation; focus on agent and skill packaging contracts.</li>
+<li data-markdown>Codex custom agent TOML has no `haiku`/`sonnet`/`opus` model aliases — only concrete model IDs (e.g. `gpt-5.3-codex-spark`). The translator must always emit without `model` (inheriting parent session) unless wipnote ships a maintained Claude→Codex model alias table; pinning concrete IDs is fragile because Codex model names age fast.</li>
 </ul>
 
     <div class="approval-row">
@@ -851,8 +852,13 @@ Codex mapping.</p>
 <li>Map Claude model aliases conservatively: <code>haiku</code> to an inexpensive
 Codex model only if the repo already has a Codex model policy; otherwise
 omit <code>model</code> and inherit from parent.</li>
-<li>Omit Claude-only fields such as <code>color</code>, <code>tools</code>, and <code>maxTurns</code> unless
-Codex has documented equivalents.</li>
+<li>Map Claude <code>tools: [Read, Grep, Glob]</code>-style allowlists onto Codex&#39;s
+<code>sandbox_mode</code> field — reader-class agents (e.g. <code>reader.md</code>,
+<code>researcher.md</code>) become <code>sandbox_mode = &#34;read-only&#34;</code>; writer-class
+agents (<code>haiku-coder.md</code>, <code>sonnet-coder.md</code>, <code>opus-coder.md</code>,
+<code>test-runner.md</code>) become <code>sandbox_mode = &#34;workspace-write&#34;</code>.</li>
+<li>Omit Claude-only fields such as <code>color</code>, <code>disallowedTools</code>, and
+<code>maxTurns</code> — Codex has no documented equivalents.</li>
 <li>Prefix or namespace names only if needed to avoid collisions; prefer
 stable names like <code>wipnote-sonnet-coder</code> for user-level agents.</li>
 </ul>
@@ -928,7 +934,11 @@ sourced while making agents visible to Codex.</p>
         
         <div class="question-block slice-question-block">
           <p>Should wipnote install generated Codex custom agents globally or project-locally?</p>
-          
+          <p class="question-desc">Codex resolves agents in priority order: project `.codex/agents/` overrides
+user `~/.codex/agents/`. Both can coexist — installing user-global gives
+cross-repo coverage; users who want repo-pinned versions can override per
+project. Choosing user-global does not preclude project overrides.
+</p>
           
             
             
@@ -1001,12 +1011,29 @@ sourced while making agents visible to Codex.</p>
           <input type="checkbox" id="slice-4-what-reveal" class="reveal-toggle">
           <div class="markdown-block reveal-content serif-prose"><p>Extend the <code>cmd/wipnote/codex.go</code> setup path so <code>wipnote codex --init</code>,
 <code>wipnote codex --dev</code>, and normal <code>wipnote codex</code> ensure generated Codex
-custom-agent TOML files exist in the selected Codex agent location.</p>
-<p>In dev mode, force-refresh the generated agent files on each launch, just
-like the local plugin cache. In normal mode, install missing or stale
-files idempotently. Add a clear ownership marker comment or generated
-header so wipnote can update its own files without touching user-authored
-agents.</p>
+custom-agent TOML files are present in the user&#39;s Codex agent directory.</p>
+<p>Distinguish staging from install:</p>
+<ul>
+<li><strong>Staging</strong>: the generator writes TOML to a build-output path under
+the wipnote source tree (e.g. <code>dist/codex-agents/&lt;name&gt;.toml</code>) for
+inspection and CI. This is NOT where Codex loads agents from.</li>
+<li><strong>Install</strong>: at launch time, copy generated TOML into
+<code>~/.codex/agents/</code> (user-global) — Codex&#39;s documented agent
+location. <code>os.MkdirAll</code> the directory if absent (it is not present
+by default). Use a stable filename per agent (e.g.
+<code>wipnote-sonnet-coder.toml</code>).</li>
+</ul>
+<p>In dev mode, force-refresh on each launch. In normal mode, install
+idempotently: read the existing file&#39;s ownership marker; only
+overwrite if the marker matches wipnote&#39;s (so user-authored files
+with the same name are never clobbered). Add a clear ownership marker
+as a TOML comment block at the top of every generated file:</p>
+<pre><code># wipnote-managed: do not edit by hand. version=1
+# source: &lt;repo-rel-path-to-canonical-agent-md&gt;
+# generated: &lt;ISO-8601 timestamp&gt;
+</code></pre>
+<p>wipnote treats absence of this marker as user-authored and refuses
+to overwrite, even in dev mode.</p>
 </div>
           <label for="slice-4-what-reveal" class="reveal-label">Show full description</label>
           
@@ -1030,13 +1057,13 @@ copy generated files.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>cmd/wipnote/codex.go, cmd/wipnote/codex_test.go, internal/pluginbuild/codex_agents.go, packages/codex-marketplace/.agents/plugins/wipnote/agents/</code></div>
+        <div class="slice-field-value"><code>cmd/wipnote/codex.go, cmd/wipnote/codex_test.go, internal/pluginbuild/codex_agents.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>`wipnote codex --dev` refreshes generated agent TOML and leaves unrelated user agents untouched.</li><li>`wipnote codex --init` installs missing agents idempotently.</li><li>Tests cover fresh install, stale generated file replacement, and user-authored file preservation.</li></ul>
+        <ul class="slice-done-list slice-done-list--grid"><li>`wipnote codex --dev` refreshes generated agent TOML and leaves unrelated user agents untouched.</li><li>`wipnote codex --init` installs missing agents idempotently.</li><li>Tests cover fresh install, stale generated file replacement, and user-authored file preservation.</li><li>Generated TOML is installed to `~/.codex/agents/wipnote-*.toml`, not bundled inside the plugin tree.</li><li>`wipnote codex --init` creates `~/.codex/agents/` via os.MkdirAll if absent.</li><li>Files lacking the `# wipnote-managed:` marker are never overwritten, even in dev mode — they emit a `skipped: user-owned` log line and continue.</li></ul>
       </div>
       
     
@@ -1134,7 +1161,8 @@ to describe the new single-source architecture:</p>
 <li>canonical business logic lives in parsed plugin assets,</li>
 <li>Claude receives Claude-native markdown,</li>
 <li>Gemini receives translated command and agent metadata,</li>
-<li>Codex receives plugin-packaged skills plus installed custom-agent TOML.</li>
+<li>Codex receives plugin-packaged skills (in marketplace plugin tree) plus separately-installed custom-agent TOML in <code>~/.codex/agents/</code>,</li>
+<li>Gemini receives translated commands and markdown agents inside the extension directory (loaded automatically by <code>gemini extensions install</code>).</li>
 </ul>
 <p>Add a parity test that enumerates canonical agent and skill names and
 asserts every target emits an expected representation. Add a small
@@ -1169,7 +1197,7 @@ way to reason about generated ports.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Docs explicitly distinguish shared business logic from target-native packaging.</li><li>Parity tests fail if a canonical agent or skill is absent from a target that should expose it.</li><li>The Codex verification checklist covers skills, hooks, and custom agents.</li></ul>
+        <ul class="slice-done-list"><li>Docs explicitly distinguish shared business logic from target-native packaging.</li><li>Parity tests fail if a canonical agent or skill is absent from a target that should expose it.</li><li>The Codex verification checklist covers skills, hooks, and custom agents.</li><li>The stale claim at `packages/plugin-core/README.md:14-15` (&#34;same markdown format works for both Claude and Codex&#34;) is removed or scoped to skills only — agents are explicitly noted as TOML-for-Codex.</li></ul>
       </div>
       
     
@@ -1195,6 +1223,11 @@ way to reason about generated ports.</p>
           <div class="test-group" data-kind="smoke">
             <span class="test-chip">SMOKE &middot; 1</span>
             <ul><li>run `wipnote plugin build-ports --target codex` and inspect generated output paths.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="cross-harness parity">
+            <span class="test-chip">CROSS-HARNESS PARITY &middot; 1</span>
+            <ul><li>enumerate canonical agent and skill names; assert each target emits an expected representation (Claude markdown, Codex TOML, Gemini markdown). Test that the parity test FAILS if any canonical asset is missing from one of the three target trees.</li></ul>
           </div>
           
         </div>

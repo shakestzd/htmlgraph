@@ -7,7 +7,7 @@ meta:
     created_at: "2026-05-06"
     status: active
     created_by: codex
-    version: 3
+    version: 5
 design:
     problem: |
         wipnote currently treats `plugin/skills/**/SKILL.md` and `plugin/agents/*.md` as cross-harness assets, then copies them into the Codex marketplace tree. That is sufficient for Codex skills now that the plugin manifest points at `./skills/`, but it is not sufficient for Codex custom agents: current Codex documentation says custom agents are standalone TOML files under `.codex/agents/` or `~/.codex/agents/`, not plugin-root `agents/*.md` files. The result is a partial port where the skills load but wipnote's named subagents do not appear in Codex. The next architecture must keep business logic in one place while emitting each harness's native packaging format.
@@ -23,6 +23,7 @@ design:
         - 'Preserve local-first behavior: users should not need network access after installing the wipnote binary and local marketplace.'
         - Keep generated Codex agent files out of project source unless explicitly requested; user-level install under `~/.codex/agents/` is the safest default for shipped plugin agents.
         - Avoid broad rewrites of all command/skill content in the first implementation; focus on agent and skill packaging contracts.
+        - Codex custom agent TOML has no `haiku`/`sonnet`/`opus` model aliases — only concrete model IDs (e.g. `gpt-5.3-codex-spark`). The translator must always emit without `model` (inheriting parent session) unless wipnote ships a maintained Claude→Codex model alias table; pinning concrete IDs is fragile because Codex model names age fast.
     approved: false
     comment: ""
 slices:
@@ -128,8 +129,13 @@ slices:
         - Map Claude model aliases conservatively: `haiku` to an inexpensive
           Codex model only if the repo already has a Codex model policy; otherwise
           omit `model` and inherit from parent.
-        - Omit Claude-only fields such as `color`, `tools`, and `maxTurns` unless
-          Codex has documented equivalents.
+        - Map Claude `tools: [Read, Grep, Glob]`-style allowlists onto Codex's
+          `sandbox_mode` field — reader-class agents (e.g. `reader.md`,
+          `researcher.md`) become `sandbox_mode = "read-only"`; writer-class
+          agents (`haiku-coder.md`, `sonnet-coder.md`, `opus-coder.md`,
+          `test-runner.md`) become `sandbox_mode = "workspace-write"`.
+        - Omit Claude-only fields such as `color`, `disallowedTools`, and
+          `maxTurns` — Codex has no documented equivalents.
         - Prefix or namespace names only if needed to avoid collisions; prefer
           stable names like `wipnote-sonnet-coder` for user-level agents.
       why: |
@@ -165,6 +171,11 @@ slices:
       questions:
         - id: q-agent-install-scope
           text: Should wipnote install generated Codex custom agents globally or project-locally?
+          description: |
+            Codex resolves agents in priority order: project `.codex/agents/` overrides
+            user `~/.codex/agents/`. Both can coexist — installing user-global gives
+            cross-repo coverage; users who want repo-pinned versions can override per
+            project. Choosing user-global does not preclude project overrides.
           recommended: user-global
           options:
             - key: user-global
@@ -177,13 +188,30 @@ slices:
       what: |
         Extend the `cmd/wipnote/codex.go` setup path so `wipnote codex --init`,
         `wipnote codex --dev`, and normal `wipnote codex` ensure generated Codex
-        custom-agent TOML files exist in the selected Codex agent location.
+        custom-agent TOML files are present in the user's Codex agent directory.
 
-        In dev mode, force-refresh the generated agent files on each launch, just
-        like the local plugin cache. In normal mode, install missing or stale
-        files idempotently. Add a clear ownership marker comment or generated
-        header so wipnote can update its own files without touching user-authored
-        agents.
+        Distinguish staging from install:
+        - **Staging**: the generator writes TOML to a build-output path under
+          the wipnote source tree (e.g. `dist/codex-agents/<name>.toml`) for
+          inspection and CI. This is NOT where Codex loads agents from.
+        - **Install**: at launch time, copy generated TOML into
+          `~/.codex/agents/` (user-global) — Codex's documented agent
+          location. `os.MkdirAll` the directory if absent (it is not present
+          by default). Use a stable filename per agent (e.g.
+          `wipnote-sonnet-coder.toml`).
+
+        In dev mode, force-refresh on each launch. In normal mode, install
+        idempotently: read the existing file's ownership marker; only
+        overwrite if the marker matches wipnote's (so user-authored files
+        with the same name are never clobbered). Add a clear ownership marker
+        as a TOML comment block at the top of every generated file:
+
+            # wipnote-managed: do not edit by hand. version=1
+            # source: <repo-rel-path-to-canonical-agent-md>
+            # generated: <ISO-8601 timestamp>
+
+        wipnote treats absence of this marker as user-authored and refuses
+        to overwrite, even in dev mode.
       why: |
         Even with a correct generator, users will not see wipnote subagents unless
         the launcher installs them into a Codex-scanned location. This slice makes
@@ -193,13 +221,15 @@ slices:
         - cmd/wipnote/codex.go
         - cmd/wipnote/codex_test.go
         - internal/pluginbuild/codex_agents.go
-        - packages/codex-marketplace/.agents/plugins/wipnote/agents/
       deps:
         - 3
       done_when:
         - '`wipnote codex --dev` refreshes generated agent TOML and leaves unrelated user agents untouched.'
         - '`wipnote codex --init` installs missing agents idempotently.'
         - Tests cover fresh install, stale generated file replacement, and user-authored file preservation.
+        - Generated TOML is installed to `~/.codex/agents/wipnote-*.toml`, not bundled inside the plugin tree.
+        - '`wipnote codex --init` creates `~/.codex/agents/` via os.MkdirAll if absent.'
+        - 'Files lacking the `# wipnote-managed:` marker are never overwritten, even in dev mode — they emit a `skipped: user-owned` log line and continue.'
       effort: M
       risk: High
       tests: |
@@ -219,7 +249,8 @@ slices:
         - canonical business logic lives in parsed plugin assets,
         - Claude receives Claude-native markdown,
         - Gemini receives translated command and agent metadata,
-        - Codex receives plugin-packaged skills plus installed custom-agent TOML.
+        - Codex receives plugin-packaged skills (in marketplace plugin tree) plus separately-installed custom-agent TOML in `~/.codex/agents/`,
+        - Gemini receives translated commands and markdown agents inside the extension directory (loaded automatically by `gemini extensions install`).
 
         Add a parity test that enumerates canonical agent and skill names and
         asserts every target emits an expected representation. Add a small
@@ -244,12 +275,14 @@ slices:
         - Docs explicitly distinguish shared business logic from target-native packaging.
         - Parity tests fail if a canonical agent or skill is absent from a target that should expose it.
         - The Codex verification checklist covers skills, hooks, and custom agents.
+        - The stale claim at `packages/plugin-core/README.md:14-15` ("same markdown format works for both Claude and Codex") is removed or scoped to skills only — agents are explicitly noted as TOML-for-Codex.
       effort: M
       risk: Low
       tests: |
         Unit: run `go test ./internal/pluginbuild ./cmd/wipnote`.
         Documentation regression: grep docs to ensure the old claim that Codex agents are compatible markdown is gone.
         Smoke: run `wipnote plugin build-ports --target codex` and inspect generated output paths.
+        Cross-harness parity: enumerate canonical agent and skill names; assert each target emits an expected representation (Claude markdown, Codex TOML, Gemini markdown). Test that the parity test FAILS if any canonical asset is missing from one of the three target trees.
       approved: false
       comment: ""
       approval_status: pending
@@ -276,4 +309,74 @@ questions:
           label: Prefix — avoid collisions in flat Codex namespace
         - key: preserve
           label: Preserve names — closer to Claude but collision-prone
+      answer: null
+    - id: q-sandbox-mode-mapping
+      text: Confirm sandbox_mode mapping for reader vs writer agents.
+      description: |
+        Plan slice-3 proposes mapping Claude's `tools: [Read, Grep, Glob]` allowlists onto Codex's `sandbox_mode = "read-only"` for reader-class agents and `"workspace-write"` for writer-class agents. Confirm this mapping or override per-agent.
+      recommended: by-class
+      options:
+        - key: by-class
+          label: Map by agent class — reader = read-only, writer = workspace-write
+        - key: omit-all
+          label: Omit sandbox_mode — let Codex use default per session
+      answer: null
+    - id: q-skills-config-in-agents
+      text: Should Codex agent TOML use the optional `skills.config` field to preload wipnote skills?
+      description: |
+        Codex custom agent TOML supports `skills.config` to link skills to an agent. Claude agents use `skills: [agent-context]` for similar preloading. Mapping might be 1:1, but the Codex `skills.config` schema is not fully documented publicly. Risk: hand-coded mapping ages fast.
+      recommended: defer
+      options:
+        - key: include
+          label: Include skills.config mapping now (maintenance burden, may break)
+        - key: defer
+          label: Defer until Codex docs stabilize the schema
+      answer: null
+    - id: q-gemini-agent-parity
+      text: Does the parity test in slice-5 cover Gemini agents, or only Claude + Codex?
+      description: |
+        Gemini agents are already generated (markdown with translated frontmatter) and placed in `packages/gemini-extension/agents/`. Slice-5 says the parity test enumerates canonical names per target. Should the test include Gemini agents and treat their absence as a failure, or scope to Claude + Codex only since the Gemini agent loader is still preview?
+      recommended: include-gemini
+      options:
+        - key: include-gemini
+          label: Include Gemini in parity test (early-warning if Gemini changes contract)
+        - key: claude-codex-only
+          label: Scope to Claude + Codex; Gemini opt-in until non-preview
+      answer: null
+    - id: q-nickname-candidates
+      text: Should generated Codex agents include `nickname_candidates`?
+      description: |
+        Codex custom agent TOML supports `nickname_candidates` (an optional array) to improve UI when multiple agents are spawned. Useful when wipnote installs 6+ agents (haiku-coder, sonnet-coder, opus-coder, reader, researcher, test-runner). Stable nicknames per agent improve human readability.
+      recommended: include
+      options:
+        - key: include
+          label: Include nickname_candidates per agent (e.g. ["haiku", "fastcoder"])
+        - key: omit
+          label: Omit (cleaner TOML, less UI hinting)
+      answer: null
+    - id: q-hook-event-coverage
+      text: Slice-5's verification checklist for hooks should explicitly list Codex-supported events.
+      description: |
+        Codex's hook event set is a subset of Claude's: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, TaskStarted, TaskComplete, TurnAborted. Events like SubagentStart/Stop, PreCompact, TeammateIdle are Claude-only. The verification checklist should not require testing events Codex doesn't support.
+      recommended: codex-subset-only
+      options:
+        - key: codex-subset-only
+          label: Verify only the seven Codex-supported events against Codex
+        - key: all-events
+          label: Test all 30+ Claude events (most will skip on Codex)
+      answer: null
+    - id: q-ownership-marker-format
+      text: Confirm the ownership marker format for generated Codex agent TOML.
+      description: |
+        Slice-4 specifies a 3-line TOML comment header as the ownership marker. Once published, this format is a forever-contract — future wipnote versions must read marker version=1 to decide whether to overwrite. Confirm the format below or specify an alternative.
+
+            # wipnote-managed: do not edit by hand. version=1
+            # source: <repo-rel-path-to-canonical-agent-md>
+            # generated: <ISO-8601 timestamp>
+      recommended: confirm
+      options:
+        - key: confirm
+          label: Confirm 3-line header as specified
+        - key: revise
+          label: Revise (specify in answer)
       answer: null
