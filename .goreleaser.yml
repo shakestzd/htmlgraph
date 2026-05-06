@@ -26,7 +26,9 @@ archives:
       - wipnote
     name_template: "wipnote_{{.Version}}_{{.Os}}_{{.Arch}}"
     format: tar.gz
-    wrap_in_directory: false
+    files:
+      - src: dist/wipnote_{{ .Os }}_{{ .Arch }}*/wn
+        dst: wn
 
 checksum:
   name_template: "wipnote_{{.Version}}_checksums.txt"
