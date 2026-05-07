@@ -2,21 +2,28 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 # Fix ownership of named-volume mount points (Docker creates these as root:root)
 sudo chown -R vscode:vscode \
-    /workspaces/htmlgraph/.htmlgraph \
-    /workspaces/htmlgraph/.claude \
+    "${REPO_ROOT}/.wipnote" \
     /home/vscode/.codex \
     /home/vscode/.gemini \
     /home/vscode/.copilot \
     2>/dev/null || true
 
-cd "$(dirname "$0")/.."
+cd "${REPO_ROOT}"
 
 export PATH="${HOME}/.local/bin:${PATH}"
 
-echo "==> Installing tmux and ripgrep..."
-sudo apt-get update && sudo apt-get install -y tmux ripgrep
+echo "==> Verifying image tools..."
+for tool in tmux rg fd jq sqlite3 shellcheck direnv zsh; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "missing required image tool: $tool" >&2
+    exit 1
+  }
+done
 
 echo "==> Installing AI agent CLIs..."
 npm install -g --no-fund --no-audit \
@@ -25,7 +32,7 @@ npm install -g --no-fund --no-audit \
     @openai/codex \
     @github/copilot
 
-echo "==> Building htmlgraph from source..."
+echo "==> Building wipnote from source..."
 ./plugin/build.sh
 
 echo "==> Running quality gates..."
@@ -63,20 +70,20 @@ fi
 echo "==> Ensuring \$HOME/.local/bin is on PATH in shell rc files..."
 for _rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
   if [ -f "$_rc" ] && ! grep -q '.local/bin' "$_rc"; then
+    # shellcheck disable=SC2016
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$_rc"
   fi
 done
 
-echo "==> Installing HtmlGraph + Oh My Posh Claude Code wrapper..."
+echo "==> Installing wipnote + Oh My Posh Claude Code wrapper..."
 mkdir -p "$HOME/.claude"
-if [ ! -f "$HOME/.claude/omp-claude-wrapper.sh" ]; then
-  cat > "$HOME/.claude/omp-claude-wrapper.sh" << 'EOF'
+cat > "$HOME/.claude/omp-claude-wrapper.sh" << 'EOF'
 #!/bin/bash
-# HtmlGraph + Oh My Posh wrapper for Claude Code status line
+# wipnote + Oh My Posh wrapper for Claude Code status line
 
 _dir="$(pwd)"
 while [ "$_dir" != "/" ]; do
-    [ -d "$_dir/.htmlgraph" ] && break
+    [ -d "$_dir/.wipnote" ] && break
     _dir=$(dirname "$_dir")
 done
 if [ "$_dir" = "/" ]; then
@@ -86,7 +93,7 @@ fi
 
 INPUT=$(cat)
 SESS_ID=$(echo "$INPUT" | python3 -c "import sys, json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
-ACTIVE_WORK=$(htmlgraph statusline --session "$SESS_ID" 2>/dev/null)
+ACTIVE_WORK=$(wipnote statusline --session "$SESS_ID" 2>/dev/null)
 export WIPNOTE_ACTIVE="$ACTIVE_WORK"
 
 OMP_BIN="${WIPNOTE_OMP_BIN:-$(which oh-my-posh 2>/dev/null)}"
@@ -98,7 +105,6 @@ else
     echo "$ACTIVE_WORK"
 fi
 EOF
-fi
 chmod +x "$HOME/.claude/omp-claude-wrapper.sh"
 
 echo "==> Linking Claude Code Oh My Posh theme..."
@@ -107,7 +113,7 @@ echo "==> Linking Claude Code Oh My Posh theme..."
 # Use an absolute path — a relative `$(dirname "$0")` symlink resolves from
 # $HOME (the symlink's own dir), landing at $HOME/.devcontainer/... which is
 # not the repo file.
-ln -sf "$(cd "$(dirname "$0")" && pwd)/claude.omp.json" "$HOME/.claude.omp.json"
+ln -sf "${SCRIPT_DIR}/claude.omp.json" "$HOME/.claude.omp.json"
 
 echo "==> Installing oh-my-zsh..."
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
@@ -127,8 +133,8 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
   git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
 
 echo "==> Copying dotfiles..."
-cp "$(dirname "$0")/dotfiles/.zshrc" "$HOME/.zshrc"
-cp "$(dirname "$0")/dotfiles/.p10k.zsh" "$HOME/.p10k.zsh"
+cp "${SCRIPT_DIR}/dotfiles/.zshrc" "$HOME/.zshrc"
+cp "${SCRIPT_DIR}/dotfiles/.p10k.zsh" "$HOME/.p10k.zsh"
 
 echo "==> Setting default shell to zsh..."
 sudo chsh -s /usr/bin/zsh vscode 2>/dev/null || chsh -s /usr/bin/zsh || true
@@ -142,7 +148,7 @@ claude --version || true
 codex --version || true
 gemini --version || true
 copilot --version || true
-htmlgraph version || true
+wipnote version || true
 oh-my-posh --version || true
 
 cat <<'EOF'
@@ -150,7 +156,7 @@ cat <<'EOF'
 Devcontainer bootstrap complete.
 
 This is a source-development environment — every change you make to
-cmd/, internal/, or plugin/ can be rebuilt with `htmlgraph build`.
+cmd/, internal/, or plugin/ can be rebuilt with `wipnote build`.
 
 Next steps:
 - Authenticate the CLIs once (stored in persistent volumes):
@@ -159,9 +165,9 @@ Next steps:
     gemini
     copilot
 - Launch Claude Code in dev mode so it loads the plugin from source:
-    htmlgraph claude --dev
+    wipnote claude --dev
 - Start the dashboard:
-    htmlgraph serve
+    wipnote serve
     # http://localhost:8088 (container serves on 8080)
 - Run the full test suite on demand:
     bash scripts/devcontainer-verify.sh
@@ -171,7 +177,7 @@ Persistent volumes mounted:
   /home/vscode/.codex          — Codex credentials
   /home/vscode/.gemini         — Gemini credentials
   /home/vscode/.copilot        — GitHub Copilot CLI credentials
-  /home/vscode/.local          — htmlgraph binary + version metadata
-  <workspace>/.htmlgraph       — devcontainer-only work item state
-                                 (isolated from your host .htmlgraph/)
+  /home/vscode/.local          — wipnote binary + version metadata
+  <workspace>/.wipnote         — tracked dogfood work items; runtime artifacts
+                                 are ignored by git
 EOF

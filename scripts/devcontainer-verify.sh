@@ -2,8 +2,8 @@
 # devcontainer-verify.sh — Full verification suite for the wipnote devcontainer.
 #
 # Runs the complete quality gate: build, vet, and the full Go test suite.
-# Also exercises a minimal smoke test of the wipnote CLI to confirm the
-# binary on PATH behaves correctly.
+# Also verifies the tools installed by the Dockerfile and post-create hook,
+# then exercises a minimal smoke test of the wipnote CLI.
 #
 # Usage:
 #   bash scripts/devcontainer-verify.sh
@@ -15,6 +15,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 export PATH="${HOME}/.local/bin:${PATH}"
+export WIPNOTE_CACHE_DIR="${WIPNOTE_CACHE_DIR:-/tmp/wipnote-devcontainer-cache}"
+mkdir -p "${WIPNOTE_CACHE_DIR}"
 
 section() {
     printf '\n==> %s\n' "$1"
@@ -29,11 +31,15 @@ go vet ./...
 section "go test ./... -count=1"
 go test ./... -count=1
 
+section "required devcontainer tools"
+for tool in wipnote claude codex gemini copilot uv mkdocs oh-my-posh ttyd tmux rg fd jq sqlite3 shellcheck zsh direnv; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "$tool is not on PATH. Rebuild the devcontainer or rerun .devcontainer/post-create.sh." >&2
+        exit 1
+    fi
+done
+
 section "wipnote binary smoke test"
-if ! command -v wipnote >/dev/null 2>&1; then
-    echo "wipnote binary is not on PATH. Run ./plugin/build.sh first." >&2
-    exit 1
-fi
 wipnote version
 wipnote help --compact | head -20 || true
 

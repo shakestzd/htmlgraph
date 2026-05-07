@@ -38,6 +38,9 @@ scripts/worktree-cleanup.sh <name>      # Remove a worktree
 ## Devcontainer
 
 ```bash
+scripts/devcontainer.sh up                 # Create or reuse the devcontainer
+scripts/devcontainer.sh rebuild            # Rebuild after devcontainer config changes
+scripts/devcontainer.sh shell              # Open zsh inside the running container
 scripts/devcontainer-verify.sh          # Full verification suite for the devcontainer
                                          # (go build + go vet + go test + binary + dashboard smoke test)
 ```

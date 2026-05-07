@@ -20,6 +20,7 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
         ripgrep \
         shellcheck \
         sqlite3 \
+        tmux \
         tree \
         unzip \
         xz-utils \

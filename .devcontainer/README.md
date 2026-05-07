@@ -8,8 +8,8 @@ any host-side Claude/Gemini/Codex configuration.
 
 This devcontainer is not a user environment — it is specifically for
 editing `cmd/`, `internal/`, and `plugin/` source files, running the Go
-test suite, and exercising the dashboard against a container-local
-`.wipnote/` state.
+test suite, and exercising the dashboard against the repository's tracked
+dogfood `.wipnote/` state.
 
 Your laptop keeps running the installed `wipnote` release for day-to-day
 work across other projects. The two are fully independent.
@@ -18,22 +18,29 @@ work across other projects. The two are fully independent.
 
 | Tool | Source |
 |------|--------|
-| Go 1.23 | Devcontainer base image |
+| Go 1.24 | Devcontainer base image |
 | Node.js 22 | `ghcr.io/devcontainers/features/node` |
 | GitHub CLI | `ghcr.io/devcontainers/features/github-cli` |
 | Claude Code CLI | `npm install -g @anthropic-ai/claude-code` |
 | Gemini CLI | `npm install -g @google/gemini-cli` |
 | Codex CLI | `npm install -g @openai/codex` |
+| GitHub Copilot CLI | `npm install -g @github/copilot` |
 | `wipnote` binary | Built from repo source via `plugin/build.sh` |
-| `git`, `make`, `ripgrep`, `fd`, `jq`, `sqlite3`, `shellcheck` | Dockerfile apt install |
+| `tmux`, `rg`, `fd`, `jq`, `sqlite3`, `shellcheck`, `direnv`, `zsh` | Dockerfile apt install |
+| `uv` | `.devcontainer/post-create.sh` via Astral installer |
+| MkDocs + Material + pymdown extensions | `.devcontainer/post-create.sh` via `uv tool install` |
+| Oh My Posh | `.devcontainer/post-create.sh` via upstream installer |
+| `ttyd` | `.devcontainer/post-create.sh` via upstream release binary |
+| Oh My Zsh, Powerlevel10k, zsh plugins | `.devcontainer/post-create.sh` |
 
 ## Start
 
 1. Open the repository in VS Code.
 2. Run `Dev Containers: Reopen in Container`.
 3. Wait for `.devcontainer/post-create.sh` to finish. It installs the
-   three agent CLIs, runs `./plugin/build.sh` so `wipnote` lands on
-   PATH, and runs `go build` + `go vet` as quality gates.
+   agent CLIs, docs/shell/dashboard helper tools, runs `./plugin/build.sh`
+   so `wipnote` lands on PATH, and runs `go build` + `go vet` as quality
+   gates.
 
 ## Authentication
 
@@ -45,10 +52,17 @@ configuration. On first boot, authenticate each CLI interactively:
 claude         # OAuth browser login (or API key if you prefer)
 codex          # OpenAI login
 gemini         # Google login
+copilot        # GitHub login
 ```
 
 Credentials persist across rebuilds via named Docker volumes mounted at
-`/home/vscode/.claude`, `/home/vscode/.codex`, and `/home/vscode/.gemini`.
+`/home/vscode/.claude`, `/home/vscode/.codex`, `/home/vscode/.gemini`,
+and `/home/vscode/.copilot`. The source-built `wipnote` binary and
+locally installed helper tools persist in `/home/vscode/.local`.
+
+The volume names are `wipnote-*`. If you previously used the old
+`htmlgraph-*` devcontainer volumes, expect to authenticate once after
+rebuilding or copy credentials between Docker volumes manually.
 
 ### GitHub Codespaces (optional)
 
@@ -58,18 +72,17 @@ secrets** in your GitHub account settings. Codespaces injects them as
 environment variables automatically. No changes to `devcontainer.json`
 are required.
 
-## State Isolation
+## State
 
-The container uses a **named Docker volume** (`wipnote-dev-state`) for
-`.wipnote/`. This means:
+The repository's `.wipnote/**/*.html` files are canonical dogfood work
+items and are intentionally visible inside the devcontainer. They are
+tracked in Git so closing or resuming wipnote work has the same context
+inside and outside the container.
 
-- The container starts with an empty `.wipnote/` on first boot.
-- Work items you create inside the container stay inside the container
-  and do not affect your host `.wipnote/`.
-- The state persists across container rebuilds, so you can dogfood
-  wipnote inside the container without losing work.
-- If you want to reset the container-local state, delete the volume:
-  `docker volume rm wipnote-dev-state`.
+Runtime files under `.wipnote/` remain untracked and ignored: SQLite
+indexes, session telemetry, logs, locks, and temporary collector state.
+CLI credentials and user-level agent config are isolated in named Docker
+volumes under `$HOME`; no host auth files are mounted into the container.
 
 ## Development Workflow
 
@@ -97,8 +110,8 @@ longer exists, never built the Go binary, never enabled the plugin, and
 forwarded six host API keys into the container. This version:
 
 - Builds `wipnote` from source and installs it to `~/.local/bin/`.
-- Uses the Go 1.23 devcontainer base image (Python base dropped).
+- Uses the Go 1.24 devcontainer base image (Python base dropped).
 - Forwards no host API keys — all authentication is interactive or via
   Codespaces secrets.
-- Isolates `.wipnote/` in a named volume so the container never sees
-  your laptop's work items.
+- Keeps tracked `.wipnote` work items in the repo while ignoring runtime
+  artifacts, so dogfood state is available when wipnote sessions close.

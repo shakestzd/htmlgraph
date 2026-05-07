@@ -1,5 +1,5 @@
 {
-  "name": "htmlgraph-dev",
+  "name": "wipnote-dev",
   "containerEnv": {
     "TZ": "America/New_York",
     "TERM": "xterm-256color",
@@ -22,11 +22,11 @@
     }
   },
   "mounts": [
-    "source=htmlgraph-claude-home,target=/home/vscode/.claude,type=volume",
-    "source=htmlgraph-codex-home,target=/home/vscode/.codex,type=volume",
-    "source=htmlgraph-gemini-home,target=/home/vscode/.gemini,type=volume",
-    "source=htmlgraph-copilot-home,target=/home/vscode/.copilot,type=volume",
-    "source=htmlgraph-local-bin,target=/home/vscode/.local,type=volume",
+    "source=wipnote-claude-home,target=/home/vscode/.claude,type=volume",
+    "source=wipnote-codex-home,target=/home/vscode/.codex,type=volume",
+    "source=wipnote-gemini-home,target=/home/vscode/.gemini,type=volume",
+    "source=wipnote-copilot-home,target=/home/vscode/.copilot,type=volume",
+    "source=wipnote-local-bin,target=/home/vscode/.local,type=volume",
     "type=tmpfs,destination=/tmp,tmpfs-size=4294967296"
   ],
   "appPort": ["8088:8080", "2222:2222"],
