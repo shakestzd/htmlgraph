@@ -837,7 +837,7 @@ class HgEventTree extends HTMLElement {
       : this._otelBadges(turn);
 
     var html = '<div class="turn-group">'
-      + '<div class="event-row depth-0 user-query-row"'
+      + '<div class="event-row depth-0 user-query-row accent-user"'
       + ' data-event-id="' + esc(uq.event_id) + '"'
       + ' data-timestamp="' + esc(uq.timestamp || '') + '">'
       + expandIcon
@@ -939,7 +939,7 @@ class HgEventTree extends HTMLElement {
 
     var featureBdg = this.featureBadge(log.feature_id || '', log.feature_title || '');
 
-    var html = '<div class="event-row depth-1 assistant-text-row"'
+    var html = '<div class="event-row depth-1 assistant-text-row accent-system"'
       + ' data-event-id="' + esc(logId) + '"'
       + ' data-timestamp="' + esc((attrs.timestamp || log.ts_micros || 0)) + '"'
       + ' style="padding-left: 2.5rem">'
@@ -973,7 +973,7 @@ class HgEventTree extends HTMLElement {
           + '</pre>';
       }
 
-      html += '<div class="event-row depth-2 assistant-text-detail"'
+      html += '<div class="event-row depth-2 assistant-text-detail accent-system"'
         + ' style="padding-left: 3.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem;">'
         + body
         + '</div>';
@@ -1008,7 +1008,7 @@ class HgEventTree extends HTMLElement {
 
     var featureBdg = this.featureBadge(evt.feature_id || '', evt.feature_title || '');
 
-    var html = '<div class="event-row depth-1 assistant-text-row"'
+    var html = '<div class="event-row depth-1 assistant-text-row accent-system"'
       + ' data-event-id="' + esc(evtId) + '"'
       + ' data-timestamp="' + esc(evt.timestamp || '') + '"'
       + ' style="padding-left: 2.5rem">'
@@ -1038,7 +1038,7 @@ class HgEventTree extends HTMLElement {
           + '</pre>';
       }
 
-      html += '<div class="event-row depth-2 assistant-text-detail"'
+      html += '<div class="event-row depth-2 assistant-text-detail accent-system"'
         + ' style="padding-left: 3.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem;">'
         + body
         + '</div>';
@@ -1069,7 +1069,8 @@ class HgEventTree extends HTMLElement {
     var padLeft = (depth + 1) * 1.25;
     var bgAlpha = 0.05 + depth * 0.08;
 
-    var html = '<div class="event-row depth-' + depth + ' ' + borderClass + ' clickable-row"'
+    var accentClass = this._rowAccentClass(evt);
+    var html = '<div class="event-row depth-' + depth + ' ' + borderClass + ' ' + accentClass + ' clickable-row"'
       + ' data-event-id="' + esc(evt.event_id) + '"'
       + (evt.session_id ? ' data-session="' + esc(evt.session_id) + '"' : '')
       + ' data-tool-use-id="' + esc(evt.tool_use_id || '') + '"'
@@ -1095,27 +1096,48 @@ class HgEventTree extends HTMLElement {
     return html;
   }
 
+  _rowAccentClass(evt) {
+    if (!evt) return 'accent-system';
+    var tool = (evt.tool_name || '').toLowerCase();
+    if (tool === 'userquery') return 'accent-user';
+    var agent = (evt.agent_id || '').toLowerCase();
+    if (agent.indexOf('claude') !== -1) return 'accent-claude';
+    if (agent.indexOf('codex') !== -1) return 'accent-codex';
+    if (agent.indexOf('gemini') !== -1) return 'accent-gemini';
+    if (agent === 'human' || agent === 'user') return 'accent-user';
+    return 'accent-system';
+  }
+
+  _spanAccentClass(span) {
+    var nativeName = ((span && span.native_name) || '').toLowerCase();
+    if (nativeName.indexOf('claude_code') === 0) return 'accent-claude';
+    if (nativeName.indexOf('codex') === 0 || nativeName.indexOf('gen_ai') === 0 ||
+        nativeName.indexOf('mcp.tools') === 0) return 'accent-codex';
+    if (nativeName.indexOf('gemini') === 0) return 'accent-gemini';
+    return 'accent-system';
+  }
+
   // _relativizePath strips a project root prefix from an absolute file
   // path so spans show a compact relative path instead of the full
   // filesystem location. The full path is preserved in the row's title
   // attribute as a hover tooltip.
   //
   // Strategy (in order):
-  //   1. Strip window.htmlgraphProjectRoot if set.
+  //   1. Strip window.wipnoteProjectRoot if set.
   //   2. Find the first occurrence of a common repo-marker segment
-  //      (/cmd/, /internal/, /plugin/, /packages/, /scripts/, /.htmlgraph/)
+  //      (/cmd/, /internal/, /plugin/, /packages/, /scripts/, /.wipnote/)
   //      and trim everything up to (but not including) that segment.
   //   3. Return unchanged when the path is not absolute or no marker matches.
   _relativizePath(path) {
     if (!path || path.charAt(0) !== '/') return path;
     // Strategy 1: explicit project root (set from /api/mode projectRoot).
-    var root = window.htmlgraphProjectRoot;
+    var root = window.wipnoteProjectRoot;
     if (root) {
       if (path.startsWith(root + '/')) return path.slice(root.length + 1);
       if (path === root) return '.';
     }
     // Strategy 2: repo-marker heuristic.
-    var markers = ['/cmd/', '/internal/', '/plugin/', '/packages/', '/scripts/', '/.htmlgraph/'];
+    var markers = ['/cmd/', '/internal/', '/plugin/', '/packages/', '/scripts/', '/.wipnote/'];
     for (var i = 0; i < markers.length; i++) {
       var idx = path.indexOf(markers[i]);
       if (idx !== -1) return path.slice(idx + 1); // keep the marker segment itself
@@ -1147,6 +1169,7 @@ class HgEventTree extends HTMLElement {
       return !!(d.description || d.prompt || d.subagent_type);
     }
     if (tn.indexOf('mcp__') === 0) return !!(d.mcp_input || d.url || d.query || d.pattern || d.file_path);
+    if (d.tool_input) return true;
     // Also check for absorbed api_request details.
     if (span._precedingApi) return true;
     return false;
@@ -1192,7 +1215,7 @@ class HgEventTree extends HTMLElement {
         ? (span.duration_ms >= 1000 ? (span.duration_ms / 1000).toFixed(2) + 's' : span.duration_ms + 'ms')
         : '';
       var durBdgGroup = durGroup ? '<span class="turn-stats">' + durGroup + '</span>' : '';
-      var htmlGroup = '<div class="event-row depth-' + depth + '"'
+      var htmlGroup = '<div class="event-row depth-' + depth + ' ' + this._spanAccentClass(span) + '"'
         + ' data-span-id="' + esc(span.span_id) + '"'
         + ' style="padding-left: ' + padLeftGroup + 'rem; background: rgba(0,0,0,' + bgAlphaGroup + ')">'
         + '<span class="expand-icon ' + (isExpGroup ? 'expanded' : '') + '" data-toggle="' + esc(groupToggleKey) + '">▶</span>'
@@ -1360,7 +1383,7 @@ class HgEventTree extends HTMLElement {
       rowTitle = span.native_name;
     }
 
-    var html = '<div class="event-row depth-' + depth + ' ' + errBorder + '"'
+    var html = '<div class="event-row depth-' + depth + ' ' + errBorder + ' ' + this._spanAccentClass(span) + '"'
       + ' data-span-id="' + esc(span.span_id) + '"'
       + ' data-trace-id="' + esc(span.trace_id) + '"'
       + (span.parent_span ? ' data-parent-span="' + esc(span.parent_span) + '"' : '')
@@ -1516,7 +1539,19 @@ class HgEventTree extends HTMLElement {
       if (api.cost_usd > 0)     rows.push(['cost', '$' + api.cost_usd.toFixed(6)]);
       if (api.duration_ms)      rows.push(['api duration', api.duration_ms + 'ms']);
       if (ad.request_id)        rows.push(['request id', ad.request_id]);
-      if (ad.speed)             rows.push(['mode', ad.speed]);
+      if (ad.mode || ad.speed)  rows.push(['mode', ad.mode || ad.speed]);
+      if (ad.command_type)      rows.push(['command type', ad.command_type]);
+    }
+    if (d.tool_input && typeof d.tool_input === 'object' && !(span.tool_name && span.tool_name.indexOf('mcp__') === 0)) {
+      var inputKeys = Object.keys(d.tool_input);
+      for (var ti = 0; ti < inputKeys.length; ti++) {
+        var tk = inputKeys[ti];
+        var tv = d.tool_input[tk];
+        var tvStr = (typeof tv === 'string') ? tv : JSON.stringify(tv, null, 2);
+        if (tvStr.length <= 200 && tvStr.indexOf('\n') === -1) {
+          rows.push([tk, tvStr]);
+        }
+      }
     }
     // Long-content code panels: render Bash command / Edit old_string /
     // Edit new_string / Write content as <pre><code class="language-xxx">
@@ -1552,6 +1587,17 @@ class HgEventTree extends HTMLElement {
           codeBlocks += this._codeBlock(mck, mcvStr, mcvStr.length, false, mcLang);
         }
       }
+    } else if (d.tool_input && typeof d.tool_input === 'object') {
+      var genericCodeKeys = Object.keys(d.tool_input);
+      for (var gci = 0; gci < genericCodeKeys.length; gci++) {
+        var gck = genericCodeKeys[gci];
+        var gcv = d.tool_input[gck];
+        var gcvStr = (typeof gcv === 'string') ? gcv : JSON.stringify(gcv, null, 2);
+        if (gcvStr.length > 200 || gcvStr.indexOf('\n') !== -1) {
+          var gcLang = (typeof gcv !== 'string') ? 'json' : '';
+          codeBlocks += this._codeBlock(gck, gcvStr, gcvStr.length, false, gcLang);
+        }
+      }
     }
 
     if (rows.length === 0 && !codeBlocks) return '';
@@ -1562,7 +1608,7 @@ class HgEventTree extends HTMLElement {
       return '<div class="otel-detail-row"><span class="otel-detail-key">' + esc(r[0]) + '</span>'
         + '<span class="otel-detail-val">' + esc(String(r[1])) + '</span></div>';
     }).join('');
-    return '<div class="event-row event-row-otel-detail depth-' + depth + '"'
+    return '<div class="event-row event-row-otel-detail depth-' + depth + ' ' + this._spanAccentClass(span) + '"'
       + ' style="padding-left: ' + padLeft + 'rem; background: rgba(0,0,0,' + bgAlpha + ')">'
       + kvHtml
       + codeBlocks
@@ -1941,7 +1987,8 @@ class HgEventTree extends HTMLElement {
       return '';
     }
     if (span.canonical === 'api_request') {
-      return d.speed === 'fast' ? 'fast mode' : '';
+      var mode = d.mode || d.speed || '';
+      return mode ? mode + ' mode' : '';
     }
     return '';
   }

@@ -41,6 +41,34 @@ func TestPaneContainerInHTML(t *testing.T) {
 	}
 }
 
+func TestDashboardHTMLUsesWipnoteBranding(t *testing.T) {
+	data, err := os.ReadFile("dashboard/index.html")
+	if err != nil {
+		t.Fatalf("read dashboard/index.html: %v", err)
+	}
+	html := string(data)
+
+	for _, legacy := range []string{
+		"HtmlGraph",
+		"htmlgraph status",
+		"htmlgraph plan generate",
+	} {
+		if strings.Contains(html, legacy) {
+			t.Errorf("dashboard HTML still contains legacy visible branding %q", legacy)
+		}
+	}
+	for _, want := range []string{
+		"<title>wipnote Dashboard</title>",
+		`<span id="brand-text">wipnote</span>`,
+		"wipnote status",
+		"wipnote plan generate",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("dashboard HTML missing wipnote branding %q", want)
+		}
+	}
+}
+
 // TestPaneStyles verifies the required CSS classes for floating panes exist in
 // components.css.
 func TestPaneStyles(t *testing.T) {
@@ -51,6 +79,46 @@ func TestPaneStyles(t *testing.T) {
 	for _, cls := range []string{".terminal-pane", ".pane-titlebar", ".pane-close", ".pane-body"} {
 		if !strings.Contains(string(data), cls) {
 			t.Errorf("components.css missing %q", cls)
+		}
+	}
+}
+
+func TestEventTreeAccentRails(t *testing.T) {
+	jsData, err := os.ReadFile("dashboard/components/event-tree.js")
+	if err != nil {
+		t.Fatalf("read dashboard/components/event-tree.js: %v", err)
+	}
+	js := string(jsData)
+	for _, marker := range []string{
+		"_rowAccentClass(evt)",
+		"_spanAccentClass(span)",
+		"accent-claude",
+		"accent-codex",
+		"accent-gemini",
+		"accent-user",
+		"accent-system",
+		"event-row-otel-detail depth-' + depth + ' ' + this._spanAccentClass(span)",
+	} {
+		if !strings.Contains(js, marker) {
+			t.Errorf("event-tree.js missing accent marker %q", marker)
+		}
+	}
+
+	cssData, err := os.ReadFile("dashboard/css/components.css")
+	if err != nil {
+		t.Fatalf("read dashboard/css/components.css: %v", err)
+	}
+	css := string(cssData)
+	for _, cls := range []string{
+		".event-row.accent-claude",
+		".event-row.accent-codex",
+		".event-row.accent-gemini",
+		".event-row.accent-user",
+		".event-row.accent-system",
+		"border-left: 3px solid transparent",
+	} {
+		if !strings.Contains(css, cls) {
+			t.Errorf("components.css missing accent marker %q", cls)
 		}
 	}
 }

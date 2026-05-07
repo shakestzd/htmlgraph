@@ -17,8 +17,9 @@ import (
 // reached SessionEnd yet.
 //
 // GET /api/otel/rollup?session_id=<id>
-//   404 if no OTel signals exist for the session
-//   200 JSON body shaped like the rollup struct with snake_case keys
+//
+//	404 if no OTel signals exist for the session
+//	200 JSON body shaped like the rollup struct with snake_case keys
 func otelRollupHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -76,7 +77,8 @@ func otelRollupHandler(database *sql.DB) http.HandlerFunc {
 // event-tree can render cost/token badges per turn.
 //
 // GET /api/otel/prompts?session_id=<id>
-//   200 JSON body: {"prompts": [{...}]}
+//
+//	200 JSON body: {"prompts": [{...}]}
 func otelPromptsHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -116,9 +118,9 @@ func otelPromptsHandler(database *sql.DB) http.HandlerFunc {
 // otelCostHandler returns grouped cost aggregates. Supports three group
 // dimensions matching common dashboard questions:
 //
-//   GET /api/otel/cost?group_by=model      — cost per model
-//   GET /api/otel/cost?group_by=session    — cost per session
-//   GET /api/otel/cost?group_by=day        — cost per calendar day (UTC)
+//	GET /api/otel/cost?group_by=model      — cost per model
+//	GET /api/otel/cost?group_by=session    — cost per session
+//	GET /api/otel/cost?group_by=day        — cost per calendar day (UTC)
 //
 // Omitting group_by defaults to "model". Invalid values return 400.
 func otelCostHandler(database *sql.DB) http.HandlerFunc {
@@ -262,38 +264,41 @@ type spanJSON struct {
 // this struct stays in the SQLite attrs_json column for drill-through
 // via a future "span detail" view.
 type spanDetail struct {
-	FullCommand    string `json:"full_command,omitempty"`    // Bash: exact command executed
-	BashCommand    string `json:"bash_command,omitempty"`    // Bash: un-shelled command
-	Description    string `json:"description,omitempty"`     // Bash / Task / Agent: human description
-	Timeout        int64  `json:"timeout,omitempty"`         // Bash: timeout in milliseconds
-	GitCommitID    string `json:"git_commit_id,omitempty"`   // Bash: commit SHA when `git commit` succeeds
-	FilePath       string `json:"file_path,omitempty"`       // Read/Edit/Write/NotebookEdit
-	Offset         int64  `json:"offset,omitempty"`          // Read: 1-based start line
-	Limit          int64  `json:"limit,omitempty"`           // Read: line count
-	OldStringLen   int64  `json:"old_string_len,omitempty"`  // Edit: char count of old_string
-	NewStringLen   int64  `json:"new_string_len,omitempty"`  // Edit: char count of new_string
-	OldString      string `json:"old_string,omitempty"`      // Edit: truncated old_string (4 KB max)
-	NewString      string `json:"new_string,omitempty"`      // Edit: truncated new_string (4 KB max)
-	ReplaceAll     bool   `json:"replace_all,omitempty"`     // Edit: replace_all flag
-	ContentLen     int64  `json:"content_len,omitempty"`     // Write: char count of content
-	Content        string `json:"content,omitempty"`         // Write: truncated content (4 KB max)
-	Truncated      bool   `json:"content_truncated,omitempty"` // true when any of the above were cut
-	URL            string `json:"url,omitempty"`             // WebFetch
-	Query          string `json:"query,omitempty"`           // WebSearch
-	Pattern        string `json:"pattern,omitempty"`         // Grep/Glob
-	Path           string `json:"path,omitempty"`            // Grep/Glob: search root
-	OutputMode     string `json:"output_mode,omitempty"`     // Grep: content|files_with_matches|count
-	Prompt         string `json:"prompt,omitempty"`          // Task/Agent: delegation prompt (truncated)
-	SkillName      string `json:"skill_name,omitempty"`      // Skill tool
-	SubagentType   string `json:"subagent_type,omitempty"`   // Agent/Task delegation target
-	MCPServerName  string         `json:"mcp_server_name,omitempty"` // MCP tool
-	MCPToolName    string         `json:"mcp_tool_name,omitempty"`   // MCP tool
-	MCPInput       map[string]any `json:"mcp_input,omitempty"`       // MCP tool: full parsed tool_input
-	TodoCount      int64  `json:"todo_count,omitempty"`      // TodoWrite: count of todos
-	DecisionSrc    string `json:"decision_source,omitempty"` // tool.blocked_on_user
-	Speed          string `json:"speed,omitempty"`           // llm_request: fast|normal
-	RequestID      string `json:"request_id,omitempty"`      // llm_request: Anthropic request ID
-	Attempt        int64  `json:"attempt,omitempty"`         // llm_request: retry number
+	FullCommand   string         `json:"full_command,omitempty"`      // Bash: exact command executed
+	BashCommand   string         `json:"bash_command,omitempty"`      // Bash: un-shelled command
+	Description   string         `json:"description,omitempty"`       // Bash / Task / Agent: human description
+	Timeout       int64          `json:"timeout,omitempty"`           // Bash: timeout in milliseconds
+	GitCommitID   string         `json:"git_commit_id,omitempty"`     // Bash: commit SHA when `git commit` succeeds
+	FilePath      string         `json:"file_path,omitempty"`         // Read/Edit/Write/NotebookEdit
+	Offset        int64          `json:"offset,omitempty"`            // Read: 1-based start line
+	Limit         int64          `json:"limit,omitempty"`             // Read: line count
+	OldStringLen  int64          `json:"old_string_len,omitempty"`    // Edit: char count of old_string
+	NewStringLen  int64          `json:"new_string_len,omitempty"`    // Edit: char count of new_string
+	OldString     string         `json:"old_string,omitempty"`        // Edit: truncated old_string (4 KB max)
+	NewString     string         `json:"new_string,omitempty"`        // Edit: truncated new_string (4 KB max)
+	ReplaceAll    bool           `json:"replace_all,omitempty"`       // Edit: replace_all flag
+	ContentLen    int64          `json:"content_len,omitempty"`       // Write: char count of content
+	Content       string         `json:"content,omitempty"`           // Write: truncated content (4 KB max)
+	Truncated     bool           `json:"content_truncated,omitempty"` // true when any of the above were cut
+	URL           string         `json:"url,omitempty"`               // WebFetch
+	Query         string         `json:"query,omitempty"`             // WebSearch
+	Pattern       string         `json:"pattern,omitempty"`           // Grep/Glob
+	Path          string         `json:"path,omitempty"`              // Grep/Glob: search root
+	OutputMode    string         `json:"output_mode,omitempty"`       // Grep: content|files_with_matches|count
+	Prompt        string         `json:"prompt,omitempty"`            // Task/Agent: delegation prompt (truncated)
+	SkillName     string         `json:"skill_name,omitempty"`        // Skill tool
+	SubagentType  string         `json:"subagent_type,omitempty"`     // Agent/Task delegation target
+	MCPServerName string         `json:"mcp_server_name,omitempty"`   // MCP tool
+	MCPToolName   string         `json:"mcp_tool_name,omitempty"`     // MCP tool
+	MCPInput      map[string]any `json:"mcp_input,omitempty"`         // MCP tool: full parsed tool_input
+	ToolInput     map[string]any `json:"tool_input,omitempty"`        // Generic tool: full parsed tool_input
+	TodoCount     int64          `json:"todo_count,omitempty"`        // TodoWrite: count of todos
+	DecisionSrc   string         `json:"decision_source,omitempty"`   // tool.blocked_on_user
+	Speed         string         `json:"speed,omitempty"`             // llm_request: fast|normal
+	Mode          string         `json:"mode,omitempty"`              // Codex mode/sandbox/approval setting
+	CommandType   string         `json:"command_type,omitempty"`      // Codex command/event kind
+	RequestID     string         `json:"request_id,omitempty"`        // llm_request: Anthropic request ID
+	Attempt       int64          `json:"attempt,omitempty"`           // llm_request: retry number
 }
 
 // otelSpansHandler returns every span persisted for the given session,
@@ -311,8 +316,9 @@ type spanDetail struct {
 // subagent's Bash/Read/etc. under the parent session's Agent row.
 //
 // GET /api/otel/spans?session_id=<id>
-//   200 { "spans": [...] } — empty array if none exist
-//   400 when session_id is missing
+//
+//	200 { "spans": [...] } — empty array if none exist
+//	400 when session_id is missing
 func otelSpansHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -494,12 +500,8 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 		return
 	}
 	// tool_input is a JSON-encoded string inside attrs; parse it.
-	toolInputStr, ok := logAttrs["tool_input"].(string)
-	if !ok || toolInputStr == "" {
-		return
-	}
-	var ti map[string]any
-	if err := json.Unmarshal([]byte(toolInputStr), &ti); err != nil {
+	ti := parseToolInput(logAttrs)
+	if len(ti) == 0 {
 		return
 	}
 	// Fill in only fields the span didn't already populate. Later adapter
@@ -641,6 +643,33 @@ func mergeLogIntoSpanDetails(d *spanDetail, logAttrsRaw string) {
 			d.MCPInput = ti
 		}
 	}
+	if d.ToolInput == nil {
+		d.ToolInput = ti
+	}
+}
+
+func parseToolInput(logAttrs map[string]any) map[string]any {
+	for _, key := range []string{"tool_input", "input", "arguments", "tool.arguments"} {
+		v, ok := logAttrs[key]
+		if !ok {
+			continue
+		}
+		switch x := v.(type) {
+		case string:
+			if x == "" {
+				continue
+			}
+			var ti map[string]any
+			if err := json.Unmarshal([]byte(x), &ti); err == nil {
+				return ti
+			}
+		case map[string]any:
+			if len(x) > 0 {
+				return x
+			}
+		}
+	}
+	return nil
 }
 
 // extractSpanDetails pulls the whitelisted attributes out of attrs_json.
@@ -658,19 +687,23 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	if err := json.Unmarshal([]byte(attrsRaw), &raw); err != nil {
 		return d
 	}
-	pull := func(k string) string {
-		if v, ok := raw[k]; ok {
+	pull := func(keys ...string) string {
+		for _, k := range keys {
+			v, ok := raw[k]
+			if !ok {
+				continue
+			}
 			if s, ok := v.(string); ok {
 				return s
 			}
 		}
 		return ""
 	}
-	d.FullCommand = pull("full_command")
+	d.FullCommand = pull("full_command", "command")
 	d.BashCommand = pull("bash_command")
 	d.Description = pull("description")
 	d.GitCommitID = pull("git_commit_id")
-	d.FilePath = pull("file_path")
+	d.FilePath = pull("file_path", "path")
 	d.URL = pull("url")
 	d.Query = pull("query")
 	d.Pattern = pull("pattern")
@@ -678,11 +711,13 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	d.OutputMode = pull("output_mode")
 	d.SkillName = pull("skill_name")
 	d.SubagentType = pull("subagent_type")
-	d.MCPServerName = pull("mcp_server_name")
-	d.MCPToolName = pull("mcp_tool_name")
-	d.DecisionSrc = pull("source")
+	d.MCPServerName = pull("mcp_server_name", "mcp.server.name")
+	d.MCPToolName = pull("mcp_tool_name", "tool.name")
+	d.DecisionSrc = pull("source", "decision_source")
 	d.Speed = pull("speed")
-	d.RequestID = pull("request_id")
+	d.Mode = pull("mode", "approval_policy", "sandbox_policy", "sandbox")
+	d.CommandType = pull("command_type", "event.kind", "type", "gen_ai.operation.name", "operation.name")
+	d.RequestID = pull("request_id", "request.id", "gen_ai.request.id", "gen_ai.response.id", "response_id")
 	if v, ok := raw["replace_all"]; ok {
 		if b, ok := v.(bool); ok {
 			d.ReplaceAll = b
@@ -690,11 +725,20 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	}
 	// Numeric fields that may arrive as int (OTLP/gRPC binary) or as
 	// string (OTLP/HTTP JSON). Best-effort parse in both cases.
-	d.Attempt = pullInt(raw, "attempt")
+	d.Attempt = firstPullInt(raw, "attempt", "retry_attempt")
 	d.Offset = pullInt(raw, "offset")
 	d.Limit = pullInt(raw, "limit")
 	d.Timeout = pullInt(raw, "timeout")
 	return d
+}
+
+func firstPullInt(raw map[string]any, keys ...string) int64 {
+	for _, key := range keys {
+		if v := pullInt(raw, key); v != 0 {
+			return v
+		}
+	}
+	return 0
 }
 
 // pullInt extracts a numeric attr, accepting int / float / digit-string.
@@ -725,14 +769,14 @@ func pullInt(raw map[string]any, key string) int64 {
 	return 0
 }
 
-
 // otelLogsHandler returns assistant_text logs for rendering in the
 // dashboard event tree. These are text-only turn responses captured from
 // the transcript at the Stop hook.
 //
 // GET /api/otel/logs?session_id=<id>
-//   200 { "logs": [...] } — empty array if none exist
-//   400 when session_id is missing
+//
+//	200 { "logs": [...] } — empty array if none exist
+//	400 when session_id is missing
 func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Codex dashboard events still lack Claude-level expanded metadata</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-9ab5a3e3"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-05-06T20:16:05.236594"
+             data-updated="2026-05-06T23:24:10.657539" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Codex dashboard events still lack Claude-level expanded metadata</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-06T20:16:05.250959">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="019dfe44-ba8c-7451-b68a-43d382e55516.html" data-relationship="implemented_in" data-since="2026-05-06T23:19:18.389814">session 019dfe44-ba8c-7451-b68a-43d382e55516</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-bug-9ab5a3e3-0" data-agent="claude-code">✅ Capture representative Claude and Codex OTEL rows from the same dashboard session</li>
+                <li data-completed="true" data-step-id="step-bug-9ab5a3e3-1" data-agent="claude-code">✅ Map Codex OTEL attributes/spans/logs to the Claude event detail fields where equivalents exist</li>
+                <li data-completed="true" data-step-id="step-bug-9ab5a3e3-2" data-agent="claude-code">✅ Render Codex expanded details with token/model/duration/request/tool payload parity</li>
+                <li data-completed="true" data-step-id="step-bug-9ab5a3e3-3" data-agent="claude-code">✅ Add regression tests comparing expected Claude and Codex detail fields</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Validation screenshot Screenshot_2026-05-06_at_4.10.09_PM.png shows Claude Code tool rows expanding with model, input/output token counts, api duration, request id, mode, command type, and formatted command payload. Codex rows in the same Activity view remain summarized tool lines with work-item/status badges and do not expose comparable normalized metadata. Extend Codex OTEL normalization and dashboard rendering until Codex events show the same useful fields as Claude where Codex emits them, with graceful absent-field handling.</p>
+        </section>
+    </article>
+</body>
+</html>

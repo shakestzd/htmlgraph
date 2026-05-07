@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Dashboard header still shows HtmlGraph after wipnote rename</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-38dd3244"
+             data-type="bug"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-05-06T20:16:05.206454"
+             data-updated="2026-05-06T23:21:39.85113" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+
+        <header>
+            <h1>Dashboard header still shows HtmlGraph after wipnote rename</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-06T20:16:05.221041">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="019dfe44-ba8c-7451-b68a-43d382e55516.html" data-relationship="implemented_in" data-since="2026-05-06T23:19:19.76022">session 019dfe44-ba8c-7451-b68a-43d382e55516</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-bug-38dd3244-0" data-agent="claude-code">✅ Find visible dashboard chrome and title strings still rendering HtmlGraph/htmlgraph</li>
+                <li data-completed="true" data-step-id="step-bug-38dd3244-1" data-agent="claude-code">✅ Update user-facing labels to wipnote naming</li>
+                <li data-completed="true" data-step-id="step-bug-38dd3244-2" data-agent="claude-code">✅ Add or update a focused dashboard/template test that fails on visible HtmlGraph branding</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Validation screenshot Screenshot_2026-05-06_at_4.10.09_PM.png shows the dashboard header still rendering HtmlGraph and / htmlgraph while the product and CLI are now wipnote. This stale branding is user-visible and makes validation ambiguous during the rename. Update dashboard chrome, titles, metadata, and any generated template labels that still surface HtmlGraph/htmlgraph for the current product name.</p>
+        </section>
+    </article>
+</body>
+</html>

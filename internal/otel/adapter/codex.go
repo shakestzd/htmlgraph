@@ -30,7 +30,12 @@ func NewCodexAdapter() *CodexAdapter {
 func (c *CodexAdapter) Name() otel.Harness { return otel.HarnessCodex }
 
 func (c *CodexAdapter) Identify(res OTLPResource) bool {
-	return AttrString(res.Attrs, "service.name") == "codex-cli"
+	switch AttrString(res.Attrs, "service.name") {
+	case "codex-cli", "codex_cli_rs":
+		return true
+	default:
+		return false
+	}
 }
 
 // ConvertMetric maps Codex metric data points into canonical signals.
@@ -71,23 +76,29 @@ func (c *CodexAdapter) ConvertMetric(res OTLPResource, scope OTLPScope, m OTLPMe
 // ConvertLog maps Codex log events onto canonical names. The event naming
 // convention follows OpenAI's gen_ai semconv where applicable.
 func (c *CodexAdapter) ConvertLog(res OTLPResource, scope OTLPScope, l OTLPLog) []otel.UnifiedSignal {
-	base := c.baseSignal(res, scope, otel.KindLog, l.Name, l.Timestamp, l.Attrs)
+	nativeName := codexLogNativeName(l)
+	base := c.baseSignal(res, scope, otel.KindLog, nativeName, l.Timestamp, l.Attrs)
 	base.TraceID = l.TraceID
 	base.SpanID = l.SpanID
 
-	switch l.Name {
+	switch nativeName {
+	case "codex.conversation_starts":
+		base.CanonicalName = otel.CanonicalSessionStart
 	case "codex.user_prompt", "user_prompt":
 		base.CanonicalName = otel.CanonicalUserPrompt
-	case "codex.api_request", "gen_ai.client.operation.duration":
+		base.Model = AttrString(l.Attrs, "model")
+	case "codex.api_request", "gen_ai.client.operation.duration",
+		"codex.websocket_connect", "codex.websocket_request":
 		base.CanonicalName = otel.CanonicalAPIRequest
-		base.Model = AttrString(l.Attrs, "gen_ai.response.model")
-		if base.Model == "" {
-			base.Model = AttrString(l.Attrs, "model")
+		base.Model = firstCodexString(l.Attrs, "gen_ai.response.model", "gen_ai.request.model", "model")
+		base.DurationMs = firstCodexInt64(l.Attrs, "duration_ms", "gen_ai.client.operation.duration_ms")
+		base.Tokens.Input = firstCodexInt64(l.Attrs, "gen_ai.usage.input_tokens", "input_token_count", "input_tokens")
+		base.Tokens.Output = firstCodexInt64(l.Attrs, "gen_ai.usage.output_tokens", "output_token_count", "output_tokens")
+		base.Tokens.Reasoning = firstCodexInt64(l.Attrs, "gen_ai.usage.reasoning_tokens", "reasoning_token_count", "reasoning_tokens")
+		if success := AttrString(l.Attrs, "success"); success != "" {
+			v := success == "true"
+			base.Success = &v
 		}
-		base.DurationMs = AttrInt64(l.Attrs, "duration_ms")
-		base.Tokens.Input = AttrInt64(l.Attrs, "gen_ai.usage.input_tokens")
-		base.Tokens.Output = AttrInt64(l.Attrs, "gen_ai.usage.output_tokens")
-		base.Tokens.Reasoning = AttrInt64(l.Attrs, "gen_ai.usage.reasoning_tokens")
 	case "codex.api_error":
 		base.CanonicalName = otel.CanonicalAPIError
 		base.Model = AttrString(l.Attrs, "model")
@@ -98,16 +109,27 @@ func (c *CodexAdapter) ConvertLog(res OTLPResource, scope OTLPScope, l OTLPLog) 
 	case "codex.tool_result", "tool_result":
 		base.CanonicalName = otel.CanonicalToolResult
 		base.ToolName = AttrString(l.Attrs, "tool_name")
+		base.ToolUseID = AttrString(l.Attrs, "call_id")
 		base.DurationMs = AttrInt64(l.Attrs, "duration_ms")
 		base.Decision = AttrString(l.Attrs, "decision")
 		base.DecisionSource = normalizeDecisionSource(AttrString(l.Attrs, "source"))
 		succ := AttrString(l.Attrs, "success") == "true"
 		base.Success = &succ
+		base.Model = AttrString(l.Attrs, "model")
 	case "codex.tool_decision", "tool_decision":
 		base.CanonicalName = otel.CanonicalToolDecision
 		base.ToolName = AttrString(l.Attrs, "tool_name")
+		base.ToolUseID = AttrString(l.Attrs, "call_id")
 		base.Decision = AttrString(l.Attrs, "decision")
 		base.DecisionSource = normalizeDecisionSource(AttrString(l.Attrs, "source"))
+		base.Model = AttrString(l.Attrs, "model")
+	case "codex.sse_event":
+		base.CanonicalName = otel.CanonicalTokenUsage
+		base.Model = AttrString(l.Attrs, "model")
+		base.Tokens.Input = AttrInt64(l.Attrs, "input_token_count")
+		base.Tokens.Output = AttrInt64(l.Attrs, "output_token_count")
+		base.Tokens.Reasoning = AttrInt64(l.Attrs, "reasoning_token_count")
+		base.Tokens.Tool = AttrInt64(l.Attrs, "tool_token_count")
 	default:
 		base.CanonicalName = otel.CanonicalUnknown
 	}
@@ -139,19 +161,20 @@ func (c *CodexAdapter) ConvertSpan(res OTLPResource, scope OTLPScope, s OTLPSpan
 		base.CanonicalName = otel.CanonicalInteraction
 	case "codex.llm_request", "gen_ai.client.operation":
 		base.CanonicalName = otel.CanonicalAPIRequest
-		base.Model = AttrString(s.Attrs, "gen_ai.response.model")
-		if base.Model == "" {
-			base.Model = AttrString(s.Attrs, "gen_ai.request.model")
-		}
-		base.Tokens.Input = AttrInt64(s.Attrs, "gen_ai.usage.input_tokens")
-		base.Tokens.Output = AttrInt64(s.Attrs, "gen_ai.usage.output_tokens")
-		base.Tokens.Reasoning = AttrInt64(s.Attrs, "gen_ai.usage.reasoning_tokens")
+		base.Model = firstCodexString(s.Attrs, "gen_ai.response.model", "gen_ai.request.model", "model")
+		base.Tokens.Input = firstCodexInt64(s.Attrs, "gen_ai.usage.input_tokens", "input_token_count", "input_tokens")
+		base.Tokens.Output = firstCodexInt64(s.Attrs, "gen_ai.usage.output_tokens", "output_token_count", "output_tokens")
+		base.Tokens.Reasoning = firstCodexInt64(s.Attrs, "gen_ai.usage.reasoning_tokens", "reasoning_token_count", "reasoning_tokens")
 	case "codex.tool", "ai.tool":
 		base.CanonicalName = otel.CanonicalToolResult
 		base.ToolName = AttrString(s.Attrs, "tool_name")
 		if base.ToolName == "" {
 			base.ToolName = AttrString(s.Attrs, "gen_ai.tool.name")
 		}
+	case "mcp.tools.call":
+		base.CanonicalName = otel.CanonicalToolResult
+		base.ToolName = codexMCPToolName(s.Attrs)
+		base.ToolUseID = AttrString(s.Attrs, "tool.call_id")
 	default:
 		base.CanonicalName = otel.CanonicalUnknown
 	}
@@ -178,4 +201,41 @@ func (c *CodexAdapter) baseSignal(
 		RawAttrs:       copyAttrs(attrs),
 	}
 	return sig
+}
+
+func codexLogNativeName(l OTLPLog) string {
+	if eventName := AttrString(l.Attrs, "event.name"); eventName != "" {
+		return eventName
+	}
+	return l.Name
+}
+
+func codexMCPToolName(attrs map[string]any) string {
+	tool := AttrString(attrs, "tool.name")
+	if tool == "" {
+		return ""
+	}
+	server := AttrString(attrs, "mcp.server.name")
+	if server == "" {
+		return tool
+	}
+	return "mcp__" + server + "__" + tool
+}
+
+func firstCodexString(attrs map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if v := AttrString(attrs, key); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func firstCodexInt64(attrs map[string]any, keys ...string) int64 {
+	for _, key := range keys {
+		if v := AttrInt64(attrs, key); v != 0 {
+			return v
+		}
+	}
+	return 0
 }

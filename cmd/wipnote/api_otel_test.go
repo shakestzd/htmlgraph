@@ -378,7 +378,7 @@ func TestOtelSpansHandler_ConcurrentSubagentModelAttribution(t *testing.T) {
 			ts_micros, trace_id, span_id, parent_span, tool_name, model, attrs_json
 		) VALUES
 		('task-sonnet', 'claude_code', ?, 'span', 'subagent_invocation', 'claude_code.tool',
-			1400, 'trace-A', 'task-sonnet-span', 'orch-root', 'Agent', NULL, '{"subagent_type":"htmlgraph:sonnet-coder"}')`,
+			1400, 'trace-A', 'task-sonnet-span', 'orch-root', 'Agent', NULL, '{"subagent_type":"wipnote:sonnet-coder"}')`,
 		sessionID)
 	if err != nil {
 		t.Fatalf("seed Task sonnet span: %v", err)
@@ -449,6 +449,78 @@ func TestOtelSpansHandler_ConcurrentSubagentModelAttribution(t *testing.T) {
 	// haiku-api-req must also be parented to orch-root (the mis-parented scenario).
 	if haikuSpan.ParentSpan != "orch-root" {
 		t.Errorf("haiku api_request parent_span = %q, want orch-root (mis-parented scenario)", haikuSpan.ParentSpan)
+	}
+}
+
+func TestOtelSpansHandler_CodexDetailsAndToolInput(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "codex-details.db")
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+
+	sessionID := "codex-sess"
+	database.Exec(`INSERT INTO sessions (session_id, agent_assigned) VALUES (?, ?)`, sessionID, "codex")
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, parent_span, tool_name, model,
+			tokens_in, tokens_out, duration_ms, attrs_json
+		) VALUES
+		('codex-api', 'codex', ?, 'span', 'api_request', 'gen_ai.client.operation',
+			100, 'trace-codex', 'api-span', '', '', 'gpt-5.1-codex',
+			1234, 567, 890, '{"request.id":"req_abc","approval_policy":"on-request","event.kind":"turn"}'),
+		('codex-bash', 'codex', ?, 'span', 'tool_result', 'mcp.tools.call',
+			200, 'trace-codex', 'bash-span', 'api-span', 'Bash', '',
+			0, 0, 42, '{}')`,
+		sessionID, sessionID)
+	if err != nil {
+		t.Fatalf("seed spans: %v", err)
+	}
+	_, err = database.Exec(`
+		INSERT INTO otel_signals (
+			signal_id, harness, session_id, kind, canonical, native,
+			ts_micros, trace_id, span_id, tool_name, attrs_json
+		) VALUES
+		('codex-bash-log', 'codex', ?, 'log', 'tool_result', 'codex.tool_result',
+			210, 'trace-codex', 'bash-log', 'Bash',
+			'{"tool_name":"Bash","tool_input":{"command":"go test ./cmd/wipnote","timeout":60000},"success":"true"}')`,
+		sessionID)
+	if err != nil {
+		t.Fatalf("seed tool log: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/otel/spans?session_id="+sessionID, nil)
+	rec := httptest.NewRecorder()
+	otelSpansHandler(database).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body struct {
+		Spans []spanJSON `json:"spans"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	byID := map[string]spanJSON{}
+	for _, s := range body.Spans {
+		byID[s.SignalID] = s
+	}
+	api := byID["codex-api"]
+	if api.Model != "gpt-5.1-codex" || api.TokensIn != 1234 || api.TokensOut != 567 || api.DurationMs != 890 {
+		t.Fatalf("api span core fields wrong: %+v", api)
+	}
+	if api.Details.RequestID != "req_abc" || api.Details.Mode != "on-request" || api.Details.CommandType != "turn" {
+		t.Fatalf("api details = %+v", api.Details)
+	}
+	bash := byID["codex-bash"]
+	if bash.Details.FullCommand != "go test ./cmd/wipnote" || bash.Details.Timeout != 60000 {
+		t.Fatalf("bash details = %+v", bash.Details)
+	}
+	if bash.Details.ToolInput == nil || bash.Details.ToolInput["command"] != "go test ./cmd/wipnote" {
+		t.Fatalf("tool input not preserved: %+v", bash.Details.ToolInput)
 	}
 }
 
