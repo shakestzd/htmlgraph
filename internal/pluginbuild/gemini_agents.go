@@ -74,6 +74,7 @@ func emitGeminiAgents(m *Manifest, repoRoot, outDir string, t Target) error {
 	if err := os.MkdirAll(dstDir, 0o755); err != nil {
 		return err
 	}
+	knownRoles := codexKnownAgentRoles(m, repoRoot)
 
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
@@ -93,7 +94,8 @@ func emitGeminiAgents(m *Manifest, repoRoot, outDir string, t Target) error {
 			return fmt.Errorf("translate agent %s: %w", e.Name(), err)
 		}
 		dst := filepath.Join(dstDir, e.Name())
-		if err := os.WriteFile(dst, translated, 0o644); err != nil {
+		body := rewriteGeminiAgentIDs(rewriteGeminiDelegationSyntax(string(translated), knownRoles), knownRoles)
+		if err := os.WriteFile(dst, []byte(body), 0o644); err != nil {
 			return fmt.Errorf("write translated agent %s: %w", dst, err)
 		}
 	}

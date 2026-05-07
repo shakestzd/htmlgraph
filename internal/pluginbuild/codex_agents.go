@@ -35,7 +35,7 @@ type codexAgentTOML struct {
 	DeveloperInstructions string   `toml:"developer_instructions"`
 }
 
-func emitCodexAgents(m *Manifest, repoRoot, outDir string) error {
+func emitCodexAgents(m *Manifest, repoRoot, outDir string, knownRoles map[string]struct{}) error {
 	if m.AssetSources.Agents == "" {
 		return nil
 	}
@@ -72,6 +72,9 @@ func emitCodexAgents(m *Manifest, repoRoot, outDir string) error {
 		if err != nil {
 			return fmt.Errorf("translate agent %s: %w", e.Name(), err)
 		}
+		// Translate colon-form agent IDs in developer_instructions so agent
+		// bodies that reference wipnote:<role> work correctly in Codex.
+		agent.DeveloperInstructions = codexRewriteAgentIDs(agent.DeveloperInstructions, knownRoles)
 		out, err := toml.Marshal(agent)
 		if err != nil {
 			return fmt.Errorf("marshal codex agent %s: %w", e.Name(), err)

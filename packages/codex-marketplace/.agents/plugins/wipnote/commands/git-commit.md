@@ -58,11 +58,8 @@ If `--push` was passed, add: "Then push to origin." to the prompt.
 **Only if copilot failed, timed out, or was not found — delegate to patch-coder:**
 
 ```text
-Agent(
-    subagent_type="wipnote:patch-coder",
-    description="Commit: <message>",
-    prompt="Stage these files: <list>. Commit with message: '<message>'. Do NOT push."
-)
+Call spawn_agent with:
+Call spawn_agent with agent_type "wipnote-patch-coder" and message containing: description="Commit: <message>"; prompt="Stage these files: <list>. Commit with message: '<message>'. Do NOT push.".
 ```
 
 **Only if BOTH copilot and patch-coder failed — use direct git as last resort:**
