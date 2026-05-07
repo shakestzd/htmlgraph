@@ -7,7 +7,7 @@ meta:
     created_at: "2026-05-06"
     status: finalized
     created_by: codex
-    version: 10
+    version: 11
 design:
     problem: |
         wipnote currently treats `plugin/skills/**/SKILL.md` and `plugin/agents/*.md` as cross-harness assets, then copies them into the Codex marketplace tree. That is sufficient for Codex skills now that the plugin manifest points at `./skills/`, but it is not sufficient for Codex custom agents: current Codex documentation says custom agents are standalone TOML files under `.codex/agents/` or `~/.codex/agents/`, not plugin-root `agents/*.md` files. The result is a partial port where the skills load but wipnote's named subagents do not appear in Codex. The next architecture must keep business logic in one place while emitting each harness's native packaging format.
@@ -167,9 +167,9 @@ slices:
         Unit: parse each `plugin/agents/*.md`, translate to TOML, parse the TOML back, and assert required Codex fields.
         Regression: assert no unsupported Claude fields (`tools`, `color`, `maxTurns`) leak into generated Codex TOML.
         Manual smoke: after install, ask Codex to list available custom agents or inspect prompt/debug output for the generated names.
-      approved: false
+      approved: true
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: promoted
       questions:
         - id: q-agent-install-scope
@@ -185,6 +185,7 @@ slices:
               label: User global — works across repos after `wipnote codex`
             - key: project-local
               label: Project local — check in `.codex/agents`, but may pollute repos
+          answer: user-global
     - id: slice-4
       feature_id: feat-73cd46aa
       num: 4
@@ -240,9 +241,9 @@ slices:
         Unit: use temporary HOME to assert install paths, generated headers, idempotence, and stale replacement.
         Integration: run `go test ./cmd/wipnote -run 'Test.*Codex'` and `go run ./cmd/wipnote codex --dev -- exec ...` smoke.
         Manual smoke: verify Codex recognizes `wipnote-sonnet-coder`, `wipnote-reader`, and `wipnote-test-runner` as custom agents.
-      approved: false
+      approved: true
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: promoted
     - id: slice-5
       num: 5

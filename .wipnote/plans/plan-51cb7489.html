@@ -415,14 +415,14 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     
     <li>
       <a href="#slice-3" class="slice-nav-item" data-slice-nav="3">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="3"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="3"></span>
         <span>#3 Translate wipnote agents into Codex custom-agent TOML</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-4" class="slice-nav-item" data-slice-nav="4">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="4"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="4"></span>
         <span>#4 Install and refresh Codex custom agents during wipnote codex launch</span>
       </a>
     </li>
@@ -452,7 +452,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v10 · 5 slices · Created 2026-05-06</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v11 · 5 slices · Created 2026-05-06</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -795,7 +795,7 @@ descriptions, and path layout while keeping the workflow body shared.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 3: Translate wipnote agents into Codex custom-agent TOML">
     <span class="slice-num">#3</span>
     <span class="slice-title-col">
@@ -806,14 +806,14 @@ descriptions, and path layout while keeping the workflow body shared.</p>
           <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-revision badge-sm" title="Execution: promoted">Promoted</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-3">Approved</span>
           
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" aria-label="Approve slice 3">
+              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" checked aria-label="Approve slice 3">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -944,7 +944,7 @@ project. Choosing user-global does not preclude project overrides.
             
             
             
-            <label class="recommended"><input type="radio" name="slice-3-question-q-agent-install-scope" data-section="slice-3-question-q-agent-install-scope" data-action="answer" value="user-global"> User global — works across repos after `wipnote codex` <span class="rec-tag">recommended</span></label>
+            <label><input type="radio" name="slice-3-question-q-agent-install-scope" data-section="slice-3-question-q-agent-install-scope" data-action="answer" value="user-global" checked> User global — works across repos after `wipnote codex`</label>
             
             <label><input type="radio" name="slice-3-question-q-agent-install-scope" data-section="slice-3-question-q-agent-install-scope" data-action="answer" value="project-local"> Project local — check in `.codex/agents`, but may pollute repos</label>
             
@@ -965,7 +965,7 @@ project. Choosing user-global does not preclude project overrides.
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 4: Install and refresh Codex custom agents during wipnote codex launch">
     <span class="slice-num">#4</span>
     <span class="slice-title-col">
@@ -976,14 +976,14 @@ project. Choosing user-global does not preclude project overrides.
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-revision badge-sm" title="Execution: promoted">Promoted</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-4">Approved</span>
           
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" aria-label="Approve slice 4">
+              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" checked aria-label="Approve slice 4">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
