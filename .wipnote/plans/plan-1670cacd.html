@@ -397,6 +397,80 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <a href="#design" class="nav-link active" data-spy="design" data-initial="D">Design</a>
   <a href="#slices" class="nav-link" data-spy="slices" data-initial="S">Slices</a>
   
+  <ul class="slice-nav-list" id="slice-nav-list">
+    
+    <li>
+      <a href="#slice-1" class="slice-nav-item" data-slice-nav="1">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="1"></span>
+        <span>#1 Launcher mode contract and environment detection</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-2" class="slice-nav-item" data-slice-nav="2">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="2"></span>
+        <span>#2 Default isolated worktree launches with dirty-main guard</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-3" class="slice-nav-item" data-slice-nav="3">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="3"></span>
+        <span>#3 Canonical project identity across worktrees</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-4" class="slice-nav-item" data-slice-nav="4">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="4"></span>
+        <span>#4 Session-family continuity and per-session fallback state</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-5" class="slice-nav-item" data-slice-nav="5">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="5"></span>
+        <span>#5 Parallel attribution and claim coordination</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-6" class="slice-nav-item" data-slice-nav="6">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="6"></span>
+        <span>#6 Collector and event-writer concurrency hardening</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-7" class="slice-nav-item" data-slice-nav="7">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="7"></span>
+        <span>#7 Dashboard worktree/session-family UX</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-8" class="slice-nav-item" data-slice-nav="8">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="8"></span>
+        <span>#8 Host, devcontainer, and production deployment profiles</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-9" class="slice-nav-item" data-slice-nav="9">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="9"></span>
+        <span>#9 Migration, cleanup, and compatibility tooling</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-10" class="slice-nav-item" data-slice-nav="10">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="10"></span>
+        <span>#10 Parallel stress harness and release gates</span>
+      </a>
+    </li>
+    
+  </ul>
+  
   <a href="#questions" class="nav-link" data-spy="questions" data-initial="Q">Decisions</a>
   <a href="#critique" class="nav-link" data-spy="critique" data-initial="C">Critique</a>
   <a href="#feedback-summary" class="nav-link" data-spy="feedback-summary" data-initial="P">Progress</a>
@@ -404,15 +478,16 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-1670cacd" data-type="plan" data-plan-id="plan-1670cacd" data-feature-id="trk-a30e8df4" data-status="draft" data-priority="medium">
+<article id="plan-1670cacd" data-type="plan" data-plan-id="plan-1670cacd" data-feature-id="trk-a30e8df4" data-status="active" data-priority="medium">
 
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Launcher isolation, deployment modes, and parallel attribution</h1>
-  <p style="color:var(--text-dim)">Design production-ready launcher isolation across Claude, Codex, and Gemini: default branch/worktree behavior, devcontainer vs host deployment modes, and robust attribution/event capture for parallel CLIs and subagents.</p>
+  <p style="color:var(--text-dim)">Design production-ready launcher isolation across Claude, Codex, and Gemini: default branch/worktree behavior, devcontainer versus host deployment modes, and robust attribution/event capture for parallel CLIs and subagents.
+</p>
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 0 slices · Created 2026-05-08</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v1 · 10 slices · Created 2026-05-08</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -432,6 +507,16 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
+    <div data-node="1" data-name="Launcher mode contract and environment detection" data-status="pending" data-deps="" data-files="6"></div>
+    <div data-node="2" data-name="Default isolated worktree launches with dirty-main guard" data-status="pending" data-deps="1" data-files="7"></div>
+    <div data-node="3" data-name="Canonical project identity across worktrees" data-status="pending" data-deps="1,2" data-files="9"></div>
+    <div data-node="4" data-name="Session-family continuity and per-session fallback state" data-status="pending" data-deps="3" data-files="8"></div>
+    <div data-node="5" data-name="Parallel attribution and claim coordination" data-status="pending" data-deps="4" data-files="8"></div>
+    <div data-node="6" data-name="Collector and event-writer concurrency hardening" data-status="pending" data-deps="3,4" data-files="7"></div>
+    <div data-node="7" data-name="Dashboard worktree/session-family UX" data-status="pending" data-deps="4,5,6" data-files="7"></div>
+    <div data-node="8" data-name="Host, devcontainer, and production deployment profiles" data-status="pending" data-deps="1,2,3" data-files="8"></div>
+    <div data-node="9" data-name="Migration, cleanup, and compatibility tooling" data-status="pending" data-deps="2,3,4" data-files="7"></div>
+    <div data-node="10" data-name="Parallel stress harness and release gates" data-status="pending" data-deps="5,6,7,8,9" data-files="8"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -444,17 +529,34 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <details id="design" class="section-card" open data-phase="design" data-status="pending">
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
-    <!--PLAN_DESIGN_CONTENT-->
-    <div class="sub-section">
-      <h4>Open Questions</h4>
-      <!--PLAN_QUESTIONS-->
-    </div>
+    <h4>Problem</h4>
+<div data-markdown>wipnote can currently launch multiple AI CLIs directly from a mutable checkout. That is convenient, but it allows long-running local stacks, generated plugin changes, work-item bookkeeping, and merged upstream work to accumulate on local main. The result is avoidable divergence, hard-to-review commits, and fragile reconciliation after PR merges. The obvious fix is to launch mutating sessions in isolated branches or worktrees by default, but that changes the shape of project identity, session continuity, active-session fallback state, event capture, subagent attribution, and dashboard grouping. The design must also account for the difference between production host installs and devcontainer sessions, where ports, bind addresses, filesystem permissions, plugin paths, and temp execution policy differ.
+</div>
+<h4>Goals</h4>
+<ol>
+<li data-markdown>**Protect main** — mutating Claude, Codex, and Gemini sessions do not dirty or diverge local main by default.</li>
+<li data-markdown>**Preserve observability** — dashboard sessions, event trees, NDJSON, SQLite indexes, and lineage remain grouped under one canonical project even when execution happens in worktrees.</li>
+<li data-markdown>**Coordinate parallelism** — multiple CLIs and their subagents can run concurrently in the same project without clobbering attribution, active-session fallback state, collectors, branch names, or work-item claims.</li>
+<li data-markdown>**Deploy safely** — host installs, devcontainers, local plugin development, and production launcher paths have explicit mode detection, defaults, and test coverage.</li>
+<li data-markdown>**Migrate incrementally** — existing yolo/worktree helpers, session rows, and dashboard APIs are reused and hardened without breaking current users.</li>
+</ol>
+<h4>Constraints</h4>
+<ul>
+<li data-markdown>Canonical project identity must remain the main repo root containing .wipnote, not an arbitrary linked worktree path.</li>
+<li data-markdown>Fresh worktrees are execution directories only; event storage and dashboard project grouping stay anchored to the canonical root.</li>
+<li data-markdown>The launcher must offer an explicit in-place escape hatch for intentional local-main work.</li>
+<li data-markdown>Branch naming must remain compatible with existing work-item completion and lineage conventions until explicit metadata replaces branch-name inference.</li>
+<li data-markdown>Devcontainer defaults must bind dashboard services to 0.0.0.0:8088, while host installs keep the production default of 127.0.0.1:8080.</li>
+<li data-markdown>No implementation slice may rely solely on global mutable fallback files when parallel CLI sessions are expected.</li>
+</ul>
+
     <div class="approval-row">
       <label><input type="checkbox" data-section="design" data-action="approve"> Approve design</label>
       <textarea data-section="design" data-comment-for="design" placeholder="Comments on design decisions..."></textarea>
     </div>
   </div>
 </details>
+
 
 <!-- Structure Outline (hidden when empty) -->
 
@@ -463,23 +565,1447 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
+    <details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-1" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 1: Launcher mode contract and environment detection">
+    <span class="slice-num">#1</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Launcher mode contract and environment detection</span>
+      <span class="slice-preview">Define a shared launcher mode contract used by Claude, Codex, Gemini, yolo,</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-revision badge-sm">M</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
+          
+          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-1-approval" value="approved" data-section="slice-1" data-action="approve" aria-label="Approve slice 1">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-1-approval" value="changes_requested" data-section="slice-1" data-action="approve" aria-label="Request changes for slice 1">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-1-approval" value="rejected" data-section="slice-1" data-action="approve" aria-label="Reject slice 1">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
     
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-1-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Define a shared launcher mode contract used by Claude, Codex, Gemini, yolo,
+and dashboard terminal launch paths. Add an <code>internal/launcher/mode</code> package
+or equivalent small helper that computes:</p>
+<ul>
+<li>execution mode: <code>isolated-worktree</code>, <code>in-place</code>, or <code>read-only</code></li>
+<li>runtime mode: <code>host</code>, <code>devcontainer</code>, or <code>ci</code></li>
+<li>plugin mode: <code>installed</code>, <code>local-dev</code>, or <code>generated-port</code></li>
+<li>dashboard bind defaults for the runtime mode</li>
+<li>temp execution policy for tests and helper subprocesses</li>
+</ul>
+<p>Wire the helper into launcher preflight code without changing default
+behavior yet. Emit a structured plan/preview object for callers so later
+slices can switch defaults safely.</p>
+</div>
+          <label for="slice-1-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>The branch/worktree policy should not be duplicated independently in every
+harness launcher. A shared contract lets production deployment, devcontainer
+behavior, and tests reason from the same inputs before any risky default
+changes are introduced.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/launcher/mode/mode.go, internal/launcher/mode/mode_test.go, cmd/wipnote/claude.go, cmd/wipnote/codex.go, cmd/wipnote/gemini.go, cmd/wipnote/yolo.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>A shared helper reports launcher execution/runtime/plugin mode without mutating the repository.</li><li>Claude, Codex, Gemini, and yolo launchers can log or expose the computed mode in dry/preflight paths.</li><li>Devcontainer mode selects bind default 0.0.0.0:8088 while host mode selects 127.0.0.1:8080.</li><li>Existing launcher behavior remains unchanged until later slices explicitly flip defaults.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestDetectRuntimeMode_HostDevcontainerCI covers marker files and env vars.</li><li>TestDashboardBindDefaults covers host versus devcontainer bind/port.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing launcher command construction tests still pass.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>a launcher preflight test asserts all three harnesses return a mode object without starting a CLI.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Which signal should define devcontainer mode?</p>
+          
+          
+          <textarea
+            data-section="slice-1-question-q-devcontainer-detect"
+            data-comment-for="slice-1-question-q-devcontainer-detect"
+            placeholder="Answer question q-devcontainer-detect..."></textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: none</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-1" data-comment-for="slice-1" placeholder="Comments on slice 1..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 2: Default isolated worktree launches with dirty-main guard">
+    <span class="slice-num">#2</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Default isolated worktree launches with dirty-main guard</span>
+      <span class="slice-preview">Change mutating launcher defaults so wipnote claude, wipnote codex,</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
+          
+          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-2-approval" value="approved" data-section="slice-2" data-action="approve" aria-label="Approve slice 2">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-2-approval" value="changes_requested" data-section="slice-2" data-action="approve" aria-label="Request changes for slice 2">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-2-approval" value="rejected" data-section="slice-2" data-action="approve" aria-label="Reject slice 2">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-2-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Change mutating launcher defaults so <code>wipnote claude</code>, <code>wipnote codex</code>,
+<code>wipnote gemini</code>, yolo, and dashboard terminal launches run in managed
+worktrees when invoked from local main or another protected branch.</p>
+<p>Reuse existing <code>internal/worktree</code> and command-level worktree helpers.
+Add explicit flags:</p>
+<ul>
+<li><code>--worktree</code> / <code>--no-worktree</code></li>
+<li><code>--in-place</code> as an alias for intentional local checkout mutation</li>
+<li><code>--base &lt;branch&gt;</code> for advanced users</li>
+<li><code>--work-item &lt;id&gt;</code> as a harness-neutral spelling for feature/bug/track</li>
+</ul>
+<p>Add a dirty-main guard that refuses mutating in-place launch unless the
+user passes <code>--in-place</code> and the mode contract records the decision.</p>
+</div>
+          <label for="slice-2-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>This is the main divergence prevention mechanism. It keeps local main able
+to fast-forward and absorb upstream PRs while work proceeds on explicit,
+named branches/worktrees tied to work items.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/worktree/worktree.go, cmd/wipnote/worktree_helpers.go, cmd/wipnote/claude.go, cmd/wipnote/codex.go, cmd/wipnote/gemini.go, cmd/wipnote/yolo.go, cmd/wipnote/terminal_handlers.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Launching a mutating session from local main defaults to a managed worktree.</li><li>Launching with `--in-place` preserves existing behavior and records that the user opted out of isolation.</li><li>Dirty protected branches refuse in-place mutating launch unless the explicit escape hatch is present.</li><li>Worktree branch names remain deterministic and compatible with existing work-item branch conventions.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestLauncherPlan_DefaultsToWorktreeOnMain validates command planning without starting a harness.</li><li>TestLauncherPlan_InPlaceEscapeHatch validates explicit in-place mode.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestWorktreeLaunch_PreservesCanonicalRoot starts a fake harness in a managed worktree.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing yolo worktree reuse and branch-already-exists tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Should all mutating launchers default to worktree mode immediately, or should this roll out behind a config flag first?</p>
+          
+          
+          <textarea
+            data-section="slice-2-question-q-default"
+            data-comment-for="slice-2-question-q-default"
+            placeholder="Answer question q-default..."></textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: slices 1</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-2" data-comment-for="slice-2" placeholder="Comments on slice 2..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 3: Canonical project identity across worktrees">
+    <span class="slice-num">#3</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Canonical project identity across worktrees</span>
+      <span class="slice-preview">Formalize and harden the rule that WIPNOTEPROJECTDIR,</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
+          
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" aria-label="Approve slice 3">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-3-approval" value="changes_requested" data-section="slice-3" data-action="approve" aria-label="Request changes for slice 3">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-3-approval" value="rejected" data-section="slice-3" data-action="approve" aria-label="Reject slice 3">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-3-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Formalize and harden the rule that <code>WIPNOTE_PROJECT_DIR</code>,
+<code>sessions.project_dir</code>, DB cache keys, NDJSON event paths, and dashboard
+project filters use the canonical main repo root even when execution CWD is
+a worktree.</p>
+<p>Add a small <code>ProjectIdentity</code> value that carries both:</p>
+<ul>
+<li><code>CanonicalRoot</code> for tracking/storage/dashboard</li>
+<li><code>ExecutionRoot</code> for process cwd and file edits</li>
+</ul>
+<p>Thread it through launcher env construction, hook resolution, session
+start, storage path resolution, and dashboard handlers where raw paths are
+currently compared.</p>
+</div>
+          <label for="slice-3-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Worktree-per-launch is safe only if worktrees do not become separate
+projects. If project identity is keyed by each worktree path, the
+dashboard fragments sessions, SQLite indexes split, and divergence guards
+start flagging normal cross-worktree activity as project drift.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/paths/resolve.go, internal/storage/dbpath.go, internal/hooks/session_start.go, internal/hooks/runner.go, internal/hooks/pretooluse.go, cmd/wipnote/api.go, cmd/wipnote/claude.go, cmd/wipnote/codex.go, cmd/wipnote/gemini.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Sessions launched from linked worktrees store the canonical root in `sessions.project_dir`.</li><li>Dashboard project/session filters show worktree-launched sessions under the main project.</li><li>SQLite cache paths do not multiply by worktree path when canonical root is available.</li><li>Divergence guards compare canonical roots rather than raw execution directories.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestResolveProjectIdentity_LinkedWorktree returns canonical and execution roots.</li><li>TestSessionStart_StoresCanonicalProjectDir covers worktree launch env.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestDashboardSessions_WorktreeGroupedUnderCanonicalProject verifies API filtering.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing project resolution and cache path tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 1,2</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-3" data-comment-for="slice-3" placeholder="Comments on slice 3..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 4: Session-family continuity and per-session fallback state">
+    <span class="slice-num">#4</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Session-family continuity and per-session fallback state</span>
+      <span class="slice-preview">Replace the project-global active-session fallback with a concurrency-safe</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
+          
+          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" aria-label="Approve slice 4">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-4-approval" value="changes_requested" data-section="slice-4" data-action="approve" aria-label="Request changes for slice 4">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-4-approval" value="rejected" data-section="slice-4" data-action="approve" aria-label="Reject slice 4">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-4-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Replace the project-global active-session fallback with a concurrency-safe
+session-family model.</p>
+<p>Add or wire:</p>
+<ul>
+<li><code>session_family_id</code> or robust use of existing <code>continued_from</code></li>
+<li>per-session fallback files under <code>.wipnote/sessions/&lt;session_id&gt;/</code></li>
+<li>a project-level index of active session families instead of one
+<code>.active-session</code> last-writer-wins file</li>
+<li>harness-neutral resume correlation for Claude, Codex, and Gemini</li>
+</ul>
+<p>Keep backward compatibility for old <code>.active-session</code> reads during a
+migration window, but prefer per-session state when present.</p>
+</div>
+          <label for="slice-4-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Parallel CLI sessions and subagents cannot rely on one global active
+session file. The dashboard needs continuity across resumes and child
+sessions, while hooks need a stable fallback identity when harness-specific
+env propagation is incomplete.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/models/session.go, internal/db/session_repo.go, internal/db/schema.go, internal/hooks/session_start.go, internal/hooks/runner.go, internal/hooks/subagent_start.go, cmd/wipnote/api_tree.go, cmd/wipnote/api_otel.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Parallel root sessions no longer overwrite one another&#39;s fallback identity.</li><li>Claude, Codex, and Gemini launches can link resume/continue events into a session family.</li><li>Old `.active-session` fallback remains readable but is no longer the primary parallel-session mechanism.</li><li>Dashboard event tree can group by session family when requested while preserving per-session drilldown.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestActiveSessionIndex_ParallelFamilies verifies two roots can coexist.</li><li>TestSessionFamily_ContinuedFrom links resumed sessions without relying on harness-specific IDs.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestEventTree_SessionFamilyGrouping creates root plus subagent sessions and asserts tree continuity.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing Claude Rosetta session_start behavior still works.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Should we add `session_family_id` or standardize on existing `continued_from`?</p>
+          
+          
+          <textarea
+            data-section="slice-4-question-q-family-field"
+            data-comment-for="slice-4-question-q-family-field"
+            placeholder="Answer question q-family-field..."></textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: slices 3</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 5: Parallel attribution and claim coordination">
+    <span class="slice-num">#5</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Parallel attribution and claim coordination</span>
+      <span class="slice-preview">Harden work-item attribution for multiple CLIs and their simultaneous</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-5">Pending</span>
+          
+          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-5-approval" value="approved" data-section="slice-5" data-action="approve" aria-label="Approve slice 5">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-5-approval" value="changes_requested" data-section="slice-5" data-action="approve" aria-label="Request changes for slice 5">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-5-approval" value="rejected" data-section="slice-5" data-action="approve" aria-label="Reject slice 5">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-5-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Harden work-item attribution for multiple CLIs and their simultaneous
+subagents. Add a coordination layer that records:</p>
+<ul>
+<li>root launcher session to work item claim</li>
+<li>subagent spawn event to parent session and work item</li>
+<li>branch/worktree path to work item</li>
+<li>explicit claim owner and heartbeat</li>
+<li>collision policy when two CLIs claim the same work item</li>
+</ul>
+<p>Prefer existing claim machinery and lineage edges, but stop relying on
+branch names alone for completion/attribution. Make hook handlers write
+best-effort events even when parent records arrive later.</p>
+</div>
+          <label for="slice-5-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Worktree isolation prevents git conflicts, but it does not solve
+attribution conflicts. Parallel Claude, Codex, and Gemini sessions can all
+spawn agents at once. The system needs to know who owns which work, how
+child sessions relate to roots, and whether simultaneous claims are
+intentional collaboration or accidental collision.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/workitem/claim.go, internal/db/claim_repo.go, internal/db/lineage_repo.go, internal/hooks/subagent_start.go, internal/hooks/missing_events.go, internal/hooks/posttooluse.go, cmd/wipnote/claim.go, cmd/wipnote/lineage.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Two root CLI sessions claiming the same work item produce a visible collision or collaboration state.</li><li>Subagent events retain parent/session/work-item attribution even when event ordering is out of order.</li><li>Completion can use explicit session/work-item metadata rather than only branch-name parsing.</li><li>Lineage output shows root CLI, child agents, branch/worktree, commits, and work item in one chain.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestClaimCollisionPolicy covers exclusive and collaborative claim modes.</li><li>TestSubagentAttribution_OutOfOrderParent preserves child events before parent insert.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestParallelHarnessClaims starts fake Claude/Codex/Gemini roots against one work item and asserts lineage.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing `wipnote lineage`, `trace`, and `history` tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Should same-work-item parallel sessions be blocked by default, warned, or allowed as collaboration?</p>
+          
+          
+          <textarea
+            data-section="slice-5-question-q-claim-policy"
+            data-comment-for="slice-5-question-q-claim-policy"
+            placeholder="Answer question q-claim-policy..."></textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: slices 4</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-6" data-slice="6" data-slice-name="slice-6" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 6: Collector and event-writer concurrency hardening">
+    <span class="slice-num">#6</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Collector and event-writer concurrency hardening</span>
+      <span class="slice-preview">Audit and harden NDJSON, OTel collector, SQLite index, and child-process</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-6">Pending</span>
+          
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-6-approval" value="approved" data-section="slice-6" data-action="approve" aria-label="Approve slice 6">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-6-approval" value="changes_requested" data-section="slice-6" data-action="approve" aria-label="Request changes for slice 6">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-6-approval" value="rejected" data-section="slice-6" data-action="approve" aria-label="Reject slice 6">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-6-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Audit and harden NDJSON, OTel collector, SQLite index, and child-process
+helpers for many parallel root sessions and subagents.</p>
+<p>Ensure:</p>
+<ul>
+<li>one collector per canonical project can safely receive events from many
+execution worktrees</li>
+<li>per-session NDJSON files flush and fsync sentinel events</li>
+<li>SQLite writes use busy timeouts and return errors instead of silent empty
+results</li>
+<li>helper scripts/tests avoid noexec temp mounts by using exec-capable temp
+roots</li>
+<li>orphan events are repaired or surfaced rather than silently dropped</li>
+</ul>
+</div>
+          <label for="slice-6-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Worktree isolation increases concurrency. Event capture must remain durable
+under host sleep, devcontainer restarts, bursty subagent spawns, and
+sandboxed temp files. Otherwise the dashboard will look clean while losing
+the causal trail the feature is meant to protect.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/otel/sink/ndjson/ndjson.go, internal/otel/collector/lifecycle.go, internal/otel/indexer/indexer.go, internal/db/pragmas.go, internal/childproc/childproc_test.go, cmd/wipnote/otel_collect.go, cmd/wipnote/api_collector_status.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Parallel sessions can write events without interleaving or losing NDJSON records.</li><li>Collector status identifies canonical project, active session families, and stale collectors.</li><li>Tests no longer execute generated helpers from noexec temp locations.</li><li>SQLite busy/locked paths are surfaced as errors or retries, not silent empty dashboard states.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestNDJSONParallelFlush writes concurrent sessions and validates complete JSON lines.</li><li>TestChildprocFakeBinary_ExecCapableTempRoot avoids /tmp noexec failures.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestCollectorParallelWorktrees sends events from multiple execution roots to one canonical collector.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing OTel receiver/indexer/materializer tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 3,4</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-6" data-comment-for="slice-6" placeholder="Comments on slice 6..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-7" data-slice="7" data-slice-name="slice-7" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 7: Dashboard worktree/session-family UX">
+    <span class="slice-num">#7</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Dashboard worktree/session-family UX</span>
+      <span class="slice-preview">Update dashboard APIs and UI to make isolation visible without fragmenting</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-7">Pending</span>
+          
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-7-approval" value="approved" data-section="slice-7" data-action="approve" aria-label="Approve slice 7">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-7-approval" value="changes_requested" data-section="slice-7" data-action="approve" aria-label="Request changes for slice 7">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-7-approval" value="rejected" data-section="slice-7" data-action="approve" aria-label="Reject slice 7">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-7-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Update dashboard APIs and UI to make isolation visible without fragmenting
+the project view. Add API fields and UI affordances for:</p>
+<ul>
+<li>canonical project root versus execution worktree</li>
+<li>branch/work-item/session-family badge on active sessions</li>
+<li>collision or collaboration status for work-item claims</li>
+<li>stale collector and stale worktree warnings</li>
+<li>filters by harness, work item, branch, session family, and execution root</li>
+</ul>
+<p>Keep the first screen operational, not explanatory: the dashboard should
+show what is running, where it is running, what it is editing, and why it
+is attributed to a work item.</p>
+</div>
+          <label for="slice-7-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Isolation only helps if the operator can see it. When several CLIs and
+subagents run in parallel, the dashboard must answer &#34;which branch,
+worktree, session, and work item does this activity belong to?&#34; without
+forcing users to inspect git state manually.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>cmd/wipnote/api.go, cmd/wipnote/api_feed.go, cmd/wipnote/api_tree.go, cmd/wipnote/api_otel.go, cmd/wipnote/dashboard/js/app.js, cmd/wipnote/dashboard/components/event-tree.js, cmd/wipnote/dashboard/css/components.css</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Dashboard active sessions display harness, branch/worktree, work item, and session family.</li><li>Event tree can filter or group by session family while preserving individual session views.</li><li>Claim collisions and stale collectors are visible as operational warnings.</li><li>Existing single-session dashboard views remain readable and unchanged in normal host installs.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestSessionsAPI_IncludesExecutionRootAndFamily validates response fields.</li><li>dashboard JS component tests render worktree/session-family badges without layout overflow.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestDashboardParallelSessionsAPI builds a fake multi-harness event graph.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing activity feed and event-tree tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 4,5,6</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-7" data-comment-for="slice-7" placeholder="Comments on slice 7..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-8" data-slice="8" data-slice-name="slice-8" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 8: Host, devcontainer, and production deployment profiles">
+    <span class="slice-num">#8</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Host, devcontainer, and production deployment profiles</span>
+      <span class="slice-preview">Add explicit deployment profiles and documentation for launcher isolation:</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-revision badge-sm">M</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-8">Pending</span>
+          
+          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-8-approval" value="approved" data-section="slice-8" data-action="approve" aria-label="Approve slice 8">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-8-approval" value="changes_requested" data-section="slice-8" data-action="approve" aria-label="Request changes for slice 8">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-8-approval" value="rejected" data-section="slice-8" data-action="approve" aria-label="Reject slice 8">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-8-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Add explicit deployment profiles and documentation for launcher isolation:</p>
+<ul>
+<li>host production install</li>
+<li>devcontainer development</li>
+<li>local plugin development via <code>wipnote codex --dev</code> and equivalents</li>
+<li>CI/test mode</li>
+</ul>
+<p>Define per-profile defaults for dashboard bind/port, plugin source,
+generated port rebuilds, cache location, temp execution root, worktree
+root, and cleanup behavior. Update install scripts, devcontainer docs,
+plugin build docs, and deployment runbooks so users understand what runs
+inside the container versus on the host.</p>
+</div>
+          <label for="slice-8-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>A safe launcher default in a devcontainer can be wrong on a host install.
+The product needs clear deployment behavior so isolation does not break
+production users, and production deployment does not accidentally depend
+on devcontainer-only paths or volumes.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>.devcontainer/devcontainer.json, .devcontainer/README.md, install.sh, scripts/deploy-all.sh, scripts/devcontainer-verify.sh, packages/plugin-core/README.md, docs/reference/cli.md, README.md</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Docs distinguish host versus devcontainer dashboard defaults and launcher behavior.</li><li>Install/deploy scripts do not require devcontainer-only paths or assumptions.</li><li>Devcontainer verification checks launcher mode, port convention, and exec-capable temp root.</li><li>Production release notes include migration guidance for the new worktree defaults.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 1</span>
+            <ul><li>script shell checks for devcontainer and deploy scripts.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestLauncherProfiles validates host/devcontainer/CI profile outputs.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>plugin build ports still produce Claude, Codex, and Gemini artifacts.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="manual">
+            <span class="test-chip">MANUAL &middot; 1</span>
+            <ul><li>run devcontainer verification and host `wipnote serve` smoke test before release.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Should production releases flip the worktree default immediately or ship warning-only first?</p>
+          
+          
+          <textarea
+            data-section="slice-8-question-q-rollout"
+            data-comment-for="slice-8-question-q-rollout"
+            placeholder="Answer question q-rollout..."></textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: slices 1,2,3</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-8" data-comment-for="slice-8" placeholder="Comments on slice 8..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-9" data-slice="9" data-slice-name="slice-9" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 9: Migration, cleanup, and compatibility tooling">
+    <span class="slice-num">#9</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Migration, cleanup, and compatibility tooling</span>
+      <span class="slice-preview">Add migration and cleanup commands for users with existing divergent local</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-revision badge-sm">M</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-9">Pending</span>
+          
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-9-approval" value="approved" data-section="slice-9" data-action="approve" aria-label="Approve slice 9">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-9-approval" value="changes_requested" data-section="slice-9" data-action="approve" aria-label="Request changes for slice 9">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-9-approval" value="rejected" data-section="slice-9" data-action="approve" aria-label="Reject slice 9">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-9-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Add migration and cleanup commands for users with existing divergent local
+main states and stale worktrees.</p>
+<p>Provide:</p>
+<ul>
+<li><code>wipnote launcher doctor</code> or similar diagnostic command</li>
+<li>detection of local main ahead/behind origin with dirty worktree</li>
+<li>suggestions to create backup branches, stash, or move work into managed
+worktrees</li>
+<li>stale managed-worktree listing and safe prune guidance</li>
+<li>compatibility handling for old sessions without session families</li>
+<li>release migration docs and dashboard warning links</li>
+</ul>
+</div>
+          <label for="slice-9-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Changing launcher defaults does not help users who already have messy
+repositories, stale worktrees, or historical sessions. Migration tooling
+turns the PR 60-style cleanup we just performed manually into a guided,
+observable workflow.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>cmd/wipnote/launcher_doctor.go, cmd/wipnote/worktree_helpers.go, internal/worktree/repair.go, internal/worktree/worktree.go, cmd/wipnote/dashboard/js/app.js, docs/reference/cli.md, docs/runbook/launcher-isolation.md</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Doctor command reports dirty main, ahead/behind, stale worktrees, and missing canonical identity metadata.</li><li>Doctor command prints non-destructive remediation steps by default.</li><li>Dashboard can link stale/isolation warnings to the doctor command.</li><li>Old sessions without session-family metadata remain visible and are labeled as legacy rather than broken.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestLauncherDoctor_DivergedMain reports ahead/behind and dirty state.</li><li>TestLauncherDoctor_StaleWorktree reports removed or broken gitdir worktrees.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestLegacySessionFamilyFallback keeps old sessions visible in dashboard APIs.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing worktree repair tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 2,3,4</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-9" data-comment-for="slice-9" placeholder="Comments on slice 9..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-10" data-slice="10" data-slice-name="slice-10" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 10: Parallel stress harness and release gates">
+    <span class="slice-num">#10</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Parallel stress harness and release gates</span>
+      <span class="slice-preview">Build an end-to-end stress harness and production release gate for the new</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-10">Pending</span>
+          
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-10-approval" value="approved" data-section="slice-10" data-action="approve" aria-label="Approve slice 10">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-10-approval" value="changes_requested" data-section="slice-10" data-action="approve" aria-label="Request changes for slice 10">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-10-approval" value="rejected" data-section="slice-10" data-action="approve" aria-label="Reject slice 10">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-10-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Build an end-to-end stress harness and production release gate for the new
+launcher model. The harness should start multiple fake or real harness
+sessions in parallel:</p>
+<ul>
+<li>Claude, Codex, and Gemini roots in one canonical project</li>
+<li>multiple subagents per root</li>
+<li>overlapping work-item claims</li>
+<li>one session resumed/continued</li>
+<li>one stale collector/worktree scenario</li>
+</ul>
+<p>Validate git state, event capture, dashboard APIs, lineage, and cleanup
+commands. Add CI-safe versions using fake harness binaries and mark
+environment-sensitive socket/process tests so they run in the right mode.</p>
+</div>
+          <label for="slice-10-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>The whole feature exists to make parallel agentic development safe. Unit
+tests cannot prove that concurrent CLIs, subagents, collectors, and
+dashboard views coordinate correctly. A stress harness gives production
+deployment a concrete readiness signal.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>scripts/stress-launch.sh, cmd/wipnote/launch_run_test.go, cmd/wipnote/multiharness_test.go, cmd/wipnote/api_tree_test.go, cmd/wipnote/api_otel_test.go, internal/childproc/childproc_test.go, .github/workflows/ci.yml, docs/runbook/launcher-isolation.md</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Stress harness proves local main stays clean while parallel sessions edit isolated branches/worktrees.</li><li>Dashboard APIs show all parallel root and subagent sessions under one canonical project.</li><li>Lineage output links work item, root session, subagents, branches/worktrees, and commits.</li><li>CI and release runbooks include the stress gate or a documented reduced fake-harness equivalent.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 1</span>
+            <ul><li>fake harness helpers cover deterministic event emission and exit modes.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>TestParallelLauncherIsolation starts multiple harness roots and validates git/dash/lineage state.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>full Go quality gates pass in an exec-capable environment.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="manual">
+            <span class="test-chip">MANUAL &middot; 1</span>
+            <ul><li>pre-release run of stress-launch against devcontainer and host profiles.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 5,6,7,8,9</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-10" data-comment-for="slice-10" placeholder="Comments on slice 10..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
 
 <!-- Design Decisions (hidden for v2 plans — slice cards carry their own questions) -->
-<details id="questions" class="section-card" data-phase="questions" data-status="pending">
-  <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
-  <div class="section-body">
-    <table class="q-table">
-      <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
-      <tbody id="questionsRecap">
-        <!--PLAN_QUESTIONS_RECAP-->
-      </tbody>
-    </table>
-  </div>
-</details>
+
 
 
 
@@ -490,8 +2016,8 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">1</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">1</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">11</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">11</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -571,7 +2097,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6","slice-7","slice-8","slice-9","slice-10"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');

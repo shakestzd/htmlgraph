@@ -2,16 +2,574 @@ meta:
     id: plan-1670cacd
     track_id: trk-a30e8df4
     title: Launcher isolation, deployment modes, and parallel attribution
-    description: 'Design production-ready launcher isolation across Claude, Codex, and Gemini: default branch/worktree behavior, devcontainer vs host deployment modes, and robust attribution/event capture for parallel CLIs and subagents.'
+    description: |
+        Design production-ready launcher isolation across Claude, Codex, and Gemini: default branch/worktree behavior, devcontainer versus host deployment modes, and robust attribution/event capture for parallel CLIs and subagents.
     created_at: "2026-05-08"
-    status: draft
-    priority: medium
-    version: 2
+    status: active
+    created_by: codex
+    version: 1
 design:
-    problem: ""
-    goals: []
-    constraints: []
+    problem: |
+        wipnote can currently launch multiple AI CLIs directly from a mutable checkout. That is convenient, but it allows long-running local stacks, generated plugin changes, work-item bookkeeping, and merged upstream work to accumulate on local main. The result is avoidable divergence, hard-to-review commits, and fragile reconciliation after PR merges. The obvious fix is to launch mutating sessions in isolated branches or worktrees by default, but that changes the shape of project identity, session continuity, active-session fallback state, event capture, subagent attribution, and dashboard grouping. The design must also account for the difference between production host installs and devcontainer sessions, where ports, bind addresses, filesystem permissions, plugin paths, and temp execution policy differ.
+    goals:
+        - '**Protect main** — mutating Claude, Codex, and Gemini sessions do not dirty or diverge local main by default.'
+        - '**Preserve observability** — dashboard sessions, event trees, NDJSON, SQLite indexes, and lineage remain grouped under one canonical project even when execution happens in worktrees.'
+        - '**Coordinate parallelism** — multiple CLIs and their subagents can run concurrently in the same project without clobbering attribution, active-session fallback state, collectors, branch names, or work-item claims.'
+        - '**Deploy safely** — host installs, devcontainers, local plugin development, and production launcher paths have explicit mode detection, defaults, and test coverage.'
+        - '**Migrate incrementally** — existing yolo/worktree helpers, session rows, and dashboard APIs are reused and hardened without breaking current users.'
+    constraints:
+        - Canonical project identity must remain the main repo root containing .wipnote, not an arbitrary linked worktree path.
+        - Fresh worktrees are execution directories only; event storage and dashboard project grouping stay anchored to the canonical root.
+        - The launcher must offer an explicit in-place escape hatch for intentional local-main work.
+        - Branch naming must remain compatible with existing work-item completion and lineage conventions until explicit metadata replaces branch-name inference.
+        - Devcontainer defaults must bind dashboard services to 0.0.0.0:8088, while host installs keep the production default of 127.0.0.1:8080.
+        - No implementation slice may rely solely on global mutable fallback files when parallel CLI sessions are expected.
     approved: false
     comment: ""
-slices: []
-questions: []
+slices:
+    - id: slice-1
+      num: 1
+      title: Launcher mode contract and environment detection
+      what: |
+        Define a shared launcher mode contract used by Claude, Codex, Gemini, yolo,
+        and dashboard terminal launch paths. Add an `internal/launcher/mode` package
+        or equivalent small helper that computes:
+
+        - execution mode: `isolated-worktree`, `in-place`, or `read-only`
+        - runtime mode: `host`, `devcontainer`, or `ci`
+        - plugin mode: `installed`, `local-dev`, or `generated-port`
+        - dashboard bind defaults for the runtime mode
+        - temp execution policy for tests and helper subprocesses
+
+        Wire the helper into launcher preflight code without changing default
+        behavior yet. Emit a structured plan/preview object for callers so later
+        slices can switch defaults safely.
+      why: |
+        The branch/worktree policy should not be duplicated independently in every
+        harness launcher. A shared contract lets production deployment, devcontainer
+        behavior, and tests reason from the same inputs before any risky default
+        changes are introduced.
+      files:
+        - internal/launcher/mode/mode.go
+        - internal/launcher/mode/mode_test.go
+        - cmd/wipnote/claude.go
+        - cmd/wipnote/codex.go
+        - cmd/wipnote/gemini.go
+        - cmd/wipnote/yolo.go
+      deps: []
+      done_when:
+        - A shared helper reports launcher execution/runtime/plugin mode without mutating the repository.
+        - Claude, Codex, Gemini, and yolo launchers can log or expose the computed mode in dry/preflight paths.
+        - Devcontainer mode selects bind default 0.0.0.0:8088 while host mode selects 127.0.0.1:8080.
+        - Existing launcher behavior remains unchanged until later slices explicitly flip defaults.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestDetectRuntimeMode_HostDevcontainerCI covers marker files and env vars.
+        Unit: TestDashboardBindDefaults covers host versus devcontainer bind/port.
+        Regression: existing launcher command construction tests still pass.
+        Integration: a launcher preflight test asserts all three harnesses return a mode object without starting a CLI.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-devcontainer-detect
+          text: Which signal should define devcontainer mode?
+    - id: slice-2
+      num: 2
+      title: Default isolated worktree launches with dirty-main guard
+      what: |
+        Change mutating launcher defaults so `wipnote claude`, `wipnote codex`,
+        `wipnote gemini`, yolo, and dashboard terminal launches run in managed
+        worktrees when invoked from local main or another protected branch.
+
+        Reuse existing `internal/worktree` and command-level worktree helpers.
+        Add explicit flags:
+
+        - `--worktree` / `--no-worktree`
+        - `--in-place` as an alias for intentional local checkout mutation
+        - `--base <branch>` for advanced users
+        - `--work-item <id>` as a harness-neutral spelling for feature/bug/track
+
+        Add a dirty-main guard that refuses mutating in-place launch unless the
+        user passes `--in-place` and the mode contract records the decision.
+      why: |
+        This is the main divergence prevention mechanism. It keeps local main able
+        to fast-forward and absorb upstream PRs while work proceeds on explicit,
+        named branches/worktrees tied to work items.
+      files:
+        - internal/worktree/worktree.go
+        - cmd/wipnote/worktree_helpers.go
+        - cmd/wipnote/claude.go
+        - cmd/wipnote/codex.go
+        - cmd/wipnote/gemini.go
+        - cmd/wipnote/yolo.go
+        - cmd/wipnote/terminal_handlers.go
+      deps:
+        - 1
+      done_when:
+        - Launching a mutating session from local main defaults to a managed worktree.
+        - Launching with `--in-place` preserves existing behavior and records that the user opted out of isolation.
+        - Dirty protected branches refuse in-place mutating launch unless the explicit escape hatch is present.
+        - Worktree branch names remain deterministic and compatible with existing work-item branch conventions.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestLauncherPlan_DefaultsToWorktreeOnMain validates command planning without starting a harness.
+        Unit: TestLauncherPlan_InPlaceEscapeHatch validates explicit in-place mode.
+        Integration: TestWorktreeLaunch_PreservesCanonicalRoot starts a fake harness in a managed worktree.
+        Regression: existing yolo worktree reuse and branch-already-exists tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-default
+          text: Should all mutating launchers default to worktree mode immediately, or should this roll out behind a config flag first?
+    - id: slice-3
+      num: 3
+      title: Canonical project identity across worktrees
+      what: |
+        Formalize and harden the rule that `WIPNOTE_PROJECT_DIR`,
+        `sessions.project_dir`, DB cache keys, NDJSON event paths, and dashboard
+        project filters use the canonical main repo root even when execution CWD is
+        a worktree.
+
+        Add a small `ProjectIdentity` value that carries both:
+
+        - `CanonicalRoot` for tracking/storage/dashboard
+        - `ExecutionRoot` for process cwd and file edits
+
+        Thread it through launcher env construction, hook resolution, session
+        start, storage path resolution, and dashboard handlers where raw paths are
+        currently compared.
+      why: |
+        Worktree-per-launch is safe only if worktrees do not become separate
+        projects. If project identity is keyed by each worktree path, the
+        dashboard fragments sessions, SQLite indexes split, and divergence guards
+        start flagging normal cross-worktree activity as project drift.
+      files:
+        - internal/paths/resolve.go
+        - internal/storage/dbpath.go
+        - internal/hooks/session_start.go
+        - internal/hooks/runner.go
+        - internal/hooks/pretooluse.go
+        - cmd/wipnote/api.go
+        - cmd/wipnote/claude.go
+        - cmd/wipnote/codex.go
+        - cmd/wipnote/gemini.go
+      deps:
+        - 1
+        - 2
+      done_when:
+        - Sessions launched from linked worktrees store the canonical root in `sessions.project_dir`.
+        - Dashboard project/session filters show worktree-launched sessions under the main project.
+        - SQLite cache paths do not multiply by worktree path when canonical root is available.
+        - Divergence guards compare canonical roots rather than raw execution directories.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestResolveProjectIdentity_LinkedWorktree returns canonical and execution roots.
+        Unit: TestSessionStart_StoresCanonicalProjectDir covers worktree launch env.
+        Integration: TestDashboardSessions_WorktreeGroupedUnderCanonicalProject verifies API filtering.
+        Regression: existing project resolution and cache path tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-4
+      num: 4
+      title: Session-family continuity and per-session fallback state
+      what: |
+        Replace the project-global active-session fallback with a concurrency-safe
+        session-family model.
+
+        Add or wire:
+
+        - `session_family_id` or robust use of existing `continued_from`
+        - per-session fallback files under `.wipnote/sessions/<session_id>/`
+        - a project-level index of active session families instead of one
+          `.active-session` last-writer-wins file
+        - harness-neutral resume correlation for Claude, Codex, and Gemini
+
+        Keep backward compatibility for old `.active-session` reads during a
+        migration window, but prefer per-session state when present.
+      why: |
+        Parallel CLI sessions and subagents cannot rely on one global active
+        session file. The dashboard needs continuity across resumes and child
+        sessions, while hooks need a stable fallback identity when harness-specific
+        env propagation is incomplete.
+      files:
+        - internal/models/session.go
+        - internal/db/session_repo.go
+        - internal/db/schema.go
+        - internal/hooks/session_start.go
+        - internal/hooks/runner.go
+        - internal/hooks/subagent_start.go
+        - cmd/wipnote/api_tree.go
+        - cmd/wipnote/api_otel.go
+      deps:
+        - 3
+      done_when:
+        - Parallel root sessions no longer overwrite one another's fallback identity.
+        - Claude, Codex, and Gemini launches can link resume/continue events into a session family.
+        - Old `.active-session` fallback remains readable but is no longer the primary parallel-session mechanism.
+        - Dashboard event tree can group by session family when requested while preserving per-session drilldown.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestActiveSessionIndex_ParallelFamilies verifies two roots can coexist.
+        Unit: TestSessionFamily_ContinuedFrom links resumed sessions without relying on harness-specific IDs.
+        Integration: TestEventTree_SessionFamilyGrouping creates root plus subagent sessions and asserts tree continuity.
+        Regression: existing Claude Rosetta session_start behavior still works.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-family-field
+          text: Should we add `session_family_id` or standardize on existing `continued_from`?
+    - id: slice-5
+      num: 5
+      title: Parallel attribution and claim coordination
+      what: |
+        Harden work-item attribution for multiple CLIs and their simultaneous
+        subagents. Add a coordination layer that records:
+
+        - root launcher session to work item claim
+        - subagent spawn event to parent session and work item
+        - branch/worktree path to work item
+        - explicit claim owner and heartbeat
+        - collision policy when two CLIs claim the same work item
+
+        Prefer existing claim machinery and lineage edges, but stop relying on
+        branch names alone for completion/attribution. Make hook handlers write
+        best-effort events even when parent records arrive later.
+      why: |
+        Worktree isolation prevents git conflicts, but it does not solve
+        attribution conflicts. Parallel Claude, Codex, and Gemini sessions can all
+        spawn agents at once. The system needs to know who owns which work, how
+        child sessions relate to roots, and whether simultaneous claims are
+        intentional collaboration or accidental collision.
+      files:
+        - internal/workitem/claim.go
+        - internal/db/claim_repo.go
+        - internal/db/lineage_repo.go
+        - internal/hooks/subagent_start.go
+        - internal/hooks/missing_events.go
+        - internal/hooks/posttooluse.go
+        - cmd/wipnote/claim.go
+        - cmd/wipnote/lineage.go
+      deps:
+        - 4
+      done_when:
+        - Two root CLI sessions claiming the same work item produce a visible collision or collaboration state.
+        - Subagent events retain parent/session/work-item attribution even when event ordering is out of order.
+        - Completion can use explicit session/work-item metadata rather than only branch-name parsing.
+        - Lineage output shows root CLI, child agents, branch/worktree, commits, and work item in one chain.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestClaimCollisionPolicy covers exclusive and collaborative claim modes.
+        Unit: TestSubagentAttribution_OutOfOrderParent preserves child events before parent insert.
+        Integration: TestParallelHarnessClaims starts fake Claude/Codex/Gemini roots against one work item and asserts lineage.
+        Regression: existing `wipnote lineage`, `trace`, and `history` tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-claim-policy
+          text: Should same-work-item parallel sessions be blocked by default, warned, or allowed as collaboration?
+    - id: slice-6
+      num: 6
+      title: Collector and event-writer concurrency hardening
+      what: |
+        Audit and harden NDJSON, OTel collector, SQLite index, and child-process
+        helpers for many parallel root sessions and subagents.
+
+        Ensure:
+
+        - one collector per canonical project can safely receive events from many
+          execution worktrees
+        - per-session NDJSON files flush and fsync sentinel events
+        - SQLite writes use busy timeouts and return errors instead of silent empty
+          results
+        - helper scripts/tests avoid noexec temp mounts by using exec-capable temp
+          roots
+        - orphan events are repaired or surfaced rather than silently dropped
+      why: |
+        Worktree isolation increases concurrency. Event capture must remain durable
+        under host sleep, devcontainer restarts, bursty subagent spawns, and
+        sandboxed temp files. Otherwise the dashboard will look clean while losing
+        the causal trail the feature is meant to protect.
+      files:
+        - internal/otel/sink/ndjson/ndjson.go
+        - internal/otel/collector/lifecycle.go
+        - internal/otel/indexer/indexer.go
+        - internal/db/pragmas.go
+        - internal/childproc/childproc_test.go
+        - cmd/wipnote/otel_collect.go
+        - cmd/wipnote/api_collector_status.go
+      deps:
+        - 3
+        - 4
+      done_when:
+        - Parallel sessions can write events without interleaving or losing NDJSON records.
+        - Collector status identifies canonical project, active session families, and stale collectors.
+        - Tests no longer execute generated helpers from noexec temp locations.
+        - SQLite busy/locked paths are surfaced as errors or retries, not silent empty dashboard states.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestNDJSONParallelFlush writes concurrent sessions and validates complete JSON lines.
+        Unit: TestChildprocFakeBinary_ExecCapableTempRoot avoids /tmp noexec failures.
+        Integration: TestCollectorParallelWorktrees sends events from multiple execution roots to one canonical collector.
+        Regression: existing OTel receiver/indexer/materializer tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-7
+      num: 7
+      title: Dashboard worktree/session-family UX
+      what: |
+        Update dashboard APIs and UI to make isolation visible without fragmenting
+        the project view. Add API fields and UI affordances for:
+
+        - canonical project root versus execution worktree
+        - branch/work-item/session-family badge on active sessions
+        - collision or collaboration status for work-item claims
+        - stale collector and stale worktree warnings
+        - filters by harness, work item, branch, session family, and execution root
+
+        Keep the first screen operational, not explanatory: the dashboard should
+        show what is running, where it is running, what it is editing, and why it
+        is attributed to a work item.
+      why: |
+        Isolation only helps if the operator can see it. When several CLIs and
+        subagents run in parallel, the dashboard must answer "which branch,
+        worktree, session, and work item does this activity belong to?" without
+        forcing users to inspect git state manually.
+      files:
+        - cmd/wipnote/api.go
+        - cmd/wipnote/api_feed.go
+        - cmd/wipnote/api_tree.go
+        - cmd/wipnote/api_otel.go
+        - cmd/wipnote/dashboard/js/app.js
+        - cmd/wipnote/dashboard/components/event-tree.js
+        - cmd/wipnote/dashboard/css/components.css
+      deps:
+        - 4
+        - 5
+        - 6
+      done_when:
+        - Dashboard active sessions display harness, branch/worktree, work item, and session family.
+        - Event tree can filter or group by session family while preserving individual session views.
+        - Claim collisions and stale collectors are visible as operational warnings.
+        - Existing single-session dashboard views remain readable and unchanged in normal host installs.
+      effort: L
+      risk: Med
+      tests: |
+        Unit: TestSessionsAPI_IncludesExecutionRootAndFamily validates response fields.
+        Unit: dashboard JS component tests render worktree/session-family badges without layout overflow.
+        Integration: TestDashboardParallelSessionsAPI builds a fake multi-harness event graph.
+        Regression: existing activity feed and event-tree tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-8
+      num: 8
+      title: Host, devcontainer, and production deployment profiles
+      what: |
+        Add explicit deployment profiles and documentation for launcher isolation:
+
+        - host production install
+        - devcontainer development
+        - local plugin development via `wipnote codex --dev` and equivalents
+        - CI/test mode
+
+        Define per-profile defaults for dashboard bind/port, plugin source,
+        generated port rebuilds, cache location, temp execution root, worktree
+        root, and cleanup behavior. Update install scripts, devcontainer docs,
+        plugin build docs, and deployment runbooks so users understand what runs
+        inside the container versus on the host.
+      why: |
+        A safe launcher default in a devcontainer can be wrong on a host install.
+        The product needs clear deployment behavior so isolation does not break
+        production users, and production deployment does not accidentally depend
+        on devcontainer-only paths or volumes.
+      files:
+        - .devcontainer/devcontainer.json
+        - .devcontainer/README.md
+        - install.sh
+        - scripts/deploy-all.sh
+        - scripts/devcontainer-verify.sh
+        - packages/plugin-core/README.md
+        - docs/reference/cli.md
+        - README.md
+      deps:
+        - 1
+        - 2
+        - 3
+      done_when:
+        - Docs distinguish host versus devcontainer dashboard defaults and launcher behavior.
+        - Install/deploy scripts do not require devcontainer-only paths or assumptions.
+        - Devcontainer verification checks launcher mode, port convention, and exec-capable temp root.
+        - Production release notes include migration guidance for the new worktree defaults.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: script shell checks for devcontainer and deploy scripts.
+        Integration: TestLauncherProfiles validates host/devcontainer/CI profile outputs.
+        Regression: plugin build ports still produce Claude, Codex, and Gemini artifacts.
+        Manual: run devcontainer verification and host `wipnote serve` smoke test before release.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-rollout
+          text: Should production releases flip the worktree default immediately or ship warning-only first?
+    - id: slice-9
+      num: 9
+      title: Migration, cleanup, and compatibility tooling
+      what: |
+        Add migration and cleanup commands for users with existing divergent local
+        main states and stale worktrees.
+
+        Provide:
+
+        - `wipnote launcher doctor` or similar diagnostic command
+        - detection of local main ahead/behind origin with dirty worktree
+        - suggestions to create backup branches, stash, or move work into managed
+          worktrees
+        - stale managed-worktree listing and safe prune guidance
+        - compatibility handling for old sessions without session families
+        - release migration docs and dashboard warning links
+      why: |
+        Changing launcher defaults does not help users who already have messy
+        repositories, stale worktrees, or historical sessions. Migration tooling
+        turns the PR 60-style cleanup we just performed manually into a guided,
+        observable workflow.
+      files:
+        - cmd/wipnote/launcher_doctor.go
+        - cmd/wipnote/worktree_helpers.go
+        - internal/worktree/repair.go
+        - internal/worktree/worktree.go
+        - cmd/wipnote/dashboard/js/app.js
+        - docs/reference/cli.md
+        - docs/runbook/launcher-isolation.md
+      deps:
+        - 2
+        - 3
+        - 4
+      done_when:
+        - Doctor command reports dirty main, ahead/behind, stale worktrees, and missing canonical identity metadata.
+        - Doctor command prints non-destructive remediation steps by default.
+        - Dashboard can link stale/isolation warnings to the doctor command.
+        - Old sessions without session-family metadata remain visible and are labeled as legacy rather than broken.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestLauncherDoctor_DivergedMain reports ahead/behind and dirty state.
+        Unit: TestLauncherDoctor_StaleWorktree reports removed or broken gitdir worktrees.
+        Integration: TestLegacySessionFamilyFallback keeps old sessions visible in dashboard APIs.
+        Regression: existing worktree repair tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-10
+      num: 10
+      title: Parallel stress harness and release gates
+      what: |
+        Build an end-to-end stress harness and production release gate for the new
+        launcher model. The harness should start multiple fake or real harness
+        sessions in parallel:
+
+        - Claude, Codex, and Gemini roots in one canonical project
+        - multiple subagents per root
+        - overlapping work-item claims
+        - one session resumed/continued
+        - one stale collector/worktree scenario
+
+        Validate git state, event capture, dashboard APIs, lineage, and cleanup
+        commands. Add CI-safe versions using fake harness binaries and mark
+        environment-sensitive socket/process tests so they run in the right mode.
+      why: |
+        The whole feature exists to make parallel agentic development safe. Unit
+        tests cannot prove that concurrent CLIs, subagents, collectors, and
+        dashboard views coordinate correctly. A stress harness gives production
+        deployment a concrete readiness signal.
+      files:
+        - scripts/stress-launch.sh
+        - cmd/wipnote/launch_run_test.go
+        - cmd/wipnote/multiharness_test.go
+        - cmd/wipnote/api_tree_test.go
+        - cmd/wipnote/api_otel_test.go
+        - internal/childproc/childproc_test.go
+        - .github/workflows/ci.yml
+        - docs/runbook/launcher-isolation.md
+      deps:
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+      done_when:
+        - Stress harness proves local main stays clean while parallel sessions edit isolated branches/worktrees.
+        - Dashboard APIs show all parallel root and subagent sessions under one canonical project.
+        - Lineage output links work item, root session, subagents, branches/worktrees, and commits.
+        - CI and release runbooks include the stress gate or a documented reduced fake-harness equivalent.
+      effort: L
+      risk: High
+      tests: |
+        Unit: fake harness helpers cover deterministic event emission and exit modes.
+        Integration: TestParallelLauncherIsolation starts multiple harness roots and validates git/dash/lineage state.
+        Regression: full Go quality gates pass in an exec-capable environment.
+        Manual: pre-release run of stress-launch against devcontainer and host profiles.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+questions:
+    - id: q-default-policy
+      text: What should be the initial rollout default for isolated worktree launches?
+      description: |
+        Immediate default maximizes safety but may surprise existing users. A warning-only release reduces surprise but allows divergence to continue.
+      recommended: config-gated-default
+      options:
+        - key: config-gated-default
+          label: Config-gated default — enable in devcontainer/local dev first, warn elsewhere
+        - key: immediate-default
+          label: Immediate default — all mutating launches use managed worktrees unless --in-place
+        - key: warning-only
+          label: Warning-only — detect dirty main but do not change launch location
+      answer: null
+    - id: q-claim-collisions
+      text: How should simultaneous claims on one work item behave?
+      description: |
+        Parallel CLIs may intentionally collaborate on a feature, but accidental duplicate claims should be visible before two agents edit the same surface.
+      recommended: warn-and-record-collaboration
+      options:
+        - key: warn-and-record-collaboration
+          label: Warn and record collaboration — visible collision, no hard block
+        - key: hard-exclusive
+          label: Hard exclusive — block second mutating launcher unless forced
+        - key: allow-silent
+          label: Allow silently — attribution only, no collision UX
+      answer: null
+    - id: q-session-continuity
+      text: Should session continuity use `session_family_id` or existing `continued_from`?
+      description: |
+        A new family id is explicit and dashboard-friendly. Reusing continued_from is smaller but may make root-family grouping harder for parallel resumes.
+      recommended: session-family-id
+      options:
+        - key: session-family-id
+          label: Add session_family_id — explicit root grouping
+        - key: continued-from-only
+          label: Use continued_from only — minimal schema change
+      answer: null
