@@ -78,11 +78,14 @@ slices:
           text: Which signal should define devcontainer mode?
     - id: slice-2
       num: 2
-      title: Default isolated worktree launches with dirty-main guard
+      title: Gated isolated worktree launch plumbing and dirty-main guard
       what: |
-        Change mutating launcher defaults so `wipnote claude`, `wipnote codex`,
-        `wipnote gemini`, yolo, and dashboard terminal launches run in managed
-        worktrees when invoked from local main or another protected branch.
+        Add the launch planning and guard machinery needed for mutating launchers
+        to run in managed worktrees, but do not flip host production defaults
+        unconditionally in this slice. For devcontainer/local-dev profiles the
+        plan may default to managed worktrees behind an explicit config gate; for
+        host production profiles it starts as warn-only until doctor/migration and
+        session-family hardening have landed.
 
         Reuse existing `internal/worktree` and command-level worktree helpers.
         Add explicit flags:
@@ -92,12 +95,15 @@ slices:
         - `--base <branch>` for advanced users
         - `--work-item <id>` as a harness-neutral spelling for feature/bug/track
 
-        Add a dirty-main guard that refuses mutating in-place launch unless the
-        user passes `--in-place` and the mode contract records the decision.
+        Add a dirty-main guard that explains the managed-worktree recommendation
+        and refuses mutating in-place launch only when the configured rollout mode
+        says enforcement is enabled. The mode contract must record whether the
+        launch used isolation, warn-only, or explicit in-place override.
       why: |
-        This is the main divergence prevention mechanism. It keeps local main able
-        to fast-forward and absorb upstream PRs while work proceeds on explicit,
-        named branches/worktrees tied to work items.
+        This introduces the main divergence prevention mechanism without
+        surprising host users before migration tooling exists. It keeps local main
+        able to fast-forward in gated environments and gives production users a
+        visible warning path before enforcement.
       files:
         - internal/worktree/worktree.go
         - cmd/wipnote/worktree_helpers.go
@@ -109,9 +115,10 @@ slices:
       deps:
         - 1
       done_when:
-        - Launching a mutating session from local main defaults to a managed worktree.
+        - Launcher planning can select managed-worktree, warn-only, or explicit in-place mode from profile/config.
+        - Devcontainer/local-dev profiles can opt into managed-worktree defaults without changing host production defaults.
         - Launching with `--in-place` preserves existing behavior and records that the user opted out of isolation.
-        - Dirty protected branches refuse in-place mutating launch unless the explicit escape hatch is present.
+        - Dirty protected branches produce a clear warning or refusal according to rollout mode.
         - Worktree branch names remain deterministic and compatible with existing work-item branch conventions.
       effort: L
       risk: High
@@ -126,7 +133,14 @@ slices:
       execution_status: not_started
       questions:
         - id: q-default
-          text: Should all mutating launchers default to worktree mode immediately, or should this roll out behind a config flag first?
+          text: Should host production start in warn-only mode while devcontainer/local-dev starts config-gated worktree-by-default?
+      critic_revisions:
+        - source: deployment-critique
+          severity: HIGH
+          summary: Do not flip host launcher defaults before doctor/migration tooling exists; make this slice config-gated and warn-only for host profiles.
+        - source: observability-critique
+          severity: HIGH
+          summary: Do not enforce fresh-worktree defaults before canonical identity and per-session fallback/session-family hardening are available.
     - id: slice-3
       num: 3
       title: Canonical project identity across worktrees
@@ -192,6 +206,8 @@ slices:
         - a project-level index of active session families instead of one
           `.active-session` last-writer-wins file
         - harness-neutral resume correlation for Claude, Codex, and Gemini
+        - persisted launcher-session to harness-session bridges for all three
+          launchers, not just Claude's Rosetta event path
 
         Keep backward compatibility for old `.active-session` reads during a
         migration window, but prefer per-session state when present.
@@ -213,7 +229,7 @@ slices:
         - 3
       done_when:
         - Parallel root sessions no longer overwrite one another's fallback identity.
-        - Claude, Codex, and Gemini launches can link resume/continue events into a session family.
+        - Claude, Codex, and Gemini launchers each persist resume/continue linkage into a harness-neutral session family field.
         - Old `.active-session` fallback remains readable but is no longer the primary parallel-session mechanism.
         - Dashboard event tree can group by session family when requested while preserving per-session drilldown.
       effort: L
@@ -230,6 +246,10 @@ slices:
       questions:
         - id: q-family-field
           text: Should we add `session_family_id` or standardize on existing `continued_from`?
+      critic_revisions:
+        - source: observability-critique
+          severity: HIGH
+          summary: Specify concrete Codex and Gemini resume/family write paths; dashboard inference alone would leave session continuity harness-skewed.
     - id: slice-5
       num: 5
       title: Parallel attribution and claim coordination
@@ -244,8 +264,10 @@ slices:
         - collision policy when two CLIs claim the same work item
 
         Prefer existing claim machinery and lineage edges, but stop relying on
-        branch names alone for completion/attribution. Make hook handlers write
-        best-effort events even when parent records arrive later.
+        branch names alone for completion/attribution. No launcher may depend on
+        arbitrary fresh-worktree branch names for completion once metadata-based
+        completion is available. Make hook handlers write best-effort events even
+        when parent records arrive later.
       why: |
         Worktree isolation prevents git conflicts, but it does not solve
         attribution conflicts. Parallel Claude, Codex, and Gemini sessions can all
@@ -266,7 +288,7 @@ slices:
       done_when:
         - Two root CLI sessions claiming the same work item produce a visible collision or collaboration state.
         - Subagent events retain parent/session/work-item attribution even when event ordering is out of order.
-        - Completion can use explicit session/work-item metadata rather than only branch-name parsing.
+        - Completion no longer requires branch-name inference when session/work-item metadata is present.
         - Lineage output shows root CLI, child agents, branch/worktree, commits, and work item in one chain.
       effort: L
       risk: High
@@ -282,6 +304,10 @@ slices:
       questions:
         - id: q-claim-policy
           text: Should same-work-item parallel sessions be blocked by default, warned, or allowed as collaboration?
+      critic_revisions:
+        - source: observability-critique
+          severity: MED
+          summary: Tighten transition away from branch-name completion; metadata-based completion must be live before arbitrary fresh-worktree branch names are allowed.
     - id: slice-6
       num: 6
       title: Collector and event-writer concurrency hardening
@@ -289,16 +315,24 @@ slices:
         Audit and harden NDJSON, OTel collector, SQLite index, and child-process
         helpers for many parallel root sessions and subagents.
 
+        Choose and document the collector model explicitly: preserve the current
+        session-scoped collector model, but harden many parallel collectors under
+        one canonical project root. Do not redesign to a shared per-project
+        collector in this plan unless a later plan deliberately changes that
+        architecture.
+
         Ensure:
 
-        - one collector per canonical project can safely receive events from many
-          execution worktrees
+        - many session-scoped collectors can safely write under one canonical
+          project root
         - per-session NDJSON files flush and fsync sentinel events
         - SQLite writes use busy timeouts and return errors instead of silent empty
           results
         - helper scripts/tests avoid noexec temp mounts by using exec-capable temp
           roots
         - orphan events are repaired or surfaced rather than silently dropped
+        - index checkpoints are monotonic and replay is restart-safe with no
+          duplicate or lost events across collector restarts
       why: |
         Worktree isolation increases concurrency. Event capture must remain durable
         under host sleep, devcontainer restarts, bursty subagent spawns, and
@@ -316,10 +350,11 @@ slices:
         - 3
         - 4
       done_when:
-        - Parallel sessions can write events without interleaving or losing NDJSON records.
-        - Collector status identifies canonical project, active session families, and stale collectors.
+        - Parallel session-scoped collectors can write events without interleaving or losing NDJSON records.
+        - Collector status identifies canonical project, active session families, and stale session collectors.
         - Tests no longer execute generated helpers from noexec temp locations.
         - SQLite busy/locked paths are surfaced as errors or retries, not silent empty dashboard states.
+        - Indexer checkpoints advance monotonically and restart replay produces no duplicate or missing events.
       effort: L
       risk: High
       tests: |
@@ -331,6 +366,13 @@ slices:
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: observability-critique
+          severity: HIGH
+          summary: Current architecture is session-scoped collectors, not one shared project collector; choose that model explicitly and harden it.
+        - source: observability-critique
+          severity: MED
+          summary: Add restart-safe index checkpoint and duplicate/loss prevention criteria for parallel ingestion.
     - id: slice-7
       num: 7
       title: Dashboard worktree/session-family UX
@@ -343,6 +385,9 @@ slices:
         - collision or collaboration status for work-item claims
         - stale collector and stale worktree warnings
         - filters by harness, work item, branch, session family, and execution root
+        - explicit default grouping semantics for sessions list, activity feed,
+          and event tree: canonical project first, session family second,
+          individual session drilldown third
 
         Keep the first screen operational, not explanatory: the dashboard should
         show what is running, where it is running, what it is editing, and why it
@@ -365,8 +410,8 @@ slices:
         - 5
         - 6
       done_when:
-        - Dashboard active sessions display harness, branch/worktree, work item, and session family.
-        - Event tree can filter or group by session family while preserving individual session views.
+        - Dashboard active sessions display harness, canonical project, execution root, branch/worktree, work item, and session family.
+        - Sessions list, activity feed, and event tree have documented defaults for project/family/session grouping.
         - Claim collisions and stale collectors are visible as operational warnings.
         - Existing single-session dashboard views remain readable and unchanged in normal host installs.
       effort: L
@@ -380,11 +425,15 @@ slices:
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: observability-critique
+          severity: MED
+          summary: Pin down dashboard grouping semantics and required API fields instead of leaving family grouping as an optional view.
     - id: slice-8
       num: 8
       title: Host, devcontainer, and production deployment profiles
       what: |
-        Add explicit deployment profiles and documentation for launcher isolation:
+        Add explicit deployment profile plumbing for launcher isolation:
 
         - host production install
         - devcontainer development
@@ -393,9 +442,9 @@ slices:
 
         Define per-profile defaults for dashboard bind/port, plugin source,
         generated port rebuilds, cache location, temp execution root, worktree
-        root, and cleanup behavior. Update install scripts, devcontainer docs,
-        plugin build docs, and deployment runbooks so users understand what runs
-        inside the container versus on the host.
+        root, cleanup behavior, and rollout mode. Add only the docs needed to make
+        this behavior reviewable; full runbook and migration documentation are
+        completed in the migration slice.
       why: |
         A safe launcher default in a devcontainer can be wrong on a host install.
         The product needs clear deployment behavior so isolation does not break
@@ -415,10 +464,10 @@ slices:
         - 2
         - 3
       done_when:
-        - Docs distinguish host versus devcontainer dashboard defaults and launcher behavior.
+        - Profile plumbing distinguishes host versus devcontainer dashboard defaults and launcher behavior.
         - Install/deploy scripts do not require devcontainer-only paths or assumptions.
         - Devcontainer verification checks launcher mode, port convention, and exec-capable temp root.
-        - Production release notes include migration guidance for the new worktree defaults.
+        - Host production remains warn-only/config-gated until migration tooling and release runbooks are present.
       effort: M
       risk: Med
       tests: |
@@ -433,6 +482,10 @@ slices:
       questions:
         - id: q-rollout
           text: Should production releases flip the worktree default immediately or ship warning-only first?
+      critic_revisions:
+        - source: deployment-critique
+          severity: MED
+          summary: Keep behavior/profile plumbing separate from full documentation and release runbooks so rollout gates are reviewable.
     - id: slice-9
       num: 9
       title: Migration, cleanup, and compatibility tooling
@@ -449,6 +502,11 @@ slices:
         - stale managed-worktree listing and safe prune guidance
         - compatibility handling for old sessions without session families
         - release migration docs and dashboard warning links
+        - diagnostics for legacy/global fallback use, sessions missing family
+          linkage, collector PID without index advancement, and dashboard-visible
+          sessions split across unexpected canonical roots
+        - the rollout gate that allows host production to move from warn-only to
+          worktree-by-default once identity, fallback, and doctor checks pass
       why: |
         Changing launcher defaults does not help users who already have messy
         repositories, stale worktrees, or historical sessions. Migration tooling
@@ -471,6 +529,8 @@ slices:
         - Doctor command prints non-destructive remediation steps by default.
         - Dashboard can link stale/isolation warnings to the doctor command.
         - Old sessions without session-family metadata remain visible and are labeled as legacy rather than broken.
+        - Doctor reports fallback/session-family/collector-index health in addition to git/worktree state.
+        - Host production default flip is gated on passing doctor/migration checks and documented release guidance.
       effort: M
       risk: Med
       tests: |
@@ -482,6 +542,13 @@ slices:
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: deployment-critique
+          severity: HIGH
+          summary: Migration/doctor tooling must exist before host defaults are enforced; use this slice as the rollout gate.
+        - source: observability-critique
+          severity: LOW
+          summary: Doctor should report session-family, fallback, collector, and split-canonical-root health, not only git/worktree state.
     - id: slice-10
       num: 10
       title: Parallel stress harness and release gates
@@ -495,6 +562,7 @@ slices:
         - overlapping work-item claims
         - one session resumed/continued
         - one stale collector/worktree scenario
+        - one noexec temp-root profile check
 
         Validate git state, event capture, dashboard APIs, lineage, and cleanup
         commands. Add CI-safe versions using fake harness binaries and mark
@@ -523,7 +591,8 @@ slices:
         - Stress harness proves local main stays clean while parallel sessions edit isolated branches/worktrees.
         - Dashboard APIs show all parallel root and subagent sessions under one canonical project.
         - Lineage output links work item, root session, subagents, branches/worktrees, and commits.
-        - CI and release runbooks include the stress gate or a documented reduced fake-harness equivalent.
+        - CI and release runbooks include a small production acceptance harness and a documented larger stress harness.
+        - Environment-sensitive socket/process tests declare the profile they require and use exec-capable temp roots.
       effort: L
       risk: High
       tests: |
@@ -535,6 +604,13 @@ slices:
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: deployment-critique
+          severity: MED
+          summary: Split release validation into a practical production acceptance harness plus a broader stress harness.
+        - source: observability-critique
+          severity: LOW
+          summary: Include temp-root execution policy in stress/profile validation so noexec mounts do not masquerade as launcher failures.
 questions:
     - id: q-default-policy
       text: What should be the initial rollout default for isolated worktree launches?

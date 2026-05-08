@@ -409,7 +409,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <li>
       <a href="#slice-2" class="slice-nav-item" data-slice-nav="2">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="2"></span>
-        <span>#2 Default isolated worktree launches with dirty-main guard</span>
+        <span>#2 Gated isolated worktree launch plumbing and dirty-main guard</span>
       </a>
     </li>
     
@@ -508,7 +508,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
     <div data-node="1" data-name="Launcher mode contract and environment detection" data-status="pending" data-deps="" data-files="6"></div>
-    <div data-node="2" data-name="Default isolated worktree launches with dirty-main guard" data-status="pending" data-deps="1" data-files="7"></div>
+    <div data-node="2" data-name="Gated isolated worktree launch plumbing and dirty-main guard" data-status="pending" data-deps="1" data-files="7"></div>
     <div data-node="3" data-name="Canonical project identity across worktrees" data-status="pending" data-deps="1,2" data-files="9"></div>
     <div data-node="4" data-name="Session-family continuity and per-session fallback state" data-status="pending" data-deps="3" data-files="8"></div>
     <div data-node="5" data-name="Parallel attribution and claim coordination" data-status="pending" data-deps="4" data-files="8"></div>
@@ -718,18 +718,18 @@ changes are introduced.</p>
   </div>
 </details>
 <details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 2: Default isolated worktree launches with dirty-main guard">
+  <summary class="slice-summary" aria-label="Slice 2: Gated isolated worktree launch plumbing and dirty-main guard">
     <span class="slice-num">#2</span>
     <span class="slice-title-col">
-      <span class="slice-name">Default isolated worktree launches with dirty-main guard</span>
-      <span class="slice-preview">Change mutating launcher defaults so wipnote claude, wipnote codex,</span>
+      <span class="slice-name">Gated isolated worktree launch plumbing and dirty-main guard</span>
+      <span class="slice-preview">Add the launch planning and guard machinery needed for mutating launchers</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -761,9 +761,12 @@ changes are introduced.</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-2-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>Change mutating launcher defaults so <code>wipnote claude</code>, <code>wipnote codex</code>,
-<code>wipnote gemini</code>, yolo, and dashboard terminal launches run in managed
-worktrees when invoked from local main or another protected branch.</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Add the launch planning and guard machinery needed for mutating launchers
+to run in managed worktrees, but do not flip host production defaults
+unconditionally in this slice. For devcontainer/local-dev profiles the
+plan may default to managed worktrees behind an explicit config gate; for
+host production profiles it starts as warn-only until doctor/migration and
+session-family hardening have landed.</p>
 <p>Reuse existing <code>internal/worktree</code> and command-level worktree helpers.
 Add explicit flags:</p>
 <ul>
@@ -772,8 +775,10 @@ Add explicit flags:</p>
 <li><code>--base &lt;branch&gt;</code> for advanced users</li>
 <li><code>--work-item &lt;id&gt;</code> as a harness-neutral spelling for feature/bug/track</li>
 </ul>
-<p>Add a dirty-main guard that refuses mutating in-place launch unless the
-user passes <code>--in-place</code> and the mode contract records the decision.</p>
+<p>Add a dirty-main guard that explains the managed-worktree recommendation
+and refuses mutating in-place launch only when the configured rollout mode
+says enforcement is enabled. The mode contract must record whether the
+launch used isolation, warn-only, or explicit in-place override.</p>
 </div>
           <label for="slice-2-what-reveal" class="reveal-label">Show full description</label>
           
@@ -785,9 +790,10 @@ user passes <code>--in-place</code> and the mode contract records the decision.<
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>This is the main divergence prevention mechanism. It keeps local main able
-to fast-forward and absorb upstream PRs while work proceeds on explicit,
-named branches/worktrees tied to work items.</p>
+          <div class="markdown-block serif-prose"><p>This introduces the main divergence prevention mechanism without
+surprising host users before migration tooling exists. It keeps local main
+able to fast-forward in gated environments and gives production users a
+visible warning path before enforcement.</p>
 </div>
           
         </div>
@@ -802,7 +808,7 @@ named branches/worktrees tied to work items.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Launching a mutating session from local main defaults to a managed worktree.</li><li>Launching with `--in-place` preserves existing behavior and records that the user opted out of isolation.</li><li>Dirty protected branches refuse in-place mutating launch unless the explicit escape hatch is present.</li><li>Worktree branch names remain deterministic and compatible with existing work-item branch conventions.</li></ul>
+        <ul class="slice-done-list"><li>Launcher planning can select managed-worktree, warn-only, or explicit in-place mode from profile/config.</li><li>Devcontainer/local-dev profiles can opt into managed-worktree defaults without changing host production defaults.</li><li>Launching with `--in-place` preserves existing behavior and records that the user opted out of isolation.</li><li>Dirty protected branches produce a clear warning or refusal according to rollout mode.</li><li>Worktree branch names remain deterministic and compatible with existing work-item branch conventions.</li></ul>
       </div>
       
     
@@ -837,6 +843,25 @@ named branches/worktrees tied to work items.</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">deployment-critique</span>
+          <span class="critic-revision-summary">Do not flip host launcher defaults before doctor/migration tooling exists; make this slice config-gated and warn-only for host profiles.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Do not enforce fresh-worktree defaults before canonical identity and per-session fallback/session-family hardening are available.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
     <div class="slice-field slice-questions">
@@ -844,7 +869,7 @@ named branches/worktrees tied to work items.</p>
       <div class="slice-field-value">
         
         <div class="question-block slice-question-block">
-          <p>Should all mutating launchers default to worktree mode immediately, or should this roll out behind a config flag first?</p>
+          <p>Should host production start in warn-only mode while devcontainer/local-dev starts config-gated worktree-by-default?</p>
           
           
           <textarea
@@ -1013,7 +1038,7 @@ start flagging normal cross-worktree activity as project drift.</p>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1054,6 +1079,8 @@ session-family model.</p>
 <li>a project-level index of active session families instead of one
 <code>.active-session</code> last-writer-wins file</li>
 <li>harness-neutral resume correlation for Claude, Codex, and Gemini</li>
+<li>persisted launcher-session to harness-session bridges for all three
+launchers, not just Claude&#39;s Rosetta event path</li>
 </ul>
 <p>Keep backward compatibility for old <code>.active-session</code> reads during a
 migration window, but prefer per-session state when present.</p>
@@ -1086,7 +1113,7 @@ env propagation is incomplete.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Parallel root sessions no longer overwrite one another&#39;s fallback identity.</li><li>Claude, Codex, and Gemini launches can link resume/continue events into a session family.</li><li>Old `.active-session` fallback remains readable but is no longer the primary parallel-session mechanism.</li><li>Dashboard event tree can group by session family when requested while preserving per-session drilldown.</li></ul>
+        <ul class="slice-done-list"><li>Parallel root sessions no longer overwrite one another&#39;s fallback identity.</li><li>Claude, Codex, and Gemini launchers each persist resume/continue linkage into a harness-neutral session family field.</li><li>Old `.active-session` fallback remains readable but is no longer the primary parallel-session mechanism.</li><li>Dashboard event tree can group by session family when requested while preserving per-session drilldown.</li></ul>
       </div>
       
     
@@ -1120,6 +1147,19 @@ env propagation is incomplete.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Specify concrete Codex and Gemini resume/family write paths; dashboard inference alone would leave session continuity harness-skewed.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -1164,7 +1204,7 @@ env propagation is incomplete.</p>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-5">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1206,8 +1246,10 @@ subagents. Add a coordination layer that records:</p>
 <li>collision policy when two CLIs claim the same work item</li>
 </ul>
 <p>Prefer existing claim machinery and lineage edges, but stop relying on
-branch names alone for completion/attribution. Make hook handlers write
-best-effort events even when parent records arrive later.</p>
+branch names alone for completion/attribution. No launcher may depend on
+arbitrary fresh-worktree branch names for completion once metadata-based
+completion is available. Make hook handlers write best-effort events even
+when parent records arrive later.</p>
 </div>
           <label for="slice-5-what-reveal" class="reveal-label">Show full description</label>
           
@@ -1238,7 +1280,7 @@ intentional collaboration or accidental collision.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Two root CLI sessions claiming the same work item produce a visible collision or collaboration state.</li><li>Subagent events retain parent/session/work-item attribution even when event ordering is out of order.</li><li>Completion can use explicit session/work-item metadata rather than only branch-name parsing.</li><li>Lineage output shows root CLI, child agents, branch/worktree, commits, and work item in one chain.</li></ul>
+        <ul class="slice-done-list"><li>Two root CLI sessions claiming the same work item produce a visible collision or collaboration state.</li><li>Subagent events retain parent/session/work-item attribution even when event ordering is out of order.</li><li>Completion no longer requires branch-name inference when session/work-item metadata is present.</li><li>Lineage output shows root CLI, child agents, branch/worktree, commits, and work item in one chain.</li></ul>
       </div>
       
     
@@ -1272,6 +1314,19 @@ intentional collaboration or accidental collision.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Tighten transition away from branch-name completion; metadata-based completion must be live before arbitrary fresh-worktree branch names are allowed.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -1316,7 +1371,7 @@ intentional collaboration or accidental collision.</p>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-6">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1350,16 +1405,23 @@ intentional collaboration or accidental collision.</p>
           <input type="checkbox" id="slice-6-what-reveal" class="reveal-toggle">
           <div class="markdown-block reveal-content serif-prose"><p>Audit and harden NDJSON, OTel collector, SQLite index, and child-process
 helpers for many parallel root sessions and subagents.</p>
+<p>Choose and document the collector model explicitly: preserve the current
+session-scoped collector model, but harden many parallel collectors under
+one canonical project root. Do not redesign to a shared per-project
+collector in this plan unless a later plan deliberately changes that
+architecture.</p>
 <p>Ensure:</p>
 <ul>
-<li>one collector per canonical project can safely receive events from many
-execution worktrees</li>
+<li>many session-scoped collectors can safely write under one canonical
+project root</li>
 <li>per-session NDJSON files flush and fsync sentinel events</li>
 <li>SQLite writes use busy timeouts and return errors instead of silent empty
 results</li>
 <li>helper scripts/tests avoid noexec temp mounts by using exec-capable temp
 roots</li>
 <li>orphan events are repaired or surfaced rather than silently dropped</li>
+<li>index checkpoints are monotonic and replay is restart-safe with no
+duplicate or lost events across collector restarts</li>
 </ul>
 </div>
           <label for="slice-6-what-reveal" class="reveal-label">Show full description</label>
@@ -1390,7 +1452,7 @@ the causal trail the feature is meant to protect.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Parallel sessions can write events without interleaving or losing NDJSON records.</li><li>Collector status identifies canonical project, active session families, and stale collectors.</li><li>Tests no longer execute generated helpers from noexec temp locations.</li><li>SQLite busy/locked paths are surfaced as errors or retries, not silent empty dashboard states.</li></ul>
+        <ul class="slice-done-list"><li>Parallel session-scoped collectors can write events without interleaving or losing NDJSON records.</li><li>Collector status identifies canonical project, active session families, and stale session collectors.</li><li>Tests no longer execute generated helpers from noexec temp locations.</li><li>SQLite busy/locked paths are surfaced as errors or retries, not silent empty dashboard states.</li><li>Indexer checkpoints advance monotonically and restart replay produces no duplicate or missing events.</li></ul>
       </div>
       
     
@@ -1425,6 +1487,25 @@ the causal trail the feature is meant to protect.</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Current architecture is session-scoped collectors, not one shared project collector; choose that model explicitly and harden it.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Add restart-safe index checkpoint and duplicate/loss prevention criteria for parallel ingestion.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
 
@@ -1450,7 +1531,7 @@ the causal trail the feature is meant to protect.</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-7">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1490,6 +1571,9 @@ the project view. Add API fields and UI affordances for:</p>
 <li>collision or collaboration status for work-item claims</li>
 <li>stale collector and stale worktree warnings</li>
 <li>filters by harness, work item, branch, session family, and execution root</li>
+<li>explicit default grouping semantics for sessions list, activity feed,
+and event tree: canonical project first, session family second,
+individual session drilldown third</li>
 </ul>
 <p>Keep the first screen operational, not explanatory: the dashboard should
 show what is running, where it is running, what it is editing, and why it
@@ -1523,7 +1607,7 @@ forcing users to inspect git state manually.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Dashboard active sessions display harness, branch/worktree, work item, and session family.</li><li>Event tree can filter or group by session family while preserving individual session views.</li><li>Claim collisions and stale collectors are visible as operational warnings.</li><li>Existing single-session dashboard views remain readable and unchanged in normal host installs.</li></ul>
+        <ul class="slice-done-list"><li>Dashboard active sessions display harness, canonical project, execution root, branch/worktree, work item, and session family.</li><li>Sessions list, activity feed, and event tree have documented defaults for project/family/session grouping.</li><li>Claim collisions and stale collectors are visible as operational warnings.</li><li>Existing single-session dashboard views remain readable and unchanged in normal host installs.</li></ul>
       </div>
       
     
@@ -1558,6 +1642,19 @@ forcing users to inspect git state manually.</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Pin down dashboard grouping semantics and required API fields instead of leaving family grouping as an optional view.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
 
@@ -1576,14 +1673,14 @@ forcing users to inspect git state manually.</p>
     <span class="slice-num">#8</span>
     <span class="slice-title-col">
       <span class="slice-name">Host, devcontainer, and production deployment profiles</span>
-      <span class="slice-preview">Add explicit deployment profiles and documentation for launcher isolation:</span>
+      <span class="slice-preview">Add explicit deployment profile plumbing for launcher isolation:</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-8">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1615,7 +1712,7 @@ forcing users to inspect git state manually.</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-8-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>Add explicit deployment profiles and documentation for launcher isolation:</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Add explicit deployment profile plumbing for launcher isolation:</p>
 <ul>
 <li>host production install</li>
 <li>devcontainer development</li>
@@ -1624,9 +1721,9 @@ forcing users to inspect git state manually.</p>
 </ul>
 <p>Define per-profile defaults for dashboard bind/port, plugin source,
 generated port rebuilds, cache location, temp execution root, worktree
-root, and cleanup behavior. Update install scripts, devcontainer docs,
-plugin build docs, and deployment runbooks so users understand what runs
-inside the container versus on the host.</p>
+root, cleanup behavior, and rollout mode. Add only the docs needed to make
+this behavior reviewable; full runbook and migration documentation are
+completed in the migration slice.</p>
 </div>
           <label for="slice-8-what-reveal" class="reveal-label">Show full description</label>
           
@@ -1656,7 +1753,7 @@ on devcontainer-only paths or volumes.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Docs distinguish host versus devcontainer dashboard defaults and launcher behavior.</li><li>Install/deploy scripts do not require devcontainer-only paths or assumptions.</li><li>Devcontainer verification checks launcher mode, port convention, and exec-capable temp root.</li><li>Production release notes include migration guidance for the new worktree defaults.</li></ul>
+        <ul class="slice-done-list"><li>Profile plumbing distinguishes host versus devcontainer dashboard defaults and launcher behavior.</li><li>Install/deploy scripts do not require devcontainer-only paths or assumptions.</li><li>Devcontainer verification checks launcher mode, port convention, and exec-capable temp root.</li><li>Host production remains warn-only/config-gated until migration tooling and release runbooks are present.</li></ul>
       </div>
       
     
@@ -1695,6 +1792,19 @@ on devcontainer-only paths or volumes.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">deployment-critique</span>
+          <span class="critic-revision-summary">Keep behavior/profile plumbing separate from full documentation and release runbooks so rollout gates are reviewable.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -1739,7 +1849,7 @@ on devcontainer-only paths or volumes.</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-9">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1782,6 +1892,11 @@ worktrees</li>
 <li>stale managed-worktree listing and safe prune guidance</li>
 <li>compatibility handling for old sessions without session families</li>
 <li>release migration docs and dashboard warning links</li>
+<li>diagnostics for legacy/global fallback use, sessions missing family
+linkage, collector PID without index advancement, and dashboard-visible
+sessions split across unexpected canonical roots</li>
+<li>the rollout gate that allows host production to move from warn-only to
+worktree-by-default once identity, fallback, and doctor checks pass</li>
 </ul>
 </div>
           <label for="slice-9-what-reveal" class="reveal-label">Show full description</label>
@@ -1812,7 +1927,7 @@ observable workflow.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Doctor command reports dirty main, ahead/behind, stale worktrees, and missing canonical identity metadata.</li><li>Doctor command prints non-destructive remediation steps by default.</li><li>Dashboard can link stale/isolation warnings to the doctor command.</li><li>Old sessions without session-family metadata remain visible and are labeled as legacy rather than broken.</li></ul>
+        <ul class="slice-done-list slice-done-list--grid"><li>Doctor command reports dirty main, ahead/behind, stale worktrees, and missing canonical identity metadata.</li><li>Doctor command prints non-destructive remediation steps by default.</li><li>Dashboard can link stale/isolation warnings to the doctor command.</li><li>Old sessions without session-family metadata remain visible and are labeled as legacy rather than broken.</li><li>Doctor reports fallback/session-family/collector-index health in addition to git/worktree state.</li><li>Host production default flip is gated on passing doctor/migration checks and documented release guidance.</li></ul>
       </div>
       
     
@@ -1847,6 +1962,25 @@ observable workflow.</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">deployment-critique</span>
+          <span class="critic-revision-summary">Migration/doctor tooling must exist before host defaults are enforced; use this slice as the rollout gate.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Doctor should report session-family, fallback, collector, and split-canonical-root health, not only git/worktree state.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
 
@@ -1872,7 +2006,7 @@ observable workflow.</p>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-10">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1913,6 +2047,7 @@ sessions in parallel:</p>
 <li>overlapping work-item claims</li>
 <li>one session resumed/continued</li>
 <li>one stale collector/worktree scenario</li>
+<li>one noexec temp-root profile check</li>
 </ul>
 <p>Validate git state, event capture, dashboard APIs, lineage, and cleanup
 commands. Add CI-safe versions using fake harness binaries and mark
@@ -1946,7 +2081,7 @@ deployment a concrete readiness signal.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Stress harness proves local main stays clean while parallel sessions edit isolated branches/worktrees.</li><li>Dashboard APIs show all parallel root and subagent sessions under one canonical project.</li><li>Lineage output links work item, root session, subagents, branches/worktrees, and commits.</li><li>CI and release runbooks include the stress gate or a documented reduced fake-harness equivalent.</li></ul>
+        <ul class="slice-done-list"><li>Stress harness proves local main stays clean while parallel sessions edit isolated branches/worktrees.</li><li>Dashboard APIs show all parallel root and subagent sessions under one canonical project.</li><li>Lineage output links work item, root session, subagents, branches/worktrees, and commits.</li><li>CI and release runbooks include a small production acceptance harness and a documented larger stress harness.</li><li>Environment-sensitive socket/process tests declare the profile they require and use exec-capable temp roots.</li></ul>
       </div>
       
     
@@ -1985,6 +2120,25 @@ deployment a concrete readiness signal.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">deployment-critique</span>
+          <span class="critic-revision-summary">Split release validation into a practical production acceptance harness plus a broader stress harness.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">observability-critique</span>
+          <span class="critic-revision-summary">Include temp-root execution policy in stress/profile validation so noexec mounts do not masquerade as launcher failures.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
