@@ -89,7 +89,6 @@ func buildCodexOtelEnv(base []string, port int, sessionID string) []string {
 	copy(env, base)
 	env = appendOrReplaceEnv(env,
 		"OTEL_EXPORTER_OTLP_ENDPOINT="+endpoint,
-		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
 		"OTEL_SERVICE_NAME=codex-cli",
 		"WIPNOTE_OTEL_SESSION="+sessionID,
 	)

@@ -13,23 +13,25 @@ import (
 // feedEvent is the unified wire shape for /api/events/feed.
 // source is "otel" for OTel-derived events, "hook" for agent_events fallback.
 type feedEvent struct {
-	ID         string  `json:"id"`
-	Source     string  `json:"source"`
-	Type       string  `json:"type"`
-	ToolName   string  `json:"tool_name,omitempty"`
-	Model      string  `json:"model,omitempty"`
-	Timestamp  string  `json:"timestamp"`
-	DurationMs int64   `json:"duration_ms,omitempty"`
-	TokensIn   int64   `json:"tokens_in,omitempty"`
-	TokensOut  int64   `json:"tokens_out,omitempty"`
-	CostUSD    float64 `json:"cost_usd,omitempty"`
-	Success    *bool   `json:"success,omitempty"`
-	Decision   string  `json:"decision,omitempty"`
-	SessionID  string  `json:"session_id,omitempty"`
-	FeatureID  string  `json:"feature_id,omitempty"`
-	TraceID    string  `json:"trace_id,omitempty"`
-	ParentSpan string  `json:"parent_span,omitempty"`
-	Summary    string  `json:"summary,omitempty"`
+	ID           string  `json:"id"`
+	Source       string  `json:"source"`
+	Type         string  `json:"type"`
+	Harness      string  `json:"harness,omitempty"`
+	ToolName     string  `json:"tool_name,omitempty"`
+	Model        string  `json:"model,omitempty"`
+	Timestamp    string  `json:"timestamp"`
+	DurationMs   int64   `json:"duration_ms,omitempty"`
+	TokensIn     int64   `json:"tokens_in,omitempty"`
+	TokensOut    int64   `json:"tokens_out,omitempty"`
+	CostUSD      float64 `json:"cost_usd,omitempty"`
+	Success      *bool   `json:"success,omitempty"`
+	Decision     string  `json:"decision,omitempty"`
+	SessionID    string  `json:"session_id,omitempty"`
+	FeatureID    string  `json:"feature_id,omitempty"`
+	TraceID      string  `json:"trace_id,omitempty"`
+	ParentSpan   string  `json:"parent_span,omitempty"`
+	Summary      string  `json:"summary,omitempty"`
+	FeatureTitle string  `json:"feature_title,omitempty"`
 	// tsMicros is used internally for sorting and is not serialised.
 	tsMicros int64
 }
@@ -73,7 +75,7 @@ func eventsFeedHandler(database *sql.DB) http.HandlerFunc {
 // queryOtelFeedEvents fetches relevant OTel spans and returns them as feedEvents.
 func queryOtelFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 	rows, err := database.Query(`
-		SELECT s.signal_id, s.trace_id, COALESCE(s.parent_span, ''),
+		SELECT s.signal_id, COALESCE(s.harness, ''), s.trace_id, COALESCE(s.parent_span, ''),
 		       s.canonical, COALESCE(s.tool_name, '') AS tool_name,
 		       COALESCE(s.model, '') AS model,
 		       s.ts_micros, COALESCE(s.duration_ms, 0) AS duration_ms,
@@ -82,6 +84,7 @@ func queryOtelFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 		       s.success, COALESCE(s.decision, '') AS decision,
 		       COALESCE(s.session_id, '') AS session_id,
 		       COALESCE(s.feature_id, '') AS feature_id,
+		       COALESCE((SELECT f.title FROM features f WHERE f.id = s.feature_id LIMIT 1), '') AS feature_title,
 		       COALESCE(s.attrs_json, '{}') AS attrs_json
 		FROM otel_signals s
 		WHERE s.kind = 'span'
@@ -104,12 +107,12 @@ func queryOtelFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 		var tsMicros int64
 
 		if err := rows.Scan(
-			&ev.ID, &ev.TraceID, &ev.ParentSpan,
+			&ev.ID, &ev.Harness, &ev.TraceID, &ev.ParentSpan,
 			&ev.Type, &ev.ToolName, &ev.Model,
 			&tsMicros, &ev.DurationMs,
 			&ev.TokensIn, &ev.TokensOut, &ev.CostUSD,
 			&successVal, &ev.Decision,
-			&ev.SessionID, &ev.FeatureID,
+			&ev.SessionID, &ev.FeatureID, &ev.FeatureTitle,
 			&attrsRaw,
 		); err != nil {
 			continue
@@ -143,7 +146,8 @@ func queryHookFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 		       COALESCE(e.output_summary, '') AS output_summary,
 		       COALESCE(e.session_id, '') AS session_id,
 		       COALESCE(e.feature_id, '') AS feature_id,
-		       COALESCE(e.parent_event_id, '') AS parent_event_id
+		       COALESCE(e.parent_event_id, '') AS parent_event_id,
+		       COALESCE((SELECT f.title FROM features f WHERE f.id = e.feature_id LIMIT 1), '') AS feature_title
 		FROM agent_events e
 		WHERE e.event_type IN ('start', 'end', 'check_point', 'error', 'tool_call')
 		ORDER BY e.timestamp DESC
@@ -161,7 +165,7 @@ func queryHookFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 		if err := rows.Scan(
 			&ev.ID, &ev.Type, &ts,
 			&ev.ToolName, &inputSum, &outputSum,
-			&ev.SessionID, &ev.FeatureID, &parentEvtID,
+			&ev.SessionID, &ev.FeatureID, &parentEvtID, &ev.FeatureTitle,
 		); err != nil {
 			continue
 		}
@@ -300,4 +304,56 @@ func merge(a, b []feedEvent, limit int) []feedEvent {
 		combined = combined[:limit]
 	}
 	return combined
+}
+
+func legacyEventFromFeed(ev feedEvent) map[string]any {
+	toolName := ev.ToolName
+	if toolName == "" && ev.Type == "interaction" {
+		toolName = "UserQuery"
+	}
+
+	status := "recorded"
+	if ev.Type == "tool_blocked_on_user" {
+		status = "blocked"
+	} else if ev.Success != nil {
+		if *ev.Success {
+			status = "completed"
+		} else {
+			status = "failed"
+		}
+	}
+
+	return map[string]any{
+		"event_id":        ev.ID,
+		"agent_id":        legacyAgentID(ev),
+		"event_type":      ev.Type,
+		"timestamp":       ev.Timestamp,
+		"tool_name":       toolName,
+		"input_summary":   ev.Summary,
+		"output_summary":  ev.Summary,
+		"session_id":      ev.SessionID,
+		"feature_id":      ev.FeatureID,
+		"feature_title":   ev.FeatureTitle,
+		"parent_event_id": ev.ParentSpan,
+		"status":          status,
+	}
+}
+
+func legacyAgentID(ev feedEvent) string {
+	switch ev.Harness {
+	case "claude_code":
+		return "claude-code"
+	case "gemini_cli":
+		return "gemini"
+	case "codex", "wipnote":
+		return ev.Harness
+	}
+	switch ev.Source {
+	case "otel":
+		return "otel"
+	case "hook":
+		return "hook"
+	default:
+		return ""
+	}
 }

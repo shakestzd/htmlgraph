@@ -118,40 +118,40 @@ func TestIsCodexHooksEnabledAt(t *testing.T) {
 		t.Errorf("expected false when config file does not exist")
 	}
 
-	// Test 2: File exists but no codex_hooks line
+	// Test 2: File exists but no hooks line
 	err := os.WriteFile(configPath, []byte("[other]\nkey = value\n"), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	if isCodexHooksEnabledAt(configPath) {
-		t.Errorf("expected false when codex_hooks not in config")
+		t.Errorf("expected false when hooks not in config")
 	}
 
-	// Test 3: File has codex_hooks = true
+	// Test 3: File has hooks = true
+	err = os.WriteFile(configPath, []byte("[features]\nhooks = true\n"), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if !isCodexHooksEnabledAt(configPath) {
+		t.Errorf("expected true when hooks = true")
+	}
+
+	// Test 4: File has hooks = false
+	err = os.WriteFile(configPath, []byte("[features]\nhooks = false\n"), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if isCodexHooksEnabledAt(configPath) {
+		t.Errorf("expected false when hooks = false")
+	}
+
+	// Test 5: Legacy codex_hooks is still recognized for compatibility.
 	err = os.WriteFile(configPath, []byte("[features]\ncodex_hooks = true\n"), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	if !isCodexHooksEnabledAt(configPath) {
-		t.Errorf("expected true when codex_hooks = true")
-	}
-
-	// Test 4: File has codex_hooks = false
-	err = os.WriteFile(configPath, []byte("[features]\ncodex_hooks = false\n"), 0644)
-	if err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-	if isCodexHooksEnabledAt(configPath) {
-		t.Errorf("expected false when codex_hooks = false")
-	}
-
-	// Test 5: File has codex_hooks with spaces around =
-	err = os.WriteFile(configPath, []byte("[features]\ncodex_hooks  =  true\n"), 0644)
-	if err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-	if !isCodexHooksEnabledAt(configPath) {
-		t.Errorf("expected true when codex_hooks has spaces around =")
+		t.Errorf("expected true when legacy codex_hooks = true")
 	}
 }
 
@@ -243,7 +243,7 @@ func TestEnsureCodexHooksEnabledIdempotent(t *testing.T) {
 }
 
 // TestCodexHooksUpsertPreservesExistingFeaturesTable verifies that enabling
-// codex_hooks merges into an existing [features] table without duplicating it.
+// hooks merges into an existing [features] table without duplicating it.
 func TestCodexHooksUpsertPreservesExistingFeaturesTable(t *testing.T) {
 	tmpdir := t.TempDir()
 	configPath := filepath.Join(tmpdir, "config.toml")
@@ -270,8 +270,8 @@ func TestCodexHooksUpsertPreservesExistingFeaturesTable(t *testing.T) {
 	}
 
 	// Verify both keys are present
-	if !strings.Contains(content, "codex_hooks") {
-		t.Errorf("codex_hooks not found in output")
+	if !strings.Contains(content, "hooks = true") {
+		t.Errorf("hooks = true not found in output")
 	}
 	if !strings.Contains(content, "other_flag") {
 		t.Errorf("other_flag not preserved in output")
@@ -284,20 +284,46 @@ func TestEnsureCodexHooksEnabledCreatesFromEmpty(t *testing.T) {
 	tmpdir := t.TempDir()
 	configPath := filepath.Join(tmpdir, "config.toml")
 
-	// Enable codex_hooks on a non-existent file
+	// Enable hooks on a non-existent file
 	if err := ensureCodexHooksEnabled(configPath); err != nil {
 		t.Fatalf("ensureCodexHooksEnabled: %v", err)
 	}
 
-	// Verify the file was created with codex_hooks enabled
+	// Verify the file was created with hooks enabled
 	data, _ := os.ReadFile(configPath)
 	content := string(data)
 
-	if !strings.Contains(content, "codex_hooks") {
-		t.Errorf("codex_hooks not found in newly created config")
+	if !strings.Contains(content, "hooks = true") {
+		t.Errorf("hooks = true not found in newly created config")
 	}
 	if !isCodexHooksEnabledAt(configPath) {
-		t.Errorf("codex_hooks = true check failed after ensureCodexHooksEnabled")
+		t.Errorf("hooks = true check failed after ensureCodexHooksEnabled")
+	}
+}
+
+func TestEnsureCodexHooksEnabledMigratesLegacyKey(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	initialContent := "[features]\ncodex_hooks = true\nother_flag = true\n"
+	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	if err := ensureCodexHooksEnabled(configPath); err != nil {
+		t.Fatalf("ensureCodexHooksEnabled: %v", err)
+	}
+
+	data, _ := os.ReadFile(configPath)
+	content := string(data)
+	if strings.Contains(content, "codex_hooks") {
+		t.Fatalf("legacy codex_hooks key should be removed:\n%s", content)
+	}
+	if !strings.Contains(content, "hooks = true") {
+		t.Fatalf("hooks = true missing after migration:\n%s", content)
+	}
+	if !strings.Contains(content, "other_flag") {
+		t.Fatalf("other_flag should be preserved:\n%s", content)
 	}
 }
 
@@ -335,7 +361,7 @@ func TestEnsureCodexPluginEnabledPreservesExistingPlugins(t *testing.T) {
 enabled = true
 
 [features]
-codex_hooks = true
+hooks = true
 `
 	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
@@ -353,7 +379,7 @@ codex_hooks = true
 	if !strings.Contains(content, "wipnote@wipnote") {
 		t.Errorf("wipnote plugin config should be present:\n%s", content)
 	}
-	if !strings.Contains(content, "codex_hooks") {
+	if !strings.Contains(content, "hooks = true") {
 		t.Errorf("features config should be preserved:\n%s", content)
 	}
 	if !isCodexPluginEnabledAt(configPath) {

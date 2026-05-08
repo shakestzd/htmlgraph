@@ -68,19 +68,27 @@ func isCodexMarketplaceInstalledAt(configPath string) bool {
 		strings.Contains(content, `[plugins."wipnote@wipnote"]`)
 }
 
-// isCodexHooksEnabledAt is the testable core.
+// isCodexHooksEnabledAt reports whether Codex hooks are enabled in config.toml.
+// Prefer the current [features].hooks key, but keep recognizing the legacy
+// codex_hooks key for compatibility with existing user configs.
 func isCodexHooksEnabledAt(configPath string) bool {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return false
 	}
-	for line := range strings.SplitSeq(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "codex_hooks") && strings.Contains(trimmed, "=") {
-			parts := strings.SplitN(trimmed, "=", 2)
-			if len(parts) == 2 && strings.TrimSpace(parts[1]) == "true" {
-				return true
-			}
+
+	tree := make(map[string]any)
+	if err := toml.Unmarshal(data, &tree); err != nil {
+		return false
+	}
+
+	features, ok := tree["features"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, key := range []string{"hooks", "codex_hooks"} {
+		if enabled, ok := features[key].(bool); ok && enabled {
+			return true
 		}
 	}
 	return false
@@ -242,10 +250,9 @@ func removeCodexWipnoteRegistrations(configPath string) (bool, error) {
 	return true, nil
 }
 
-// ensureCodexHooksEnabled parses the config.toml file, merges codex_hooks = true
-// into the [features] table (creating the section if absent), and writes it back.
-// This is idempotent: if codex_hooks = true is already set, it's a no-op after
-// re-serialization.
+// ensureCodexHooksEnabled parses the config.toml file, merges hooks = true into
+// the [features] table (creating the section if absent), removes the deprecated
+// codex_hooks key, and writes it back. This is idempotent.
 func ensureCodexHooksEnabled(configPath string) error {
 	// Read existing config, if any
 	data, err := os.ReadFile(configPath)
@@ -261,13 +268,14 @@ func ensureCodexHooksEnabled(configPath string) error {
 		}
 	}
 
-	// Ensure [features] table exists and set codex_hooks = true
+	// Ensure [features] table exists and set hooks = true.
 	features, ok := tree["features"].(map[string]any)
 	if !ok {
 		features = make(map[string]any)
 		tree["features"] = features
 	}
-	features["codex_hooks"] = true
+	features["hooks"] = true
+	delete(features, "codex_hooks")
 
 	// Marshal back to TOML and write
 	newData, err := toml.Marshal(tree)
@@ -716,7 +724,7 @@ Session IDs come from ~/.codex/session_index.jsonl.`,
 // runCodexInit installs the wipnote Codex marketplace plugin, idempotently.
 // Corresponds to: wipnote codex --init
 // Phase 1: Install / verify marketplace (idempotent).
-// Phase 2: Check codex_hooks — prompt user if not set.
+// Phase 2: Check hooks feature flag — prompt user if not set.
 func runCodexInit(yes, dryRun bool) error {
 	configPath := codexConfigPath()
 
@@ -743,22 +751,22 @@ func runCodexInit(yes, dryRun bool) error {
 		fmt.Println("wipnote Codex marketplace is already installed.")
 	}
 
-	// Phase 2: Check and optionally enable codex_hooks feature flag.
+	// Phase 2: Check and optionally enable the hooks feature flag.
 	// This runs on every --init so partial setups can be repaired.
 	if !isCodexHooksEnabledAt(configPath) {
-		if promptYesNo("Enable the codex_hooks feature flag in ~/.codex/config.toml?", yes) {
+		if promptYesNo("Enable the hooks feature flag in ~/.codex/config.toml?", yes) {
 			if dryRun {
-				fmt.Println("[dry-run] would enable codex_hooks = true in ~/.codex/config.toml")
+				fmt.Println("[dry-run] would enable hooks = true in ~/.codex/config.toml")
 			} else {
 				if err := ensureCodexHooksEnabled(configPath); err != nil {
-					fmt.Fprintf(os.Stderr, "warning: could not enable codex_hooks: %v\n", err)
+					fmt.Fprintf(os.Stderr, "warning: could not enable hooks feature flag: %v\n", err)
 				} else {
-					fmt.Println("codex_hooks feature flag enabled.")
+					fmt.Println("hooks feature flag enabled.")
 				}
 			}
 		}
 	} else {
-		fmt.Println("codex_hooks feature flag is already enabled.")
+		fmt.Println("hooks feature flag is already enabled.")
 	}
 
 	// Phase 3: enable the actual plugin. Without this, the marketplace is
@@ -824,9 +832,9 @@ func launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem str
 	configPath := codexConfigPath()
 	if isCodexMarketplaceInstalledAt(configPath) && !isCodexHooksEnabledAt(configPath) {
 		if err := ensureCodexHooksEnabled(configPath); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not enable codex_hooks: %v\n", err)
+			fmt.Fprintf(os.Stderr, "warning: could not enable hooks feature flag: %v\n", err)
 		} else {
-			fmt.Println("codex_hooks feature flag enabled.")
+			fmt.Println("hooks feature flag enabled.")
 		}
 	}
 	if isCodexMarketplaceInstalledAt(configPath) && !isCodexPluginEnabledAt(configPath) {
@@ -998,13 +1006,13 @@ func launchCodexDev(resumeID string, cleanup, dryRun, yolo bool, extraArgs []str
 
 	if dryRun {
 		if !isCodexHooksEnabledAt(configPath) {
-			fmt.Println("[dry-run] would enable codex_hooks = true in ~/.codex/config.toml")
+			fmt.Println("[dry-run] would enable hooks = true in ~/.codex/config.toml")
 		}
 	} else if !isCodexHooksEnabledAt(configPath) {
 		if err := ensureCodexHooksEnabled(configPath); err != nil {
-			return fmt.Errorf("enabling codex_hooks in %s: %w", configPath, err)
+			return fmt.Errorf("enabling hooks feature flag in %s: %w", configPath, err)
 		}
-		fmt.Println("codex_hooks feature flag enabled.")
+		fmt.Println("hooks feature flag enabled.")
 	}
 
 	if dryRun {

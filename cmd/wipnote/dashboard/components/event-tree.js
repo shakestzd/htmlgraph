@@ -15,6 +15,7 @@ class HgEventTree extends HTMLElement {
     this.otelRollupBySession = {};
     this.otelSpansBySession = {};
     this.otelLogsBySession = {};
+    this.loadError = '';
   }
 
   connectedCallback() {
@@ -69,9 +70,11 @@ class HgEventTree extends HTMLElement {
     var limit = this.dataset.limit || 50;
     try {
       var resp = await fetch(buildProjectUrl('events/tree', 'limit=' + limit));
-      if (!resp.ok) return;
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      this.loadError = '';
       this.turns = await resp.json();
     } catch(e) {
+      this.loadError = 'Activity feed unavailable right now.';
       this.turns = [];
     }
     await this.loadFeatureTitles();
@@ -756,8 +759,13 @@ class HgEventTree extends HTMLElement {
   }
 
   render() {
+    if (this.loadError) {
+      this.innerHTML = '<div class="empty-state">' + this.loadError + '</div>';
+      this._updateFilterCount(0, 0);
+      return;
+    }
     if (!this.turns || this.turns.length === 0) {
-      this.innerHTML = '<div class="empty-state">No activity yet. Start a Claude Code session to see activity.</div>';
+      this.innerHTML = '<div class="empty-state">No activity yet.</div>';
       this._updateFilterCount(0, 0);
       return;
     }

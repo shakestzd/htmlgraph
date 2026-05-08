@@ -72,43 +72,22 @@ func recentEventsHandler(database *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		rows, err := database.Query(`
-			SELECT e.event_id, e.agent_id, e.event_type, e.timestamp, e.tool_name,
-			       COALESCE(e.input_summary, ''), COALESCE(e.output_summary, ''),
-			       e.session_id, COALESCE(e.feature_id, ''),
-			       COALESCE(e.parent_event_id, ''), e.status,
-			       COALESCE((SELECT f.title FROM features f WHERE f.id = e.feature_id LIMIT 1), '')
-			FROM agent_events e
-			ORDER BY e.timestamp DESC
-			LIMIT ?`, limit)
+		otelEvents, err := queryOtelFeedEvents(database, limit)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
-		events := make([]map[string]any, 0, limit)
-		for rows.Next() {
-			var eventID, agentID, eventType, ts, toolName string
-			var inputSum, outputSum, sessionID, featureID, parentEvtID, status, featureTitle string
-			if err := rows.Scan(&eventID, &agentID, &eventType, &ts, &toolName,
-				&inputSum, &outputSum, &sessionID, &featureID, &parentEvtID, &status, &featureTitle); err != nil {
-				continue
-			}
-			events = append(events, map[string]any{
-				"event_id":        eventID,
-				"agent_id":        agentID,
-				"event_type":      eventType,
-				"timestamp":       ts,
-				"tool_name":       toolName,
-				"input_summary":   inputSum,
-				"output_summary":  outputSum,
-				"session_id":      sessionID,
-				"feature_id":      featureID,
-				"feature_title":   featureTitle,
-				"parent_event_id": parentEvtID,
-				"status":          status,
-			})
+		hookEvents, err := queryHookFeedEvents(database, limit)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		merged := merge(otelEvents, hookEvents, limit)
+		events := make([]map[string]any, 0, len(merged))
+		for _, ev := range merged {
+			events = append(events, legacyEventFromFeed(ev))
 		}
 
 		respondJSON(w, events)

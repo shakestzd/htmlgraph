@@ -8,6 +8,7 @@ var stats = {};
 var currentView = 'activity';
 var seenEventIds = new Set();
 var groupByTrack = localStorage.getItem('wipnote-kanban-group-by-track') === 'true';
+var activityFeedError = '';
 
 // Global mode state — populated by detectMode() on init. In single-project
 // mode both values stay unset and buildProjectUrl() returns plain URLs.
@@ -75,12 +76,32 @@ function updateStatsBar() {
 
 function fetchEvents() {
   return fetch(buildProjectUrl('events/recent', 'limit=100')).then(function(r) {
-    if (!r.ok) return;
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json().then(function(data) {
+      activityFeedError = '';
       events = data;
+      seenEventIds = new Set();
       events.forEach(function(e) { seenEventIds.add(e.event_id); });
+      updateActivityFeedError();
     });
-  }).catch(function() {});
+  }).catch(function(err) {
+    events = [];
+    seenEventIds = new Set();
+    activityFeedError = 'Feed unavailable right now.';
+    updateActivityFeedError();
+    return err;
+  });
+}
+
+function updateActivityFeedError() {
+  var countEl = document.getElementById('filter-count');
+  if (!countEl) return;
+  if (activityFeedError) {
+    countEl.textContent = activityFeedError;
+    countEl.title = activityFeedError;
+    return;
+  }
+  countEl.title = '';
 }
 
 function fetchSessions() {
@@ -3825,4 +3846,3 @@ function dashSidebarTeardown() {
   var fb = document.getElementById('dash-finalize-btn');
   if (fb) { fb.textContent = 'Finalize Plan'; fb.disabled = true; fb.style.background = ''; fb.style.display = ''; }
 }
-
