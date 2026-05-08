@@ -24,7 +24,7 @@ design:
         - Branch naming must remain compatible with existing work-item completion and lineage conventions until explicit metadata replaces branch-name inference.
         - Devcontainer defaults must bind dashboard services to 0.0.0.0:8088, while host installs keep the production default of 127.0.0.1:8080.
         - No implementation slice may rely solely on global mutable fallback files when parallel CLI sessions are expected.
-    approved: false
+    approved: true
     comment: ""
 slices:
     - id: slice-1
@@ -624,7 +624,7 @@ questions:
           label: Immediate default — all mutating launches use managed worktrees unless --in-place
         - key: warning-only
           label: Warning-only — detect dirty main but do not change launch location
-      answer: null
+      answer: config-gated-default
     - id: q-claim-collisions
       text: How should simultaneous claims on one work item behave?
       description: |
@@ -637,7 +637,7 @@ questions:
           label: Hard exclusive — block second mutating launcher unless forced
         - key: allow-silent
           label: Allow silently — attribution only, no collision UX
-      answer: null
+      answer: warn-and-record-collaboration
     - id: q-session-continuity
       text: Should session continuity use `session_family_id` or existing `continued_from`?
       description: |
@@ -648,4 +648,4 @@ questions:
           label: Add session_family_id — explicit root grouping
         - key: continued-from-only
           label: Use continued_from only — minimal schema change
-      answer: null
+      answer: session-family-id

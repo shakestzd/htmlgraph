@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>wipnote plan answer subcommand missing — no way to record plan-level question answers via CLI</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-9c5fb1da"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-08T11:52:25.968472"
+             data-updated="2026-05-08T11:52:28.127618" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4">
+
+        <header>
+            <h1>wipnote plan answer subcommand missing — no way to record plan-level question answers via CLI</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-08T11:52:25.976699">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="plan-1670cacd.html" data-relationship="caused_by" data-since="2026-05-08T11:52:28.126981">Plan: Launcher isolation, deployment modes, and parallel attribution</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>The plan YAML supports top-level questions with answer fields, but wipnote plan has no answer subcommand to set them. Discovered during review of plan-1670cacd: had to edit the YAML directly and run wipnote plan render to record the three design-question answers. The only related command is answer-slice-question, which handles slice-local questions only. Need a wipnote plan answer    command analogous to answer-slice-question.</p>
+        </section>
+    </article>
+</body>
+</html>

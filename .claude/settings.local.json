@@ -601,7 +601,25 @@
       "Bash(/usr/bin/grep -n \"isGoTestTempDirPath\\\\|ShouldSkipRegistration\" /workspaces/htmlgraph/internal/registry/registry.go)",
       "Bash(roborev show *)",
       "Bash(/usr/bin/python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'closed={d.get\\(\\\\\"closed\\\\\"\\)}, verdict={d.get\\(\\\\\"job\\\\\",{}\\).get\\(\\\\\"verdict\\\\\"\\)}'\\)\")",
-      "Bash(/home/vscode/.local/bin/htmlgraph link *)"
+      "Bash(/home/vscode/.local/bin/htmlgraph link *)",
+      "Bash(wipnote bug *)",
+      "Bash(wipnote build *)",
+      "Bash(wipnote feature *)",
+      "Bash(wipnote link *)",
+      "Bash(wipnote snapshot *)",
+      "Bash(wipnote wip *)",
+      "Bash(wipnote find *)",
+      "Bash(wipnote track *)",
+      "Bash(wipnote plan *)",
+      "Bash(wipnote serve *)",
+      "Bash(wipnote reindex *)",
+      "Bash(convert \"/home/vscode/.claude/projects/-workspaces-wipnote/0fb15b12-501a-4993-b846-8e40ee6633c8/tool-results/webfetch-1778195338502-x3x581.png\" -resize 1800x /tmp/screenshot-resized.png)",
+      "Bash(pip install *)",
+      "Bash(apt-get install *)",
+      "Bash(sudo apt-get install -y python3-pil -q)",
+      "Bash(wipnote session *)",
+      "Bash(wipnote relevant *)",
+      "Bash(wipnote status *)"
     ]
   },
   "enabledPlugins": {
