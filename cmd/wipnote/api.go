@@ -266,7 +266,7 @@ func mergeProvenanceFromHTML(features []map[string]any, projectDir string) {
 			if err != nil || node == nil || node.ID == "" {
 				continue
 			}
-			if node.CreatedByAgent == "" && node.CreatedByModel == "" {
+			if node.CreatedByAgent == "" && node.CreatedByModel == "" && node.CreatedByRole == "" && node.CreatedByCLIVersion == "" {
 				continue // nothing to merge
 			}
 			lookup[node.ID] = provFields{

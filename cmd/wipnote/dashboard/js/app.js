@@ -400,7 +400,8 @@ function renderSessions() {
     var isExpanded = _expandedSessions.has(s.session_id);
 
     var tr = document.createElement('tr');
-    var harnessClass = s.agent ? ' harness-' + s.agent : '';
+    var _knownHarnesses = {'claude-code': true, 'codex': true, 'gemini': true};
+    var harnessClass = (s.agent && _knownHarnesses[s.agent]) ? ' harness-' + s.agent : '';
     tr.className = 'session-row' + (s.status === 'active' ? ' live' : '') + harnessClass;
     tr.setAttribute('data-session-id', s.session_id);
     tr.addEventListener('click', function(e) {
@@ -444,9 +445,11 @@ function renderSessions() {
       titleTd.appendChild(planBadge);
     }
     if (s.agent) {
+      var _harnessLabels = {'claude-code': 'Claude', 'codex': 'Codex', 'gemini': 'Gemini'};
       var cliBadge = document.createElement('span');
-      var harnessShort = {'claude-code': 'Claude', 'codex': 'Codex', 'gemini': 'Gemini'}[s.agent] || s.agent;
-      cliBadge.className = 'badge-cli badge-cli-' + s.agent;
+      var harnessShort = _harnessLabels[s.agent] || s.agent;
+      var harnessKey = _harnessLabels[s.agent] ? s.agent : 'unknown';
+      cliBadge.className = 'badge-cli badge-cli-' + harnessKey;
       cliBadge.textContent = harnessShort;
       titleTd.appendChild(cliBadge);
     }
