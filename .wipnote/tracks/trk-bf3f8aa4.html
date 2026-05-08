@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="htmlgraph-version" content="1.0">
+    <meta name="wipnote-version" content="1.0">
     <title>Public Launch 2026-05 — Erinn AI rename &#43; announcement</title>
     <link rel="stylesheet" href="../styles.css">
 </head>
@@ -13,7 +13,7 @@
              data-status="todo"
              data-priority="high"
              data-created="2026-05-05T21:42:21.035762"
-             data-updated="2026-05-06T11:09:03.073485" data-agent-assigned="claude-code">
+             data-updated="2026-05-07T21:59:13.863985" data-agent-assigned="claude-code">
 
         <header>
             <h1>Public Launch 2026-05 — Erinn AI rename &#43; announcement</h1>
@@ -40,75 +40,25 @@
                     <li><a href="feat-8b8b0823.html" data-relationship="contains" data-since="2026-05-05T22:19:16.880374">Rename wave 5c — pre-restart binary cleanup</a></li>
                     <li><a href="feat-afc9e38b.html" data-relationship="contains" data-since="2026-05-06T10:38:45.228605">Rename erinn → spuren (second-pass rename)</a></li>
                     <li><a href="feat-913bf7a6.html" data-relationship="contains" data-since="2026-05-06T11:09:03.073165">Rename erinn → wipnote (final brand decision)</a></li>
+                    <li><a href="bug-e0795e08.html" data-relationship="contains" data-since="2026-05-07T19:18:36.640335">Add root LICENSE file (MIT)</a></li>
+                    <li><a href="bug-587f3e44.html" data-relationship="contains" data-since="2026-05-07T19:18:36.671859">Fix wipnote-aliases.sh: replace hg- prefix with wn-, add wn alias</a></li>
+                    <li><a href="bug-3f5922c8.html" data-relationship="contains" data-since="2026-05-07T19:18:36.702032">Fix gh-pages docs title: still shows HtmlGraph - erinn instead of wipnote</a></li>
+                    <li><a href="feat-c8bb337e.html" data-relationship="contains" data-since="2026-05-07T19:19:06.834742">Update Homebrew formula to current version</a></li>
+                    <li><a href="feat-c40942d3.html" data-relationship="contains" data-since="2026-05-07T19:19:06.87554">Tag v0.59.0, push origin/main, cut GitHub release</a></li>
+                    <li><a href="feat-89fa8d07.html" data-relationship="contains" data-since="2026-05-07T19:22:21.29071">Review public launch work items</a></li>
+                    <li><a href="plan-cf1a6ae4.html" data-relationship="contains" data-since="2026-05-07T19:27:55.595465">Launch readiness — wipnote public launch blockers</a></li>
+                    <li><a href="plan-cf1a6ae4.html" data-relationship="contains" data-since="2026-05-07T21:54:56.908921">Plan: Launch readiness — wipnote public launch blockers</a></li>
+                    <li><a href="bug-82634ec3.html" data-relationship="contains" data-since="2026-05-07T21:56:48.276296">YAML plan priority is not persisted or rendered</a></li>
+                    <li><a href="plan-cf1a6ae4.html" data-relationship="contains" data-since="2026-05-07T21:59:13.859234">Plan: Launch readiness — wipnote public launch blockers</a></li>
                 </ul>
             </section>
         </nav>
 
         <section data-content>
             <h3>Description</h3>
-            <p>Public launch of Erinn AI (formerly HtmlGraph), week of 2026-05-05.
-
-## Strategic context
-
-Three-way local-first agent-tooling triangulation in May 2026:
-- **Symphony** (OpenAI, 2026-04-27) — cloud orchestration of Codex agents off Linear board
-- **kata** (Wes McKinney, 2026-04-30) — local-first agent-friendly issue tracker
-- **erinn** (us, renamed 2026-05-05) — local-first observability + causal lineage
-
-Positioning: Symphony orchestrates. kata tracks. erinn observes.
-
-## Rename decision (2026-05-05)
-
-HtmlGraph was 9 chars, awkward, disconnected from the product (HTML files are an implementation detail). Renamed to **erinn** — clipped from German *erinnern* (to remember). Captures the product thesis: causal lineage = remembering why code exists.
-
-Considered: spor (taken — Vy design system), merken (merken.ai stealth player), stamm, causa (.tech collision), pfad (.com taken). Erinn won on cleanest availability + dual etymology (German evocation, Irish/Gaelic name fallback).
-
-**Brand presentation:** lowercase `erinn` (like brew, kata, curl, jq), no AI suffix in prose, German etymology one-line README opener. Domain erinnai.com purchased. CLI binary `erinn`. Module path github.com/shakestzd/erinn. Internal data dir .erinn/. Repo renamed to shakestzd/erinn (GitHub auto-redirects).
-
-## Pre-launch fix sprint (committed 2026-05-05)
-
-Five launch-blocker bugs fixed, all related to yolo-mode safety:
-- bug-5b5611c2 — legacy SQLite warning (7141ca76)
-- bug-ab377859 — OTel handshake timeout (a50057e8)
-- bug-0413c3c4 — claim check parent-chain walk (833adbe9)
-- bug-730c0f19 — block subagent commit on main (8b02b115)
-- bug-8ff540a7 — yolo posture inheritance (a30def66)
-
-Plus opus-coder maxTurns bumped 40→80 (ea159c16). v0.58.0 cut and shipped (689cea5e) as last 'htmlgraph' release.
-
-## Rename sprint progress
-
-- Wave 1: Go module + cmd/erinn (a71bc508) DONE
-- Wave 2: env vars + cache paths (ea8e1ca4) DONE
-- Wave 3: plugin source tree + ports (e5f97d21) DONE
-- Wave 4: docs and prompts sweep — PENDING
-- Wave 5: .htmlgraph -> .erinn data dir — PENDING
-- Wave 6: final sweep + verification — PENDING
-- Brand cleanup (Erinn AI -> erinn lowercase) — PENDING
-- Workspace dir rename (post-session) — PENDING
-
-## Launch sequence
-
-1. Complete rename sprint (waves 4-6 + brand cleanup)
-2. Cut v0.59.0 of erinn
-3. Demo video (feat-4ae13f3c)
-4. Blog post draft (feat-e505e51c)
-5. LinkedIn launch post (feat-ec81c370) — Variant C: three-way triangulation
-6. HN submission
-
-## Variant C (recommended launch post)
-
-> Three local-first answers to what the agent is actually doing:
->
-> Symphony (Codex + Linear) orchestrates. kata tracks. erinn observes.
->
-> Building erinn since October — runs on Claude Code, causal lineage from plan to commit to session, yolo-mode guards compiled in Go. The 'why does this code exist?' layer above your task ledger.
->
-> Open source. brew install erinn.
-
-## Process note
-
-Rename sprint should have been decomposed into per-wave work items upfront rather than a single umbrella feature (feat-b02a559b). Created wave 4-6 + brand cleanup + workspace rename features as part of this track for proper audit trail.</p>
+            <p>Public launch of wipnote, week of 2026-05-05. Critical path: finish rename cleanup, clear launch-blocking safety/observability/integration bugs, fix first-impression docs and aliases, ship v0.59.0, update Homebrew, then publish demo video, blog post, LinkedIn, and HN. Historical Erinn/HtmlGraph rename context remains in prior work items; current launch copy and release artifacts should use wipnote and wn.
+Acceptance Criteria
+1. Launch blockers are represented as graph edges before release. 2. Public-facing docs, aliases, formula, and release artifacts use wipnote naming. 3. v0.59.0 is not tagged until quality gates and blocking items are complete. 4. Content work starts only after the product install path and docs are credible.</p>
         </section>
     </article>
 </body>

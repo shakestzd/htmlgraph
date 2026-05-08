@@ -4,7 +4,8 @@ meta:
     description: Ordered critical path to LinkedIn + HN launch. Audit performed 2026-05-07. Estimated 3–4 days of focused work.
     created_at: "2026-05-07"
     status: active
-    version: 5
+    priority: high
+    version: 6
 design:
     problem: 'Audit on 2026-05-07 found 4 blocker categories before public launch: missing LICENSE, incomplete rename artifacts, claim-breaking bugs (OTel, Gemini hooks, Yolo guard), stale docs/release, and missing content.'
     goals:
