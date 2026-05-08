@@ -17,6 +17,7 @@ import (
 	"github.com/shakestzd/wipnote/internal/otel"
 	"github.com/shakestzd/wipnote/internal/otel/sink/ndjson"
 	"github.com/shakestzd/wipnote/internal/paths"
+	"github.com/shakestzd/wipnote/internal/provenance"
 	"github.com/shakestzd/wipnote/internal/worktree"
 )
 
@@ -187,6 +188,20 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 	if event.Model != "" {
 		s.Model = event.Model
 	}
+
+	// Provenance — capture which harness/model/role/CLI started this session
+	// so downstream consumers can attribute it across handoffs (feat-40ef1333).
+	prov := provenance.Detect()
+	if prov.Agent == "" {
+		prov.Agent = s.AgentAssigned
+	}
+	if event.Model != "" {
+		prov.Model = event.Model
+	}
+	s.CreatedByAgent = prov.Agent
+	s.CreatedByModel = prov.Model
+	s.CreatedByRole = prov.Role
+	s.CreatedByCLIVersion = prov.CLIVersion
 
 	// Resolve lineage inputs before opening the transaction (read-only queries).
 	var inp *lineageInputs
@@ -545,6 +560,14 @@ func emitRosettaEvent(projectDir, wipnoteSID, claudeSessionID string) {
 		debugLog(projectDir, "[session-start] rosetta: create ndjson sink: %v", err)
 		return
 	}
+	// Close flushes the in-memory buffer + fsyncs before the hook process exits.
+	// Without this a single-event write stays in memory and is lost — the 2s
+	// periodic ticker never fires in a short-lived hook process.
+	defer func() {
+		if err := snk.Close(); err != nil {
+			debugLog(projectDir, "[session-start] rosetta: close ndjson sink: %v", err)
+		}
+	}()
 
 	sig := otel.UnifiedSignal{
 		Harness:       "wipnote",
