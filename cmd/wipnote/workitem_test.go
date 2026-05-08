@@ -216,6 +216,91 @@ func TestNoImplementedInEdgeWithoutSession(t *testing.T) {
 	}
 }
 
+func TestRunWiSetStatus_ClaudeStartTip(t *testing.T) {
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".wipnote")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	t.Setenv("WIPNOTE_AGENT_TYPE", "claude-code")
+	t.Setenv("WIPNOTE_AGENT_ID", "claude-code")
+	t.Setenv("WIPNOTE_SESSION_ID", "")
+	t.Setenv("CLAUDE_SESSION_ID", "")
+
+	trackID := testSetupTrack(t, hgDir)
+
+	if err := testCreate("bug", "Claude Tip Bug", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create bug: %v", err)
+	}
+
+	bugFiles, _ := filepath.Glob(filepath.Join(hgDir, "bugs", "bug-*.html"))
+	if len(bugFiles) != 1 {
+		t.Fatalf("expected 1 bug file, got %d", len(bugFiles))
+	}
+	bugNode, _ := htmlparse.ParseFile(bugFiles[0])
+
+	out := captureStdout(t, func() {
+		if err := runWiSetStatus("bug", bugNode.ID, "in-progress"); err != nil {
+			t.Fatalf("start bug: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "Tip: sync your Claude session label to this item:") {
+		t.Fatalf("expected Claude tip in output:\n%s", out)
+	}
+	if !strings.Contains(out, "/rename claude-tip-bug") || !strings.Contains(out, "/color red") {
+		t.Fatalf("expected Claude slash commands in output:\n%s", out)
+	}
+}
+
+func TestRunWiSetStatus_CodexStartTipIsHarnessNeutral(t *testing.T) {
+	tmpDir := t.TempDir()
+	hgDir := filepath.Join(tmpDir, ".wipnote")
+	for _, sub := range []string{"features", "bugs", "spikes", "tracks", "plans", "specs"} {
+		os.MkdirAll(filepath.Join(hgDir, sub), 0o755)
+	}
+
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = "" }()
+
+	t.Setenv("WIPNOTE_AGENT_TYPE", "codex")
+	t.Setenv("WIPNOTE_AGENT_ID", "codex")
+	t.Setenv("WIPNOTE_SESSION_ID", "")
+	t.Setenv("CLAUDE_SESSION_ID", "")
+
+	trackID := testSetupTrack(t, hgDir)
+
+	if err := testCreate("bug", "Codex Tip Bug", trackID, "medium", false, false); err != nil {
+		t.Fatalf("create bug: %v", err)
+	}
+
+	bugFiles, _ := filepath.Glob(filepath.Join(hgDir, "bugs", "bug-*.html"))
+	if len(bugFiles) != 1 {
+		t.Fatalf("expected 1 bug file, got %d", len(bugFiles))
+	}
+	bugNode, _ := htmlparse.ParseFile(bugFiles[0])
+
+	out := captureStdout(t, func() {
+		if err := runWiSetStatus("bug", bugNode.ID, "in-progress"); err != nil {
+			t.Fatalf("start bug: %v", err)
+		}
+	})
+
+	if strings.Contains(out, "Claude") || strings.Contains(out, "/rename") || strings.Contains(out, "/color") {
+		t.Fatalf("expected Codex output to avoid Claude-only tip text:\n%s", out)
+	}
+	if !strings.Contains(out, "Tip: keep this session aligned with the item:") {
+		t.Fatalf("expected harness-neutral tip in output:\n%s", out)
+	}
+	if !strings.Contains(out, "label: codex-tip-bug") || !strings.Contains(out, "color: red") {
+		t.Fatalf("expected label and color hints in output:\n%s", out)
+	}
+}
+
 func TestAutoCausedByEdgeOnBugCreate(t *testing.T) {
 	tmpDir := t.TempDir()
 	hgDir := filepath.Join(tmpDir, ".wipnote")

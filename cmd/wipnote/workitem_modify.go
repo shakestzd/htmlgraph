@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/shakestzd/wipnote/internal/models"
+	"github.com/shakestzd/wipnote/internal/planyaml"
 	"github.com/shakestzd/wipnote/internal/workitem"
 	"github.com/spf13/cobra"
 )
@@ -72,6 +74,11 @@ func runWiUpdate(typeName, id string, o *wiUpdateOpts) error {
 	if err := edit.Save(); err != nil {
 		return fmt.Errorf("update %s: %w", id, err)
 	}
+	if typeName == "plan" && o.priority != "" {
+		if err := updatePlanYAMLPriority(dir, id, o.priority); err != nil {
+			return err
+		}
+	}
 
 	// If track changed, update edges.
 	if o.trackID != "" {
@@ -81,6 +88,30 @@ func runWiUpdate(typeName, id string, o *wiUpdateOpts) error {
 	}
 
 	fmt.Printf("Updated: %s\n", id)
+	return nil
+}
+
+func updatePlanYAMLPriority(wipnoteDir, planID, priority string) error {
+	yamlPath := filepath.Join(wipnoteDir, "plans", planID+".yaml")
+	if _, err := os.Stat(yamlPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	unlock := planyaml.LockPlanForWrite(yamlPath)
+	defer unlock()
+	plan, err := planyaml.Load(yamlPath)
+	if err != nil {
+		return fmt.Errorf("load plan YAML %s: %w", planID, err)
+	}
+	plan.Meta.Priority = priority
+	if err := planyaml.SaveLocked(yamlPath, plan); err != nil {
+		return fmt.Errorf("save plan YAML %s: %w", planID, err)
+	}
+	if err := renderPlanToFileQuiet(wipnoteDir, planID); err != nil {
+		return fmt.Errorf("render plan %s: %w", planID, err)
+	}
 	return nil
 }
 

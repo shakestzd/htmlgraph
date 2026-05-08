@@ -318,16 +318,41 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 	}
 	fmt.Printf("%s: %s  %s\n", verb, node.ID, node.Title)
 
-	// On start, print a hint so the user can sync the Claude session label.
+	// On start, print a session-label hint tailored to the active harness.
 	if status == "in-progress" {
-		titleSlug := slug.Make(node.Title, 30)
-		color := slug.WorkItemColor(typeName)
-		fmt.Printf("\nTip: sync your Claude session label to this item:\n")
-		fmt.Printf("  /rename %s\n", titleSlug)
-		fmt.Printf("  /color %s\n", color)
+		printStartTip(typeName, node.Title)
 	}
 
 	return nil
+}
+
+func printStartTip(typeName, title string) {
+	titleSlug := slug.Make(title, 30)
+	color := slug.WorkItemColor(typeName)
+	switch currentHarness() {
+	case "claude":
+		fmt.Printf("\nTip: sync your Claude session label to this item:\n")
+		fmt.Printf("  /rename %s\n", titleSlug)
+		fmt.Printf("  /color %s\n", color)
+	default:
+		fmt.Printf("\nTip: keep this session aligned with the item:\n")
+		fmt.Printf("  label: %s\n", titleSlug)
+		fmt.Printf("  color: %s\n", color)
+	}
+}
+
+func currentHarness() string {
+	for _, v := range []string{os.Getenv("WIPNOTE_AGENT_TYPE"), os.Getenv("WIPNOTE_AGENT_ID")} {
+		switch {
+		case strings.Contains(v, "codex"):
+			return "codex"
+		case strings.Contains(v, "claude"):
+			return "claude"
+		case strings.Contains(v, "gemini"):
+			return "gemini"
+		}
+	}
+	return "claude"
 }
 
 func collectionFor(p *workitem.Project, typeName string) *workitem.Collection {
