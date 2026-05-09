@@ -839,6 +839,28 @@ func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 			out = append(out, l)
 		}
 
+		// Index canonical assistant_text timestamps so synthetic rows from
+		// messages/transcripts are skipped when otel_signals already covers them.
+		const otelLogsDedupWindowMicros = int64(5 * 1000 * 1000) // 5 seconds
+		otelAssistantTimes := make([]int64, 0, len(out))
+		for _, l := range out {
+			if l.Canonical == "assistant_text" {
+				otelAssistantTimes = append(otelAssistantTimes, l.TsMicros)
+			}
+		}
+		isOtelCovered := func(tsMicros int64) bool {
+			for _, t := range otelAssistantTimes {
+				d := t - tsMicros
+				if d < 0 {
+					d = -d
+				}
+				if d < otelLogsDedupWindowMicros {
+					return true
+				}
+			}
+			return false
+		}
+
 		messageRows, err := database.Query(`
 			SELECT id, COALESCE(timestamp, ''), COALESCE(content, ''),
 				COALESCE(model, ''), COALESCE(uuid, ''), COALESCE(parent_uuid, '')
@@ -860,6 +882,9 @@ func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 			}
 			tsMicros := timestampStringToMicros(tsRaw)
 			if tsMicros == 0 {
+				continue
+			}
+			if isOtelCovered(tsMicros) {
 				continue
 			}
 			attrs := map[string]any{
@@ -888,7 +913,11 @@ func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 			})
 		}
 
-		out = append(out, transcriptAssistantLogs(sessionID)...)
+		for _, l := range transcriptAssistantLogs(sessionID) {
+			if !isOtelCovered(l.TsMicros) {
+				out = append(out, l)
+			}
+		}
 
 		sort.SliceStable(out, func(i, j int) bool {
 			return out[i].TsMicros < out[j].TsMicros

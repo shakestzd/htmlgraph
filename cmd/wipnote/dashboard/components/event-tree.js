@@ -909,15 +909,29 @@ class HgEventTree extends HTMLElement {
       } else if (turn.children) {
         turn.children.forEach(function(child) {
           var isStop = child.tool_name === 'Stop' && child.event_type === 'end';
-          if (isStop && timelineItems.some(function(item) { return item.kind === 'assistant'; })) {
-            return;
-          }
+          if (isStop) return; // handled below
           timelineItems.push({
-            kind: isStop ? 'stop' : 'event',
+            kind: 'event',
             ts: this._eventTimelineMicros(child),
-            render: () => isStop ? this.renderStopFallback(child, uq.feature_id) : this.renderEvent(child, 1),
+            render: () => this.renderEvent(child, 1),
           });
         }, this);
+      }
+
+      // Stop fallback: show when no assistant_text captured, regardless of whether OTel spans exist.
+      if (!timelineItems.some(function(item) { return item.kind === 'assistant'; }) && turn.children) {
+        var stopEvt = null;
+        for (var sci = 0; sci < turn.children.length; sci++) {
+          var sc = turn.children[sci];
+          if (sc.tool_name === 'Stop' && sc.event_type === 'end') { stopEvt = sc; break; }
+        }
+        if (stopEvt) {
+          timelineItems.push({
+            kind: 'stop',
+            ts: this._eventTimelineMicros(stopEvt),
+            render: () => this.renderStopFallback(stopEvt, uq.feature_id),
+          });
+        }
       }
 
       timelineItems.sort(function(a, b) {

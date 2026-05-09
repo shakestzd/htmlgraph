@@ -252,6 +252,11 @@ func buildEventTreeOtelLogFallback(database *sql.DB, limit int) ([]turn, error) 
 		return []turn{}, nil
 	}
 
+	anchors = filterAnchorsAgainstInteractionSpans(database, anchors)
+	if len(anchors) == 0 {
+		return []turn{}, nil
+	}
+
 	sort.SliceStable(anchors, func(i, j int) bool {
 		return anchors[i].TSMicros > anchors[j].TSMicros
 	})
@@ -301,6 +306,30 @@ func buildEventTreeOtelLogFallback(database *sql.DB, limit int) ([]turn, error) 
 	}
 
 	return turns, nil
+}
+
+// filterAnchorsAgainstInteractionSpans removes anchors whose effective timestamp
+// falls within hookOtelDedupWindowMicros of an interaction span. This handles
+// the case where a prompt log has ts_micros=0 but a valid attrs_json timestamp,
+// which the SQL NOT EXISTS check misses because it compares against raw ts_micros.
+func filterAnchorsAgainstInteractionSpans(database *sql.DB, anchors []otelPromptAnchor) []otelPromptAnchor {
+	out := anchors[:0:len(anchors)]
+	for _, a := range anchors {
+		if a.SessionID == "" || a.TSMicros == 0 {
+			out = append(out, a)
+			continue
+		}
+		var count int
+		_ = database.QueryRow(`
+			SELECT COUNT(*) FROM otel_signals
+			WHERE kind = 'span' AND canonical = 'interaction'
+			  AND session_id = ? AND ABS(ts_micros - ?) < ?`,
+			a.SessionID, a.TSMicros, hookOtelDedupWindowMicros).Scan(&count)
+		if count == 0 {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 func treeTimestampFromOtel(tsMicros int64, attrsRaw string) (string, int64) {
