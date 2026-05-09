@@ -1,0 +1,32 @@
+meta:
+    id: plan-98dee97e
+    track_id: trk-1d96dcbd
+    title: Promote Test
+    description: ""
+    created_at: "2026-05-09"
+    status: active
+    priority: medium
+    version: 3
+design:
+    problem: test problem
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices:
+    - id: slic-e8cefe99
+      feature_id: feat-21a9252e
+      num: 1
+      title: Slice One
+      what: Do the thing
+      why: Because
+      files: []
+      deps: []
+      done_when: []
+      effort: ""
+      risk: ""
+      tests: ""
+      approved: false
+      comment: ""
+      execution_status: promoted
+questions: []
