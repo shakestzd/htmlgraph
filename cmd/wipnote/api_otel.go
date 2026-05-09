@@ -839,78 +839,67 @@ func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 			out = append(out, l)
 		}
 
-		// Index canonical assistant_text timestamps so synthetic rows from
-		// messages/transcripts are skipped when otel_signals already covers them.
-		const otelLogsDedupWindowMicros = int64(60 * 1000 * 1000) // 60 seconds
-		otelAssistantTimes := make([]int64, 0, len(out))
+		// Hook-coverage gate: if otel_signals already has assistant_text logs for this
+		// session, hooks ran and the transcript is redundant — skip fallback entirely.
+		// Only use transcript when there are zero hook-sourced rows (legacy session).
+		hasHookCoverage := false
 		for _, l := range out {
 			if l.Canonical == "assistant_text" {
-				otelAssistantTimes = append(otelAssistantTimes, l.TsMicros)
+				hasHookCoverage = true
+				break
 			}
-		}
-		isOtelCovered := func(tsMicros int64) bool {
-			for _, t := range otelAssistantTimes {
-				d := t - tsMicros
-				if d < 0 {
-					d = -d
-				}
-				if d < otelLogsDedupWindowMicros {
-					return true
-				}
-			}
-			return false
 		}
 
-		messageRows, err := database.Query(`
-			SELECT id, COALESCE(timestamp, ''), COALESCE(content, ''),
-				COALESCE(model, ''), COALESCE(uuid, ''), COALESCE(parent_uuid, '')
-			FROM messages
-			WHERE session_id = ? AND role = 'assistant' AND TRIM(content) != ''
-			ORDER BY timestamp ASC, ordinal ASC`, sessionID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer messageRows.Close()
-
-		for messageRows.Next() {
-			var id int64
-			var tsRaw, content, model, uuid, parentUUID string
-			if err := messageRows.Scan(&id, &tsRaw, &content, &model, &uuid, &parentUUID); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			tsMicros := timestampStringToMicros(tsRaw)
-			if tsMicros == 0 {
-				continue
-			}
-			if isOtelCovered(tsMicros) {
-				continue
-			}
-			attrs := map[string]any{
-				"text":   content,
-				"source": "messages",
-			}
-			if model != "" {
-				attrs["model"] = model
-			}
-			attrsJSON, err := json.Marshal(attrs)
+		// Messages fallback: only used when hooks never fired.
+		if !hasHookCoverage {
+			messageRows, err := database.Query(`
+				SELECT id, COALESCE(timestamp, ''), COALESCE(content, ''),
+					COALESCE(model, ''), COALESCE(uuid, ''), COALESCE(parent_uuid, '')
+				FROM messages
+				WHERE session_id = ? AND role = 'assistant' AND TRIM(content) != ''
+				ORDER BY timestamp ASC, ordinal ASC`, sessionID)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			spanID := uuid
-			if spanID == "" {
-				spanID = fmt.Sprintf("message:%d", id)
+			defer messageRows.Close()
+
+			for messageRows.Next() {
+				var id int64
+				var tsRaw, content, model, uuid, parentUUID string
+				if err := messageRows.Scan(&id, &tsRaw, &content, &model, &uuid, &parentUUID); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				tsMicros := timestampStringToMicros(tsRaw)
+				if tsMicros == 0 {
+					continue
+				}
+				attrs := map[string]any{
+					"text":   content,
+					"source": "messages",
+				}
+				if model != "" {
+					attrs["model"] = model
+				}
+				attrsJSON, err := json.Marshal(attrs)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				spanID := uuid
+				if spanID == "" {
+					spanID = fmt.Sprintf("message:%d", id)
+				}
+				out = append(out, otelLogJSON{
+					SignalID:   fmt.Sprintf("message:%d", id),
+					SpanID:     spanID,
+					ParentSpan: parentUUID,
+					Canonical:  "assistant_text",
+					TsMicros:   tsMicros,
+					AttrsJSON:  string(attrsJSON),
+				})
 			}
-			out = append(out, otelLogJSON{
-				SignalID:   fmt.Sprintf("message:%d", id),
-				SpanID:     spanID,
-				ParentSpan: parentUUID,
-				Canonical:  "assistant_text",
-				TsMicros:   tsMicros,
-				AttrsJSON:  string(attrsJSON),
-			})
 		}
 
 		var sessionHarness string
@@ -919,17 +908,20 @@ func otelLogsHandler(database *sql.DB) http.HandlerFunc {
 			sessionID,
 		).Scan(&sessionHarness)
 
-		var transcriptLogs []otelLogJSON
-		switch sessionHarness {
-		case "codex":
-			transcriptLogs = codexTranscriptAssistantLogs(sessionID)
-		case "gemini_cli":
-			transcriptLogs = geminiTranscriptAssistantLogs(sessionID)
-		default:
-			transcriptLogs = transcriptAssistantLogs(sessionID)
-		}
-		for _, l := range transcriptLogs {
-			if !isOtelCovered(l.TsMicros) {
+		// Transcript fallback: only used for legacy sessions where hooks never fired.
+		// If otel_signals already has assistant_text rows, hooks ran and the transcript
+		// would duplicate them — skip it entirely.
+		if !hasHookCoverage {
+			var transcriptLogs []otelLogJSON
+			switch sessionHarness {
+			case "codex":
+				transcriptLogs = codexTranscriptAssistantLogs(sessionID)
+			case "gemini_cli":
+				transcriptLogs = geminiTranscriptAssistantLogs(sessionID)
+			default:
+				transcriptLogs = transcriptAssistantLogs(sessionID)
+			}
+			for _, l := range transcriptLogs {
 				out = append(out, l)
 			}
 		}
