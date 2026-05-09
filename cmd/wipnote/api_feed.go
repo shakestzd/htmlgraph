@@ -73,6 +73,11 @@ func eventsFeedHandler(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Deduplicate assistant_text entries within otelEvents that have the same
+		// session_id and timestamps within a 30-second window. This prevents duplicate
+		// assistant responses from appearing (e.g., one from ingest pipeline, one from Stop hook).
+		otelEvents = deduplicateOtelAssistantText(otelEvents)
+
 		// Deduplicate messageEvents against otelEvents to avoid showing
 		// the same assistant response twice (once from otel_signals, once from messages).
 		deduped := deduplicateMessageEvents(otelEvents, messageEvents)
@@ -500,54 +505,95 @@ func legacyAgentID(ev feedEvent) string {
 	}
 }
 
-// deduplicateMessageEvents filters out message table entries that have a
-// corresponding otel_signals assistant_text event. A match is detected when
-// the session_id and type are both "assistant_text" and timestamps are within
-// ±5 seconds of each other.
+// deduplicateOtelAssistantText removes duplicate assistant_text entries within
+// otelEvents where two entries have the same session_id and timestamps within a
+// 30-second window. This prevents the same assistant response from appearing twice
+// (e.g., once from the OTel ingest pipeline, once from the Stop hook's custom insert).
+//
+// The function keeps non-assistant_text events unchanged and returns all events
+// re-sorted by tsMicros DESC.
+func deduplicateOtelAssistantText(events []feedEvent) []feedEvent {
+	const windowMicros int64 = 30_000_000 // 30 seconds in microseconds
+
+	// Separate assistant_text from other event types.
+	var assistantEvents []feedEvent
+	var otherEvents []feedEvent
+
+	for _, ev := range events {
+		if ev.Type == "assistant_text" {
+			assistantEvents = append(assistantEvents, ev)
+		} else {
+			otherEvents = append(otherEvents, ev)
+		}
+	}
+
+	// Sort assistant_text events by session_id, then by tsMicros (ascending for bucketing).
+	sort.Slice(assistantEvents, func(i, j int) bool {
+		if assistantEvents[i].SessionID != assistantEvents[j].SessionID {
+			return assistantEvents[i].SessionID < assistantEvents[j].SessionID
+		}
+		return assistantEvents[i].tsMicros < assistantEvents[j].tsMicros
+	})
+
+	// Deduplicate: keep only one entry per (session_id, 30-second bucket).
+	// For each session, iterate through sorted timestamps and keep the first event
+	// in each 30-second bucket.
+	var deduped []feedEvent
+	var lastSessionID string
+	var lastBucketStart int64
+
+	for _, ev := range assistantEvents {
+		if ev.SessionID != lastSessionID {
+			// New session; reset bucket tracking.
+			lastSessionID = ev.SessionID
+			lastBucketStart = ev.tsMicros
+			deduped = append(deduped, ev)
+		} else {
+			// Same session; check if this event is in a new 30-second bucket.
+			if ev.tsMicros-lastBucketStart >= windowMicros {
+				// New bucket; keep this event and update the bucket start.
+				lastBucketStart = ev.tsMicros
+				deduped = append(deduped, ev)
+			}
+			// else: within the same bucket; skip this event (keep the first one).
+		}
+	}
+
+	// Combine deduplicated assistant events with non-assistant events.
+	combined := append(deduped, otherEvents...)
+
+	// Re-sort by tsMicros DESC to match the expected feed order.
+	sort.Slice(combined, func(i, j int) bool {
+		if combined[i].tsMicros == combined[j].tsMicros {
+			return combined[i].ID > combined[j].ID
+		}
+		return combined[i].tsMicros > combined[j].tsMicros
+	})
+
+	return combined
+}
+
+// deduplicateMessageEvents filters out message table entries that have
+// corresponding otel_signals assistant_text coverage. If a session has ANY
+// otel assistant_text event, suppress ALL message-path assistant_text entries
+// for that session regardless of timestamp divergence. This mirrors the
+// hook-coverage gate pattern and handles Gemini's large timestamp skew.
 func deduplicateMessageEvents(otelEvents, messageEvents []feedEvent) []feedEvent {
-	// Build a set of (session_id, timestamp_micros) pairs from otel events.
-	// We use a 5-second window to account for minor timestamp skew.
-	const windowMicros int64 = 5_000_000 // 5 seconds in microseconds
-
-	otelSet := make(map[string]struct{}) // key: "session_id:type"
-	otelTimestamps := make(map[string][]int64)
-
+	// Build set of session IDs that have otel assistant_text coverage.
+	coveredSessions := make(map[string]bool)
 	for _, ev := range otelEvents {
 		if ev.Type == "assistant_text" && ev.SessionID != "" {
-			key := ev.SessionID + ":" + ev.Type
-			otelSet[key] = struct{}{}
-			otelTimestamps[key] = append(otelTimestamps[key], ev.tsMicros)
+			coveredSessions[ev.SessionID] = true
 		}
 	}
 
 	var deduped []feedEvent
 	for _, msg := range messageEvents {
-		if msg.Type != "assistant_text" || msg.SessionID == "" {
-			// Keep non-assistant or missing session messages.
-			deduped = append(deduped, msg)
+		// Suppress assistant_text for covered sessions; keep everything else.
+		if msg.Type == "assistant_text" && coveredSessions[msg.SessionID] {
 			continue
 		}
-
-		key := msg.SessionID + ":" + msg.Type
-		if _, found := otelSet[key]; !found {
-			// No otel event for this session+type; keep the message event.
-			deduped = append(deduped, msg)
-			continue
-		}
-
-		// Check if any otel timestamp is within ±5 seconds of this message.
-		isDuplicate := false
-		for _, otelTs := range otelTimestamps[key] {
-			if diff := msg.tsMicros - otelTs; diff >= -windowMicros && diff <= windowMicros {
-				isDuplicate = true
-				break
-			}
-		}
-
-		if !isDuplicate {
-			// No otel event within ±5s; keep the message event.
-			deduped = append(deduped, msg)
-		}
+		deduped = append(deduped, msg)
 	}
 
 	return deduped

@@ -157,7 +157,7 @@ func ensureGeminiSession(database *sql.DB, sessionID string, result *ingest.Pars
 
 	database.Exec(`
 		INSERT INTO sessions (session_id, agent_assigned, created_at, status, model, project_dir)
-		VALUES (?, 'gemini', COALESCE(NULLIF(?, ''), CURRENT_TIMESTAMP), 'completed', ?, ?)`,
+		VALUES (?, 'gemini_cli', COALESCE(NULLIF(?, ''), CURRENT_TIMESTAMP), 'completed', ?, ?)`,
 		sessionID, ts, nullStrVal(result.Model), projectDir,
 	)
 }
