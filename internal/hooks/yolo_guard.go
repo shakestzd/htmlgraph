@@ -442,12 +442,24 @@ func checkYoloBashResearchGuard(event *CloudEvent, _ bool, hasResearch bool) str
 // are considered internal (returns false); paths outside are external (returns true).
 // When projectRoot is empty, any absolute path is treated as external.
 func bashCommandTargetsExternalPath(cmd, projectRoot string) bool {
+	// Whitelist osascript: typically used to drive macOS apps (Notes, Mail, etc.)
+	// via AppleScript. While it can write files, its primary use in research
+	// is app-control and doesn't warrant a filesystem-protection block.
+	if strings.HasPrefix(cmd, "osascript") {
+		return false
+	}
+
 	// Look for the first argument that looks like a path (starts with ~ or /).
 	for _, field := range strings.Fields(cmd) {
 		if strings.HasPrefix(field, "~/") || strings.HasPrefix(field, "~\\") {
 			return true
 		}
 		if strings.HasPrefix(field, "/") {
+			// Whitelist /tmp/: allowed for ephemeral artifacts.
+			if strings.HasPrefix(field, "/tmp/") {
+				continue
+			}
+
 			// Resolve against project root: if the path is inside the project,
 			// it is internal — not an external write.
 			if projectRoot != "" {
@@ -614,9 +626,30 @@ func hasRecentResearch(database *sql.DB, sessionID string) bool {
 	sessionIDs := getSessionAndParent(database, sessionID)
 	for _, sid := range sessionIDs {
 		var count int
+		// Expand the research check to include:
+		//  1. Canonical Claude Code tools (Read, Grep, Glob)
+		//  2. Gemini/Codex equivalents (read_file, grep_search, glob, list_directory)
+		//  3. Web research tools (web_fetch, web_search, google_web_search)
+		//  4. Read-only Bash commands (ls, find, cat, etc.)
 		database.QueryRow(`
 			SELECT COUNT(*) FROM agent_events
-			WHERE session_id = ? AND tool_name IN ('Read', 'Grep', 'Glob')
+			WHERE session_id = ? AND (
+				tool_name IN (
+					'Read', 'Grep', 'Glob',
+					'read_file', 'grep_search', 'glob', 'list_directory',
+					'web_fetch', 'web_search', 'google_web_search'
+				) OR (
+					tool_name = 'Bash' AND (
+						input_summary LIKE 'ls %' OR input_summary = 'ls'
+						OR input_summary LIKE 'find %'
+						OR input_summary LIKE 'cat %'
+						OR input_summary LIKE 'grep %'
+						OR input_summary LIKE 'head %'
+						OR input_summary LIKE 'tail %'
+						OR input_summary LIKE 'stat %'
+					)
+				)
+			)
 			LIMIT 1`,
 			sid,
 		).Scan(&count)
