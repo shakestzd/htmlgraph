@@ -78,6 +78,12 @@ func eventsFeedHandler(database *sql.DB) http.HandlerFunc {
 		// assistant responses from appearing (e.g., one from ingest pipeline, one from Stop hook).
 		otelEvents = deduplicateOtelAssistantText(otelEvents)
 
+		// Deduplicate user_prompt log events for sessions that already have interaction
+		// span coverage. Gemini emits both an interaction span (which shows the user's
+		// query as its summary) and a separate user_prompt log for the same turn, causing
+		// the prompt text to appear twice in the feed.
+		otelEvents = deduplicateUserPromptLogs(otelEvents)
+
 		// Deduplicate messageEvents against otelEvents to avoid showing
 		// the same assistant response twice (once from otel_signals, once from messages).
 		deduped := deduplicateMessageEvents(otelEvents, messageEvents)
@@ -597,4 +603,30 @@ func deduplicateMessageEvents(otelEvents, messageEvents []feedEvent) []feedEvent
 	}
 
 	return deduped
+}
+
+// deduplicateUserPromptLogs suppresses user_prompt log events for sessions
+// that already have interaction span coverage. Gemini emits both an
+// interaction span (which shows the user's query as its summary) and a
+// separate user_prompt log for the same turn, causing the prompt text to
+// appear twice in the feed.
+func deduplicateUserPromptLogs(events []feedEvent) []feedEvent {
+	// Build set of sessions that have at least one interaction span.
+	hasInteraction := make(map[string]bool)
+	for _, ev := range events {
+		if ev.Type == "interaction" {
+			hasInteraction[ev.SessionID] = true
+		}
+	}
+	if len(hasInteraction) == 0 {
+		return events
+	}
+	out := events[:0:len(events)]
+	for _, ev := range events {
+		if ev.Type == "user_prompt" && hasInteraction[ev.SessionID] {
+			continue // suppressed: interaction span already shows this turn's prompt
+		}
+		out = append(out, ev)
+	}
+	return out
 }
