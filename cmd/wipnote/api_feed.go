@@ -605,29 +605,28 @@ func deduplicateMessageEvents(otelEvents, messageEvents []feedEvent) []feedEvent
 	return deduped
 }
 
-// deduplicateUserPromptLogs suppresses user_prompt log events for sessions
-// that already have interaction span coverage, but only for the gemini_cli harness.
-// Gemini emits both an interaction span (which shows the user's query as its
-// summary) and a separate user_prompt log for the same turn, causing the prompt
-// text to appear twice in the feed. A stray interaction span from another harness
-// (or a resumed session) must not silently drop user_prompts from other sources.
+// deduplicateUserPromptLogs suppresses user_prompt OTel log events for
+// gemini_cli sessions that already have OTel coverage. Gemini emits both:
+//   1. hook check_point events that render the user's prompt with tool children
+//   2. a gemini_cli.user_prompt OTel log with the same prompt text and 0 tools
+//
+// Suppression is gated to gemini_cli harness only — any other harness with a
+// user_prompt log (e.g. Codex, which has no interaction span) keeps its events.
 func deduplicateUserPromptLogs(events []feedEvent) []feedEvent {
-	// Only suppress for gemini_cli: it emits both a gemini_cli.interaction span
-	// and a gemini_cli.user_prompt log per turn. Gate by harness so a stray
-	// interaction span from another harness cannot silently drop user_prompts.
-	geminiInteraction := make(map[string]bool) // session IDs with gemini_cli interaction spans
+	// Collect sessions that have any gemini_cli OTel signal.
+	geminiOtelSessions := make(map[string]bool)
 	for _, ev := range events {
-		if ev.Type == "interaction" && ev.Harness == "gemini_cli" {
-			geminiInteraction[ev.SessionID] = true
+		if ev.Source == "otel" && ev.Harness == "gemini_cli" {
+			geminiOtelSessions[ev.SessionID] = true
 		}
 	}
-	if len(geminiInteraction) == 0 {
+	if len(geminiOtelSessions) == 0 {
 		return events
 	}
 	out := make([]feedEvent, 0, len(events))
 	for _, ev := range events {
-		if ev.Type == "user_prompt" && ev.Harness == "gemini_cli" && geminiInteraction[ev.SessionID] {
-			continue
+		if ev.Type == "user_prompt" && ev.Harness == "gemini_cli" && geminiOtelSessions[ev.SessionID] {
+			continue // hook check_point already shows this turn's prompt
 		}
 		out = append(out, ev)
 	}

@@ -148,11 +148,12 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 		wantType map[int]string // index -> type, only for preserved events
 	}{
 		{
-			name: "gemini: interaction suppresses user_prompt",
+			name: "gemini: any otel event triggers suppression",
 			events: []feedEvent{
 				{
 					ID:        "ev1",
-					Type:      "interaction",
+					Type:      "api_request",
+					Source:    "otel",
 					Harness:   "gemini_cli",
 					SessionID: "sess-1",
 					tsMicros:  1000,
@@ -160,6 +161,7 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 				{
 					ID:        "ev2",
 					Type:      "user_prompt",
+					Source:    "otel",
 					Harness:   "gemini_cli",
 					SessionID: "sess-1",
 					tsMicros:  1001,
@@ -167,15 +169,16 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 			},
 			wantLen: 1,
 			wantType: map[int]string{
-				0: "interaction",
+				0: "api_request",
 			},
 		},
 		{
-			name: "codex: no interaction span keeps user_prompt",
+			name: "codex: no gemini otel, user_prompt preserved",
 			events: []feedEvent{
 				{
 					ID:        "ev1",
 					Type:      "user_prompt",
+					Source:    "otel",
 					Harness:   "codex",
 					SessionID: "sess-2",
 					tsMicros:  2000,
@@ -191,7 +194,8 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 			events: []feedEvent{
 				{
 					ID:        "ev1",
-					Type:      "interaction",
+					Type:      "api_request",
+					Source:    "otel",
 					Harness:   "gemini_cli",
 					SessionID: "sess-gemini",
 					tsMicros:  3000,
@@ -199,6 +203,7 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 				{
 					ID:        "ev2",
 					Type:      "user_prompt",
+					Source:    "otel",
 					Harness:   "gemini_cli",
 					SessionID: "sess-gemini",
 					tsMicros:  3001,
@@ -206,6 +211,7 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 				{
 					ID:        "ev3",
 					Type:      "user_prompt",
+					Source:    "otel",
 					Harness:   "codex",
 					SessionID: "sess-codex",
 					tsMicros:  3002,
@@ -213,8 +219,8 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 			},
 			wantLen: 2,
 			wantType: map[int]string{
-				0: "interaction", // preserved in original order
-				1: "user_prompt", // codex event preserved (gemini user_prompt suppressed)
+				0: "api_request",  // preserved in original order
+				1: "user_prompt",  // codex event preserved (gemini user_prompt suppressed)
 			},
 		},
 	}
