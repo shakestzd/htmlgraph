@@ -310,6 +310,7 @@ type spanDetail struct {
 	MCPToolName   string         `json:"mcp_tool_name,omitempty"`     // MCP tool
 	MCPInput      map[string]any `json:"mcp_input,omitempty"`         // MCP tool: full parsed tool_input
 	ToolInput     map[string]any `json:"tool_input,omitempty"`        // Generic tool: full parsed tool_input
+	ToolOutput    string         `json:"tool_output,omitempty"`       // Generic tool: tool output/result
 	TodoCount     int64          `json:"todo_count,omitempty"`        // TodoWrite: count of todos
 	DecisionSrc   string         `json:"decision_source,omitempty"`   // tool.blocked_on_user
 	Speed         string         `json:"speed,omitempty"`             // llm_request: fast|normal
@@ -747,6 +748,18 @@ func extractSpanDetails(attrsRaw string) spanDetail {
 	d.Offset = pullInt(raw, "offset")
 	d.Limit = pullInt(raw, "limit")
 	d.Timeout = pullInt(raw, "timeout")
+	// Gemini tool spans: gen_ai.tool.call.arguments → ToolInput, gen_ai.tool.call.result → ToolOutput
+	if d.ToolInput == nil {
+		if raw := pull("gen_ai.tool.call.arguments"); raw != "" {
+			var ti map[string]any
+			if json.Unmarshal([]byte(raw), &ti) == nil {
+				d.ToolInput = ti
+			}
+		}
+	}
+	if d.ToolOutput == "" {
+		d.ToolOutput = pull("gen_ai.tool.call.result")
+	}
 	return d
 }
 

@@ -1706,6 +1706,10 @@ class HgEventTree extends HTMLElement {
         }
       }
     }
+    // Tool output: render when available (e.g., Gemini tool spans)
+    if (d.tool_output) {
+      codeBlocks += this._codeBlock('output', d.tool_output, d.tool_output.length, false, '');
+    }
 
     if (rows.length === 0 && !codeBlocks) return '';
 
