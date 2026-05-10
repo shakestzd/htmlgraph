@@ -41,12 +41,27 @@ const claudeSessionStartJSON = `{
 }`
 
 // Gemini payload — best-effort per https://geminicli.com/docs/hooks/reference/.
-// The unique discriminator is the "invocation_id" field.
+// geminiSessionStartJSON uses invocation_id as the discriminator (legacy / hypothetical
+// future payload shape). Most real Gemini payloads do NOT include invocation_id — see
+// geminiSessionStartNoInvocationIDJSON for the realistic case.
 const geminiSessionStartJSON = `{
 	"invocation_id": "gemini-inv-abc123",
 	"session_id": "gemini-sess-xyz789",
 	"cwd": "/Users/testuser/DevProjects/wipnote",
 	"model": "gemini-2.5-pro"
+}`
+
+// geminiSessionStartNoInvocationIDJSON matches the real Gemini CLI hook schema:
+// session_id, cwd, hook_event_name, timestamp, source — no invocation_id.
+// Without WIPNOTE_AGENT_ID=gemini in the environment this payload is
+// indistinguishable from a Codex payload (both have hook_event_name), causing
+// the bug where Gemini agent_events rows were written with agent_id='codex'.
+const geminiSessionStartNoInvocationIDJSON = `{
+	"session_id": "8de1df19-68e7-43c3-938e-20a2f1322363",
+	"cwd": "/workspaces/wipnote",
+	"hook_event_name": "SessionStart",
+	"timestamp": "2026-05-09T10:00:00Z",
+	"source": "startup"
 }`
 
 // noClaudeEnv is a getenv stub that has no CLAUDE_CODE_ENTRYPOINT, simulating
@@ -58,6 +73,15 @@ func noClaudeEnv(key string) string { return "" }
 func claudeEnv(key string) string {
 	if key == "CLAUDE_CODE_ENTRYPOINT" {
 		return "cli"
+	}
+	return ""
+}
+
+// geminiEnv simulates the environment set by `wipnote gemini` (buildGeminiAgentEnv):
+// WIPNOTE_AGENT_ID=gemini, no CLAUDE_CODE_ENTRYPOINT.
+func geminiEnv(key string) string {
+	if key == "WIPNOTE_AGENT_ID" {
+		return "gemini"
 	}
 	return ""
 }
@@ -93,6 +117,34 @@ func TestDetectHarnessFromGeminiPayload(t *testing.T) {
 	got := detectHarnessWithEnv([]byte(geminiSessionStartJSON), noClaudeEnv)
 	if got != HarnessGemini {
 		t.Errorf("detectHarnessWithEnv(gemini session-start, noClaudeEnv) = %v, want HarnessGemini", got)
+	}
+}
+
+// TestDetectHarness_GeminiWithoutInvocationID is a regression test for the bug
+// where Gemini hook payloads that lack "invocation_id" (the real Gemini CLI
+// hook schema — session 8de1df19-68e7-43c3-938e-20a2f1322363) were classified
+// as HarnessCodex because both harnesses use "hook_event_name". The fix is to
+// check WIPNOTE_AGENT_ID=gemini (set by the `wipnote gemini` launcher) before
+// any payload-shape inspection.
+func TestDetectHarness_GeminiWithoutInvocationID(t *testing.T) {
+	// Real Gemini SessionStart payload: has hook_event_name but no invocation_id.
+	// Without the WIPNOTE_AGENT_ID fix, detectHarness misclassifies this as Codex.
+	got := detectHarnessWithEnv([]byte(geminiSessionStartNoInvocationIDJSON), geminiEnv)
+	if got != HarnessGemini {
+		t.Errorf("detectHarnessWithEnv(gemini SessionStart without invocation_id, geminiEnv) = %v, want HarnessGemini; "+
+			"WIPNOTE_AGENT_ID=gemini must classify as Gemini even when invocation_id is absent", got)
+	}
+}
+
+// TestDetectHarness_GeminiWithoutInvocationIDNoEnv asserts that a real Gemini
+// payload without invocation_id AND without WIPNOTE_AGENT_ID falls back to
+// HarnessCodex (payload-shape only). This documents the limitation: users who
+// invoke `gemini` directly (not via `wipnote gemini`) still hit the misclassification.
+func TestDetectHarness_GeminiWithoutInvocationIDNoEnv(t *testing.T) {
+	got := detectHarnessWithEnv([]byte(geminiSessionStartNoInvocationIDJSON), noClaudeEnv)
+	if got != HarnessCodex {
+		t.Errorf("detectHarnessWithEnv(gemini SessionStart without invocation_id, noClaudeEnv) = %v, want HarnessCodex; "+
+			"without WIPNOTE_AGENT_ID the payload is indistinguishable from Codex", got)
 	}
 }
 
