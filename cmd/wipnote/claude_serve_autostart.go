@@ -19,6 +19,54 @@ func serveLockPath(projectDir string) string {
 	return filepath.Join(projectDir, ".wipnote", ".serve.lock")
 }
 
+// resolveDashboardAddress chooses the dashboard bind host and port for
+// the auto-started serve process.
+//
+// Default: 127.0.0.1:8080 (production / host install).
+// Devcontainer auto-detect: 0.0.0.0:8088 — applied when /.dockerenv exists
+// or CODESPACES=true, so the forwarded port is reachable from the host.
+// Env var overrides (highest priority): WIPNOTE_SERVE_BIND, WIPNOTE_SERVE_PORT.
+func resolveDashboardAddress() (string, int) {
+	host := "127.0.0.1"
+	port := 8080
+	if isDevcontainer() {
+		host = "0.0.0.0"
+		port = 8088
+	}
+	if v := os.Getenv("WIPNOTE_SERVE_BIND"); v != "" {
+		host = v
+	}
+	if v := os.Getenv("WIPNOTE_SERVE_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			port = p
+		}
+	}
+	return host, port
+}
+
+// devcontainerDetector is the function used to detect a devcontainer.
+// Tests can replace this to control detection behavior deterministically.
+var devcontainerDetector = defaultDevcontainerDetector
+
+func defaultDevcontainerDetector() bool {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	if os.Getenv("CODESPACES") == "true" {
+		return true
+	}
+	if os.Getenv("REMOTE_CONTAINERS") == "true" {
+		return true
+	}
+	return false
+}
+
+// isDevcontainer returns true when wipnote is running inside a Docker
+// container or GitHub Codespace.
+func isDevcontainer() bool {
+	return devcontainerDetector()
+}
+
 // ensureServeForDashboard spawns a detached `wipnote serve` if one is not
 // already running. Called from launchClaude before exec'ing claude so that
 // the dashboard (and semantic-ops such as AI-title backfill) are available
@@ -28,10 +76,10 @@ func serveLockPath(projectDir string) string {
 // Gating:
 //   - When WIPNOTE_OTEL_ENABLED is explicitly disabled (0/false/no/off),
 //     return immediately — user opted out of the full wipnote stack.
-//   - When the dashboard port (8080) already accepts a TCP connection,
+//   - When the dashboard port already accepts a TCP connection,
 //     a serve process is assumed live — return nil.
 //   - Otherwise spawn `wipnote serve` detached, wait up to 3 seconds
-//     for it to bind port 8080, and log a warning if it never does. Never
+//     for it to bind the port, and log a warning if it never does. Never
 //     return an error — a missing dashboard is degraded operation, not a
 //     fatal launcher failure.
 //
@@ -42,10 +90,9 @@ func ensureServeForDashboard(projectDir string) {
 		return
 	}
 
-	// Probe the dashboard port (8080) rather than the OTLP port — serve
-	// is now a pure reader + dashboard server, not a receiver.
-	const dashboardHost = "127.0.0.1"
-	const dashboardPort = 8080
+	// Resolve the dashboard bind address. In devcontainers this is
+	// 0.0.0.0:8088; on host installs it is 127.0.0.1:8080.
+	dashboardHost, dashboardPort := resolveDashboardAddress()
 
 	if probePort(dashboardHost, dashboardPort, 200*time.Millisecond) {
 		return // something is already bound — leave it alone
@@ -53,7 +100,7 @@ func ensureServeForDashboard(projectDir string) {
 
 	// Check the lockfile before spawning. If a serve process is already
 	// running (lock file contains a live PID), skip the spawn to prevent
-	// a second wipnote serve from racing to bind port 8080.
+	// a second wipnote serve from racing to bind the dashboard port.
 	if skipSpawn, stale := checkServeLock(projectDir); skipSpawn {
 		debugLog("ensureServeForDashboard: skipping spawn, serve already running (lockfile)")
 		return
@@ -221,7 +268,8 @@ func spawnDetachedServe(projectDir string) error {
 		return fmt.Errorf("open log %s: %w", logPath, err)
 	}
 
-	cmd := exec.Command(binPath, "serve")
+	host, port := resolveDashboardAddress()
+	cmd := exec.Command(binPath, "serve", "--bind", host, "--port", strconv.Itoa(port))
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
