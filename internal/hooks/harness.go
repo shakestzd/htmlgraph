@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/shakestzd/wipnote/internal/harness"
 )
 
 // Harness identifies the AI coding harness that invoked this hook.
@@ -136,11 +138,10 @@ func detectHarnessWithEnv(payload []byte, getenv func(string) string) Harness {
 	// check, every Gemini hook event is misclassified as HarnessCodex (because
 	// hook_event_name IS present), causing agent_id='codex' to be written to
 	// agent_events for Gemini sessions (the bug reported for session 8de1df19).
-	switch getenv("WIPNOTE_AGENT_ID") {
-	case "gemini":
-		return HarnessGemini
-	case "codex":
-		return HarnessCodex
+	if id := getenv("WIPNOTE_AGENT_ID"); id != "" {
+		if cfg := harness.GetByAgentID(id); cfg != nil {
+			return Harness(cfg.HooksHarness)
+		}
 	}
 
 	if len(payload) == 0 {
@@ -193,8 +194,8 @@ func parseCodexEvent(raw []byte) (*CloudEvent, error) {
 		return nil, fmt.Errorf("parseCodexEvent: %w", err)
 	}
 
-	agentID := "codex"
-	if parent := strings.TrimSpace(os.Getenv("WIPNOTE_PARENT_AGENT")); parent != "" && parent != "codex" {
+	agentID := harness.GetByHooksHarness(harness.HooksCodex).AgentID
+	if parent := strings.TrimSpace(os.Getenv("WIPNOTE_PARENT_AGENT")); parent != "" && parent != agentID {
 		agentID = parent
 	}
 
@@ -234,7 +235,7 @@ func parseGeminiEvent(raw []byte) (*CloudEvent, error) {
 	}
 
 	ev := &CloudEvent{
-		AgentID: "gemini",
+		AgentID: harness.GetByHooksHarness(harness.HooksGemini).AgentID,
 		// Gemini may use "invocation_id" as the session identifier;
 		// fall back to session_id if present.
 		SessionID:      p.SessionID,
