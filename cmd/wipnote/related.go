@@ -46,7 +46,7 @@ func runRelated(featureID string) error {
 	if err != nil {
 		return fmt.Errorf("resolve db path: %w", err)
 	}
-	database, err := dbpkg.Open(dbPath)
+	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

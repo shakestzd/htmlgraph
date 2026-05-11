@@ -51,7 +51,7 @@ func statuslineFromSession(dir, sessionID string) error {
 	if err != nil {
 		return nil
 	}
-	database, err := dbpkg.Open(dbPath)
+	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
 		return nil
 	}
@@ -247,7 +247,7 @@ func buildCacheLine(wipnoteDir, featureID string) string {
 	if err != nil {
 		return fmt.Sprintf("%s %s", iconFor(featureType), truncate(featureTitle, 30))
 	}
-	database, err := dbpkg.Open(dbPath)
+	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
 		return fmt.Sprintf("%s %s", iconFor(featureType), truncate(featureTitle, 30))
 	}
