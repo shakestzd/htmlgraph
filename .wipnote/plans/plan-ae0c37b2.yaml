@@ -2,16 +2,310 @@ meta:
     id: plan-ae0c37b2
     track_id: trk-0677c709
     title: Durable self-contained SQLite contention fix
-    description: 'Make recurring SQLITE_BUSY failures impossible or non-blocking while keeping wipnote self-contained: canonical files remain source of truth, SQLite becomes a single-writer derived index, and YAML/HTML-native commands avoid DB opens.'
+    description: |
+        Make recurring SQLITE_BUSY failures impossible or non-blocking while keeping wipnote self-contained: canonical files remain source of truth, SQLite becomes a single-writer derived index, and YAML/HTML-native commands avoid DB opens.
     created_at: "2026-05-11"
-    status: draft
-    priority: medium
+    status: active
+    priority: high
+    created_by: codex
     version: 2
 design:
-    problem: ""
-    goals: []
-    constraints: []
+    problem: |
+        Recurring SQLITE_BUSY failures block routine CLI operations such as plan critique while dashboard, collectors, hooks, or indexers are active. The current architecture opens SQLite for commands that should be able to read canonical YAML/HTML directly, runs DDL and migrations on every db.Open, and allows several independent processes to compete as writers. The project is local-first and must remain self-contained; PostgreSQL or another external service is not an acceptable fix.
+    goals:
+        - '**DB-free canonical reads** — commands that can answer from YAML/HTML/NDJSON do not open SQLite.'
+        - '**Fast warm opens** — a healthy existing DB opens without DDL, copy-and-swap, or normalization writes.'
+        - '**WAL when actually safe** — DB path selection verifies the backing filesystem, not just the parent directory convention.'
+        - '**Single-writer derived index** — hooks, collectors, indexers, and CLI mutations no longer race as independent SQLite writers.'
+        - '**Self-contained deployment** — no PostgreSQL, server dependency, or cloud database requirement.'
+    constraints:
+        - Canonical state remains `.wipnote/*.html`, plan YAML, and session NDJSON; SQLite is rebuildable.
+        - The CLI must keep working when `wipnote serve` or the writer daemon is not running.
+        - No user data loss if the SQLite cache is deleted or rebuilt.
+        - No mandatory network service or external database.
+        - Changes must preserve existing dashboard APIs while migration proceeds incrementally.
     approved: false
     comment: ""
-slices: []
+slices:
+    - id: slice-1
+      num: 1
+      title: DB-free plan critique and validation
+      what: |
+        Rewrite `cmd/wipnote/plan_critique.go` and `cmd/wipnote/plan_validate.go`
+        so YAML plans are loaded directly from `.wipnote/plans/<plan-id>.yaml`
+        before any workitem/SQLite path is used. `plan critique` should emit its
+        JSON packet entirely from YAML for v2 plans, including title, description,
+        status, slice count, and slice titles. `plan validate` should run
+        `planyaml.Validate` directly for YAML plans and only fall back to the
+        legacy HTML/workitem path for non-YAML plans.
+      why: |
+        This closes the immediate failure mode: plan critique is a read-only
+        extraction step, yet today it can fail while opening SQLite and running
+        schema DDL. It proves the architectural rule that canonical-file commands
+        should not require the derived index.
+      files:
+        - cmd/wipnote/plan_critique.go
+        - cmd/wipnote/plan_validate.go
+        - cmd/wipnote/plan_critique_test.go
+        - cmd/wipnote/plan_validate_test.go
+      deps: []
+      done_when:
+        - '`wipnote plan critique <yaml-plan>` succeeds while the SQLite DB is exclusively locked.'
+        - '`wipnote plan validate <yaml-plan>` succeeds while the SQLite DB is exclusively locked.'
+        - Legacy HTML-only plans still use the previous fallback behavior.
+        - The launch readiness plan critique no longer depends on `workitem.Open`.
+      effort: S
+      risk: Low
+      tests: |
+        Unit: TestPlanCritique_YAMLDoesNotOpenDB creates a YAML plan and a locked DB; assert critique JSON succeeds.
+        Unit: TestPlanValidate_YAMLDoesNotOpenDB creates a valid YAML plan and a locked DB; assert validation succeeds.
+        Regression: existing plan_critique and plan_lifecycle tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-2
+      num: 2
+      title: Split SQLite open modes
+      what: |
+        Introduce explicit DB open modes in `internal/db`: read-only/no-migration,
+        existing/no-migration, and migrated writable. Keep `Open` as the migrated
+        writable path only where callers truly need schema creation or mutation.
+        Add call-site helpers so read-only commands can use a `mode=ro` DSN with
+        `busy_timeout` but without `ApplyPragmas`, DDL, migrations, or
+        normalization writes.
+      why: |
+        A single `db.Open` that always prepares the world makes every command a
+        potential writer. Splitting open modes gives the codebase vocabulary to
+        express intent and prevents accidental DDL on read paths.
+      files:
+        - internal/db/schema.go
+        - internal/db/open_modes.go
+        - internal/db/schema_test.go
+        - cmd/wipnote/trace.go
+        - cmd/wipnote/graph.go
+        - cmd/wipnote/statusline.go
+        - cmd/wipnote/related.go
+      deps:
+        - 1
+      done_when:
+        - A new read-only open helper returns a `*sql.DB` without running schema creation.
+        - A new no-migration writable/existing helper applies only connection pragmas needed for normal reads/writes.
+        - At least four read-heavy CLI commands use the read-only/no-migration path.
+        - Tests fail if read-only helpers execute DDL.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestOpenReadOnly_NoDDL uses an authorizer or locked DB fixture to prove no CREATE/ALTER/DROP statements run.
+        Unit: TestOpenExisting_NoMigrations verifies warm open does not call migration hooks.
+        Regression: statusline, graph, trace, related command tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-3
+      num: 3
+      title: Version-gated migrations with PRAGMA user_version
+      what: |
+        Move schema migrations out of the unconditional `Open` body and into an
+        ordered migration runner guarded by `PRAGMA user_version`. On warm open
+        when `user_version == currentSchemaVersion`, skip CREATE INDEX, ALTER
+        TABLE, DROP TABLE, trigger creation, copy-and-swap, and
+        `NormalizePlanFeedbackValues`. On cold/new DB creation, create the full
+        current schema and set the version. On old DBs, run only missing
+        migrations in order.
+      why: |
+        Re-running idempotent DDL on every short-lived hook or CLI process creates
+        write locks for no business operation. Versioned migrations are the
+        standard SQLite pattern for keeping warm opens cheap and predictable.
+      files:
+        - internal/db/schema.go
+        - internal/db/migrations.go
+        - internal/db/pragmas.go
+        - internal/db/schema_test.go
+        - internal/db/otel_schema.go
+      deps:
+        - 2
+      done_when:
+        - Warm migrated DB open executes no CREATE, ALTER, DROP, trigger, or normalization UPDATE statements.
+        - Fresh DB creation produces the same schema as the current code.
+        - Old DB fixtures migrate to the current schema and set `PRAGMA user_version`.
+        - The copy-and-swap `agent_events` migration runs at most once per DB.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestOpenWarmDB_SkipsDDL counts statements or uses a locked writer fixture and expects warm open to succeed.
+        Unit: TestMigrateFromLegacyUserVersion applies representative old schemas and verifies final columns/indexes.
+        Regression: full internal/db package tests, plan feedback normalization tests, and OTel schema tests pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-4
+      num: 4
+      title: WAL-safe cache path selection and diagnostics
+      what: |
+        Update `internal/storage.CanonicalDBPath` and DB diagnostics so wipnote
+        selects a SQLite cache root backed by a WAL-safe filesystem when possible.
+        Prefer explicit `WIPNOTE_DB_PATH`; otherwise probe candidate roots such as
+        `XDG_RUNTIME_DIR`, `/tmp`, and `os.UserCacheDir()`. Record why a path was
+        chosen and expose journal mode/fstype in `wipnote status` or a diagnostic
+        helper. If no safe path exists, intentionally choose DELETE mode and rely
+        on the single-writer design rather than pretending concurrency is solved.
+      why: |
+        The existing cache-dir fix assumes `os.UserCacheDir()` is WAL-safe, but in
+        the current devcontainer it is overlayfs and the DB falls back to DELETE
+        mode. The path decision must be evidence-based and visible.
+      files:
+        - internal/storage/dbpath.go
+        - internal/storage/dbpath_test.go
+        - internal/db/fstype_linux.go
+        - internal/db/pragmas.go
+        - cmd/wipnote/status.go
+        - cmd/wipnote/cache.go
+      deps:
+        - 2
+      done_when:
+        - Status output shows DB path, filesystem type, and effective journal_mode.
+        - On tmpfs/ext4 candidates, a new DB uses WAL.
+        - On overlayfs/unsafe candidates, diagnostics say DELETE mode is intentional.
+        - Existing `WIPNOTE_DB_PATH` override keeps precedence and is never silently moved.
+      effort: M
+      risk: Med
+      tests: |
+        Unit: TestCanonicalDBPath_PrefersWalSafeCandidate with injectable filesystem probe.
+        Unit: TestCanonicalDBPath_OverrideWins verifies WIPNOTE_DB_PATH is preserved.
+        Integration: status fixture verifies fstype and journal mode are rendered.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-ephemeral-cache
+          text: May wipnote prefer tmpfs for the derived SQLite cache when user cache is WAL-unsafe?
+    - id: slice-5
+      num: 5
+      title: Single local SQLite writer service
+      what: |
+        Add a self-contained writer service owned by `wipnote serve` or a small
+        `wipnote daemon` subcommand. The service holds the migrated writable DB
+        connection and serializes SQLite mutations through a bounded queue. Hooks,
+        collectors, and CLI commands that only need to record events should append
+        canonical HTML/NDJSON or send a local request to the writer; if the writer
+        is unavailable, they persist to canonical files and a later reindex catches
+        up. Start with event/index writes, not every work-item mutation.
+      why: |
+        SQLite supports only one writer at a time. The industry-standard embedded
+        answer is to serialize writes in the application instead of letting many
+        short-lived processes fight over file locks. This keeps wipnote
+        self-contained while removing the contention class.
+      files:
+        - cmd/wipnote/daemon.go
+        - cmd/wipnote/serve_child.go
+        - internal/db/writequeue
+        - internal/hooks/runner.go
+        - internal/otel/indexer/indexer.go
+        - internal/otel/receiver/writer.go
+        - plugin/hooks/hooks.json
+      deps:
+        - 2
+        - 3
+        - 4
+      done_when:
+        - There is exactly one process-local owner for SQLite event/index writes during a normal dashboard session.
+        - Hook event capture does not fail user work when the SQLite writer is busy or unavailable.
+        - Queued writes are bounded and backpressure/fallback behavior is visible.
+        - Reindex can rebuild missed derived rows from canonical HTML/NDJSON.
+      effort: L
+      risk: High
+      tests: |
+        Unit: TestWriteQueue_SerializesConcurrentProducers runs many producers and asserts one transaction stream.
+        Integration: concurrent hooks plus active dashboard produce zero SQLITE_BUSY errors.
+        Regression: reindex from canonical files restores rows after daemon-disabled fallback.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      questions:
+        - id: q-service-owner
+          text: Should the single writer live inside `wipnote serve` first, or as a separate `wipnote daemon` process?
+    - id: slice-6
+      num: 6
+      title: Canonical-first fallback and rebuild guarantees
+      what: |
+        Strengthen the guarantee that SQLite is disposable by auditing commands
+        and event paths for canonical-file fallbacks. Add tests that delete or
+        lock the SQLite cache and verify core operations either succeed from
+        YAML/HTML/NDJSON or fail loudly with a rebuild instruction. Improve
+        `wipnote reindex` so it can restore plan/work-item/session/query state
+        needed by the dashboard after cache deletion.
+      why: |
+        A single-writer derived index only works if the product can tolerate the
+        index being missing, locked, stale, or rebuilt. This slice turns the
+        architecture slogan into enforced behavior.
+      files:
+        - cmd/wipnote/reindex.go
+        - cmd/wipnote/reindex_sessions.go
+        - cmd/wipnote/find.go
+        - cmd/wipnote/status.go
+        - internal/htmlparse
+        - internal/otel/indexer
+        - internal/storage
+      deps:
+        - 1
+        - 2
+        - 3
+      done_when:
+        - Deleting the SQLite cache and running reindex restores dashboard-critical rows.
+        - Locking the DB does not break YAML/HTML-native commands.
+        - Commands that still require SQLite explain the dependency and suggest reindex/retry.
+        - A documented smoke test covers cache deletion, rebuild, and dashboard load.
+      effort: M
+      risk: Med
+      tests: |
+        Integration: TestCacheDeletion_ReindexRestoresDashboardData deletes the cache DB and runs reindex.
+        Integration: TestLockedDB_CanonicalCommandsStillWork locks SQLite and runs plan critique/validate/show.
+        Regression: existing reindex and session roundtrip tests still pass.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+    - id: slice-7
+      num: 7
+      title: Contention observability and regression gate
+      what: |
+        Add lightweight observability for SQLite contention: count SQLITE_BUSY
+        occurrences by command/subsystem, record effective journal mode, expose
+        queue depth when the single writer is enabled, and add a stress command or
+        test fixture that runs dashboard/indexer/hooks/CLI operations together.
+        Use this as a release gate for Launch Readiness.
+      why: |
+        The issue has recurred because fixes addressed symptoms without a durable
+        regression signal. A contention stress gate makes future regressions obvious
+        before launch.
+      files:
+        - internal/db
+        - cmd/wipnote/status.go
+        - cmd/wipnote/health.go
+        - cmd/wipnote/check.go
+        - cmd/wipnote/api_collector_status.go
+        - cmd/wipnote/sqlite_contention_test.go
+      deps:
+        - 5
+        - 6
+      done_when:
+        - '`wipnote status` or `wipnote health` reports recent SQLITE_BUSY count and journal mode.'
+        - Stress fixture reproduces the old multi-writer workload.
+        - Stress fixture passes without SQLITE_BUSY after the single-writer path is enabled.
+        - Launch readiness checklist references this gate before release.
+      effort: M
+      risk: Med
+      tests: |
+        Integration: TestSQLiteContentionStress starts dashboard/indexer plus concurrent CLI writes and expects zero SQLITE_BUSY.
+        Unit: TestBusyCounterClassifiesErrors verifies wrapped SQLite lock errors increment the right counter.
+        Regression: health/status output remains stable for existing callers.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
 questions: []
