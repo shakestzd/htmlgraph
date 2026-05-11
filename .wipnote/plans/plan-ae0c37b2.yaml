@@ -8,7 +8,7 @@ meta:
     status: finalized
     priority: high
     created_by: codex
-    version: 24
+    version: 25
 design:
     problem: |
         Recurring SQLITE_BUSY failures block routine CLI operations such as plan critique while dashboard, collectors, hooks, or indexers are active. The current architecture opens SQLite for commands that should be able to read canonical YAML/HTML directly, runs DDL and migrations on every db.Open, and allows several independent processes to compete as writers. The project is local-first and must remain self-contained; PostgreSQL or another external service is not an acceptable fix.
@@ -414,6 +414,7 @@ slices:
           severity: MED
           summary: Writer crash mid-queue was not covered. Added a done_when criterion and integration test — if the writer dies with N writes queued, reindex from canonical NDJSON must restore them.
     - id: slice-8
+      feature_id: feat-985d02ed
       num: 8
       title: Canonical command audit and fail-loud DB dependency
       what: |
@@ -450,7 +451,7 @@ slices:
       approved: false
       comment: ""
       approval_status: approved
-      execution_status: not_started
+      execution_status: promoted
       critic_revisions:
         - source: execution-critic
           severity: HIGH
