@@ -107,6 +107,11 @@ func (idx *Indexer) runOnce(ctx context.Context) {
 }
 
 // discoverSessions returns session IDs that have an events.ndjson file.
+// When the indexer has a database attached (idx.database != nil), it also
+// filters out session directories that have no corresponding row in the
+// sessions table (orphans). Orphan directories are logged at debug level and
+// skipped so the indexer never wastes writer cycles on data that cannot be
+// attributed to a known session.
 func (idx *Indexer) discoverSessions() ([]string, error) {
 	sessionsDir := filepath.Join(idx.wipnoteDir, "sessions")
 	entries, err := os.ReadDir(sessionsDir)
@@ -127,6 +132,9 @@ func (idx *Indexer) discoverSessions() ([]string, error) {
 			sessions = append(sessions, e.Name())
 		}
 	}
+
+	// Gate on DB membership: skip orphan directories (no sessions row).
+	sessions = filterSessionsByDB(idx.database, idx.wipnoteDir, sessions)
 	return sessions, nil
 }
 

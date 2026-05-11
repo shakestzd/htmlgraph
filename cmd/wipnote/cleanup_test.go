@@ -401,3 +401,130 @@ func containsID(ids []string, target string) bool {
 	}
 	return false
 }
+
+// ---------- orphan-sessions tests ----------
+
+// makeOrphanSessionDir creates a session directory under wipnoteDir/sessions/<id>/
+// with an events.ndjson file and optionally back-dates it.
+func makeOrphanSessionDir(t *testing.T, wipnoteDir, sessionID string, age time.Duration) string {
+	t.Helper()
+	dir := filepath.Join(wipnoteDir, "sessions", sessionID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("MkdirAll %s: %v", dir, err)
+	}
+	ndjson := filepath.Join(dir, "events.ndjson")
+	if err := os.WriteFile(ndjson, []byte{}, 0o644); err != nil {
+		t.Fatalf("WriteFile events.ndjson: %v", err)
+	}
+	if age > 0 {
+		oldTime := time.Now().Add(-age)
+		_ = os.Chtimes(dir, oldTime, oldTime)
+		_ = os.Chtimes(ndjson, oldTime, oldTime)
+	}
+	return dir
+}
+
+// TestRunCleanupOrphanSessions_ListDoesNotDelete verifies that --list (no
+// --delete) prints candidates but does not remove any directories.
+func TestRunCleanupOrphanSessions_ListDoesNotDelete(t *testing.T) {
+	hgDir, database := setupHTMLGraphDir(t)
+	// Create an orphan session directory (no DB row).
+	orphanDir := makeOrphanSessionDir(t, hgDir, "orphan-list-cli-01", 20*24*time.Hour)
+	database.Close()
+
+	origFlag := projectDirFlag
+	projectDirFlag = filepath.Dir(hgDir)
+	defer func() { projectDirFlag = origFlag }()
+
+	output := captureStdout(t, func() {
+		err := runCleanupOrphanSessions(false /* delete */, false /* yes */)
+		if err != nil {
+			t.Errorf("runCleanupOrphanSessions list: %v", err)
+		}
+	})
+
+	// Directory must still exist (dry-run / list).
+	if _, err := os.Stat(orphanDir); err != nil {
+		t.Errorf("orphan dir should still exist after list: %v", err)
+	}
+
+	// Output should mention the orphan or a summary line.
+	if len(output) == 0 {
+		t.Error("expected non-empty output from orphan-sessions list")
+	}
+}
+
+// TestRunCleanupOrphanSessions_DeleteRequiresYes verifies --delete without
+// --yes returns an error.
+func TestRunCleanupOrphanSessions_DeleteRequiresYes(t *testing.T) {
+	hgDir, database := setupHTMLGraphDir(t)
+	makeOrphanSessionDir(t, hgDir, "orphan-noyes-01", 20*24*time.Hour)
+	database.Close()
+
+	origFlag := projectDirFlag
+	projectDirFlag = filepath.Dir(hgDir)
+	defer func() { projectDirFlag = origFlag }()
+
+	err := runCleanupOrphanSessions(true /* delete */, false /* yes */)
+	if err == nil {
+		t.Error("expected error when --delete is used without --yes")
+	}
+}
+
+// TestRunCleanupOrphanSessions_DeleteWithYesRemovesEligible verifies that
+// --delete --yes removes orphan directories older than OrphanRetentionDays.
+func TestRunCleanupOrphanSessions_DeleteWithYesRemovesEligible(t *testing.T) {
+	hgDir, database := setupHTMLGraphDir(t)
+
+	// Old orphan (20 days > 14-day retention, no recent writes after chtimes).
+	oldOrphanDir := makeOrphanSessionDir(t, hgDir, "old-orphan-del-01", 20*24*time.Hour)
+	// Young orphan (5 days < 14-day retention) — must NOT be deleted.
+	youngOrphanDir := makeOrphanSessionDir(t, hgDir, "young-orphan-del-01", 5*24*time.Hour)
+
+	database.Close()
+
+	origFlag := projectDirFlag
+	projectDirFlag = filepath.Dir(hgDir)
+	defer func() { projectDirFlag = origFlag }()
+
+	err := runCleanupOrphanSessions(true /* delete */, true /* yes */)
+	if err != nil {
+		t.Fatalf("runCleanupOrphanSessions delete: %v", err)
+	}
+
+	// Old orphan must be gone.
+	if _, err := os.Stat(oldOrphanDir); !os.IsNotExist(err) {
+		t.Errorf("old orphan dir should be deleted, got stat err: %v", err)
+	}
+
+	// Young orphan must remain.
+	if _, err := os.Stat(youngOrphanDir); err != nil {
+		t.Errorf("young orphan dir should still exist: %v", err)
+	}
+}
+
+// TestRunCleanupOrphanSessions_NoOrphans verifies clean output when there
+// are no orphan directories.
+func TestRunCleanupOrphanSessions_NoOrphans(t *testing.T) {
+	hgDir, database := setupHTMLGraphDir(t)
+	// Insert a known session AND create its directory — it is NOT an orphan.
+	insertSessionRow(t, database, "known-sess-no-orphan")
+	makeOrphanSessionDir(t, hgDir, "known-sess-no-orphan", 0)
+	database.Close()
+
+	origFlag := projectDirFlag
+	projectDirFlag = filepath.Dir(hgDir)
+	defer func() { projectDirFlag = origFlag }()
+
+	output := captureStdout(t, func() {
+		err := runCleanupOrphanSessions(false /* delete */, false /* yes */)
+		if err != nil {
+			t.Errorf("runCleanupOrphanSessions no-orphans: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "No orphan") {
+		t.Errorf("expected 'No orphan' message, got: %q", output)
+	}
+}
+
