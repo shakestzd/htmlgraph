@@ -8,7 +8,7 @@ meta:
     status: finalized
     priority: high
     created_by: codex
-    version: 26
+    version: 27
 design:
     problem: |
         Recurring SQLITE_BUSY failures block routine CLI operations such as plan critique while dashboard, collectors, hooks, or indexers are active. The current architecture opens SQLite for commands that should be able to read canonical YAML/HTML directly, runs DDL and migrations on every db.Open, and allows several independent processes to compete as writers. The project is local-first and must remain self-contained; PostgreSQL or another external service is not an acceptable fix.
@@ -505,6 +505,7 @@ slices:
           severity: MED
           summary: Define the dashboard-critical dataset explicitly; avoid vague "query state" acceptance.
     - id: slice-10
+      feature_id: feat-156e0a1a
       num: 10
       title: Contention observability and regression gate
       what: |
@@ -550,7 +551,7 @@ slices:
       approved: false
       comment: ""
       approval_status: approved
-      execution_status: not_started
+      execution_status: promoted
       critic_revisions:
         - source: architecture-critic
           severity: HIGH
