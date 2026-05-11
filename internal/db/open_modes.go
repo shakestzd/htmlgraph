@@ -90,6 +90,13 @@ func OpenReadOnly(dbPath string) (*sql.DB, error) {
 // IMPORTANT — prompt close contract: same as OpenReadOnly. In DELETE journal
 // mode, open transactions can block the writer. Close rows and transactions
 // promptly.
+//
+// APPROVED CALLERS — every first-party Go callsite that opens a writable
+// SQLite handle is enumerated in cmd/wipnote/sqlite_write_boundary_test.go
+// (variable approvedWriteSites). Adding a new caller without updating that
+// inventory fails the boundary test. Hook / indexer / OTLP-receiver paths
+// MUST route writes through the slice-6 writer service (feat-f3bcbcef);
+// do not add new direct OpenWritable callers in those locations.
 func OpenWritable(dbPath string) (*sql.DB, error) {
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

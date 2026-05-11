@@ -1,0 +1,814 @@
+// SQLite writable-open enforcement boundary — slice 5 of plan-ae0c37b2.
+//
+// Architectural rule: there must be exactly one writer process per project
+// database. Slice 6 introduces the dedicated writer service. Without an
+// enforcement gate, the codebase can drift back into "queue PLUS direct
+// writable opens", which silently recreates the SQLITE_BUSY contention the
+// plan is trying to eliminate.
+//
+// This file is the enforcement boundary. It maintains an explicit inventory
+// of every first-party Go callsite that opens a writable SQLite handle and
+// fails the build when:
+//
+//  1. A new writable open appears in a forbidden path (hook, collector,
+//     indexer, event-capture) without being added to the inventory.
+//  2. An inventory entry no longer matches a real callsite (stale entry).
+//  3. A forbidden-path entry is mis-classified as something other than
+//     daemon-routed-pending-slice-6.
+//
+// SCOPE — IMPORTANT:
+//
+// This boundary scans first-party Go source under cmd/, internal/ ONLY.
+// (plugin/ is markdown / static assets only — verified at scan time.)
+// MCP servers, third-party plugins, and external tools that open the DB
+// file directly are EXPLICITLY OUT OF SCOPE — Go-level enforcement cannot
+// reach them. That is a known limitation documented in the plan's review
+// critique (review-2026-05-11) and surfaced in the inventory comment for
+// the receiver/writer entry.
+//
+// HOW TO EXTEND:
+//
+//  - New canonical-first command: no inventory change needed (does not open DB).
+//  - New CLI command that legitimately mutates work items: add to inventory
+//    with classification "intentional-cli-mutation".
+//  - New reindex command: add with "reindex-only".
+//  - New schema migration runner: add with "migration-only".
+//  - New hook / collector / indexer write path: STOP. Route it through the
+//    writer service introduced by slice 6 (feat-f3bcbcef). Do not add a
+//    direct open here.
+package main
+
+import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+)
+
+// writeSiteClassification labels how a callsite is allowed to open the DB
+// in writable mode. The labels deliberately read like a status board so
+// reviewers can see at a glance which entries still need migration to the
+// writer service.
+type writeSiteClassification string
+
+const (
+	// daemonRoutedPendingSlice6 marks call sites currently opening writable
+	// DB handles directly that MUST move to the slice-6 writer service.
+	// Their presence here is intentional — the inventory locks the current
+	// state. Slice 7 (feat-33c26c74) will migrate runner.go + indexer.go +
+	// receiver writer.go off this classification.
+	daemonRoutedPendingSlice6 writeSiteClassification = "daemon-routed-pending-slice-6"
+
+	// intentionalCLIMutation marks user-driven CLI commands that legitimately
+	// mutate work items (e.g., wipnote feature start). These keep direct
+	// writable opens because they are short-lived foreground processes;
+	// slice 6's queue is for high-frequency hook/indexer/collector traffic.
+	intentionalCLIMutation writeSiteClassification = "intentional-cli-mutation"
+
+	// reindexOnly marks call sites for the wipnote reindex family. Reindex
+	// is the rebuild path — it rebuilds the SQLite read index from canonical
+	// HTML/NDJSON state, and is the ONE writer-of-record while running.
+	reindexOnly writeSiteClassification = "reindex-only"
+
+	// migrationOnly marks call sites that exist solely to run schema
+	// migrations (wipnote init, wipnote migrate). Migrations are run-once
+	// and must keep a direct writable handle to apply DDL.
+	migrationOnly writeSiteClassification = "migration-only"
+)
+
+// writeSite describes one approved writable SQLite open in first-party
+// Go source. The triple (file, line, openExpr) is the de-duplication key.
+// note SHOULD explain why this site exists and what (if anything) will
+// migrate it onto the slice-6 writer service.
+type writeSite struct {
+	File           string                  // path relative to module root, forward slashes
+	Line           int                     // 1-indexed source line of the open call
+	Function       string                  // enclosing function name
+	OpenExpr       string                  // "db.Open" | "dbpkg.Open" | "sql.Open" | "db.OpenWritable" | "dbpkg.OpenWritable"
+	Classification writeSiteClassification // see constants above
+	Note           string                  // human-readable rationale
+}
+
+// approvedWriteSites is the canonical inventory. To add a new entry, scroll
+// to the matching classification block and insert in alphabetical order
+// by File. To remove an obsolete entry, delete the line.
+//
+// MAINTENANCE: when slice 6 lands and routes hook/indexer/receiver off
+// direct writes, the daemon-routed-pending-slice-6 entries become stale
+// and the test will demand they be removed.
+var approvedWriteSites = []writeSite{
+	// ----------------------------------------------------------------------
+	// daemon-routed-pending-slice-6 (FORBIDDEN PATHS — temporary tolerance)
+	// ----------------------------------------------------------------------
+	// These are the four call sites the plan explicitly calls out as the
+	// SQLITE_BUSY contention source. They open writable handles from
+	// high-frequency, short-lived, or concurrent processes that must move
+	// to the single-writer queue introduced by slice 6 (feat-f3bcbcef).
+	{
+		File:           "cmd/wipnote/hook.go",
+		Line:           114,
+		Function:       "hookSubcmd",
+		OpenExpr:       "db.Open",
+		Classification: daemonRoutedPendingSlice6,
+		Note:           "Per-event hook handler opens DB directly; slice 6 routes via writer service.",
+	},
+	{
+		File:           "cmd/wipnote/hook.go",
+		Line:           153,
+		Function:       "hookSubcmdWithProject",
+		OpenExpr:       "db.Open",
+		Classification: daemonRoutedPendingSlice6,
+		Note:           "Per-event session hook opens DB directly; slice 6 routes via writer service.",
+	},
+	{
+		File:           "cmd/wipnote/hook.go",
+		Line:           189,
+		Function:       "hookTrackEventCmd",
+		OpenExpr:       "db.Open",
+		Classification: daemonRoutedPendingSlice6,
+		Note:           "track-event hook opens DB directly; slice 6 routes via writer service.",
+	},
+	{
+		File:           "internal/otel/receiver/writer.go",
+		Line:           66,
+		Function:       "NewWriter",
+		OpenExpr:       "sql.Open",
+		Classification: daemonRoutedPendingSlice6,
+		Note:           "OTLP receiver Writer pins a MaxOpenConns=1 handle today; slice 6 turns this into the single writer service implementation.",
+	},
+
+	// ----------------------------------------------------------------------
+	// intentional-cli-mutation (CLI commands that mutate work items)
+	// ----------------------------------------------------------------------
+	{
+		File:           "cmd/wipnote/ingest_gemini.go",
+		Line:           57,
+		Function:       "runIngestGemini",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven `wipnote ingest gemini`; short-lived foreground process.",
+	},
+	{
+		File:           "cmd/wipnote/plan_feedback_cmd.go",
+		Line:           77,
+		Function:       "planFeedback",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven `wipnote plan feedback`; short-lived foreground process.",
+	},
+	{
+		File:           "cmd/wipnote/plan_finalize_yaml.go",
+		Line:           69,
+		Function:       "finalizeYAML",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven `wipnote plan finalize-yaml`; short-lived foreground process.",
+	},
+	{
+		File:           "cmd/wipnote/plan_typed_sections.go",
+		Line:           52,
+		Function:       "buildTypedPlanSections",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "Plan rendering helper used by CLI plan commands; best-effort optional open.",
+	},
+	{
+		File:           "cmd/wipnote/plan_yaml_cmds.go",
+		Line:           524,
+		Function:       "openPlanDB",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "Plan CLI helper for plan create/edit/finalize commands.",
+	},
+	{
+		File:           "cmd/wipnote/plan_yaml_extras.go",
+		Line:           483,
+		Function:       "applyAcceptedAmendments",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven plan amendment apply; short-lived foreground process.",
+	},
+	{
+		File:           "cmd/wipnote/plan_yaml_extras.go",
+		Line:           623,
+		Function:       "runReadFeedbackYAML",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven `wipnote plan read-feedback-yaml`; short-lived.",
+	},
+	{
+		File:           "cmd/wipnote/query.go",
+		Line:           46,
+		Function:       "runQuery",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven `wipnote query`; opens writable to migrate-on-open then queries.",
+	},
+	{
+		File:           "cmd/wipnote/serve_child.go",
+		Line:           62,
+		Function:       "runServeChild",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "Dashboard child process (long-lived but single-instance per project).",
+	},
+	{
+		File:           "cmd/wipnote/session.go",
+		Line:           208,
+		Function:       "openDB",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "Helper for `wipnote session list/start/end/show` CLI commands.",
+	},
+	{
+		File:           "cmd/wipnote/status.go",
+		Line:           90,
+		Function:       "runStatus",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "`wipnote status` opens writable to run pending migrations (best-effort) before read.",
+	},
+	{
+		File:           "cmd/wipnote/sweep.go",
+		Line:           44,
+		Function:       "sweepOrphanedEventsCmd",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "User-driven `wipnote sweep` orphan cleanup CLI command.",
+	},
+	{
+		File:           "cmd/wipnote/track.go",
+		Line:           195,
+		Function:       "openTrackDB",
+		OpenExpr:       "db.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "Helper for `wipnote track show` CLI command.",
+	},
+	{
+		File:           "internal/workitem/project.go",
+		Line:           80,
+		Function:       "Open",
+		OpenExpr:       "dbpkg.Open",
+		Classification: intentionalCLIMutation,
+		Note:           "Canonical entry point for every CLI work-item operation (feature/bug/spike/track start/complete).",
+	},
+
+	// ----------------------------------------------------------------------
+	// reindex-only (rebuilds SQLite from canonical HTML/NDJSON)
+	// ----------------------------------------------------------------------
+	{
+		File:           "cmd/wipnote/purge_spikes.go",
+		Line:           126,
+		Function:       "runFullReindex",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "Full-reindex helper invoked after spike purge.",
+	},
+	{
+		File:           "cmd/wipnote/reindex.go",
+		Line:           51,
+		Function:       "runReindex",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "`wipnote reindex` top-level command.",
+	},
+	{
+		File:           "cmd/wipnote/reindex_orphans.go",
+		Line:           82,
+		Function:       "runReindexBackfillOrphans",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "`wipnote reindex backfill-orphans` reindex variant.",
+	},
+
+	// ----------------------------------------------------------------------
+	// migration-only (schema bootstrap / DDL upgrades)
+	// ----------------------------------------------------------------------
+	{
+		File:           "cmd/wipnote/init.go",
+		Line:           84,
+		Function:       "initDatabase",
+		OpenExpr:       "db.Open",
+		Classification: migrationOnly,
+		Note:           "`wipnote init` runs the first-time schema migrations.",
+	},
+	{
+		File:           "cmd/wipnote/migrate.go",
+		Line:           57,
+		Function:       "runMigrateSessions",
+		OpenExpr:       "dbpkg.Open",
+		Classification: migrationOnly,
+		Note:           "`wipnote migrate sessions` schema upgrade command.",
+	},
+	{
+		File:           "cmd/wipnote/migrate_attribution.go",
+		Line:           80,
+		Function:       "runMigrateAttributionFix",
+		OpenExpr:       "dbpkg.Open",
+		Classification: migrationOnly,
+		Note:           "`wipnote migrate attribution-fix` schema upgrade command.",
+	},
+}
+
+// forbiddenPathPrefixes is the set of first-party directories where a
+// writable SQLite open MUST be marked daemon-routed-pending-slice-6 (or
+// migrated to the slice-6 writer service). Hook, collector, indexer, and
+// event-capture paths are the contention sources the plan targets.
+var forbiddenPathPrefixes = []string{
+	"cmd/wipnote/hook.go",      // hook event handlers
+	"internal/hooks/",          // hook implementations
+	"internal/otel/indexer/",   // NDJSON→SQLite indexer
+	"internal/otel/receiver/",  // OTLP HTTP receiver writer
+	"internal/otel/collector/", // OTLP collector spawn (defensive — not currently a writer)
+}
+
+// scannedDirs lists the first-party Go directories the boundary covers.
+// plugin/ holds only markdown / static assets (verified by the file-walk).
+var scannedDirs = []string{"cmd", "internal"}
+
+// excludedDirs lists package directories whose internal sql.Open / Open
+// calls are NOT caller sites — they are the canonical open primitives
+// themselves. internal/db defines Open / OpenWritable / OpenReadOnly,
+// which by definition must call into the SQLite driver. The boundary
+// rule applies to CALLERS of these primitives, not to the primitives.
+var excludedDirs = []string{
+	"internal/db",
+}
+
+// foundSite captures one writable-open occurrence discovered by the AST scan.
+type foundSite struct {
+	File     string
+	Line     int
+	Function string
+	OpenExpr string
+}
+
+// TestWritableDBOpenBoundary is the enforcement gate. It walks the
+// first-party Go source tree, finds every writable SQLite open, and
+// compares against approvedWriteSites. The test fails on:
+//
+//  1. A new writable open that is not in approvedWriteSites (review/migration trigger).
+//  2. An approved entry that no longer matches a real callsite (stale entry).
+//  3. A forbidden-path entry that is not marked daemon-routed-pending-slice-6
+//     (architectural rule: hook/indexer/receiver writers MUST go through
+//     the slice-6 writer service, not directly).
+func TestWritableDBOpenBoundary(t *testing.T) {
+	root := findModuleRoot(t)
+
+	found, err := scanWritableOpens(root)
+	if err != nil {
+		t.Fatalf("scan writable opens: %v", err)
+	}
+
+	// Build lookup keyed by file:line:openExpr — unique per call site.
+	type key struct {
+		File     string
+		Line     int
+		OpenExpr string
+	}
+	mkKey := func(f, expr string, line int) key { return key{File: f, Line: line, OpenExpr: expr} }
+
+	foundByKey := make(map[key]foundSite, len(found))
+	for _, fs := range found {
+		foundByKey[mkKey(fs.File, fs.OpenExpr, fs.Line)] = fs
+	}
+
+	approvedByKey := make(map[key]writeSite, len(approvedWriteSites))
+	for _, ws := range approvedWriteSites {
+		approvedByKey[mkKey(ws.File, ws.OpenExpr, ws.Line)] = ws
+	}
+
+	// 1. New direct opens not in the inventory.
+	var newSites []foundSite
+	for k, fs := range foundByKey {
+		if _, ok := approvedByKey[k]; !ok {
+			newSites = append(newSites, fs)
+		}
+	}
+
+	// 2. Inventory entries with no matching real call site.
+	var staleEntries []writeSite
+	for k, ws := range approvedByKey {
+		if _, ok := foundByKey[k]; !ok {
+			staleEntries = append(staleEntries, ws)
+		}
+	}
+
+	// 3. Forbidden-path entries must be daemon-routed-pending-slice-6.
+	var misclassified []writeSite
+	for _, ws := range approvedWriteSites {
+		if !isForbiddenPath(ws.File) {
+			continue
+		}
+		if ws.Classification != daemonRoutedPendingSlice6 {
+			misclassified = append(misclassified, ws)
+		}
+	}
+
+	// 4. Forbidden-path call sites discovered by the scan must also live
+	// in the inventory under daemon-routed-pending-slice-6 — catches the
+	// case where someone removes the inventory entry but leaves the
+	// direct open in place (this is also caught by check #1 above; this
+	// check is explicit so the failure message is precise).
+	var unannotatedForbidden []foundSite
+	for _, fs := range found {
+		if !isForbiddenPath(fs.File) {
+			continue
+		}
+		ws, ok := approvedByKey[mkKey(fs.File, fs.OpenExpr, fs.Line)]
+		if !ok {
+			// Will already be reported under newSites.
+			continue
+		}
+		if ws.Classification != daemonRoutedPendingSlice6 {
+			unannotatedForbidden = append(unannotatedForbidden, fs)
+		}
+	}
+
+	if len(newSites) > 0 || len(staleEntries) > 0 || len(misclassified) > 0 || len(unannotatedForbidden) > 0 {
+		var b strings.Builder
+		fmt.Fprintf(&b, "writable SQLite open boundary failed.\n\n")
+
+		if len(newSites) > 0 {
+			sort.Slice(newSites, func(i, j int) bool {
+				if newSites[i].File != newSites[j].File {
+					return newSites[i].File < newSites[j].File
+				}
+				return newSites[i].Line < newSites[j].Line
+			})
+			fmt.Fprintf(&b, "NEW direct writable opens not in inventory (%d):\n", len(newSites))
+			fmt.Fprintf(&b, "  These must be classified by adding entries to approvedWriteSites.\n")
+			fmt.Fprintf(&b, "  Hook / indexer / receiver / event-capture paths SHOULD instead route through the slice-6 writer service.\n")
+			for _, fs := range newSites {
+				fmt.Fprintf(&b, "  + %s:%d  func=%s  open=%s\n", fs.File, fs.Line, fs.Function, fs.OpenExpr)
+			}
+			b.WriteString("\n")
+		}
+		if len(staleEntries) > 0 {
+			sort.Slice(staleEntries, func(i, j int) bool {
+				if staleEntries[i].File != staleEntries[j].File {
+					return staleEntries[i].File < staleEntries[j].File
+				}
+				return staleEntries[i].Line < staleEntries[j].Line
+			})
+			fmt.Fprintf(&b, "STALE inventory entries (no matching call site found, %d):\n", len(staleEntries))
+			fmt.Fprintf(&b, "  Either the line moved (update Line field) or the call was removed (delete entry).\n")
+			for _, ws := range staleEntries {
+				fmt.Fprintf(&b, "  - %s:%d  func=%s  open=%s  class=%s\n", ws.File, ws.Line, ws.Function, ws.OpenExpr, ws.Classification)
+			}
+			b.WriteString("\n")
+		}
+		if len(misclassified) > 0 {
+			fmt.Fprintf(&b, "MISCLASSIFIED forbidden-path entries (%d):\n", len(misclassified))
+			fmt.Fprintf(&b, "  Hook / indexer / receiver / event-capture paths must use classification %q.\n", daemonRoutedPendingSlice6)
+			for _, ws := range misclassified {
+				fmt.Fprintf(&b, "  ! %s:%d  func=%s  class=%s  (must be %s)\n",
+					ws.File, ws.Line, ws.Function, ws.Classification, daemonRoutedPendingSlice6)
+			}
+			b.WriteString("\n")
+		}
+		if len(unannotatedForbidden) > 0 {
+			fmt.Fprintf(&b, "UN-ANNOTATED forbidden-path sites (%d):\n", len(unannotatedForbidden))
+			for _, fs := range unannotatedForbidden {
+				fmt.Fprintf(&b, "  ? %s:%d  func=%s  open=%s\n", fs.File, fs.Line, fs.Function, fs.OpenExpr)
+			}
+			b.WriteString("\n")
+		}
+
+		t.Fatalf("%s", b.String())
+	}
+}
+
+// TestWriteSiteInventoryComplete is a redundant safety net: it re-asserts
+// that every discovered writable open lives in the inventory AND every
+// inventory entry references a real file. TestWritableDBOpenBoundary
+// already covers this, but having a separate, narrower test makes the
+// failure mode immediately readable in CI output.
+func TestWriteSiteInventoryComplete(t *testing.T) {
+	root := findModuleRoot(t)
+
+	// Verify every inventory file exists.
+	for _, ws := range approvedWriteSites {
+		full := filepath.Join(root, filepath.FromSlash(ws.File))
+		if _, err := os.Stat(full); err != nil {
+			t.Errorf("inventory file %s does not exist: %v", ws.File, err)
+		}
+	}
+
+	// Verify every classification is a known constant.
+	known := map[writeSiteClassification]bool{
+		daemonRoutedPendingSlice6: true,
+		intentionalCLIMutation:    true,
+		reindexOnly:               true,
+		migrationOnly:             true,
+	}
+	for _, ws := range approvedWriteSites {
+		if !known[ws.Classification] {
+			t.Errorf("inventory %s:%d uses unknown classification %q", ws.File, ws.Line, ws.Classification)
+		}
+	}
+
+	// Verify the plugin/ directory contains no Go source — slice 5 documents
+	// that plugin/ is markdown / static assets, so the boundary scan does
+	// not cover it. If a Go file ever lands there, this test catches it
+	// before the boundary scan silently misses a write site.
+	pluginDir := filepath.Join(root, "plugin")
+	if _, err := os.Stat(pluginDir); err == nil {
+		err := filepath.Walk(pluginDir, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if info.IsDir() {
+				return nil
+			}
+			if strings.HasSuffix(path, ".go") {
+				rel, _ := filepath.Rel(root, path)
+				t.Errorf("plugin/ now contains a Go file (%s) — extend scannedDirs to include plugin/", rel)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk plugin/: %v", err)
+		}
+	}
+}
+
+// findModuleRoot resolves the wipnote module root by walking up from the
+// test's CWD until it finds go.mod. The cmd/wipnote test package always
+// runs from cmd/wipnote/, so we step up two levels to get the root.
+func findModuleRoot(t *testing.T) string {
+	t.Helper()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	// Walk up at most 6 levels searching for go.mod.
+	dir := cwd
+	for i := 0; i < 6; i++ {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	t.Fatalf("cannot find module root from %s", cwd)
+	return ""
+}
+
+// scanWritableOpens parses every .go file (excluding _test.go) under
+// scannedDirs and returns every writable SQLite open call discovered.
+//
+// A "writable open" is any of:
+//
+//   - <db-alias>.Open(...)         — internal/db.Open (writable, runs migrations)
+//   - <db-alias>.OpenWritable(...) — internal/db.OpenWritable (writable, no migrations)
+//   - sql.Open("sqlite", ...)      — direct driver open; checked for ?mode=ro
+//     in the DSN — if mode=ro is present, the call is READ-ONLY and skipped.
+//
+// The db-alias resolution honours the import statement at the top of
+// each file (e.g. `import dbpkg "github.com/shakestzd/wipnote/internal/db"`
+// makes `dbpkg.Open(...)` a write call).
+func scanWritableOpens(root string) ([]foundSite, error) {
+	var sites []foundSite
+	for _, dir := range scannedDirs {
+		walkRoot := filepath.Join(root, dir)
+		err := filepath.Walk(walkRoot, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if info.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			if isExcludedPath(root, path) {
+				return nil
+			}
+			fileSites, err := scanFile(root, path)
+			if err != nil {
+				return fmt.Errorf("scan %s: %w", path, err)
+			}
+			sites = append(sites, fileSites...)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return sites, nil
+}
+
+// scanFile parses one Go file and returns every writable SQLite open it
+// contains. relPath is the path relative to the module root, used to
+// label results.
+func scanFile(root, path string) ([]foundSite, error) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	// Map import-name → import-path so we can identify which package
+	// aliases resolve to internal/db.
+	dbAliases := make(map[string]bool) // alias name → is db package
+	for _, imp := range f.Imports {
+		// imp.Path.Value is the quoted import path, e.g. "\"...internal/db\"".
+		pathStr := strings.Trim(imp.Path.Value, "\"")
+		if pathStr != "github.com/shakestzd/wipnote/internal/db" {
+			continue
+		}
+		alias := "db" // default package name
+		if imp.Name != nil && imp.Name.Name != "" && imp.Name.Name != "_" {
+			alias = imp.Name.Name
+		}
+		dbAliases[alias] = true
+	}
+	// Always-watched aliases. The literal `sql.Open` (database/sql) is
+	// caught separately because the DSN must be inspected for mode=ro.
+	hasSQLImport := false
+	for _, imp := range f.Imports {
+		if strings.Trim(imp.Path.Value, "\"") == "database/sql" {
+			hasSQLImport = true
+			break
+		}
+	}
+
+	relPath, err := filepath.Rel(root, path)
+	if err != nil {
+		return nil, err
+	}
+	relPath = filepath.ToSlash(relPath)
+
+	var sites []foundSite
+
+	// Stack of enclosing function names, so nested closures resolve to
+	// their containing func.
+	var funcStack []string
+	currentFunc := func() string {
+		if len(funcStack) == 0 {
+			return ""
+		}
+		return funcStack[len(funcStack)-1]
+	}
+
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.FuncDecl:
+			if node.Body == nil {
+				return false
+			}
+			funcStack = append(funcStack, node.Name.Name)
+			// Pre-scan: does this function contain a literal that flags
+			// the open as read-only?  If yes, sql.Open calls in this
+			// function body are treated as RO and skipped.
+			funcIsReadOnly := funcBodyDeclaresReadOnlyDSN(node.Body)
+			ast.Inspect(node.Body, func(inner ast.Node) bool {
+				return inspectCall(inner, currentFunc(), funcIsReadOnly, fset, relPath, dbAliases, hasSQLImport, &sites)
+			})
+			funcStack = funcStack[:len(funcStack)-1]
+			return false
+		}
+		return true
+	})
+
+	return sites, nil
+}
+
+// funcBodyDeclaresReadOnlyDSN returns true when the function body contains
+// any string literal whose value includes "mode=ro". This is the heuristic
+// for "this function opens read-only" — it catches DSNs assembled by
+// fmt.Sprintf, string concatenation, or any literal-bearing expression.
+func funcBodyDeclaresReadOnlyDSN(body *ast.BlockStmt) bool {
+	if body == nil {
+		return false
+	}
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		lit, ok := n.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		if strings.Contains(lit.Value, "mode=ro") {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// inspectCall examines one AST node; if it is a writable DB open call,
+// it appends a foundSite to sites. funcIsReadOnly is the result of a
+// per-function pre-scan: if true, sql.Open calls in this function are
+// suppressed because the function's DSN literals indicate read-only.
+func inspectCall(n ast.Node, fnName string, funcIsReadOnly bool, fset *token.FileSet, relPath string, dbAliases map[string]bool, hasSQLImport bool, sites *[]foundSite) bool {
+	call, ok := n.(*ast.CallExpr)
+	if !ok {
+		return true
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return true
+	}
+	pkgIdent, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return true
+	}
+	pkgName := pkgIdent.Name
+	method := sel.Sel.Name
+
+	// internal/db writable opens.
+	if dbAliases[pkgName] && (method == "Open" || method == "OpenWritable") {
+		pos := fset.Position(call.Pos())
+		*sites = append(*sites, foundSite{
+			File:     relPath,
+			Line:     pos.Line,
+			Function: fnName,
+			OpenExpr: pkgName + "." + method,
+		})
+		return true
+	}
+
+	// database/sql.Open — only count writable opens. Read-only DSNs
+	// (mode=ro) are excluded.
+	if hasSQLImport && pkgName == "sql" && method == "Open" {
+		if funcIsReadOnly || isReadOnlySQLOpenArg(call) {
+			return true
+		}
+		pos := fset.Position(call.Pos())
+		*sites = append(*sites, foundSite{
+			File:     relPath,
+			Line:     pos.Line,
+			Function: fnName,
+			OpenExpr: "sql.Open",
+		})
+	}
+	return true
+}
+
+// isReadOnlySQLOpenArg returns true when the DSN argument of a sql.Open
+// call is a literal/concat expression containing "mode=ro". The function-
+// scope scan (funcBodyDeclaresReadOnlyDSN) catches DSNs assembled via
+// fmt.Sprintf; this fallback handles the simple inline-literal case.
+func isReadOnlySQLOpenArg(call *ast.CallExpr) bool {
+	if len(call.Args) < 2 {
+		return false
+	}
+	return containsModeRO(call.Args[1])
+}
+
+// containsModeRO walks a (possibly-concatenated) expression and returns
+// true if any string-literal node contains "mode=ro".
+func containsModeRO(e ast.Expr) bool {
+	switch v := e.(type) {
+	case *ast.BasicLit:
+		if v.Kind == token.STRING {
+			return strings.Contains(v.Value, "mode=ro")
+		}
+	case *ast.BinaryExpr:
+		return containsModeRO(v.X) || containsModeRO(v.Y)
+	case *ast.ParenExpr:
+		return containsModeRO(v.X)
+	}
+	return false
+}
+
+// isForbiddenPath returns true if relPath sits under a directory where
+// writable DB opens must be daemon-routed.
+func isForbiddenPath(relPath string) bool {
+	for _, prefix := range forbiddenPathPrefixes {
+		if strings.HasPrefix(relPath, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// isExcludedPath returns true when path lives under one of excludedDirs,
+// meaning its writable opens are the canonical primitives themselves and
+// not call sites the boundary should police.
+func isExcludedPath(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	relSlash := filepath.ToSlash(rel)
+	for _, dir := range excludedDirs {
+		if strings.HasPrefix(relSlash, dir+"/") || relSlash == dir {
+			return true
+		}
+	}
+	return false
+}
