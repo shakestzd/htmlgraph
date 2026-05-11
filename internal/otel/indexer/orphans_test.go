@@ -68,22 +68,30 @@ func insertMainSessionRow(t *testing.T, database *sql.DB, sessionID string) {
 
 // TestDiscoverSessions_SkipsOrphans seeds FS with 5 session dirs and DB with
 // 3 corresponding sessions; asserts only the 3 in-DB sessions are returned.
+//
+// Note (roborev #1505): the orphan-filter policy now only skips
+// directories that are BOTH stale (>= orphanMinAge) AND quiescent (no
+// writes in orphanQuiescenceWindow). To exercise the skip path we
+// back-date the orphan directories so they qualify; fresh orphan dirs
+// are intentionally NOT skipped — see TestDiscoverSessions_KeepsRecentOrphans
+// for that case.
 func TestDiscoverSessions_SkipsOrphans(t *testing.T) {
 	_, dbPath := setupIndexerDB(t)
 	mainDB := openMainDB(t, dbPath)
 	wipnoteDir := t.TempDir()
 
-	allSessions := []string{
-		"sess-orphan-a1",
-		"sess-known-b1",
-		"sess-known-b2",
-		"sess-orphan-a2",
-		"sess-known-b3",
-	}
 	knownSessions := []string{"sess-known-b1", "sess-known-b2", "sess-known-b3"}
+	orphanSessions := []string{"sess-orphan-a1", "sess-orphan-a2"}
 
-	for _, sid := range allSessions {
+	// Known sessions: fresh dirs are fine — they have a DB row.
+	for _, sid := range knownSessions {
 		makeSessionDir(t, wipnoteDir, sid)
+	}
+	// Orphan sessions: age them well past orphanMinAge (1h) and make
+	// the ndjson stale beyond orphanQuiescenceWindow (5m). 2 hours is
+	// comfortably past both thresholds.
+	for _, sid := range orphanSessions {
+		makeAgedSessionDir(t, wipnoteDir, sid, 2*time.Hour)
 	}
 	for _, sid := range knownSessions {
 		insertMainSessionRow(t, mainDB, sid)
@@ -109,6 +117,66 @@ func TestDiscoverSessions_SkipsOrphans(t *testing.T) {
 		if !knownSet[s] {
 			t.Errorf("returned orphan session %q (not in DB)", s)
 		}
+	}
+}
+
+// TestDiscoverSessions_KeepsRecentOrphans is the roborev #1505
+// regression test: orphan session directories that are EITHER recent
+// (< orphanMinAge) OR actively producing telemetry (last write within
+// orphanQuiescenceWindow) must remain in the indexer's working set
+// even if no sessions row exists yet. Hook-failure, late-plugin-load,
+// and OTel-only sessions all rely on this: their session row is
+// written by a downstream code path (writer queue / hook gate) AFTER
+// the NDJSON starts appearing.
+//
+// Three fixtures cover the policy matrix:
+//
+//   - "recent-orphan-30s"  : 30s old, no DB row.            Keep.
+//   - "active-old-orphan"  : 2h old dir, ndjson written 1m ago. Keep.
+//   - "stale-quiet-orphan" : 2h old dir, ndjson stale 2h.   Skip.
+func TestDiscoverSessions_KeepsRecentOrphans(t *testing.T) {
+	_, dbPath := setupIndexerDB(t)
+	mainDB := openMainDB(t, dbPath)
+	wipnoteDir := t.TempDir()
+
+	// Recent orphan — fresh dir (< 1h).
+	makeSessionDir(t, wipnoteDir, "recent-orphan-30s")
+
+	// Active old orphan — back-date the dir but refresh the ndjson so
+	// it reads as actively producing.
+	makeAgedSessionDir(t, wipnoteDir, "active-old-orphan", 2*time.Hour)
+	ndjson := filepath.Join(wipnoteDir, "sessions", "active-old-orphan", "events.ndjson")
+	recent := time.Now().Add(-1 * time.Minute)
+	if err := os.Chtimes(ndjson, recent, recent); err != nil {
+		t.Fatalf("Chtimes active ndjson: %v", err)
+	}
+
+	// Truly orphan — old dir AND stale ndjson.
+	makeAgedSessionDir(t, wipnoteDir, "stale-quiet-orphan", 2*time.Hour)
+
+	snk := sqls.New(&fakeWriter{})
+	idxr := New(wipnoteDir, snk).WithDB(mainDB)
+
+	sessions, err := idxr.discoverSessions()
+	if err != nil {
+		t.Fatalf("discoverSessions: %v", err)
+	}
+
+	want := map[string]bool{
+		"recent-orphan-30s": true,
+		"active-old-orphan": true,
+	}
+	got := map[string]bool{}
+	for _, s := range sessions {
+		got[s] = true
+	}
+	for sid := range want {
+		if !got[sid] {
+			t.Errorf("orphan session %q was dropped; should have been kept (recent or actively writing)", sid)
+		}
+	}
+	if got["stale-quiet-orphan"] {
+		t.Errorf("stale+quiescent orphan was kept; should have been skipped")
 	}
 }
 
@@ -238,8 +306,12 @@ func TestCleanupOrphanSessions_RespectsRetention(t *testing.T) {
 	}
 }
 
-// TestOrphanSession_NoIndexerRetry verifies that an orphan session NDJSON
-// is never processed by the indexer across multiple ticks (zero INSERT attempts).
+// TestOrphanSession_NoIndexerRetry verifies that a stale + quiescent
+// orphan session NDJSON is never processed by the indexer across
+// multiple ticks (zero INSERT attempts). The fixture is intentionally
+// back-dated past both orphanMinAge and orphanQuiescenceWindow so the
+// new "keep recent / active orphans" policy (roborev #1505) cannot
+// keep it.
 func TestOrphanSession_NoIndexerRetry(t *testing.T) {
 	w, dbPath := setupIndexerDB(t)
 	wipnoteDir := t.TempDir()
@@ -248,7 +320,17 @@ func TestOrphanSession_NoIndexerRetry(t *testing.T) {
 	lines := []string{
 		`{"kind":"span","harness":"claude_code","ts":"2026-04-24T19:00:00Z","signal_id":"orp-s1","session_id":"` + orphanID + `","canonical":"api_request","native":"claude_code.api_request"}`,
 	}
-	writeNDJSONFixture(t, wipnoteDir, orphanID, lines)
+	ndjsonPath := writeNDJSONFixture(t, wipnoteDir, orphanID, lines)
+	// Age both the directory and the ndjson file so the orphan is
+	// stale+quiescent and the filter skips it.
+	oldTime := time.Now().Add(-2 * time.Hour)
+	dir := filepath.Dir(ndjsonPath)
+	if err := os.Chtimes(dir, oldTime, oldTime); err != nil {
+		t.Fatalf("Chtimes dir: %v", err)
+	}
+	if err := os.Chtimes(ndjsonPath, oldTime, oldTime); err != nil {
+		t.Fatalf("Chtimes ndjson: %v", err)
+	}
 
 	// Open main DB — intentionally do NOT insert a sessions row for orphanID.
 	mainDB := openMainDB(t, dbPath)

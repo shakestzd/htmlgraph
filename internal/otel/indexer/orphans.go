@@ -106,9 +106,41 @@ func IsEligibleForDeletion(o OrphanInfo) bool {
 	return sinceLastWrite >= 24*time.Hour
 }
 
-// filterSessionsByDB filters a candidate list of session IDs to only those
-// that exist in the sessions table. On query error it logs a warning and
-// returns the full candidate list (fail-open).
+// orphanMinAge is the minimum directory age before a session lacking a
+// DB row may be skipped by the indexer. Below this floor we always
+// process the directory — hook-failure, late-plugin-load, and OTel-only
+// sessions can produce NDJSON before any session row is written, and
+// the indexer or downstream code is what eventually creates the row.
+// Set well below OrphanRetentionDays (14d) so the deletion path is
+// still owned by the cleanup CLI; this gate only controls what the
+// indexer chooses to index per tick.
+const orphanMinAge = time.Hour
+
+// orphanQuiescenceWindow is the "no recent writes" window. A session
+// directory whose most recent file modification is within this window
+// is considered actively producing telemetry and is processed even if
+// it has no DB row yet — the row may land momentarily.
+const orphanQuiescenceWindow = 5 * time.Minute
+
+// filterSessionsByDB filters candidate session IDs to those the indexer
+// should process this tick. Sessions with a corresponding sessions row
+// are always kept. Sessions WITHOUT a row are kept when they are recent
+// (< orphanMinAge) OR actively producing telemetry (last write within
+// orphanQuiescenceWindow). Only sessions that are BOTH stale AND
+// quiescent are skipped — these are true orphans whose telemetry will
+// be cleaned up by `wipnote cleanup orphan-sessions` per the
+// OrphanRetentionDays policy.
+//
+// This is the fix for roborev #1505 (slice 11): the prior
+// implementation skipped every directory that lacked a DB row, which
+// permanently discarded valid telemetry from hook-failure,
+// late-plugin-load, and OTel-only sessions whose row had not been
+// written yet. The writer queue or hook gate creates the row
+// eventually; the indexer must wait for that to happen instead of
+// silently dropping data.
+//
+// On query error the function logs and returns the full candidate list
+// (fail-open) so a transient DB hiccup never silently drops telemetry.
 func filterSessionsByDB(database *sql.DB, wipnoteDir string, candidates []string) []string {
 	if database == nil || len(candidates) == 0 {
 		return candidates
@@ -128,7 +160,18 @@ func filterSessionsByDB(database *sql.DB, wipnoteDir string, candidates []string
 		}
 		dirPath := filepath.Join(sessionsDir, id)
 		lastWrite, age := inspectOrphanDir(dirPath, now)
-		log.Printf("indexer: skipping orphan session dir %s (age=%s, last-write=%s) — no DB row",
+		// Recent OR active sessions are NOT orphans yet — keep them
+		// in the indexer's working set so the row can land before we
+		// give up on the telemetry.
+		if age < orphanMinAge {
+			kept = append(kept, id)
+			continue
+		}
+		if !lastWrite.IsZero() && now.Sub(lastWrite) < orphanQuiescenceWindow {
+			kept = append(kept, id)
+			continue
+		}
+		log.Printf("indexer: skipping orphan session dir %s (age=%s, last-write=%s) — no DB row, stale and quiescent",
 			id, formatAge(age), lastWrite.Format(time.RFC3339))
 	}
 	return kept
