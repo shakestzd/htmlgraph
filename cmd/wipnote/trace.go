@@ -75,7 +75,7 @@ func runTrace(arg string, jsonOut bool) error {
 		if err != nil {
 			return fmt.Errorf("resolve db path: %w", err)
 		}
-		database, err := dbpkg.Open(dbPath)
+		database, err := dbpkg.OpenReadOnly(dbPath)
 		if err != nil {
 			return fmt.Errorf("open database: %w", err)
 		}
@@ -115,7 +115,7 @@ func runTraceCommit(sha string, jsonOut bool) error {
 	if err != nil {
 		return fmt.Errorf("resolve db path: %w", err)
 	}
-	database, err := dbpkg.Open(dbPath)
+	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -196,7 +196,7 @@ func runTraceFile(filePath string, jsonOut bool) error {
 	if err != nil {
 		return fmt.Errorf("resolve db path: %w", err)
 	}
-	database, err := dbpkg.Open(dbPath)
+	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

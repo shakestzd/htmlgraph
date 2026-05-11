@@ -40,27 +40,32 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("applying pragmas: %w", err)
 	}
 
+	notifyMigration("CreateAllTables")
 	if err := CreateAllTables(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("creating tables: %w", err)
 	}
 
+	notifyMigration("CreateAllIndexes")
 	if err := CreateAllIndexes(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("creating indexes: %w", err)
 	}
 
+	notifyMigration("CreateOtelTables")
 	if err := CreateOtelTables(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("creating OTel tables: %w", err)
 	}
 
+	notifyMigration("CreateOtelIndexes")
 	if err := CreateOtelIndexes(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("creating OTel indexes: %w", err)
 	}
 
 	// Idempotent migrations for columns added after initial schema.
+	notifyMigration("alter-columns")
 	db.Exec(`ALTER TABLE sessions ADD COLUMN title TEXT`)
 	db.Exec(`ALTER TABLE sessions ADD COLUMN active_feature_id TEXT`)
 	db.Exec(`ALTER TABLE sessions ADD COLUMN updated_at DATETIME`)
@@ -113,6 +118,7 @@ func Open(dbPath string) (*sql.DB, error) {
 	// tool_call events (agent_id='human' with non-UserQuery tool_name).
 	// SQLite cannot add CHECK constraints via ALTER TABLE, so we use copy-and-swap
 	// guarded by the metadata table to make it idempotent.
+	notifyMigration("migrateAgentEventsAddCheckConstraint")
 	if err := migrateAgentEventsAddCheckConstraint(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate agent_events check constraint: %w", err)
@@ -138,6 +144,7 @@ func Open(dbPath string) (*sql.DB, error) {
 		}
 	}
 
+	notifyMigration("NormalizePlanFeedbackValues")
 	if err := NormalizePlanFeedbackValues(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("normalize plan_feedback values: %w", err)
