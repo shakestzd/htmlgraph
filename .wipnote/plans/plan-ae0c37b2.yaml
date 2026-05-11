@@ -8,7 +8,7 @@ meta:
     status: active
     priority: high
     created_by: codex
-    version: 2
+    version: 3
 design:
     problem: |
         Recurring SQLITE_BUSY failures block routine CLI operations such as plan critique while dashboard, collectors, hooks, or indexers are active. The current architecture opens SQLite for commands that should be able to read canonical YAML/HTML directly, runs DDL and migrations on every db.Open, and allows several independent processes to compete as writers. The project is local-first and must remain self-contained; PostgreSQL or another external service is not an acceptable fix.
@@ -57,13 +57,18 @@ slices:
       effort: S
       risk: Low
       tests: |
-        Unit: TestPlanCritique_YAMLDoesNotOpenDB creates a YAML plan and a locked DB; assert critique JSON succeeds.
-        Unit: TestPlanValidate_YAMLDoesNotOpenDB creates a valid YAML plan and a locked DB; assert validation succeeds.
+        Unit: TestPlanCritique_YAMLDoesNotOpenDB injects an open-factory spy; assert no `workitem.Open` or `db.Open` call for YAML plans.
+        Unit: TestPlanValidate_YAMLDoesNotOpenDB injects an open-factory spy; assert no `workitem.Open` or `db.Open` call for YAML plans.
+        Integration: locked SQLite DB fixture is secondary proof that critique/validate still succeed.
         Regression: existing plan_critique and plan_lifecycle tests still pass.
       approved: false
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: execution-critic
+          severity: LOW
+          summary: Prefer deterministic open-factory instrumentation over only locked-DB fixtures so the test proves no DB open, not just lock tolerance.
     - id: slice-2
       num: 2
       title: Split SQLite open modes
@@ -93,16 +98,24 @@ slices:
         - A new no-migration writable/existing helper applies only connection pragmas needed for normal reads/writes.
         - At least four read-heavy CLI commands use the read-only/no-migration path.
         - Tests fail if read-only helpers execute DDL.
+        - Read-only CLI/API paths close rows and transactions promptly; diagnostics can identify reader-blocked writer cases.
       effort: M
       risk: Med
       tests: |
-        Unit: TestOpenReadOnly_NoDDL uses an authorizer or locked DB fixture to prove no CREATE/ALTER/DROP statements run.
+        Unit: TestOpenReadOnly_NoDDL uses an authorizer or statement recorder to prove no CREATE/ALTER/DROP statements run.
         Unit: TestOpenExisting_NoMigrations verifies warm open does not call migration hooks.
         Regression: statusline, graph, trace, related command tests still pass.
       approved: false
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: architecture-critic
+          severity: LOW
+          summary: The plan must also prevent long-lived read transactions from blocking the single writer in DELETE mode.
+        - source: execution-critic
+          severity: LOW
+          summary: Prefer deterministic statement instrumentation over locked-DB-only proof for no-DDL behavior.
     - id: slice-3
       num: 3
       title: Version-gated migrations with PRAGMA user_version
@@ -129,18 +142,24 @@ slices:
       done_when:
         - Warm migrated DB open executes no CREATE, ALTER, DROP, trigger, or normalization UPDATE statements.
         - Fresh DB creation produces the same schema as the current code.
-        - Old DB fixtures migrate to the current schema and set `PRAGMA user_version`.
+        - Fixture DBs at user_version 0, N-1, and pre-agent_events-copy-swap migrate to the current schema and set `PRAGMA user_version`.
         - The copy-and-swap `agent_events` migration runs at most once per DB.
+        - Migration runner exposes per-step names so tests can assert exact applied migrations.
       effort: L
       risk: High
       tests: |
-        Unit: TestOpenWarmDB_SkipsDDL counts statements or uses a locked writer fixture and expects warm open to succeed.
-        Unit: TestMigrateFromLegacyUserVersion applies representative old schemas and verifies final columns/indexes.
+        Unit: TestOpenWarmDB_SkipsDDL uses a statement recorder/authorizer to assert zero schema-changing statements.
+        Unit: TestMigrateFromLegacyUserVersion applies explicit fixture DBs at user_version 0, N-1, and pre-copy-swap schemas.
+        Integration: locked writer fixture is secondary proof that warm open succeeds without schema work.
         Regression: full internal/db package tests, plan feedback normalization tests, and OTel schema tests pass.
       approved: false
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: execution-critic
+          severity: MED
+          summary: Migration tests need explicit fixtures and step-name assertions rather than vague "representative old schemas".
     - id: slice-4
       num: 4
       title: WAL-safe cache path selection and diagnostics
@@ -155,7 +174,9 @@ slices:
       why: |
         The existing cache-dir fix assumes `os.UserCacheDir()` is WAL-safe, but in
         the current devcontainer it is overlayfs and the DB falls back to DELETE
-        mode. The path decision must be evidence-based and visible.
+        mode. The path decision must be evidence-based and visible. WAL-safe path
+        selection improves concurrency when available; correctness must still come
+        from canonical-first persistence and the single-writer model.
       files:
         - internal/storage/dbpath.go
         - internal/storage/dbpath_test.go
@@ -170,11 +191,13 @@ slices:
         - On tmpfs/ext4 candidates, a new DB uses WAL.
         - On overlayfs/unsafe candidates, diagnostics say DELETE mode is intentional.
         - Existing `WIPNOTE_DB_PATH` override keeps precedence and is never silently moved.
+        - If filesystem type cannot be determined, path selection uses a deterministic fallback and emits `fstype=unknown` diagnostics.
       effort: M
       risk: Med
       tests: |
         Unit: TestCanonicalDBPath_PrefersWalSafeCandidate with injectable filesystem probe.
         Unit: TestCanonicalDBPath_OverrideWins verifies WIPNOTE_DB_PATH is preserved.
+        Unit: TestCanonicalDBPath_UnknownProbeDeterministic verifies unknown fstype fallback and reason rendering.
         Integration: status fixture verifies fstype and journal mode are rendered.
       approved: false
       comment: ""
@@ -183,95 +206,245 @@ slices:
       questions:
         - id: q-ephemeral-cache
           text: May wipnote prefer tmpfs for the derived SQLite cache when user cache is WAL-unsafe?
+        - id: q-cold-reindex-cost
+          text: Is an ephemeral tmpfs cache acceptable if it increases cold-start reindex frequency?
+      critic_revisions:
+        - source: architecture-critic
+          severity: MED
+          summary: WAL-safe path selection is useful but not required for correctness; single-writer plus canonical-first must carry correctness.
+        - source: execution-critic
+          severity: MED
+          summary: Add deterministic unknown-fstype behavior and diagnostics for platform-specific probe failures.
     - id: slice-5
       num: 5
-      title: Single local SQLite writer service
+      title: Writable SQLite call-site inventory and enforcement boundary
       what: |
-        Add a self-contained writer service owned by `wipnote serve` or a small
-        `wipnote daemon` subcommand. The service holds the migrated writable DB
-        connection and serializes SQLite mutations through a bounded queue. Hooks,
-        collectors, and CLI commands that only need to record events should append
-        canonical HTML/NDJSON or send a local request to the writer; if the writer
-        is unavailable, they persist to canonical files and a later reindex catches
-        up. Start with event/index writes, not every work-item mutation.
+        Audit every writable SQLite call site and classify it as one of:
+        daemon-routed, canonical-only, reindex-only, migration-only, or intentional
+        CLI work-item mutation. Add an enforcement test/static check that fails
+        when hook, collector, indexer, or event-capture paths open a writable DB
+        directly outside the approved boundary. Document the approved write paths
+        in code comments near the DB open helpers.
       why: |
-        SQLite supports only one writer at a time. The industry-standard embedded
-        answer is to serialize writes in the application instead of letting many
-        short-lived processes fight over file locks. This keeps wipnote
-        self-contained while removing the contention class.
+        A single writer service only removes contention if stray writers are
+        found and prevented. Without an inventory and enforcement boundary, the
+        codebase can end with both a queue and direct writable DB opens, recreating
+        the same SQLITE_BUSY class.
       files:
-        - cmd/wipnote/daemon.go
-        - cmd/wipnote/serve_child.go
-        - internal/db/writequeue
+        - internal/db/open_modes.go
+        - internal/storage/dbpath_test.go
+        - cmd/wipnote/sqlite_write_boundary_test.go
         - internal/hooks/runner.go
         - internal/otel/indexer/indexer.go
         - internal/otel/receiver/writer.go
-        - plugin/hooks/hooks.json
       deps:
         - 2
         - 3
-        - 4
       done_when:
-        - There is exactly one process-local owner for SQLite event/index writes during a normal dashboard session.
-        - Hook event capture does not fail user work when the SQLite writer is busy or unavailable.
-        - Queued writes are bounded and backpressure/fallback behavior is visible.
-        - Reindex can rebuild missed derived rows from canonical HTML/NDJSON.
-      effort: L
+        - All writable SQLite call sites are listed and classified in a checked-in inventory or test fixture.
+        - Hook, collector, indexer, and event-capture paths have no direct migrated writable DB opens.
+        - Enforcement test fails on new direct writable opens in forbidden paths.
+        - Reindex and migration paths are explicitly exempted and documented.
+      effort: M
+      risk: High
+      tests: |
+        Unit: TestWritableDBOpenBoundary scans production Go files and rejects direct migrated writable opens from hook/collector/event paths.
+        Unit: TestWriteSiteInventoryComplete compares known write sites against the checked-in classification list.
+        Regression: existing storage/dbpath literal-path guard still passes.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      critic_revisions:
+        - source: architecture-critic
+          severity: HIGH
+          summary: Exactly-one-writer must be enforceable across all producers, not aspirational or limited to new queue users.
+    - id: slice-6
+      num: 6
+      title: Single local writer transport for event/index writes
+      what: |
+        Add a self-contained writer service owned by `wipnote serve` first, with
+        an internal abstraction that can later move to a separate `wipnote daemon`
+        if needed. The service holds the migrated writable DB connection and
+        serializes event/index SQLite mutations through a bounded queue. Producers
+        submit best-effort derived-index updates only after canonical persistence
+        has succeeded; SQLite is never the sole durable copy.
+      why: |
+        SQLite supports only one writer at a time. The embedded/self-contained
+        pattern is to serialize writes in the application while keeping canonical
+        files durable. Starting inside `serve` avoids adding a second lifecycle
+        problem before the queue contract is proven.
+      files:
+        - cmd/wipnote/serve_child.go
+        - internal/db/writequeue
+        - internal/otel/indexer/indexer.go
+        - internal/otel/receiver/writer.go
+        - cmd/wipnote/api_collector_status.go
+      deps:
+        - 2
+        - 3
+        - 5
+      done_when:
+        - During a normal dashboard session, event/index writes have exactly one writable SQLite owner.
+        - Queue accepts concurrent producer submissions and commits them in one serialized transaction stream.
+        - Queue is bounded and exposes queue_full/timeout/writer_unavailable outcomes.
+        - No event/index write path can acknowledge success before canonical persistence.
+      effort: M
       risk: High
       tests: |
         Unit: TestWriteQueue_SerializesConcurrentProducers runs many producers and asserts one transaction stream.
-        Integration: concurrent hooks plus active dashboard produce zero SQLITE_BUSY errors.
-        Regression: reindex from canonical files restores rows after daemon-disabled fallback.
+        Unit: TestWriteQueue_BoundedBackpressure verifies queue_full and timeout outcomes.
+        Integration: active dashboard plus concurrent event producers produce no direct SQLITE_BUSY from event/index writes.
       approved: false
       comment: ""
       approval_status: pending
       execution_status: not_started
       questions:
         - id: q-service-owner
-          text: Should the single writer live inside `wipnote serve` first, or as a separate `wipnote daemon` process?
-    - id: slice-6
-      num: 6
-      title: Canonical-first fallback and rebuild guarantees
+          text: Should the single writer remain inside `wipnote serve` for v1, or graduate to a separate `wipnote daemon` process after the queue contract is proven?
+      critic_revisions:
+        - source: architecture-critic
+          severity: HIGH
+          summary: Canonical persistence must happen before or independent of writer RPC; SQLite updates are best-effort derived-index writes only.
+        - source: architecture-critic
+          severity: MED
+          summary: Single-writer correctness must not depend on WAL-safe cache path selection.
+    - id: slice-7
+      num: 7
+      title: Hook and indexer integration with canonical-first fallback
       what: |
-        Strengthen the guarantee that SQLite is disposable by auditing commands
-        and event paths for canonical-file fallbacks. Add tests that delete or
-        lock the SQLite cache and verify core operations either succeed from
-        YAML/HTML/NDJSON or fail loudly with a rebuild instruction. Improve
-        `wipnote reindex` so it can restore plan/work-item/session/query state
-        needed by the dashboard after cache deletion.
+        Route hook event capture and NDJSON indexer updates through the writer
+        transport from slice 6. Hooks, collectors, and CLI event producers always
+        persist canonical HTML/NDJSON first; SQLite updates are best-effort via
+        the local writer and never the sole durable store. If writer RPC/IPC fails,
+        times out, or the queue is full, ingestion still returns success after
+        canonical append and records a visible fallback reason.
       why: |
-        A single-writer derived index only works if the product can tolerate the
-        index being missing, locked, stale, or rebuilt. This slice turns the
-        architecture slogan into enforced behavior.
+        The writer service becomes safe only when integrated producers treat it as
+        a derived-index accelerator, not as durability. This protects user work
+        from writer outages and keeps reindex as the recovery mechanism.
       files:
-        - cmd/wipnote/reindex.go
-        - cmd/wipnote/reindex_sessions.go
+        - internal/hooks/runner.go
+        - internal/hooks/session_html.go
+        - internal/otel/indexer/indexer.go
+        - internal/otel/sink/ndjson
+        - plugin/hooks/hooks.json
+        - cmd/wipnote/hook.go
+      deps:
+        - 6
+      done_when:
+        - If writer RPC/IPC fails, hook/event ingestion still returns success after appending canonical HTML/NDJSON.
+        - If the queue is full, hook/event ingestion falls back without user-visible hook failure.
+        - 'Fallback path records a reason: `writer_unavailable`, `queue_full`, or `timeout`.'
+        - Replay/reindex from fallback artifacts is idempotent.
+      effort: L
+      risk: High
+      tests: |
+        Integration: TestWriterUnavailable_FallsBackToCanonicalAppend disables the writer and verifies canonical append plus successful hook return.
+        Integration: TestQueueFull_FallsBackWithoutUserVisibleFailure fills the queue and verifies fallback reason is recorded.
+        Integration: TestReplayAfterFallback_IsIdempotent replays fallback artifacts twice and verifies no duplicate derived rows.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      critic_revisions:
+        - source: execution-critic
+          severity: HIGH
+          summary: Fallback behavior must be concrete and testable; writer unavailable, queue full, and replay idempotence need acceptance coverage.
+        - source: architecture-critic
+          severity: HIGH
+          summary: No event/index write path may use SQLite as the only durable copy.
+    - id: slice-8
+      num: 8
+      title: Canonical command audit and fail-loud DB dependency
+      what: |
+        Audit core CLI commands and classify whether they can answer from
+        YAML/HTML/NDJSON without SQLite. Convert the highest-value commands to
+        canonical-first behavior and make remaining SQLite-dependent commands fail
+        loudly with a clear reason plus retry/reindex guidance when the DB is
+        locked or missing.
+      why: |
+        Users should not lose access to canonical project knowledge because the
+        derived index is locked. This slice broadens the slice-1 pattern beyond
+        plan critique/validate without mixing it with full rebuild guarantees.
+      files:
         - cmd/wipnote/find.go
         - cmd/wipnote/status.go
+        - cmd/wipnote/plan_show.go
+        - cmd/wipnote/wip.go
         - internal/htmlparse
-        - internal/otel/indexer
         - internal/storage
       deps:
         - 1
         - 2
-        - 3
       done_when:
-        - Deleting the SQLite cache and running reindex restores dashboard-critical rows.
-        - Locking the DB does not break YAML/HTML-native commands.
-        - Commands that still require SQLite explain the dependency and suggest reindex/retry.
-        - A documented smoke test covers cache deletion, rebuild, and dashboard load.
+        - At least five core commands are classified as canonical-first or SQLite-required.
+        - YAML/HTML-native commands work while SQLite is locked.
+        - SQLite-required commands surface a non-silent error with retry/reindex guidance.
+        - No command returns partial/truncated output after a DB open failure.
       effort: M
       risk: Med
       tests: |
-        Integration: TestCacheDeletion_ReindexRestoresDashboardData deletes the cache DB and runs reindex.
-        Integration: TestLockedDB_CanonicalCommandsStillWork locks SQLite and runs plan critique/validate/show.
+        Integration: TestLockedDB_CanonicalCommandsStillWork locks SQLite and runs plan critique/validate/show plus selected canonical commands.
+        Integration: TestSQLiteRequiredCommand_FailsLoudly verifies no partial output on DB open failure.
+        Regression: existing find/status/wip behavior remains stable when DB is healthy.
+      approved: false
+      comment: ""
+      approval_status: pending
+      execution_status: not_started
+      critic_revisions:
+        - source: execution-critic
+          severity: HIGH
+          summary: Canonical command behavior should be separated from full derived-index rebuild so each has crisp acceptance criteria.
+    - id: slice-9
+      num: 9
+      title: Reindex rebuild guarantees for dashboard-critical rows
+      what: |
+        Improve `wipnote reindex` so deleting the SQLite cache and rebuilding from
+        canonical files restores a named minimal dashboard dataset: plans, work
+        items, graph edges, sessions, recent agent events, OTel-derived events,
+        and collector status where canonical artifacts contain the needed data.
+        Document any data that is intentionally cache-only and remove it from
+        launch-critical views.
+      why: |
+        A disposable SQLite index is only credible if rebuild coverage is explicit
+        and tested. This slice proves cache deletion is a recovery path rather
+        than a slogan.
+      files:
+        - cmd/wipnote/reindex.go
+        - cmd/wipnote/reindex_sessions.go
+        - internal/htmlparse
+        - internal/otel/indexer
+        - cmd/wipnote/api_events.go
+        - cmd/wipnote/api_collector_status.go
+      deps:
+        - 7
+        - 8
+      done_when:
+        - Deleting the SQLite cache and running reindex restores plans, work items, graph edges, sessions, recent agent events, OTel-derived events, and collector status where canonical artifacts exist.
+        - Daemon unavailable/crash during a write still leaves canonical artifacts sufficient for full reindex.
+        - Dashboard smoke endpoints load after cache deletion and reindex.
+        - Reindex is idempotent across repeated runs.
+      effort: L
+      risk: High
+      tests: |
+        Integration: TestCacheDeletion_ReindexRestoresDashboardCriticalRows deletes the cache DB and asserts named tables/views are restored.
+        Integration: TestDaemonCrashDuringWrite_ReindexRecovers simulates writer crash after canonical append and verifies reindex recovery.
+        Integration: dashboard smoke checks specific endpoints/views after rebuild instead of vague page load.
         Regression: existing reindex and session roundtrip tests still pass.
       approved: false
       comment: ""
       approval_status: pending
       execution_status: not_started
-    - id: slice-7
-      num: 7
+      critic_revisions:
+        - source: architecture-critic
+          severity: MED
+          summary: Rebuild guarantees must validate the writer-service failure mode, so this depends on writer integration.
+        - source: execution-critic
+          severity: MED
+          summary: Define the dashboard-critical dataset explicitly; avoid vague "query state" acceptance.
+    - id: slice-10
+      num: 10
       title: Contention observability and regression gate
       what: |
         Add lightweight observability for SQLite contention: count SQLITE_BUSY
@@ -291,21 +464,30 @@ slices:
         - cmd/wipnote/api_collector_status.go
         - cmd/wipnote/sqlite_contention_test.go
       deps:
-        - 5
-        - 6
+        - 7
+        - 9
       done_when:
         - '`wipnote status` or `wipnote health` reports recent SQLITE_BUSY count and journal mode.'
-        - Stress fixture reproduces the old multi-writer workload.
-        - Stress fixture passes without SQLITE_BUSY after the single-writer path is enabled.
+        - Stress fixture reproduces the old multi-writer workload with 20 producers for 30 seconds across hooks, indexer, dashboard reads, and CLI writes.
+        - Stress fixture passes with zero SQLITE_BUSY across 3 consecutive runs after the single-writer path is enabled.
+        - Regression test fails if any direct writable DB open remains in hook/collector/event paths.
         - Launch readiness checklist references this gate before release.
       effort: M
       risk: Med
       tests: |
         Integration: TestSQLiteContentionStress starts dashboard/indexer plus concurrent CLI writes and expects zero SQLITE_BUSY.
         Unit: TestBusyCounterClassifiesErrors verifies wrapped SQLite lock errors increment the right counter.
+        Regression: TestNoDirectWritableDBOpenInEventPaths fails on forbidden direct writable DB opens.
         Regression: health/status output remains stable for existing callers.
       approved: false
       comment: ""
       approval_status: pending
       execution_status: not_started
+      critic_revisions:
+        - source: architecture-critic
+          severity: HIGH
+          summary: Stress gate must enforce the no-stray-writers boundary, not just observe queue behavior.
+        - source: execution-critic
+          severity: LOW
+          summary: Stress workload needs explicit producer count, duration, and pass threshold to avoid flaky CI semantics.
 questions: []

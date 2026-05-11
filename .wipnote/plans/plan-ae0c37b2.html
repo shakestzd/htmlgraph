@@ -430,21 +430,42 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <li>
       <a href="#slice-5" class="slice-nav-item" data-slice-nav="5">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="5"></span>
-        <span>#5 Single local SQLite writer service</span>
+        <span>#5 Writable SQLite call-site inventory and enforcement boundary</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-6" class="slice-nav-item" data-slice-nav="6">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="6"></span>
-        <span>#6 Canonical-first fallback and rebuild guarantees</span>
+        <span>#6 Single local writer transport for event/index writes</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-7" class="slice-nav-item" data-slice-nav="7">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="7"></span>
-        <span>#7 Contention observability and regression gate</span>
+        <span>#7 Hook and indexer integration with canonical-first fallback</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-8" class="slice-nav-item" data-slice-nav="8">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="8"></span>
+        <span>#8 Canonical command audit and fail-loud DB dependency</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-9" class="slice-nav-item" data-slice-nav="9">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="9"></span>
+        <span>#9 Reindex rebuild guarantees for dashboard-critical rows</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-10" class="slice-nav-item" data-slice-nav="10">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="10"></span>
+        <span>#10 Contention observability and regression gate</span>
       </a>
     </li>
     
@@ -466,7 +487,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </p>
   <div class="meta">
     <span class="badge badge-revision">Active</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 7 slices · Created 2026-05-11</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v3 · 10 slices · Created 2026-05-11</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -490,9 +511,12 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <div data-node="2" data-name="Split SQLite open modes" data-status="pending" data-deps="1" data-files="7"></div>
     <div data-node="3" data-name="Version-gated migrations with PRAGMA user_version" data-status="pending" data-deps="2" data-files="5"></div>
     <div data-node="4" data-name="WAL-safe cache path selection and diagnostics" data-status="pending" data-deps="2" data-files="6"></div>
-    <div data-node="5" data-name="Single local SQLite writer service" data-status="pending" data-deps="2,3,4" data-files="7"></div>
-    <div data-node="6" data-name="Canonical-first fallback and rebuild guarantees" data-status="pending" data-deps="1,2,3" data-files="7"></div>
-    <div data-node="7" data-name="Contention observability and regression gate" data-status="pending" data-deps="5,6" data-files="6"></div>
+    <div data-node="5" data-name="Writable SQLite call-site inventory and enforcement boundary" data-status="pending" data-deps="2,3" data-files="6"></div>
+    <div data-node="6" data-name="Single local writer transport for event/index writes" data-status="pending" data-deps="2,3,5" data-files="5"></div>
+    <div data-node="7" data-name="Hook and indexer integration with canonical-first fallback" data-status="pending" data-deps="6" data-files="6"></div>
+    <div data-node="8" data-name="Canonical command audit and fail-loud DB dependency" data-status="pending" data-deps="1,2" data-files="6"></div>
+    <div data-node="9" data-name="Reindex rebuild guarantees for dashboard-critical rows" data-status="pending" data-deps="7,8" data-files="6"></div>
+    <div data-node="10" data-name="Contention observability and regression gate" data-status="pending" data-deps="7,9" data-files="6"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -552,7 +576,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <span class="badge badge-pending badge-sm">Low</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -635,7 +659,12 @@ should not require the derived index.</p>
           
           <div class="test-group" data-kind="unit">
             <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestPlanCritique_YAMLDoesNotOpenDB creates a YAML plan and a locked DB; assert critique JSON succeeds.</li><li>TestPlanValidate_YAMLDoesNotOpenDB creates a valid YAML plan and a locked DB; assert validation succeeds.</li></ul>
+            <ul><li>TestPlanCritique_YAMLDoesNotOpenDB injects an open-factory spy; assert no `workitem.Open` or `db.Open` call for YAML plans.</li><li>TestPlanValidate_YAMLDoesNotOpenDB injects an open-factory spy; assert no `workitem.Open` or `db.Open` call for YAML plans.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>locked SQLite DB fixture is secondary proof that critique/validate still succeed.</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
@@ -649,6 +678,19 @@ should not require the derived index.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Prefer deterministic open-factory instrumentation over only locked-DB fixtures so the test proves no DB open, not just lock tolerance.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -675,7 +717,7 @@ should not require the derived index.</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -739,7 +781,7 @@ express intent and prevents accidental DDL on read paths.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>A new read-only open helper returns a `*sql.DB` without running schema creation.</li><li>A new no-migration writable/existing helper applies only connection pragmas needed for normal reads/writes.</li><li>At least four read-heavy CLI commands use the read-only/no-migration path.</li><li>Tests fail if read-only helpers execute DDL.</li></ul>
+        <ul class="slice-done-list"><li>A new read-only open helper returns a `*sql.DB` without running schema creation.</li><li>A new no-migration writable/existing helper applies only connection pragmas needed for normal reads/writes.</li><li>At least four read-heavy CLI commands use the read-only/no-migration path.</li><li>Tests fail if read-only helpers execute DDL.</li><li>Read-only CLI/API paths close rows and transactions promptly; diagnostics can identify reader-blocked writer cases.</li></ul>
       </div>
       
     
@@ -754,7 +796,7 @@ express intent and prevents accidental DDL on read paths.</p>
           
           <div class="test-group" data-kind="unit">
             <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestOpenReadOnly_NoDDL uses an authorizer or locked DB fixture to prove no CREATE/ALTER/DROP statements run.</li><li>TestOpenExisting_NoMigrations verifies warm open does not call migration hooks.</li></ul>
+            <ul><li>TestOpenReadOnly_NoDDL uses an authorizer or statement recorder to prove no CREATE/ALTER/DROP statements run.</li><li>TestOpenExisting_NoMigrations verifies warm open does not call migration hooks.</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
@@ -768,6 +810,25 @@ express intent and prevents accidental DDL on read paths.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">The plan must also prevent long-lived read transactions from blocking the single writer in DELETE mode.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Prefer deterministic statement instrumentation over locked-DB-only proof for no-DDL behavior.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -794,7 +855,7 @@ express intent and prevents accidental DDL on read paths.</p>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -861,7 +922,7 @@ standard SQLite pattern for keeping warm opens cheap and predictable.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Warm migrated DB open executes no CREATE, ALTER, DROP, trigger, or normalization UPDATE statements.</li><li>Fresh DB creation produces the same schema as the current code.</li><li>Old DB fixtures migrate to the current schema and set `PRAGMA user_version`.</li><li>The copy-and-swap `agent_events` migration runs at most once per DB.</li></ul>
+        <ul class="slice-done-list"><li>Warm migrated DB open executes no CREATE, ALTER, DROP, trigger, or normalization UPDATE statements.</li><li>Fresh DB creation produces the same schema as the current code.</li><li>Fixture DBs at user_version 0, N-1, and pre-agent_events-copy-swap migrate to the current schema and set `PRAGMA user_version`.</li><li>The copy-and-swap `agent_events` migration runs at most once per DB.</li><li>Migration runner exposes per-step names so tests can assert exact applied migrations.</li></ul>
       </div>
       
     
@@ -876,7 +937,12 @@ standard SQLite pattern for keeping warm opens cheap and predictable.</p>
           
           <div class="test-group" data-kind="unit">
             <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestOpenWarmDB_SkipsDDL counts statements or uses a locked writer fixture and expects warm open to succeed.</li><li>TestMigrateFromLegacyUserVersion applies representative old schemas and verifies final columns/indexes.</li></ul>
+            <ul><li>TestOpenWarmDB_SkipsDDL uses a statement recorder/authorizer to assert zero schema-changing statements.</li><li>TestMigrateFromLegacyUserVersion applies explicit fixture DBs at user_version 0, N-1, and pre-copy-swap schemas.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>locked writer fixture is secondary proof that warm open succeeds without schema work.</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
@@ -890,6 +956,19 @@ standard SQLite pattern for keeping warm opens cheap and predictable.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Migration tests need explicit fixtures and step-name assertions rather than vague &#34;representative old schemas&#34;.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -916,8 +995,8 @@ standard SQLite pattern for keeping warm opens cheap and predictable.</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
-          
-          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
+          <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
@@ -968,7 +1047,9 @@ on the single-writer design rather than pretending concurrency is solved.</p>
           
           <div class="markdown-block serif-prose"><p>The existing cache-dir fix assumes <code>os.UserCacheDir()</code> is WAL-safe, but in
 the current devcontainer it is overlayfs and the DB falls back to DELETE
-mode. The path decision must be evidence-based and visible.</p>
+mode. The path decision must be evidence-based and visible. WAL-safe path
+selection improves concurrency when available; correctness must still come
+from canonical-first persistence and the single-writer model.</p>
 </div>
           
         </div>
@@ -983,7 +1064,7 @@ mode. The path decision must be evidence-based and visible.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Status output shows DB path, filesystem type, and effective journal_mode.</li><li>On tmpfs/ext4 candidates, a new DB uses WAL.</li><li>On overlayfs/unsafe candidates, diagnostics say DELETE mode is intentional.</li><li>Existing `WIPNOTE_DB_PATH` override keeps precedence and is never silently moved.</li></ul>
+        <ul class="slice-done-list"><li>Status output shows DB path, filesystem type, and effective journal_mode.</li><li>On tmpfs/ext4 candidates, a new DB uses WAL.</li><li>On overlayfs/unsafe candidates, diagnostics say DELETE mode is intentional.</li><li>Existing `WIPNOTE_DB_PATH` override keeps precedence and is never silently moved.</li><li>If filesystem type cannot be determined, path selection uses a deterministic fallback and emits `fstype=unknown` diagnostics.</li></ul>
       </div>
       
     
@@ -997,8 +1078,8 @@ mode. The path decision must be evidence-based and visible.</p>
         <div class="test-strategy">
           
           <div class="test-group" data-kind="unit">
-            <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestCanonicalDBPath_PrefersWalSafeCandidate with injectable filesystem probe.</li><li>TestCanonicalDBPath_OverrideWins verifies WIPNOTE_DB_PATH is preserved.</li></ul>
+            <span class="test-chip">UNIT &middot; 3</span>
+            <ul><li>TestCanonicalDBPath_PrefersWalSafeCandidate with injectable filesystem probe.</li><li>TestCanonicalDBPath_OverrideWins verifies WIPNOTE_DB_PATH is preserved.</li><li>TestCanonicalDBPath_UnknownProbeDeterministic verifies unknown fstype fallback and reason rendering.</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
@@ -1012,6 +1093,25 @@ mode. The path decision must be evidence-based and visible.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">WAL-safe path selection is useful but not required for correctness; single-writer plus canonical-first must carry correctness.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Add deterministic unknown-fstype behavior and diagnostics for platform-specific probe failures.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -1030,6 +1130,17 @@ mode. The path decision must be evidence-based and visible.</p>
           
         </div>
         
+        <div class="question-block slice-question-block">
+          <p>Is an ephemeral tmpfs cache acceptable if it increases cold-start reindex frequency?</p>
+          
+          
+          <textarea
+            data-section="slice-4-question-q-cold-reindex-cost"
+            data-comment-for="slice-4-question-q-cold-reindex-cost"
+            placeholder="Answer question q-cold-reindex-cost..."></textarea>
+          
+        </div>
+        
       </div>
     </div>
     
@@ -1045,19 +1156,19 @@ mode. The path decision must be evidence-based and visible.</p>
   </div>
 </details>
 <details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 5: Single local SQLite writer service">
+  <summary class="slice-summary" aria-label="Slice 5: Writable SQLite call-site inventory and enforcement boundary">
     <span class="slice-num">#5</span>
     <span class="slice-title-col">
-      <span class="slice-name">Single local SQLite writer service</span>
-      <span class="slice-preview">Add a self-contained writer service owned by wipnote serve or a small</span>
+      <span class="slice-name">Writable SQLite call-site inventory and enforcement boundary</span>
+      <span class="slice-preview">Audit every writable SQLite call site and classify it as one of:</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
-          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-5">Pending</span>
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
-          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
@@ -1088,13 +1199,12 @@ mode. The path decision must be evidence-based and visible.</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-5-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>Add a self-contained writer service owned by <code>wipnote serve</code> or a small
-<code>wipnote daemon</code> subcommand. The service holds the migrated writable DB
-connection and serializes SQLite mutations through a bounded queue. Hooks,
-collectors, and CLI commands that only need to record events should append
-canonical HTML/NDJSON or send a local request to the writer; if the writer
-is unavailable, they persist to canonical files and a later reindex catches
-up. Start with event/index writes, not every work-item mutation.</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Audit every writable SQLite call site and classify it as one of:
+daemon-routed, canonical-only, reindex-only, migration-only, or intentional
+CLI work-item mutation. Add an enforcement test/static check that fails
+when hook, collector, indexer, or event-capture paths open a writable DB
+directly outside the approved boundary. Document the approved write paths
+in code comments near the DB open helpers.</p>
 </div>
           <label for="slice-5-what-reveal" class="reveal-label">Show full description</label>
           
@@ -1106,10 +1216,10 @@ up. Start with event/index writes, not every work-item mutation.</p>
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>SQLite supports only one writer at a time. The industry-standard embedded
-answer is to serialize writes in the application instead of letting many
-short-lived processes fight over file locks. This keeps wipnote
-self-contained while removing the contention class.</p>
+          <div class="markdown-block serif-prose"><p>A single writer service only removes contention if stray writers are
+found and prevented. Without an inventory and enforcement boundary, the
+codebase can end with both a queue and direct writable DB opens, recreating
+the same SQLITE_BUSY class.</p>
 </div>
           
         </div>
@@ -1118,13 +1228,13 @@ self-contained while removing the contention class.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>cmd/wipnote/daemon.go, cmd/wipnote/serve_child.go, internal/db/writequeue, internal/hooks/runner.go, internal/otel/indexer/indexer.go, internal/otel/receiver/writer.go, plugin/hooks/hooks.json</code></div>
+        <div class="slice-field-value"><code>internal/db/open_modes.go, internal/storage/dbpath_test.go, cmd/wipnote/sqlite_write_boundary_test.go, internal/hooks/runner.go, internal/otel/indexer/indexer.go, internal/otel/receiver/writer.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>There is exactly one process-local owner for SQLite event/index writes during a normal dashboard session.</li><li>Hook event capture does not fail user work when the SQLite writer is busy or unavailable.</li><li>Queued writes are bounded and backpressure/fallback behavior is visible.</li><li>Reindex can rebuild missed derived rows from canonical HTML/NDJSON.</li></ul>
+        <ul class="slice-done-list"><li>All writable SQLite call sites are listed and classified in a checked-in inventory or test fixture.</li><li>Hook, collector, indexer, and event-capture paths have no direct migrated writable DB opens.</li><li>Enforcement test fails on new direct writable opens in forbidden paths.</li><li>Reindex and migration paths are explicitly exempted and documented.</li></ul>
       </div>
       
     
@@ -1138,18 +1248,13 @@ self-contained while removing the contention class.</p>
         <div class="test-strategy">
           
           <div class="test-group" data-kind="unit">
-            <span class="test-chip">UNIT &middot; 1</span>
-            <ul><li>TestWriteQueue_SerializesConcurrentProducers runs many producers and asserts one transaction stream.</li></ul>
-          </div>
-          
-          <div class="test-group" data-kind="integration">
-            <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>concurrent hooks plus active dashboard produce zero SQLITE_BUSY errors.</li></ul>
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestWritableDBOpenBoundary scans production Go files and rejects direct migrated writable opens from hook/collector/event paths.</li><li>TestWriteSiteInventoryComplete compares known write sites against the checked-in classification list.</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
             <span class="test-chip">REGRESSION &middot; 1</span>
-            <ul><li>reindex from canonical files restores rows after daemon-disabled fallback.</li></ul>
+            <ul><li>existing storage/dbpath literal-path guard still passes.</li></ul>
           </div>
           
         </div>
@@ -1159,28 +1264,23 @@ self-contained while removing the contention class.</p>
     
 
     
-
-    
-    <div class="slice-field slice-questions">
-      <div class="slice-field-label">Open Questions</div>
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
       <div class="slice-field-value">
         
-        <div class="question-block slice-question-block">
-          <p>Should the single writer live inside `wipnote serve` first, or as a separate `wipnote daemon` process?</p>
-          
-          
-          <textarea
-            data-section="slice-5-question-q-service-owner"
-            data-comment-for="slice-5-question-q-service-owner"
-            placeholder="Answer question q-service-owner..."></textarea>
-          
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">Exactly-one-writer must be enforceable across all producers, not aspirational or limited to new queue users.</span>
         </div>
         
       </div>
     </div>
     
 
-    <div class="slice-deps">Dependencies: slices 2,3,4</div>
+    
+
+    <div class="slice-deps">Dependencies: slices 2,3</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
@@ -1191,19 +1291,19 @@ self-contained while removing the contention class.</p>
   </div>
 </details>
 <details class="slice-card" id="slice-6" data-slice="6" data-slice-name="slice-6" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 6: Canonical-first fallback and rebuild guarantees">
+  <summary class="slice-summary" aria-label="Slice 6: Single local writer transport for event/index writes">
     <span class="slice-num">#6</span>
     <span class="slice-title-col">
-      <span class="slice-name">Canonical-first fallback and rebuild guarantees</span>
-      <span class="slice-preview">Strengthen the guarantee that SQLite is disposable by auditing commands</span>
+      <span class="slice-name">Single local writer transport for event/index writes</span>
+      <span class="slice-preview">Add a self-contained writer service owned by wipnote serve first, with</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-revision badge-sm">M</span>
-          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-6">Pending</span>
-          
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
+          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
@@ -1233,13 +1333,15 @@ self-contained while removing the contention class.</p>
         <div class="slice-field-label">What</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Strengthen the guarantee that SQLite is disposable by auditing commands
-and event paths for canonical-file fallbacks. Add tests that delete or
-lock the SQLite cache and verify core operations either succeed from
-YAML/HTML/NDJSON or fail loudly with a rebuild instruction. Improve
-<code>wipnote reindex</code> so it can restore plan/work-item/session/query state
-needed by the dashboard after cache deletion.</p>
+          <input type="checkbox" id="slice-6-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Add a self-contained writer service owned by <code>wipnote serve</code> first, with
+an internal abstraction that can later move to a separate <code>wipnote daemon</code>
+if needed. The service holds the migrated writable DB connection and
+serializes event/index SQLite mutations through a bounded queue. Producers
+submit best-effort derived-index updates only after canonical persistence
+has succeeded; SQLite is never the sole durable copy.</p>
 </div>
+          <label for="slice-6-what-reveal" class="reveal-label">Show full description</label>
           
         </div>
       </div>
@@ -1249,9 +1351,10 @@ needed by the dashboard after cache deletion.</p>
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>A single-writer derived index only works if the product can tolerate the
-index being missing, locked, stale, or rebuilt. This slice turns the
-architecture slogan into enforced behavior.</p>
+          <div class="markdown-block serif-prose"><p>SQLite supports only one writer at a time. The embedded/self-contained
+pattern is to serialize writes in the application while keeping canonical
+files durable. Starting inside <code>serve</code> avoids adding a second lifecycle
+problem before the queue contract is proven.</p>
 </div>
           
         </div>
@@ -1260,13 +1363,13 @@ architecture slogan into enforced behavior.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>cmd/wipnote/reindex.go, cmd/wipnote/reindex_sessions.go, cmd/wipnote/find.go, cmd/wipnote/status.go, internal/htmlparse, internal/otel/indexer, internal/storage</code></div>
+        <div class="slice-field-value"><code>cmd/wipnote/serve_child.go, internal/db/writequeue, internal/otel/indexer/indexer.go, internal/otel/receiver/writer.go, cmd/wipnote/api_collector_status.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Deleting the SQLite cache and running reindex restores dashboard-critical rows.</li><li>Locking the DB does not break YAML/HTML-native commands.</li><li>Commands that still require SQLite explain the dependency and suggest reindex/retry.</li><li>A documented smoke test covers cache deletion, rebuild, and dashboard load.</li></ul>
+        <ul class="slice-done-list"><li>During a normal dashboard session, event/index writes have exactly one writable SQLite owner.</li><li>Queue accepts concurrent producer submissions and commits them in one serialized transaction stream.</li><li>Queue is bounded and exposes queue_full/timeout/writer_unavailable outcomes.</li><li>No event/index write path can acknowledge success before canonical persistence.</li></ul>
       </div>
       
     
@@ -1279,14 +1382,14 @@ architecture slogan into enforced behavior.</p>
         
         <div class="test-strategy">
           
-          <div class="test-group" data-kind="integration">
-            <span class="test-chip">INTEGRATION &middot; 2</span>
-            <ul><li>TestCacheDeletion_ReindexRestoresDashboardData deletes the cache DB and runs reindex.</li><li>TestLockedDB_CanonicalCommandsStillWork locks SQLite and runs plan critique/validate/show.</li></ul>
+          <div class="test-group" data-kind="unit">
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestWriteQueue_SerializesConcurrentProducers runs many producers and asserts one transaction stream.</li><li>TestWriteQueue_BoundedBackpressure verifies queue_full and timeout outcomes.</li></ul>
           </div>
           
-          <div class="test-group" data-kind="regression">
-            <span class="test-chip">REGRESSION &middot; 1</span>
-            <ul><li>existing reindex and session roundtrip tests still pass.</li></ul>
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 1</span>
+            <ul><li>active dashboard plus concurrent event producers produce no direct SQLITE_BUSY from event/index writes.</li></ul>
           </div>
           
         </div>
@@ -1296,10 +1399,47 @@ architecture slogan into enforced behavior.</p>
     
 
     
-
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">Canonical persistence must happen before or independent of writer RPC; SQLite updates are best-effort derived-index writes only.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">Single-writer correctness must not depend on WAL-safe cache path selection.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
-    <div class="slice-deps">Dependencies: slices 1,2,3</div>
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Should the single writer remain inside `wipnote serve` for v1, or graduate to a separate `wipnote daemon` process after the queue contract is proven?</p>
+          
+          
+          <textarea
+            data-section="slice-6-question-q-service-owner"
+            data-comment-for="slice-6-question-q-service-owner"
+            placeholder="Answer question q-service-owner..."></textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: slices 2,3,5</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
@@ -1310,18 +1450,18 @@ architecture slogan into enforced behavior.</p>
   </div>
 </details>
 <details class="slice-card" id="slice-7" data-slice="7" data-slice-name="slice-7" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 7: Contention observability and regression gate">
+  <summary class="slice-summary" aria-label="Slice 7: Hook and indexer integration with canonical-first fallback">
     <span class="slice-num">#7</span>
     <span class="slice-title-col">
-      <span class="slice-name">Contention observability and regression gate</span>
-      <span class="slice-preview">Add lightweight observability for SQLite contention: count SQLITEBUSY</span>
+      <span class="slice-name">Hook and indexer integration with canonical-first fallback</span>
+      <span class="slice-preview">Route hook event capture and NDJSON indexer updates through the writer</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
-          <span class="badge badge-revision badge-sm">M</span>
-          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-7">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -1336,6 +1476,410 @@ architecture slogan into enforced behavior.</p>
             </label>
             <label class="seg-btn seg-reject" title="Reject">
               <input type="radio" name="slice-7-approval" value="rejected" data-section="slice-7" data-action="approve" aria-label="Reject slice 7">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-7-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Route hook event capture and NDJSON indexer updates through the writer
+transport from slice 6. Hooks, collectors, and CLI event producers always
+persist canonical HTML/NDJSON first; SQLite updates are best-effort via
+the local writer and never the sole durable store. If writer RPC/IPC fails,
+times out, or the queue is full, ingestion still returns success after
+canonical append and records a visible fallback reason.</p>
+</div>
+          <label for="slice-7-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>The writer service becomes safe only when integrated producers treat it as
+a derived-index accelerator, not as durability. This protects user work
+from writer outages and keeps reindex as the recovery mechanism.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>internal/hooks/runner.go, internal/hooks/session_html.go, internal/otel/indexer/indexer.go, internal/otel/sink/ndjson, plugin/hooks/hooks.json, cmd/wipnote/hook.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>If writer RPC/IPC fails, hook/event ingestion still returns success after appending canonical HTML/NDJSON.</li><li>If the queue is full, hook/event ingestion falls back without user-visible hook failure.</li><li>Fallback path records a reason: `writer_unavailable`, `queue_full`, or `timeout`.</li><li>Replay/reindex from fallback artifacts is idempotent.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 3</span>
+            <ul><li>TestWriterUnavailable_FallsBackToCanonicalAppend disables the writer and verifies canonical append plus successful hook return.</li><li>TestQueueFull_FallsBackWithoutUserVisibleFailure fills the queue and verifies fallback reason is recorded.</li><li>TestReplayAfterFallback_IsIdempotent replays fallback artifacts twice and verifies no duplicate derived rows.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Fallback behavior must be concrete and testable; writer unavailable, queue full, and replay idempotence need acceptance coverage.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">No event/index write path may use SQLite as the only durable copy.</span>
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 6</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-7" data-comment-for="slice-7" placeholder="Comments on slice 7..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-8" data-slice="8" data-slice-name="slice-8" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 8: Canonical command audit and fail-loud DB dependency">
+    <span class="slice-num">#8</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Canonical command audit and fail-loud DB dependency</span>
+      <span class="slice-preview">Audit core CLI commands and classify whether they can answer from</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-revision badge-sm">M</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-8">Pending</span>
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-8-approval" value="approved" data-section="slice-8" data-action="approve" aria-label="Approve slice 8">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-8-approval" value="changes_requested" data-section="slice-8" data-action="approve" aria-label="Request changes for slice 8">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-8-approval" value="rejected" data-section="slice-8" data-action="approve" aria-label="Reject slice 8">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Audit core CLI commands and classify whether they can answer from
+YAML/HTML/NDJSON without SQLite. Convert the highest-value commands to
+canonical-first behavior and make remaining SQLite-dependent commands fail
+loudly with a clear reason plus retry/reindex guidance when the DB is
+locked or missing.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Users should not lose access to canonical project knowledge because the
+derived index is locked. This slice broadens the slice-1 pattern beyond
+plan critique/validate without mixing it with full rebuild guarantees.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>cmd/wipnote/find.go, cmd/wipnote/status.go, cmd/wipnote/plan_show.go, cmd/wipnote/wip.go, internal/htmlparse, internal/storage</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>At least five core commands are classified as canonical-first or SQLite-required.</li><li>YAML/HTML-native commands work while SQLite is locked.</li><li>SQLite-required commands surface a non-silent error with retry/reindex guidance.</li><li>No command returns partial/truncated output after a DB open failure.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 2</span>
+            <ul><li>TestLockedDB_CanonicalCommandsStillWork locks SQLite and runs plan critique/validate/show plus selected canonical commands.</li><li>TestSQLiteRequiredCommand_FailsLoudly verifies no partial output on DB open failure.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing find/status/wip behavior remains stable when DB is healthy.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Canonical command behavior should be separated from full derived-index rebuild so each has crisp acceptance criteria.</span>
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 1,2</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-8" data-comment-for="slice-8" placeholder="Comments on slice 8..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-9" data-slice="9" data-slice-name="slice-9" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 9: Reindex rebuild guarantees for dashboard-critical rows">
+    <span class="slice-num">#9</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Reindex rebuild guarantees for dashboard-critical rows</span>
+      <span class="slice-preview">Improve wipnote reindex so deleting the SQLite cache and rebuilding from</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-9">Pending</span>
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-9-approval" value="approved" data-section="slice-9" data-action="approve" aria-label="Approve slice 9">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-9-approval" value="changes_requested" data-section="slice-9" data-action="approve" aria-label="Request changes for slice 9">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-9-approval" value="rejected" data-section="slice-9" data-action="approve" aria-label="Reject slice 9">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Improve <code>wipnote reindex</code> so deleting the SQLite cache and rebuilding from
+canonical files restores a named minimal dashboard dataset: plans, work
+items, graph edges, sessions, recent agent events, OTel-derived events,
+and collector status where canonical artifacts contain the needed data.
+Document any data that is intentionally cache-only and remove it from
+launch-critical views.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>A disposable SQLite index is only credible if rebuild coverage is explicit
+and tested. This slice proves cache deletion is a recovery path rather
+than a slogan.</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>cmd/wipnote/reindex.go, cmd/wipnote/reindex_sessions.go, internal/htmlparse, internal/otel/indexer, cmd/wipnote/api_events.go, cmd/wipnote/api_collector_status.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>Deleting the SQLite cache and running reindex restores plans, work items, graph edges, sessions, recent agent events, OTel-derived events, and collector status where canonical artifacts exist.</li><li>Daemon unavailable/crash during a write still leaves canonical artifacts sufficient for full reindex.</li><li>Dashboard smoke endpoints load after cache deletion and reindex.</li><li>Reindex is idempotent across repeated runs.</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="integration">
+            <span class="test-chip">INTEGRATION &middot; 3</span>
+            <ul><li>TestCacheDeletion_ReindexRestoresDashboardCriticalRows deletes the cache DB and asserts named tables/views are restored.</li><li>TestDaemonCrashDuringWrite_ReindexRecovers simulates writer crash after canonical append and verifies reindex recovery.</li><li>dashboard smoke checks specific endpoints/views after rebuild instead of vague page load.</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing reindex and session roundtrip tests still pass.</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">Rebuild guarantees must validate the writer-service failure mode, so this depends on writer integration.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Define the dashboard-critical dataset explicitly; avoid vague &#34;query state&#34; acceptance.</span>
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 7,8</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-9" data-comment-for="slice-9" placeholder="Comments on slice 9..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
+<details class="slice-card" id="slice-10" data-slice="10" data-slice-name="slice-10" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 10: Contention observability and regression gate">
+    <span class="slice-num">#10</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Contention observability and regression gate</span>
+      <span class="slice-preview">Add lightweight observability for SQLite contention: count SQLITEBUSY</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-revision badge-sm">M</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-10">Pending</span>
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-10-approval" value="approved" data-section="slice-10" data-action="approve" aria-label="Approve slice 10">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-10-approval" value="changes_requested" data-section="slice-10" data-action="approve" aria-label="Request changes for slice 10">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-10-approval" value="rejected" data-section="slice-10" data-action="approve" aria-label="Reject slice 10">
               &#10005;
             </label>
           </span>
@@ -1384,7 +1928,7 @@ before launch.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>`wipnote status` or `wipnote health` reports recent SQLITE_BUSY count and journal mode.</li><li>Stress fixture reproduces the old multi-writer workload.</li><li>Stress fixture passes without SQLITE_BUSY after the single-writer path is enabled.</li><li>Launch readiness checklist references this gate before release.</li></ul>
+        <ul class="slice-done-list"><li>`wipnote status` or `wipnote health` reports recent SQLITE_BUSY count and journal mode.</li><li>Stress fixture reproduces the old multi-writer workload with 20 producers for 30 seconds across hooks, indexer, dashboard reads, and CLI writes.</li><li>Stress fixture passes with zero SQLITE_BUSY across 3 consecutive runs after the single-writer path is enabled.</li><li>Regression test fails if any direct writable DB open remains in hook/collector/event paths.</li><li>Launch readiness checklist references this gate before release.</li></ul>
       </div>
       
     
@@ -1408,8 +1952,8 @@ before launch.</p>
           </div>
           
           <div class="test-group" data-kind="regression">
-            <span class="test-chip">REGRESSION &middot; 1</span>
-            <ul><li>health/status output remains stable for existing callers.</li></ul>
+            <span class="test-chip">REGRESSION &middot; 2</span>
+            <ul><li>TestNoDirectWritableDBOpenInEventPaths fails on forbidden direct writable DB opens.</li><li>health/status output remains stable for existing callers.</li></ul>
           </div>
           
         </div>
@@ -1419,15 +1963,34 @@ before launch.</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">architecture-critic</span>
+          <span class="critic-revision-summary">Stress gate must enforce the no-stray-writers boundary, not just observe queue behavior.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">execution-critic</span>
+          <span class="critic-revision-summary">Stress workload needs explicit producer count, duration, and pass threshold to avoid flaky CI semantics.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
 
-    <div class="slice-deps">Dependencies: slices 5,6</div>
+    <div class="slice-deps">Dependencies: slices 7,9</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
       <div class="comment-collapse-body">
-        <textarea data-section="slice-7" data-comment-for="slice-7" placeholder="Comments on slice 7..."></textarea>
+        <textarea data-section="slice-10" data-comment-for="slice-10" placeholder="Comments on slice 10..."></textarea>
       </div>
     </details>
   </div>
@@ -1449,8 +2012,8 @@ before launch.</p>
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">8</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">8</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">11</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">11</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -1530,7 +2093,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6","slice-7"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5","slice-6","slice-7","slice-8","slice-9","slice-10"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
