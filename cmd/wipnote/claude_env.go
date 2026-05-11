@@ -64,7 +64,8 @@ func buildClaudeLaunchEnv(wipnoteProjectDir string, overrides *otelEnvOverrides)
 
 	// Layer harness-specific launch env vars from the registry. User-set values
 	// always win — we use addIfUnset, matching the OTel injection policy above.
-	if cfg := harness.Get("claude_code"); cfg != nil {
+	cfg := harness.Get("claude_code")
+	if cfg != nil {
 		for _, kv := range cfg.LaunchEnv {
 			if idx := strings.Index(kv, "="); idx > 0 {
 				env = addIfUnset(env, kv[:idx], kv[idx+1:])
@@ -90,22 +91,23 @@ func buildClaudeLaunchEnv(wipnoteProjectDir string, overrides *otelEnvOverrides)
 	}
 
 	// Pull defaults from the registry (centralized per-harness config).
-	cfg := harness.Get("claude_code")
-	otelVars := cfg.OtelEnv(overrides.CollectorPort, "")
-	for _, kv := range otelVars {
-		idx := strings.Index(kv, "=")
-		if idx <= 0 {
-			continue
-		}
-		key, value := kv[:idx], kv[idx+1:]
-		if key == "OTEL_EXPORTER_OTLP_ENDPOINT" {
-			// Force-replace: launcher's endpoint must win because it's derived
-			// from WIPNOTE_OTEL_HTTP_PORT and inherited values would silently
-			// drop spans. Users who need to point Claude Code at a non-wipnote
-			// receiver can steer via WIPNOTE_OTEL_HTTP_PORT / WIPNOTE_OTEL_BIND.
-			env = setOrReplaceEnv(env, key, value)
-		} else {
-			env = addIfUnset(env, key, value)
+	if cfg != nil {
+		otelVars := cfg.OtelEnv(overrides.CollectorPort, "")
+		for _, kv := range otelVars {
+			idx := strings.Index(kv, "=")
+			if idx <= 0 {
+				continue
+			}
+			key, value := kv[:idx], kv[idx+1:]
+			if key == "OTEL_EXPORTER_OTLP_ENDPOINT" {
+				// Force-replace: launcher's endpoint must win because it's derived
+				// from WIPNOTE_OTEL_HTTP_PORT and inherited values would silently
+				// drop spans. Users who need to point Claude Code at a non-wipnote
+				// receiver can steer via WIPNOTE_OTEL_HTTP_PORT / WIPNOTE_OTEL_BIND.
+				env = setOrReplaceEnv(env, key, value)
+			} else {
+				env = addIfUnset(env, key, value)
+			}
 		}
 	}
 

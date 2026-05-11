@@ -6,21 +6,6 @@ import "fmt"
 // Cross-package assertion is in registry_test.go (TestRegistry_IDsMatchOtelConsts).
 const _claudeOtelID = "claude_code"
 
-// Env var name constants for the Claude OTel env injection.
-// Declared here so the names are co-located with the function that uses them.
-const (
-	claudeEnvEnableTelemetry    = "CLAUDE_CODE_ENABLE_TELEMETRY"
-	claudeEnvEnhancedTelemetry  = "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"
-	claudeEnvMetricsExporter    = "OTEL_METRICS_EXPORTER"
-	claudeEnvLogsExporter       = "OTEL_LOGS_EXPORTER"
-	claudeEnvTracesExporter     = "OTEL_TRACES_EXPORTER"
-	claudeEnvOTLPProtocol       = "OTEL_EXPORTER_OTLP_PROTOCOL"
-	claudeEnvOTLPEndpoint       = "OTEL_EXPORTER_OTLP_ENDPOINT"
-	claudeEnvLogToolDetails     = "OTEL_LOG_TOOL_DETAILS"
-	claudeEnvLogUserPrompts     = "OTEL_LOG_USER_PROMPTS"
-	claudeEnvLogToolContent     = "OTEL_LOG_TOOL_CONTENT"
-)
-
 // claudeOtelEnv returns the OTel-related environment variables to inject when
 // launching Claude Code. The port comes from the per-session collector spawned
 // by the launcher. The sessionID argument is ignored by Claude (no session.id
@@ -28,16 +13,22 @@ const (
 func claudeOtelEnv(port int, sessionID string) []string {
 	endpoint := fmt.Sprintf("http://127.0.0.1:%d", port)
 	return []string{
-		claudeEnvEnableTelemetry + "=1",
-		claudeEnvEnhancedTelemetry + "=1",
-		claudeEnvMetricsExporter + "=otlp",
-		claudeEnvLogsExporter + "=otlp",
-		claudeEnvTracesExporter + "=otlp",
-		claudeEnvOTLPProtocol + "=http/protobuf",
-		claudeEnvOTLPEndpoint + "=" + endpoint,
-		claudeEnvLogToolDetails + "=1",
-		claudeEnvLogUserPrompts + "=1",
-		claudeEnvLogToolContent + "=1",
+		"CLAUDE_CODE_ENABLE_TELEMETRY=1",
+		"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1",
+		"OTEL_METRICS_EXPORTER=otlp",
+		"OTEL_LOGS_EXPORTER=otlp",
+		"OTEL_TRACES_EXPORTER=otlp",
+		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
+		"OTEL_EXPORTER_OTLP_ENDPOINT=" + endpoint,
+		// Privacy note: these three default-on flags cause Claude Code to emit
+		// potentially sensitive content via OTel. They mirror the launcher's
+		// historical default; users can override per-key to "0" before launch.
+		//   OTEL_LOG_TOOL_DETAILS=0  → suppress bash commands, skill names, MCP tool names
+		//   OTEL_LOG_USER_PROMPTS=0  → suppress user prompt content
+		//   OTEL_LOG_TOOL_CONTENT=0  → suppress tool input/output payloads
+		"OTEL_LOG_TOOL_DETAILS=1",
+		"OTEL_LOG_USER_PROMPTS=1",
+		"OTEL_LOG_TOOL_CONTENT=1",
 	}
 }
 
