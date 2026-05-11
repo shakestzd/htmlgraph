@@ -6,6 +6,7 @@
 package hooks
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,9 +14,44 @@ import (
 	"path/filepath"
 
 	"github.com/shakestzd/wipnote/internal/agent"
+	"github.com/shakestzd/wipnote/internal/db/writequeue"
 	"github.com/shakestzd/wipnote/internal/paths"
 	"github.com/shakestzd/wipnote/internal/storage"
 )
+
+// Runner bundles the optional dependencies needed by in-process hook
+// invocations (e.g. `wipnote claude` / `wipnote yolo` embedding the hook
+// dispatch loop without spawning subprocesses).
+//
+// SLICE-7 CONTRACT (plan-ae0c37b2 / feat-33c26c74):
+//
+//	Subprocess hooks construct a zero-value Runner: Queue is nil, so any
+//	derived-index op falls back to the synchronous DB path. In-process
+//	callers pass a *writequeue.Queue obtained from the slice-6 writer
+//	service so their derived-index updates serialize through the queue
+//	worker (the single SQLite writer per project DB).
+//
+// All fields are optional. A nil Runner is the canonical-only-mode default
+// for legacy callers and tests.
+type Runner struct {
+	// Queue is the slice-6 write queue. Optional. When non-nil, hook
+	// handlers route their derived-index updates through it via
+	// SubmitDerivedOp; when nil, ops run synchronously against the DB
+	// handle (subprocess hooks) or are skipped (canonical-only paths).
+	Queue *writequeue.Queue
+
+	// DB is the writable SQLite handle that handlers use for synchronous
+	// queries/updates when the queue is unavailable. Optional.
+	DB *sql.DB
+}
+
+// NewRunner constructs a Runner with the given optional dependencies.
+// Both arguments are nil-safe and individually optional; the most common
+// in-process configuration is (queue, db) where db is the read pool shared
+// with the dashboard.
+func NewRunner(queue *writequeue.Queue, database *sql.DB) *Runner {
+	return &Runner{Queue: queue, DB: database}
+}
 
 // CloudEvent is the JSON payload Claude Code sends to every hook via stdin.
 // Only the fields wipnote actually uses are decoded; the rest are ignored.

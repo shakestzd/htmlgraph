@@ -72,6 +72,21 @@ const (
 	// no longer need their own entry in this inventory.
 	daemonRoutedWriterService writeSiteClassification = "daemon-routed-writer-service"
 
+	// canonicalFirstHookFallback marks the single writable open used by
+	// hook subprocesses (`wipnote hook <name>` spawned by Claude Code).
+	// Slice 7 (feat-33c26c74) consolidated the three formerly-direct
+	// `db.Open` call sites in cmd/wipnote/hook.go into one helper
+	// (internal/hooks/dbgate.go: OpenHookDB) so the failure-tolerance
+	// contract — log + count fallback, return canonical-success — lives
+	// at ONE auditable boundary.
+	//
+	// Architectural rationale: hook subprocesses can't reach the in-process
+	// queue inside `wipnote serve`. They still need to read project context
+	// and emit derived-index rows synchronously while data is fresh. The
+	// canonical NDJSON write upstream (in the handler tree) makes any
+	// failed open safely recoverable on the next reindex cycle.
+	canonicalFirstHookFallback writeSiteClassification = "canonical-first-hook-fallback"
+
 	// intentionalCLIMutation marks user-driven CLI commands that legitimately
 	// mutate work items (e.g., wipnote feature start). These keep direct
 	// writable opens because they are short-lived foreground processes;
@@ -111,35 +126,22 @@ type writeSite struct {
 // and the test will demand they be removed.
 var approvedWriteSites = []writeSite{
 	// ----------------------------------------------------------------------
-	// daemon-routed-pending-slice-6 (FORBIDDEN PATHS — temporary tolerance)
+	// daemon-routed-writer-service / canonical-first-hook-fallback
+	// (FORBIDDEN PATHS — explicitly classified)
 	// ----------------------------------------------------------------------
-	// These are the four call sites the plan explicitly calls out as the
-	// SQLITE_BUSY contention source. They open writable handles from
-	// high-frequency, short-lived, or concurrent processes that must move
-	// to the single-writer queue introduced by slice 6 (feat-f3bcbcef).
+	// Slice 7 (feat-33c26c74) collapsed the three former direct opens in
+	// cmd/wipnote/hook.go (hookSubcmd / hookSubcmdWithProject /
+	// hookTrackEventCmd) into a single helper at internal/hooks/dbgate.go
+	// — see classification doc-comment above for the canonical-first
+	// failure-tolerance contract. The hook tree therefore has exactly one
+	// approved writable open today.
 	{
-		File:           "cmd/wipnote/hook.go",
-		Line:           114,
-		Function:       "hookSubcmd",
+		File:           "internal/hooks/dbgate.go",
+		Line:           123,
+		Function:       "OpenHookDB",
 		OpenExpr:       "db.Open",
-		Classification: daemonRoutedPendingSlice6,
-		Note:           "Per-event hook handler opens DB directly; slice 6 routes via writer service.",
-	},
-	{
-		File:           "cmd/wipnote/hook.go",
-		Line:           153,
-		Function:       "hookSubcmdWithProject",
-		OpenExpr:       "db.Open",
-		Classification: daemonRoutedPendingSlice6,
-		Note:           "Per-event session hook opens DB directly; slice 6 routes via writer service.",
-	},
-	{
-		File:           "cmd/wipnote/hook.go",
-		Line:           189,
-		Function:       "hookTrackEventCmd",
-		OpenExpr:       "db.Open",
-		Classification: daemonRoutedPendingSlice6,
-		Note:           "track-event hook opens DB directly; slice 6 routes via writer service.",
+		Classification: canonicalFirstHookFallback,
+		Note:           "Slice 7 (feat-33c26c74): single auditable writable open used by hook subprocesses. Logs a structured `writer_unavailable` fallback and returns nil-DB on failure; callers MUST treat nil as a signal to return canonical-success. The canonical NDJSON write upstream guarantees reindex recovers any rows the synchronous path could not write.",
 	},
 	{
 		File:           "internal/otel/receiver/writer.go",
@@ -478,8 +480,8 @@ func TestWritableDBOpenBoundary(t *testing.T) {
 		}
 		if len(misclassified) > 0 {
 			fmt.Fprintf(&b, "MISCLASSIFIED forbidden-path entries (%d):\n", len(misclassified))
-			fmt.Fprintf(&b, "  Hook / indexer / receiver / event-capture paths must use either %q (awaiting migration) or %q (writer service internal).\n",
-				daemonRoutedPendingSlice6, daemonRoutedWriterService)
+			fmt.Fprintf(&b, "  Hook / indexer / receiver / event-capture paths must use one of %q (awaiting migration), %q (writer service internal), or %q (slice-7 hook subprocess fallback).\n",
+				daemonRoutedPendingSlice6, daemonRoutedWriterService, canonicalFirstHookFallback)
 			for _, ws := range misclassified {
 				fmt.Fprintf(&b, "  ! %s:%d  func=%s  class=%s\n",
 					ws.File, ws.Line, ws.Function, ws.Classification)
@@ -516,11 +518,12 @@ func TestWriteSiteInventoryComplete(t *testing.T) {
 
 	// Verify every classification is a known constant.
 	known := map[writeSiteClassification]bool{
-		daemonRoutedPendingSlice6: true,
-		daemonRoutedWriterService: true,
-		intentionalCLIMutation:    true,
-		reindexOnly:               true,
-		migrationOnly:             true,
+		daemonRoutedPendingSlice6:  true,
+		daemonRoutedWriterService:  true,
+		canonicalFirstHookFallback: true,
+		intentionalCLIMutation:     true,
+		reindexOnly:                true,
+		migrationOnly:              true,
 	}
 	for _, ws := range approvedWriteSites {
 		if !known[ws.Classification] {
@@ -812,12 +815,15 @@ func isForbiddenPath(relPath string) bool {
 }
 
 // isForbiddenPathClassification reports whether a classification is
-// permitted on a forbidden-path entry. Slice 6 introduces a second
-// acceptable label — the writer service's own internal Open — so the
-// boundary check now allows either daemon-routed-pending-slice-6 or
-// daemon-routed-writer-service.
+// permitted on a forbidden-path entry. Three labels are now accepted:
+//   - daemon-routed-pending-slice-6: legacy / awaiting migration
+//   - daemon-routed-writer-service:  slice-6 writer service's internal open
+//   - canonical-first-hook-fallback: slice-7 hook subprocess writable open
+//     whose failure is logged + counted and recovered via reindex
 func isForbiddenPathClassification(c writeSiteClassification) bool {
-	return c == daemonRoutedPendingSlice6 || c == daemonRoutedWriterService
+	return c == daemonRoutedPendingSlice6 ||
+		c == daemonRoutedWriterService ||
+		c == canonicalFirstHookFallback
 }
 
 // isExcludedPath returns true when path lives under one of excludedDirs,

@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/hooks"
 	"github.com/shakestzd/wipnote/internal/provenance"
 	"github.com/spf13/cobra"
@@ -111,10 +110,17 @@ func hookSubcmd(
 						fmt.Sprintf("DBPath failed: %v", err))
 					return fallback, nil
 				}
-				database, err := db.Open(dbPath)
-				if err != nil {
-					hooks.LogError(use, event.SessionID,
-						fmt.Sprintf("db.Open failed: %v", err))
+				// Canonical-first contract (plan-ae0c37b2 slice 7): the
+				// writable open is best-effort. A failure is logged and
+				// counted as writer_unavailable; we then return the
+				// fallback HookResult so Claude Code sees SUCCESS. The
+				// canonical NDJSON written elsewhere in the handler tree
+				// (collector, session-start Rosetta) is the authoritative
+				// copy; the dashboard indexer rebuilds the derived index
+				// on its next cycle.
+				database, reason := hooks.OpenHookDB(use, event.SessionID, dbPath)
+				if database == nil {
+					_ = reason
 					return fallback, nil
 				}
 				defer database.Close()
@@ -150,10 +156,10 @@ func hookSubcmdWithProject(
 						fmt.Sprintf("DBPath failed: %v", err))
 					return fallback, nil
 				}
-				database, err := db.Open(dbPath)
-				if err != nil {
-					hooks.LogError(use, event.SessionID,
-						fmt.Sprintf("db.Open failed: %v", err))
+				// Canonical-first contract — see hookSubcmd above.
+				database, reason := hooks.OpenHookDB(use, event.SessionID, dbPath)
+				if database == nil {
+					_ = reason
 					return fallback, nil
 				}
 				defer database.Close()
@@ -186,10 +192,10 @@ func hookTrackEventCmd(fallback *hooks.HookResult) *cobra.Command {
 						fmt.Sprintf("DBPath failed: %v", err))
 					return fallback, nil
 				}
-				database, err := db.Open(dbPath)
-				if err != nil {
-					hooks.LogError("track-event", event.SessionID,
-						fmt.Sprintf("db.Open failed: %v", err))
+				// Canonical-first contract — see hookSubcmd above.
+				database, reason := hooks.OpenHookDB("track-event", event.SessionID, dbPath)
+				if database == nil {
+					_ = reason
 					return fallback, nil
 				}
 				defer database.Close()
