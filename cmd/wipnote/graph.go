@@ -12,6 +12,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// graphDBError wraps a database open/query failure with actionable retry and
+// reindex guidance. Commands that genuinely require the SQLite cache must use
+// this helper so users are never left with a silent failure or cryptic error.
+//
+// Typical causes: DB file not yet created (first run), SQLite locked by a
+// concurrent writer, or a corrupted cache. Running `wipnote reindex` rebuilds
+// the cache from the canonical HTML sources.
+func graphDBError(cmd string, err error) error {
+	msg := err.Error()
+	if strings.Contains(msg, "locked") || strings.Contains(msg, "SQLITE_BUSY") {
+		return fmt.Errorf("wipnote %s: SQLite cache is locked. Try again in a moment, or run `wipnote reindex` to rebuild", cmd)
+	}
+	return fmt.Errorf("wipnote %s: cannot open SQLite cache (%w). Run `wipnote reindex` to rebuild the cache, or retry in a moment", cmd, err)
+}
+
 func graphCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "graph",
@@ -59,7 +74,7 @@ func runGraphCycles() error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph cycles", err)
 	}
 	defer database.Close()
 
@@ -117,7 +132,7 @@ func runGraphPath(fromID, toID string) error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph path", err)
 	}
 	defer database.Close()
 
@@ -172,7 +187,7 @@ func runGraphReach(startID string, depth int) error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph reach", err)
 	}
 	defer database.Close()
 
@@ -223,7 +238,7 @@ func runGraphOrphans() error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph orphans", err)
 	}
 	defer database.Close()
 
@@ -274,7 +289,7 @@ func runGraphHubs(minEdges int) error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph hubs", err)
 	}
 	defer database.Close()
 
@@ -323,7 +338,7 @@ func runGraphBottlenecks() error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph bottlenecks", err)
 	}
 	defer database.Close()
 
@@ -373,7 +388,7 @@ func runGraphSessions(featureID string) error {
 	}
 	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return graphDBError("graph sessions", err)
 	}
 	defer database.Close()
 
