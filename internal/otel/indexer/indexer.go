@@ -88,6 +88,15 @@ func (idx *Indexer) Status() map[string]FileInfo {
 	return out
 }
 
+// RunOnce performs one indexer pass synchronously. It exists so callers
+// outside the daemon (notably `wipnote reindex` — slice 9, feat-229f3333)
+// can drive the same NDJSON-to-SQLite pipeline used by Start, but in
+// foreground mode for full-rebuild scenarios. Idempotent: replaying the
+// same offsets is safe because the receiver Writer uses INSERT OR IGNORE.
+func (idx *Indexer) RunOnce(ctx context.Context) {
+	idx.runOnce(ctx)
+}
+
 // runOnce discovers all sessions and processes any new data.
 func (idx *Indexer) runOnce(ctx context.Context) {
 	sessions, err := idx.discoverSessions()

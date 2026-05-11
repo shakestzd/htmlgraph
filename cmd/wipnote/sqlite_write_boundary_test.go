@@ -295,6 +295,14 @@ var approvedWriteSites = []writeSite{
 		Classification: reindexOnly,
 		Note:           "`wipnote reindex backfill-orphans` reindex variant.",
 	},
+	{
+		File:           "cmd/wipnote/reindex_otel_events.go",
+		Line:           76,
+		Function:       "reindexOtelEvents",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "Slice 9 (feat-229f3333): bridge handle for the prompt_id correlation pass inside the OTel NDJSON replay. Reads orphans + writes UPDATE on agent_events.prompt_id only; the receiver.Writer owns the otel_signals write path. Disjoint tables, single-process reindex — no contention with the main writer.",
+	},
 
 	// ----------------------------------------------------------------------
 	// migration-only (schema bootstrap / DDL upgrades)

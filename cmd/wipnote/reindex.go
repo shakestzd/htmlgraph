@@ -52,7 +52,14 @@ func runReindex(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
-	defer database.Close()
+	dbClosed := false
+	closeDB := func() {
+		if !dbClosed {
+			_ = database.Close()
+			dbClosed = true
+		}
+	}
+	defer closeDB()
 	currentCommit := gitHeadCommit(projectDir)
 
 	lastCommit, _ := dbpkg.GetMetadata(database, metaKeyLastIndexedCommit)
@@ -121,8 +128,38 @@ func runReindex(cmd *cobra.Command, _ []string) error {
 		fmt.Printf("  feature_files: %d file associations rebuilt\n", fileCount)
 	}
 
+	// Slice 9 (feat-229f3333): rebuild graph_edges derived from plan YAML
+	// dependency lists. The HTML edge pass above only covers <a data-*-id>
+	// attributes; plan YAML slice deps are a separate canonical source.
+	if !useIncremental {
+		planFiles, planEdges, planErrs := reindexPlanEdges(database, wipnoteDir)
+		if planEdges > 0 || planErrs > 0 {
+			fmt.Printf("  plan edges: %d edges from %d plan YAML files (%d errors)\n",
+				planEdges, planFiles, planErrs)
+		}
+	}
+
 	if currentCommit != "" && errCount == 0 {
 		_ = dbpkg.SetMetadata(database, metaKeyLastIndexedCommit, currentCommit)
+	}
+
+	// Close the read-pool handle before opening the OTel writer. Slice 6's
+	// writer service uses a dedicated writable connection — opening it on
+	// the same DB file while another writer is active is the contention
+	// pattern slice 6 is engineered to AVOID, not exercise. Sequencing the
+	// open/close keeps reindex a single writer at any moment.
+	closeDB()
+
+	// Slice 9 (feat-229f3333): replay every per-session events.ndjson back
+	// into otel_signals. This is the canonical-first recovery path — the
+	// dashboard's OTel-derived event surface is fully rebuildable from
+	// NDJSON, exactly the rebuild promise slice 9 ratifies.
+	if !useIncremental {
+		otelSess, otelIter, otelErrs := reindexOtelEvents(dbPath, wipnoteDir)
+		if otelSess > 0 || otelErrs > 0 {
+			fmt.Printf("  otel events: replayed %d session NDJSON files in %d iterations (%d errors)\n",
+				otelSess, otelIter, otelErrs)
+		}
 	}
 
 	return nil
