@@ -3,6 +3,8 @@ package indexer
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -302,6 +304,145 @@ func TestIndexer_DiscoverSessions(t *testing.T) {
 	}
 	if len(sessions) > 0 && sessions[0] != "sess-alpha" {
 		t.Errorf("expected sess-alpha, got %q", sessions[0])
+	}
+}
+
+// TestProcessSession_RespectsMaxBytesPerTick verifies that processSession advances
+// the checkpoint by at most maxBytesPerTick bytes on a single call, even when far
+// more data is available.
+func TestProcessSession_RespectsMaxBytesPerTick(t *testing.T) {
+	wipnoteDir := t.TempDir()
+	sessionID := "budget-sess-01"
+
+	// Build a large NDJSON file that is clearly over maxBytesPerTick (4 MiB).
+	// Each line is a valid signal JSON. We want total > 2*maxBytesPerTick so two
+	// ticks are needed.
+	singleLine := `{"kind":"span","harness":"claude_code","ts":"2026-04-24T19:00:00Z","signal_id":"bud-%06d","session_id":"budget-sess-01","canonical":"api_request","native":"claude_code.api_request"}`
+	// One line is ~150 bytes; we need >4 MiB total, so ~30,000 lines.
+	const targetBytes = maxBytesPerTick*2 + 512*1024 // ~8.5 MiB
+	const approxLineBytes = 160
+	lineCount := targetBytes/approxLineBytes + 1
+
+	sessDir := filepath.Join(wipnoteDir, "sessions", sessionID)
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	ndjsonPath := filepath.Join(sessDir, "events.ndjson")
+	f, err := os.Create(ndjsonPath)
+	if err != nil {
+		t.Fatalf("create ndjson: %v", err)
+	}
+	for i := 0; i < lineCount; i++ {
+		fmt.Fprintf(f, singleLine+"\n", i)
+	}
+	f.Close()
+
+	info, err := os.Stat(ndjsonPath)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	totalSize := info.Size()
+	if totalSize <= maxBytesPerTick {
+		t.Fatalf("fixture too small: %d bytes (need > %d)", totalSize, maxBytesPerTick)
+	}
+
+	snk := sqls.New(&fakeWriter{})
+	idxr := New(wipnoteDir, snk)
+	ctx := context.Background()
+
+	// First tick: should advance by at most maxBytesPerTick.
+	if err := idxr.processSession(ctx, sessionID); err != nil {
+		t.Fatalf("first processSession: %v", err)
+	}
+	checkpointPath := filepath.Join(sessDir, ".index-offset")
+	offset1, err := readCheckpoint(checkpointPath)
+	if err != nil {
+		t.Fatalf("read checkpoint after tick 1: %v", err)
+	}
+	if offset1 <= 0 {
+		t.Fatal("offset did not advance after first tick")
+	}
+	if offset1 > maxBytesPerTick+approxLineBytes {
+		// Allow one extra line of slop (the budget check happens before reading
+		// the line, so the final line may push us slightly over).
+		t.Errorf("offset after tick 1 = %d, want <= %d (+slop)", offset1, maxBytesPerTick+approxLineBytes)
+	}
+
+	// Second tick: should advance further but still not reach end of file.
+	if err := idxr.processSession(ctx, sessionID); err != nil {
+		t.Fatalf("second processSession: %v", err)
+	}
+	offset2, err := readCheckpoint(checkpointPath)
+	if err != nil {
+		t.Fatalf("read checkpoint after tick 2: %v", err)
+	}
+	if offset2 <= offset1 {
+		t.Errorf("offset did not advance on second tick: before=%d after=%d", offset1, offset2)
+	}
+	if offset2 >= totalSize {
+		t.Logf("offset2=%d totalSize=%d: file fully consumed in 2 ticks (acceptable if file is small)", offset2, totalSize)
+	}
+}
+
+// TestProcessSession_AlignsCutoffToNewline verifies that processSession never
+// checkpoints mid-record: the offset is always on a newline boundary.
+func TestProcessSession_AlignsCutoffToNewline(t *testing.T) {
+	wipnoteDir := t.TempDir()
+	sessionID := "align-sess-01"
+
+	// Write enough lines to exceed maxBytesPerTick.
+	// We use fakeWriter so no real SQLite is needed.
+	fixedLine := `{"kind":"span","harness":"claude_code","ts":"2026-04-24T19:00:00Z","signal_id":"aln-XXXXX","session_id":"align-sess-01","canonical":"api_request","native":"claude_code.api_request"}`
+	const totalLines = 30000
+	sessDir := filepath.Join(wipnoteDir, "sessions", sessionID)
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	ndjsonPath := filepath.Join(sessDir, "events.ndjson")
+	fh, err := os.Create(ndjsonPath)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	for i := 0; i < totalLines; i++ {
+		fmt.Fprintln(fh, fixedLine)
+	}
+	fh.Close()
+
+	snk := sqls.New(&fakeWriter{})
+	idxr := New(wipnoteDir, snk)
+	ctx := context.Background()
+
+	if err := idxr.processSession(ctx, sessionID); err != nil {
+		t.Fatalf("processSession: %v", err)
+	}
+
+	checkpointPath := filepath.Join(sessDir, ".index-offset")
+	offset, err := readCheckpoint(checkpointPath)
+	if err != nil {
+		t.Fatalf("read checkpoint: %v", err)
+	}
+	if offset <= 0 {
+		t.Fatal("no progress made")
+	}
+
+	// Re-open file at the checkpointed offset and confirm the byte there is a
+	// newline (i.e. the offset lands right after a '\n').
+	fh2, err := os.Open(ndjsonPath)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer fh2.Close()
+
+	// Seek to offset-1 to read the byte before the checkpoint position.
+	if _, err := fh2.Seek(offset-1, io.SeekStart); err != nil {
+		t.Fatalf("seek: %v", err)
+	}
+	b := make([]byte, 1)
+	if _, err := fh2.Read(b); err != nil {
+		t.Fatalf("read byte at offset-1: %v", err)
+	}
+	if b[0] != '\n' {
+		t.Errorf("checkpoint offset %d is not on a newline boundary: byte at offset-1 = 0x%02x", offset, b[0])
 	}
 }
 

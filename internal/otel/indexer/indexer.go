@@ -18,6 +18,12 @@ import (
 
 const pollInterval = 500 * time.Millisecond
 
+// maxBytesPerTick caps the amount of NDJSON data processed per session per tick.
+// Prevents a single huge session from monopolizing the SQLite writer lock and
+// starving other sessions, which manifested as bug-faf8e395 (indexer retry loop
+// on a 366MB events.ndjson).
+const maxBytesPerTick = 4 * 1024 * 1024 // 4 MiB
+
 // FileInfo holds per-file health metrics for the /api/indexer/status endpoint.
 type FileInfo struct {
 	LastOffset    int64     `json:"last_offset"`
@@ -147,7 +153,14 @@ func (idx *Indexer) processSession(ctx context.Context, sessionID string) error 
 		return nil // no new data
 	}
 
-	parsed, newOffset, err := idx.readNewSignals(ndjsonPath, offset)
+	// Cap the read window to maxBytesPerTick so a single huge file cannot
+	// monopolize the SQLite writer lock across ticks (bug-faf8e395).
+	readUpTo := currentSize
+	if readUpTo-offset > maxBytesPerTick {
+		readUpTo = offset + maxBytesPerTick
+	}
+
+	parsed, newOffset, err := idx.readNewSignals(ndjsonPath, offset, readUpTo)
 	if err != nil {
 		return err
 	}
@@ -168,10 +181,11 @@ func (idx *Indexer) processSession(ctx context.Context, sessionID string) error 
 }
 
 // readNewSignals opens ndjsonPath, seeks to offset, reads complete
-// newline-terminated lines, and parses them. Incomplete trailing data
-// (no newline at EOF) is left uncheckpointed so the next poll retries
-// once the writer finishes the line.
-func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]parsedSignal, int64, error) {
+// newline-terminated lines up to readUpTo bytes, and parses them.
+// Incomplete trailing data (no newline at EOF) is left uncheckpointed
+// so the next poll retries once the writer finishes the line.
+// readUpTo limits how many bytes are consumed per tick (bug-faf8e395).
+func (idx *Indexer) readNewSignals(ndjsonPath string, offset, readUpTo int64) ([]parsedSignal, int64, error) {
 	f, err := os.Open(ndjsonPath)
 	if err != nil {
 		return nil, offset, err
@@ -189,6 +203,12 @@ func (idx *Indexer) readNewSignals(ndjsonPath string, offset int64) ([]parsedSig
 	committedOffset := offset
 
 	for {
+		// Stop once we've reached or passed the byte budget ceiling.
+		// Because readLine consumes exactly one complete newline-terminated
+		// record, the cutoff is always on a newline boundary.
+		if committedOffset >= readUpTo {
+			break
+		}
 		line, err := readLine(reader)
 		if err != nil {
 			break
