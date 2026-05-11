@@ -401,77 +401,77 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     
     <li>
       <a href="#slice-1" class="slice-nav-item" data-slice-nav="1">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="1"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="1"></span>
         <span>#1 DB-free plan critique and validation</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-2" class="slice-nav-item" data-slice-nav="2">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="2"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="2"></span>
         <span>#2 Split SQLite open modes</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-3" class="slice-nav-item" data-slice-nav="3">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="3"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="3"></span>
         <span>#3 Version-gated migrations with PRAGMA user_version</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-4" class="slice-nav-item" data-slice-nav="4">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="4"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="4"></span>
         <span>#4 WAL-safe cache path selection and diagnostics</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-5" class="slice-nav-item" data-slice-nav="5">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="5"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="5"></span>
         <span>#5 Writable SQLite call-site inventory and enforcement boundary</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-6" class="slice-nav-item" data-slice-nav="6">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="6"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="6"></span>
         <span>#6 Single local writer transport for event/index writes</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-7" class="slice-nav-item" data-slice-nav="7">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="7"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="7"></span>
         <span>#7 Hook and indexer integration with canonical-first fallback</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-8" class="slice-nav-item" data-slice-nav="8">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="8"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="8"></span>
         <span>#8 Canonical command audit and fail-loud DB dependency</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-9" class="slice-nav-item" data-slice-nav="9">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="9"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="9"></span>
         <span>#9 Reindex rebuild guarantees for dashboard-critical rows</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-10" class="slice-nav-item" data-slice-nav="10">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="10"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="10"></span>
         <span>#10 Contention observability and regression gate</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-11" class="slice-nav-item" data-slice-nav="11">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="11"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="11"></span>
         <span>#11 Orphan session NDJSON pruning</span>
       </a>
     </li>
@@ -485,7 +485,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-ae0c37b2" data-type="plan" data-plan-id="plan-ae0c37b2" data-feature-id="trk-0677c709" data-status="active" data-priority="high">
+<article id="plan-ae0c37b2" data-type="plan" data-plan-id="plan-ae0c37b2" data-feature-id="trk-0677c709" data-status="finalized" data-priority="high">
 
 <!-- Plan Header -->
 <header class="plan-header">
@@ -493,8 +493,8 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <p style="color:var(--text-dim)">Make recurring SQLITE_BUSY failures impossible or non-blocking while keeping wipnote self-contained: canonical files remain source of truth, SQLite becomes a single-writer derived index, and YAML/HTML-native commands avoid DB opens.
 </p>
   <div class="meta">
-    <span class="badge badge-revision">Active</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v5 · 11 slices · Created 2026-05-11</span>
+    <span class="badge badge-approved">Done</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v18 · 11 slices · Created 2026-05-11</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -576,7 +576,7 @@ A concrete instance was diagnosed on 2026-05-11: the OTel indexer was looping wi
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    <details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-1" data-status="pending" data-approval="pending">
+    <details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-1" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 1: DB-free plan critique and validation">
     <span class="slice-num">#1</span>
     <span class="slice-title-col">
@@ -586,15 +586,15 @@ A concrete instance was diagnosed on 2026-05-11: the OTel indexer was looping wi
         <span class="slice-summary-badges">
           <span class="badge badge-pending badge-sm">S</span>
           <span class="badge badge-pending badge-sm">Low</span>
-          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
+          <span class="badge badge-revision badge-sm" title="Execution: promoted">Promoted</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-1">Approved</span>
           <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-1-approval" value="approved" data-section="slice-1" data-action="approve" aria-label="Approve slice 1">
+              <input type="radio" name="slice-1-approval" value="approved" data-section="slice-1" data-action="approve" checked aria-label="Approve slice 1">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -717,7 +717,7 @@ should not require the derived index.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 2: Split SQLite open modes">
     <span class="slice-num">#2</span>
     <span class="slice-title-col">
@@ -728,14 +728,14 @@ should not require the derived index.</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-2">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-2-approval" value="approved" data-section="slice-2" data-action="approve" aria-label="Approve slice 2">
+              <input type="radio" name="slice-2-approval" value="approved" data-section="slice-2" data-action="approve" checked aria-label="Approve slice 2">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -855,7 +855,7 @@ express intent and prevents accidental DDL on read paths.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 3: Version-gated migrations with PRAGMA user_version">
     <span class="slice-num">#3</span>
     <span class="slice-title-col">
@@ -866,14 +866,14 @@ express intent and prevents accidental DDL on read paths.</p>
           <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-3">Approved</span>
           <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" aria-label="Approve slice 3">
+              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" checked aria-label="Approve slice 3">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -995,7 +995,7 @@ standard SQLite pattern for keeping warm opens cheap and predictable.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 4: WAL-safe cache path selection and diagnostics">
     <span class="slice-num">#4</span>
     <span class="slice-title-col">
@@ -1006,14 +1006,14 @@ standard SQLite pattern for keeping warm opens cheap and predictable.</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-4">Approved</span>
           <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" aria-label="Approve slice 4">
+              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" checked aria-label="Approve slice 4">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1188,7 +1188,7 @@ typical project; otherwise prefer persistent cache.
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 5: Writable SQLite call-site inventory and enforcement boundary">
     <span class="slice-num">#5</span>
     <span class="slice-title-col">
@@ -1199,14 +1199,14 @@ typical project; otherwise prefer persistent cache.
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-5">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-5">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-5-approval" value="approved" data-section="slice-5" data-action="approve" aria-label="Approve slice 5">
+              <input type="radio" name="slice-5-approval" value="approved" data-section="slice-5" data-action="approve" checked aria-label="Approve slice 5">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1335,7 +1335,7 @@ the same SQLITE_BUSY class.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-6" data-slice="6" data-slice-name="slice-6" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-6" data-slice="6" data-slice-name="slice-6" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 6: Single local writer transport for event/index writes">
     <span class="slice-num">#6</span>
     <span class="slice-title-col">
@@ -1346,14 +1346,14 @@ the same SQLITE_BUSY class.</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-6">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-6">Approved</span>
           <span class="badge badge-sm badge-issues" title="4 critic issue(s)">4 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-6-approval" value="approved" data-section="slice-6" data-action="approve" aria-label="Approve slice 6">
+              <input type="radio" name="slice-6-approval" value="approved" data-section="slice-6" data-action="approve" checked aria-label="Approve slice 6">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1506,7 +1506,7 @@ problem before the queue contract is proven.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-7" data-slice="7" data-slice-name="slice-7" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-7" data-slice="7" data-slice-name="slice-7" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 7: Hook and indexer integration with canonical-first fallback">
     <span class="slice-num">#7</span>
     <span class="slice-title-col">
@@ -1517,14 +1517,14 @@ problem before the queue contract is proven.</p>
           <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-7">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-7">Approved</span>
           <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-7-approval" value="approved" data-section="slice-7" data-action="approve" aria-label="Approve slice 7">
+              <input type="radio" name="slice-7-approval" value="approved" data-section="slice-7" data-action="approve" checked aria-label="Approve slice 7">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1647,7 +1647,7 @@ from writer outages and keeps reindex as the recovery mechanism.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-8" data-slice="8" data-slice-name="slice-8" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-8" data-slice="8" data-slice-name="slice-8" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 8: Canonical command audit and fail-loud DB dependency">
     <span class="slice-num">#8</span>
     <span class="slice-title-col">
@@ -1658,14 +1658,14 @@ from writer outages and keeps reindex as the recovery mechanism.</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-8">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-8">Approved</span>
           <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-8-approval" value="approved" data-section="slice-8" data-action="approve" aria-label="Approve slice 8">
+              <input type="radio" name="slice-8-approval" value="approved" data-section="slice-8" data-action="approve" checked aria-label="Approve slice 8">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1778,7 +1778,7 @@ plan critique/validate without mixing it with full rebuild guarantees.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-9" data-slice="9" data-slice-name="slice-9" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-9" data-slice="9" data-slice-name="slice-9" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 9: Reindex rebuild guarantees for dashboard-critical rows">
     <span class="slice-num">#9</span>
     <span class="slice-title-col">
@@ -1789,14 +1789,14 @@ plan critique/validate without mixing it with full rebuild guarantees.</p>
           <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-9">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-9">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-9-approval" value="approved" data-section="slice-9" data-action="approve" aria-label="Approve slice 9">
+              <input type="radio" name="slice-9-approval" value="approved" data-section="slice-9" data-action="approve" checked aria-label="Approve slice 9">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1916,7 +1916,7 @@ than a slogan.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-10" data-slice="10" data-slice-name="slice-10" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-10" data-slice="10" data-slice-name="slice-10" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 10: Contention observability and regression gate">
     <span class="slice-num">#10</span>
     <span class="slice-title-col">
@@ -1927,14 +1927,14 @@ than a slogan.</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-10">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-10">Approved</span>
           <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-10-approval" value="approved" data-section="slice-10" data-action="approve" aria-label="Approve slice 10">
+              <input type="radio" name="slice-10-approval" value="approved" data-section="slice-10" data-action="approve" checked aria-label="Approve slice 10">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -2071,7 +2071,7 @@ before launch.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-11" data-slice="11" data-slice-name="slice-11" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-11" data-slice="11" data-slice-name="slice-11" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 11: Orphan session NDJSON pruning">
     <span class="slice-num">#11</span>
     <span class="slice-title-col">
@@ -2082,14 +2082,14 @@ before launch.</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-11">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-11">Approved</span>
           <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-11-approval" value="approved" data-section="slice-11" data-action="approve" aria-label="Approve slice 11">
+              <input type="radio" name="slice-11-approval" value="approved" data-section="slice-11" data-action="approve" checked aria-label="Approve slice 11">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">

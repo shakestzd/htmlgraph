@@ -5,10 +5,10 @@ meta:
     description: |
         Make recurring SQLITE_BUSY failures impossible or non-blocking while keeping wipnote self-contained: canonical files remain source of truth, SQLite becomes a single-writer derived index, and YAML/HTML-native commands avoid DB opens.
     created_at: "2026-05-11"
-    status: active
+    status: finalized
     priority: high
     created_by: codex
-    version: 5
+    version: 18
 design:
     problem: |
         Recurring SQLITE_BUSY failures block routine CLI operations such as plan critique while dashboard, collectors, hooks, or indexers are active. The current architecture opens SQLite for commands that should be able to read canonical YAML/HTML directly, runs DDL and migrations on every db.Open, and allows several independent processes to compete as writers. The project is local-first and must remain self-contained; PostgreSQL or another external service is not an acceptable fix.
@@ -32,6 +32,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-813b2b8c
       num: 1
       title: DB-free plan critique and validation
       what: |
@@ -67,8 +68,8 @@ slices:
         Regression: existing plan_critique and plan_lifecycle tests still pass.
       approved: false
       comment: ""
-      approval_status: pending
-      execution_status: not_started
+      approval_status: approved
+      execution_status: promoted
       critic_revisions:
         - source: execution-critic
           severity: LOW
@@ -111,7 +112,7 @@ slices:
         Regression: statusline, graph, trace, related command tests still pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: architecture-critic
@@ -158,7 +159,7 @@ slices:
         Regression: full internal/db package tests, plan feedback normalization tests, and OTel schema tests pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: execution-critic
@@ -205,7 +206,7 @@ slices:
         Integration: status fixture verifies fstype and journal mode are rendered.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       questions:
         - id: q-ephemeral-cache
@@ -289,7 +290,7 @@ slices:
         Regression: existing storage/dbpath literal-path guard still passes.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: architecture-critic
@@ -338,7 +339,7 @@ slices:
         Integration: TestWriterTransport_WithIndexerBudget verifies that even with the 4MiB indexer budget active, the writer queue ingests the chunked NDJSON correctly.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       questions:
         - id: q-service-owner
@@ -394,7 +395,7 @@ slices:
         Integration: TestWriterCrashMidQueue_RecoversFromCanonical kills the writer process while N writes are in-flight; restart and reindex; assert all N rows are eventually present.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: execution-critic
@@ -442,7 +443,7 @@ slices:
         Regression: existing find/status/wip behavior remains stable when DB is healthy.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: execution-critic
@@ -486,7 +487,7 @@ slices:
         Regression: existing reindex and session roundtrip tests still pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: architecture-critic
@@ -540,7 +541,7 @@ slices:
         Regression: health/status output remains stable for existing callers.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: architecture-critic
@@ -600,7 +601,7 @@ slices:
         Integration: TestOrphanSession_NoIndexerRetry — write an orphan NDJSON, run the indexer for 2 ticks, assert no INSERT attempts for it.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: review-2026-05-11
