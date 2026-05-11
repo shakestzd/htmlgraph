@@ -402,21 +402,28 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <li>
       <a href="#slice-1" class="slice-nav-item" data-slice-nav="1">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="1"></span>
-        <span>#1 Fix tool_calls attribution in storeParseResult for sub-agent rows</span>
+        <span>#1 Idempotency foundation: UNIQUE constraint + INSERT OR IGNORE on tool_calls</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-2" class="slice-nav-item" data-slice-nav="2">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="2"></span>
-        <span>#2 Auto-ingest sub-agent JSONL on SubagentStop hook</span>
+        <span>#2 Attribution fix: tool_calls + agent_events + feature lookup</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-3" class="slice-nav-item" data-slice-nav="3">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="3"></span>
-        <span>#3 Verify dashboard / snapshot queries pick up sub-agent rows</span>
+        <span>#3 Auto-ingest sub-agent JSONL on SubagentStop hook (with refactor)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="#slice-4" class="slice-nav-item" data-slice-nav="4">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="4"></span>
+        <span>#4 Audit dashboard / snapshot / cost queries (audit-only, no code changes)</span>
       </a>
     </li>
     
@@ -434,11 +441,11 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Sub-agent tool_calls ingestion + attribution</h1>
-  <p style="color:var(--text-dim)">Fix bug-fbadab6d. Sub-agent JSONL transcripts exist on disk but `tool_calls` has zero rows for sub-agent sessions because (a) `wipnote ingest` is never auto-triggered for sub-agent JSONLs and (b) the existing ingest path would still mis-attribute `tool_calls.session_id` to the short agent ID instead of the parent orchestrator UUID. Plan delivers ingest auto-trigger plus correct attribution so dashboards, cost queries, and stuck-agent diagnostics see sub-agent activity.
+  <p style="color:var(--text-dim)">Fix bug-fbadab6d. Sub-agent JSONL transcripts exist on disk but `tool_calls` has zero rows for sub-agent sessions because (a) `wipnote ingest` is never auto-triggered for sub-agent JSONLs, (b) the ingest path would mis-attribute `tool_calls.session_id` to the short agent ID instead of the parent orchestrator UUID, and (c) `tool_calls` has no UNIQUE constraint so re-ingest duplicates rows. Plan delivers idempotent ingest + correct attribution (tool_calls, agent_events, and active-feature lookup) + auto-ingest on SubagentStop + audit of dashboard queries. Scope is depth-1 sub-agents; deeper nesting is a known limitation.
 </p>
   <div class="meta">
     <span class="badge badge-revision">Active</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v1 · 3 slices · Created 2026-05-10</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v1 · 4 slices · Created 2026-05-10</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -458,9 +465,10 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <section class="dep-graph" data-zone="dependency-graph">
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
-    <div data-node="1" data-name="Fix tool_calls attribution in storeParseResult for sub-agent rows" data-status="pending" data-deps="" data-files="1"></div>
-    <div data-node="2" data-name="Auto-ingest sub-agent JSONL on SubagentStop hook" data-status="pending" data-deps="1" data-files="2"></div>
-    <div data-node="3" data-name="Verify dashboard / snapshot queries pick up sub-agent rows" data-status="pending" data-deps="1,2" data-files="4"></div>
+    <div data-node="1" data-name="Idempotency foundation: UNIQUE constraint + INSERT OR IGNORE on tool_calls" data-status="pending" data-deps="" data-files="2"></div>
+    <div data-node="2" data-name="Attribution fix: tool_calls + agent_events + feature lookup" data-status="pending" data-deps="1" data-files="1"></div>
+    <div data-node="3" data-name="Auto-ingest sub-agent JSONL on SubagentStop hook (with refactor)" data-status="pending" data-deps="1,2" data-files="4"></div>
+    <div data-node="4" data-name="Audit dashboard / snapshot / cost queries (audit-only, no code changes)" data-status="pending" data-deps="2" data-files="5"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -474,19 +482,21 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <summary><span>Design</span><span class="badge badge-pending" data-badge-for="design">Pending</span></summary>
   <div class="section-body">
     <h4>Problem</h4>
-<div data-markdown>`tool_calls` is an ingest-only table populated by `wipnote ingest` reading JSONL transcripts. Hooks (PreToolUse / PostToolUse) write to `agent_events`, not `tool_calls`. Sub-agent JSONLs land at `&lt;session-dir&gt;/subagents/agent-&lt;id&gt;.jsonl` and `DiscoverSubagents()` can find them, but nothing auto-runs ingest for live sessions, so `tool_calls` stays empty for every sub-agent. Even if ingest is run manually, `storeParseResult` currently writes `tool_calls.session_id = agentID` (the short sub-agent ID) and `tool_calls.subagent_session_id = agentID` (same value), which makes cross-session queries against the orchestrator&#39;s UUID impossible. The schema clearly intended `session_id = orchestrator UUID` and `subagent_session_id = agent short ID`.
+<div data-markdown>`tool_calls` is an ingest-only table populated by `wipnote ingest` reading JSONL transcripts. Hooks (PreToolUse / PostToolUse) write to `agent_events`, not `tool_calls`. Sub-agent JSONLs land at `&lt;session-dir&gt;/subagents/agent-&lt;id&gt;.jsonl` and `DiscoverSubagents()` can find them, but nothing auto-runs ingest for live sessions, so `tool_calls` stays empty for every sub-agent. Even if ingest is run manually, `storeParseResult` writes `tool_calls.session_id = agentID` (the short sub-agent ID) and `tool_calls.subagent_session_id = agentID` (same value), and the same function synthesizes `agent_events` rows keyed on the same wrong `sessionID`. The schema clearly intended `session_id = orchestrator UUID` and `subagent_session_id = short agent ID`. Compounding all of this, `tool_calls` has no UNIQUE constraint, so re-running ingest produces duplicate rows on every pass.
 </div>
 <h4>Goals</h4>
 <ol>
-<li data-markdown>**Coverage** — every sub-agent JSONL transcript is parsed into `tool_calls` rows automatically, no manual `wipnote ingest` needed</li>
-<li data-markdown>**Attribution** — `tool_calls.session_id` holds the parent orchestrator UUID and `subagent_session_id` holds the short agent ID, so existing dashboard queries grouping by orchestrator session pick up sub-agent activity</li>
-<li data-markdown>**Idempotency** — re-running auto-ingest on a sub-agent that has already been ingested does not duplicate rows</li>
+<li data-markdown>**Idempotency** — re-running ingest on the same JSONL never produces duplicate `tool_calls` or `agent_events` rows</li>
+<li data-markdown>**Coverage** — every sub-agent JSONL transcript is parsed into `tool_calls` rows automatically on `SubagentStop`, no manual `wipnote ingest` needed</li>
+<li data-markdown>**Attribution** — `tool_calls.session_id` and the synthesized `agent_events.session_id` both hold the parent orchestrator UUID; `subagent_session_id` holds the short agent ID; `feature_id` reflects the orchestrator&#39;s active feature</li>
+<li data-markdown>**Visibility** — dashboard / snapshot / cost queries pick up sub-agent activity grouped under the orchestrator session</li>
 </ol>
 <h4>Constraints</h4>
 <ul>
-<li data-markdown>No new dependencies — use existing `ingest.go` and hook handler code</li>
-<li data-markdown>No schema migration — `subagent_session_id` column already exists; only writes change</li>
-<li data-markdown>Auto-ingest must not block the sub-agent stop hook return — slow ingest cannot delay Claude Code</li>
+<li data-markdown>No new runtime dependencies — use existing `ingest.go` and hook handler code</li>
+<li data-markdown>Idempotency must be data-layer enforced (UNIQUE constraint + INSERT OR IGNORE), not application-layer pre-checks</li>
+<li data-markdown>Auto-ingest must not block the SubagentStop hook return — slow ingest cannot delay Claude Code</li>
+<li data-markdown>Scope: depth-1 sub-agents only. Sub-sub-agents (orchestrator → sub → sub-sub) attribute to their immediate parent, not the root orchestrator. Document this limitation; revisit in a follow-up if usage demands it.</li>
 </ul>
 
     <div class="approval-row">
@@ -504,19 +514,19 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <details id="slices" class="section-card" open data-phase="slices" data-status="pending">
   <summary><span>Slices</span><span class="badge badge-pending" data-badge-for="slices">Pending</span></summary>
   <div class="section-body">
-    <details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-1" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 1: Fix tool_calls attribution in storeParseResult for sub-agent rows">
+    <details class="slice-card" id="slice-1" data-slice="1" data-slice-name="slice-0" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 1: Idempotency foundation: UNIQUE constraint &#43; INSERT OR IGNORE on tool_calls">
     <span class="slice-num">#1</span>
     <span class="slice-title-col">
-      <span class="slice-name">Fix tool_calls attribution in storeParseResult for sub-agent rows</span>
-      <span class="slice-preview">In cmd/wipnote/ingest.go, modify storeParseResult so that when a</span>
+      <span class="slice-name">Idempotency foundation: UNIQUE constraint &#43; INSERT OR IGNORE on tool_calls</span>
+      <span class="slice-preview">Make toolcalls writes idempotent at the data layer so re-ingest</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -548,34 +558,23 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-1-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>In <code>cmd/wipnote/ingest.go</code>, modify <code>storeParseResult</code> so that when a
-<code>parseResult</code> originates from a sub-agent JSONL (the file lives under
-<code>&lt;session-dir&gt;/subagents/</code>), it writes:</p>
-<ul>
-<li><code>tool_calls.session_id = &lt;parent orchestrator UUID&gt;</code></li>
-<li><code>tool_calls.subagent_session_id = &lt;agent short ID&gt;</code></li>
-</ul>
-<p>Today (around line 253–267) it writes <code>tc.SessionID = sessionID</code> where
-<code>sessionID</code> is the agent short ID, and <code>tc.SubagentSessionID = agentID</code>
-where <code>agentID</code> is the same value. The orchestrator UUID is not
-currently threaded into <code>ingestSubagents → ingestFileWithAgent → storeParseResult</code>.</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Make <code>tool_calls</code> writes idempotent at the data layer so re-ingest
+(manual or auto) never produces duplicates.</p>
 <p>Implementation:</p>
 <ol>
-<li>Add an optional <code>parentSessionID string</code> parameter to
-<code>ingestFileWithAgent</code> (or a sibling sub-agent–specific variant).</li>
-<li><code>ingestSubagents</code> looks up the parent UUID from the directory
-name of the JSONL file or from the existing <code>sessions</code> row
-(<code>parent_session_id</code> column on the sub-agent session) and passes
-it down.</li>
-<li><code>storeParseResult</code> uses <code>parentSessionID</code> for <code>tc.SessionID</code>
-when non-empty, and assigns <code>agentID</code> to <code>tc.SubagentSessionID</code>.
-When <code>parentSessionID</code> is empty (regular non-sub-agent ingest),
-behavior is unchanged.</li>
+<li>In <code>internal/db/schema.go</code>, add a <code>UNIQUE(session_id, tool_use_id)</code>
+constraint to <code>tool_calls</code>. Guard with a migration that creates
+the unique index <code>IF NOT EXISTS</code> so existing databases pick it up
+without rebuilding the table. Verify <code>tool_use_id</code> is non-null
+and stable across re-parses (parser emits it from JSONL).</li>
+<li>In <code>internal/db/message_repo.go</code>, change <code>InsertToolCall</code> from a
+bare <code>INSERT</code> to <code>INSERT OR IGNORE</code>. Document the choice — IGNORE
+preserves the earlier row (typically the canonical one).</li>
+<li>Add the same <code>INSERT OR IGNORE</code> discipline to the <code>agent_events</code>
+writer if it has the same risk (check schema for a uniqueness
+candidate — likely <code>(session_id, event_id)</code> or <code>(session_id, ts_micros, agent_id)</code>).</li>
 </ol>
-<p>The same correction applies to <code>messages</code> writes if they also key on
-<code>session_id</code> and are intended to be queryable by orchestrator — but
-check first whether the <code>messages</code> table already has a parent column
-and only touch the <code>tool_calls</code> path if <code>messages</code> is out of scope.</p>
+<p>This slice is purely structural and unblocks every subsequent slice.</p>
 </div>
           <label for="slice-1-what-reveal" class="reveal-label">Show full description</label>
           
@@ -587,10 +586,11 @@ and only touch the <code>tool_calls</code> path if <code>messages</code> is out 
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Goal &#34;Attribution&#34;. Without this, even after auto-ingest fires
-(slice 2), every dashboard query that joins <code>tool_calls</code> against
-orchestrator sessions still returns zero sub-agent rows. The schema
-already has <code>subagent_session_id</code> — slice 1 honors that intent.</p>
+          <div class="markdown-block serif-prose"><p>Goal &#34;Idempotency&#34;. Without a unique constraint, slice 2&#39;s auto-ingest
+would duplicate rows on every SubagentStop (the same JSONL is parsed
+both on stop and on any later manual ingest run). The plan&#39;s earlier
+idempotency claim was unsupported by the schema — critic finding
+DANGER #1. This slice makes it real.</p>
 </div>
           
         </div>
@@ -599,13 +599,13 @@ already has <code>subagent_session_id</code> — slice 1 honors that intent.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>cmd/wipnote/ingest.go</code></div>
+        <div class="slice-field-value"><code>internal/db/schema.go, internal/db/message_repo.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>After ingesting a sub-agent JSONL, `SELECT COUNT(*) FROM tool_calls WHERE session_id = &#39;&lt;parent UUID&gt;&#39; AND subagent_session_id = &#39;&lt;agent short ID&gt;&#39;` returns the correct row count</li><li>Non-sub-agent ingest is unaffected — `tool_calls.subagent_session_id` is NULL for non-sub-agent rows; `tool_calls.session_id` still equals the orchestrator&#39;s session UUID</li><li>Re-running ingest on the same JSONL does not create duplicate `tool_calls` rows (idempotency via the existing `tool_use_id` uniqueness or equivalent)</li></ul>
+        <ul class="slice-done-list"><li>Running ingest twice on the same JSONL produces the same `tool_calls` row count both times (verified by integration test)</li><li>Existing test data continues to load — the migration runs without error against a populated test DB</li><li>`SELECT COUNT(*) FROM tool_calls GROUP BY session_id, tool_use_id HAVING COUNT(*) &gt; 1` returns zero rows on any fresh DB</li></ul>
       </div>
       
     
@@ -619,18 +619,18 @@ already has <code>subagent_session_id</code> — slice 1 honors that intent.</p>
         <div class="test-strategy">
           
           <div class="test-group" data-kind="unit">
-            <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestStoreParseResult_SubagentAttribution — feed a parseResult with a parentSessionID and an agentID; assert tool_calls rows have session_id=parent and subagent_session_id=agent</li><li>TestStoreParseResult_RegularSession_Unchanged — feed a parseResult with empty parentSessionID; assert behavior matches current main (session_id=sessionID, subagent_session_id=NULL)</li></ul>
+            <span class="test-chip">UNIT &middot; 1</span>
+            <ul><li>TestInsertToolCall_Idempotent — insert the same (session_id, tool_use_id) twice, expect one row</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
             <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestIngestSubagents_AttributionFromParentDir — set up a fake session directory with a `subagents/agent-X.jsonl` file, run `ingestSubagents`, query the DB and assert attribution is correct</li></ul>
+            <ul><li>TestIngest_RerunIsIdempotent — ingest a JSONL twice, assert no row count change on the second pass</li></ul>
           </div>
           
-          <div class="test-group" data-kind="regression">
-            <span class="test-chip">REGRESSION &middot; 1</span>
-            <ul><li>existing TestIngestFile_* and TestStoreParseResult_* tests must still pass</li></ul>
+          <div class="test-group" data-kind="migration">
+            <span class="test-chip">MIGRATION &middot; 1</span>
+            <ul><li>TestSchemaMigration_AddsUniqueIndex — load an old-shape DB, run migration, assert the unique index exists</li></ul>
           </div>
           
         </div>
@@ -639,6 +639,19 @@ already has <code>subagent_session_id</code> — slice 1 honors that intent.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Original plan claimed idempotency &#39;via existing tool_use_id uniqueness&#39;. No such uniqueness exists (schema.go:375-386). This slice was added explicitly to create that uniqueness before any other slice runs.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -653,19 +666,19 @@ already has <code>subagent_session_id</code> — slice 1 honors that intent.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 2: Auto-ingest sub-agent JSONL on SubagentStop hook">
+<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-1" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 2: Attribution fix: tool_calls &#43; agent_events &#43; feature lookup">
     <span class="slice-num">#2</span>
     <span class="slice-title-col">
-      <span class="slice-name">Auto-ingest sub-agent JSONL on SubagentStop hook</span>
-      <span class="slice-preview">In internal/hooks/subagentstop.go (or wherever the SubagentStop</span>
+      <span class="slice-name">Attribution fix: tool_calls &#43; agent_events &#43; feature lookup</span>
+      <span class="slice-preview">In cmd/wipnote/ingest.go, modify storeParseResult and the</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -697,28 +710,24 @@ already has <code>subagent_session_id</code> — slice 1 honors that intent.</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-2-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>In <code>internal/hooks/subagent_stop.go</code> (or wherever the SubagentStop
-handler lives — verify exact filename), invoke <code>ingestSubagents</code>
-(or <code>ingestFileWithAgent</code> directly) for the sub-agent that just
-stopped. The hook receives the sub-agent&#39;s <code>session_id</code> (which is
-really the agent short ID, per the bug report) and the parent
-<code>session_id</code> UUID; both are available in the CloudEvent or
-derivable from the existing <code>sessions</code> row.</p>
-<p>Key implementation details:</p>
+          <div class="markdown-block reveal-content serif-prose"><p>In <code>cmd/wipnote/ingest.go</code>, modify <code>storeParseResult</code> and the
+callers in <code>ingestSubagents</code> / <code>ingestFileWithAgent</code> so sub-agent
+ingest writes:</p>
 <ul>
-<li>Resolve the JSONL path from the <code>Stop</code> event payload
-(<code>transcript_path</code> field) or via <code>DiscoverSubagents</code> on the
-parent session directory.</li>
-<li>Run ingest in a goroutine so the hook returns immediately
-(<code>go func() { ingestSubagents(...) }()</code>). This satisfies the
-&#34;do not block hook&#34; constraint.</li>
-<li>Log errors via the existing hook logger but do not propagate
-them as hook failures — ingest failure is a telemetry issue,
-not a hook contract violation.</li>
+<li><code>tool_calls.session_id = &lt;parent orchestrator UUID&gt;</code></li>
+<li><code>tool_calls.subagent_session_id = &lt;agent short ID&gt;</code></li>
+<li><code>agent_events.session_id = &lt;parent orchestrator UUID&gt;</code> (the rows
+synthesized in <code>storeParseResult</code> around lines 291-333)</li>
+<li><code>feature_id</code> resolved via <code>sessionActiveFeature(database, &lt;parent orchestrator UUID&gt;)</code>, NOT the agent short ID</li>
 </ul>
-<p>Slice 1 must land first because the auto-ingest depends on
-correct attribution to be useful — otherwise we&#39;d just populate
-mis-attributed rows.</p>
+<p>Today the parent UUID is already in scope inside <code>ingestSubagents</code>
+as <code>parent.SessionID</code> (line ~199). The fix is just to thread it
+down through <code>ingestFileWithAgent</code> and into <code>storeParseResult</code> as
+a new <code>parentSessionID string</code> parameter. When <code>parentSessionID</code>
+is empty (regular non-sub-agent ingest), behavior is unchanged.</p>
+<p>Add a check: only ingest non-sub-agent rows write
+<code>subagent_session_id = NULL</code>; sub-agent rows always write both
+columns.</p>
 </div>
           <label for="slice-2-what-reveal" class="reveal-label">Show full description</label>
           
@@ -730,9 +739,12 @@ mis-attributed rows.</p>
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Goal &#34;Coverage&#34;. This is the trigger that makes sub-agent rows
-appear in <code>tool_calls</code> for live sessions without requiring the
-user to remember to run <code>wipnote ingest</code>.</p>
+          <div class="markdown-block serif-prose"><p>Goals &#34;Attribution&#34; and &#34;Visibility&#34;. Without this, auto-ingest
+from slice 2 would populate rows attributed to the wrong session,
+defeating the dashboard fix. Slice 1 also addresses three
+attribution surfaces that the original plan missed: <code>agent_events</code>
+synthesis, the active-feature lookup, and the simplification of
+parent-UUID resolution.</p>
 </div>
           
         </div>
@@ -741,13 +753,13 @@ user to remember to run <code>wipnote ingest</code>.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>internal/hooks/subagent_stop.go, cmd/wipnote/ingest.go</code></div>
+        <div class="slice-field-value"><code>cmd/wipnote/ingest.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>After a sub-agent finishes (SubagentStop fires), `tool_calls` contains rows for that sub-agent&#39;s session within ~5 seconds (allowing for goroutine scheduling)</li><li>Hook return latency is unchanged — auto-ingest does not block the response to Claude Code</li><li>If the JSONL is mid-write (still open by Claude), the ingest either skips it cleanly or treats it as a partial parse — no panic, no corrupted DB rows</li></ul>
+        <ul class="slice-done-list"><li>After ingesting a sub-agent JSONL, `SELECT COUNT(*) FROM tool_calls WHERE session_id = &#39;&lt;parent UUID&gt;&#39; AND subagent_session_id = &#39;&lt;agent short ID&gt;&#39;` returns the correct row count</li><li>After ingesting a sub-agent JSONL where the orchestrator had an active feature, the sub-agent&#39;s `tool_calls` rows have `feature_id` set to that feature ID</li><li>After ingesting a sub-agent JSONL, the synthesized `agent_events` rows are also attributed to the parent UUID (not the agent short ID)</li><li>Non-sub-agent ingest is unaffected — `tool_calls.subagent_session_id` is NULL, `session_id` is the session&#39;s UUID</li></ul>
       </div>
       
     
@@ -761,18 +773,18 @@ user to remember to run <code>wipnote ingest</code>.</p>
         <div class="test-strategy">
           
           <div class="test-group" data-kind="unit">
-            <span class="test-chip">UNIT &middot; 1</span>
-            <ul><li>TestSubagentStopHook_TriggersIngest — fake CloudEvent for SubagentStop, mock the ingest call, assert it is invoked with the correct parent UUID and JSONL path</li></ul>
+            <span class="test-chip">UNIT &middot; 3</span>
+            <ul><li>TestStoreParseResult_SubagentAttribution — feed parseResult with parentSessionID &#43; agentID; assert tool_calls AND agent_events rows have session_id=parent and subagent_session_id=agent</li><li>TestStoreParseResult_FeatureLookupUsesParent — set active_feature_id on the parent session; ingest a sub-agent; assert sub-agent rows have feature_id = parent&#39;s active feature</li><li>TestStoreParseResult_RegularSession_Unchanged — empty parentSessionID; assert behavior matches main</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
             <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestSubagentStop_E2E — spin up the hook handler in a test harness, feed a SubagentStop event, sleep briefly, assert tool_calls rows exist with correct attribution</li></ul>
+            <ul><li>TestIngestSubagents_AttributionFromParentDir — set up a fake session dir with subagents/agent-X.jsonl, run ingestSubagents, query DB, assert attribution</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
             <span class="test-chip">REGRESSION &middot; 1</span>
-            <ul><li>existing TestSubagentStop_* tests must still pass; existing PostToolUse/Stop hook tests must still pass</li></ul>
+            <ul><li>existing TestIngestFile_* and TestStoreParseResult_* tests pass</li></ul>
           </div>
           
         </div>
@@ -781,6 +793,31 @@ user to remember to run <code>wipnote ingest</code>.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Original slice mentioned only tool_calls. storeParseResult also synthesizes agent_events rows (ingest.go:291-333) keyed on the same wrong sessionID — added to the fix.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">sessionActiveFeature(database, sessionID) reads against the agent short ID; active_work_items is keyed on orchestrator UUID. Sub-agent rows would get feature_id=&#39;&#39; until this is fixed — added to the slice.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Parent UUID resolution path described in v1 was over-complicated. parent.SessionID is already in scope in ingestSubagents (ingest.go:199) — just thread it through, no extra DB lookup needed.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -795,19 +832,19 @@ user to remember to run <code>wipnote ingest</code>.</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 3: Verify dashboard / snapshot queries pick up sub-agent rows">
+<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-2" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 3: Auto-ingest sub-agent JSONL on SubagentStop hook (with refactor)">
     <span class="slice-num">#3</span>
     <span class="slice-title-col">
-      <span class="slice-name">Verify dashboard / snapshot queries pick up sub-agent rows</span>
-      <span class="slice-preview">Audit the dashboard SQL queries and wipnote snapshot aggregation</span>
+      <span class="slice-name">Auto-ingest sub-agent JSONL on SubagentStop hook (with refactor)</span>
+      <span class="slice-preview">Trigger ingest of the sub-agent&#39;s JSONL when SubagentStop fires,</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
-          <span class="badge badge-revision badge-sm">M</span>
-          <span class="badge badge-pending badge-sm">Low</span>
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="4 critic issue(s)">4 issues</span>
           
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -839,28 +876,36 @@ user to remember to run <code>wipnote ingest</code>.</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-3-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>Audit the dashboard SQL queries and <code>wipnote snapshot</code> aggregation
-queries that GROUP BY or JOIN on <code>tool_calls.session_id</code>. Two
-possible outcomes:</p>
-<p>(a) Most queries already group by orchestrator UUID; with slice 1
-attribution fix they automatically pick up sub-agent rows
-because <code>tool_calls.session_id</code> is now the orchestrator UUID.
-→ No code change needed; just verify and document.</p>
-<p>(b) Some queries explicitly key on <code>subagent_session_id</code> (or should,
-to distinguish &#34;parent did this tool call&#34; vs &#34;a sub-agent did
-this tool call&#34;). For these, update the query to UNION or
-LEFT JOIN on <code>subagent_session_id</code>.</p>
-<p>Concrete audit targets:</p>
-<ul>
-<li><code>cmd/wipnote/api_feed.go</code> (activity feed)</li>
-<li><code>cmd/wipnote/api_tree.go</code> (event tree)</li>
-<li><code>cmd/wipnote/snapshot.go</code> (snapshot aggregations)</li>
-<li><code>cmd/wipnote/sessions.go</code> (session detail)</li>
-<li>Any cost / token rollups (search for <code>SUM(.*tokens</code> in cmd/)</li>
-</ul>
-<p>For each, document whether sub-agent rows now appear correctly and
-whether the user-visible labelling distinguishes
-&#34;orchestrator did X&#34; vs &#34;sub-agent did X&#34;.</p>
+          <div class="markdown-block reveal-content serif-prose"><p>Trigger ingest of the sub-agent&#39;s JSONL when <code>SubagentStop</code> fires,
+so <code>tool_calls</code> populates without requiring <code>wipnote ingest</code>.</p>
+<p>Two-part implementation:</p>
+<p>Part A — Package boundary refactor:
+<code>ingestSubagents</code> and <code>ingestFileWithAgent</code> are currently in
+<code>package main</code> (cmd/wipnote/ingest.go). Hooks live in <code>package hooks</code> (internal/hooks/). To call ingest from a hook, extract
+the ingest logic to <code>internal/ingest/</code> (or a similar internal
+package). The CLI command in cmd/ becomes a thin caller.
+Alternative: shell out to <code>wipnote ingest --session &lt;id&gt;</code> from
+the hook — simpler but adds process spawn overhead per stop.
+Recommended: extract to <code>internal/ingest/</code>.</p>
+<p>Part B — Hook wiring:
+In the SubagentStop handler (<code>internal/hooks/subagent_stop.go</code>
+or equivalent — verify exact filename; today the handler lives
+near <code>subagent_start.go</code>):
+1. Resolve the JSONL path from <code>event.TranscriptPath</code> (already
+present on CloudEvent per runner.go:60). Fall back to
+<code>DiscoverSubagents</code> on the session dir only if the field is
+empty.
+2. Spawn a goroutine that opens its own DB connection (do NOT
+share the hook&#39;s *sql.DB — the hook binary may exit before
+the goroutine finishes) and runs the ingest.
+3. Log errors via the hook logger; do not propagate as hook
+failures.
+4. Schedule a final re-ingest on <code>session_end</code> to catch any
+tool_call that landed in the JSONL after SubagentStop fired
+(the parser tolerates EOF on incomplete final lines, but
+those lines are silently dropped — re-ingest recovers them).</p>
+<p>With slice 0&#39;s INSERT OR IGNORE in place, the re-ingest on
+session_end is safe — no duplicate rows.</p>
 </div>
           <label for="slice-3-what-reveal" class="reveal-label">Show full description</label>
           
@@ -872,10 +917,10 @@ whether the user-visible labelling distinguishes
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Goal &#34;Coverage&#34; implies user-visible visibility, not just DB rows.
-Without this audit we could land slices 1+2 and discover the
-dashboard still hides sub-agent activity because a query filters
-on <code>is_subagent = 0</code> somewhere.</p>
+          <div class="markdown-block serif-prose"><p>Goal &#34;Coverage&#34;. The trigger that makes sub-agent rows appear in
+<code>tool_calls</code> without manual intervention. Requires slice 1&#39;s
+attribution fix to be useful and slice 0&#39;s idempotency for the
+re-ingest safety net.</p>
 </div>
           
         </div>
@@ -884,13 +929,13 @@ on <code>is_subagent = 0</code> somewhere.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>cmd/wipnote/api_feed.go, cmd/wipnote/api_tree.go, cmd/wipnote/snapshot.go, cmd/wipnote/sessions.go</code></div>
+        <div class="slice-field-value"><code>internal/ingest/ingest.go, cmd/wipnote/ingest.go, internal/hooks/subagent_stop.go, internal/hooks/session_end.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>Activity feed displays sub-agent tool_call events grouped under the orchestrator session, with a clear sub-agent label or indent</li><li>`wipnote snapshot` total tool_use count includes sub-agent tool uses</li><li>At least one regression test added that asserts a sub-agent&#39;s tool_calls appear in the relevant query result</li></ul>
+        <ul class="slice-done-list"><li>After SubagentStop fires for a sub-agent that ran N tool calls, `SELECT COUNT(*) FROM tool_calls WHERE subagent_session_id = &#39;&lt;agent ID&gt;&#39;` returns N within 5 seconds</li><li>SubagentStop hook return latency is unchanged versus baseline (no synchronous ingest blocking)</li><li>On session_end, a final re-ingest pass runs and recovers any tool_call missed due to JSONL flush race; total row count converges to the JSONL&#39;s actual tool_use count</li><li>If the JSONL is mid-write, ingest does not panic or corrupt the DB; partial rows are upserted via INSERT OR IGNORE (so re-ingest catches the missing ones)</li></ul>
       </div>
       
     
@@ -904,18 +949,18 @@ on <code>is_subagent = 0</code> somewhere.</p>
         <div class="test-strategy">
           
           <div class="test-group" data-kind="unit">
-            <span class="test-chip">UNIT &middot; 1</span>
-            <ul><li>TestActivityFeed_IncludesSubagentToolCalls — insert one orchestrator tool_call and one sub-agent tool_call in the test DB; query the feed handler; assert both appear</li></ul>
+            <span class="test-chip">UNIT &middot; 2</span>
+            <ul><li>TestSubagentStopHook_TriggersIngest — fake CloudEvent for SubagentStop, mock ingest, assert it&#39;s called with correct parent UUID and JSONL path</li><li>TestSubagentStopHook_ReturnsBeforeIngestCompletes — mock a slow ingest, assert hook returns immediately</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
-            <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestSnapshotCount_IncludesSubagentToolUses — same setup, assert `wipnote snapshot --summary` total count reflects both</li></ul>
+            <span class="test-chip">INTEGRATION &middot; 2</span>
+            <ul><li>TestSubagentStop_E2E — spin up hook handler, feed SubagentStop, sleep, assert tool_calls rows with correct attribution</li><li>TestSubagentStop_RaceWithJSONLFlush — partial JSONL, fire SubagentStop, then write final line and trigger session_end re-ingest; assert final tool_call appears exactly once</li></ul>
           </div>
           
           <div class="test-group" data-kind="regression">
             <span class="test-chip">REGRESSION &middot; 1</span>
-            <ul><li>all existing api_feed and snapshot tests must still pass</li></ul>
+            <ul><li>existing TestSubagentStop_* and Stop hook tests pass</li></ul>
           </div>
           
         </div>
@@ -924,6 +969,37 @@ on <code>is_subagent = 0</code> somewhere.</p>
     </div>
     
 
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">cmd/wipnote/ingest.go is package main; internal/hooks/ is package hooks. v1 plan named ingest.go as a dependency for slice 2 but didn&#39;t acknowledge the package boundary. Refactor to internal/ingest/ is now Part A of this slice.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">TranscriptPath is on CloudEvent (runner.go:60); v1 said &#39;or via DiscoverSubagents&#39; as if equal. TranscriptPath is preferred — DiscoverSubagents is a directory scan and the fallback only.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">Goroutine sharing the hook&#39;s *sql.DB risks losing work if the hook binary exits first. Goroutine must open its own DB connection from the project path.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">JSONL flush race: SubagentStop may fire before final write completes. Added &#39;final re-ingest on session_end&#39; to the done_when; this depends on slice 0&#39;s INSERT OR IGNORE to be safe.</span>
+        </div>
+        
+      </div>
+    </div>
     
 
     
@@ -938,62 +1014,159 @@ on <code>is_subagent = 0</code> somewhere.</p>
     </details>
   </div>
 </details>
+<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-3" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 4: Audit dashboard / snapshot / cost queries (audit-only, no code changes)">
+    <span class="slice-num">#4</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Audit dashboard / snapshot / cost queries (audit-only, no code changes)</span>
+      <span class="slice-preview">Inventory every SQL query in the codebase that filters, groups, or</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-pending badge-sm">S</span>
+          <span class="badge badge-pending badge-sm">Low</span>
+          <span class="badge badge-pending badge-sm" title="Execution: not_started">Not Started</span>
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
+          
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" aria-label="Approve slice 4">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-4-approval" value="changes_requested" data-section="slice-4" data-action="approve" aria-label="Request changes for slice 4">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-4-approval" value="rejected" data-section="slice-4" data-action="approve" aria-label="Reject slice 4">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-4-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Inventory every SQL query in the codebase that filters, groups, or
+joins on <code>tool_calls.session_id</code> OR <code>agent_events.session_id</code>, and
+document whether the slice 1 attribution fix makes them
+sub-agent-aware automatically or whether a query change is needed.</p>
+<p>Concrete files to scan:</p>
+<ul>
+<li><code>cmd/wipnote/api_feed.go</code> (activity feed; uses agent_events
+and otel_signals)</li>
+<li><code>cmd/wipnote/api_tree.go</code> (event tree; uses agent_events)</li>
+<li><code>cmd/wipnote/api.go</code> (token cost query around line 413-426;
+uses messages.input_tokens joined to sessions)</li>
+<li><code>cmd/wipnote/snapshot.go</code> (snapshot aggregations; does NOT
+query tool_calls per critic finding MED — confirm and
+document)</li>
+<li><code>cmd/wipnote/sessions.go</code> (session detail)</li>
+</ul>
+<p>For each affected query produce a one-line note in this slice&#39;s
+<code>decisions_notes</code> field: query location, current behavior,
+whether it passes with slice 1 attribution, and a recommended
+action (no-change / UNION-fallback for historical rows / rewrite).
+The deliverable is a list of follow-up slices to file.</p>
+<p>NO code changes in this slice. The audit output drives slice 5+.</p>
+</div>
+          <label for="slice-4-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>Slice 3 in v1 combined audit + fix across five query surfaces,
+which is unbounded scope. Splitting audit from repair lets each
+follow-up fix slice carry its own done_when. The audit also
+catches the cost-query in <code>api.go</code> that v1 missed entirely
+(critic finding MED).</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>cmd/wipnote/api_feed.go, cmd/wipnote/api_tree.go, cmd/wipnote/api.go, cmd/wipnote/snapshot.go, cmd/wipnote/sessions.go</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list"><li>A documented audit table is written into this slice&#39;s `decisions_notes` listing every affected query, its file:line, current behavior, and recommended action</li><li>At least one follow-up slice is added to this plan per query that requires changes</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="markdown-block slice-tests"><p>No code change in this slice → no test code. The audit table itself is the deliverable, verified by code review.</p>
+</div>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">opus</span>
+          <span class="critic-revision-summary">v1 slice 3 combined audit &#43; fix for 5 query surfaces — unbounded scope per slice. Split into audit-only here; per-fix slices to be appended after audit lands.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">v1 listed snapshot.go as an audit target but snapshot.go has no tool_calls queries. api.go cost rollup (line 413-426) was missed entirely and is added here.</span>
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+
+    <div class="slice-deps">Dependencies: slices 2</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-4" data-comment-for="slice-4" placeholder="Comments on slice 4..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
 
     <!--PLAN_SLICE_CARDS-->
   </div>
 </details>
 
 <!-- Design Decisions (hidden for v2 plans — slice cards carry their own questions) -->
-<details id="questions" class="section-card" data-phase="questions" data-status="pending">
-  <summary><span>Design Decisions</span><span class="badge badge-pending" data-badge-for="questions">Pending</span></summary>
-  <div class="section-body">
-    
-    <div class="question-block" id="q-jsonl-locking">
-      <p>How do we handle the case where SubagentStop fires while Claude is still writing the final lines of the JSONL?</p>
-      
-      
-      <label><input type="radio" name="q-jsonl-locking" data-question="q-jsonl-locking" value="A: 500ms sleep before goroutine ingest — simple, may still race"> A: 500ms sleep before goroutine ingest — simple, may still race</label>
-      
-      <label class="recommended"><input type="radio" name="q-jsonl-locking" data-question="q-jsonl-locking" value="B: Trust parser EOF tolerance &#43; add a final re-ingest on session_end — robust, two writes"> B: Trust parser EOF tolerance &#43; add a final re-ingest on session_end — robust, two writes <span class="rec-tag">recommended</span></label>
-      
-      <label><input type="radio" name="q-jsonl-locking" data-question="q-jsonl-locking" value="C: fsnotify tail-watch — most accurate, most complex"> C: fsnotify tail-watch — most accurate, most complex</label>
-      
-      <textarea data-section="questions" data-question-rationale="q-jsonl-locking" placeholder="Rationale for q-jsonl-locking..."></textarea>
-    </div>
-    
-    <div class="question-block" id="q-error-attribution">
-      <p>Should we backfill attribution for existing sub-agent rows that were ingested under the wrong session_id?</p>
-      
-      
-      <label><input type="radio" name="q-error-attribution" data-question="q-error-attribution" value="A: One-time backfill — clean state, requires schema-aware migration"> A: One-time backfill — clean state, requires schema-aware migration</label>
-      
-      <label class="recommended"><input type="radio" name="q-error-attribution" data-question="q-error-attribution" value="B: Leave old rows, document — pragmatic; affects only history"> B: Leave old rows, document — pragmatic; affects only history <span class="rec-tag">recommended</span></label>
-      
-      <label><input type="radio" name="q-error-attribution" data-question="q-error-attribution" value="C: Dashboard UNION fallback — covers both, makes queries uglier"> C: Dashboard UNION fallback — covers both, makes queries uglier</label>
-      
-      <textarea data-section="questions" data-question-rationale="q-error-attribution" placeholder="Rationale for q-error-attribution..."></textarea>
-    </div>
-    
-    <table class="q-table">
-      <thead><tr><th>Question</th><th>Selected</th><th>Status</th></tr></thead>
-      <tbody id="questionsRecap">
-        
-        <tr data-recap-for="q-jsonl-locking">
-          <td>How do we handle the case where SubagentStop fires while Claude is still writing the final lines of the JSONL?</td>
-          <td class="recap-answer">&mdash;</td>
-          <td><span class="badge badge-pending">Pending</span></td>
-        </tr>
-        
-        <tr data-recap-for="q-error-attribution">
-          <td>Should we backfill attribution for existing sub-agent rows that were ingested under the wrong session_id?</td>
-          <td class="recap-answer">&mdash;</td>
-          <td><span class="badge badge-pending">Pending</span></td>
-        </tr>
-        
-      </tbody>
-    </table>
-  </div>
-</details>
 
 
 
@@ -1005,8 +1178,8 @@ on <code>is_subagent = 0</code> somewhere.</p>
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">4</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">4</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">5</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">5</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -1086,7 +1259,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');
