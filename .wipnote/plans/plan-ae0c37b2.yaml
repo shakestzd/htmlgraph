@@ -1,0 +1,17 @@
+meta:
+    id: plan-ae0c37b2
+    track_id: trk-0677c709
+    title: Durable self-contained SQLite contention fix
+    description: 'Make recurring SQLITE_BUSY failures impossible or non-blocking while keeping wipnote self-contained: canonical files remain source of truth, SQLite becomes a single-writer derived index, and YAML/HTML-native commands avoid DB opens.'
+    created_at: "2026-05-11"
+    status: draft
+    priority: medium
+    version: 2
+design:
+    problem: ""
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices: []
+questions: []
