@@ -10,8 +10,67 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shakestzd/wipnote/internal/db/writequeue"
 	"github.com/shakestzd/wipnote/internal/otel/collector"
 )
+
+// WriterServiceStatus is the diagnostic JSON the dashboard reads from
+// /api/collector-status to render the slice-6 writer-queue backpressure
+// indicator. State is one of "init" / "running" / "draining" /
+// "stopped"; "disabled" means the serve process did not construct a
+// writer service (e.g., test harness, DB open failed at startup).
+//
+// Depth + Capacity + EnqueueRate + DequeueRate are the primary signals
+// the dashboard surfaces; Enqueued / Dequeued / Rejected / Errors are
+// monotonic counters useful for the contention-observability gate
+// (slice 10).
+type WriterServiceStatus struct {
+	State             string  `json:"state"`
+	Depth             int     `json:"depth"`
+	Capacity          int     `json:"capacity"`
+	Enqueued          int64   `json:"enqueued"`
+	Dequeued          int64   `json:"dequeued"`
+	Rejected          int64   `json:"rejected"`
+	Errors            int64   `json:"errors"`
+	EnqueueRatePerSec float64 `json:"enqueue_rate_per_sec"`
+	DequeueRatePerSec float64 `json:"dequeue_rate_per_sec"`
+}
+
+// collectorWriterStatusHandler returns the live writer-queue status as
+// JSON. Returns "disabled" state when no writer service is wired (which
+// is correct for unit tests that build the mux without a DB).
+func collectorWriterStatusHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		out := readWriterServiceStatus(writerService.queue)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(out)
+	})
+}
+
+// readWriterServiceStatus converts queue.Stats into the wire shape
+// the dashboard expects. Exposed so the test file can probe it without
+// instantiating an HTTP recorder.
+func readWriterServiceStatus(q *writequeue.Queue) WriterServiceStatus {
+	if q == nil {
+		return WriterServiceStatus{State: "disabled"}
+	}
+	s := q.Stats()
+	return WriterServiceStatus{
+		State:             string(s.State),
+		Depth:             s.Depth,
+		Capacity:          s.Capacity,
+		Enqueued:          s.Enqueued,
+		Dequeued:          s.Dequeued,
+		Rejected:          s.Rejected,
+		Errors:            s.Errors,
+		EnqueueRatePerSec: s.EnqueueRatePerSec,
+		DequeueRatePerSec: s.DequeueRatePerSec,
+	}
+}
 
 // CollectorStatus holds the live health of a per-session OTel collector.
 // Exported so tests can deserialise the HTTP response into this struct.
