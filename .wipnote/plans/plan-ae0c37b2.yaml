@@ -8,7 +8,7 @@ meta:
     status: finalized
     priority: high
     created_by: codex
-    version: 19
+    version: 20
 design:
     problem: |
         Recurring SQLITE_BUSY failures block routine CLI operations such as plan critique while dashboard, collectors, hooks, or indexers are active. The current architecture opens SQLite for commands that should be able to read canonical YAML/HTML directly, runs DDL and migrations on every db.Open, and allows several independent processes to compete as writers. The project is local-first and must remain self-contained; PostgreSQL or another external service is not an acceptable fix.
@@ -123,6 +123,7 @@ slices:
           severity: LOW
           summary: Prefer deterministic statement instrumentation over locked-DB-only proof for no-DDL behavior.
     - id: slice-3
+      feature_id: feat-80259f26
       num: 3
       title: Version-gated migrations with PRAGMA user_version
       what: |
@@ -161,7 +162,7 @@ slices:
       approved: false
       comment: ""
       approval_status: approved
-      execution_status: not_started
+      execution_status: promoted
       critic_revisions:
         - source: execution-critic
           severity: MED
