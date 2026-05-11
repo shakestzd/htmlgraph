@@ -1,0 +1,17 @@
+meta:
+    id: plan-6ee9b0c8
+    track_id: trk-0677c709
+    title: Sub-agent tool_calls ingestion + attribution
+    description: 'Fix bug-fbadab6d: auto-ingest sub-agent JSONL transcripts on SubagentStop hook and correct tool_calls.session_id attribution so the orchestrator UUID is the join key and subagent_session_id holds the short agent ID.'
+    created_at: "2026-05-11"
+    status: draft
+    priority: medium
+    version: 2
+design:
+    problem: ""
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices: []
+questions: []
