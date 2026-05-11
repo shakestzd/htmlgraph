@@ -16,6 +16,7 @@ func cleanupCmd() *cobra.Command {
 		Short: "Cleanup operations that respect the HTML-canonical invariant",
 	}
 	cmd.AddCommand(cleanupGhostSessionsCmd())
+	cmd.AddCommand(cleanupOrphanSessionsCmd())
 	return cmd
 }
 
