@@ -380,3 +380,96 @@ func TestWriteQueue_DefaultCapacity(t *testing.T) {
 		t.Errorf("default Capacity = %d, want %d", got, DefaultCapacity)
 	}
 }
+
+// TestWriteQueue_NoPanicOnSubmitDuringStop is the regression test for
+// roborev #1504: the prior implementation closed q.ch in Stop, racing
+// concurrent Submit goroutines into a "send on closed channel" panic.
+// This test races 50 producers against Stop and asserts:
+//  1. No panic.
+//  2. Every Submit returns either nil (enqueued before Stop) or
+//     ErrWriterUnavailable (rejected after Stop).
+func TestWriteQueue_NoPanicOnSubmitDuringStop(t *testing.T) {
+	const producers = 50
+	const opsPerProducer = 20
+
+	q := New(Config{Capacity: 256})
+	if err := q.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("unexpected panic: %v", r)
+		}
+	}()
+
+	op := func(_ context.Context) error { return nil }
+
+	// Synchronize the producer kickoff so they all hit Submit at once.
+	start := make(chan struct{})
+	results := make(chan error, producers*opsPerProducer)
+	var wg sync.WaitGroup
+	for p := 0; p < producers; p++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			defer func() {
+				if r := recover(); r != nil {
+					results <- errors.New("PANIC: " + safeRecoverString(r))
+				}
+			}()
+			for i := 0; i < opsPerProducer; i++ {
+				results <- q.Submit(context.Background(), op)
+			}
+		}()
+	}
+
+	// Race producers and Stop. The window where they overlap is
+	// exactly the window the old close(q.ch) code panicked in.
+	close(start)
+	// Yield briefly so producers actually start submitting before we
+	// call Stop, but not so long that they all finish first.
+	time.Sleep(time.Microsecond * 50)
+	q.Stop(2 * time.Second)
+	wg.Wait()
+	close(results)
+
+	var nilCount, unavailCount, otherCount int
+	for err := range results {
+		switch {
+		case err == nil:
+			nilCount++
+		case errors.Is(err, ErrWriterUnavailable):
+			unavailCount++
+		case errors.Is(err, ErrQueueFull):
+			// Acceptable: capacity-bounded backpressure.
+			otherCount++
+		default:
+			t.Errorf("unexpected Submit error: %v", err)
+			otherCount++
+		}
+	}
+
+	// We expect SOME nil (pre-Stop) and SOME unavailable (post-Stop).
+	// Tolerate any mix as long as no panic and no unexpected errors.
+	if nilCount == 0 && unavailCount == 0 {
+		t.Errorf("all submits errored unexpectedly: nil=%d unavail=%d other=%d",
+			nilCount, unavailCount, otherCount)
+	}
+	t.Logf("submits: nil=%d unavail=%d other=%d (total=%d)",
+		nilCount, unavailCount, otherCount, nilCount+unavailCount+otherCount)
+}
+
+// safeRecoverString turns a recover() value into a string for test
+// assertions without panicking if it's not stringer-compatible.
+func safeRecoverString(r any) string {
+	switch v := r.(type) {
+	case string:
+		return v
+	case error:
+		return v.Error()
+	default:
+		return "non-string panic value"
+	}
+}

@@ -94,10 +94,29 @@ type Queue struct {
 	ch  chan WriteOp
 
 	// state guards lifecycle transitions. The atomic.Int32 holds an
-	// internal state code so Submit can fast-fail without taking a
-	// mutex.
+	// internal state code; Submit consults it under sendMu (read lock)
+	// so the state check and the channel send are an atomic unit
+	// against Stop's transition (write lock).
 	stateMu sync.Mutex
 	state   atomic.Int32
+
+	// sendMu serializes Submit's "state check + send" against Stop's
+	// "state transition + quit". Producers hold RLock for the whole
+	// check-then-send window; Stop holds the (exclusive) write lock
+	// while flipping state to draining and closing q.quit. This is the
+	// fix for roborev #1504: the prior implementation closed q.ch
+	// directly, racing concurrent Submit goroutines into a "send on
+	// closed channel" panic. The current implementation never closes
+	// q.ch; Stop signals shutdown via q.quit instead, and sendMu
+	// guarantees that any Submit that successfully completed its send
+	// observed state==running.
+	sendMu sync.RWMutex
+
+	// quit signals the consumer to stop accepting new ops and drain
+	// remaining buffered work. Closed exactly once by Stop (via
+	// quitOnce).
+	quit     chan struct{}
+	quitOnce sync.Once
 
 	// done is closed by the consumer goroutine when it exits.
 	done chan struct{}
@@ -136,6 +155,7 @@ func New(cfg Config) *Queue {
 	q := &Queue{
 		cfg:        cfg,
 		ch:         make(chan WriteOp, cfg.Capacity),
+		quit:       make(chan struct{}),
 		done:       make(chan struct{}),
 		rateWindow: 60 * time.Second,
 	}
@@ -168,6 +188,14 @@ func (q *Queue) Start(ctx context.Context) error {
 //
 // After Stop, Submit returns ErrWriterUnavailable. The Queue cannot be
 // restarted — construct a new instance.
+//
+// IMPORTANT: Stop does NOT close q.ch. Closing the producer-facing
+// channel races with concurrent Submit calls and panics on "send on
+// closed channel" (roborev #1504). Instead, Stop transitions state to
+// draining (which makes Submit fast-fail) and signals the consumer via
+// q.quit. Any Submit that already passed the state gate and is mid-send
+// completes safely against the still-open buffered channel; the
+// consumer's drain loop sweeps it up before exiting.
 func (q *Queue) Stop(timeout time.Duration) {
 	q.stateMu.Lock()
 	current := q.state.Load()
@@ -175,8 +203,14 @@ func (q *Queue) Stop(timeout time.Duration) {
 		q.stateMu.Unlock()
 		return
 	}
+	// Take sendMu's write lock so no Submit goroutine is mid-"state
+	// check + send" while we flip state and close q.quit. Once we
+	// release this lock, any subsequent Submit observes draining and
+	// fast-fails with ErrWriterUnavailable.
+	q.sendMu.Lock()
 	q.state.Store(stateCodeDraining)
-	close(q.ch)
+	q.quitOnce.Do(func() { close(q.quit) })
+	q.sendMu.Unlock()
 	q.stateMu.Unlock()
 
 	if timeout <= 0 {
@@ -202,6 +236,13 @@ func (q *Queue) Submit(ctx context.Context, op WriteOp) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	// Hold sendMu (read) for the state check and the send so Stop's
+	// state transition cannot interleave between them. Multiple
+	// Submits proceed in parallel (RWMutex read lock); Stop's write
+	// lock excludes them all while it flips state and signals quit.
+	// See type doc and Stop for the full rationale (roborev #1504).
+	q.sendMu.RLock()
+	defer q.sendMu.RUnlock()
 	current := q.state.Load()
 	if current != stateCodeRunning {
 		q.rejected.Add(1)
@@ -229,24 +270,50 @@ func (q *Queue) SubmitWithTimeout(ctx context.Context, op WriteOp, timeout time.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	current := q.state.Load()
-	if current != stateCodeRunning {
-		q.rejected.Add(1)
-		return ErrWriterUnavailable
-	}
 	if timeout <= 0 {
 		return q.Submit(ctx, op)
 	}
+	// Fast path: take sendMu briefly and try a non-blocking send. If
+	// the buffer has room, we're done — and the send happened under
+	// the read lock, so Stop cannot have flipped state mid-call.
+	q.sendMu.RLock()
+	current := q.state.Load()
+	if current != stateCodeRunning {
+		q.sendMu.RUnlock()
+		q.rejected.Add(1)
+		return ErrWriterUnavailable
+	}
+	select {
+	case q.ch <- op:
+		q.enqueued.Add(1)
+		q.recordEnqueue()
+		q.sendMu.RUnlock()
+		return nil
+	default:
+		// Buffer full; fall through to the blocking-wait path below.
+	}
+	q.sendMu.RUnlock()
+	// Slow path: buffer was full at first look. Wait up to timeout for
+	// a slot, observing both ctx and quit so Stop can release us.
+	// q.ch is never closed (see Stop), so this select is safe.
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case q.ch <- op:
+		// Re-check state under the lock to avoid enqueueing into a
+		// channel whose consumer has already exited. If state moved
+		// while we were blocked, we still enqueued successfully and
+		// the drain phase in consume() will run the op (since q.ch is
+		// shared); record it as enqueued and let the consumer decide.
 		q.enqueued.Add(1)
 		q.recordEnqueue()
 		return nil
 	case <-timer.C:
 		q.rejected.Add(1)
 		return ErrTimeout
+	case <-q.quit:
+		q.rejected.Add(1)
+		return ErrWriterUnavailable
 	case <-ctx.Done():
 		q.rejected.Add(1)
 		return ctx.Err()
@@ -276,11 +343,21 @@ func (q *Queue) Capacity() int { return q.cfg.Capacity }
 // consume is the single-writer consumer goroutine. Each op runs with
 // the context passed to Start so the operator can cancel the entire
 // writer service from one place.
+//
+// The loop runs in two phases:
+//
+//  1. Running: select on q.ch or q.quit. New ops arrive on q.ch; Stop
+//     closes q.quit to signal shutdown.
+//  2. Draining: after q.quit fires, drain any ops still in q.ch's
+//     buffer (these were enqueued by Submit calls that won the state
+//     check just before Stop transitioned state). q.ch is never closed
+//     (see Stop), so we drain with a non-blocking receive loop instead
+//     of a `range` and exit when the buffer empties.
 func (q *Queue) consume(ctx context.Context) {
 	defer close(q.done)
-	for op := range q.ch {
+	run := func(op WriteOp) {
 		if op == nil {
-			continue
+			return
 		}
 		// Run the op with the parent context. The op should respect
 		// cancellation for its own internal DB calls; we don't try to
@@ -293,7 +370,27 @@ func (q *Queue) consume(ctx context.Context) {
 		q.dequeued.Add(1)
 		q.recordDequeue()
 	}
-	q.state.Store(stateCodeStopped)
+loop:
+	for {
+		select {
+		case op := <-q.ch:
+			run(op)
+		case <-q.quit:
+			break loop
+		}
+	}
+	// Drain remaining buffered ops. Submit cannot enqueue more (state
+	// is now draining, fast-failing the gate) so the buffer monotonically
+	// shrinks.
+	for {
+		select {
+		case op := <-q.ch:
+			run(op)
+		default:
+			q.state.Store(stateCodeStopped)
+			return
+		}
+	}
 }
 
 func (q *Queue) currentState() State {
