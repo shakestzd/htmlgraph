@@ -182,6 +182,7 @@ chrome/*.zip
 # Subagent worktrees (transient; created by Claude Code Agent tool)
 .claude/worktrees/
 
-# Go test fixtures and temporary directories
-/.gotmp/
-/.tmp-go/
+# Go test scratch space (used to avoid /tmp noexec in devcontainers)
+.test-exec/
+.gotmp/
+.tmp-go/

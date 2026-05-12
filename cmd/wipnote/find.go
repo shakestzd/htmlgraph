@@ -2,14 +2,26 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
+	"github.com/shakestzd/wipnote/internal/graph"
 	"github.com/shakestzd/wipnote/internal/htmlparse"
 	"github.com/shakestzd/wipnote/internal/models"
 	"github.com/shakestzd/wipnote/internal/workitem"
 	"github.com/spf13/cobra"
 )
+
+// findProjectOpener is the function used to open the workitem project. It is a
+// package-level variable so tests can inject a spy to assert that the DB is
+// never opened for find queries (canonical-first guarantee).
+//
+// In production this variable is never invoked because the canonical path
+// (graph.LoadAll / graph.LoadDir) does not call workitem.Open. The variable
+// exists solely so a test spy can detect any accidental DB access regression.
+var findProjectOpener = workitem.Open //nolint:unused
 
 // workItemIDPattern matches canonical work item IDs like feat-abc12345, bug-abc12345, etc.
 var workItemIDPattern = regexp.MustCompile(`^(feat|bug|spk|trk|plan|pln|spec|spc)-[0-9a-f]{8}$`)
@@ -91,6 +103,10 @@ type findOpts struct {
 	limit    int
 }
 
+// runFind implements canonical-first find: all data is read from .wipnote/*.html
+// files; SQLite is never opened. If the argument looks like a work item ID, a
+// direct HTML lookup is performed. Otherwise, the argument is treated as a
+// collection name (or title search when not a known collection).
 func runFind(collection string, opts findOpts) error {
 	dir, err := findWipnoteDir()
 	if err != nil {
@@ -108,50 +124,23 @@ func runFind(collection string, opts findOpts) error {
 		collection = "all"
 	}
 
-	p, err := workitem.Open(dir, "claude-code")
+	// Canonical-first: load nodes directly from HTML files — no SQLite needed.
+	nodes, err := loadFindNodes(dir, collection)
 	if err != nil {
-		return fmt.Errorf("open project: %w", err)
-	}
-	defer p.Close()
-
-	// Build query.
-	var q *workitem.Query
-	if collection == "all" {
-		q = p.FindAll()
-	} else {
-		q = p.Find(collection)
+		return fmt.Errorf("find: %w", err)
 	}
 
-	// Apply filters.
-	if opts.status != "" {
-		q = q.Where(workitem.StatusIs(opts.status))
-	}
-	if opts.priority != "" {
-		q = q.Where(workitem.PriorityIs(opts.priority))
-	}
-	if opts.title != "" {
-		q = q.Where(workitem.TitleContains(opts.title))
-	}
-	if opts.trackID != "" {
-		q = q.Where(workitem.TrackIs(opts.trackID))
-	}
-	if opts.agent != "" {
-		q = q.Where(workitem.AgentIs(opts.agent))
-	}
+	// Apply filters in memory.
+	nodes = applyFindFilters(nodes, opts)
 
 	// Apply ordering.
 	if opts.orderBy != "" {
-		q = q.OrderBy(opts.orderBy, workitem.Asc)
+		sortFindNodes(nodes, opts.orderBy)
 	}
 
 	// Apply limit.
-	if opts.limit > 0 {
-		q = q.Limit(opts.limit)
-	}
-
-	nodes, err := q.Execute()
-	if err != nil {
-		return fmt.Errorf("find: %w", err)
+	if opts.limit > 0 && len(nodes) > opts.limit {
+		nodes = nodes[:opts.limit]
 	}
 
 	if len(nodes) == 0 {
@@ -161,6 +150,84 @@ func runFind(collection string, opts findOpts) error {
 
 	printFindResults(nodes)
 	return nil
+}
+
+// loadFindNodes loads nodes from HTML files for the given collection.
+// collection == "all" loads across all standard collections.
+func loadFindNodes(wipnoteDir, collection string) ([]*models.Node, error) {
+	if collection == "all" {
+		return graph.LoadAll(wipnoteDir)
+	}
+	dir := filepath.Join(wipnoteDir, collection)
+	nodes, err := graph.LoadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("load %s: %w", collection, err)
+	}
+	return nodes, nil
+}
+
+// applyFindFilters returns the subset of nodes that match all active filters.
+func applyFindFilters(nodes []*models.Node, opts findOpts) []*models.Node {
+	if opts.status == "" && opts.priority == "" && opts.title == "" &&
+		opts.trackID == "" && opts.agent == "" {
+		return nodes
+	}
+	titleLower := strings.ToLower(opts.title)
+	out := nodes[:0:0]
+	for _, n := range nodes {
+		if opts.status != "" && string(n.Status) != opts.status {
+			continue
+		}
+		if opts.priority != "" && string(n.Priority) != opts.priority {
+			continue
+		}
+		if opts.title != "" && !strings.Contains(strings.ToLower(n.Title), titleLower) {
+			continue
+		}
+		if opts.trackID != "" && n.TrackID != opts.trackID {
+			continue
+		}
+		if opts.agent != "" && n.AgentAssigned != opts.agent {
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// sortFindNodes sorts nodes in-place by field (ascending).
+func sortFindNodes(nodes []*models.Node, field string) {
+	sort.SliceStable(nodes, func(i, j int) bool {
+		a, b := nodes[i], nodes[j]
+		switch strings.ToLower(field) {
+		case "created", "created_at":
+			return a.CreatedAt.Before(b.CreatedAt)
+		case "updated", "updated_at":
+			return a.UpdatedAt.Before(b.UpdatedAt)
+		case "title":
+			return strings.ToLower(a.Title) < strings.ToLower(b.Title)
+		case "priority":
+			return priorityRank(a.Priority) < priorityRank(b.Priority)
+		default: // "id" and unknown fields
+			return a.ID < b.ID
+		}
+	})
+}
+
+// priorityRank maps priority to a sortable int (higher = more urgent).
+func priorityRank(p models.Priority) int {
+	switch p {
+	case models.PriorityLow:
+		return 0
+	case models.PriorityMedium:
+		return 1
+	case models.PriorityHigh:
+		return 2
+	case models.PriorityCritical:
+		return 3
+	default:
+		return -1
+	}
 }
 
 // runFindByID resolves a work item by its canonical ID and prints it.

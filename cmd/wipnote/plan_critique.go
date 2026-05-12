@@ -12,6 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// critiqueProjectOpener is the function used to open the workitem project. It
+// is a package-level variable so tests can inject a spy to assert that the DB
+// is never opened for YAML plans.
+var critiqueProjectOpener = workitem.Open
+
 // critiqueOutput is the structured JSON output from plan critique.
 type critiqueOutput struct {
 	PlanID            string          `json:"plan_id"`
@@ -62,9 +67,45 @@ func runPlanCritique(wipnoteDir, planID string) error {
 	return enc.Encode(out)
 }
 
-// extractCritiqueData reads a plan node and extracts structured data for critique.
+// extractCritiqueData reads a plan and extracts structured data for critique.
+//
+// For v2 plans (those with a .yaml file), all data is read directly from YAML
+// — no SQLite/workitem.Open call is made. Legacy HTML-only plans fall back to
+// the previous workitem path.
 func extractCritiqueData(wipnoteDir, planID string) (*critiqueOutput, error) {
-	p, err := workitem.Open(wipnoteDir, agentForClaim())
+	yamlPath := filepath.Join(wipnoteDir, "plans", planID+".yaml")
+	if plan, err := planyaml.Load(yamlPath); err == nil {
+		return extractCritiqueFromYAML(planID, plan), nil
+	}
+
+	// Legacy fallback: HTML-only plan — open workitem project (requires SQLite).
+	return extractCritiqueFromWorkitem(wipnoteDir, planID)
+}
+
+// extractCritiqueFromYAML builds the critiqueOutput entirely from a PlanYAML
+// with no database access.
+func extractCritiqueFromYAML(planID string, plan *planyaml.PlanYAML) *critiqueOutput {
+	out := &critiqueOutput{
+		PlanID:      planID,
+		Title:       plan.Meta.Title,
+		Description: plan.Meta.Description,
+		Status:      plan.Meta.Status,
+	}
+	for _, s := range plan.Slices {
+		out.Slices = append(out.Slices, critiqueSlice{
+			Number: s.Num,
+			Title:  s.Title,
+		})
+	}
+	out.SliceCount = len(out.Slices)
+	out.Complexity, out.CritiqueWarranted = classifyComplexity(out.SliceCount)
+	return out
+}
+
+// extractCritiqueFromWorkitem reads plan data via workitem.Open (legacy path
+// for HTML-only plans that predate the YAML schema).
+func extractCritiqueFromWorkitem(wipnoteDir, planID string) (*critiqueOutput, error) {
+	p, err := critiqueProjectOpener(wipnoteDir, agentForClaim())
 	if err != nil {
 		return nil, fmt.Errorf("open project: %w", err)
 	}
@@ -86,26 +127,13 @@ func extractCritiqueData(wipnoteDir, planID string) (*critiqueOutput, error) {
 		Status:      string(node.Status),
 	}
 
-	// Extract slices from HTML steps first, then fall back to YAML.
+	// Extract slices from HTML steps; YAML fallback is not needed here because
+	// extractCritiqueData already tried YAML first and it was absent.
 	for i, step := range node.Steps {
 		out.Slices = append(out.Slices, critiqueSlice{
 			Number: i + 1,
 			Title:  step.Description,
 		})
-	}
-	if len(out.Slices) == 0 {
-		yamlPath := filepath.Join(wipnoteDir, "plans", planID+".yaml")
-		if plan, err := planyaml.Load(yamlPath); err == nil {
-			for _, s := range plan.Slices {
-				out.Slices = append(out.Slices, critiqueSlice{
-					Number: s.Num,
-					Title:  s.Title,
-				})
-			}
-			if out.Description == "" && plan.Meta.Description != "" {
-				out.Description = plan.Meta.Description
-			}
-		}
 	}
 
 	// Complexity gate.

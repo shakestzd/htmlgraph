@@ -1,23 +1,36 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shakestzd/wipnote/internal/planyaml"
+	"github.com/shakestzd/wipnote/internal/workitem"
 )
 
 func TestValidatePlan_ValidPlan(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)
-
-	planID, err := createPlanFromTopic(dir, "Valid Plan", "A valid plan")
-	if err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "plans"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := runPlanAddSliceYAML(dir, planID, "Slice One",
-		"Implement slice one", "", "", "", "", "S", "Low", ""); err != nil {
+
+	// Build a fully-populated YAML plan so planyaml.Validate passes.
+	planID := "plan-validtest"
+	yamlPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan := planyaml.NewPlan(planID, "Valid Plan", "A valid plan")
+	plan.Design.Problem = "test problem statement"
+	plan.Design.Goals = []string{"ship the feature"}
+	plan.Design.Constraints = []string{"no breaking changes"}
+	plan.Slices = []planyaml.PlanSlice{
+		{Num: 1, ID: "s1", Title: "Slice One", What: "implement it", Why: "needed",
+			Files: []string{"x.go"}, DoneWhen: []string{"tests pass"}, Tests: "unit",
+			Effort: "S", Risk: "Low"},
+	}
+	if err := planyaml.Save(yamlPath, plan); err != nil {
 		t.Fatal(err)
 	}
 
@@ -35,10 +48,18 @@ func TestValidatePlan_ValidPlan(t *testing.T) {
 
 func TestValidatePlan_EmptyPlanWarns(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, "plans"), 0o755)
+	if err := os.MkdirAll(filepath.Join(dir, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
-	planID, err := createPlanFromTopic(dir, "Empty Plan", "")
-	if err != nil {
+	// Build a minimal YAML plan (missing required design fields) to exercise the
+	// schema-validation path. planyaml.Validate findings are reported as warnings
+	// (not errors) so in-progress plans are still considered structurally valid.
+	planID := "plan-emptytest"
+	yamlPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan := planyaml.NewPlan(planID, "Empty Plan", "")
+	// Leave Design and Slices empty — planyaml.Validate will emit completeness issues.
+	if err := planyaml.Save(yamlPath, plan); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,11 +67,12 @@ func TestValidatePlan_EmptyPlanWarns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Schema completeness issues surface as warnings, not hard errors.
 	if !result.Valid {
-		t.Errorf("empty plan should be valid (warnings only), got: %v", result.Errors)
+		t.Errorf("empty plan should be valid (warnings only), got errors: %v", result.Errors)
 	}
 	if len(result.Warnings) == 0 {
-		t.Error("empty plan should have warnings about missing slices/description")
+		t.Error("empty plan should have warnings about missing slices/description/design")
 	}
 }
 
@@ -227,6 +249,48 @@ func TestCountOccurrences(t *testing.T) {
 		if got := countOccurrences(c.s, c.sub); got != c.want {
 			t.Errorf("countOccurrences(%q, %q) = %d, want %d", c.s, c.sub, got, c.want)
 		}
+	}
+}
+
+// TestPlanValidate_YAMLDoesNotOpenDB verifies that validatePlan for a v2 YAML
+// plan never calls workitem.Open (and therefore never touches SQLite).
+// The test installs an open-factory spy that fails the test if invoked.
+func TestPlanValidate_YAMLDoesNotOpenDB(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Build a minimal YAML plan directly — no workitem.Open during setup.
+	planID := "plan-valspy01"
+	yamlPath := filepath.Join(dir, "plans", planID+".yaml")
+	plan := planyaml.NewPlan(planID, "Validate Spy Plan", "validate DB isolation")
+	plan.Design.Problem = "test problem"
+	plan.Design.Goals = []string{"goal1"}
+	plan.Design.Constraints = []string{"constraint1"}
+	plan.Slices = []planyaml.PlanSlice{
+		{Num: 1, ID: "s1", Title: "Slice One", What: "do it", Why: "because",
+			Files: []string{"x.go"}, DoneWhen: []string{"done"}, Tests: "unit",
+			Effort: "S", Risk: "Low"},
+	}
+	if err := planyaml.Save(yamlPath, plan); err != nil {
+		t.Fatalf("save YAML plan: %v", err)
+	}
+
+	// Install spy: fail the test if workitem.Open is ever called.
+	orig := validateProjectOpener
+	t.Cleanup(func() { validateProjectOpener = orig })
+	validateProjectOpener = func(projectDir, agent string) (*workitem.Project, error) {
+		t.Errorf("workitem.Open called for YAML plan (projectDir=%s) — DB path leaked", projectDir)
+		return nil, errors.New("spy: DB must not be opened for YAML plans")
+	}
+
+	result, err := validatePlan(dir, planID)
+	if err != nil {
+		t.Fatalf("validatePlan: %v", err)
+	}
+	if result.Stats.Slices != 1 {
+		t.Errorf("slices = %d, want 1", result.Stats.Slices)
 	}
 }
 

@@ -12,6 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// validateProjectOpener is the function used to open the workitem project. It
+// is a package-level variable so tests can inject a spy to assert that the DB
+// is never opened for YAML plans.
+var validateProjectOpener = workitem.Open
+
 // planValidation holds the result of structural validation for a plan.
 type planValidation struct {
 	PlanID   string   `json:"plan_id"`
@@ -53,9 +58,82 @@ func runPlanValidate(planID string) error {
 	return enc.Encode(result)
 }
 
-// validatePlan performs structural validation on a plan node.
+// validatePlan performs structural validation on a plan.
+//
+// For v2 plans (those with a .yaml file), validation runs planyaml.Validate
+// directly — no SQLite/workitem.Open call is made. Legacy HTML-only plans fall
+// back to the previous workitem path.
 func validatePlan(wipnoteDir, planID string) (planValidation, error) {
-	p, err := workitem.Open(wipnoteDir, agentForClaim())
+	yamlPath := filepath.Join(wipnoteDir, "plans", planID+".yaml")
+	if plan, err := planyaml.Load(yamlPath); err == nil {
+		return validatePlanFromYAML(wipnoteDir, planID, plan), nil
+	}
+
+	// Legacy fallback: HTML-only plan — open workitem project (requires SQLite).
+	return validatePlanFromWorkitem(wipnoteDir, planID)
+}
+
+// validatePlanFromYAML runs planyaml.Validate on the loaded plan and also
+// checks the CRISPI HTML file if present, without opening any database.
+func validatePlanFromYAML(wipnoteDir, planID string, plan *planyaml.PlanYAML) planValidation {
+	var result planValidation
+	result.PlanID = planID
+	result.Valid = true
+
+	addError := func(msg string) {
+		result.Errors = append(result.Errors, msg)
+		result.Valid = false
+	}
+	addWarning := func(msg string) {
+		result.Warnings = append(result.Warnings, msg)
+	}
+
+	// Run schema validation. Completeness issues (missing design fields, slice
+	// content) are reported as warnings rather than errors — the plan may be a
+	// work-in-progress. Only hard structural problems (invalid meta) become errors.
+	for _, e := range planyaml.Validate(plan) {
+		addWarning(e)
+	}
+
+	// Slice stats from YAML.
+	result.Stats.Slices = len(plan.Slices)
+	result.Stats.GraphNodes = len(plan.Slices)
+
+	// Warn if no slices.
+	if result.Stats.Slices == 0 {
+		addWarning("plan has no slices (steps)")
+	}
+
+	// Warn if no description.
+	if plan.Meta.Description == "" {
+		addWarning("plan has no description")
+	}
+
+	// Validate CRISPI HTML file if it exists.
+	crisPIPath := filepath.Join(wipnoteDir, "plans", planID+".html")
+	if isCRISPIFile(crisPIPath) {
+		htmlErrs, htmlWarnings, htmlStats := validatePlanHTML(crisPIPath)
+		for _, e := range htmlErrs {
+			addError(e)
+		}
+		for _, w := range htmlWarnings {
+			addWarning(w)
+		}
+		if htmlStats.graphNodes > 0 {
+			result.Stats.GraphNodes = htmlStats.graphNodes
+		}
+		if htmlStats.questions > 0 {
+			result.Stats.Questions = htmlStats.questions
+		}
+	}
+
+	return result
+}
+
+// validatePlanFromWorkitem reads plan data via workitem.Open (legacy path for
+// HTML-only plans that predate the YAML schema).
+func validatePlanFromWorkitem(wipnoteDir, planID string) (planValidation, error) {
+	p, err := validateProjectOpener(wipnoteDir, agentForClaim())
 	if err != nil {
 		return planValidation{}, fmt.Errorf("open project: %w", err)
 	}
@@ -94,19 +172,9 @@ func validatePlan(wipnoteDir, planID string) (planValidation, error) {
 		addError("plan is missing a title")
 	}
 
-	// Count slices — prefer YAML (source of truth), fall back to HTML steps.
-	yamlPath := filepath.Join(wipnoteDir, "plans", planID+".yaml")
-	yamlSliceCount := 0
-	if plan, loadErr := planyaml.Load(yamlPath); loadErr == nil {
-		yamlSliceCount = len(plan.Slices)
-	}
-	if yamlSliceCount > 0 {
-		result.Stats.Slices = yamlSliceCount
-		result.Stats.GraphNodes = yamlSliceCount
-	} else {
-		result.Stats.Slices = len(node.Steps)
-		result.Stats.GraphNodes = len(node.Steps)
-	}
+	// Count slices from HTML steps (YAML already tried and absent).
+	result.Stats.Slices = len(node.Steps)
+	result.Stats.GraphNodes = len(node.Steps)
 
 	// Warn if no description.
 	if node.Content == "" {

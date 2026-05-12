@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/db/writequeue"
 	"github.com/shakestzd/wipnote/internal/otel/indexer"
 	otelreceiver "github.com/shakestzd/wipnote/internal/otel/receiver"
 	"github.com/shakestzd/wipnote/internal/otel/retention"
@@ -18,6 +20,22 @@ import (
 	"github.com/shakestzd/wipnote/internal/storage"
 	"github.com/spf13/cobra"
 )
+
+// writerService is the dashboard's instance of the slice-6 writer
+// transport. It is constructed once per `wipnote serve` child process
+// and shared by every in-process producer (the NDJSON indexer today;
+// the OTLP HTTP receiver and sub-agent auto-ingest paths follow in
+// slices 7 and beyond).
+//
+// Holding both the queue and the underlying Writer here lets the
+// collector-status handler expose live depth + state without reaching
+// into producer-local state. Nil-safe: an unset writerService means
+// the dashboard is running without an index-update channel (e.g.
+// during unit tests of buildSingleProjectMux that pass database=nil).
+var writerService struct {
+	queue *writequeue.Queue
+	sink  *sqls.QueuedSink
+}
 
 // serveChildCmd is the hidden internal subcommand the parent wipnote
 // server spawns for each project in multi-project mode. It is NOT intended
@@ -65,20 +83,58 @@ func runServeChild(port int) error {
 	}
 	// database is closed when the process exits; no defer Close — Serve blocks.
 
+	// Slice 6 writer service (plan-ae0c37b2): one Writer + one queue
+	// per project DB. Every in-process producer (indexer, future OTLP
+	// receiver, sub-agent auto-ingest) submits SignalSink batches
+	// through this queue instead of opening its own writable handle.
+	// This is the architectural fix for the SQLITE_BUSY contention the
+	// plan targets — see plan q-service-owner for the post-launch
+	// `wipnote daemon` graduation path.
+	if writer, err := otelreceiver.NewWriter(dbPath); err != nil {
+		fmt.Fprintf(os.Stderr, "writer service init: %v\n", err)
+	} else {
+		q := writequeue.New(writequeue.Config{
+			Capacity: writequeue.DefaultCapacity,
+			OnError: func(err error) {
+				// Slice-10 contention observability: BUSY classification
+				// already lands at the WriteBatch boundary in
+				// internal/otel/receiver/writer.go under the writer_service
+				// subsystem (which captures the actual SQL contention
+				// site). Counting again here would double-bill the same
+				// event. We keep the OnError hook as the log-only path
+				// so operators can correlate the queue depth surfaced via
+				// /api/collector-status with worker errors.
+				log.Printf("writequeue: op error: %v", err)
+			},
+		})
+		if startErr := q.Start(context.Background()); startErr != nil {
+			fmt.Fprintf(os.Stderr, "writer queue start: %v\n", startErr)
+			_ = writer.Close()
+		} else {
+			writerService.queue = q
+			writerService.sink = sqls.NewQueued(q, writer)
+		}
+	}
+
 	mux := buildSingleProjectMux(database, wipnoteDir)
 
 	// NDJSON→SQLite indexer (unconditional per Q5 cutover decision).
-	// A dedicated Writer is opened for the indexer so it does not contend
-	// with the OTLP receiver's Writer (each has MaxOpenConns=1).
-	if idxWriter, err := otelreceiver.NewWriter(dbPath); err != nil {
-		fmt.Fprintf(os.Stderr, "indexer writer init: %v\n", err)
-	} else {
-		idxr := indexer.New(wipnoteDir, sqls.New(idxWriter)).WithDB(database)
+	// The indexer now routes every SignalSink batch through the slice-6
+	// writer queue rather than holding its own writable handle. Canonical
+	// persistence is upstream of this path — the indexer reads NDJSON
+	// produced by per-session collectors, so user work is durable on
+	// disk before any submit hits the queue (canonical-first contract).
+	if writerService.sink != nil {
+		idxr := indexer.New(wipnoteDir, writerService.sink).WithDB(database)
 		ctx := context.Background()
 		go idxr.Start(ctx)
 		// /api/indexer/status — per-file health for observability (Q7).
 		mux.Handle("/api/indexer/status", indexerStatusHandler(idxr))
 	}
+
+	// /api/collector-status — slice-6 diagnostic surface. Returns writer
+	// queue depth/state/rates so the dashboard can show backpressure.
+	mux.Handle("/api/collector-status", collectorWriterStatusHandler())
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
