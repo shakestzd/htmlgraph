@@ -47,6 +47,17 @@ func NormalizeToRepoRelative(absPath, repoRoot string) (string, bool) {
 	return NormalizeWithResolver(absPath, repoRoot, resolveWipnoteAnchor)
 }
 
+// ResolveWipnoteAnchorForDir is the exported form of resolveWipnoteAnchor.
+// It finds the relativization anchor (local worktree toplevel) for the given
+// directory. Exported so that hook handlers can use it as the production
+// resolver argument to NormalizeWithResolver, enabling tests to substitute a
+// stub without shelling to git.
+//
+// Returns "" when dir is not inside any wipnote-aware git repo.
+func ResolveWipnoteAnchorForDir(dir string) string {
+	return resolveWipnoteAnchor(dir)
+}
+
 // resolveWipnoteAnchor finds the relativization anchor for paths inside
 // dir. The anchor is the local worktree's toplevel (for both main and
 // linked worktrees) — verified to belong to a wipnote project either
@@ -114,6 +125,47 @@ func MustNormalize(absPath, repoRoot string) string {
 	if !ok || got == "" {
 		debugLog("MustNormalize: falling back to original %q", absPath)
 		return absPath
+	}
+	return got
+}
+
+// NormalizeProjectDir normalizes an absolute project-root directory to a
+// repo-relative path, applying the same outside-repo policy as
+// NormalizeToRepoRelative but treating the argument as a directory rather
+// than a file. This is necessary because NormalizeToRepoRelative resolves the
+// anchor from filepath.Dir(absPath), which for a directory gives its PARENT —
+// causing the git lookup to run in the wrong directory.
+//
+// Policy (mirrors NormalizeToRepoRelative):
+//   - Already-relative input → returned unchanged with ok=true.
+//   - Empty input → returned unchanged with ok=true.
+//   - Local session (dir resolves to a wipnote-aware git repo) → returned as
+//     the relative path from the repo root (typically "." for the root itself).
+//   - Foreign-machine session (canonical root differs from any local repo) →
+//     returned as "unresolved:"+dir so the origin is queryable.
+func NormalizeProjectDir(dir string) string {
+	if dir == "" || !filepath.IsAbs(dir) {
+		return dir
+	}
+	// Use a sentinel child path so filepath.Dir(sentinel) == dir, allowing
+	// discoverRepoRoot to invoke the resolver with dir itself rather than
+	// its parent. The sentinel file need not exist on disk — EvalSymlinks
+	// failures are tolerated by NormalizeWithResolver.
+	sentinel := filepath.Join(dir, ".wipnote")
+	got, _ := NormalizeWithResolver(sentinel, "", resolveWipnoteAnchor)
+	if got == "" {
+		return dir
+	}
+	// Strip the ".wipnote" suffix that was appended as the sentinel.
+	if got == ".wipnote" {
+		return "."
+	}
+	if strings.HasSuffix(got, "/.wipnote") {
+		return strings.TrimSuffix(got, "/.wipnote")
+	}
+	// Handle "unresolved:" prefix — strip the sentinel suffix from the original path.
+	if strings.HasPrefix(got, "unresolved:") {
+		return "unresolved:" + dir
 	}
 	return got
 }
