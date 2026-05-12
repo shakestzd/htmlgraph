@@ -5,9 +5,9 @@ meta:
     description: |
         Normalize every path stored by wipnote (HTML, SQLite, session captures, agent provenance) against the canonical repo root so causal lineage survives worktrees, host changes, and CWD switches. Closes defensibility-audit finding #1.
     created_at: "2026-05-11"
-    status: active
+    status: finalized
     created_by: claude-opus
-    version: 1
+    version: 10
 design:
     problem: |
         wipnote's causal lineage is host-locked. Hooks, the indexer, and provenance capture record paths as the agent observed them — often absolute (`/workspaces/wipnote/foo.go`, `/tmp/worktree-abc/foo.go`) or worktree- relative. When the same repo is queried from a different working directory (worktree orchestrators like our own `Agent({isolation: "worktree"})` or Conductor; same repo on a different host like Codespace → local) the lineage chain breaks: file references don't resolve, blame queries miss commits, and `wipnote lineage <id>` returns partial chains.
@@ -46,6 +46,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-edbc978b
       num: 1
       title: Canonical write-time path normalizer in internal/paths
       what: |
@@ -119,8 +120,8 @@ slices:
         Regression: `go test ./...` green.
       approved: false
       comment: ""
-      approval_status: pending
-      execution_status: not_started
+      approval_status: approved
+      execution_status: promoted
       questions:
         - id: q-canonical-root-source
           text: When `repoRoot` is empty, resolution order is git-common-dir → walk-up → unresolved-prefix. Confirm?
@@ -216,7 +217,7 @@ slices:
         Regression: all existing `internal/hooks/...` tests must pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       questions:
         - id: q-normalize-write-vs-read
@@ -280,7 +281,7 @@ slices:
         Regression: existing missing_events tests pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: impl-critique
@@ -346,7 +347,7 @@ slices:
         Regression: existing session HTML golden tests pass; foreign-ingest fixtures still match (foreign-origin sessions distinguishable by `unresolved:` prefix).
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       questions:
         - id: q-foreign-cwd-detection
@@ -403,7 +404,7 @@ slices:
         Regression: existing create tests pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: risk-critique
@@ -515,7 +516,7 @@ slices:
         Regression: existing CLI tests pass.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       questions:
         - id: q-migration-when
@@ -605,7 +606,7 @@ slices:
         Regression: full `go test ./...` passes including the new test.
       approved: false
       comment: ""
-      approval_status: pending
+      approval_status: approved
       execution_status: not_started
       critic_revisions:
         - source: impl-critique
