@@ -186,3 +186,6 @@ chrome/*.zip
 .test-exec/
 .gotmp/
 .tmp-go/
+.tmp-gotest/
+tmp/go-tmp/
+.build-cache/
