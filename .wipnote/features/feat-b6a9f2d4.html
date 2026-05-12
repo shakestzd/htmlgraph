@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Normalize tool_input file paths in PreToolUse/PostToolUse</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-b6a9f2d4"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-05-12T02:15:32.258745"
+             data-updated="2026-05-12T02:43:06.894337" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33">
+
+        <header>
+            <h1>Normalize tool_input file paths in PreToolUse/PostToolUse</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-12T02:15:32.260526">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="a400442f-4147-4bd1-a006-5a728ef93bad.html" data-relationship="implemented_in" data-since="2026-05-12T02:33:57.989717">session a400442f-4147-4bd1-a006-5a728ef93bad</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-2133adf2.html" data-relationship="planned_in" data-since="2026-05-12T02:15:32.26413">plan-2133adf2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-edbc978b.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:32.265551">feat-edbc978b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Wire `paths.NormalizeToRepoRelative` into the two hot-path hooks:
+
+`internal/hooks/pretooluse.go:217-220` — `event.ToolInput` arrives as
+`map[string]any` and is SINGLE-encoded via `json.Marshal` before
+storage in `agent_events.tool_input`. Before encoding, walk the map
+with a new helper `paths.NormalizeToolInputPaths(toolInput map[string]any, repoRoot string) map[string]any`
+that normalizes the known path keys (`file_path`, `path`,
+`notebook_path`) and leaves unknown keys untouched. Returns a new map
+(no caller-mutation).
+
+Correction from initial design: the column is NOT doubly-encoded. The
+stored value is a normal JSON object string. The normalizer needs a
+single `json.Marshal`/`Unmarshal` cycle, not two.
+
+`internal/hooks/posttooluse.go:123-131` — replace the raw
+`extractFilePath(event.ToolInput)` write with
+`paths.MustNormalize(extractFilePath(...), repoRoot)` so
+`feature_files.file_path` stores repo-relative.
+
+The `repoRoot` for both call sites comes from
+`resolveProjectDir(event.CWD)` (already called in the hook flow).
+Pass it through; do not re-resolve.</p>
+        </section>
+    </article>
+</body>
+</html>

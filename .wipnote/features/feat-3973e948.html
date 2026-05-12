@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Normalize SessionStart and SubagentStart CWD attribution</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-3973e948"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-05-12T02:15:32.966653"
+             data-updated="2026-05-12T02:43:24.736751" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33">
+
+        <header>
+            <h1>Normalize SessionStart and SubagentStart CWD attribution</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-2133adf2.html" data-relationship="planned_in" data-since="2026-05-12T02:15:32.974268">plan-2133adf2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="a400442f-4147-4bd1-a006-5a728ef93bad.html" data-relationship="implemented_in" data-since="2026-05-12T02:34:23.924274">session a400442f-4147-4bd1-a006-5a728ef93bad</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-edbc978b.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:32.975537">feat-edbc978b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-12T02:15:32.969039">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Three related call sites:
+
+`internal/hooks/session_html.go:88-89` — `data-project-dir` is set
+from `canonicalProjectDir` (resolved from `event.CWD`). Currently
+verbatim (see deliberate-verbatim comment at session_html.go:53-57).
+
+`internal/db/session_repo.go:16-23` + `session_start.go:351` —
+`sessions.project_dir` SQLite column, also absolute.
+
+`internal/hooks/subagent_start.go:80` — `pending_subagent_starts.cwd`,
+absolute.
+
+Change: all three call sites use `paths.NormalizeToRepoRelative` with
+the slice-1 outside-repo policy. Worktree CWDs collapse to the
+canonical root. Foreign-machine CWDs (where `git rev-parse` returns
+a different canonical root than the local `.wipnote/` repo) get the
+`unresolved:` prefix — this preserves the foreign-ingest invariant
+from the deliberate-verbatim comment while still making the foreign
+origin queryable.
+
+Rewrite the deliberate-verbatim comment in `session_html.go:53-57` to
+describe the new rule: "normalize to canonical root for local
+sessions; mark with `unresolved:` for sessions ingested from foreign
+machines (different canonical root)."</p>
+        </section>
+    </article>
+</body>
+</html>

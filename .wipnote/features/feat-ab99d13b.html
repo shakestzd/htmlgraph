@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Normalize WorktreePath in worktree events</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-ab99d13b"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-05-12T02:15:32.64153"
+             data-updated="2026-05-12T02:43:14.674184" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33">
+
+        <header>
+            <h1>Normalize WorktreePath in worktree events</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-2133adf2.html" data-relationship="planned_in" data-since="2026-05-12T02:15:32.649128">plan-2133adf2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-12T02:15:32.644009">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="a400442f-4147-4bd1-a006-5a728ef93bad.html" data-relationship="implemented_in" data-since="2026-05-12T02:34:11.53195">session a400442f-4147-4bd1-a006-5a728ef93bad</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-edbc978b.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:32.651261">feat-edbc978b</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>`internal/hooks/missing_events.go:324-368` — the WorktreeCreate and
+WorktreeRemove handlers embed `event.WorktreePath` verbatim into
+`agent_events.input_summary` as free text. The WorktreeRemove handler
+also embeds it (and `projectRoot`) into the `AdditionalContext` string
+at line 368 that is injected into the conversation.
+
+Change: before formatting, run
+`paths.NormalizeToRepoRelative(event.WorktreePath, repoRoot)` and
+embed the relative form (e.g. `.claude/worktrees/feat-x`).
+`extractBranchFromWorktreePath` keeps working because
+`filepath.Base(".claude/worktrees/feat-x")` still returns `feat-x`.
+
+Apply the same normalization in BOTH the `input_summary` write AND
+the `AdditionalContext` agent-facing message, so the agent and the
+stored record see identical paths.</p>
+        </section>
+    </article>
+</body>
+</html>
