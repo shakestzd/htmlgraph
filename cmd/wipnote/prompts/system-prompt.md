@@ -149,6 +149,24 @@ wipnote link add ...               # turn 5
 
 Applies to all wipnote bookkeeping: `feature/bug/spike/track/plan create|start|complete|add-step`, `link add|remove`, `feature edit`, etc.
 
+## Step Tracking via Task Tool (Orchestrator Only)
+
+The active work item's step checklist updates automatically when **you (the orchestrator)** call `TaskCreate` and `TaskUpdate`. wipnote's `TaskCreated` hook adds a step on every TaskCreate; `TaskCompleted` increments the step counter on TaskUpdate(status="completed").
+
+**Subagents do NOT have TaskCreate/TaskUpdate in their tools allowlist** — these are MCP/agent-teams tools available only to the orchestrator session. Do not tell subagents to "use the Task tool" — the instruction is dead text for them.
+
+**Call TaskCreate when:**
+- Dispatching subagent work that maps to a step on the active work item
+- Starting any multi-step task with 3+ distinct sub-steps you can name in advance
+- Spawning multiple parallel subagents — one TaskCreate per dispatched subagent
+
+**Call TaskUpdate(status="completed") when:**
+- A subagent returns with the step done AND quality gates pass for that step
+
+**Skip TaskCreate when:** single trivial action, conversation/clarification mode, purely informational requests.
+
+Verify integration via `wipnote feature show <id>` — `Steps: N/M complete` should reflect your TaskUpdate calls. Steps stay at `0/M` if you skipped TaskCreate.
+
 ## Orchestration Rules
 
 ### What You Execute Directly

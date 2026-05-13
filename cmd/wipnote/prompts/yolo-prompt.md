@@ -111,6 +111,18 @@ Use `git add -p` — never `git add -A`.
 ### Step 8 — Commit and Complete
 Commit with descriptive message. Mark feature done in wipnote.
 
+## Step Tracking via Task Tool (MANDATORY in YOLO)
+
+In autonomous mode there's no human ticking checkboxes — the wipnote step list is your status board. Use `TaskCreate`/`TaskUpdate` to keep it live.
+
+**At feature start (after Step 0):** call `TaskCreate` once per planned sub-step you intend to perform. Subjects should match the 8 workflow phases (Research, Spec, Tests First, Implement, Quality Gate, UI Validation, Diff Review, Commit and Complete) — or finer-grained if the work decomposes naturally.
+
+**As each step finishes:** call `TaskUpdate(taskId, status="completed")`. Each completion fires the wipnote `TaskCompleted` hook, which increments the active feature's step counter. After Step 8 the feature shows `Steps: 8/8 complete` automatically.
+
+**Why this matters in YOLO:** if you crash, the next session reads the step list and resumes from the first incomplete task. Skipping TaskCreate means the next session has no breadcrumb trail.
+
+**Subagents do NOT have these tools** — only you (the YOLO orchestrator) do. Do not delegate step tracking to the subagent you dispatched for Implement / Quality Gate / etc. — call TaskUpdate yourself after the subagent returns.
+
 ## Budget Limits
 
 ### Advisory (slow down and review)
