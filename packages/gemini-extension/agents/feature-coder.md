@@ -3,6 +3,7 @@ name: feature-coder
 description: Balanced code execution agent for moderate complexity tasks
 model: flash
 max_turns: 40
+timeout_mins: 30
 tools:
     - read_file
     - replace

@@ -36,6 +36,7 @@ type geminiAgentFrontmatter struct {
 	Description string   `yaml:"description,omitempty"`
 	Model       string   `yaml:"model,omitempty"`
 	MaxTurns    int      `yaml:"max_turns,omitempty"`
+	TimeoutMins int      `yaml:"timeout_mins,omitempty"`
 	Tools       []string `yaml:"tools,omitempty"`
 }
 
@@ -51,7 +52,7 @@ func init() {
 // Translation rules applied per agent:
 //   - DROP:    color, skills, initialPrompt
 //   - RENAME:  maxTurns → max_turns
-//   - KEEP:    name, description, model
+//   - KEEP:    name, description, model, timeout_mins
 //   - TRANSLATE: tools (see claudeToGeminiTool map; unknowns dropped with warning)
 //   - FALLBACK: empty tools after translation → ["*"] (Gemini wildcard for all tools)
 func emitGeminiAgents(m *Manifest, repoRoot, outDir string, t Target) error {
@@ -134,6 +135,9 @@ func translateAgentFrontmatter(filename string, raw []byte) ([]byte, error) {
 	}
 	if v, ok := claudeFM["maxTurns"].(int); ok {
 		gFM.MaxTurns = v
+	}
+	if v, ok := claudeFM["timeout_mins"].(int); ok {
+		gFM.TimeoutMins = v
 	}
 
 	// Translate tools list: map known Claude tools to Gemini equivalents;
