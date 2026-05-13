@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Add wipnote sync CLI for batch-committing dirty .wipnote/ files</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-5ddde9d7"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-05-13T04:03:57.097625"
+             data-updated="2026-05-13T07:47:05.691887" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.58.0-1820-g8bd77dc43">
+
+        <header>
+            <h1>Add wipnote sync CLI for batch-committing dirty .wipnote/ files</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="relates_to">
+                <h3>Relates To:</h3>
+                <ul>
+                    <li><a href="feat-fdf99806.html" data-relationship="relates_to" data-since="2026-05-13T04:04:03.935022">Auto-commit .wipnote/ artifact on feature/bug/spike complete</a></li>
+                    <li><a href="feat-712f9194.html" data-relationship="relates_to" data-since="2026-05-13T04:04:03.958781">Auto-commit .wipnote/ artifact on every state transition (create/start/complete/reopen)</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-13T04:03:57.101198">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="f464330c-c46d-4f34-8de4-30425d84a930.html" data-relationship="implemented_in" data-since="2026-05-13T07:47:05.691619">session f464330c-c46d-4f34-8de4-30425d84a930</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-0" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Implement cmd/wipnote/sync.go: walk git status --porcelain .wipnote/ for modifications and untracked files</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-1" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Stage matched files (skipping anything matching isTestTmpPath / .pre-merge-backup-*/)</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-2" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Single commit with message &#39;wipnote: sync &lt;N&gt; items&#39; or &#39;wipnote: sync &lt;id&gt;&#39; if only one item</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-3" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Add --dry-run flag printing planned operations without writing</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-4" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Add tests covering: dry-run no-mutation</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-5" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Add tests covering: skip on clean tree</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-6" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Add tests covering: respect isTestTmpPath guard</li>
+                <li data-completed="false" data-step-id="step-feat-5ddde9d7-7" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Optional: wire into existing SessionEnd hook as auto-flush (gated by .wipnote/config.json flag)</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Closes the other half of the durability gap from feat-fdf99806 follow-up. State-transition commits (feat-A above) handle birth/death but mid-flight add-step/edit mutations remain uncommitted. wipnote sync explicitly flushes any dirty .wipnote/ content to git in a single batch commit. Manual invocation for tidy history; optional SessionEnd auto-flush for hands-off durability. Skips paths matching the existing isTestTmpPath defensive guard. Estimate: M (~80 lines + tests).</p>
+        </section>
+    </article>
+</body>
+</html>
