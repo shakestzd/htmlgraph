@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Auto-commit .wipnote/ artifact on every state transition (create/start/complete/reopen)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-712f9194"
+             data-type="feature"
+             data-status="done"
+             data-priority="high"
+             data-created="2026-05-13T04:03:57.065005"
+             data-updated="2026-05-13T04:35:26.630212" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.58.0-1820-g8bd77dc43">
+
+        <header>
+            <h1>Auto-commit .wipnote/ artifact on every state transition (create/start/complete/reopen)</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="e5179b35-6359-4fe4-b95a-3b0e86dd85cc.html" data-relationship="implemented_in" data-since="2026-05-13T04:06:53.450425">session e5179b35-6359-4fe4-b95a-3b0e86dd85cc</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-13T04:03:57.070305">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="relates_to">
+                <h3>Relates To:</h3>
+                <ul>
+                    <li><a href="feat-fdf99806.html" data-relationship="relates_to" data-since="2026-05-13T04:04:03.918663">Auto-commit .wipnote/ artifact on feature/bug/spike complete</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-steps>
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li data-completed="true" data-step-id="step-feat-712f9194-0" data-agent="claude-code" data-created-by-agent="claude-code">✅ Extend commitWipnoteArtifact call in wiSetStatusWithAgent to fire on all status transitions (todo-&gt;in-progress</li>
+                <li data-completed="true" data-step-id="step-feat-712f9194-1" data-agent="claude-code" data-created-by-agent="claude-code">✅ in-progress-&gt;done</li>
+                <li data-completed="true" data-step-id="step-feat-712f9194-2" data-agent="claude-code" data-created-by-agent="claude-code">✅ done-&gt;in-progress reopen) not just status==&#39;done&#39;</li>
+                <li data-completed="true" data-step-id="step-feat-712f9194-3" data-agent="claude-code" data-created-by-agent="claude-code">✅ Wire commitWipnoteArtifact into runWiCreate so the initial HTML is committed at creation time</li>
+                <li data-completed="true" data-step-id="step-feat-712f9194-4" data-agent="claude-code" data-created-by-agent="claude-code">✅ Adjust commit message format: &#39;wipnote: create &lt;id&gt;&#39; / &#39;wipnote: start &lt;id&gt;&#39; / &#39;wipnote: complete &lt;id&gt;&#39; / &#39;wipnote: reopen &lt;id&gt;&#39;</li>
+                <li data-completed="true" data-step-id="step-feat-712f9194-5" data-agent="claude-code" data-created-by-agent="claude-code">✅ Add tests covering each transition path</li>
+                <li data-completed="true" data-step-id="step-feat-712f9194-6" data-agent="claude-code" data-created-by-agent="claude-code">✅ Verify defensive isTestTmpPath guard still suppresses commits from test fixtures</li>
+                <li data-completed="true" data-step-id="task-9" data-agent="claude-code" data-created-by-agent="claude-code">✅ Read current commitWipnoteArtifact &#43; wiSetStatusWithAgent shape</li>
+                <li data-completed="true" data-step-id="task-10" data-agent="claude-code" data-created-by-agent="claude-code">✅ Add action parameter to commitWipnoteArtifact</li>
+                <li data-completed="true" data-step-id="task-11" data-agent="claude-code" data-created-by-agent="claude-code">✅ Extend wiSetStatusWithAgent to fire on all transitions</li>
+                <li data-completed="true" data-step-id="task-12" data-agent="claude-code" data-created-by-agent="claude-code">✅ Wire commitWipnoteArtifact into runWiCreate</li>
+                <li data-completed="true" data-step-id="task-13" data-agent="claude-code" data-created-by-agent="claude-code">✅ Add tests for create / start / reopen transitions</li>
+                <li data-completed="true" data-step-id="task-14" data-agent="claude-code" data-created-by-agent="claude-code">✅ Build, run quality gates, verify no pollution</li>
+                <li data-completed="true" data-step-id="task-15" data-agent="claude-code" data-created-by-agent="claude-code">✅ Commit via copilot</li>
+            </ol>
+        </section>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Close half the durability gap from feat-fdf99806 follow-up discussion. Currently commitWipnoteArtifact only fires on 'complete'. Long-running in-progress items have no git durability between create and complete — exactly the failure mode that caused the lost-7-HTMLs incident on 2026-05-11. Fix: fire on every state transition. Expected ~3 commits per item lifecycle (create/start/complete), each tightly scoped to a single .html file via the existing absolute-path-in-git-commit pattern. Mid-flight add-step/edit mutations still uncommitted between transitions — that's the C-feature's job. Estimate: S (~15-30 lines + tests).</p>
+        </section>
+    </article>
+</body>
+</html>
