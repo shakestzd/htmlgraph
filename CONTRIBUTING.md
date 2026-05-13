@@ -17,8 +17,7 @@ go build -o wipnote ./cmd/wipnote/
 
 # All subsequent rebuilds
 wipnote build
-# equivalent: plugin/build.sh
-# outputs to: plugin/hooks/bin/wipnote
+# outputs to: ~/.local/bin/wipnote
 ```
 
 ## Layout

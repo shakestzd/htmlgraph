@@ -7,7 +7,7 @@ import (
 )
 
 // Files contains the plan review notebook and its dependencies.
-// These files are copied from prototypes/ at build time by plugin/build.sh.
+// These files are mirrored from prototypes/ at build time by `wipnote build`.
 //
 //go:embed files/plan_notebook.py files/plan_ui.py files/plan_persistence.py files/critique_renderer.py files/dagre_widget.py files/chat_widget.py files/claude_chat.py files/amendment_parser.py
 var Files embed.FS
