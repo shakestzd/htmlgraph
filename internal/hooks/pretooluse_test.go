@@ -3,6 +3,7 @@ package hooks
 import (
 	"database/sql"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,6 +62,92 @@ func TestCheckProjectDivergence_SameProject(t *testing.T) {
 	if result != nil {
 		t.Errorf("expected nil (allow) for same project, got: %+v", result)
 	}
+}
+
+// TestCheckProjectDivergence_WorktreeOfSameRepo_Allows is the regression test
+// for bug-a1993e6b: a Claude session whose sess.ProjectDir was recorded as the
+// main repo, but whose events fire from inside a linked worktree of that repo,
+// must NOT be flagged as cross-project. The two paths are different on disk
+// but share a .git common dir, so they are the same logical project.
+//
+// Pre-fix: this scenario blocked every Write/Edit with "CWD has changed to a
+// different project", wedging YOLO runs.
+func TestCheckProjectDivergence_WorktreeOfSameRepo_Allows(t *testing.T) {
+	// Anchor temp dirs to /tmp so paths don't accidentally land inside the
+	// real wipnote project tree (which would confuse ResolveProjectDir).
+	parent, err := os.MkdirTemp("/tmp", "wipnote-cwd-drift-test-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(parent) })
+
+	mainRepo := filepath.Join(parent, "main")
+	if err := os.MkdirAll(filepath.Join(mainRepo, ".wipnote"), 0o755); err != nil {
+		t.Fatalf("mkdir main .wipnote: %v", err)
+	}
+	// Git won't commit empty directories — drop a placeholder so the initial
+	// commit has something to stage and the worktree add has a clean base.
+	if err := os.WriteFile(filepath.Join(mainRepo, ".wipnote", ".keep"), nil, 0o644); err != nil {
+		t.Fatalf("write placeholder: %v", err)
+	}
+	if err := runGitCmds(t, mainRepo,
+		[]string{"init"},
+		[]string{"config", "user.email", "test@test"},
+		[]string{"config", "user.name", "test"},
+		[]string{"add", "-A"},
+		[]string{"commit", "-m", "init"},
+	); err != nil {
+		t.Fatalf("init main repo: %v", err)
+	}
+
+	worktree := filepath.Join(parent, "wt-feature")
+	if err := runGitCmds(t, mainRepo,
+		[]string{"worktree", "add", "-b", "feature-branch", worktree},
+	); err != nil {
+		t.Fatalf("create linked worktree: %v", err)
+	}
+
+	// Isolate the test from the developer's real environment: ResolveProjectDir
+	// checks several env vars and a hint file before falling back to git.
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Setenv("WIPNOTE_PROJECT_DIR", "")
+	t.Setenv("WIPNOTE_SESSION_ID", "")
+
+	sessionID := "sess-worktree-vs-main"
+	database := makeSessionDB(t, sessionID, mainRepo)
+
+	for _, toolName := range []string{"Write", "Edit", "MultiEdit"} {
+		t.Run(toolName, func(t *testing.T) {
+			event := &CloudEvent{
+				ToolName: toolName,
+				CWD:      worktree,
+				ToolInput: map[string]any{
+					"path":    filepath.Join(worktree, "foo.go"),
+					"content": "package main",
+				},
+			}
+			result := checkProjectDivergence(event, database, sessionID)
+			if result != nil {
+				t.Errorf("expected nil (allow) for worktree-vs-main same repo, got block: %q",
+					result.Reason)
+			}
+		})
+	}
+}
+
+// runGitCmds runs a sequence of git commands in dir; returns on first error.
+func runGitCmds(t *testing.T, dir string, cmds ...[]string) error {
+	t.Helper()
+	for _, args := range cmds {
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		out, err := c.CombinedOutput()
+		if err != nil {
+			t.Logf("git %v in %s: %v\n%s", args, dir, err, out)
+			return err
+		}
+	}
+	return nil
 }
 
 func TestCheckProjectDivergence_DifferentProject_WriteTool_Blocks(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/models"
+	"github.com/shakestzd/wipnote/internal/paths"
 )
 
 // PreToolUse handles the PreToolUse Claude Code hook event.
@@ -683,6 +684,18 @@ func checkProjectDivergence(event *CloudEvent, database *sql.DB, sessionID strin
 		return nil
 	}
 
+	// Worktree-aware: linked worktrees and their main repo share a .git
+	// common dir and therefore the same logical project. Normalising both
+	// paths through ResolveViaGitCommonDir collapses worktree↔main and
+	// worktreeA↔worktreeB to the same canonical root. Without this check,
+	// a YOLO session that records sess.ProjectDir=<main> in SessionStart
+	// then fires events with WIPNOTE_PROJECT_DIR=<worktree> sees a false
+	// divergence and blocks every Write/Edit (bug-a1993e6b — wedged
+	// YOLO session on feat-5ddde9d7 / 2026-05-13).
+	if canonicalRepoRoot(cleanEvent) == canonicalRepoRoot(cleanSession) {
+		return nil
+	}
+
 	if isWriteTool(event.ToolName) {
 		return &HookResult{
 			Decision: "block",
@@ -698,6 +711,35 @@ func checkProjectDivergence(event *CloudEvent, database *sql.DB, sessionID strin
 	debugLog(sessionProjectDir, "[wipnote] CWD divergence (read-only %s): session=%s event_cwd=%s",
 		event.ToolName, sessionProjectDir, event.CWD)
 	return nil
+}
+
+// canonicalRepoRoot returns the main repository root for any path that lives
+// inside the same logical project (whether the path is the main checkout or
+// a linked worktree of it). Used by checkProjectDivergence so that worktrees
+// don't trigger a false-positive "different project" block.
+//
+// Behaviour:
+//   - For a linked worktree, paths.ResolveViaGitCommonDir returns the main
+//     repo root (parent of the shared .git dir).
+//   - For the main checkout (or any non-worktree path that already has its
+//     own .git), ResolveViaGitCommonDir returns "" — in that case we treat
+//     dir itself as the canonical root after cleaning + symlink resolution.
+//
+// Two paths in the same logical project will produce the same canonical
+// root via this helper; two paths in unrelated projects will produce
+// different roots.
+func canonicalRepoRoot(dir string) string {
+	if main := paths.ResolveViaGitCommonDir(dir); main != "" {
+		if eval, err := filepath.EvalSymlinks(main); err == nil {
+			return eval
+		}
+		return main
+	}
+	clean := filepath.Clean(dir)
+	if eval, err := filepath.EvalSymlinks(clean); err == nil {
+		return eval
+	}
+	return clean
 }
 
 // checkSubagentWorkItemGuard blocks Write/Edit/MultiEdit from subagents when
