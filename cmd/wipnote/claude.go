@@ -212,7 +212,7 @@ func launchClaudeDev(extraArgs []string, auto bool, resumeID, name string) error
 
 func requireWipnoteOnPath() error {
 	if _, err := exec.LookPath("wipnote"); err != nil {
-		return fmt.Errorf("wipnote binary not found on PATH\nBuild with: wipnote build (or plugin/build.sh)")
+		return fmt.Errorf("wipnote binary not found on PATH\nBuild with: wipnote build")
 	}
 	return nil
 }

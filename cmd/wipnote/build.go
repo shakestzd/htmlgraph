@@ -1,123 +1,164 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 func buildCmd() *cobra.Command {
-	var dist bool
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "build",
 		Short: "Rebuild the wipnote binary",
-		Long:  "Rebuild the wipnote Go binary using the build script in the plugin directory.",
+		Long:  "Compile the wipnote Go binary with version stamping and install it to ~/.local/bin/.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			buildScript, err := resolveBuildScript()
-			if err != nil {
-				return err
-			}
-
-			var c *exec.Cmd
-			if dist {
-				c = exec.Command("bash", buildScript, "--dist")
-			} else {
-				c = exec.Command("bash", buildScript)
-			}
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-			return c.Run()
+			return runBuild()
 		},
 	}
-	cmd.Flags().BoolVar(&dist, "dist", false, "Build for distribution (bootstrap entry point + binary)")
-	return cmd
 }
 
-// resolveBuildScript finds build.sh using a priority-ordered strategy.
-//
-// The build script lives at plugin/build.sh.  Its location
-// depends on which binary is running:
-//
-//   - Dev mode: binary at plugin/hooks/bin/wipnote → two levels up
-//   - Standalone CLI: binary at ~/.local/bin/wipnote → walk-up fails;
-//     fall back to plugin dir from CLAUDE_PLUGIN_ROOT / WIPNOTE_PLUGIN_DIR /
-//     project-root detection
-//   - Marketplace install: binary is a bootstrap script, not the real binary;
-//     CLAUDE_PLUGIN_ROOT points to the real plugin tree
-//
-// Search order:
-//  1. CLAUDE_PLUGIN_ROOT env var (always set in hook/plugin context)
-//  2. WIPNOTE_PLUGIN_DIR env var (explicit user override)
-//  3. project-root detection (find .wipnote/, look for plugin/ next to it)
-//  4. os.Executable() walk-up (dev mode: binary inside plugin tree)
-func resolveBuildScript() (string, error) {
-	// Helper: probe whether a plugin dir has build.sh.
-	tryPluginDir := func(dir string) (string, bool) {
-		if dir == "" {
-			return "", false
-		}
-		candidate := filepath.Join(dir, "build.sh")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, true
-		}
-		return "", false
-	}
-
-	// 1. CLAUDE_PLUGIN_ROOT (hook/plugin context).
-	if s, ok := tryPluginDir(os.Getenv("CLAUDE_PLUGIN_ROOT")); ok {
-		return s, nil
-	}
-
-	// 2. Explicit user override.
-	if s, ok := tryPluginDir(os.Getenv("WIPNOTE_PLUGIN_DIR")); ok {
-		return s, nil
-	}
-
-	// 3. Project-root detection: find the .wipnote/ directory walking up from
-	//    CWD, then look for plugin/ adjacent to .wipnote/.
-	//    This works when the user runs `wipnote build` from anywhere inside
-	//    the project tree (standalone CLI case).
-	if cwd, err := os.Getwd(); err == nil {
-		dir := cwd
-		for {
-			if _, err := os.Stat(filepath.Join(dir, ".wipnote")); err == nil {
-				candidate := filepath.Join(dir, "plugin", "build.sh")
-				if _, err := os.Stat(candidate); err == nil {
-					return candidate, nil
-				}
-			}
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
-	}
-
-	// 4. os.Executable() walk-up — works for dev mode where the binary lives
-	//    at plugin/hooks/bin/wipnote.
-	binPath, err := os.Executable()
+func runBuild() error {
+	projectRoot, err := findProjectRoot()
 	if err != nil {
-		return "", fmt.Errorf("finding executable path: %w", err)
+		return err
 	}
-	if resolved, err := filepath.EvalSymlinks(binPath); err == nil {
-		binPath = resolved
+
+	version := resolveBuildVersion(projectRoot)
+
+	if err := syncNotebookFiles(projectRoot); err != nil {
+		return fmt.Errorf("sync notebook files: %w", err)
 	}
-	binDir := filepath.Dir(binPath)
-	script := filepath.Join(binDir, "..", "..", "build.sh")
-	abs, err := filepath.Abs(script)
+
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("resolving build script path: %w", err)
+		return fmt.Errorf("resolve home dir: %w", err)
 	}
-	if _, err := os.Stat(abs); os.IsNotExist(err) {
-		return "", fmt.Errorf(
-			"build script not found — tried CLAUDE_PLUGIN_ROOT, WIPNOTE_PLUGIN_DIR, "+
-				"project-root walk-up, and binary walk-up (last path: %s).\n"+
-				"Run from the project root or set WIPNOTE_PLUGIN_DIR=<path-to-go-plugin>.", abs)
+	installDir := filepath.Join(home, ".local", "bin")
+	metaDir := filepath.Join(home, ".local", "share", "wipnote")
+	binaryPath := filepath.Join(installDir, "wipnote")
+	aliasPath := filepath.Join(installDir, "wn")
+	versionFile := filepath.Join(metaDir, ".binary-version")
+
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", installDir, err)
 	}
-	return abs, nil
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", metaDir, err)
+	}
+
+	// Remove existing binary first so macOS doesn't reuse a cached code signature.
+	_ = os.Remove(binaryPath)
+
+	fmt.Printf("Building wipnote (version: %s)...\n", version)
+	goBuild := exec.Command("go", "build",
+		"-ldflags", fmt.Sprintf("-s -w -X main.version=%s", version),
+		"-o", binaryPath,
+		"./cmd/wipnote/",
+	)
+	goBuild.Dir = projectRoot
+	goBuild.Stdout = os.Stdout
+	goBuild.Stderr = os.Stderr
+	if err := goBuild.Run(); err != nil {
+		return fmt.Errorf("go build: %w", err)
+	}
+	if err := os.Chmod(binaryPath, 0o755); err != nil {
+		return fmt.Errorf("chmod %s: %w", binaryPath, err)
+	}
+
+	if err := os.Remove(aliasPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove %s: %w", aliasPath, err)
+	}
+	if err := os.Symlink(binaryPath, aliasPath); err != nil {
+		return fmt.Errorf("symlink %s: %w", aliasPath, err)
+	}
+
+	if err := os.WriteFile(versionFile, []byte(version+"\n"), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", versionFile, err)
+	}
+
+	fmt.Printf("Installed: %s (v%s)\n", binaryPath, version)
+	fmt.Printf("Alias:     %s -> wipnote\n", aliasPath)
+	return nil
+}
+
+// findProjectRoot walks up from CWD looking for go.mod. Honors WIPNOTE_PROJECT_ROOT.
+func findProjectRoot() (string, error) {
+	if env := os.Getenv("WIPNOTE_PROJECT_ROOT"); env != "" {
+		if _, err := os.Stat(filepath.Join(env, "go.mod")); err == nil {
+			return env, nil
+		}
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dir := cwd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf(
+				"wipnote project root not found — no go.mod walking up from %s.\n"+
+					"Run from within the project tree, or set WIPNOTE_PROJECT_ROOT=<repo-path>",
+				cwd,
+			)
+		}
+		dir = parent
+	}
+}
+
+func resolveBuildVersion(projectRoot string) string {
+	cmd := exec.Command("git", "describe", "--tags", "--always")
+	cmd.Dir = projectRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return "dev"
+	}
+	return strings.TrimPrefix(strings.TrimSpace(string(out)), "v")
+}
+
+// syncNotebookFiles mirrors prototypes/*.py into internal/notebook/files/ so
+// //go:embed picks up the latest source. Idempotent; preserves destination-only
+// files (plan_notebook.py, plan_persistence.py, plan_ui.py live only in the
+// destination and must not be deleted).
+func syncNotebookFiles(projectRoot string) error {
+	srcDir := filepath.Join(projectRoot, "prototypes")
+	dstDir := filepath.Join(projectRoot, "internal", "notebook", "files")
+
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return err
+	}
+
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".py") {
+			continue
+		}
+		src := filepath.Join(srcDir, e.Name())
+		dst := filepath.Join(dstDir, e.Name())
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		if existing, err := os.ReadFile(dst); err == nil && string(existing) == string(data) {
+			continue
+		}
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
