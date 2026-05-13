@@ -60,6 +60,10 @@ func Validate(plan *PlanYAML) []string {
 	default:
 		errs = append(errs, fmt.Sprintf("meta.status %q must be draft|review|finalized|active|completed", plan.Meta.Status))
 	}
+	// Validate SchemaVersion enum when non-empty: only "v3" is accepted.
+	if plan.Meta.SchemaVersion != "" && plan.Meta.SchemaVersion != "v3" {
+		errs = append(errs, fmt.Sprintf("meta.schema_version %q is invalid; accepted values: \"v3\" (or omit for legacy)", plan.Meta.SchemaVersion))
+	}
 	if plan.Design.Problem == "" {
 		errs = append(errs, "design.problem is required")
 	}
@@ -130,7 +134,14 @@ func Validate(plan *PlanYAML) []string {
 			if s.Tests == "" {
 				errs = append(errs, prefix+".tests is required")
 			}
-			if plan.Meta.Status != "finalized" && s.Complexity != "" {
+			// decisions_notes is required when the plan is not finalized AND:
+			//   - schema_version == "v3" (strict model: catches omitted Complexity
+			//     which defaults to "standard"), OR
+			//   - slice.Complexity is explicitly set (legacy behaviour).
+			isStrictModel := plan.Meta.SchemaVersion == "v3"
+			requiresDecisionsNotes := plan.Meta.Status != "finalized" &&
+				(isStrictModel || s.Complexity != "")
+			if requiresDecisionsNotes {
 				if len(strings.TrimSpace(s.DecisionsNotes)) < 50 {
 					errs = append(errs, prefix+".decisions_notes is required (>=50 chars) for standard slices")
 				}

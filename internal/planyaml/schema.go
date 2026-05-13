@@ -21,8 +21,19 @@ type PlanMeta struct {
 	CreatedAt   string `yaml:"created_at"`
 	Status      string `yaml:"status"` // draft | review | finalized | active | completed
 	Priority    string `yaml:"priority,omitempty"`
-	CreatedBy   string `yaml:"created_by,omitempty"`
-	Version     int    `yaml:"version"`
+
+	// SchemaVersion identifies which plan-authoring model produced this plan.
+	// Empty = legacy (pre-triage). "v3" = triage-gated interview model with
+	// decisions_notes as the rationale spine.
+	//
+	// Empty SchemaVersion preserves back-compat: legacy plans validate under
+	// pre-v3 rules. Setting SchemaVersion="v3" enables strict validation:
+	// decisions_notes becomes required for all standard/complex slices, even
+	// when slice.Complexity is left empty (defaulting to "standard").
+	SchemaVersion string `yaml:"schema_version,omitempty"`
+
+	CreatedBy string `yaml:"created_by,omitempty"`
+	Version   int    `yaml:"version"`
 }
 
 // PlanDesign captures the problem statement, goals, constraints, and

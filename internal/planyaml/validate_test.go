@@ -759,6 +759,118 @@ func TestValidate_LegacyDraftPlan_NoComplexity_NoDecisionsNotes(t *testing.T) {
 	}
 }
 
+// ---- schema_version=v3 strict-model tests ----
+
+// v3MinimalPlan returns a non-finalized plan with schema_version=v3 and a
+// single slice whose Complexity is intentionally left empty (defaults to
+// "standard" via effectiveComplexity). All standard mandatory fields except
+// decisions_notes are populated so tests can toggle that field independently.
+func v3MinimalPlan(decisionsNotes string) *PlanYAML {
+	return &PlanYAML{
+		Meta: PlanMeta{
+			ID:            "plan-v3test01",
+			Title:         "V3 Strict Test Plan",
+			Status:        "draft",
+			SchemaVersion: "v3",
+		},
+		Design: PlanDesign{
+			Problem:     "A problem.",
+			Goals:       []string{"Goal 1"},
+			Constraints: []string{"Constraint 1"},
+		},
+		Slices: []PlanSlice{
+			{
+				Num:            1,
+				What:           "Build the thing.",
+				Why:            "Because it matters.",
+				Files:          []string{"internal/foo/bar.go"},
+				DoneWhen:       []string{"Tests pass"},
+				Tests:          "Unit: it works",
+				Effort:         "S",
+				Risk:           "Low",
+				Deps:           []int{},
+				DecisionsNotes: decisionsNotes,
+				// Complexity intentionally absent — defaults to "standard".
+			},
+		},
+		Questions: []PlanQuestion{},
+	}
+}
+
+func TestValidate_V3Plan_StandardSliceWithoutComplexity_RequiresDecisionsNotes(t *testing.T) {
+	// v3 strict model: slice with no complexity field (defaults to standard)
+	// and no decisions_notes must produce an error.
+	plan := v3MinimalPlan("")
+	errs := Validate(plan)
+	assertContainsError(t, errs, "decisions_notes")
+}
+
+func TestValidate_V3Plan_StandardSliceWithoutComplexity_WithDecisionsNotes_Passes(t *testing.T) {
+	// v3 strict model: slice with no complexity field and sufficient
+	// decisions_notes must validate clean.
+	plan := v3MinimalPlan(fiftyCharsNotes)
+	errs := Validate(plan)
+	if len(errs) != 0 {
+		t.Errorf("v3 plan with decisions_notes should validate clean, got: %v", errs)
+	}
+}
+
+func TestValidate_V3Plan_ExplicitTrivialComplexity_NoDecisionsNotesRequired(t *testing.T) {
+	// v3 strict model: trivial slices are always exempt from decisions_notes,
+	// regardless of schema_version.
+	plan := &PlanYAML{
+		Meta: PlanMeta{
+			ID:            "plan-v3triv01",
+			Title:         "V3 Trivial Test",
+			Status:        "draft",
+			SchemaVersion: "v3",
+		},
+		Design: PlanDesign{
+			Problem:     "A problem.",
+			Goals:       []string{"Goal 1"},
+			Constraints: []string{"Constraint 1"},
+		},
+		Slices: []PlanSlice{
+			{
+				Num:        1,
+				Why:        "Quick polish.",
+				Files:      []string{"internal/foo/bar.go"},
+				Effort:     "S",
+				Risk:       "Low",
+				Complexity: "trivial",
+				Deps:       []int{},
+				// No decisions_notes — trivial is exempt.
+			},
+		},
+		Questions: []PlanQuestion{},
+	}
+	errs := Validate(plan)
+	for _, e := range errs {
+		if strings.Contains(e, "decisions_notes") {
+			t.Errorf("trivial slice in v3 plan should not require decisions_notes, got error: %s", e)
+		}
+	}
+}
+
+func TestValidate_InvalidSchemaVersion_Rejected(t *testing.T) {
+	// Any non-empty schema_version other than "v3" must be rejected.
+	for _, bad := range []string{"v2", "future", "1"} {
+		plan := v3MinimalPlan(fiftyCharsNotes)
+		plan.Meta.SchemaVersion = bad
+		errs := Validate(plan)
+		found := false
+		for _, e := range errs {
+			if strings.Contains(e, "schema_version") && strings.Contains(e, bad) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("schema_version %q should be rejected with a message containing the bad value; got: %v", bad, errs)
+		}
+	}
+}
+
 func TestValidate_LegacyPlanRegression(t *testing.T) {
 	// A legacy plan (no v2 fields, status=finalized) should still validate
 	// without errors. The triage-gated decisions_notes requirement is
