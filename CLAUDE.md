@@ -11,8 +11,7 @@ Local-first observability and coordination platform for AI-assisted development.
 **Always use `wipnote build`, never `go build` directly.**
 
 ```bash
-wipnote build      # outputs to plugin/hooks/bin/wipnote (on your PATH)
-plugin/build.sh      # equivalent
+wipnote build      # outputs to ~/.local/bin/wipnote (on your PATH)
 ```
 
 Running `go build -o wipnote ./cmd/wipnote/` puts the binary in CWD, not on your PATH.

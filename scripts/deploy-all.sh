@@ -226,7 +226,7 @@ step "Update local install"
 
 if $DRY_RUN; then
     ok "[dry-run] Would pull marketplace clone"
-    ok "[dry-run] Would rebuild CLI binary via plugin/build.sh"
+    ok "[dry-run] Would rebuild CLI binary via 'wipnote build'"
 else
     # 1. Pull the marketplace clone so `claude plugin update` sees the new version.
     #    Claude Code's marketplace is a local git clone; without a pull the
@@ -245,14 +245,10 @@ else
     #    Plugin hooks use `wipnote` (PATH lookup), not the bundled binary.
     #    No plugin reinstall needed — the marketplace clone update (above)
     #    is sufficient. Reinstalling interferes with dev mode (--plugin-dir).
-    if [[ -f "$PROJECT_ROOT/plugin/build.sh" ]]; then
-        # Invoke with bash explicitly: build.sh uses `set -o pipefail` which is
-        # a bashism and fails under POSIX sh / dash (bug-364cebb7).
-        bash "$PROJECT_ROOT/plugin/build.sh" 2>&1 | tail -1
-        ok "CLI binary rebuilt"
-    else
-        warn "build.sh not found — skipping CLI rebuild"
-    fi
+    #    Bootstrap from source via `go run` so we don't depend on a pre-existing
+    #    wipnote binary in PATH (chicken-and-egg).
+    (cd "$PROJECT_ROOT" && go run ./cmd/wipnote build 2>&1 | tail -1)
+    ok "CLI binary rebuilt"
 fi
 
 # ── Post-release ───────────────────────────────────────────────
