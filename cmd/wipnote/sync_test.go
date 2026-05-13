@@ -299,6 +299,120 @@ func TestSyncSingleIDDerivation(t *testing.T) {
 	}
 }
 
+// TestSyncFindsWorktreeExcludedFiles verifies that sync discovers and stages
+// .wipnote/ files that are hidden from `git status` by a per-worktree exclude
+// (info/exclude). This is the regression gate for roborev #1720: without
+// --ignored=matching + `git add -f`, sync was a no-op in exactly the worktrees
+// it is meant to flush (excludeWipnoteFromWorktree installs that exclude).
+func TestSyncFindsWorktreeExcludedFiles(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "wipnote-sync-excluded-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp /tmp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	mainRepo := setupWorktreeGitRepoIn(t, tmpDir)
+	wipnoteDir := filepath.Join(mainRepo, ".wipnote")
+	if err := os.MkdirAll(filepath.Join(wipnoteDir, "features"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	seedWipnoteCommit(t, mainRepo)
+
+	// Install the exact exclude that excludeWipnoteFromWorktree writes into
+	// linked worktrees. From git's perspective the repo now treats any
+	// untracked file under .wipnote/ as ignored — `git status` hides them,
+	// and `git add` refuses them without -f.
+	excludePath := filepath.Join(mainRepo, ".git", "info", "exclude")
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
+		t.Fatalf("mkdir info/: %v", err)
+	}
+	if err := os.WriteFile(excludePath, []byte(".wipnote/\n"), 0o644); err != nil {
+		t.Fatalf("write exclude: %v", err)
+	}
+
+	// Drop an untracked file that the exclude would normally hide.
+	featureID := "feat-excluded1"
+	featureHTML := filepath.Join(wipnoteDir, "features", featureID+".html")
+	if err := os.WriteFile(featureHTML, []byte(`<article id="`+featureID+`"></article>`), 0o644); err != nil {
+		t.Fatalf("write feature: %v", err)
+	}
+
+	// Sanity check: confirm the exclude actually hides the file from a plain
+	// `git status` so this test is exercising the bug it documents, not a
+	// silently-passing variation.
+	plain, _ := exec.Command("git", "-C", mainRepo, "status", "--porcelain", "--", ".wipnote/").CombinedOutput()
+	if strings.Contains(string(plain), featureID) {
+		t.Fatalf("test precondition broken: plain `git status` should hide excluded files but emitted: %s", plain)
+	}
+
+	countBefore := gitCommitCount(t, mainRepo)
+
+	var out bytes.Buffer
+	n, err := runSync(wipnoteDir, false, &out)
+	if err != nil {
+		t.Fatalf("runSync: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 worktree-excluded file synced, got %d (sync is silently missing excluded files — regression of roborev #1720)", n)
+	}
+	if got := gitCommitCount(t, mainRepo); got != countBefore+1 {
+		t.Errorf("expected exactly 1 new commit, count %d -> %d", countBefore, got)
+	}
+
+	showOut, _ := exec.Command("git", "-C", mainRepo, "show", "--name-only", "HEAD").CombinedOutput()
+	if !strings.Contains(string(showOut), featureID+".html") {
+		t.Errorf("expected %s.html in commit, got:\n%s", featureID, showOut)
+	}
+}
+
+// TestSyncReturnsStagedCountOnCommitFailure verifies that when files were
+// discovered and staged but the commit fails (e.g. a pre-commit hook rejects
+// it), runSync returns the staged count rather than 0. The CLI wrapper uses
+// the return value to decide whether to print "nothing to sync" — returning
+// 0 in this branch misleads the user that no work was found. Regression gate
+// for roborev #1720.
+func TestSyncReturnsStagedCountOnCommitFailure(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "wipnote-sync-failcommit-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp /tmp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	mainRepo := setupWorktreeGitRepoIn(t, tmpDir)
+	wipnoteDir := filepath.Join(mainRepo, ".wipnote")
+	if err := os.MkdirAll(filepath.Join(wipnoteDir, "features"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	seedWipnoteCommit(t, mainRepo)
+
+	// Install a pre-commit hook that always rejects, simulating a hook-side
+	// failure. We use the worktree's .git/hooks/ which is the per-worktree
+	// path Git resolves first.
+	hooksDir := filepath.Join(mainRepo, ".git", "hooks")
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
+		t.Fatalf("mkdir hooks: %v", err)
+	}
+	hookPath := filepath.Join(hooksDir, "pre-commit")
+	if err := os.WriteFile(hookPath, []byte("#!/bin/sh\necho 'rejected by test hook' >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatalf("write hook: %v", err)
+	}
+
+	featureID := "feat-hookfail1"
+	if err := os.WriteFile(filepath.Join(wipnoteDir, "features", featureID+".html"),
+		[]byte(`<article id="`+featureID+`"></article>`), 0o644); err != nil {
+		t.Fatalf("write feature: %v", err)
+	}
+
+	var out bytes.Buffer
+	n, err := runSync(wipnoteDir, false, &out)
+	if err != nil {
+		t.Fatalf("runSync: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("expected staged count = 1 on hook-rejected commit, got %d (CLI wrapper would falsely print 'nothing to sync')", n)
+	}
+}
+
 // seedWipnoteCommit writes and commits a .wipnote/.keep placeholder so the
 // repo has a HEAD that `gitCommitCount` can read, and so subsequent dirty
 // .wipnote/ writes show up as modifications/untracked rather than appearing

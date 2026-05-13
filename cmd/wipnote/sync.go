@@ -111,10 +111,14 @@ func runSync(wipnoteDir string, dryRun bool, out io.Writer) (int, error) {
 		return len(files), nil
 	}
 
-	// Stage each path explicitly. `git -C <repoRoot> add -- <relPath>` bypasses
-	// any per-worktree exclude on .wipnote/ (see commitWipnoteArtifact for the
-	// design rationale).
-	addArgs := append([]string{"-C", repoRoot, "add", "--"}, files...)
+	// Stage each path explicitly. `git -C <repoRoot> add -f -- <relPath>` is
+	// the load-bearing combination: -C anchors to the main repo (bypassing any
+	// linked-worktree CWD), -f overrides the per-worktree .wipnote/ exclude
+	// installed by excludeWipnoteFromWorktree so that ignored-but-real files
+	// can still be staged. Without -f, `git add` refuses ignored paths with
+	// "Use -f if you really want to add them" and sync becomes a no-op in
+	// exactly the worktrees it is meant to flush.
+	addArgs := append([]string{"-C", repoRoot, "add", "-f", "--"}, files...)
 	if addOut, err := exec.Command("git", addArgs...).CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("wipnote sync: git add: %s: %w", strings.TrimSpace(string(addOut)), err)
 	}
@@ -127,26 +131,40 @@ func runSync(wipnoteDir string, dryRun bool, out io.Writer) (int, error) {
 		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
 			return 0, nil
 		}
-		fmt.Fprintf(stderr, "wipnote sync warning: git commit failed (files staged — please commit manually): %s\n",
-			strings.TrimSpace(outStr))
-		return 0, nil
+		// Non-fatal: files are staged on disk; the user can `git commit` by
+		// hand. Return the staged count rather than 0 so the CLI wrapper does
+		// not mislead the user with "nothing to sync" (roborev #1720).
+		fmt.Fprintf(stderr, "wipnote sync warning: git commit failed for %d staged file(s) — please commit manually: %s\n",
+			len(files), strings.TrimSpace(outStr))
+		return len(files), nil
 	}
 
 	fmt.Fprintf(out, "wipnote sync: committed %d file(s) — %s\n", len(files), msg)
 	return len(files), nil
 }
 
-// dirtyWipnoteFiles returns repo-relative paths of any modified or untracked
-// files under .wipnote/ inside repoRoot, with pre-merge-backup snapshots
-// filtered out. Uses `git status --porcelain` so the result reflects exactly
-// what git considers dirty (respecting .gitignore but bypassing the per-
-// worktree exclude on .wipnote/ via the explicit pathspec).
+// dirtyWipnoteFiles returns repo-relative paths of any modified, untracked,
+// or ignored files under .wipnote/ inside repoRoot, with pre-merge-backup
+// snapshots filtered out.
+//
+// --ignored=traditional is critical (roborev #1720): wipnote installs a per-
+// worktree exclude on .wipnote/ (excludeWipnoteFromWorktree, see
+// internal/worktree). Without --ignored, every untracked .wipnote/ file in a
+// linked worktree is invisible to `git status` and sync becomes a no-op in
+// exactly the worktrees it is meant to flush. "traditional" (paired with
+// --untracked-files=all) expands the excluded directory into individual file
+// paths — "matching" would instead collapse to the directory pattern, giving
+// us nothing to stage. Pairing this with `git add -f` (in runSync) lets sync
+// see and stage worktree-excluded files while the same exclude continues to
+// keep .wipnote/ noise out of normal `git status` output.
+//
+// The "-- .wipnote/" pathspec scopes the walk to wipnote artifacts only, so
+// we don't surface unrelated ignored files elsewhere in the repo.
 func dirtyWipnoteFiles(repoRoot string) ([]string, error) {
-	// --untracked-files=all expands directories so we get individual file
-	// paths to stage, not the parent dir. The -- .wipnote/ pathspec scopes
-	// the walk to wipnote artifacts.
 	out, err := exec.Command(
-		"git", "-C", repoRoot, "status", "--porcelain", "--untracked-files=all", "--", ".wipnote/",
+		"git", "-C", repoRoot, "status", "--porcelain",
+		"--untracked-files=all", "--ignored=traditional",
+		"--", ".wipnote/",
 	).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git status: %s: %w", strings.TrimSpace(string(out)), err)
@@ -166,6 +184,12 @@ func dirtyWipnoteFiles(repoRoot string) ([]string, error) {
 		// Strip surrounding quotes that git uses for paths with special chars.
 		path = strings.Trim(path, `"`)
 		if !strings.HasPrefix(path, ".wipnote/") {
+			continue
+		}
+		// Skip directory entries that `--ignored=matching` may emit when a
+		// directory itself is excluded (e.g. ".wipnote/" with a trailing
+		// slash). Only individual files should be staged.
+		if strings.HasSuffix(path, "/") {
 			continue
 		}
 		if preMergeBackupRe.MatchString(path) {
