@@ -3,6 +3,7 @@ name: researcher
 description: Research, debug, and visual QA agent. Use for investigating unfamiliar systems, root cause analysis of errors, and visual quality assurance of web UIs. Enforces research-first philosophy — documentation before trial-and-error.
 model: flash
 max_turns: 40
+timeout_mins: 30
 tools:
     - read_file
     - grep_search
