@@ -130,7 +130,7 @@ func Validate(plan *PlanYAML) []string {
 			if s.Tests == "" {
 				errs = append(errs, prefix+".tests is required")
 			}
-			if plan.Meta.Status != "finalized" {
+			if plan.Meta.Status != "finalized" && s.Complexity != "" {
 				if len(strings.TrimSpace(s.DecisionsNotes)) < 50 {
 					errs = append(errs, prefix+".decisions_notes is required (>=50 chars) for standard slices")
 				}

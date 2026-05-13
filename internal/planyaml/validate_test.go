@@ -722,6 +722,43 @@ func TestValidate_ExistingFinalizedPlan_1c14d560(t *testing.T) {
 	}
 }
 
+func TestValidate_LegacyDraftPlan_NoComplexity_NoDecisionsNotes(t *testing.T) {
+	// Legacy non-finalized plans that predate the complexity field must not be
+	// required to supply decisions_notes. When slice.Complexity == "" the
+	// decisions_notes gate is skipped entirely, preserving back-compat.
+	plan := &PlanYAML{
+		Meta: PlanMeta{
+			ID:     "plan-legacy02",
+			Title:  "Legacy Draft Plan",
+			Status: "draft",
+		},
+		Design: PlanDesign{
+			Problem:     "An old problem.",
+			Goals:       []string{"Legacy goal"},
+			Constraints: []string{"Legacy constraint"},
+		},
+		Slices: []PlanSlice{
+			{
+				Num:      1,
+				What:     "Do the legacy thing.",
+				Why:      "Because legacy.",
+				Files:    []string{"internal/legacy/foo.go"},
+				DoneWhen: []string{"It works"},
+				Tests:    "Manual: smoke test",
+				Effort:   "M",
+				Risk:     "High",
+				Deps:     []int{},
+				// Complexity and DecisionsNotes intentionally absent — legacy plan.
+			},
+		},
+		Questions: []PlanQuestion{},
+	}
+	errs := Validate(plan)
+	if len(errs) != 0 {
+		t.Errorf("legacy draft plan without complexity/decisions_notes should validate clean, got: %v", errs)
+	}
+}
+
 func TestValidate_LegacyPlanRegression(t *testing.T) {
 	// A legacy plan (no v2 fields, status=finalized) should still validate
 	// without errors. The triage-gated decisions_notes requirement is
