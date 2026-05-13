@@ -510,7 +510,7 @@ func TestValidate_ValidExecutionStatuses(t *testing.T) {
 // minimalPlan returns a non-finalized plan with a single slice in the given
 // complexity tier, with only the unconditionally-required fields populated.
 // Helper for triage-gated validator tests.
-func minimalPlan(complexity string, slice PlanSlice) *PlanYAML {
+func minimalPlan(_ string, slice PlanSlice) *PlanYAML {
 	return &PlanYAML{
 		Meta: PlanMeta{
 			ID:     "plan-triage001",
