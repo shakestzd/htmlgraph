@@ -180,6 +180,16 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 		}
 	}
 
+	// Auto-commit the freshly-created HTML so in-progress lineage starts on
+	// commit-1 rather than waiting for completion. Gated by the same allowlist
+	// that gates the complete-time commit; plans use commitPlanChange instead.
+	// Non-fatal: failures log to stderr and continue.
+	if shouldAutocommitWorkitemArtifact(typeName) {
+		if err := commitWipnoteArtifact(dir, typeName, node.ID, "create"); err != nil {
+			fmt.Fprintf(os.Stderr, "autocommit warning: %v\n", err)
+		}
+	}
+
 	if o.start {
 		if _, startErr := collectionFor(p, typeName).Start(node.ID); startErr != nil {
 			return fmt.Errorf("start %s: %w", typeName, startErr)
@@ -191,6 +201,14 @@ func runWiCreate(typeName, title string, o *wiCreateOpts) error {
 			_ = dbpkg.SetActiveWorkItem(p.DB, sessionID, agentID, node.ID)
 			// Legacy dual-write for consumers not yet reading active_work_items.
 			_ = hooks.UpdateActiveFeature(p.DB, sessionID, node.ID)
+		}
+		// Second auto-commit for the start transition. Two commits per
+		// "create --start" invocation is intentional — each captures a
+		// distinct state in HTML and gives git log a clean transition trail.
+		if shouldAutocommitWorkitemArtifact(typeName) {
+			if err := commitWipnoteArtifact(dir, typeName, node.ID, "start"); err != nil {
+				fmt.Fprintf(os.Stderr, "autocommit warning: %v\n", err)
+			}
 		}
 		fmt.Printf("Created and started: %s  %s\n", node.ID, node.Title)
 	} else {

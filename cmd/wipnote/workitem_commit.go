@@ -45,6 +45,11 @@ func isTestTmpPath(absPath string) bool {
 // typeName is "feature", "bug", or "spike"; the HTML lives at
 // .wipnote/<typeName>s/<id>.html relative to the project root.
 //
+// action is the state-transition verb embedded in the commit message —
+// "create", "start", "complete", "reopen", "block" — producing messages like
+// "wipnote: start feat-XYZ" or "wipnote: complete feat-XYZ". The action gives
+// `git log` a clean per-transition trail for each work item.
+//
 // Design: `git -C <repoRoot>` anchors the command to the main repository even
 // when the caller's shell CWD is inside a linked worktree. The per-worktree
 // gitignore installed by excludeWipnoteFromWorktree (internal/worktree) only
@@ -56,7 +61,7 @@ func isTestTmpPath(absPath string) bool {
 // fails for any reason (hook rejection, locked index, nothing to commit), the
 // function logs to stderr and returns nil. The caller must not make completion
 // of the work item depend on the git commit succeeding.
-func commitWipnoteArtifact(wipnoteDir, typeName, id string) error {
+func commitWipnoteArtifact(wipnoteDir, typeName, id, action string) error {
 	// Derive the repo root: wipnoteDir is .wipnote/ inside the project root.
 	repoRoot := filepath.Dir(wipnoteDir)
 
@@ -100,7 +105,10 @@ func commitWipnoteArtifact(wipnoteDir, typeName, id string) error {
 	_ = diffOut // non-zero exit is the expected "there is a diff" result
 
 	// Commit only the artifact file — never touch the broader index.
-	msg := "wipnote: complete " + id
+	if action == "" {
+		action = "update"
+	}
+	msg := "wipnote: " + action + " " + id
 	commitOut, err := exec.Command(
 		"git", "-C", repoRoot, "commit", "-m", msg, "--", absPath,
 	).CombinedOutput()
@@ -128,5 +136,21 @@ func shouldAutocommitWorkitemArtifact(typeName string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// actionFromStatus maps a wipnote work-item status value to the verb used in
+// the auto-commit message ("wipnote: <action> <id>"). "in-progress" becomes
+// "start" since that's the human-readable transition verb; "done" becomes
+// "complete". Other statuses pass through verbatim, used as-is for messages
+// like "wipnote: blocked <id>" or "wipnote: todo <id>" (rare resets).
+func actionFromStatus(status string) string {
+	switch status {
+	case "in-progress":
+		return "start"
+	case "done":
+		return "complete"
+	default:
+		return status
 	}
 }

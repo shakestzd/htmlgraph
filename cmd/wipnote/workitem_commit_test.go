@@ -81,7 +81,7 @@ func TestCompleteCommitsWipnoteArtifact(t *testing.T) {
 
 	// Step 5: call commitWipnoteArtifact directly, simulating what wiSetStatusWithAgent
 	// does after completing a work item.
-	if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID); err != nil {
+	if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID, "complete"); err != nil {
 		t.Fatalf("commitWipnoteArtifact: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestCompleteCommitsWipnoteArtifact_NoOpWhenAlreadyCommitted(t *testing.T) {
 	countBefore := gitCommitCount(t, mainRepo)
 
 	// Call commitWipnoteArtifact — nothing has changed, so it should be a no-op.
-	if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID); err != nil {
+	if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID, "complete"); err != nil {
 		t.Fatalf("commitWipnoteArtifact (idempotent): %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestCompleteCommitsWipnoteArtifact_SkipsWhenNoGitRepo(t *testing.T) {
 	}
 
 	// Should return nil even though there is no git repo.
-	if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID); err != nil {
+	if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID, "complete"); err != nil {
 		t.Fatalf("expected nil in non-git dir, got: %v", err)
 	}
 }
@@ -209,6 +209,78 @@ func TestShouldAutocommitWorkitemArtifact(t *testing.T) {
 	for _, c := range cases {
 		if got := shouldAutocommitWorkitemArtifact(c.typeName); got != c.want {
 			t.Errorf("shouldAutocommitWorkitemArtifact(%q) = %v, want %v", c.typeName, got, c.want)
+		}
+	}
+}
+
+// TestActionFromStatus verifies the status→action verb mapping used to compose
+// auto-commit messages. "in-progress" maps to "start" (the human-readable
+// transition verb), "done" maps to "complete", everything else passes through.
+func TestActionFromStatus(t *testing.T) {
+	cases := []struct {
+		status string
+		want   string
+	}{
+		{"in-progress", "start"},
+		{"done", "complete"},
+		{"todo", "todo"},
+		{"blocked", "blocked"},
+		{"", ""},
+		{"reopen", "reopen"},
+	}
+	for _, c := range cases {
+		if got := actionFromStatus(c.status); got != c.want {
+			t.Errorf("actionFromStatus(%q) = %q, want %q", c.status, got, c.want)
+		}
+	}
+}
+
+// TestCommitMessageReflectsAction verifies commitWipnoteArtifact embeds the
+// action verb into the commit subject. This is the per-transition trail that
+// gives `git log` a clean view of work-item lifecycle events.
+func TestCommitMessageReflectsAction(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "wipnote-action-msg-test-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp /tmp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	mainRepo := setupWorktreeGitRepoIn(t, tmpDir)
+
+	wipnoteDir := filepath.Join(mainRepo, ".wipnote")
+	if err := os.MkdirAll(filepath.Join(wipnoteDir, "features"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	featureID := "feat-actionmsg1"
+	featureHTML := filepath.Join(wipnoteDir, "features", featureID+".html")
+
+	// Each action writes a distinct HTML body so the file differs each time
+	// and commitWipnoteArtifact has something to stage. In real use, the
+	// HTML differs because of status/timestamp mutations.
+	cases := []struct {
+		action string
+		body   string
+	}{
+		{"create", `<article id="` + featureID + `" data-status="todo"></article>`},
+		{"start", `<article id="` + featureID + `" data-status="in-progress"></article>`},
+		{"complete", `<article id="` + featureID + `" data-status="done"></article>`},
+	}
+	for _, c := range cases {
+		if err := os.WriteFile(featureHTML, []byte(c.body), 0o644); err != nil {
+			t.Fatalf("write feature HTML for %s: %v", c.action, err)
+		}
+		if err := commitWipnoteArtifact(wipnoteDir, "feature", featureID, c.action); err != nil {
+			t.Fatalf("commitWipnoteArtifact(%q): %v", c.action, err)
+		}
+		// Read the latest commit subject and assert it contains the expected
+		// action verb.
+		out, err := exec.Command("git", "-C", mainRepo, "log", "-1", "--format=%s").CombinedOutput()
+		if err != nil {
+			t.Fatalf("git log -1 after %q: %v\n%s", c.action, err, out)
+		}
+		wantPrefix := "wipnote: " + c.action + " " + featureID
+		if got := strings.TrimSpace(string(out)); got != wantPrefix {
+			t.Errorf("commit subject after %q action = %q, want %q", c.action, got, wantPrefix)
 		}
 	}
 }

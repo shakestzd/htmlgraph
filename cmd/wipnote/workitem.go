@@ -304,17 +304,18 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 		)
 	}
 
-	// When completing a work item, commit the artifact HTML to the main git
-	// repo so that YOLO/worktree-based runs (where .wipnote/ is suppressed by
-	// the per-worktree exclude) never lose the state file. The commit is
-	// non-fatal: if git is unavailable or the commit fails for any reason
-	// (hook rejection, nothing to commit, non-git project), we log to stderr
-	// and continue. Completion of the work item does not depend on this.
+	// Commit the artifact HTML to the main git repo on every state transition
+	// so that YOLO/worktree-based runs (where .wipnote/ is suppressed by the
+	// per-worktree exclude) never lose the state file at any point in the
+	// lifecycle. The commit is non-fatal: if git is unavailable or the commit
+	// fails for any reason (hook rejection, nothing to commit, non-git project),
+	// we log to stderr and continue. State change does not depend on the commit.
 	// Gate with an explicit allowlist via shouldAutocommitWorkitemArtifact:
 	// plans have their own atomic commit path (commitPlanChange in
 	// plan_yaml_cmds.go) that handles YAML+HTML together.
-	if status == "done" && shouldAutocommitWorkitemArtifact(typeName) {
-		if err := commitWipnoteArtifact(dir, typeName, id); err != nil {
+	if shouldAutocommitWorkitemArtifact(typeName) {
+		action := actionFromStatus(status)
+		if err := commitWipnoteArtifact(dir, typeName, id, action); err != nil {
 			fmt.Fprintf(os.Stderr, "autocommit warning: %v\n", err)
 		}
 	}
