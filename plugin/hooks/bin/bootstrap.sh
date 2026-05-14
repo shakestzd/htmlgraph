@@ -3,16 +3,18 @@
 #
 # In the distributed plugin, this script IS named "wipnote".
 # On first run it downloads the correct platform binary from GitHub Releases,
-# then exec's into it.  Subsequent runs simply exec the cached binary after
-# a fast (~1 ms) version check.
+# verifies its SHA256 against the published checksums file, then exec's into
+# it. Subsequent runs simply exec the cached binary after a fast (~1 ms)
+# version check.
 #
 # Install location: ~/.local/bin/wipnote — shared by plugin bootstrap,
-# curl install script, Homebrew, and setup-cli.  Metadata (version tracking)
+# curl install script, Homebrew, and setup-cli. Metadata (version tracking)
 # lives at ~/.local/share/wipnote/.
 #
 # Design constraints:
 #   - POSIX sh (no bash-isms)
-#   - No dependencies beyond curl/tar (standard on macOS + Linux)
+#   - Dependencies: curl, tar, shasum or sha256sum (all standard on
+#     macOS + Linux). No wget fallback.
 #   - Never blocks Claude Code: on error, prints {} to stdout and exits 0
 #   - Stdin passthrough via exec (CloudEvent JSON piped by hooks)
 
@@ -21,11 +23,39 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Install the binary to ~/.local/bin so it's on PATH for both plugin and
-# standalone users.  Metadata (version file) lives in ~/.local/share/wipnote.
+# standalone users. Metadata (version file) lives in ~/.local/share/wipnote.
 INSTALL_DIR="${HOME}/.local/bin"
 BINARY="${INSTALL_DIR}/wipnote"
 META_DIR="${HOME}/.local/share/wipnote"
 VERSION_FILE="${META_DIR}/.binary-version"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+log_err() {
+    echo "[wipnote] $*" >&2
+}
+
+# bail outputs {} to stdout (so Claude Code sees valid JSON) and exits 0.
+# Load-bearing: any stderr-only failure would surface as "hook error" in
+# Claude Code's UI.
+bail() {
+    echo "{}"
+    exit 0
+}
+
+# sha256_of prints the SHA256 hex digest of $1 to stdout.
+# Uses shasum (macOS default) or sha256sum (Linux default).
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        log_err "Neither sha256sum nor shasum found; cannot verify checksum."
+        bail
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Resolve expected version from plugin.json
@@ -56,10 +86,6 @@ resolve_version() {
         _tag=""
         if command -v curl >/dev/null 2>&1; then
             _tag="$(curl -fsSL --max-time 5 "${_api_url}" 2>/dev/null \
-                | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' \
-                | head -1 || true)"
-        elif command -v wget >/dev/null 2>&1; then
-            _tag="$(wget -q -T 5 -O - "${_api_url}" 2>/dev/null \
                 | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' \
                 | head -1 || true)"
         fi
@@ -98,36 +124,55 @@ detect_platform() {
 }
 
 # ---------------------------------------------------------------------------
-# Download binary from GitHub Releases
+# Download binary from GitHub Releases (with SHA256 verification)
 # ---------------------------------------------------------------------------
 download_binary() {
     _version="$1"
     _archive="wipnote_${_version}_${PLATFORM_OS}_${PLATFORM_ARCH}.tar.gz"
-    _url="https://github.com/shakestzd/wipnote/releases/download/v${_version}/${_archive}"
+    _checksums="wipnote_${_version}_checksums.txt"
+    _base="https://github.com/shakestzd/wipnote/releases/download/v${_version}"
 
     log_err "Downloading binary v${_version} for ${PLATFORM_OS}/${PLATFORM_ARCH}..."
+
+    if ! command -v curl >/dev/null 2>&1; then
+        log_err "curl not found. Cannot download binary."
+        bail
+    fi
 
     mkdir -p "${INSTALL_DIR}"
     mkdir -p "${META_DIR}"
     _tmpdir="$(mktemp -d)"
-    _tarball="${_tmpdir}/wipnote.tar.gz"
+    _tarball="${_tmpdir}/${_archive}"
+    _sumfile="${_tmpdir}/${_checksums}"
 
-    # Try curl first (available on macOS + most Linux), fall back to wget.
-    if command -v curl >/dev/null 2>&1; then
-        if ! curl -fsSL -o "${_tarball}" "${_url}" 2>/dev/null; then
-            rm -rf "${_tmpdir}"
-            log_err "Download failed (curl): ${_url}"
-            bail
-        fi
-    elif command -v wget >/dev/null 2>&1; then
-        if ! wget -q -O "${_tarball}" "${_url}" 2>/dev/null; then
-            rm -rf "${_tmpdir}"
-            log_err "Download failed (wget): ${_url}"
-            bail
-        fi
-    else
+    if ! curl -fsSL -o "${_tarball}" "${_base}/${_archive}" 2>/dev/null; then
         rm -rf "${_tmpdir}"
-        log_err "Neither curl nor wget found. Cannot download binary."
+        log_err "Download failed: ${_base}/${_archive}"
+        bail
+    fi
+
+    # Fetch the checksums manifest. A failure here is fatal — we never skip
+    # verification silently.
+    if ! curl -fsSL -o "${_sumfile}" "${_base}/${_checksums}" 2>/dev/null; then
+        rm -rf "${_tmpdir}"
+        log_err "Checksum manifest download failed: ${_base}/${_checksums}"
+        bail
+    fi
+
+    # Extract expected hash for our archive. Format: "<hex>  <filename>".
+    _expected="$(awk -v f="${_archive}" '$2 == f {print $1; exit}' "${_sumfile}")"
+    if [ -z "${_expected}" ]; then
+        rm -rf "${_tmpdir}"
+        log_err "Archive ${_archive} not listed in ${_checksums}."
+        bail
+    fi
+
+    _actual="$(sha256_of "${_tarball}")"
+    if [ "${_actual}" != "${_expected}" ]; then
+        rm -rf "${_tmpdir}"
+        log_err "Checksum mismatch for ${_archive}"
+        log_err "  expected: ${_expected}"
+        log_err "  actual:   ${_actual}"
         bail
     fi
 
@@ -138,32 +183,18 @@ download_binary() {
         bail
     fi
 
-    if [ -f "${_tmpdir}/wipnote" ]; then
-        mv "${_tmpdir}/wipnote" "${BINARY}"
-    else
+    if [ ! -f "${_tmpdir}/wipnote" ]; then
         rm -rf "${_tmpdir}"
         log_err "Binary not found in archive."
         bail
     fi
 
+    mv "${_tmpdir}/wipnote" "${BINARY}"
     chmod +x "${BINARY}"
     echo "${_version}" > "${VERSION_FILE}"
 
     rm -rf "${_tmpdir}"
     log_err "Installed wipnote v${_version} to ${BINARY}."
-}
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-log_err() {
-    echo "[wipnote] $*" >&2
-}
-
-# bail outputs {} to stdout (so Claude Code sees valid JSON) and exits 0.
-bail() {
-    echo "{}"
-    exit 0
 }
 
 # ---------------------------------------------------------------------------
@@ -177,17 +208,21 @@ if [ -z "${EXPECTED_VERSION}" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Prefer PATH-installed binary if version matches (Homebrew, go install, curl)
+# Prefer PATH-installed binary if version matches (Homebrew, go install,
+# curl install, dev builds via `wipnote build`).
+#
+# Version-string contract: this regex assumes `wipnote version` prints the
+# semver triple "X.Y.Z" somewhere on its first line. That format is set by
+# `versionCmd()` in cmd/wipnote/main.go and injected via -ldflags at build
+# time — if that contract changes, this match must change too.
 # ---------------------------------------------------------------------------
 PATH_BINARY="$(command -v wipnote 2>/dev/null || true)"
 if [ -n "${PATH_BINARY}" ]; then
-    # Guard: don't exec ourselves (bootstrap is also named "wipnote")
-    # Resolve real path of found binary
+    # Guard: don't exec ourselves (bootstrap is also named "wipnote").
     _real_path="$(cd "$(dirname "${PATH_BINARY}")" && pwd)/$(basename "${PATH_BINARY}")"
     _self_path="${SCRIPT_DIR}/$(basename "$0")"
 
     if [ "${_real_path}" != "${_self_path}" ]; then
-        # Check version matches expected
         _path_ver="$("${PATH_BINARY}" version 2>/dev/null | grep -o '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*' | head -1 || true)"
         if [ "${_path_ver}" = "${EXPECTED_VERSION}" ]; then
             exec "${PATH_BINARY}" "$@"
@@ -195,7 +230,7 @@ if [ -n "${PATH_BINARY}" ]; then
     fi
 fi
 
-# Fast path: binary exists and version matches.
+# Fast path: cached binary exists and version matches.
 if [ -x "${BINARY}" ] && [ -f "${VERSION_FILE}" ]; then
     CACHED_VERSION="$(cat "${VERSION_FILE}" 2>/dev/null || echo "")"
     if [ "${CACHED_VERSION}" = "${EXPECTED_VERSION}" ]; then
@@ -203,15 +238,13 @@ if [ -x "${BINARY}" ] && [ -f "${VERSION_FILE}" ]; then
     fi
 fi
 
-# Slow path: download or update.
+# Slow path: download (and verify) the binary, then exec.
 detect_platform
 download_binary "${EXPECTED_VERSION}"
 
-# Now exec the freshly downloaded binary.
 if [ -x "${BINARY}" ]; then
     exec "${BINARY}" "$@"
 fi
 
-# Should not reach here, but handle gracefully.
 log_err "Binary not executable after download."
 bail
