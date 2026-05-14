@@ -1,11 +1,12 @@
 meta:
     id: plan-cf1a6ae4
+    track_id: trk-d78fd431
     title: Launch readiness — wipnote public launch blockers
     description: Ordered critical path to LinkedIn + HN launch. Audit performed 2026-05-07. Estimated 3–4 days of focused work.
     created_at: "2026-05-07"
-    status: todo
+    status: finalized
     priority: high
-    version: 8
+    version: 9
 design:
     problem: 'Audit on 2026-05-07 found 4 blocker categories before public launch: missing LICENSE, incomplete rename artifacts, claim-breaking bugs (OTel, Gemini hooks, Yolo guard), stale docs/release, and missing content.'
     goals:
@@ -36,7 +37,7 @@ slices:
       effort: S
       risk: Low
       tests: 'Manual verification: inspect LICENSE and search for stale license references with `rg -n "license|MIT|HtmlGraph|erinn" README.md docs plugin packages`.'
-      approved: false
+      approved: true
       comment: ""
     - id: slice-002
       num: 2
@@ -57,7 +58,7 @@ slices:
       effort: S
       risk: Low
       tests: Run `zsh -n wipnote-aliases.sh` and `rg -n "hg-|htmlgraph|erinn" wipnote-aliases.sh install.sh README.md docs`.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-003
       num: 3
@@ -86,7 +87,7 @@ slices:
       effort: M
       risk: Med
       tests: Run targeted stale-name searches, then `wipnote plugin build-ports` if plugin assets changed. Finish with Go quality gates before release.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-004
       num: 4
@@ -112,7 +113,7 @@ slices:
       effort: M
       risk: High
       tests: '`go build ./...`, `go vet ./...`, `go test -timeout 180s ./...`, plus targeted OTel collector tests and a scratch-session manual smoke.'
-      approved: false
+      approved: true
       comment: ""
     - id: slice-005
       num: 5
@@ -135,7 +136,7 @@ slices:
       effort: M
       risk: High
       tests: Unit-test settings merge behavior, run generated-port rebuild if plugin source changes, then smoke Gemini hook execution in an isolated home/config dir.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-006
       num: 6
@@ -158,7 +159,7 @@ slices:
       effort: M
       risk: High
       tests: Add integration tests for the misfire and bypass scenarios, then run hook package tests and full Go quality gates.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-007
       num: 7
@@ -179,7 +180,7 @@ slices:
       effort: S
       risk: Low
       tests: Run docs build if available, and search generated/site sources for `HtmlGraph`, `Erinn`, and `erinn` before release.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-008
       num: 8
@@ -205,7 +206,7 @@ slices:
       effort: S
       risk: Med
       tests: Run formula syntax/audit locally where available, inspect generated release archive names, and verify install docs match formula behavior.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-009
       num: 9
@@ -237,7 +238,7 @@ slices:
       effort: M
       risk: High
       tests: Full Go quality gates, release dry-run if available, Homebrew formula check, docs build, and post-release install smoke.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-010
       num: 10
@@ -258,7 +259,7 @@ slices:
       effort: M
       risk: Med
       tests: 'Manual review checklist: branding, install commands, dashboard accuracy, audio/video quality, and no secrets or private data visible.'
-      approved: false
+      approved: true
       comment: ""
     - id: slice-011
       num: 11
@@ -281,7 +282,7 @@ slices:
       effort: M
       risk: Med
       tests: Editorial pass for stale branding, unsupported claims, broken links, and consistency with the release notes/demo video.
-      approved: false
+      approved: true
       comment: ""
     - id: slice-012
       num: 12
@@ -306,6 +307,6 @@ slices:
       effort: S
       risk: Med
       tests: Preflight all public links in an incognito browser, run one fresh install smoke, and keep release/docs rollback notes nearby during the launch window.
-      approved: false
+      approved: true
       comment: ""
 questions: []
