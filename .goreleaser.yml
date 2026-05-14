@@ -28,11 +28,48 @@ checksum:
   name_template: "wipnote_{{.Version}}_checksums.txt"
   algorithm: sha256
 
+# Keyless cosign signing of the checksums file via GitHub Actions OIDC.
+# The signature (.sig) and certificate (.pem) are uploaded alongside the
+# checksums.txt as release assets. End users can verify with:
+#   cosign verify-blob \
+#     --certificate wipnote_VERSION_checksums.txt.pem \
+#     --signature  wipnote_VERSION_checksums.txt.sig \
+#     --certificate-identity-regexp '^https://github.com/shakestzd/wipnote/' \
+#     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+#     wipnote_VERSION_checksums.txt
+# Cosign must be installed on the runner — see the workflow's "Install Cosign" step.
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args:
+      - "sign-blob"
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
 release:
   github:
     owner: shakestzd
     name: wipnote
   name_template: "Go v{{.Version}}"
+
+brews:
+  - name: wipnote
+    repository:
+      owner: shakestzd
+      name: homebrew-wipnote
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/shakestzd/wipnote
+    description: "Local-first observability and coordination platform for AI-assisted development"
+    license: MIT
+    install: |
+      bin.install "wipnote"
+      bin.install_symlink "wipnote" => "wn"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/wipnote version")
 
 git:
   tag_sort: -version:refname

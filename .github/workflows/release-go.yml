@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Required for cosign keyless signing via GitHub Actions OIDC.
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -19,6 +21,10 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # Install cosign so goreleaser's `signs:` block can sign the checksums file.
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
       - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
@@ -26,3 +32,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
