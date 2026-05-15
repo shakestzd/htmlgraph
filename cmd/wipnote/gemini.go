@@ -132,6 +132,16 @@ func runGeminiInit(ref string, force, dryRun bool) error {
 	}
 
 	fmt.Println("wipnote Gemini extension linked (bundled).")
+
+	// Install hooks into ~/.gemini/settings.json so they are picked up by
+	// Gemini CLI. The extension-dir hooks.json is not read by Gemini CLI;
+	// hooks must live in settings.json#hooks.
+	fmt.Println()
+	if err := installGeminiHooks("", dryRun); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not install hooks into settings.json: %v\n", err)
+		fmt.Fprintln(os.Stderr, "  Run manually: wipnote gemini --init")
+	}
+
 	fmt.Println()
 	fmt.Println("Setup complete. Run: wipnote gemini")
 	return nil
