@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Within-turn subagent messages recorded as UserQuery and not nested under originating turn</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-c6044f69"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-15T22:09:06.183355"
+             data-updated="2026-05-15T22:09:06.192571" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-97-gd241ca098">
+
+        <header>
+            <h1>Within-turn subagent messages recorded as UserQuery and not nested under originating turn</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-a17abb28.html" data-relationship="caused_by" data-since="2026-05-15T22:09:06.190548">bug-a17abb28</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-15T22:09:06.192161">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Activity feed / event tree: messages exchanged with subagents during a turn (SendMessage to teammates, subagent prompts/results) are being recorded as top-level UserQuery rows instead of being nested under the originating turn/tool row. Distinct from the closed OTel-fallback duplicate-prompt bugs (266f3aa0/7b5339cc/d67e695e) and the task-notification nesting bug (485c328e) — this is subagent-message classification + nesting. Repro evidence: user screenshot 2026-05-15 18:06.</p>
+        </section>
+    </article>
+</body>
+</html>
