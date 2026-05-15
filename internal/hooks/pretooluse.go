@@ -141,13 +141,6 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 				Reason:   warn,
 			}, nil
 		}
-		// Extend work-item guard to Bash file-write commands (sed -i, rm, redirects, etc.).
-		if warn := checkYoloBashWorkItemGuard(event, activeWorkItem, ctx.IsYoloMode, ctx.SessionID, database); warn != "" {
-			return &HookResult{
-				Decision: "block",
-				Reason:   warn,
-			}, nil
-		}
 		// Research-first: require at least one Read/Grep/Glob before writing.
 		hasResearch := hasRecentResearch(database, ctx.SessionID, ctx.AgentID, ctx.ProjectDir)
 		if warn := checkYoloResearchGuard(event.ToolName, ctx.IsYoloMode, hasResearch); warn != "" {

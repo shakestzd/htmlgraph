@@ -154,27 +154,6 @@ func checkYoloSubagentGrace(yolo, isSubagent bool, sessionCreatedAt time.Time, p
 	return db.GetActiveFeatureIDForSession(database, parentSessionID) != ""
 }
 
-// checkYoloBashWorkItemGuard extends the work-item guard to Bash file-write
-// commands (sed -i, rm, redirects, etc.). Always enforced (was YOLO-only, now universal).
-// wipnote CLI commands are always exempt — they are the approved write path.
-func checkYoloBashWorkItemGuard(event *CloudEvent, featureID string, _ bool, sessionID string, database *sql.DB) string {
-	cmd := shellCommand(event.ToolInput)
-	if isWipnoteCLICommand(cmd) {
-		return ""
-	}
-	if !isBashFileWrite(event) {
-		return ""
-	}
-	if featureID != "" {
-		return ""
-	}
-	if sessionID != "" && database != nil && sessionHasLinkedFeature(database, sessionID) {
-		return ""
-	}
-	return "An active work item is required before writing code via Bash. " +
-		"Run: wipnote feature start <id>  or  wipnote feature create \"title\" --track <trk-id>"
-}
-
 // sessionHasLinkedFeature returns true when the given session has a feature
 // linked via sessions.active_feature_id OR when a recent feature-start command
 // updated the session's feature association. This replaces the old global

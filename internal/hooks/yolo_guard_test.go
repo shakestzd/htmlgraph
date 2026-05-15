@@ -237,28 +237,24 @@ func TestCheckYoloWorkItemGuard_RejectsUnlinkedActiveWorkItem(t *testing.T) {
 	}
 }
 
-// TestCheckYoloBashWorkItemGuard_RejectsUnlinkedActiveWorkItem verifies the
-// same attribution rule for Bash file-write commands.
-func TestCheckYoloBashWorkItemGuard_RejectsUnlinkedActiveWorkItem(t *testing.T) {
+// TestBashWorkItemGuardRemoved_RegressionBug verifies that a Bash file-write
+// command (e.g. "cp /tmp/a /tmp/b") with no active work item is NOT blocked by
+// the work-item guard — the misfiring Bash guard has been removed (bug-d0eab5c4).
+// The structured-tool guard (Write/Edit/MultiEdit/apply_patch) must still block.
+func TestBashWorkItemGuardRemoved_RegressionBug(t *testing.T) {
 	tdb := setupTestDB(t)
 	defer tdb.DB.Close()
 
-	event := &CloudEvent{
-		ToolName:  "Bash",
-		ToolInput: map[string]any{"command": "sed -i 's/foo/bar/' file.go"},
+	// Bash with write-intent command and no active work item: must not be blocked.
+	bashResult := checkYoloWorkItemGuard("Bash", "", true, "sess-regression", tdb.DB)
+	if bashResult != "" {
+		t.Errorf("Bash should not be blocked by work-item guard (guard removed), got: %s", bashResult)
 	}
 
-	// No active work items → blocked
-	result := checkYoloBashWorkItemGuard(event, "", true, "some-session", tdb.DB)
-	if result == "" {
-		t.Error("expected block when no active work item and session unlinked")
-	}
-
-	// Add an in-progress feature in the project. It must not satisfy this session.
-	tdb.addFeature("feat-active", "feature", "Active feature", "in-progress")
-	result = checkYoloBashWorkItemGuard(event, "", true, "some-session", tdb.DB)
-	if result == "" {
-		t.Error("expected block when only an unrelated work item is active")
+	// Write with no active work item: must still be blocked by checkYoloWorkItemGuard.
+	writeResult := checkYoloWorkItemGuard("Write", "", true, "sess-regression", tdb.DB)
+	if writeResult == "" {
+		t.Error("Write should still be blocked by checkYoloWorkItemGuard when no active work item")
 	}
 }
 
