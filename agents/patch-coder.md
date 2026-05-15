@@ -1,7 +1,7 @@
 ---
 name: patch-coder
 description: Fast, efficient code execution agent for simple tasks
-model: flash-lite
+model: gemini-2.5-flash-lite
 max_turns: 20
 tools:
     - read_file
