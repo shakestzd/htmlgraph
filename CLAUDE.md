@@ -143,27 +143,39 @@ Use `/wipnote:orchestrator-directives-skill` for delegation patterns and model s
 
 ---
 
-## Monitoring Claude Code Upstream
+## Monitoring Upstream Harnesses (Claude Code / Codex / Gemini)
 
-Claude Code is our only integration surface. Plugins, hooks, skills, slash commands, and observability (logging, events, sessions) are how wipnote influences behavior — if upstream changes those contracts, our plugin either breaks silently or misses new capabilities.
+wipnote ships to three independently-evolving CLIs: Claude Code, Codex CLI, and Gemini CLI. Each harness is an integration surface; plugins, hooks, skills, agents, and observability all have harness-specific contracts that change on different vendor release cadences. A doc audit on 2026-05-15 found silent-failure drift in all three — fields set in your agent config may stop being honored with no error. Continuous monitoring is non-negotiable.
 
-**Periodically review the Claude Code docs for changes to:**
+**Periodically review the upstream docs for changes to:**
 
-- **Plugin system** — manifest format, `plugin.json` schema, marketplace structure
-- **Hooks** — event names, payload shapes, exit-code semantics, new hook types
-- **Skills** — frontmatter fields, activation triggers, invocation patterns
-- **Agent teams** — still experimental as of last review; watch for graduation out of `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (v2.1.32+), API stability, nested-team support
+- **Plugin system / agent manifest** — formats, frontmatter schema, marketplace/config lookup paths
+- **Hooks** — event names, payload shapes, exit-code semantics (Claude Code only)
+- **Skills** — frontmatter fields, activation triggers, invocation patterns (Claude Code only)
+- **Agent configuration** — frontmatter schema (name, description, model, tools, timeout/maxTurns, memory, max_depth)
 - **Observability** — session metadata, telemetry, cost/token reporting, transcript format
+- **Tool interfaces** — available tools per harness (Claude Code ≠ Codex ≠ Gemini), invocation signatures
 
 **Upstream sources to monitor:**
 
-- https://code.claude.com/docs/en/plugins
-- https://code.claude.com/docs/en/hooks
-- https://code.claude.com/docs/en/skills
-- https://code.claude.com/docs/en/agent-teams
+**Claude Code (Anthropic):**
+- https://code.claude.com/docs/en/sub-agents — subagent frontmatter schema
+- https://code.claude.com/docs/en/plugins — plugin manifest and marketplace structure
+- https://code.claude.com/docs/en/hooks — hook events, payloads, exit codes
+- https://code.claude.com/docs/en/skills — skill frontmatter and activation
 - Claude Code release notes / changelog
 
-When upstream contracts change, the fix lands in `plugin/hooks/hooks.json`, `internal/hooks/`, `plugin/skills/`, or `cmd/wipnote/prompts/system-prompt.md` — not in AGENTS.md or CLAUDE.md (which are user-facing project docs, not plugin surfaces).
+**Codex CLI (OpenAI):**
+- https://developers.openai.com/codex/subagents — custom agent TOML schema and native lookup paths (~/.codex/agents/, .codex/agents/)
+- https://developers.openai.com/codex/config-reference — config keys including [agents] section (max_threads, max_depth, job_max_runtime_seconds; note: NO per-agent interactive turn cap)
+- https://developers.openai.com/codex/config-advanced — advanced configuration options
+
+**Gemini CLI (Google):**
+- https://github.com/google-gemini/gemini-cli — repo; see docs/core/subagents.md and docs/extensions/reference.md
+- Gemini agent .md frontmatter: max_turns (snake_case), tools (Gemini tool names like run_shell_command/read_file), timeout_mins (documented, default 10min), model (full IDs e.g. gemini-3-flash-preview)
+- https://ai.google.dev/gemini-api/docs/models — current model identifiers
+
+**Re-verify on a cadence, not just on suspicion.** These schemas drift silently — a field you set may stop being honored with no error. Re-run the cross-harness doc-verification audit at least every release cycle (or via a scheduled routine). When a contract changes, the fix lands in `plugin/agents/*.md`, `packages/plugin-core/manifest.json`, `internal/pluginbuild/`, or `cmd/wipnote/prompts/system-prompt.md` — never in user-facing docs like AGENTS.md or CLAUDE.md (those describe, they don't configure).
 
 ---
 
