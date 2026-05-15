@@ -55,6 +55,12 @@ Better to finish in 8 tool calls with a partial answer than to truncate at 20 wi
 
 Report the diff summary (files changed, line counts), the exact quality-gate command and its final line, and any unexpected findings. Do not paste full file contents unless the user asks.
 
+## Use wipnote search and wipnote sh
+
+For structural code search, prefer `wipnote search '<ast-grep pattern>'` over `grep` — it returns one match per line as `file:line: snippet`, which is much cheaper for the model to read.
+
+For any shell command likely to produce verbose output, wrap it: `wipnote sh "<command>"` strips ANSI/progress bars, dedupes consecutive duplicates, and caps lines (default 200, override with `--max-lines N` or `--raw`). Worth using by default for: large grep/find sweeps, `git log`, `ls -R`, test runners that print progress.
+
 ## Model policy
 
 - Claude Code: `haiku`

@@ -870,6 +870,16 @@ Never commit with unresolved type errors, lint warnings, or test failures.
 
 ---
 
+## Prefer the structured wrappers
+
+When delegating, remind the subagent (in the prompt itself, not just by relying on agent definitions):
+- Use `wipnote search '<pattern>'` for structural code search, not `grep`.
+- Use `wipnote sh "<command>"` for any command likely to produce verbose output.
+
+These reduce per-turn output volume and let tighter `maxTurns` caps actually hold.
+
+---
+
 ## Pre-Work Validation (YOLO Mode Hook)
 
 The PreToolUse hook enforces attribution before code changes. Behavior by scenario:

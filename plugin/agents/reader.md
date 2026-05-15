@@ -37,6 +37,7 @@ Better to finish in 5 tool calls with a partial answer than to truncate at 10 wi
 - Do not delegate further. You are the leaf node.
 - Do not use Bash, Edit, or Write. You have Read, Grep, and Glob only.
 - Never call Edit, Write, or any Bash command that mutates state.
+- Use `wipnote search` for any structural code lookup — it's cheaper to read than raw grep output.
 
 ## When Asked to Do More
 

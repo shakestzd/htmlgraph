@@ -49,6 +49,8 @@ Better to finish in 8 tool calls with a partial answer than to truncate at 15 wi
 - Before committing
 - During deployment
 
+> Wrap test runs that produce verbose progress output with `wipnote sh` — e.g. `wipnote sh "go test ./..."` to keep the digest readable.
+
 ## When NOT to use
 
 - Investigating test failures that require code changes → `feature-coder` or `patch-coder`
