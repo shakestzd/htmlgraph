@@ -100,6 +100,13 @@ func buildEventTree(database *sql.DB, limit int) ([]turn, error) {
 		return []turn{}, nil
 	}
 
+	// Source-agnostic post-merge dedup: collapse rows that represent the same
+	// user turn but arrived from different data sources (e.g. gemini_cli span
+	// vs gemini log in the same session). The existing SQL NOT EXISTS anti-joins
+	// correlate by session_id, which is unreliable across sources. This pass
+	// is a safety-net layer that operates purely on the merged Go slice.
+	merged = collapseDuplicateTurns(merged)
+
 	// Sort DESC by timestamp (RFC3339 strings are lexicographically sortable
 	// in ascending chronological order; reverse for newest-first).
 	sort.SliceStable(merged, func(i, j int) bool {
@@ -112,6 +119,140 @@ func buildEventTree(database *sql.DB, limit int) ([]turn, error) {
 		merged = merged[:limit]
 	}
 	return merged, nil
+}
+
+// collapseBucketSecs is the coarse time bucket for same-turn dedup.
+// 10 seconds is wide enough to absorb the typical ~1 s emission gap between a
+// hook event and its twin OTel span (or between gemini/gemini_cli log vs span),
+// yet tight enough that two genuinely distinct user prompts seconds apart
+// (rapid-fire Q&A) are not collapsed. Values below 5 s are too narrow (OTel
+// pipeline latency) and above 60 s risk false-collapsing distinct prompts that
+// share a short repeated text like "continue" or "/resume".
+const collapseBucketSecs = 10
+
+// normPrompt returns a dedup key for a raw prompt string: lowercase, collapsed
+// whitespace, first 200 characters. Returns "" when the input is trivially
+// empty (empty/whitespace-only), signalling that the row should not be
+// collapsed.
+func normPrompt(raw string) string {
+	// collapse internal whitespace and trim
+	out := make([]byte, 0, len(raw))
+	prevSpace := true
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			if !prevSpace {
+				out = append(out, ' ')
+			}
+			prevSpace = true
+		} else {
+			// lowercase ASCII letters
+			if c >= 'A' && c <= 'Z' {
+				c += 32
+			}
+			out = append(out, c)
+			prevSpace = false
+		}
+	}
+	// trim trailing space
+	if len(out) > 0 && out[len(out)-1] == ' ' {
+		out = out[:len(out)-1]
+	}
+	s := string(out)
+	if len(s) > 200 {
+		s = s[:200]
+	}
+	return s
+}
+
+// turnRichness returns a sortable richness score for a turn: higher is richer.
+// Richness order (descending priority):
+//  1. has harness icon (agent_id is a known OTel harness source, not empty)
+//  2. higher tool count
+//  3. higher token count (not available in the turn struct itself; zero for now)
+//  4. has non-empty feature_id
+//
+// We prefer OTel interaction turns over hook-only or log-only turns, which
+// matches what the user expects to see (full cost/token data).
+func turnRichness(t turn) int {
+	score := 0
+	agentID, _ := t.UserQuery["agent_id"].(string)
+	if agentID != "" {
+		score += 1_000_000
+	}
+	score += t.Stats.ToolCount * 10
+	featureID, _ := t.UserQuery["feature_id"].(string)
+	if featureID != "" {
+		score += 1
+	}
+	return score
+}
+
+// collapseDuplicateTurns removes duplicate turns that represent the same user
+// prompt submitted in the same coarse time window. This is a source-agnostic
+// safety net on top of the SQL NOT EXISTS anti-joins: those correlate by
+// session_id which is unreliable across OTel/hook data sources, so duplicates
+// can slip through when a Gemini (or other) session emits the same prompt via
+// two different signal paths (e.g. gemini_cli interaction span + gemini log).
+//
+// Dedup key: (normalized prompt text, floor(unix_seconds / collapseBucketSecs)).
+// Within each group the richest row survives; the rest are dropped.
+// Groups of size 1 are untouched — unanchored hook-only rows with no OTel twin
+// are intentionally preserved.
+func collapseDuplicateTurns(turns []turn) []turn {
+	type bucketKey struct {
+		norm   string
+		bucket int64
+	}
+	type group struct {
+		best  int // index into turns slice
+		score int
+	}
+
+	groups := make(map[bucketKey]*group, len(turns))
+	order := make([]bucketKey, 0, len(turns))
+
+	for i, t := range turns {
+		raw, _ := t.UserQuery["input_summary"].(string)
+		norm := normPrompt(raw)
+		if norm == "" {
+			// Empty/whitespace prompt — do not collapse; keep as-is.
+			// Use a unique sentinel key so it lands in its own singleton group.
+			sentinel := bucketKey{norm: "\x00" + string(rune(i)), bucket: 0}
+			groups[sentinel] = &group{best: i, score: 0}
+			order = append(order, sentinel)
+			continue
+		}
+
+		ts, _ := t.UserQuery["timestamp"].(string)
+		var bucket int64
+		if ts != "" {
+			if parsed, err := time.Parse(time.RFC3339, ts); err == nil {
+				bucket = parsed.Unix() / collapseBucketSecs
+			}
+		}
+
+		key := bucketKey{norm: norm, bucket: bucket}
+		score := turnRichness(t)
+
+		if g, exists := groups[key]; exists {
+			if score > g.score {
+				g.best = i
+				g.score = score
+			}
+		} else {
+			groups[key] = &group{best: i, score: score}
+			order = append(order, key)
+		}
+	}
+
+	// Reconstruct in original encounter order so the subsequent sort is stable.
+	out := make([]turn, 0, len(groups))
+	for _, key := range order {
+		g := groups[key]
+		out = append(out, turns[g.best])
+	}
+	return out
 }
 
 // buildEventTreeOtel builds the turn list using OTel interaction spans as

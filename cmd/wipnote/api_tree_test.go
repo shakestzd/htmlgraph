@@ -686,6 +686,152 @@ func TestFilterAnchorsAgainstInteractionSpans_ZeroTS(t *testing.T) {
 	}
 }
 
+// TestCollapseDuplicateTurns_RichestSurvives: two rows, same normalized prompt,
+// 1 s apart, different session IDs (simulating gemini_cli vs gemini log source),
+// one with a harness agent_id (rich) and one without (poor). Only the rich one
+// must survive.
+func TestCollapseDuplicateTurns_RichestSurvives(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	rich := turn{
+		SessionID: "sess-rich",
+		UserQuery: map[string]any{
+			"input_summary": "should i rename wipnote to wipcli?",
+			"agent_id":      "gemini_cli",
+			"timestamp":     base.Format(time.RFC3339),
+			"feature_id":    "",
+		},
+		Stats: turnStats{ToolCount: 25},
+	}
+	poor := turn{
+		SessionID: "sess-poor",
+		UserQuery: map[string]any{
+			"input_summary": "should i rename wipnote to wipcli?",
+			"agent_id":      "",
+			"timestamp":     base.Add(1 * time.Second).Format(time.RFC3339),
+			"feature_id":    "",
+		},
+		Stats: turnStats{ToolCount: 0},
+	}
+
+	got := collapseDuplicateTurns([]turn{rich, poor})
+	if len(got) != 1 {
+		t.Fatalf("got %d turns, want 1 (poor duplicate should be dropped)", len(got))
+	}
+	if got[0].Stats.ToolCount != 25 {
+		t.Errorf("surviving turn tool_count = %d, want 25 (rich row should survive)", got[0].Stats.ToolCount)
+	}
+	if got[0].SessionID != "sess-rich" {
+		t.Errorf("surviving session_id = %s, want sess-rich", got[0].SessionID)
+	}
+}
+
+// TestCollapseDuplicateTurns_FarApartBothSurvive: same prompt text but
+// timestamps more than collapseBucketSecs apart → both rows must survive.
+func TestCollapseDuplicateTurns_FarApartBothSurvive(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	t1 := turn{
+		SessionID: "sess-a",
+		UserQuery: map[string]any{
+			"input_summary": "continue",
+			"agent_id":      "claude_code",
+			"timestamp":     base.Add(-5 * time.Minute).Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 10},
+	}
+	t2 := turn{
+		SessionID: "sess-a",
+		UserQuery: map[string]any{
+			"input_summary": "continue",
+			"agent_id":      "claude_code",
+			"timestamp":     base.Add(-2 * time.Minute).Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 15},
+	}
+
+	got := collapseDuplicateTurns([]turn{t1, t2})
+	if len(got) != 2 {
+		t.Fatalf("got %d turns, want 2 (far-apart same-prompt rows must not be collapsed)", len(got))
+	}
+}
+
+// TestCollapseDuplicateTurns_SingleUnanchoredSurvives: a lone hook row with
+// no OTel twin must pass through untouched.
+func TestCollapseDuplicateTurns_SingleUnanchoredSurvives(t *testing.T) {
+	base := time.Now().UTC()
+	sole := turn{
+		SessionID: "sess-hook-only",
+		UserQuery: map[string]any{
+			"input_summary": "run go test",
+			"agent_id":      "",
+			"timestamp":     base.Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 3},
+	}
+
+	got := collapseDuplicateTurns([]turn{sole})
+	if len(got) != 1 {
+		t.Fatalf("got %d turns, want 1 (single unanchored row must survive)", len(got))
+	}
+}
+
+// TestCollapseDuplicateTurns_DifferentPromptsSameBucketBothSurvive: two
+// different prompts that land in the same time bucket must not be collapsed.
+func TestCollapseDuplicateTurns_DifferentPromptsSameBucketBothSurvive(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
+	t1 := turn{
+		SessionID: "sess-b",
+		UserQuery: map[string]any{
+			"input_summary": "what is the capital of france?",
+			"agent_id":      "claude_code",
+			"timestamp":     base.Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 1},
+	}
+	t2 := turn{
+		SessionID: "sess-b",
+		UserQuery: map[string]any{
+			"input_summary": "what is the population of paris?",
+			"agent_id":      "claude_code",
+			"timestamp":     base.Add(2 * time.Second).Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 2},
+	}
+
+	got := collapseDuplicateTurns([]turn{t1, t2})
+	if len(got) != 2 {
+		t.Fatalf("got %d turns, want 2 (different prompts in same bucket must both survive)", len(got))
+	}
+}
+
+// TestCollapseDuplicateTurns_EmptyPromptNotCollapsed: rows with empty or
+// whitespace-only prompts must never be collapsed with each other.
+func TestCollapseDuplicateTurns_EmptyPromptNotCollapsed(t *testing.T) {
+	base := time.Now().UTC()
+	e1 := turn{
+		SessionID: "sess-c",
+		UserQuery: map[string]any{
+			"input_summary": "",
+			"agent_id":      "claude_code",
+			"timestamp":     base.Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 1},
+	}
+	e2 := turn{
+		SessionID: "sess-c",
+		UserQuery: map[string]any{
+			"input_summary": "   ",
+			"agent_id":      "claude_code",
+			"timestamp":     base.Add(1 * time.Second).Format(time.RFC3339),
+		},
+		Stats: turnStats{ToolCount: 2},
+	}
+
+	got := collapseDuplicateTurns([]turn{e1, e2})
+	if len(got) != 2 {
+		t.Fatalf("got %d turns, want 2 (empty/whitespace prompts must not be collapsed)", len(got))
+	}
+}
+
 func TestComputeStats_CountsNestedChildren(t *testing.T) {
 	children := []map[string]any{
 		{
