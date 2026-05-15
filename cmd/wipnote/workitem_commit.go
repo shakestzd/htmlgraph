@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -123,6 +125,127 @@ func commitWipnoteArtifact(wipnoteDir, typeName, id, action string) error {
 	}
 
 	return nil
+}
+
+// checkUncommittedSourceCompleteGate refuses completion when tracked files
+// outside .wipnote/ have uncommitted changes. Completion auto-commits only the
+// work-item artifact, so allowing dirty source by default makes the "done"
+// signal stronger than the durable implementation state.
+func checkUncommittedSourceCompleteGate(wipnoteDir, id string, allowDirty bool) error {
+	repoRoot := filepath.Dir(wipnoteDir)
+	if !isGitRepo(repoRoot) {
+		return nil
+	}
+
+	files, err := dirtyTrackedSourceFiles(repoRoot)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return nil
+	}
+	if allowDirty {
+		fmt.Fprintf(os.Stderr, "allow-dirty warning: completing %s with uncommitted source changes:\n", id)
+		for _, f := range files {
+			fmt.Fprintf(os.Stderr, "  %s\n", f)
+		}
+		return nil
+	}
+
+	return fmt.Errorf(
+		"refusing to complete %s with uncommitted source changes outside .wipnote/:\n%s\n\nCommit the implementation first, for example:\n  git add %s && git commit -m %q\n\nTo bypass intentionally, rerun with --allow-dirty",
+		id,
+		formatPathList(files),
+		strings.Join(shellQuotePaths(files), " "),
+		id+": commit implementation",
+	)
+}
+
+func dirtyTrackedSourceFiles(repoRoot string) ([]string, error) {
+	out, err := exec.Command(
+		"git", "-C", repoRoot, "status", "--porcelain=v1", "-z",
+		"--untracked-files=no",
+	).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("git status: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+
+	var files []string
+	for _, entry := range parsePorcelainZ(out) {
+		if isWipnotePath(entry.Path) {
+			continue
+		}
+		files = append(files, entry.Path)
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+type porcelainEntry struct {
+	Status string
+	Path   string
+}
+
+func parsePorcelainZ(out []byte) []porcelainEntry {
+	var entries []porcelainEntry
+	for len(out) > 0 {
+		nul := bytes.IndexByte(out, 0)
+		if nul < 0 {
+			break
+		}
+		record := string(out[:nul])
+		out = out[nul+1:]
+		if len(record) < 4 {
+			continue
+		}
+		status := record[:2]
+		path := filepath.ToSlash(record[3:])
+		entries = append(entries, porcelainEntry{Status: status, Path: path})
+
+		// In porcelain v1 -z, renamed/copied entries carry the destination in
+		// the first record and the source path in the following NUL record.
+		if strings.ContainsAny(status, "RC") {
+			nul = bytes.IndexByte(out, 0)
+			if nul < 0 {
+				break
+			}
+			out = out[nul+1:]
+		}
+	}
+	return entries
+}
+
+func isWipnotePath(path string) bool {
+	path = filepath.ToSlash(path)
+	return path == ".wipnote" || strings.HasPrefix(path, ".wipnote/")
+}
+
+func formatPathList(paths []string) string {
+	var b strings.Builder
+	for _, path := range paths {
+		fmt.Fprintf(&b, "  %s\n", path)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func shellQuotePaths(paths []string) []string {
+	quoted := make([]string, 0, len(paths))
+	for _, path := range paths {
+		quoted = append(quoted, shellQuote(path))
+	}
+	return quoted
+}
+
+func shellQuote(path string) string {
+	if path != "" && strings.IndexFunc(path, func(r rune) bool {
+		return !(r == '/' || r == '.' || r == '-' || r == '_' ||
+			(r >= '0' && r <= '9') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= 'a' && r <= 'z'))
+	}) < 0 {
+		return path
+	}
+	return "'" + strings.ReplaceAll(path, "'", "'\"'\"'") + "'"
 }
 
 // shouldAutocommitWorkitemArtifact returns true when commitWipnoteArtifact

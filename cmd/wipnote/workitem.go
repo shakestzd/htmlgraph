@@ -167,11 +167,12 @@ func wiStartCmd(typeName string) *cobra.Command {
 	}
 }
 
-// wiAllowSpecSkip is set by the `feature complete --allow-spec-skip` flag and
-// consumed by the feature-complete spec-enforcement gate below. Package-level
-// because wiSetStatusWithAgent has many test callers and we don't want to
-// thread a parameter through all of them just for an opt-in override.
+// wiAllowSpecSkip and wiAllowDirtyComplete are set by completion flags and
+// consumed by the completion gates below. Package-level because
+// wiSetStatusWithAgent has many test callers and we don't want to thread
+// parameters through all of them just for opt-in overrides.
 var wiAllowSpecSkip bool
+var wiAllowDirtyComplete bool
 
 func wiCompleteCmd(typeName string) *cobra.Command {
 	cmd := &cobra.Command{
@@ -185,6 +186,10 @@ func wiCompleteCmd(typeName string) *cobra.Command {
 	if typeName == "feature" {
 		cmd.Flags().BoolVar(&wiAllowSpecSkip, "allow-spec-skip", false,
 			"bypass spec_enforcement.feature_complete gate; intended for emergency overrides only")
+	}
+	if shouldAutocommitWorkitemArtifact(typeName) {
+		cmd.Flags().BoolVar(&wiAllowDirtyComplete, "allow-dirty", false,
+			"bypass the uncommitted source gate; intended for intentional dirty-tree completion only")
 	}
 	return cmd
 }
@@ -230,6 +235,12 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 	// spec section. --allow-spec-skip provides an audited bypass.
 	if typeName == "feature" && status == "done" && !wiAllowSpecSkip {
 		if err := checkFeatureCompleteSpecGate(dir, id); err != nil {
+			return err
+		}
+	}
+
+	if status == "done" && shouldAutocommitWorkitemArtifact(typeName) {
+		if err := checkUncommittedSourceCompleteGate(dir, id, wiAllowDirtyComplete); err != nil {
 			return err
 		}
 	}
