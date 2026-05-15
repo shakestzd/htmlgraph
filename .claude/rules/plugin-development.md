@@ -54,6 +54,14 @@ See `packages/plugin-core/README.md` for new-command / new-hook / new-target rec
 - Return `{}` to allow, `{"decision":"block","reason":"..."}` to block
 - Prefer file/branch state over session state for hook gates (see "Hook State" below)
 
+## Claude Code Plugin-Loaded Subagent Field Restrictions
+
+Per the [Claude Code subagent docs](https://code.claude.com/docs/en/sub-agents), subagents loaded from plugins silently ignore the `hooks`, `mcpServers`, and `permissionMode` frontmatter fields. These fields work in user-/project-level agents at `~/.claude/agents/` or `.claude/agents/` but are stripped for plugin-shipped agents (which is how wipnote ships every harness's agent definitions).
+
+**Workaround:** If you need any of these fields, define them at the harness level (e.g., plugin-wide `hooks.json`, `.mcp.json`, system-prompt context) rather than per-agent.
+
+**Honored frontmatter fields for plugin-loaded subagents:** `name`, `description`, `model`, `tools`, `maxTurns`, `memory`, and the markdown body (system prompt).
+
 ## Hook State: Prefer File/Branch State Over Session State
 
 **Rule:** Hooks should answer questions from durable state (files, branches, staged diff)

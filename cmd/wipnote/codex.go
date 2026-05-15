@@ -507,6 +507,10 @@ func ensureCodexAgentsFromCache() (bool, error) {
 	return ensureCodexCustomAgentsInstalled(codexInstalledPluginDirAt(codexPluginCachePath()), codexAgentsPath())
 }
 
+// ensureCodexCustomAgentsInstalled mirrors wipnote-*.toml agent definitions from the plugin
+// cache into ~/.codex/agents/ and cleans up stale files. Files are intentionally not
+// deleted on exit — users running bare codex (outside wipnote) should still see the agents.
+// Stale wipnote-*.toml files from old versions are cleaned up here on the next launch.
 func ensureCodexCustomAgentsInstalled(pluginDir, agentsDir string) (bool, error) {
 	if pluginDir == "" || agentsDir == "" {
 		return false, nil

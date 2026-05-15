@@ -31,6 +31,8 @@ Codex agent markdown is translated into custom-agent TOML during generation, the
 lookup locations when launching. See `packages/plugin-core/README.md` for
 details.
 
+**Codex Agent Persistence:** `wipnote codex` copies `wipnote-*.toml` files into `~/.codex/agents/` on every launch but intentionally never deletes them on exit. This allows users running bare `codex` (outside the wipnote launcher) to see the wipnote agents in `/agent` listings and invoke them from any session. Stale `wipnote-*.toml` files from old versions are cleaned up on the next `wipnote codex` launch—the function `ensureCodexCustomAgentsInstalled` removes any `wipnote-*.toml` no longer present in the source plugin tree. Non-`wipnote-*` files at the target are never touched.
+
 Agent role names are capability-based across harnesses. Use names like
 `patch-coder`, `feature-coder`, and `architect-coder`; model choices such as
 Claude `haiku`/`sonnet`/`opus`, Codex `gpt-*`, or Gemini `flash`/`pro` belong in
