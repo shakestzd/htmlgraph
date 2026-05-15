@@ -615,6 +615,77 @@ func TestBuildEventTree_MixedOtelAndHook(t *testing.T) {
 	}
 }
 
+// TestFilterAnchorsAgainstInteractionSpans_ZeroTS covers the three cases for
+// zero-ts anchors: duplicate (has matching span → filtered), orphan (no matching
+// span → kept), and the regression guard for normal non-zero-ts anchors.
+func TestFilterAnchorsAgainstInteractionSpans_ZeroTS(t *testing.T) {
+	database := openTreeTestDB(t)
+	defer database.Close()
+
+	// Seed an interaction span for sess-test using the "user_prompt" key.
+	mustExec(t, database,
+		`INSERT INTO otel_signals
+		 (signal_id, harness, session_id, kind, canonical, native, ts_micros, trace_id, span_id, attrs_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"span-filter-1", "gemini_cli", "sess-test",
+		"span", "interaction", "interaction",
+		time.Now().UnixMicro(), "trace-filter-1", "span-filter-1",
+		`{"user_prompt":"hello from gemini"}`)
+
+	// Case 1: zero-ts anchor WITH a matching interaction span → must be filtered OUT.
+	anchorsWithMatch := []otelPromptAnchor{
+		{
+			SignalID:   "log-dup-1",
+			SessionID:  "sess-test",
+			TSMicros:   0,
+			PromptText: "hello from gemini",
+		},
+	}
+	got := filterAnchorsAgainstInteractionSpans(database, anchorsWithMatch)
+	if len(got) != 0 {
+		t.Errorf("case 1 (zero-ts with matching span): got %d anchors, want 0 (should be filtered)", len(got))
+	}
+
+	// Case 2: zero-ts anchor with NO matching interaction span → must be KEPT.
+	anchorsNoMatch := []otelPromptAnchor{
+		{
+			SignalID:   "log-orphan-1",
+			SessionID:  "sess-test",
+			TSMicros:   0,
+			PromptText: "this prompt has no interaction span",
+		},
+	}
+	got = filterAnchorsAgainstInteractionSpans(database, anchorsNoMatch)
+	if len(got) != 1 {
+		t.Errorf("case 2 (zero-ts with no matching span): got %d anchors, want 1 (should be kept)", len(got))
+	}
+
+	// Case 3: normal non-zero-ts anchor with a matching interaction span →
+	// existing timestamp-based dedup still filters it (regression guard).
+	spanTS := time.Now().UnixMicro()
+	mustExec(t, database,
+		`INSERT INTO otel_signals
+		 (signal_id, harness, session_id, kind, canonical, native, ts_micros, trace_id, span_id, attrs_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"span-filter-2", "claude-code", "sess-test",
+		"span", "interaction", "interaction",
+		spanTS, "trace-filter-2", "span-filter-2",
+		`{"user_prompt":"normal ts prompt"}`)
+
+	anchorsNormalTS := []otelPromptAnchor{
+		{
+			SignalID:   "log-normal-1",
+			SessionID:  "sess-test",
+			TSMicros:   spanTS + 100, // within the dedup window
+			PromptText: "normal ts prompt",
+		},
+	}
+	got = filterAnchorsAgainstInteractionSpans(database, anchorsNormalTS)
+	if len(got) != 0 {
+		t.Errorf("case 3 (non-zero ts within window of span): got %d anchors, want 0 (timestamp dedup should filter)", len(got))
+	}
+}
+
 func TestComputeStats_CountsNestedChildren(t *testing.T) {
 	children := []map[string]any{
 		{

@@ -312,10 +312,24 @@ func buildEventTreeOtelLogFallback(database *sql.DB, limit int) ([]turn, error) 
 // falls within hookOtelDedupWindowMicros of an interaction span. This handles
 // the case where a prompt log has ts_micros=0 but a valid attrs_json timestamp,
 // which the SQL NOT EXISTS check misses because it compares against raw ts_micros.
+//
+// For anchors with TSMicros==0 (neither raw ts_micros nor event.timestamp could
+// be resolved), timestamp-based dedup is impossible. Instead, we perform a
+// content match: if any interaction span in the same session stores the same
+// prompt text (checked via json_extract across the keys extractPromptText uses),
+// the anchor is a duplicate of that span row and is dropped.
 func filterAnchorsAgainstInteractionSpans(database *sql.DB, anchors []otelPromptAnchor) []otelPromptAnchor {
 	out := anchors[:0:len(anchors)]
 	for _, a := range anchors {
-		if a.SessionID == "" || a.TSMicros == 0 {
+		if a.SessionID == "" {
+			out = append(out, a)
+			continue
+		}
+		if a.TSMicros == 0 {
+			// Cannot dedup by timestamp; fall back to prompt-text content match.
+			if anchorHasMatchingInteractionSpan(database, a) {
+				continue // duplicate of the interaction-span row — drop it
+			}
 			out = append(out, a)
 			continue
 		}
@@ -330,6 +344,28 @@ func filterAnchorsAgainstInteractionSpans(database *sql.DB, anchors []otelPrompt
 		}
 	}
 	return out
+}
+
+// anchorHasMatchingInteractionSpan reports whether any interaction span in the
+// same session stores the same prompt text as the anchor. Interaction spans may
+// store the prompt under "user_prompt", "prompt", or "text" (the same keys
+// extractPromptText checks); we test all three so the match is key-agnostic.
+func anchorHasMatchingInteractionSpan(database *sql.DB, a otelPromptAnchor) bool {
+	if a.PromptText == "" {
+		return false // empty prompt — cannot content-match; keep the anchor
+	}
+	var count int
+	_ = database.QueryRow(`
+		SELECT COUNT(*) FROM otel_signals
+		WHERE kind = 'span' AND canonical = 'interaction'
+		  AND session_id = ?
+		  AND (
+		    json_extract(attrs_json, '$.user_prompt') = ?
+		    OR json_extract(attrs_json, '$.prompt') = ?
+		    OR json_extract(attrs_json, '$.text') = ?
+		  )`,
+		a.SessionID, a.PromptText, a.PromptText, a.PromptText).Scan(&count)
+	return count > 0
 }
 
 func treeTimestampFromOtel(tsMicros int64, attrsRaw string) (string, int64) {
