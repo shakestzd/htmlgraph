@@ -1,0 +1,18 @@
+meta:
+    id: plan-83f909bc
+    track_id: trk-0677c709
+    title: 'Enforcement architecture: machine-enforce wipnote dev practices'
+    description: 'Move wipnote dev practices from advisory prose to machine-enforced, self-healing invariants in the Go binary + hook matrix so adherence is harness-identical across Claude Code, Codex, and Gemini. Seven slices: transactional complete, pre-commit check-ports drift gate, provenance-required completion, gate-record-required completion, session-exit reconciliation, dedup-on-create, cross-harness parity + adherence scorecard.'
+    created_at: "2026-05-15"
+    status: draft
+    priority: medium
+    schema_version: v3
+    version: 2
+design:
+    problem: ""
+    goals: []
+    constraints: []
+    approved: false
+    comment: ""
+slices: []
+questions: []
