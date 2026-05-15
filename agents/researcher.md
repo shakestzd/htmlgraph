@@ -93,9 +93,18 @@ End every report with a one-line actionable summary the orchestrator can act on 
 
 Bash is for **observation only** in research mode. Allowed commands:
 - `grep`, `rg`, `find`, `ls`, `cat`, `head`, `tail`, `wc` — file/text inspection
-- `wipnote find`, `wipnote show`, `wipnote search` — wipnote queries
+- `wipnote find`, `wipnote show`, `wipnote search` — wipnote queries (prefer `wipnote search '<ast pattern>'` over bare `grep` for finding code structures, e.g. functions/calls/imports)
 - `sqlite3 <db> "SELECT ..."` — read-only DB queries
 - `gh <subcommand>` — GitHub state inspection
+
+### Verbose output → wipnote sh
+
+Any command likely to produce 50+ lines (grep over the repo, find ., ls -R, git log, etc.) should be wrapped:
+- `wipnote sh "grep -rn foo ."` instead of `grep -rn foo .`
+- `wipnote sh --max-lines 30 "git log --oneline"` to cap further
+- `wipnote sh --raw "<cmd>"` to opt out of compression on rare occasions
+
+This strips ANSI, dedupes consecutive duplicate lines, drops progress bars, and caps output — saving turns and keeping the most relevant matches visible.
 
 NOT allowed (these write, build, or change state — break out of research mode and STOP if you need them):
 - `go build`, `go run`, `go test`, `npm`, `cargo`, `make` — building/testing
