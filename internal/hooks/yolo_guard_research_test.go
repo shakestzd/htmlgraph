@@ -38,11 +38,6 @@ func insertAgentEventFullWithTime(t *testing.T, tdb *testDB, eventID, sessionID,
 	}
 }
 
-// insertSession inserts a sessions row with optional parent.
-func insertResearchTestSession(t *testing.T, tdb *testDB, sessionID, parentSessionID string) {
-	t.Helper()
-	insertResearchTestSessionWithProject(t, tdb, sessionID, parentSessionID, "")
-}
 
 // insertResearchTestSessionWithProject inserts a sessions row with optional parent and project_dir.
 func insertResearchTestSessionWithProject(t *testing.T, tdb *testDB, sessionID, parentSessionID, projectDir string) {

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -603,12 +604,7 @@ var genericAgentIDs = []string{"claude-code", "codex", "gemini", "human"}
 // isGenericAgentID returns true when id is one of the well-known harness
 // identifiers that should never be used for cross-session matching.
 func isGenericAgentID(id string) bool {
-	for _, g := range genericAgentIDs {
-		if id == g {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(genericAgentIDs, id)
 }
 
 // collectRelatedSessionIDs builds a deduplicated slice of session IDs that

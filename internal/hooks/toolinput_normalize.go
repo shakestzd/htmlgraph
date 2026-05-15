@@ -35,7 +35,7 @@ var pathKeysToNormalize = []string{
 //
 // The resolver parameter is the test-injectable form of the anchor resolver;
 // pass nil to use the production resolver (paths.MustNormalize).
-func normalizeToolInputPaths(input map[string]any, toolName, repoRoot string, resolver func(string) string) string {
+func normalizeToolInputPaths(input map[string]any, _, repoRoot string, resolver func(string) string) string {
 	if input == nil {
 		return ""
 	}
