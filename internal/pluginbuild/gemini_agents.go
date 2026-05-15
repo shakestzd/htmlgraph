@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 // claudeToGeminiTool maps Claude Code tool names to their Gemini CLI equivalents.
@@ -27,17 +25,6 @@ var claudeToGeminiTool = map[string]string{
 	"Bash":      "run_shell_command",
 	"WebSearch": "google_web_search",
 	"WebFetch":  "web_fetch",
-}
-
-// geminiAgentFrontmatter is the translated agent frontmatter emitted into the
-// Gemini extension tree. Only fields Gemini understands are included.
-type geminiAgentFrontmatter struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description,omitempty"`
-	Model       string   `yaml:"model,omitempty"`
-	MaxTurns    int      `yaml:"max_turns,omitempty"`
-	TimeoutMins int      `yaml:"timeout_mins,omitempty"`
-	Tools       []string `yaml:"tools,omitempty"`
 }
 
 func init() {
@@ -119,22 +106,22 @@ func translateAgentFrontmatter(filename string, raw []byte) ([]byte, error) {
 	}
 	claudeFM = filterAgentFrontmatter(filename, "gemini", claudeFM)
 
-	gFM := geminiAgentFrontmatter{}
+	gFM := map[string]any{}
 
 	if v, ok := claudeFM["name"].(string); ok {
-		gFM.Name = v
+		gFM["name"] = v
 	}
 	if v, ok := claudeFM["description"].(string); ok {
-		gFM.Description = v
+		gFM["description"] = v
 	}
 	if v, ok := claudeFM["model"].(string); ok {
-		gFM.Model = mapGeminiAgentModel(v)
+		gFM["model"] = mapGeminiAgentModel(v)
 	}
 	if v, ok := claudeFM["maxTurns"].(int); ok {
-		gFM.MaxTurns = v
+		gFM["maxTurns"] = v
 	}
 	if v, ok := claudeFM["timeout_mins"].(int); ok {
-		gFM.TimeoutMins = v
+		gFM["timeout_mins"] = v
 	}
 
 	// Translate tools list: map known Claude tools to Gemini equivalents;
@@ -156,11 +143,13 @@ func translateAgentFrontmatter(filename string, raw []byte) ([]byte, error) {
 			// rather than silently restricting it.
 			geminiTools = []string{"*"}
 		}
-		gFM.Tools = geminiTools
+		gFM["tools"] = geminiTools
 	}
 
-	// Marshal the translated frontmatter back to YAML.
-	fmBytes, err := yaml.Marshal(gFM)
+	// Marshal the translated frontmatter back to YAML, applying any output
+	// name translations from the shared field matrix (for example maxTurns
+	// becomes max_turns for Gemini).
+	fmBytes, err := marshalAgentFrontmatterForHarness(gFM, "gemini")
 	if err != nil {
 		return nil, fmt.Errorf("marshal gemini frontmatter: %w", err)
 	}

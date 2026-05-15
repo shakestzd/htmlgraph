@@ -60,15 +60,15 @@ Per the [Claude Code subagent docs](https://code.claude.com/docs/en/sub-agents),
 
 **Workaround:** If you need any of these fields, define them at the harness level (e.g., plugin-wide `hooks.json`, `.mcp.json`, system-prompt context) rather than per-agent.
 
-**Honored frontmatter fields for plugin-loaded subagents:** `name`, `description`, `model`, `tools`, `maxTurns`, `memory`, and the markdown body (system prompt).
+**Honored frontmatter fields for plugin-loaded subagents:** `name`, `description`, `model`, `color`, `tools`, `maxTurns`, `memory`, and the markdown body (system prompt).
 
-`wipnote plugin build-ports` now enforces per-harness frontmatter allowlists during agent generation and logs a build-time warning for any stripped field. Current allowlists:
+`wipnote plugin build-ports` enforces per-harness frontmatter allowlists during agent generation and logs a build-time warning for any stripped field. The source of truth is `agentFrontmatterFieldSpecs` in `internal/pluginbuild/agent_frontmatter.go`; it records supported harnesses, output-name translations, and upstream doc provenance for every shared source field. Current derived allowlists:
 
-- Claude: `name`, `description`, `model`, `tools`, `maxTurns`, `memory`
+- Claude: `name`, `description`, `model`, `color`, `tools`, `maxTurns`, `memory`
 - Codex: `name`, `description`, `model`, `tools`, `initialPrompt`
 - Gemini: `name`, `description`, `model`, `tools`, `maxTurns`, `timeout_mins`
 
-Keep shared agent source frontmatter in `plugin/agents/*.md` within those per-harness allowlists. If you add a new source field intentionally, update the generator allowlist in `internal/pluginbuild/` and the tests in `internal/pluginbuild/*_test.go` in the same change.
+Keep shared agent source frontmatter in `plugin/agents/*.md` within those per-harness allowlists. If you add a new source field intentionally, update `agentFrontmatterFieldSpecs` and the tests in `internal/pluginbuild/*_test.go` in the same change; do not add a separate prose-only allowlist.
 
 ## Hook State: Prefer File/Branch State Over Session State
 

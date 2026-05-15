@@ -9,60 +9,101 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var sharedAgentFrontmatterOrder = []string{
-	"name",
-	"description",
-	"model",
-	"color",
-	"tools",
-	"disallowedTools",
-	"maxTurns",
-	"skills",
-	"initialPrompt",
-	"memory",
-	"timeout_mins",
+type agentFrontmatterFieldSpec struct {
+	Name       string
+	Harnesses  map[string]string
+	DocURL     string
+	Provenance string
 }
 
-var sharedAgentFrontmatterFields = setOf(
-	"name",
-	"description",
-	"model",
-	"color",
-	"tools",
-	"disallowedTools",
-	"maxTurns",
-	"skills",
-	"initialPrompt",
-	"memory",
-	"timeout_mins",
-)
-
-var harnessAgentFrontmatterAllowlist = map[string]map[string]struct{}{
-	"claude": setOf(
-		"name",
-		"description",
-		"model",
-		"color",
-		"tools",
-		"maxTurns",
-		"memory",
-	),
-	"codex": setOf(
-		"name",
-		"description",
-		"model",
-		"tools",
-		"initialPrompt",
-	),
-	"gemini": setOf(
-		"name",
-		"description",
-		"model",
-		"tools",
-		"maxTurns",
-		"timeout_mins",
-	),
+var agentFrontmatterFieldSpecs = []agentFrontmatterFieldSpec{
+	{
+		Name:   "name",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "name",
+			"codex":  "name",
+			"gemini": "name",
+		},
+	},
+	{
+		Name:   "description",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "description",
+			"codex":  "description",
+			"gemini": "description",
+		},
+	},
+	{
+		Name:   "model",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "model",
+			"codex":  "model",
+			"gemini": "model",
+		},
+	},
+	{
+		Name:   "color",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "color",
+		},
+	},
+	{
+		Name:   "maxTurns",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "maxTurns",
+			"gemini": "max_turns",
+		},
+	},
+	{
+		Name:   "tools",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "tools",
+			"codex":  "tools",
+			"gemini": "tools",
+		},
+	},
+	{
+		Name:       "disallowedTools",
+		DocURL:     "https://code.claude.com/docs/en/sub-agents",
+		Provenance: "Recognized as a shared source field so unsupported target output is stripped with a specific warning.",
+	},
+	{
+		Name:       "skills",
+		DocURL:     "https://code.claude.com/docs/en/skills",
+		Provenance: "Recognized as plugin source metadata and stripped from generated agent frontmatter unless a target explicitly supports it.",
+	},
+	{
+		Name:   "initialPrompt",
+		DocURL: "https://github.com/openai/codex",
+		Harnesses: map[string]string{
+			"codex": "initialPrompt",
+		},
+	},
+	{
+		Name:   "memory",
+		DocURL: "https://code.claude.com/docs/en/sub-agents",
+		Harnesses: map[string]string{
+			"claude": "memory",
+		},
+	},
+	{
+		Name:   "timeout_mins",
+		DocURL: "https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md",
+		Harnesses: map[string]string{
+			"gemini": "timeout_mins",
+		},
+	},
 }
+
+var sharedAgentFrontmatterOrder = agentFrontmatterOrder(agentFrontmatterFieldSpecs)
+var sharedAgentFrontmatterFields = agentFrontmatterKnownFields(agentFrontmatterFieldSpecs)
+var harnessAgentFrontmatterAllowlist = agentFrontmatterAllowlists(agentFrontmatterFieldSpecs)
 
 func parseAgentFrontmatter(raw []byte) (fm map[string]any, body []byte, hasFM bool, err error) {
 	fmRaw, body, hasFM := splitFrontmatter(raw)
@@ -100,13 +141,21 @@ func filterAgentFrontmatter(filename, harness string, fm map[string]any) map[str
 }
 
 func marshalAgentFrontmatter(fm map[string]any) ([]byte, error) {
+	return marshalAgentFrontmatterForHarness(fm, "")
+}
+
+func marshalAgentFrontmatterForHarness(fm map[string]any, harness string) ([]byte, error) {
 	node := &yaml.Node{Kind: yaml.MappingNode}
 	for _, key := range sharedAgentFrontmatterOrder {
 		value, ok := fm[key]
 		if !ok {
 			continue
 		}
-		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
+		outputKey := key
+		if harness != "" {
+			outputKey = agentFrontmatterOutputName(key, harness)
+		}
+		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: outputKey}
 		valueNode := &yaml.Node{}
 		if err := valueNode.Encode(value); err != nil {
 			return nil, fmt.Errorf("encode frontmatter field %q: %w", key, err)
@@ -132,12 +181,50 @@ func renderAgentMarkdown(fm map[string]any, body []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func setOf(keys ...string) map[string]struct{} {
-	out := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		out[key] = struct{}{}
+func agentFrontmatterOrder(specs []agentFrontmatterFieldSpec) []string {
+	out := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		out = append(out, spec.Name)
 	}
 	return out
+}
+
+func agentFrontmatterKnownFields(specs []agentFrontmatterFieldSpec) map[string]struct{} {
+	out := make(map[string]struct{}, len(specs))
+	for _, spec := range specs {
+		out[spec.Name] = struct{}{}
+	}
+	return out
+}
+
+func agentFrontmatterAllowlists(specs []agentFrontmatterFieldSpec) map[string]map[string]struct{} {
+	out := map[string]map[string]struct{}{
+		"claude": {},
+		"codex":  {},
+		"gemini": {},
+	}
+	for _, spec := range specs {
+		for harness := range spec.Harnesses {
+			if _, ok := out[harness]; !ok {
+				out[harness] = map[string]struct{}{}
+			}
+			out[harness][spec.Name] = struct{}{}
+		}
+	}
+	return out
+}
+
+func agentFrontmatterOutputName(field, harness string) string {
+	for _, spec := range agentFrontmatterFieldSpecs {
+		if spec.Name != field {
+			continue
+		}
+		if outputName, ok := spec.Harnesses[harness]; ok && outputName != "" {
+			return outputName
+		}
+		return field
+	}
+	return field
 }
 
 func sortedKeys(m map[string]any) []string {
