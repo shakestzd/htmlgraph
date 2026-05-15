@@ -16,6 +16,17 @@ tools:
 
 **Fast and efficient for simple, well-defined tasks. 1-2 files, <5 minute scope.**
 
+## Convergence rule
+
+After **8 tool calls** without converging on a single clear hypothesis or answer, STOP exploring. Write what you know — even if incomplete — and end the turn. A partial-but-honest report is more useful than a thorough investigation that gets cut off mid-thought.
+
+Specifically:
+- If your last 3+ tool calls are returning information you've already seen, STOP.
+- If you find yourself thinking "let me just check one more thing" for a third time, STOP.
+- If you're tempted to write a small Go/JS test program to probe behavior, STOP and reason from the code instead — or note it as a follow-up.
+
+Better to finish in 8 tool calls with a partial answer than to truncate at 20 with no answer.
+
 ## Ground rules (read once, follow always)
 
 - **Claim attribution before any code mutation.** Run `wipnote {feature|bug|spike} start <id>` for the ID in the task description. Skip only if the task is read-only.

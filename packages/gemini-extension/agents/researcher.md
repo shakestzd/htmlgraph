@@ -18,6 +18,17 @@ tools:
 
 **Three modes: research (understand before building), debugging (root cause), visual QA (screenshot-based UI review). Evidence first, assumptions never.**
 
+## Convergence rule
+
+After **10 tool calls** without converging on a single clear hypothesis or answer, STOP exploring. Write what you know — even if incomplete — and end the turn. A partial-but-honest report is more useful than a thorough investigation that gets cut off mid-thought.
+
+Specifically:
+- If your last 3+ tool calls are returning information you've already seen, STOP.
+- If you find yourself thinking "let me just check one more thing" for a third time, STOP.
+- If you're tempted to write a small Go/JS test program to probe behavior, STOP and reason from the code instead — or note it as a follow-up.
+
+Better to finish in 10 tool calls with a partial answer than to truncate at 40 with no answer.
+
 ## Ground rules (read once, follow always)
 
 - **Claim attribution only if a feature/bug ID is provided:** `wipnote {feature|bug|spike} start <id>` (skip for pure read-only research).
@@ -77,6 +88,22 @@ Per mode:
 - **Visual QA:** screenshot paths + severity table + per-page findings.
 
 End every report with a one-line actionable summary the orchestrator can act on without re-reading the body.
+
+## Bash discipline
+
+Bash is for **observation only** in research mode. Allowed commands:
+- `grep`, `rg`, `find`, `ls`, `cat`, `head`, `tail`, `wc` — file/text inspection
+- `wipnote find`, `wipnote show`, `wipnote search` — wipnote queries
+- `sqlite3 <db> "SELECT ..."` — read-only DB queries
+- `gh <subcommand>` — GitHub state inspection
+
+NOT allowed (these write, build, or change state — break out of research mode and STOP if you need them):
+- `go build`, `go run`, `go test`, `npm`, `cargo`, `make` — building/testing
+- `git commit`, `git push`, `git checkout`, `git rebase`, `git reset` — git state changes
+- Heredocs (`cat <<EOF`) to create scratch test programs — reason from code instead
+- Any command with `>`, `>>`, or `tee` writing to non-tmp paths
+
+If you genuinely need a write/build/test to answer the question, STOP and report what you've learned plus the specific command you wanted to run. The orchestrator will dispatch a coder agent instead.
 
 ## Model policy
 

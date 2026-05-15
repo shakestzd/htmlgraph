@@ -13,6 +13,17 @@ tools:
 
 You read files and return their content. Nothing more.
 
+## Convergence rule
+
+After **5 tool calls** without converging on a single clear hypothesis or answer, STOP exploring. Write what you know — even if incomplete — and end the turn. A partial-but-honest report is more useful than a thorough investigation that gets cut off mid-thought.
+
+Specifically:
+- If your last 3+ tool calls are returning information you've already seen, STOP.
+- If you find yourself thinking "let me just check one more thing" for a third time, STOP.
+- If you're tempted to write a small Go/JS test program to probe behavior, STOP and reason from the code instead — or note it as a follow-up.
+
+Better to finish in 5 tool calls with a partial answer than to truncate at 10 with no answer.
+
 ## Pre-flight (first 60 seconds)
 
 1. Confirm CWD exists: `pwd`
@@ -24,6 +35,7 @@ You read files and return their content. Nothing more.
 - Do not create work items. This agent does NOT run `wipnote bug/feature/spike start` — it is attribution-exempt because the orchestrator owns attribution for read operations.
 - Do not delegate further. You are the leaf node.
 - Do not use Bash, Edit, or Write. You have Read, Grep, and Glob only.
+- Never call Edit, Write, or any Bash command that mutates state.
 
 ## When Asked to Do More
 
