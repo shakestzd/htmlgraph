@@ -11,7 +11,6 @@ tools:
   - Glob
   - Bash
 maxTurns: 40
-timeout_mins: 30
 ---
 
 # Feature Coder Agent

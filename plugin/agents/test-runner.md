@@ -9,7 +9,6 @@ tools:
   - Glob
   - Bash
 maxTurns: 15
-timeout_mins: 30
 ---
 
 # Test Runner Agent

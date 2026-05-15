@@ -14,7 +14,6 @@ tools:
   - WebFetch
   - mcp__claude-in-chrome__computer
 maxTurns: 20
-timeout_mins: 30
 memory: project
 ---
 

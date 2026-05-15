@@ -1,9 +1,8 @@
 ---
 name: test-runner
 description: Quality assurance agent. Use after code changes to run tests, type checks, linting, and validate that quality gates pass.
-model: flash-lite
+model: gemini-2.5-flash-lite
 max_turns: 15
-timeout_mins: 30
 tools:
     - read_file
     - grep_search

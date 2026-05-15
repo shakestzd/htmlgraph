@@ -176,14 +176,23 @@ func translateAgentFrontmatter(filename string, raw []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// mapGeminiAgentModel translates Claude Code model shorthand to the full Gemini
+// model identifiers required by Gemini CLI's subagent frontmatter. Shorthand
+// aliases like "flash" or "flash-lite" are NOT documented as valid model values
+// in Gemini CLI's subagent schema (https://github.com/google-gemini/gemini-cli/
+// blob/main/docs/core/subagents.md — "Supported frontmatter fields" table uses
+// full IDs such as "gemini-3-flash-preview"). Full IDs are required.
 func mapGeminiAgentModel(model string) string {
 	switch strings.TrimSpace(model) {
 	case "haiku":
-		return "flash-lite"
+		// Fast/cheap tier → gemini-2.5-flash-lite (https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-lite)
+		return "gemini-2.5-flash-lite"
 	case "sonnet":
-		return "flash"
+		// Balanced tier → gemini-3-flash-preview (https://ai.google.dev/gemini-api/docs/models/gemini-3-flash-preview)
+		return "gemini-3-flash-preview"
 	case "opus":
-		return "pro"
+		// Deep-reasoning tier → gemini-3.1-pro-preview (https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview)
+		return "gemini-3.1-pro-preview"
 	default:
 		return model
 	}
