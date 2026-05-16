@@ -221,6 +221,10 @@ func buildRoot() *cobra.Command {
 	compliance.GroupID = "quality"
 	root.AddCommand(compliance)
 
+	reconcile := reconcileCmd()
+	reconcile.GroupID = "quality"
+	root.AddCommand(reconcile)
+
 	// data group
 	batch := batchCmd()
 	batch.GroupID = "data"

@@ -136,7 +136,32 @@ func Stop(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		FinalizeSessionHTML(projectDir, sessionID, time.Now().UTC().Format(time.RFC3339), "completed", evtCount)
 	}
 
+	// Session-exit reconciliation (slice-5, feat-f93fe770).
+	//
+	// AMENDMENT to the historical no-block contract: this handler previously
+	// NEVER blocked (the only exit-2 wiring was TaskCompleted via
+	// task_completion_gate.go). It now blocks (BlockExit2Error) — but ONLY for
+	// harness=="claude" AND ONLY on ambiguous generator-drift. This narrow,
+	// intentional amendment is scoped here: Gemini/Codex never block (a durable
+	// warning is persisted and surfaced at the next SessionStart instead).
+	if sessionID != "" {
+		projectDir := ResolveProjectDir(event.CWD, event.SessionID)
+		if err := runSessionExitReconcile(database, projectDir,
+			currentHarness().String(), sessionID); err != nil {
+			return nil, err
+		}
+	}
+
 	return recordSimpleEvent(models.EventEnd, "Stop", summary, "recorded", event, database)
+}
+
+// currentHarness resolves the active harness inside a hook handler. Handlers
+// do not receive the parsed Harness value, but DetectHarness's env-based
+// branches (CLAUDE_CODE_ENTRYPOINT, WIPNOTE_AGENT_ID) are authoritative and
+// payload-independent — passing nil short-circuits payload parsing and yields
+// the env-derived harness, which is exactly the discriminator slice-5 needs.
+func currentHarness() Harness {
+	return DetectHarness(nil)
 }
 
 // AfterAgent handles the Gemini CLI AfterAgent hook event. Gemini exposes the

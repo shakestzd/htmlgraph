@@ -260,27 +260,50 @@ func SessionStart(event *CloudEvent, database *sql.DB, projectDir string) (*Hook
 		debugLog(projectDir, "[error] handler=session-start session=%s: insert event: %v", shortID, err)
 	}
 
+	// Surface (and consume) any durable reconcile warnings persisted by a
+	// prior Gemini/Codex session exit (slice-5, feat-f93fe770). This is the
+	// non-blocking counterpart to the Claude exit-2 path: the user-never-
+	// returns case is recorded at session exit and rendered here on return.
+	reconcilePrefix := DrainReconcileWarnings(projectDir)
+
 	// Warn the user when the CLI and plugin versions have drifted.
 	warning := versionMismatchWarning()
 	if warning != "" {
 		debugLog(projectDir, "[session-start] version mismatch detected: %s", warning)
-		return &HookResult{AdditionalContext: warning}, nil
+		return &HookResult{AdditionalContext: joinReconcileContext(reconcilePrefix, warning)}, nil
 	}
 
 	// Emit full attribution block at session start (once per session).
 	// This includes: intro + open work items roster + CLI quick-ref + required flags.
 	attribution := buildSessionStartAttribution(database)
 	if attribution != "" {
-		return &HookResult{AdditionalContext: attribution}, nil
+		return &HookResult{AdditionalContext: joinReconcileContext(reconcilePrefix, attribution)}, nil
 	}
 
 	// Fallback nudge if no attribution block was generated (no open items).
 	// This nudge uses the same "wipnote plugin is active..." message.
 	if nudge := bareLaunchNudge(projectDir); nudge != "" {
-		return &HookResult{AdditionalContext: nudge}, nil
+		return &HookResult{AdditionalContext: joinReconcileContext(reconcilePrefix, nudge)}, nil
+	}
+
+	if reconcilePrefix != "" {
+		return &HookResult{AdditionalContext: reconcilePrefix}, nil
 	}
 
 	return &HookResult{}, nil
+}
+
+// joinReconcileContext prepends a non-empty durable-reconcile warning block to
+// the rest of the SessionStart additionalContext, separated by a blank line.
+// Returns rest unchanged when there is no reconcile prefix.
+func joinReconcileContext(reconcilePrefix, rest string) string {
+	if reconcilePrefix == "" {
+		return rest
+	}
+	if rest == "" {
+		return reconcilePrefix
+	}
+	return reconcilePrefix + "\n\n" + rest
 }
 
 // lineageInputs holds pre-resolved data needed to insert lineage traces inside

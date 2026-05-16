@@ -26,7 +26,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "wipnote hook session-end"
+            "command": "wipnote hook session-end",
+            "timeout": 90
           }
         ]
       }
@@ -112,7 +113,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "wipnote hook stop"
+            "command": "wipnote hook stop",
+            "timeout": 90
           }
         ]
       }

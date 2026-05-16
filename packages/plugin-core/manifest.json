@@ -65,7 +65,7 @@
     "events": [
       { "name": "SessionStart",       "handler": "session-start",       "targets": ["claude", "codex", "gemini"] },
       { "name": "SessionStart",       "handler": "session-resume",      "targets": ["claude"], "matcher": "resume" },
-      { "name": "SessionEnd",         "handler": "session-end",         "targets": ["claude"] },
+      { "name": "SessionEnd",         "handler": "session-end",         "targets": ["claude"], "timeout": 90 },
       { "name": "UserPromptSubmit",   "handler": "user-prompt",         "targets": ["claude", "codex", "gemini"], "geminiEventName": "BeforeAgent" },
       { "name": "AfterAgent",         "handler": "after-agent",         "targets": ["gemini"] },
       { "name": "AfterModel",         "handler": "after-model",         "targets": ["gemini"] },
@@ -75,7 +75,7 @@
       { "name": "PostToolUse",        "handler": "exit-plan-mode",      "targets": ["claude"], "matcher": "ExitPlanMode", "timeout": 30 },
       { "name": "SubagentStart",      "handler": "subagent-start",      "targets": ["claude"] },
       { "name": "SubagentStop",       "handler": "subagent-stop",       "targets": ["claude"] },
-      { "name": "Stop",               "handler": "stop",                "targets": ["claude", "gemini"], "geminiEventName": "SessionEnd", "geminiHandler": "session-end" },
+      { "name": "Stop",               "handler": "stop",                "targets": ["claude", "gemini"], "geminiEventName": "SessionEnd", "geminiHandler": "session-end", "timeout": 90 },
       { "name": "PostToolUseFailure", "handler": "posttooluse-failure", "targets": ["claude"] },
       { "name": "PreCompact",         "handler": "pre-compact",         "targets": ["claude"] },
       { "name": "TeammateIdle",       "handler": "teammate-idle",       "targets": ["claude"] },
