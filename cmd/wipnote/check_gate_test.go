@@ -35,17 +35,24 @@ func setupGateTestProject(t *testing.T) string {
     "id": "tmp-noexec",
     "match_all": ["/tmp/", "permission denied"],
     "justification": "Test fixture justification"
+  },
+  {
+    "id": "listener-socket-sandbox",
+    "match_all": ["listen tcp", "socket: operation not permitted"],
+    "justification": "Test fixture listener sandbox justification"
   }
 ]`), 0o644); err != nil {
 		t.Fatalf("write allowlist: %v", err)
 	}
-	for _, dir := range []string{".gotmp-exec", ".gocache"} {
-		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", dir, err)
+	tmpBase := filepath.Join("/home/vscode/.codex/memories", "wipnote-gotmp")
+	for _, dir := range []string{"gotmp-exec", "gocache"} {
+		if err := os.MkdirAll(filepath.Join(tmpBase, dir), 0o755); err != nil {
+			t.Fatalf("mkdir external %s: %v", dir, err)
 		}
 	}
-	t.Setenv("GOTMPDIR", filepath.Join(root, ".gotmp-exec"))
-	t.Setenv("GOCACHE", filepath.Join(root, ".gocache"))
+	t.Setenv("TMPDIR", filepath.Join(tmpBase, "gotmp-exec"))
+	t.Setenv("GOTMPDIR", filepath.Join(tmpBase, "gotmp-exec"))
+	t.Setenv("GOCACHE", filepath.Join(tmpBase, "gocache"))
 	return root
 }
 
@@ -99,6 +106,81 @@ func TestRunSessionGate_WritesSessionLocalRecord(t *testing.T) {
 	}
 	if !strings.Contains(record.GateCommand, "-buildvcs=false") {
 		t.Fatalf("gate command = %q, want buildvcs flag", record.GateCommand)
+	}
+}
+
+func TestMatchGateAllowlist_ListenerSandboxOnly(t *testing.T) {
+	entries := []gateAllowlistEntry{
+		{
+			ID:            "listener-socket-sandbox",
+			MatchAll:      []string{"listen tcp", "socket: operation not permitted"},
+			Justification: "Test fixture listener sandbox justification",
+		},
+		{
+			ID:            "broad-failure",
+			MatchAll:      []string{"socket: operation not permitted"},
+			Justification: "Should not match on its own",
+		},
+	}
+
+	hits := matchGateAllowlist("go test", "listen tcp 127.0.0.1:0: socket: operation not permitted", entries)
+	if len(hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d: %+v", len(hits), hits)
+	}
+	if hits[0].ID != "listener-socket-sandbox" {
+		t.Fatalf("first hit = %q, want listener-socket-sandbox", hits[0].ID)
+	}
+}
+
+func TestRunSessionGate_ReportsAndPersistsAllowlistHits(t *testing.T) {
+	projectRoot := setupGateTestProject(t)
+	hits := []gateAllowlistHit{{
+		ID:            "listener-socket-sandbox",
+		Command:       "go test",
+		Justification: "Some harnesses forbid listener binds, which makes otherwise healthy Go tests fail with a socket sandbox error instead of a product regression. Allow only this environmental class so the gate reports the sandbox limitation explicitly.",
+	}}
+	var stdout strings.Builder
+	writeGateAllowlistHits(&stdout, hits)
+	if !strings.Contains(stdout.String(), "Environment allowlist hits") {
+		t.Fatalf("expected allowlist section in stdout, got: %s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "listener-socket-sandbox") {
+		t.Fatalf("expected listener allowlist id in stdout, got: %s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "socket sandbox error") {
+		t.Fatalf("expected justification in stdout, got: %s", stdout.String())
+	}
+
+	result := &gateRunResult{
+		Plan: gatePlan{ProjectType: "go"},
+		Commands: []string{"go build -buildvcs=false ./...", "go vet ./...", "go test -buildvcs=false ./..."},
+		Passed: false,
+		AllowlistHits: hits,
+		OutputSummary: "go test failed",
+	}
+	record, err := persistGateRecord(projectRoot, "sess-gate-listener", "", "check", result)
+	if err != nil {
+		t.Fatalf("persistGateRecord: %v", err)
+	}
+	if record == nil {
+		t.Fatal("expected persisted gate record")
+	}
+
+	database := openGateTestDB(t, projectRoot)
+	defer database.Close()
+
+	record, err = dbpkg.LatestGateRecordForSession(database, "sess-gate-listener")
+	if err != nil {
+		t.Fatalf("LatestGateRecordForSession: %v", err)
+	}
+	if record == nil {
+		t.Fatal("expected persisted gate record")
+	}
+	if record.AllowlistHitCount != len(result.AllowlistHits) {
+		t.Fatalf("allowlist hit count = %d, want %d", record.AllowlistHitCount, len(result.AllowlistHits))
+	}
+	if !strings.Contains(record.AllowlistHitsJSON, "listener-socket-sandbox") {
+		t.Fatalf("allowlist hits JSON = %s, want listener entry", record.AllowlistHitsJSON)
 	}
 }
 

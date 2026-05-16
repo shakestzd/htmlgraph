@@ -155,13 +155,7 @@ func runSessionGate(projectRoot, sessionID, workItemID, source string, stdout, s
 	}
 
 	if len(result.AllowlistHits) > 0 {
-		fmt.Fprintln(stdout)
-		fmt.Fprintln(stdout, "Environment allowlist hits")
-		fmt.Fprintln(stdout, "-------------------------")
-		for _, hit := range result.AllowlistHits {
-			fmt.Fprintf(stdout, "  - %s (%s)\n", hit.ID, hit.Command)
-			fmt.Fprintf(stdout, "    justification: %s\n", hit.Justification)
-		}
+		writeGateAllowlistHits(stdout, result.AllowlistHits)
 	}
 
 	if len(summary) == 0 {
@@ -175,6 +169,16 @@ func runSessionGate(projectRoot, sessionID, workItemID, source string, stdout, s
 	}
 	result.Record = record
 	return result, nil
+}
+
+func writeGateAllowlistHits(w io.Writer, hits []gateAllowlistHit) {
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Environment allowlist hits")
+	fmt.Fprintln(w, "-------------------------")
+	for _, hit := range hits {
+		fmt.Fprintf(w, "  - %s (%s)\n", hit.ID, hit.Command)
+		fmt.Fprintf(w, "    justification: %s\n", hit.Justification)
+	}
 }
 
 func runGateCommand(gc gateCommand, dir string, allowlist []gateAllowlistEntry, stdout, stderr io.Writer) ([]gateAllowlistHit, error) {
