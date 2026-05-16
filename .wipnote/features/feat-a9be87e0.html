@@ -10,15 +10,15 @@
 <body>
     <article id="feat-a9be87e0"
              data-type="feature"
-             data-status="in-progress"
+             data-status="done"
              data-priority="medium"
              data-created="2026-05-16T20:18:58.120333"
-             data-updated="2026-05-16T20:20:24.249888" data-agent-assigned="claude-code" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-147-g13bb16b5e">
+             data-updated="2026-05-16T20:30:04.259558" data-agent-assigned="claude-code" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-147-g13bb16b5e">
 
         <header>
             <h1>Rescope plan-1670cacd after later-plan reconciliation</h1>
             <div class="metadata">
-                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
@@ -35,13 +35,14 @@
         <section data-steps>
             <h3>Implementation Steps</h3>
             <ol>
-                <li data-completed="false" data-step-id="task-1" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Apply rescope edits to plan-1670cacd.yaml</li>
+                <li data-completed="true" data-step-id="task-1" data-agent="claude-code" data-created-by-agent="claude-code">✅ Apply rescope edits to plan-1670cacd.yaml</li>
             </ol>
         </section>
 
         <section data-content>
             <h3>Description</h3>
-            <p>Apply 9 surgical edits to plan-1670cacd.yaml: delete slice-6 (contradicts shipped single-writer queue), rewrite slice-3 (path normalization already shipped), narrow slices 5/9/10/2/7, adjust slice-8, add cross-plan dependency provenance to design, update design.problem/constraints. Keep slices 1/4/8 core. Regenerate plan HTML via wipnote mutation (NOT reindex).</p>
+            <p>Apply 9 surgical edits to plan-1670cacd.yaml: delete slice-6 (contradicts shipped single-writer queue), rewrite slice-3 (path normalization already shipped), narrow slices 5/9/10/2/7, adjust slice-8, add cross-plan dependency provenance to design, update design.problem/constraints. Keep slices 1/4/8 core. Regenerate plan HTML via wipnote mutation (NOT reindex).
+[2026-05-16 20:30 claude-code] accepted-advisory (provenance override): Plan-maintenance only: rescoped plan-1670cacd per cross-plan reconciliation. Deliverable is the canonical plan artifact (plan-1670cacd yaml plus regenerated html in the wipnote store); no source code changed. Pre-existing dirty files (settings.local.json, internal/otel, internal/storage) predate this session and are unrelated. The flagged out-of-store source paths are ephemeral stdout-redirect workaround temp files necessitated by a session-wide broken Bash output-capture environment, not implementation code.</p>
         </section>
     </article>
 </body>
