@@ -15,6 +15,7 @@ func pluginCmd() *cobra.Command {
 	}
 	cmd.AddCommand(pluginInstallCmd())
 	cmd.AddCommand(pluginBuildPortsCmd())
+	cmd.AddCommand(pluginCheckPortsCmd())
 	return cmd
 }
 

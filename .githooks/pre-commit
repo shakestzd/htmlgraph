@@ -59,6 +59,30 @@ if git diff --cached --name-only | grep -q '\.go$' || [ -f "$REPO_ROOT/go.mod" ]
     fi
 fi
 
+# Plugin port drift gate (scoped).
+#
+# `wipnote plugin check-ports` regenerates every target plugin tree into a
+# tempdir and diffs it against the committed trees — that costs 5-30s. Only pay
+# it when the staged changeset can actually affect generated output: the
+# generator (internal/pluginbuild/), the shared manifest
+# (packages/plugin-core/), or the shared/source assets under plugin/. Skip
+# entirely for any other changeset.
+if git diff --cached --name-only \
+    | grep -qE '^(internal/pluginbuild/|packages/plugin-core/|plugin/)' ; then
+    echo "  -> plugin check-ports (generator/manifest/plugin path staged)..."
+    WIPNOTE_BIN="$(command -v wipnote 2>/dev/null || true)"
+    if [ -z "$WIPNOTE_BIN" ]; then
+        echo "FAIL: 'wipnote' not found on PATH; cannot run plugin check-ports."
+        echo "      Build it with 'wipnote build' (or plugin/build.sh) and retry."
+        exit 1
+    fi
+    if ! (cd "$REPO_ROOT" && "$WIPNOTE_BIN" plugin check-ports) ; then
+        echo "FAIL: generated plugin trees are out of sync with plugin-core."
+        echo "      Run 'wipnote plugin build-ports' and stage the regenerated trees."
+        exit 1
+    fi
+fi
+
 # Reject stray htmlgraph binary at repo root (use `htmlgraph build` instead)
 if git diff --cached --name-only | grep -q '^htmlgraph$'; then
     echo "FAIL: A binary named 'htmlgraph' is staged at the repo root."

@@ -128,7 +128,7 @@ fi
 step "Quality gates"
 
 if $DRY_RUN; then
-    ok "[dry-run] Would run: go build, go vet, go test"
+    ok "[dry-run] Would run: go build, go vet, go test, plugin check-ports"
 else
     echo "  Running go build..."
     (cd "$GO_DIR" && go build ./...) || fail "go build failed"
@@ -141,6 +141,15 @@ else
     echo "  Running go test..."
     (cd "$GO_DIR" && go test ./...) || fail "go test failed"
     ok "go test"
+
+    # Plugin port drift gate: regenerate every target tree into a tempdir and
+    # diff against the committed trees. Shipping stale generated ports would
+    # push out-of-sync Codex/Gemini/Claude plugins. Run via 'go run' so this
+    # works before the CLI binary is rebuilt later in the pipeline.
+    echo "  Running plugin check-ports..."
+    (cd "$GO_DIR" && go run ./cmd/wipnote plugin check-ports) \
+        || fail "plugin ports out of sync — run 'wipnote plugin build-ports' and commit the regenerated trees"
+    ok "plugin check-ports"
 fi
 
 if $BUILD_ONLY; then
