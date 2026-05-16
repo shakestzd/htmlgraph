@@ -70,8 +70,9 @@ func isCodexMarketplaceInstalledAt(configPath string) bool {
 }
 
 // isCodexHooksEnabledAt reports whether Codex hooks are enabled in config.toml.
-// Prefer the current [features].hooks key, but keep recognizing the legacy
-// codex_hooks key for compatibility with existing user configs.
+// Returns true ONLY when the canonical [features].hooks key is enabled.
+// The legacy codex_hooks key is recognized by ensureCodexHooksEnabled during
+// migration, but does not suppress the migration check here.
 func isCodexHooksEnabledAt(configPath string) bool {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -87,10 +88,11 @@ func isCodexHooksEnabledAt(configPath string) bool {
 	if !ok {
 		return false
 	}
-	for _, key := range []string{"hooks", "codex_hooks"} {
-		if enabled, ok := features[key].(bool); ok && enabled {
-			return true
-		}
+	// Only return true for the canonical hooks key, not the legacy codex_hooks.
+	// This ensures configs with only codex_hooks=true are treated as "not enabled"
+	// and will trigger migration via ensureCodexHooksEnabled.
+	if enabled, ok := features["hooks"].(bool); ok && enabled {
+		return true
 	}
 	return false
 }

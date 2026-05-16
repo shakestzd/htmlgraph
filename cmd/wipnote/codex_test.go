@@ -145,13 +145,14 @@ func TestIsCodexHooksEnabledAt(t *testing.T) {
 		t.Errorf("expected false when hooks = false")
 	}
 
-	// Test 5: Legacy codex_hooks is still recognized for compatibility.
+	// Test 5: Legacy codex_hooks alone does NOT satisfy the enabled check.
+	// This ensures configs with only codex_hooks will trigger migration.
 	err = os.WriteFile(configPath, []byte("[features]\ncodex_hooks = true\n"), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if !isCodexHooksEnabledAt(configPath) {
-		t.Errorf("expected true when legacy codex_hooks = true")
+	if isCodexHooksEnabledAt(configPath) {
+		t.Errorf("expected false when only legacy codex_hooks = true; should trigger migration")
 	}
 }
 
@@ -324,6 +325,45 @@ func TestEnsureCodexHooksEnabledMigratesLegacyKey(t *testing.T) {
 	}
 	if !strings.Contains(content, "other_flag") {
 		t.Fatalf("other_flag should be preserved:\n%s", content)
+	}
+}
+
+// TestCodexHooksLegacyOnlyTriggersMigration verifies that a config with ONLY
+// codex_hooks=true (no canonical hooks key) is treated as "not enabled" by the
+// launcher check, thus triggering migration via ensureCodexHooksEnabled.
+func TestCodexHooksLegacyOnlyTriggersMigration(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+
+	// Create config with only the legacy key
+	initialContent := "[features]\ncodex_hooks = true\n"
+	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// The launcher check should treat this as "not enabled"
+	if isCodexHooksEnabledAt(configPath) {
+		t.Errorf("isCodexHooksEnabledAt should return false for codex_hooks-only config, triggering migration")
+	}
+
+	// Migration should run and rewrite the config
+	if err := ensureCodexHooksEnabled(configPath); err != nil {
+		t.Fatalf("ensureCodexHooksEnabled: %v", err)
+	}
+
+	// After migration, the canonical key should exist and legacy should be gone
+	data, _ := os.ReadFile(configPath)
+	content := string(data)
+	if strings.Contains(content, "codex_hooks") {
+		t.Fatalf("legacy codex_hooks key should be removed after migration:\n%s", content)
+	}
+	if !strings.Contains(content, "hooks = true") {
+		t.Fatalf("hooks = true missing after migration:\n%s", content)
+	}
+
+	// Now the launcher check should return true (already enabled)
+	if !isCodexHooksEnabledAt(configPath) {
+		t.Errorf("isCodexHooksEnabledAt should return true for migrated config with hooks=true")
 	}
 }
 
