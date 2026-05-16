@@ -7,7 +7,7 @@ meta:
     status: finalized
     priority: medium
     schema_version: v3
-    version: 12
+    version: 13
 design:
     problem: |
         wipnote's development practices (commit-what-you-close, regenerate ports
@@ -202,6 +202,7 @@ slices:
         defeats parity; the diff must run from the single shared build-ports
         generator).
     - id: slice-3
+      feature_id: feat-7b593272
       num: 3
       title: Provenance-required completion (zero-commit block + advisory override)
       what: |
@@ -247,6 +248,7 @@ slices:
       approved: false
       comment: ""
       approval_status: approved
+      execution_status: promoted
       questions:
         - id: q-codebearing
           text: How to classify code-bearing?
