@@ -7,7 +7,7 @@ meta:
     status: finalized
     priority: medium
     schema_version: v3
-    version: 16
+    version: 17
 design:
     problem: |
         wipnote's development practices (commit-what-you-close, regenerate ports
@@ -526,6 +526,7 @@ slices:
         to manually search before creating (rejected - advisory-only is what
         failed; detection belongs in the binary).
     - id: slice-7
+      feature_id: feat-71e73bce
       num: 7
       title: Cross-harness parity audit + per-session adherence scorecard
       what: |
@@ -587,6 +588,7 @@ slices:
       approved: false
       comment: ""
       approval_status: approved
+      execution_status: promoted
       questions:
         - id: q-score
           text: Where does the scorecard live?
