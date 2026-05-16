@@ -1,0 +1,10 @@
+[
+  {
+    "id": "tmp-noexec",
+    "match_all": [
+      "/tmp/",
+      "permission denied"
+    ],
+    "justification": "Some devcontainers mount /tmp with noexec, which can stop Go's temporary test/build binaries from running at all. This must be surfaced explicitly so operators move GOTMPDIR/GOCACHE into the workspace and rerun the real gate."
+  }
+]
