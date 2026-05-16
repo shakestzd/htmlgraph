@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Baseline build break: NewWriter called via sink/sqlite alias not internal/otel/receiver</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-613c1207"
+             data-type="bug"
+             data-status="todo"
+             data-priority="critical"
+             data-created="2026-05-16T04:36:10.570236"
+             data-updated="2026-05-16T04:36:10.575666" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-97-gd241ca098">
+
+        <header>
+            <h1>Baseline build break: NewWriter called via sink/sqlite alias not internal/otel/receiver</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-critical">Critical Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-e8879220.html" data-relationship="caused_by" data-since="2026-05-16T04:36:10.574177">feat-e8879220</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-16T04:36:10.575445">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>go build ./... fails undefined otelsqlite.NewWriter (reindex_otel_events.go:54) / sqls.NewWriter (serve_child.go:92); NewWriter is in internal/otel/receiver and *receiver.Writer satisfies sqlite.WriterCloser; fix imports+callsites, keep sqlite.New/NewQueued wrappers. Pre-existing red baseline blocking all plan-83f909bc slice gates.</p>
+        </section>
+    </article>
+</body>
+</html>
