@@ -7,7 +7,7 @@ meta:
     status: finalized
     priority: medium
     schema_version: v3
-    version: 15
+    version: 16
 design:
     problem: |
         wipnote's development practices (commit-what-you-close, regenerate ports
@@ -452,6 +452,7 @@ slices:
         (rejected — drifts, defeats parity; one shared entrypoint invoked by
         the per-harness hook matrix).
     - id: slice-6
+      feature_id: feat-e8879220
       num: 6
       title: Dedup check at create (similarity-based relates_to + needs-triage-dup)
       what: |
@@ -495,6 +496,7 @@ slices:
       approved: false
       comment: ""
       approval_status: approved
+      execution_status: promoted
       questions:
         - id: q-sim
           text: Similarity metric?
