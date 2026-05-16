@@ -694,12 +694,18 @@ changes are introduced.</p>
         
         <div class="question-block slice-question-block">
           <p>Which signal should define devcontainer mode?</p>
+          <p class="question-desc">Reusing the existing detector keeps the contract consistent with dashboard bind-address resolution already in production.</p>
           
-          
-          <textarea
-            data-section="slice-1-question-q-devcontainer-detect"
-            data-comment-for="slice-1-question-q-devcontainer-detect"
-            placeholder="Answer question q-devcontainer-detect..."></textarea>
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-1-question-q-devcontainer-detect" data-section="slice-1-question-q-devcontainer-detect" data-action="answer" value="reuse-existing-detector"> Reuse existing detector — /.dockerenv, CODESPACES, REMOTE_CONTAINERS (already in defaultDevcontainerDetector) <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-1-question-q-devcontainer-detect" data-section="slice-1-question-q-devcontainer-detect" data-action="answer" value="explicit-env-override"> Explicit env var — WIPNOTE_LAUNCH_MODE=devcontainer overrides auto-detect</label>
+            
+            <label><input type="radio" name="slice-1-question-q-devcontainer-detect" data-section="slice-1-question-q-devcontainer-detect" data-action="answer" value="filesystem-probe"> Filesystem probe — check for .devcontainer/ directory in repo root</label>
+            
           
         </div>
         
@@ -877,12 +883,18 @@ visible warning path before enforcement.</p>
         
         <div class="question-block slice-question-block">
           <p>Should host production start in warn-only mode while devcontainer/local-dev starts config-gated worktree-by-default?</p>
+          <p class="question-desc">Matches the surviving critical path (slice-1→2) and the deployment-critique that forbids flipping host defaults before migration tooling exists.</p>
           
-          
-          <textarea
-            data-section="slice-2-question-q-default"
-            data-comment-for="slice-2-question-q-default"
-            placeholder="Answer question q-default..."></textarea>
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-2-question-q-default" data-section="slice-2-question-q-default" data-action="answer" value="yes-as-framed"> Yes — host production warn-only, devcontainer/local-dev config-gated worktree-by-default <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-2-question-q-default" data-section="slice-2-question-q-default" data-action="answer" value="worktree-everywhere"> Worktree-by-default everywhere — all mutating launches isolated immediately</label>
+            
+            <label><input type="radio" name="slice-2-question-q-default" data-section="slice-2-question-q-default" data-action="answer" value="warn-only-everywhere"> Warn-only everywhere — detect dirty main but never change launch location</label>
+            
           
         </div>
         
@@ -1178,12 +1190,18 @@ env propagation is incomplete.</p>
         
         <div class="question-block slice-question-block">
           <p>Should we add `session_family_id` or standardize on existing `continued_from`?</p>
+          <p class="question-desc">continued_from is a single-parent FK (internal/models/session.go:40, internal/db/schema.go:159) insufficient for N-session family grouping; session_family_id does not exist anywhere in the codebase.</p>
           
-          
-          <textarea
-            data-section="slice-4-question-q-family-field"
-            data-comment-for="slice-4-question-q-family-field"
-            placeholder="Answer question q-family-field..."></textarea>
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-4-question-q-family-field" data-section="slice-4-question-q-family-field" data-action="answer" value="add-session-family-id"> Add session_family_id — explicit root grouping for N parallel/resumed sessions <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-4-question-q-family-field" data-section="slice-4-question-q-family-field" data-action="answer" value="reuse-continued-from"> Reuse continued_from — minimal schema change, single-parent link only</label>
+            
+            <label><input type="radio" name="slice-4-question-q-family-field" data-section="slice-4-question-q-family-field" data-action="answer" value="hybrid"> Hybrid — derive family_id transitively from continued_from at query time</label>
+            
           
         </div>
         
@@ -1364,12 +1382,18 @@ intentional collaboration or accidental collision.</p>
         
         <div class="question-block slice-question-block">
           <p>Should same-work-item parallel sessions be blocked by default, warned, or allowed as collaboration?</p>
+          <p class="question-desc">Consistent with top-level q-claim-collisions answer and slice-5 scope; a hard block would prevent intentional parallel collaboration which is a core use case.</p>
           
-          
-          <textarea
-            data-section="slice-5-question-q-claim-policy"
-            data-comment-for="slice-5-question-q-claim-policy"
-            placeholder="Answer question q-claim-policy..."></textarea>
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-5-question-q-claim-policy" data-section="slice-5-question-q-claim-policy" data-action="answer" value="warn-and-allow-collaboration"> Warn and allow — visible collision with attribution, no hard block; second claimant recorded with timestamp <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-5-question-q-claim-policy" data-section="slice-5-question-q-claim-policy" data-action="answer" value="hard-exclusive-lock"> Hard exclusive — block second mutating session unless --force-claim is passed</label>
+            
+            <label><input type="radio" name="slice-5-question-q-claim-policy" data-section="slice-5-question-q-claim-policy" data-action="answer" value="allow-silent"> Allow silently — attribution only, no collision UX</label>
+            
           
         </div>
         
@@ -1702,12 +1726,18 @@ on devcontainer-only paths or volumes.</p>
         
         <div class="question-block slice-question-block">
           <p>Should production releases flip the worktree default immediately or ship warning-only first?</p>
+          <p class="question-desc">Staged rollout matches q-default and the deployment-critique gating requirement that doctor/migration tooling must exist before host defaults are enforced.</p>
           
-          
-          <textarea
-            data-section="slice-8-question-q-rollout"
-            data-comment-for="slice-8-question-q-rollout"
-            placeholder="Answer question q-rollout..."></textarea>
+            
+            
+            
+            
+            <label class="recommended"><input type="radio" name="slice-8-question-q-rollout" data-section="slice-8-question-q-rollout" data-action="answer" value="staged-rollout"> Staged — warn-only first, then config-gated opt-in, then default-on after doctor gate passes <span class="rec-tag">recommended</span></label>
+            
+            <label><input type="radio" name="slice-8-question-q-rollout" data-section="slice-8-question-q-rollout" data-action="answer" value="immediate-flip"> Immediate flip — worktree default on in first release</label>
+            
+            <label><input type="radio" name="slice-8-question-q-rollout" data-section="slice-8-question-q-rollout" data-action="answer" value="opt-in-only"> Opt-in only — never flip default; users must set config explicitly</label>
+            
           
         </div>
         

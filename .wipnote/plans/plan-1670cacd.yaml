@@ -81,6 +81,15 @@ slices:
       questions:
         - id: q-devcontainer-detect
           text: Which signal should define devcontainer mode?
+          description: Reusing the existing detector keeps the contract consistent with dashboard bind-address resolution already in production.
+          recommended: reuse-existing-detector
+          options:
+            - key: reuse-existing-detector
+              label: Reuse existing detector — /.dockerenv, CODESPACES, REMOTE_CONTAINERS (already in defaultDevcontainerDetector)
+            - key: explicit-env-override
+              label: Explicit env var — WIPNOTE_LAUNCH_MODE=devcontainer overrides auto-detect
+            - key: filesystem-probe
+              label: Filesystem probe — check for .devcontainer/ directory in repo root
     - id: slice-2
       num: 2
       title: Gated isolated worktree launch plumbing and dirty-main guard
@@ -144,6 +153,15 @@ slices:
       questions:
         - id: q-default
           text: Should host production start in warn-only mode while devcontainer/local-dev starts config-gated worktree-by-default?
+          description: Matches the surviving critical path (slice-1→2) and the deployment-critique that forbids flipping host defaults before migration tooling exists.
+          recommended: yes-as-framed
+          options:
+            - key: yes-as-framed
+              label: Yes — host production warn-only, devcontainer/local-dev config-gated worktree-by-default
+            - key: worktree-everywhere
+              label: Worktree-by-default everywhere — all mutating launches isolated immediately
+            - key: warn-only-everywhere
+              label: Warn-only everywhere — detect dirty main but never change launch location
       critic_revisions:
         - source: deployment-critique
           severity: HIGH
@@ -250,6 +268,15 @@ slices:
       questions:
         - id: q-family-field
           text: Should we add `session_family_id` or standardize on existing `continued_from`?
+          description: continued_from is a single-parent FK (internal/models/session.go:40, internal/db/schema.go:159) insufficient for N-session family grouping; session_family_id does not exist anywhere in the codebase.
+          recommended: add-session-family-id
+          options:
+            - key: add-session-family-id
+              label: Add session_family_id — explicit root grouping for N parallel/resumed sessions
+            - key: reuse-continued-from
+              label: Reuse continued_from — minimal schema change, single-parent link only
+            - key: hybrid
+              label: Hybrid — derive family_id transitively from continued_from at query time
       critic_revisions:
         - source: observability-critique
           severity: HIGH
@@ -318,6 +345,15 @@ slices:
       questions:
         - id: q-claim-policy
           text: Should same-work-item parallel sessions be blocked by default, warned, or allowed as collaboration?
+          description: Consistent with top-level q-claim-collisions answer and slice-5 scope; a hard block would prevent intentional parallel collaboration which is a core use case.
+          recommended: warn-and-allow-collaboration
+          options:
+            - key: warn-and-allow-collaboration
+              label: Warn and allow — visible collision with attribution, no hard block; second claimant recorded with timestamp
+            - key: hard-exclusive-lock
+              label: Hard exclusive — block second mutating session unless --force-claim is passed
+            - key: allow-silent
+              label: Allow silently — attribution only, no collision UX
       critic_revisions:
         - source: observability-critique
           severity: MED
@@ -447,6 +483,15 @@ slices:
       questions:
         - id: q-rollout
           text: Should production releases flip the worktree default immediately or ship warning-only first?
+          description: Staged rollout matches q-default and the deployment-critique gating requirement that doctor/migration tooling must exist before host defaults are enforced.
+          recommended: staged-rollout
+          options:
+            - key: staged-rollout
+              label: Staged — warn-only first, then config-gated opt-in, then default-on after doctor gate passes
+            - key: immediate-flip
+              label: Immediate flip — worktree default on in first release
+            - key: opt-in-only
+              label: Opt-in only — never flip default; users must set config explicitly
       critic_revisions:
         - source: deployment-critique
           severity: MED
