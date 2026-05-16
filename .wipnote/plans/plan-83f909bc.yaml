@@ -4,10 +4,10 @@ meta:
     title: 'Enforcement architecture: machine-enforce wipnote dev practices'
     description: 'Move wipnote dev practices from advisory prose to machine-enforced, self-healing invariants in the Go binary + hook matrix so adherence is harness-identical across Claude Code, Codex, and Gemini. Seven slices: transactional complete, pre-commit check-ports drift gate, provenance-required completion, gate-record-required completion, session-exit reconciliation, dedup-on-create, cross-harness parity + adherence scorecard. Dual-critic reviewed 2026-05-15.'
     created_at: "2026-05-15"
-    status: draft
+    status: finalized
     priority: medium
     schema_version: v3
-    version: 3
+    version: 12
 design:
     problem: |
         wipnote's development practices (commit-what-you-close, regenerate ports
@@ -42,6 +42,7 @@ design:
     comment: ""
 slices:
     - id: slice-1
+      feature_id: feat-2bfd67e9
       num: 1
       title: Transactional wipnote * complete (compensating re-open on commit failure)
       what: |
@@ -95,6 +96,7 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      execution_status: promoted
       questions:
         - id: q-rollback
           text: Roll back status in-process or via a deferred git-state check?
@@ -129,6 +131,7 @@ slices:
         (rejected - advisory text is exactly the failure mode; CLAUDE.md
         philosophy says fixes land in the binary/hooks, never descriptive docs).
     - id: slice-2
+      feature_id: feat-6cd28db4
       num: 2
       title: Pre-commit wipnote plugin check-ports drift gate
       what: |
@@ -174,6 +177,8 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      approval_status: approved
+      execution_status: promoted
       questions:
         - id: q-scope
           text: Full regenerate-and-diff or checksum manifest?
@@ -241,6 +246,7 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      approval_status: approved
       questions:
         - id: q-codebearing
           text: How to classify code-bearing?
@@ -315,6 +321,7 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      approval_status: approved
       questions:
         - id: q-staleness
           text: What invalidates a gate record?
@@ -400,6 +407,7 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      approval_status: approved
       questions:
         - id: q-autocommit
           text: Auto-commit or block on done-but-uncommitted?
@@ -480,6 +488,7 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      approval_status: approved
       questions:
         - id: q-sim
           text: Similarity metric?
@@ -569,6 +578,7 @@ slices:
       complexity: complex
       approved: false
       comment: ""
+      approval_status: approved
       questions:
         - id: q-score
           text: Where does the scorecard live?

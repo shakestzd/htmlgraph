@@ -408,42 +408,42 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     
     <li>
       <a href="#slice-2" class="slice-nav-item" data-slice-nav="2">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="2"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="2"></span>
         <span>#2 Pre-commit wipnote plugin check-ports drift gate</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-3" class="slice-nav-item" data-slice-nav="3">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="3"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="3"></span>
         <span>#3 Provenance-required completion (zero-commit block + advisory override)</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-4" class="slice-nav-item" data-slice-nav="4">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="4"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="4"></span>
         <span>#4 Gate-record-required completion (session-local indexable gate record)</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-5" class="slice-nav-item" data-slice-nav="5">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="5"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="5"></span>
         <span>#5 Session-exit reconciliation (reconcile --strict + harness-discriminated Stop/SessionEnd)</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-6" class="slice-nav-item" data-slice-nav="6">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="6"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="6"></span>
         <span>#6 Dedup check at create (similarity-based relates_to + needs-triage-dup)</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-7" class="slice-nav-item" data-slice-nav="7">
-        <span class="slice-nav-dot" data-approval="pending" data-dot-for="7"></span>
+        <span class="slice-nav-dot" data-approval="approved" data-dot-for="7"></span>
         <span>#7 Cross-harness parity audit + per-session adherence scorecard</span>
       </a>
     </li>
@@ -457,15 +457,15 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 </nav>
 <div class="plan-layout">
 <div class="plan-content">
-<article id="plan-83f909bc" data-type="plan" data-plan-id="plan-83f909bc" data-feature-id="trk-0677c709" data-status="draft" data-priority="medium">
+<article id="plan-83f909bc" data-type="plan" data-plan-id="plan-83f909bc" data-feature-id="trk-0677c709" data-status="finalized" data-priority="medium">
 
 <!-- Plan Header -->
 <header class="plan-header">
   <h1>Plan: Enforcement architecture: machine-enforce wipnote dev practices</h1>
   <p style="color:var(--text-dim)">Move wipnote dev practices from advisory prose to machine-enforced, self-healing invariants in the Go binary + hook matrix so adherence is harness-identical across Claude Code, Codex, and Gemini. Seven slices: transactional complete, pre-commit check-ports drift gate, provenance-required completion, gate-record-required completion, session-exit reconciliation, dedup-on-create, cross-harness parity + adherence scorecard. Dual-critic reviewed 2026-05-15.</p>
   <div class="meta">
-    <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v3 · 7 slices · Created 2026-05-15</span>
+    <span class="badge badge-approved">Done</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v12 · 7 slices · Created 2026-05-15</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -565,7 +565,7 @@ the three harnesses.
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
-          
+          <span class="badge badge-revision badge-sm" title="Execution: promoted">Promoted</span>
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
@@ -768,7 +768,7 @@ behavior is byte-identical. Run go test ./cmd/wipnote/...</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 2: Pre-commit wipnote plugin check-ports drift gate">
     <span class="slice-num">#2</span>
     <span class="slice-title-col">
@@ -779,15 +779,15 @@ behavior is byte-identical. Run go test ./cmd/wipnote/...</p>
           <span class="badge badge-revision badge-sm">M</span>
           <span class="badge badge-pending badge-sm">Low</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
-          
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
+          <span class="badge badge-revision badge-sm" title="Execution: promoted">Promoted</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-2">Approved</span>
           <span class="badge badge-sm badge-issues" title="1 critic issue(s)">1 issue</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-2-approval" value="approved" data-section="slice-2" data-action="approve" aria-label="Approve slice 2">
+              <input type="radio" name="slice-2-approval" value="approved" data-section="slice-2" data-action="approve" checked aria-label="Approve slice 2">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -949,7 +949,7 @@ go test ./cmd/wipnote/... ./internal/pluginbuild/...</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 3: Provenance-required completion (zero-commit block &#43; advisory override)">
     <span class="slice-num">#3</span>
     <span class="slice-title-col">
@@ -961,14 +961,14 @@ go test ./cmd/wipnote/... ./internal/pluginbuild/...</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-3">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" aria-label="Approve slice 3">
+              <input type="radio" name="slice-3-approval" value="approved" data-section="slice-3" data-action="approve" checked aria-label="Approve slice 3">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1148,7 +1148,7 @@ go test ./cmd/wipnote/... ./internal/db/...</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 4: Gate-record-required completion (session-local indexable gate record)">
     <span class="slice-num">#4</span>
     <span class="slice-title-col">
@@ -1160,14 +1160,14 @@ go test ./cmd/wipnote/... ./internal/db/...</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-4">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" aria-label="Approve slice 4">
+              <input type="radio" name="slice-4-approval" value="approved" data-section="slice-4" data-action="approve" checked aria-label="Approve slice 4">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1338,7 +1338,7 @@ but does not mask other failures. Run go test ./cmd/wipnote/...</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 5: Session-exit reconciliation (reconcile --strict &#43; harness-discriminated Stop/SessionEnd)">
     <span class="slice-num">#5</span>
     <span class="slice-title-col">
@@ -1350,14 +1350,14 @@ but does not mask other failures. Run go test ./cmd/wipnote/...</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-5">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-5">Approved</span>
           <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-5-approval" value="approved" data-section="slice-5" data-action="approve" aria-label="Approve slice 5">
+              <input type="radio" name="slice-5-approval" value="approved" data-section="slice-5" data-action="approve" checked aria-label="Approve slice 5">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1558,7 +1558,7 @@ pass). Run go test ./cmd/wipnote/... ./internal/hooks/...</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-6" data-slice="6" data-slice-name="slice-6" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-6" data-slice="6" data-slice-name="slice-6" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 6: Dedup check at create (similarity-based relates_to &#43; needs-triage-dup)">
     <span class="slice-num">#6</span>
     <span class="slice-title-col">
@@ -1570,14 +1570,14 @@ pass). Run go test ./cmd/wipnote/... ./internal/hooks/...</p>
           <span class="badge badge-pending badge-sm">Low</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-6">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-6">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-6-approval" value="approved" data-section="slice-6" data-action="approve" aria-label="Approve slice 6">
+              <input type="radio" name="slice-6-approval" value="approved" data-section="slice-6" data-action="approve" checked aria-label="Approve slice 6">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
@@ -1746,7 +1746,7 @@ go test ./cmd/wipnote/... ./internal/db/...</p>
     </details>
   </div>
 </details>
-<details class="slice-card" id="slice-7" data-slice="7" data-slice-name="slice-7" data-status="pending" data-approval="pending">
+<details class="slice-card" id="slice-7" data-slice="7" data-slice-name="slice-7" data-status="pending" data-approval="approved">
   <summary class="slice-summary" aria-label="Slice 7: Cross-harness parity audit &#43; per-session adherence scorecard">
     <span class="slice-num">#7</span>
     <span class="slice-title-col">
@@ -1758,14 +1758,14 @@ go test ./cmd/wipnote/... ./internal/db/...</p>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
-          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-7">Pending</span>
+          <span class="badge badge-approved badge-sm slice-approval-badge" data-badge-for="slice-7">Approved</span>
           <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
             <label class="seg-btn seg-approve" title="Approve">
-              <input type="radio" name="slice-7-approval" value="approved" data-section="slice-7" data-action="approve" aria-label="Approve slice 7">
+              <input type="radio" name="slice-7-approval" value="approved" data-section="slice-7" data-action="approve" checked aria-label="Approve slice 7">
               &#10003;
             </label>
             <label class="seg-btn seg-changes" title="Request changes">
