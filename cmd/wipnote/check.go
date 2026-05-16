@@ -323,11 +323,11 @@ func runGate(name, dir string, args ...string) gateResult {
 func runGoGates(root string, skipTests bool) []gateResult {
 	goDir := filepath.Join(root, "packages", "go")
 	gates := []gateResult{
-		runGate("go build", goDir, "go", "build", "./..."),
+		runGate("go build", goDir, "go", "build", "-buildvcs=false", "./..."),
 		runGate("go vet", goDir, "go", "vet", "./..."),
 	}
 	if !skipTests {
-		gates = append(gates, runGate("go test", goDir, "go", "test", "./..."))
+		gates = append(gates, runGate("go test", goDir, "go", "test", "-buildvcs=false", "./..."))
 	}
 	return gates
 }

@@ -395,3 +395,23 @@ func TestResolveProjectDir_FallsBackToCwdWhenNoWipnoteDirInClaudeProjectDir(t *t
 		t.Errorf("ResolveProjectDir = %q, want %q (should fall back to EventCWD)", got, realProjectDir)
 	}
 }
+
+// TestResolveProjectDir_IgnoresAmbientCwdWhenEventCWDPresent verifies that a
+// present EventCWD is returned even when the process CWD points at this repo.
+func TestResolveProjectDir_IgnoresAmbientCwdWhenEventCWDPresent(t *testing.T) {
+	eventCWD := t.TempDir()
+	t.Setenv("WIPNOTE_PROJECT_DIR", "")
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Setenv("WIPNOTE_SESSION_ID", "")
+
+	got, err := paths.ResolveProjectDir(paths.ProjectDirOptions{
+		EventCWD:   eventCWD,
+		WalkLevels: 10,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != eventCWD {
+		t.Fatalf("ResolveProjectDir = %q, want %q", got, eventCWD)
+	}
+}

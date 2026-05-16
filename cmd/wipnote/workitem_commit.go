@@ -315,6 +315,9 @@ func dirtyTrackedSourceFiles(repoRoot string) ([]string, error) {
 
 	var files []string
 	for _, entry := range parsePorcelainZ(out) {
+		if entry.Path == ".claude/settings.local.json" {
+			continue
+		}
 		if isWipnotePath(entry.Path) {
 			continue
 		}

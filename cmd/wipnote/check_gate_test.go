@@ -97,6 +97,9 @@ func TestRunSessionGate_WritesSessionLocalRecord(t *testing.T) {
 	if got, want := record.Source, "check"; got != want {
 		t.Fatalf("source = %q, want %q", got, want)
 	}
+	if !strings.Contains(record.GateCommand, "-buildvcs=false") {
+		t.Fatalf("gate command = %q, want buildvcs flag", record.GateCommand)
+	}
 }
 
 func TestLoadGateAllowlist_RequiresJustification(t *testing.T) {

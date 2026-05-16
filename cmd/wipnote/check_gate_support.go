@@ -63,9 +63,9 @@ func detectGatePlan(projectRoot string) (gatePlan, error) {
 	switch projectType {
 	case paths.ProjectTypeGo:
 		plan.Commands = []gateCommand{
-			{Name: "go build", Args: []string{"go", "build", "./..."}},
+			{Name: "go build", Args: []string{"go", "build", "-buildvcs=false", "./..."}},
 			{Name: "go vet", Args: []string{"go", "vet", "./..."}},
-			{Name: "go test", Args: []string{"go", "test", "./..."}},
+			{Name: "go test", Args: []string{"go", "test", "-buildvcs=false", "./..."}},
 		}
 	case paths.ProjectTypeNode:
 		plan.Commands = []gateCommand{

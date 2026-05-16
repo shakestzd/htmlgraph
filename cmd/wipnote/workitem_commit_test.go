@@ -340,6 +340,33 @@ func TestCheckUncommittedSourceCompleteGate_Unchanged(t *testing.T) {
 	}
 }
 
+// TestCheckUncommittedSourceCompleteGate_IgnoresSettingsLocal verifies that the
+// ephemeral .claude/settings.local.json file does not count as dirty source.
+func TestCheckUncommittedSourceCompleteGate_IgnoresSettingsLocal(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "wipnote-gate-local-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp /tmp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	mainRepo := setupWorktreeGitRepoIn(t, tmpDir)
+	gitMustCommitInitial(t, mainRepo)
+	wipnoteDir := filepath.Join(mainRepo, ".wipnote")
+	if err := os.MkdirAll(wipnoteDir, 0o755); err != nil {
+		t.Fatalf("mkdir .wipnote: %v", err)
+	}
+	claudeDir := filepath.Join(mainRepo, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatalf("mkdir .claude: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte(`{"theme":"dark"}`), 0o644); err != nil {
+		t.Fatalf("write settings.local.json: %v", err)
+	}
+
+	if err := checkUncommittedSourceCompleteGate(wipnoteDir, "feat-gate2", false); err != nil {
+		t.Fatalf("settings.local.json should be ignored, got: %v", err)
+	}
+}
+
 // TestCompleteCommitsWipnoteArtifact verifies that completing a feature from
 // inside a worktree commits the .wipnote/features/ HTML to the main repo even
 // though the worktree's per-worktree exclude suppresses .wipnote/ from the

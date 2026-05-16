@@ -120,6 +120,7 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 		if found := walkUpForWipnote(opts.EventCWD, opts.WalkLevels); found != "" {
 			return found, nil
 		}
+		return opts.EventCWD, nil
 	}
 
 	// 9. Walk-up from process CWD (unlimited).
@@ -131,9 +132,6 @@ func ResolveProjectDir(opts ProjectDirOptions) (string, error) {
 
 	// Fallback: return best-effort directory without error (mirrors prior hook
 	// behaviour where ResolveProjectDir never returned an empty string).
-	if opts.EventCWD != "" {
-		return opts.EventCWD, nil
-	}
 	if wd, err := os.Getwd(); err == nil {
 		return wd, nil
 	}
