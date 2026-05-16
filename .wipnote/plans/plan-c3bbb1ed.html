@@ -409,21 +409,21 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <li>
       <a href="#slice-2" class="slice-nav-item" data-slice-nav="2">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="2"></span>
-        <span>#2 Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory</span>
+        <span>#2 Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory (+ composite index)</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-3" class="slice-nav-item" data-slice-nav="3">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="3"></span>
-        <span>#3 Tier 2 — Populate claims.write_scope.Paths from PostToolUse edits</span>
+        <span>#3 Tier 2 — Populate claims.write_scope.Paths in PreToolUse alongside the heartbeat UPDATE</span>
       </a>
     </li>
     
     <li>
       <a href="#slice-4" class="slice-nav-item" data-slice-nav="4">
         <span class="slice-nav-dot" data-approval="pending" data-dot-for="4"></span>
-        <span>#4 Tier 3 — Honest liveness + claimless visibility + cross-harness release</span>
+        <span>#4 Tier 3 — Honest liveness + claimless visibility (session_files) + cross-harness release</span>
       </a>
     </li>
     
@@ -444,7 +444,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v1 · 4 slices · Created 2026-05-16</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 4 slices · Created 2026-05-16</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -465,9 +465,9 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   <h2>Dependency Graph</h2>
   <div id="graph-data" style="display:none">
     <div data-node="1" data-name="Tier 0 — Surface session→files: wipnote who + session show + API + dashboard" data-status="pending" data-deps="" data-files="6"></div>
-    <div data-node="2" data-name="Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory" data-status="pending" data-deps="1" data-files="4"></div>
-    <div data-node="3" data-name="Tier 2 — Populate claims.write_scope.Paths from PostToolUse edits" data-status="pending" data-deps="1" data-files="4"></div>
-    <div data-node="4" data-name="Tier 3 — Honest liveness + claimless visibility + cross-harness release" data-status="pending" data-deps="1" data-files="5"></div>
+    <div data-node="2" data-name="Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory (+ composite index)" data-status="pending" data-deps="1,4" data-files="5"></div>
+    <div data-node="3" data-name="Tier 2 — Populate claims.write_scope.Paths in PreToolUse alongside the heartbeat UPDATE" data-status="pending" data-deps="1" data-files="4"></div>
+    <div data-node="4" data-name="Tier 3 — Honest liveness + claimless visibility (session_files) + cross-harness release" data-status="pending" data-deps="1" data-files="7"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -525,7 +525,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-1">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -560,10 +560,12 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
           <div class="markdown-block reveal-content serif-prose"><p>Add read-only surfacing of data wipnote already captures. New <code>wipnote who</code> command lists every active session in the current project (joined
 sessions + claims + feature_files) with agent, model, active work item,
 claim lease remaining, and the files that session has touched
-(feature_files.session_id already exists — internal/db/schema.go:301).
+(feature_files.session_id already exists — schema.go:301-311, nullable).
 Extend <code>wipnote session show &lt;id&gt;</code> with a Files section. Add a <code>files[]</code>
-array per session to GET /api/sessions (cmd/wipnote/api.go:97). Add an
-&#34;Active sessions &amp; files&#34; dashboard panel. No new tables, no writes.</p>
+array per session to GET /api/sessions (api.go:97-173, today 13 scalar
+fields, no files). Add an &#34;Active sessions &amp; files&#34; dashboard panel.
+Reuse the ListFilesByFeature pattern (feature_files_repo.go:42) for a
+new ListFilesBySession. No new tables, no writes.</p>
 </div>
           <label for="slice-1-what-reveal" class="reveal-label">Show full description</label>
           
@@ -575,11 +577,10 @@ array per session to GET /api/sessions (cmd/wipnote/api.go:97). Add an
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Track trk-cd61bbae (Local cockpit — parallel sessions). Concurrent
-Claude/Codex/Gemini sessions edit overlapping files invisibly — this
-session a concurrent Codex session committed feat-b2d1dc2e WIP next to
-an unrelated bug fix, unseen, causing an attribution mix-up. Forward
-sibling of closed bug-e8b8900b. Highest ROI: pure surfacing of
+          <div class="markdown-block serif-prose"><p>Track trk-cd61bbae. Concurrent Claude/Codex/Gemini sessions edit
+overlapping files invisibly — this session a concurrent Codex session
+committed feat-b2d1dc2e WIP unseen, causing an attribution mix-up.
+Forward sibling of closed bug-e8b8900b. Highest ROI: pure surfacing of
 already-captured data, zero lifecycle/contention risk.</p>
 </div>
           
@@ -607,15 +608,14 @@ already-captured data, zero lifecycle/contention risk.</p>
         
         <input type="checkbox" id="slice-1-decisions-reveal" class="reveal-toggle">
         <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> explicit CLI invocation (<code>wipnote who</code>, <code>session show</code>) and
-GET /api/sessions request — no hook, off the hot path.
+GET /api/sessions — no hook, off the hot path.
 <strong>State:</strong> derived read only; joins existing sessions + claims +
 feature_files. No new table; nothing persisted.
 <strong>Payload:</strong> per-session roster row + files[] (path, operation,
 last_seen); /api/sessions gains files[].
 <strong>Track:</strong> trk-cd61bbae.
-<strong>Rejected:</strong> new session_files table (data already in feature_files —
-DRY); a live-watch daemon (out of scope for Tier 0; a pull query
-suffices and adds no process).</p>
+<strong>Rejected:</strong> new table (data already in feature_files — DRY); a
+live-watch daemon (out of scope for Tier 0; a pull query suffices).</p>
 </div>
         <label for="slice-1-decisions-reveal" class="reveal-label">Show full decisions</label>
         
@@ -658,6 +658,25 @@ suffices and adds no process).</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Verified: feature_files.session_id (schema.go:301-311, nullable); write_scope col (schema.go:202); WriteScope struct (claim.go:38-44, never populated, only read at claim.go:139-141); /api/sessions 13 scalars no files[] (api.go:97-173); ListFilesByFeature reuse realistic (feature_files_repo.go:42). Slice fully grounded.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">haiku</span>
+          <span class="critic-revision-summary">Well-scoped, read-only, testable done_when, zero write-path/contention risk. Project-only scope decision correct. No rework.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
     <div class="slice-field slice-questions">
@@ -671,7 +690,7 @@ suffices and adds no process).</p>
           <textarea
             data-section="slice-1-question-q-scope"
             data-comment-for="slice-1-question-q-scope"
-            placeholder="Answer question q-scope...">Current project only — the SQLite DB is per project-path-hash; cross-project rollup is out of scope and would need a separate aggregation path.</textarea>
+            placeholder="Answer question q-scope...">Current project only — the SQLite DB is per project-path-hash; cross-project rollup is out of scope.</textarea>
           
         </div>
         
@@ -690,19 +709,19 @@ suffices and adds no process).</p>
   </div>
 </details>
 <details class="slice-card" id="slice-2" data-slice="2" data-slice-name="slice-2" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 2: Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory">
+  <summary class="slice-summary" aria-label="Slice 2: Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory (&#43; composite index)">
     <span class="slice-num">#2</span>
     <span class="slice-title-col">
-      <span class="slice-name">Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory</span>
+      <span class="slice-name">Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory (&#43; composite index)</span>
       <span class="slice-preview">Compute intersection of recently-touched file sets (featurefiles,</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
-          <span class="badge badge-revision badge-sm">M</span>
+          <span class="badge badge-blocked badge-sm">L</span>
           <span class="badge badge-revision badge-sm">Med</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-2">Pending</span>
-          
+          <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
           <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
@@ -735,14 +754,19 @@ suffices and adds no process).</p>
           
           <input type="checkbox" id="slice-2-what-reveal" class="reveal-toggle">
           <div class="markdown-block reveal-content serif-prose"><p>Compute intersection of recently-touched file sets (feature_files,
-last_seen within a window) across active sessions. <code>wipnote who</code> marks
-files touched by &gt;=2 active sessions with ⚠ and the other session id.
-Add a PreToolUse check: before Edit/Write, a single indexed SELECT for
-the same path touched by another live session within the window emits a
-non-blocking advisory into hook output. Config: <code>warn_on_file_overlap</code>
-(default true, advisory) and <code>block_on_file_overlap</code> (default false →
-exit code 2), mirroring the existing
-<code>block_task_completion_on_quality_failure</code> pattern.</p>
+last_seen within a window) across LIVE sessions. <code>wipnote who</code> marks
+files touched by &gt;=2 live sessions with ⚠ and the other session id.
+PreToolUse check: before Edit/Write, a single indexed SELECT for the
+same path touched by another live session within the window emits a
+non-blocking advisory. ADD a composite index
+idx_feature_files_path_seen ON feature_files(file_path, last_seen) via
+schema.go + a migration (FEASIBILITY CRITIC: only idx_feature_files_path
+on (file_path) exists today — schema.go:433-434 — the overlap query
+would otherwise range-scan). Config flags <code>warn_on_file_overlap</code>
+(default true) and <code>block_on_file_overlap</code> (default false → exit 2),
+read via the same local os.ReadFile pattern as
+block_task_completion_on_quality_failure (task_completion_gate.go:77-96;
+no shared internal/config package exists).</p>
 </div>
           <label for="slice-2-what-reveal" class="reveal-label">Show full description</label>
           
@@ -754,9 +778,10 @@ exit code 2), mirroring the existing
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Track trk-cd61bbae. Detect collisions in real time, before the edit,
-not just in a post-hoc roster — the failure mode that caused the
-feat-b2d1dc2e mix-up.</p>
+          <div class="markdown-block serif-prose"><p>Track trk-cd61bbae. Detect collisions in real time, before the edit —
+the failure mode that caused the feat-b2d1dc2e mix-up. Depends on
+slice-4&#39;s heartbeat-recency liveness so the ⚠ does not false-fire on
+stale &#39;active&#39; ghost sessions (bug-6c3e8252).</p>
 </div>
           
         </div>
@@ -765,13 +790,13 @@ feat-b2d1dc2e mix-up.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>cmd/wipnote/who.go, internal/hooks/pretooluse.go, internal/db/feature_files_repo.go, internal/config</code></div>
+        <div class="slice-field-value"><code>cmd/wipnote/who.go, internal/hooks/pretooluse.go, internal/db/feature_files_repo.go, internal/db/schema.go, internal/db/migrations.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>`wipnote who` marks files touched by &gt;=2 active sessions with ⚠ and the other session id</li><li>PreToolUse prints an advisory when editing a file another live session touched within the window (non-blocking by default)</li><li>`block_on_file_overlap: true` makes PreToolUse return exit code 2 with a recovery hint</li><li>The overlap check is a single indexed SELECT with zero writes — feat-156e0a1a zero-SQLITE_BUSY gate stays green</li></ul>
+        <ul class="slice-done-list"><li>`wipnote who` marks files touched by &gt;=2 live sessions with ⚠ and the other session id</li><li>PreToolUse prints an advisory when editing a file another live session touched within the window (non-blocking by default)</li><li>`block_on_file_overlap: true` makes PreToolUse return exit code 2 with a recovery hint</li><li>A composite index idx_feature_files_path_seen on feature_files(file_path, last_seen) backs the overlap query (added in schema &#43; migration)</li><li>The overlap check is a single indexed SELECT with zero writes — feat-156e0a1a zero-SQLITE_BUSY gate stays green</li></ul>
       </div>
       
     
@@ -782,16 +807,20 @@ feat-b2d1dc2e mix-up.</p>
       <div class="slice-field-value">
         
         <input type="checkbox" id="slice-2-decisions-reveal" class="reveal-toggle">
-        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> PreToolUse on Edit/Write tool calls only.
-<strong>State:</strong> derived read from feature_files; no new table, no write on
-the hot path.
+        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> PreToolUse on Edit/Write only.
+<strong>State:</strong> derived read from feature_files; no new table; one new
+composite index idx_feature_files_path_seen(file_path, last_seen).
 <strong>Payload:</strong> advisory text naming the conflicting session+file;
-config-gated exit code 2 when blocking enabled.
+config-gated exit 2 when blocking enabled.
+<strong>Config:</strong> mirrors block_task_completion_on_quality_failure local
+os.ReadFile pattern (task_completion_gate.go:77-96); no shared
+internal/config exists.
 <strong>Track:</strong> trk-cd61bbae.
+<strong>Dep:</strong> requires slice-4 heartbeat-recency liveness, else ⚠
+false-fires on ghost &#39;active&#39; sessions (bug-6c3e8252).
 <strong>Rejected:</strong> blocking-by-default (too disruptive for parallel
 dogfooding); a dedicated file-lock table (write amplification on the
-PreToolUse hot path violates the feat-156e0a1a zero-SQLITE_BUSY
-contract).</p>
+PreToolUse hot path violates feat-156e0a1a zero-SQLITE_BUSY).</p>
 </div>
         <label for="slice-2-decisions-reveal" class="reveal-label">Show full decisions</label>
         
@@ -809,12 +838,17 @@ contract).</p>
           
           <div class="test-group" data-kind="unit">
             <span class="test-chip">UNIT &middot; 1</span>
-            <ul><li>TestOverlapQuery — intersecting feature_files by recent last_seen</li></ul>
+            <ul><li>TestOverlapQuery — intersecting feature_files by recent last_seen, EXPLAIN uses the new composite index</li></ul>
           </div>
           
           <div class="test-group" data-kind="hook">
             <span class="test-chip">HOOK &middot; 1</span>
             <ul><li>TestPreToolUseOverlapAdvisory — advisory &#43; block-mode exit 2</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="migration">
+            <span class="test-chip">MIGRATION &middot; 1</span>
+            <ul><li>TestMigration_FeatureFilesPathSeenIndex</li></ul>
           </div>
           
           <div class="test-group" data-kind="contention regression">
@@ -829,6 +863,31 @@ contract).</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Missing composite index: only idx_feature_files_path(file_path) exists (schema.go:433-434); overlap SELECT on (file_path,last_seen,session_id) would range-scan. RESOLVED: index &#43; migration added to scope; effort M→L.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Config: no internal/config package; must replicate local os.ReadFile pattern from task_completion_gate.go:77-96 (block_task_completion_on_quality_failure). Files list corrected.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">haiku</span>
+          <span class="critic-revision-summary">Overlap ⚠ depends on slice-4 honest-liveness or it false-fires on ghost sessions. RESOLVED: deps now [1,4]; execution order 1→4→2.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
     <div class="slice-field slice-questions">
@@ -842,7 +901,7 @@ contract).</p>
           <textarea
             data-section="slice-2-question-q-window"
             data-comment-for="slice-2-question-q-window"
-            placeholder="Answer question q-window...">Default 15 minutes, configurable — aligned to the claim heartbeat/lease cadence so it tracks genuinely-live work and excludes stale ghosts.</textarea>
+            placeholder="Answer question q-window...">Default 15 minutes, configurable — aligned to the claim heartbeat/lease cadence so it tracks live work and excludes ghosts.</textarea>
           
         </div>
         
@@ -850,7 +909,7 @@ contract).</p>
     </div>
     
 
-    <div class="slice-deps">Dependencies: slices 1</div>
+    <div class="slice-deps">Dependencies: slices 1,4</div>
 
     <details class="comment-collapse">
       <summary class="comment-collapse-trigger">+ Leave a comment</summary>
@@ -861,11 +920,11 @@ contract).</p>
   </div>
 </details>
 <details class="slice-card" id="slice-3" data-slice="3" data-slice-name="slice-3" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 3: Tier 2 — Populate claims.write_scope.Paths from PostToolUse edits">
+  <summary class="slice-summary" aria-label="Slice 3: Tier 2 — Populate claims.write_scope.Paths in PreToolUse alongside the heartbeat UPDATE">
     <span class="slice-num">#3</span>
     <span class="slice-title-col">
-      <span class="slice-name">Tier 2 — Populate claims.write_scope.Paths from PostToolUse edits</span>
-      <span class="slice-preview">On PostToolUse file edit, append the edited path to the owning claim&#39;s</span>
+      <span class="slice-name">Tier 2 — Populate claims.write_scope.Paths in PreToolUse alongside the heartbeat UPDATE</span>
+      <span class="slice-preview">CORRECTED from PostToolUse.</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-revision badge-sm">M</span>
@@ -873,8 +932,8 @@ contract).</p>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-3">Pending</span>
-          
-          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+          <span class="badge badge-sm badge-issues" title="2 critic issue(s)">2 issues</span>
+          <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
@@ -905,13 +964,16 @@ contract).</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-3-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>On PostToolUse file edit, append the edited path to the owning claim&#39;s
-write_scope.Paths. The models.WriteScope{Paths,Directories,Branch,
-Worktree} struct and claims.write_scope JSON column already exist
-(internal/models/claim.go:38-44) but are never populated — this is the
-reserved socket. Dedupe + cap the list; piggyback the existing
-PostToolUse claim-heartbeat UPDATE (no extra write). Surface scope in
-<code>wipnote claim list</code> / <code>claim show</code>.</p>
+          <div class="markdown-block reveal-content serif-prose"><p>CORRECTED from PostToolUse. The claim heartbeat (HeartbeatClaimByWorkItem)
+fires in PreToolUse (pretooluse.go:242), where the target file_path is
+already present in the Edit/Write tool input. Widen the SET clause of
+that EXISTING heartbeat UPDATE to also append the path to
+claims.write_scope.Paths (deduped, FIFO-capped at 200) — one UPDATE, no
+net-new write. The WriteScope struct + write_scope JSON column already
+exist (claim.go:38-44, schema.go:202) and are never populated today.
+Clear write_scope when the claim is released or expires
+(ReleaseAllClaimsForSession / ReapExpiredClaims in claim_repo.go).
+Surface scope in <code>wipnote claim list</code> / <code>claim show</code>.</p>
 </div>
           <label for="slice-3-what-reveal" class="reveal-label">Show full description</label>
           
@@ -923,9 +985,9 @@ PostToolUse claim-heartbeat UPDATE (no extra write). Surface scope in
         <div class="slice-field-label">Why</div>
         <div class="slice-field-value">
           
-          <div class="markdown-block serif-prose"><p>Track trk-97f85b3b (Passive Session Ingestion). Turns the indirect
-session→feature→files chain into a first-class claimed-files concept,
-enabling lease-based file ownership and a stronger overlap signal.</p>
+          <div class="markdown-block serif-prose"><p>Track trk-97f85b3b. First-class claimed-files concept enabling
+lease-based file ownership and a stronger overlap signal — without
+adding any write to the hot path.</p>
 </div>
           
         </div>
@@ -934,13 +996,13 @@ enabling lease-based file ownership and a stronger overlap signal.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>internal/hooks/posttooluse.go, internal/db/claim_repo.go, internal/models/claim.go, cmd/wipnote/claim.go</code></div>
+        <div class="slice-field-value"><code>internal/hooks/pretooluse.go, internal/db/claim_repo.go, internal/models/claim.go, cmd/wipnote/claim.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>PostToolUse file edit appends the path to the owning claim&#39;s write_scope.Paths (deduped, capped)</li><li>`wipnote claim list`/`show` displays the claimed file scope per claim</li><li>write_scope is cleared on claim release/expiry</li><li>No write amplification beyond the existing PostToolUse heartbeat UPDATE (single UPDATE)</li></ul>
+        <ul class="slice-done-list"><li>write_scope.Paths is appended within the EXISTING PreToolUse heartbeat UPDATE (single UPDATE, zero net-new write)</li><li>Paths are deduped and FIFO-capped at 200 per claim</li><li>write_scope is cleared when the claim is released or expires (ReleaseAllClaimsForSession / ReapExpiredClaims)</li><li>On `wipnote reindex` write_scope resets with the rebuilt claims (documented ephemeral session state); no stale paths surface</li><li>`wipnote claim list`/`show` display the claimed file scope per claim</li></ul>
       </div>
       
     
@@ -951,14 +1013,18 @@ enabling lease-based file ownership and a stronger overlap signal.</p>
       <div class="slice-field-value">
         
         <input type="checkbox" id="slice-3-decisions-reveal" class="reveal-toggle">
-        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> PostToolUse on Edit/Write when an owning claim exists.
-<strong>State:</strong> claims.write_scope JSON (existing column) — derived,
-cleared on release/expiry.
-<strong>Payload:</strong> deduped, FIFO-capped Paths[] on the claim.
+        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> PreToolUse on Edit/Write (the path is in the tool input
+there) — CORRECTED from PostToolUse.
+<strong>State:</strong> claims.write_scope JSON (existing column); widened SET in
+the existing PreToolUse heartbeat UPDATE; ephemeral — rebuilt on
+reindex, cleared on release/expiry.
+<strong>Payload:</strong> deduped, FIFO-capped (200) Paths[].
 <strong>Track:</strong> trk-97f85b3b.
-<strong>Rejected:</strong> a separate file_claims table (write amplification
-violates the feat-156e0a1a contention contract); populating in
-PreToolUse (the write is not yet confirmed at PreToolUse time).</p>
+<strong>Rejected:</strong> PostToolUse population — FEASIBILITY CRITIC proved
+HeartbeatClaimByWorkItem fires only in PreToolUse (pretooluse.go:242);
+PostToolUse does zero claim UPDATEs, so populating there is a net-new
+write violating zero-amplification. Separate file_claims table (write
+amplification, same contention contract).</p>
 </div>
         <label for="slice-3-decisions-reveal" class="reveal-label">Show full decisions</label>
         
@@ -975,13 +1041,13 @@ PreToolUse (the write is not yet confirmed at PreToolUse time).</p>
         <div class="test-strategy">
           
           <div class="test-group" data-kind="unit">
-            <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestWriteScopePopulation — append/dedupe/cap</li><li>TestClaimListShowsScope</li></ul>
+            <span class="test-chip">UNIT &middot; 3</span>
+            <ul><li>TestWriteScopeAppendedInHeartbeatUpdate — asserts a SINGLE claims UPDATE per PreToolUse</li><li>TestWriteScopeDedupeCap — append/dedupe/FIFO-cap at 200</li><li>TestWriteScopeClearedOnRelease — release &#43; expiry both clear it</li></ul>
           </div>
           
-          <div class="test-group" data-kind="contention">
-            <span class="test-chip">CONTENTION &middot; 1</span>
-            <ul><li>assert a single UPDATE per PostToolUse (no extra write)</li></ul>
+          <div class="test-group" data-kind="behavior">
+            <span class="test-chip">BEHAVIOR &middot; 1</span>
+            <ul><li>reindex resets write_scope (no stale paths)</li></ul>
           </div>
           
         </div>
@@ -991,6 +1057,25 @@ PreToolUse (the write is not yet confirmed at PreToolUse time).</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Original premise false: heartbeat is PreToolUse (pretooluse.go:242) not PostToolUse; PostToolUse does zero claim UPDATEs, so &#39;piggyback&#39; would be a net-new write breaking zero-amplification. RESOLVED: redesigned to widen the existing PreToolUse heartbeat UPDATE.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">haiku</span>
+          <span class="critic-revision-summary">write_scope lifecycle (reindex, worktree teardown, release/expiry) was undefined. RESOLVED: cleared on ReleaseAllClaimsForSession/ReapExpiredClaims; resets on reindex (documented ephemeral); tests added.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
     <div class="slice-field slice-questions">
@@ -998,13 +1083,24 @@ PreToolUse (the write is not yet confirmed at PreToolUse time).</p>
       <div class="slice-field-value">
         
         <div class="question-block slice-question-block">
-          <p>What is the per-claim path cap?</p>
+          <p>Per-claim path cap?</p>
           
           
           <textarea
             data-section="slice-3-question-q-cap"
             data-comment-for="slice-3-question-q-cap"
-            placeholder="Answer question q-cap...">200 paths/claim, FIFO-trim — covers realistic feature scope without unbounded JSON growth in the claims row.</textarea>
+            placeholder="Answer question q-cap...">200 paths/claim, FIFO-trim — realistic feature scope without unbounded JSON growth.</textarea>
+          
+        </div>
+        
+        <div class="question-block slice-question-block">
+          <p>PreToolUse or PostToolUse for write_scope population?</p>
+          
+          
+          <textarea
+            data-section="slice-3-question-q-timing"
+            data-comment-for="slice-3-question-q-timing"
+            placeholder="Answer question q-timing...">PreToolUse — the heartbeat UPDATE already runs there (pretooluse.go:242) and the file_path is in the tool input; PostToolUse has no claim write to extend.</textarea>
           
         </div>
         
@@ -1023,20 +1119,20 @@ PreToolUse (the write is not yet confirmed at PreToolUse time).</p>
   </div>
 </details>
 <details class="slice-card" id="slice-4" data-slice="4" data-slice-name="slice-4" data-status="pending" data-approval="pending">
-  <summary class="slice-summary" aria-label="Slice 4: Tier 3 — Honest liveness &#43; claimless visibility &#43; cross-harness release">
+  <summary class="slice-summary" aria-label="Slice 4: Tier 3 — Honest liveness &#43; claimless visibility (session_files) &#43; cross-harness release">
     <span class="slice-num">#4</span>
     <span class="slice-title-col">
-      <span class="slice-name">Tier 3 — Honest liveness &#43; claimless visibility &#43; cross-harness release</span>
-      <span class="slice-preview">(a) Derive &#39;live&#39; in who/roster from claim-heartbeat recency, not</span>
+      <span class="slice-name">Tier 3 — Honest liveness &#43; claimless visibility (session_files) &#43; cross-harness release</span>
+      <span class="slice-preview">(a) PRIMARY cross-harness fix: derive &#39;live&#39; in who/roster from</span>
       <span class="slice-meta-row">
         <span class="slice-summary-badges">
           <span class="badge badge-blocked badge-sm">L</span>
-          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-blocked badge-sm">High</span>
           <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
           
           <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-4">Pending</span>
-          
-          <span class="badge badge-sm badge-questions" title="1 open question(s)">1 Q</span>
+          <span class="badge badge-sm badge-issues" title="4 critic issue(s)">4 issues</span>
+          <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
         </span>
         <span class="slice-actions" onclick="event.stopPropagation()">
           <span class="approval-segmented" role="group" aria-label="Approval action">
@@ -1067,15 +1163,23 @@ PreToolUse (the write is not yet confirmed at PreToolUse time).</p>
         <div class="slice-field-value">
           
           <input type="checkbox" id="slice-4-what-reveal" class="reveal-toggle">
-          <div class="markdown-block reveal-content serif-prose"><p>(a) Derive &#39;live&#39; in who/roster from claim-heartbeat recency, not
-sessions.status, so stale &#39;active&#39; rows are excluded. (b) Session-scoped
-file ledger: attribute PostToolUse file touches even when
-ctx.FeatureID==&#34;&#34; (the gate at internal/hooks/posttooluse.go:120
-currently drops them), so claimless Codex/Gemini sessions are visible.
-(c) Add SessionEnd (and Stop) hook handlers to the codex + gemini
-targets in packages/plugin-core/manifest.json (today Claude-only,
-manifest lines 68,76-77) so claims/sessions release on exit;
-regenerate ports. Folds in open bug-6c3e8252 (9 stale active sessions).</p>
+          <div class="markdown-block reveal-content serif-prose"><p>(a) PRIMARY cross-harness fix: derive &#39;live&#39; in who/roster from
+claim-heartbeat recency, not sessions.status — works for ALL harnesses
+with no dependency on a session-end event. (b) Claimless visibility:
+the PostToolUse else-branch (posttooluse.go:134-138) currently only
+debugLogs and drops attribution when ctx.FeatureID==&#34;&#34;. Replace with a
+new lightweight <code>session_files</code> table (session_id, file_path,
+operation, last_seen, UNIQUE(session_id,file_path)) — chosen over
+relaxing feature_files because feature_files.feature_id is NOT NULL
+with UNIQUE(feature_id,file_path) (schema.go:301-311) and cannot hold
+empty-feature_id rows. (c) Cross-harness session-end: Gemini already
+releases via Stop→SessionEnd (manifest:78, geminiEventName SessionEnd);
+Codex has NO session-end event in the manifest at all (SessionEnd:68 is
+claude-only; no Codex Stop/SessionEnd). New manifest work is
+Codex-specific and contingent on whether Codex CLI emits any
+session-end / task-lifecycle event; if it does not, Codex correctly
+relies on heartbeat-recency liveness (part a) + lease reap. Folds
+bug-6c3e8252.</p>
 </div>
           <label for="slice-4-what-reveal" class="reveal-label">Show full description</label>
           
@@ -1088,8 +1192,8 @@ regenerate ports. Folds in open bug-6c3e8252 (9 stale active sessions).</p>
         <div class="slice-field-value">
           
           <div class="markdown-block serif-prose"><p>Track trk-97f85b3b. The roster is only as honest as the session
-lifecycle; cross-harness gaps make it lie — ghost Codex/Gemini
-sessions and invisible claimless sessions defeat Tiers 0-2.</p>
+lifecycle; cross-harness gaps make it lie (ghost Codex/Gemini sessions,
+invisible claimless sessions) and defeat Tiers 0-2.</p>
 </div>
           
         </div>
@@ -1098,13 +1202,13 @@ sessions and invisible claimless sessions defeat Tiers 0-2.</p>
       
       <div class="slice-field">
         <div class="slice-field-label">Files</div>
-        <div class="slice-field-value"><code>packages/plugin-core/manifest.json, internal/hooks/posttooluse.go, internal/hooks/sessionend.go, internal/db/session_repo.go, internal/db/claim_repo.go</code></div>
+        <div class="slice-field-value"><code>packages/plugin-core/manifest.json, internal/hooks/posttooluse.go, internal/hooks/sessionend.go, internal/db/session_repo.go, internal/db/claim_repo.go, internal/db/schema.go, internal/db/migrations.go</code></div>
       </div>
       
       
       <div class="slice-field">
         <div class="slice-field-label">Done when</div>
-        <ul class="slice-done-list"><li>`wipnote who` filters sessions by heartbeat recency; stale &#39;active&#39; rows are excluded</li><li>Codex/Gemini SessionEnd releases claims and marks the session completed</li><li>A claimless Codex/Gemini session&#39;s file touches are attributed and visible in `wipnote who`</li><li>`wipnote plugin build-ports` regenerates codex/gemini trees with the new SessionEnd/Stop events</li><li>bug-6c3e8252: no new stale status=active sessions accumulate after a Codex/Gemini run exits</li></ul>
+        <ul class="slice-done-list"><li>`wipnote who` derives &#39;live&#39; from claim-heartbeat recency, not sessions.status; stale &#39;active&#39; rows are excluded</li><li>Claimless session file touches are recorded in a new session_files table and visible in `wipnote who`</li><li>Gemini session-end release verified via the existing Stop→SessionEnd (manifest line 78)</li><li>Codex release mechanism resolved: either a Codex session-end handler is added to the manifest and ports regenerated, OR documented reliance on heartbeat-recency liveness because Codex emits no session-end event</li><li>bug-6c3e8252: no new stale status=active sessions accumulate after a Codex/Gemini run exits</li></ul>
       </div>
       
     
@@ -1115,17 +1219,20 @@ sessions and invisible claimless sessions defeat Tiers 0-2.</p>
       <div class="slice-field-value">
         
         <input type="checkbox" id="slice-4-decisions-reveal" class="reveal-toggle">
-        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> SessionEnd/Stop (now codex+gemini, not Claude-only) plus
-PostToolUse on the claimless path.
-<strong>State:</strong> sessions + claims (SQLite) plus a session-scoped file
-attribution (feature_files with null/unset feature, or a session_files
-ledger) — derived, rebuildable.
-<strong>Payload:</strong> liveness boolean derived from heartbeat age; claim
-release on cross-harness session end.
+        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> heartbeat-recency derivation (all harnesses); PostToolUse
+claimless else-branch (posttooluse.go:134-138); Codex session-end IF it
+exists.
+<strong>State:</strong> new session_files table (session_id, file_path, operation,
+last_seen, UNIQUE(session_id,file_path)) — chosen over nullable
+feature_id because feature_files.feature_id is NOT NULL + UNIQUE
+(schema.go:301-311).
+<strong>Payload:</strong> liveness boolean derived from heartbeat age.
 <strong>Track:</strong> trk-97f85b3b. Folds bug-6c3e8252.
-<strong>Rejected:</strong> keeping the ctx.FeatureID!=&#34;&#34; gate (claimless sessions
-stay invisible — defeats the goal); trusting sessions.status for
-liveness (unreliable for non-Claude — the root cause of bug-6c3e8252).</p>
+<strong>Rejected:</strong> relaxing feature_files (UNIQUE collision for empty
+feature_id — DESIGN+FEASIBILITY danger); trusting sessions.status
+(unreliable for non-Claude — bug-6c3e8252 root cause); assuming Codex
+has SessionEnd (manifest line 68 is claude-only; Codex has no
+session-end event — must verify Codex CLI lifecycle).</p>
 </div>
         <label for="slice-4-decisions-reveal" class="reveal-label">Show full decisions</label>
         
@@ -1143,22 +1250,27 @@ liveness (unreliable for non-Claude — the root cause of bug-6c3e8252).</p>
           
           <div class="test-group" data-kind="unit">
             <span class="test-chip">UNIT &middot; 2</span>
-            <ul><li>TestLivenessByHeartbeat</li><li>TestClaimlessSessionFileLedger</li></ul>
+            <ul><li>TestLivenessByHeartbeat — stale &#39;active&#39; excluded by heartbeat age</li><li>TestClaimlessSessionFilesLedger — FeatureID==&#34;&#34; writes session_files</li></ul>
           </div>
           
           <div class="test-group" data-kind="integration">
             <span class="test-chip">INTEGRATION &middot; 1</span>
-            <ul><li>TestCodexSessionEndRelease</li></ul>
+            <ul><li>TestGeminiSessionEndRelease (existing Stop→SessionEnd path)</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="migration">
+            <span class="test-chip">MIGRATION &middot; 1</span>
+            <ul><li>TestMigration_SessionFilesTable</li></ul>
           </div>
           
           <div class="test-group" data-kind="port regen">
             <span class="test-chip">PORT REGEN &middot; 1</span>
-            <ul><li>manifest build-ports emits SessionEnd for codex&#43;gemini</li></ul>
+            <ul><li>build-ports emits any new Codex session-end event</li></ul>
           </div>
           
           <div class="test-group" data-kind="repro">
             <span class="test-chip">REPRO &middot; 1</span>
-            <ul><li>bug-6c3e8252 stale-active reproduction harness → 0 after fix</li></ul>
+            <ul><li>bug-6c3e8252 stale-active harness → 0 after fix</li></ul>
           </div>
           
         </div>
@@ -1168,11 +1280,53 @@ liveness (unreliable for non-Claude — the root cause of bug-6c3e8252).</p>
     
 
     
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+          <span class="critic-revision-source">haiku</span>
+          <span class="critic-revision-summary">feature_files UNIQUE(feature_id,file_path)&#43;feature_id NOT NULL blocks claimless rows. RESOLVED: dedicated session_files table for FeatureID==&#39;&#39; touches.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">DANGER</span>
+          <span class="critic-revision-source">haiku</span>
+          <span class="critic-revision-summary">Codex has NO SessionEnd hook (manifest:68 claude-only; no Codex Stop). RESOLVED: heartbeat-recency liveness is the primary cross-harness fix; Codex session-end handling made contingent &#43; flagged for verification.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-pending critic-revision-badge">LOW</span>
+          <span class="critic-revision-source">sonnet</span>
+          <span class="critic-revision-summary">Manifest matrix nuance: Gemini already releases via Stop→SessionEnd (manifest:78); only Codex truly lacks any session-end event. done_when reworded accordingly.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">haiku</span>
+          <span class="critic-revision-summary">Claimless attribution table was undecided (session_files vs nullable feature_id). RESOLVED: session_files table; rationale recorded in decisions_notes.</span>
+        </div>
+        
+      </div>
+    </div>
+    
 
     
     <div class="slice-field slice-questions">
       <div class="slice-field-label">Open Questions</div>
       <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Where do claimless file touches live?</p>
+          
+          
+          <textarea
+            data-section="slice-4-question-q-claimless"
+            data-comment-for="slice-4-question-q-claimless"
+            placeholder="Answer question q-claimless...">A new session_files table keyed (session_id,file_path) — feature_files cannot hold empty feature_id (NOT NULL &#43; UNIQUE(feature_id,file_path), schema.go:301-311).</textarea>
+          
+        </div>
         
         <div class="question-block slice-question-block">
           <p>What heartbeat age marks a session as not-live?</p>
@@ -1181,7 +1335,7 @@ liveness (unreliable for non-Claude — the root cause of bug-6c3e8252).</p>
           <textarea
             data-section="slice-4-question-q-stale"
             data-comment-for="slice-4-question-q-stale"
-            placeholder="Answer question q-stale...">Greater than 2x the heartbeat interval since last heartbeat (derived from the lease/heartbeat cadence, ~2 min), tunable via config — short enough to drop ghosts, long enough to tolerate a slow tool call.</textarea>
+            placeholder="Answer question q-stale...">&gt; 2x the heartbeat interval since last heartbeat (~2 min, derived from the lease/heartbeat cadence), tunable via config — drops ghosts, tolerates a slow tool call.</textarea>
           
         </div>
         

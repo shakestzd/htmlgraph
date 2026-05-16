@@ -5,7 +5,7 @@ meta:
     created_at: ""
     status: draft
     schema_version: v3
-    version: 1
+    version: 2
 design:
     problem: Concurrent CLI sessions (Claude/Codex/Gemini) edit overlapping files invisibly — users cannot see which files other active sessions are touching, causing attribution mix-ups and coordination failures in shared projects.
     goals:
@@ -29,16 +29,17 @@ slices:
         who` command lists every active session in the current project (joined
         sessions + claims + feature_files) with agent, model, active work item,
         claim lease remaining, and the files that session has touched
-        (feature_files.session_id already exists — internal/db/schema.go:301).
+        (feature_files.session_id already exists — schema.go:301-311, nullable).
         Extend `wipnote session show <id>` with a Files section. Add a `files[]`
-        array per session to GET /api/sessions (cmd/wipnote/api.go:97). Add an
-        "Active sessions & files" dashboard panel. No new tables, no writes.
+        array per session to GET /api/sessions (api.go:97-173, today 13 scalar
+        fields, no files). Add an "Active sessions & files" dashboard panel.
+        Reuse the ListFilesByFeature pattern (feature_files_repo.go:42) for a
+        new ListFilesBySession. No new tables, no writes.
       why: |
-        Track trk-cd61bbae (Local cockpit — parallel sessions). Concurrent
-        Claude/Codex/Gemini sessions edit overlapping files invisibly — this
-        session a concurrent Codex session committed feat-b2d1dc2e WIP next to
-        an unrelated bug fix, unseen, causing an attribution mix-up. Forward
-        sibling of closed bug-e8b8900b. Highest ROI: pure surfacing of
+        Track trk-cd61bbae. Concurrent Claude/Codex/Gemini sessions edit
+        overlapping files invisibly — this session a concurrent Codex session
+        committed feat-b2d1dc2e WIP unseen, causing an attribution mix-up.
+        Forward sibling of closed bug-e8b8900b. Highest ROI: pure surfacing of
         already-captured data, zero lifecycle/contention risk.
       files:
         - cmd/wipnote/who.go
@@ -66,52 +67,68 @@ slices:
       questions:
         - id: q-scope
           text: Scope `wipnote who` to the current project only, or all projects?
-          answer: Current project only — the SQLite DB is per project-path-hash; cross-project rollup is out of scope and would need a separate aggregation path.
+          answer: Current project only — the SQLite DB is per project-path-hash; cross-project rollup is out of scope.
+      critic_revisions:
+        - source: sonnet
+          severity: LOW
+          summary: 'Verified: feature_files.session_id (schema.go:301-311, nullable); write_scope col (schema.go:202); WriteScope struct (claim.go:38-44, never populated, only read at claim.go:139-141); /api/sessions 13 scalars no files[] (api.go:97-173); ListFilesByFeature reuse realistic (feature_files_repo.go:42). Slice fully grounded.'
+        - source: haiku
+          severity: LOW
+          summary: Well-scoped, read-only, testable done_when, zero write-path/contention risk. Project-only scope decision correct. No rework.
       decisions_notes: |
         **Trigger:** explicit CLI invocation (`wipnote who`, `session show`) and
-        GET /api/sessions request — no hook, off the hot path.
+        GET /api/sessions — no hook, off the hot path.
         **State:** derived read only; joins existing sessions + claims +
         feature_files. No new table; nothing persisted.
         **Payload:** per-session roster row + files[] (path, operation,
         last_seen); /api/sessions gains files[].
         **Track:** trk-cd61bbae.
-        **Rejected:** new session_files table (data already in feature_files —
-        DRY); a live-watch daemon (out of scope for Tier 0; a pull query
-        suffices and adds no process).
+        **Rejected:** new table (data already in feature_files — DRY); a
+        live-watch daemon (out of scope for Tier 0; a pull query suffices).
     - id: slice-2
       num: 2
-      title: 'Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory'
+      title: 'Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory (+ composite index)'
       what: |
         Compute intersection of recently-touched file sets (feature_files,
-        last_seen within a window) across active sessions. `wipnote who` marks
-        files touched by >=2 active sessions with ⚠ and the other session id.
-        Add a PreToolUse check: before Edit/Write, a single indexed SELECT for
-        the same path touched by another live session within the window emits a
-        non-blocking advisory into hook output. Config: `warn_on_file_overlap`
-        (default true, advisory) and `block_on_file_overlap` (default false →
-        exit code 2), mirroring the existing
-        `block_task_completion_on_quality_failure` pattern.
+        last_seen within a window) across LIVE sessions. `wipnote who` marks
+        files touched by >=2 live sessions with ⚠ and the other session id.
+        PreToolUse check: before Edit/Write, a single indexed SELECT for the
+        same path touched by another live session within the window emits a
+        non-blocking advisory. ADD a composite index
+        idx_feature_files_path_seen ON feature_files(file_path, last_seen) via
+        schema.go + a migration (FEASIBILITY CRITIC: only idx_feature_files_path
+        on (file_path) exists today — schema.go:433-434 — the overlap query
+        would otherwise range-scan). Config flags `warn_on_file_overlap`
+        (default true) and `block_on_file_overlap` (default false → exit 2),
+        read via the same local os.ReadFile pattern as
+        block_task_completion_on_quality_failure (task_completion_gate.go:77-96;
+        no shared internal/config package exists).
       why: |
-        Track trk-cd61bbae. Detect collisions in real time, before the edit,
-        not just in a post-hoc roster — the failure mode that caused the
-        feat-b2d1dc2e mix-up.
+        Track trk-cd61bbae. Detect collisions in real time, before the edit —
+        the failure mode that caused the feat-b2d1dc2e mix-up. Depends on
+        slice-4's heartbeat-recency liveness so the ⚠ does not false-fire on
+        stale 'active' ghost sessions (bug-6c3e8252).
       files:
         - cmd/wipnote/who.go
         - internal/hooks/pretooluse.go
         - internal/db/feature_files_repo.go
-        - internal/config
+        - internal/db/schema.go
+        - internal/db/migrations.go
       deps:
         - 1
+        - 4
       done_when:
-        - '`wipnote who` marks files touched by >=2 active sessions with ⚠ and the other session id'
+        - '`wipnote who` marks files touched by >=2 live sessions with ⚠ and the other session id'
         - PreToolUse prints an advisory when editing a file another live session touched within the window (non-blocking by default)
         - '`block_on_file_overlap: true` makes PreToolUse return exit code 2 with a recovery hint'
+        - A composite index idx_feature_files_path_seen on feature_files(file_path, last_seen) backs the overlap query (added in schema + migration)
         - The overlap check is a single indexed SELECT with zero writes — feat-156e0a1a zero-SQLITE_BUSY gate stays green
-      effort: M
+      effort: L
       risk: Med
       tests: |
-        Unit: TestOverlapQuery — intersecting feature_files by recent last_seen
+        Unit: TestOverlapQuery — intersecting feature_files by recent last_seen, EXPLAIN uses the new composite index
         Hook: TestPreToolUseOverlapAdvisory — advisory + block-mode exit 2
+        Migration: TestMigration_FeatureFilesPathSeenIndex
         Contention regression: feat-156e0a1a SQLITE_BUSY assertion remains zero
       complexity: complex
       approved: false
@@ -119,123 +136,285 @@ slices:
       questions:
         - id: q-window
           text: How long is the overlap recency window?
-          answer: Default 15 minutes, configurable — aligned to the claim heartbeat/lease cadence so it tracks genuinely-live work and excludes stale ghosts.
+          answer: Default 15 minutes, configurable — aligned to the claim heartbeat/lease cadence so it tracks live work and excludes ghosts.
+      critic_revisions:
+        - source: sonnet
+          severity: DANGER
+          summary: 'Missing composite index: only idx_feature_files_path(file_path) exists (schema.go:433-434); overlap SELECT on (file_path,last_seen,session_id) would range-scan. RESOLVED: index + migration added to scope; effort M→L.'
+        - source: sonnet
+          severity: LOW
+          summary: 'Config: no internal/config package; must replicate local os.ReadFile pattern from task_completion_gate.go:77-96 (block_task_completion_on_quality_failure). Files list corrected.'
+        - source: haiku
+          severity: HIGH
+          summary: 'Overlap ⚠ depends on slice-4 honest-liveness or it false-fires on ghost sessions. RESOLVED: deps now [1,4]; execution order 1→4→2.'
       decisions_notes: |
-        **Trigger:** PreToolUse on Edit/Write tool calls only.
-        **State:** derived read from feature_files; no new table, no write on
-        the hot path.
+        **Trigger:** PreToolUse on Edit/Write only.
+        **State:** derived read from feature_files; no new table; one new
+        composite index idx_feature_files_path_seen(file_path, last_seen).
         **Payload:** advisory text naming the conflicting session+file;
-        config-gated exit code 2 when blocking enabled.
+        config-gated exit 2 when blocking enabled.
+        **Config:** mirrors block_task_completion_on_quality_failure local
+        os.ReadFile pattern (task_completion_gate.go:77-96); no shared
+        internal/config exists.
         **Track:** trk-cd61bbae.
+        **Dep:** requires slice-4 heartbeat-recency liveness, else ⚠
+        false-fires on ghost 'active' sessions (bug-6c3e8252).
         **Rejected:** blocking-by-default (too disruptive for parallel
         dogfooding); a dedicated file-lock table (write amplification on the
-        PreToolUse hot path violates the feat-156e0a1a zero-SQLITE_BUSY
-        contract).
+        PreToolUse hot path violates feat-156e0a1a zero-SQLITE_BUSY).
     - id: slice-3
       num: 3
-      title: Tier 2 — Populate claims.write_scope.Paths from PostToolUse edits
+      title: Tier 2 — Populate claims.write_scope.Paths in PreToolUse alongside the heartbeat UPDATE
       what: |
-        On PostToolUse file edit, append the edited path to the owning claim's
-        write_scope.Paths. The models.WriteScope{Paths,Directories,Branch,
-        Worktree} struct and claims.write_scope JSON column already exist
-        (internal/models/claim.go:38-44) but are never populated — this is the
-        reserved socket. Dedupe + cap the list; piggyback the existing
-        PostToolUse claim-heartbeat UPDATE (no extra write). Surface scope in
-        `wipnote claim list` / `claim show`.
+        CORRECTED from PostToolUse. The claim heartbeat (HeartbeatClaimByWorkItem)
+        fires in PreToolUse (pretooluse.go:242), where the target file_path is
+        already present in the Edit/Write tool input. Widen the SET clause of
+        that EXISTING heartbeat UPDATE to also append the path to
+        claims.write_scope.Paths (deduped, FIFO-capped at 200) — one UPDATE, no
+        net-new write. The WriteScope struct + write_scope JSON column already
+        exist (claim.go:38-44, schema.go:202) and are never populated today.
+        Clear write_scope when the claim is released or expires
+        (ReleaseAllClaimsForSession / ReapExpiredClaims in claim_repo.go).
+        Surface scope in `wipnote claim list` / `claim show`.
       why: |
-        Track trk-97f85b3b (Passive Session Ingestion). Turns the indirect
-        session→feature→files chain into a first-class claimed-files concept,
-        enabling lease-based file ownership and a stronger overlap signal.
+        Track trk-97f85b3b. First-class claimed-files concept enabling
+        lease-based file ownership and a stronger overlap signal — without
+        adding any write to the hot path.
       files:
-        - internal/hooks/posttooluse.go
+        - internal/hooks/pretooluse.go
         - internal/db/claim_repo.go
         - internal/models/claim.go
         - cmd/wipnote/claim.go
       deps:
         - 1
       done_when:
-        - PostToolUse file edit appends the path to the owning claim's write_scope.Paths (deduped, capped)
-        - '`wipnote claim list`/`show` displays the claimed file scope per claim'
-        - write_scope is cleared on claim release/expiry
-        - No write amplification beyond the existing PostToolUse heartbeat UPDATE (single UPDATE)
+        - write_scope.Paths is appended within the EXISTING PreToolUse heartbeat UPDATE (single UPDATE, zero net-new write)
+        - Paths are deduped and FIFO-capped at 200 per claim
+        - write_scope is cleared when the claim is released or expires (ReleaseAllClaimsForSession / ReapExpiredClaims)
+        - On `wipnote reindex` write_scope resets with the rebuilt claims (documented ephemeral session state); no stale paths surface
+        - '`wipnote claim list`/`show` display the claimed file scope per claim'
       effort: M
       risk: Med
       tests: |
-        Unit: TestWriteScopePopulation — append/dedupe/cap
-        Unit: TestClaimListShowsScope
-        Contention: assert a single UPDATE per PostToolUse (no extra write)
+        Unit: TestWriteScopeAppendedInHeartbeatUpdate — asserts a SINGLE claims UPDATE per PreToolUse
+        Unit: TestWriteScopeDedupeCap — append/dedupe/FIFO-cap at 200
+        Unit: TestWriteScopeClearedOnRelease — release + expiry both clear it
+        Behavior: reindex resets write_scope (no stale paths)
       complexity: complex
       approved: false
       comment: ""
       questions:
         - id: q-cap
-          text: What is the per-claim path cap?
-          answer: 200 paths/claim, FIFO-trim — covers realistic feature scope without unbounded JSON growth in the claims row.
+          text: Per-claim path cap?
+          answer: 200 paths/claim, FIFO-trim — realistic feature scope without unbounded JSON growth.
+        - id: q-timing
+          text: PreToolUse or PostToolUse for write_scope population?
+          answer: PreToolUse — the heartbeat UPDATE already runs there (pretooluse.go:242) and the file_path is in the tool input; PostToolUse has no claim write to extend.
+      critic_revisions:
+        - source: sonnet
+          severity: DANGER
+          summary: 'Original premise false: heartbeat is PreToolUse (pretooluse.go:242) not PostToolUse; PostToolUse does zero claim UPDATEs, so ''piggyback'' would be a net-new write breaking zero-amplification. RESOLVED: redesigned to widen the existing PreToolUse heartbeat UPDATE.'
+        - source: haiku
+          severity: HIGH
+          summary: 'write_scope lifecycle (reindex, worktree teardown, release/expiry) was undefined. RESOLVED: cleared on ReleaseAllClaimsForSession/ReapExpiredClaims; resets on reindex (documented ephemeral); tests added.'
       decisions_notes: |
-        **Trigger:** PostToolUse on Edit/Write when an owning claim exists.
-        **State:** claims.write_scope JSON (existing column) — derived,
-        cleared on release/expiry.
-        **Payload:** deduped, FIFO-capped Paths[] on the claim.
+        **Trigger:** PreToolUse on Edit/Write (the path is in the tool input
+        there) — CORRECTED from PostToolUse.
+        **State:** claims.write_scope JSON (existing column); widened SET in
+        the existing PreToolUse heartbeat UPDATE; ephemeral — rebuilt on
+        reindex, cleared on release/expiry.
+        **Payload:** deduped, FIFO-capped (200) Paths[].
         **Track:** trk-97f85b3b.
-        **Rejected:** a separate file_claims table (write amplification
-        violates the feat-156e0a1a contention contract); populating in
-        PreToolUse (the write is not yet confirmed at PreToolUse time).
+        **Rejected:** PostToolUse population — FEASIBILITY CRITIC proved
+        HeartbeatClaimByWorkItem fires only in PreToolUse (pretooluse.go:242);
+        PostToolUse does zero claim UPDATEs, so populating there is a net-new
+        write violating zero-amplification. Separate file_claims table (write
+        amplification, same contention contract).
     - id: slice-4
       num: 4
-      title: Tier 3 — Honest liveness + claimless visibility + cross-harness release
+      title: Tier 3 — Honest liveness + claimless visibility (session_files) + cross-harness release
       what: |
-        (a) Derive 'live' in who/roster from claim-heartbeat recency, not
-        sessions.status, so stale 'active' rows are excluded. (b) Session-scoped
-        file ledger: attribute PostToolUse file touches even when
-        ctx.FeatureID=="" (the gate at internal/hooks/posttooluse.go:120
-        currently drops them), so claimless Codex/Gemini sessions are visible.
-        (c) Add SessionEnd (and Stop) hook handlers to the codex + gemini
-        targets in packages/plugin-core/manifest.json (today Claude-only,
-        manifest lines 68,76-77) so claims/sessions release on exit;
-        regenerate ports. Folds in open bug-6c3e8252 (9 stale active sessions).
+        (a) PRIMARY cross-harness fix: derive 'live' in who/roster from
+        claim-heartbeat recency, not sessions.status — works for ALL harnesses
+        with no dependency on a session-end event. (b) Claimless visibility:
+        the PostToolUse else-branch (posttooluse.go:134-138) currently only
+        debugLogs and drops attribution when ctx.FeatureID=="". Replace with a
+        new lightweight `session_files` table (session_id, file_path,
+        operation, last_seen, UNIQUE(session_id,file_path)) — chosen over
+        relaxing feature_files because feature_files.feature_id is NOT NULL
+        with UNIQUE(feature_id,file_path) (schema.go:301-311) and cannot hold
+        empty-feature_id rows. (c) Cross-harness session-end: Gemini already
+        releases via Stop→SessionEnd (manifest:78, geminiEventName SessionEnd);
+        Codex has NO session-end event in the manifest at all (SessionEnd:68 is
+        claude-only; no Codex Stop/SessionEnd). New manifest work is
+        Codex-specific and contingent on whether Codex CLI emits any
+        session-end / task-lifecycle event; if it does not, Codex correctly
+        relies on heartbeat-recency liveness (part a) + lease reap. Folds
+        bug-6c3e8252.
       why: |
         Track trk-97f85b3b. The roster is only as honest as the session
-        lifecycle; cross-harness gaps make it lie — ghost Codex/Gemini
-        sessions and invisible claimless sessions defeat Tiers 0-2.
+        lifecycle; cross-harness gaps make it lie (ghost Codex/Gemini sessions,
+        invisible claimless sessions) and defeat Tiers 0-2.
       files:
         - packages/plugin-core/manifest.json
         - internal/hooks/posttooluse.go
         - internal/hooks/sessionend.go
         - internal/db/session_repo.go
         - internal/db/claim_repo.go
+        - internal/db/schema.go
+        - internal/db/migrations.go
       deps:
         - 1
       done_when:
-        - '`wipnote who` filters sessions by heartbeat recency; stale ''active'' rows are excluded'
-        - Codex/Gemini SessionEnd releases claims and marks the session completed
-        - A claimless Codex/Gemini session's file touches are attributed and visible in `wipnote who`
-        - '`wipnote plugin build-ports` regenerates codex/gemini trees with the new SessionEnd/Stop events'
+        - '`wipnote who` derives ''live'' from claim-heartbeat recency, not sessions.status; stale ''active'' rows are excluded'
+        - Claimless session file touches are recorded in a new session_files table and visible in `wipnote who`
+        - Gemini session-end release verified via the existing Stop→SessionEnd (manifest line 78)
+        - 'Codex release mechanism resolved: either a Codex session-end handler is added to the manifest and ports regenerated, OR documented reliance on heartbeat-recency liveness because Codex emits no session-end event'
         - 'bug-6c3e8252: no new stale status=active sessions accumulate after a Codex/Gemini run exits'
       effort: L
-      risk: Med
+      risk: High
       tests: |
-        Unit: TestLivenessByHeartbeat
-        Unit: TestClaimlessSessionFileLedger
-        Integration: TestCodexSessionEndRelease
-        Port regen: manifest build-ports emits SessionEnd for codex+gemini
-        Repro: bug-6c3e8252 stale-active reproduction harness → 0 after fix
+        Unit: TestLivenessByHeartbeat — stale 'active' excluded by heartbeat age
+        Unit: TestClaimlessSessionFilesLedger — FeatureID=="" writes session_files
+        Integration: TestGeminiSessionEndRelease (existing Stop→SessionEnd path)
+        Migration: TestMigration_SessionFilesTable
+        Port regen: build-ports emits any new Codex session-end event
+        Repro: bug-6c3e8252 stale-active harness → 0 after fix
       complexity: complex
       approved: false
       comment: ""
       questions:
+        - id: q-claimless
+          text: Where do claimless file touches live?
+          answer: A new session_files table keyed (session_id,file_path) — feature_files cannot hold empty feature_id (NOT NULL + UNIQUE(feature_id,file_path), schema.go:301-311).
         - id: q-stale
           text: What heartbeat age marks a session as not-live?
-          answer: Greater than 2x the heartbeat interval since last heartbeat (derived from the lease/heartbeat cadence, ~2 min), tunable via config — short enough to drop ghosts, long enough to tolerate a slow tool call.
+          answer: '> 2x the heartbeat interval since last heartbeat (~2 min, derived from the lease/heartbeat cadence), tunable via config — drops ghosts, tolerates a slow tool call.'
+      critic_revisions:
+        - source: haiku
+          severity: DANGER
+          summary: 'feature_files UNIQUE(feature_id,file_path)+feature_id NOT NULL blocks claimless rows. RESOLVED: dedicated session_files table for FeatureID=='''' touches.'
+        - source: haiku
+          severity: DANGER
+          summary: 'Codex has NO SessionEnd hook (manifest:68 claude-only; no Codex Stop). RESOLVED: heartbeat-recency liveness is the primary cross-harness fix; Codex session-end handling made contingent + flagged for verification.'
+        - source: sonnet
+          severity: LOW
+          summary: 'Manifest matrix nuance: Gemini already releases via Stop→SessionEnd (manifest:78); only Codex truly lacks any session-end event. done_when reworded accordingly.'
+        - source: haiku
+          severity: HIGH
+          summary: 'Claimless attribution table was undecided (session_files vs nullable feature_id). RESOLVED: session_files table; rationale recorded in decisions_notes.'
       decisions_notes: |
-        **Trigger:** SessionEnd/Stop (now codex+gemini, not Claude-only) plus
-        PostToolUse on the claimless path.
-        **State:** sessions + claims (SQLite) plus a session-scoped file
-        attribution (feature_files with null/unset feature, or a session_files
-        ledger) — derived, rebuildable.
-        **Payload:** liveness boolean derived from heartbeat age; claim
-        release on cross-harness session end.
+        **Trigger:** heartbeat-recency derivation (all harnesses); PostToolUse
+        claimless else-branch (posttooluse.go:134-138); Codex session-end IF it
+        exists.
+        **State:** new session_files table (session_id, file_path, operation,
+        last_seen, UNIQUE(session_id,file_path)) — chosen over nullable
+        feature_id because feature_files.feature_id is NOT NULL + UNIQUE
+        (schema.go:301-311).
+        **Payload:** liveness boolean derived from heartbeat age.
         **Track:** trk-97f85b3b. Folds bug-6c3e8252.
-        **Rejected:** keeping the ctx.FeatureID!="" gate (claimless sessions
-        stay invisible — defeats the goal); trusting sessions.status for
-        liveness (unreliable for non-Claude — the root cause of bug-6c3e8252).
+        **Rejected:** relaxing feature_files (UNIQUE collision for empty
+        feature_id — DESIGN+FEASIBILITY danger); trusting sessions.status
+        (unreliable for non-Claude — bug-6c3e8252 root cause); assuming Codex
+        has SessionEnd (manifest line 68 is claude-only; Codex has no
+        session-end event — must verify Codex CLI lifecycle).
 questions: []
+critique:
+    reviewed_at: "2026-05-16"
+    reviewers:
+        - Haiku (design)
+        - Sonnet (feasibility)
+    assumptions:
+        - id: A1
+          status: verified
+          text: feature_files has a nullable session_id column
+          evidence: internal/db/schema.go:301-311
+        - id: A2
+          status: verified
+          text: claims.write_scope JSON + models.WriteScope exist but are never populated in production
+          evidence: internal/models/claim.go:38-44; read-only at cmd/wipnote/claim.go:139-141
+        - id: A3
+          status: falsified
+          text: claim heartbeat UPDATE fires in PostToolUse (slice-3 original premise)
+          evidence: HeartbeatClaimByWorkItem is in internal/hooks/pretooluse.go:242; PostToolUse has zero claim UPDATEs — slice-3 redesigned to PreToolUse
+        - id: A4
+          status: falsified
+          text: Codex has a SessionEnd hook to migrate
+          evidence: packages/plugin-core/manifest.json:68 SessionEnd is claude-only; no Codex Stop/SessionEnd — slice-4 reframed around heartbeat-recency liveness
+        - id: A5
+          status: falsified
+          text: feature_files can hold claimless (empty feature_id) rows
+          evidence: schema.go:301-311 feature_id NOT NULL + UNIQUE(feature_id,file_path) — slice-4 adds a session_files table instead
+        - id: A6
+          status: questionable
+          text: slice-2 overlap SELECT is fully indexed
+          evidence: schema.go:433-434 only idx_feature_files_path(file_path); no (file_path,last_seen) — slice-2 now adds the composite index + migration
+    critics:
+        - title: DESIGN CRITIC
+          sections:
+            - heading: Dependency graph
+              items:
+                - badge: slice-2 dep
+                  kind: warn
+                  text: slice-2 overlap ⚠ false-fires on ghost sessions without slice-4 honest-liveness; deps corrected to [1,4].
+            - heading: Lifecycle gaps
+              items:
+                - badge: write_scope
+                  kind: warn
+                  text: slice-3 reindex/teardown/release lifecycle was undefined; now cleared on release/expiry and reset on reindex.
+                - badge: claimless schema
+                  kind: danger
+                  text: feature_files UNIQUE blocks claimless rows; slice-4 now adds a session_files table.
+            - heading: Cross-harness
+              items:
+                - badge: Codex end
+                  kind: danger
+                  text: Codex has no SessionEnd; slice-4 reframed so heartbeat-recency liveness is primary and Codex session-end is contingent.
+        - title: FEASIBILITY CRITIC
+          sections:
+            - heading: Cited facts
+              items:
+                - badge: slice-1
+                  kind: success
+                  text: All slice-1 schema/API facts verified at file:line; slice-1 needs no rework.
+                - badge: heartbeat
+                  kind: danger
+                  text: Heartbeat is PreToolUse not PostToolUse (pretooluse.go:242); slice-3 redesigned to widen the existing PreToolUse UPDATE.
+            - heading: Index realism
+              items:
+                - badge: no composite idx
+                  kind: danger
+                  text: Only idx_feature_files_path(file_path) exists; slice-2 now adds idx_feature_files_path_seen(file_path,last_seen) + migration.
+            - heading: Reuse
+              items:
+                - badge: config pattern
+                  kind: info
+                  text: No internal/config package; slice-2 mirrors task_completion_gate.go:77-96 local-read pattern.
+    risks:
+        - risk: 'slice-3 redesign: widening the PreToolUse heartbeat UPDATE could regress the single-write guarantee if not batched into one SQL statement'
+          severity: Medium
+          mitigation: TestWriteScopeAppendedInHeartbeatUpdate asserts exactly one claims UPDATE per PreToolUse
+        - risk: Codex CLI may emit no session-end/task-lifecycle event at all (slice-4)
+          severity: High
+          mitigation: Heartbeat-recency liveness (slice-4a) is independent of any session-end event; Codex session-end made contingent + flagged for upstream-doc verification
+        - risk: slice-2 composite-index migration on a large existing feature_files table
+          severity: Medium
+          mitigation: CREATE INDEX IF NOT EXISTS via the standard migration path; covered by TestMigration_FeatureFilesPathSeenIndex
+        - risk: 'ordering hazard: slice-2 needs slice-4 before it'
+          severity: Medium
+          mitigation: deps corrected to [1,4]; execution order is 1 → 4 → 2/3
+    synthesis: |
+        All four DANGER findings are resolved in-plan: A3 (slice-3 redesigned to
+        widen the existing PreToolUse heartbeat UPDATE — no net-new write), A5
+        (slice-4 adds a dedicated session_files table for claimless touches), A6
+        (slice-2 adds the missing (file_path,last_seen) composite index +
+        migration), and A4 (slice-4 reframed so heartbeat-recency liveness is the
+        primary cross-harness mechanism, not a Codex SessionEnd that does not
+        exist). The dependency graph was corrected to 1 → 4 → 2/3 so the overlap
+        ⚠ does not false-fire on ghost sessions. Slice-1 is verified and
+        implementation-ready as-is. Human reviewer should focus on three open
+        judgement calls: (1) confirm Codex CLI's actual session/task lifecycle
+        events before committing slice-4's Codex path; (2) accept the
+        session_files table as a new derived SQLite table; (3) confirm that
+        widening the PreToolUse heartbeat UPDATE is acceptable on the hot path
+        under the feat-156e0a1a zero-SQLITE_BUSY contract.
