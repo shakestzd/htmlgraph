@@ -16,7 +16,7 @@ import (
 // executes ZERO CREATE / ALTER / DROP / trigger / normalisation statements —
 // avoiding the write-lock acquisition that caused SQLITE_BUSY in short-lived
 // hook processes.
-const currentSchemaVersion = 5
+const currentSchemaVersion = 6
 
 // copySwapStepName is the name of the agent_events copy-and-swap migration
 // step. Exposed via CopySwapStepName() so tests can assert it runs at most
@@ -68,6 +68,11 @@ var migrations = []migrationStep{
 		version: 5,
 		name:    "005_normalize_plan_feedback",
 		apply:   stepNormalizePlanFeedback,
+	},
+	{
+		version: 6,
+		name:    "006_gate_records",
+		apply:   stepGateRecords,
 	},
 }
 
@@ -254,6 +259,35 @@ func stepPostInitialColumnsAndTables(db *sql.DB) error {
 		SELECT 1 FROM agent_events WHERE agent_events.session_id = sessions.session_id
 	)`); err != nil {
 		return fmt.Errorf("backfill total_events: %w", err)
+	}
+	return nil
+}
+
+func stepGateRecords(db *sql.DB) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS gate_records (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		session_id TEXT NOT NULL,
+		work_item_id TEXT,
+		harness TEXT,
+		project_type TEXT NOT NULL,
+		gate_command TEXT NOT NULL,
+		status TEXT NOT NULL CHECK(status IN ('pass','fail')),
+		checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		signature TEXT NOT NULL,
+		allowlist_hits_json TEXT NOT NULL DEFAULT '[]',
+		allowlist_hit_count INTEGER NOT NULL DEFAULT 0,
+		source TEXT NOT NULL DEFAULT 'check',
+		output_summary TEXT
+	)`); err != nil {
+		return fmt.Errorf("create gate_records: %w", err)
+	}
+	for _, stmt := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_gate_records_session_checked ON gate_records(session_id, checked_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_gate_records_work_item_checked ON gate_records(work_item_id, checked_at DESC)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("create gate_records index: %w", err)
+		}
 	}
 	return nil
 }

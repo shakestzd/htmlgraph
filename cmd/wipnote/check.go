@@ -9,7 +9,9 @@ import (
 	"sort"
 	"strings"
 
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/graph"
+	"github.com/shakestzd/wipnote/internal/hooks"
 	"github.com/shakestzd/wipnote/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +24,7 @@ type gateResult struct {
 }
 
 func checkCmd() *cobra.Command {
-	var goOnly, pythonOnly, skipTests bool
+	var goOnly, pythonOnly, skipTests, gateOnly bool
 
 	cmd := &cobra.Command{
 		Use:   "check",
@@ -56,6 +58,30 @@ Returns exit code 0 if all gates pass, 1 if any fail.`,
 			projectRoot, err := resolveProjectRoot()
 			if err != nil {
 				return err
+			}
+			if gateOnly {
+				if goOnly || pythonOnly || skipTests {
+					return fmt.Errorf("--gate runs the full project gate and cannot be combined with --go-only, --python-only, or --skip-tests")
+				}
+				sessionID := hooks.EnvSessionID("")
+				agentID := dbpkg.NormaliseAgentID(os.Getenv("WIPNOTE_AGENT_ID"))
+				workItemID := activeWorkItemForGate(sessionID, agentID)
+				result, err := runSessionGate(projectRoot, sessionID, workItemID, "check", os.Stdout, os.Stderr)
+				if err != nil {
+					return err
+				}
+				if result.Record != nil {
+					fmt.Printf("\nRecorded gate result for session %s", result.Record.SessionID)
+					if result.Record.WorkItemID != "" {
+						fmt.Printf(" (work item %s)", result.Record.WorkItemID)
+					}
+					fmt.Printf(" with signature %s\n", truncate(result.Record.Signature, 12))
+				}
+				if !result.Passed {
+					return fmt.Errorf("quality gates failed — no passing session-local gate record was written")
+				}
+				defer printContentionGateReminder()
+				return nil
 			}
 
 			var results []gateResult
@@ -93,6 +119,7 @@ Returns exit code 0 if all gates pass, 1 if any fail.`,
 	cmd.Flags().BoolVar(&goOnly, "go-only", false, "Run Go quality gates only")
 	cmd.Flags().BoolVar(&pythonOnly, "python-only", false, "Run Python quality gates only")
 	cmd.Flags().BoolVar(&skipTests, "skip-tests", false, "Skip test execution (run lint/build only)")
+	cmd.Flags().BoolVar(&gateOnly, "gate", false, "Run the full project quality gate and write a session-local gate record")
 
 	cmd.AddCommand(checkOrphansCmd())
 	cmd.AddCommand(checkIncompleteCmd())

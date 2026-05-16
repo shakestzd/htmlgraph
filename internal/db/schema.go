@@ -346,6 +346,23 @@ func CreateAllTables(db *sql.DB) error {
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(plan_id, section, action, question_id)
 		)`,
+
+		// 16. gate_records — session-local derived quality-gate runs
+		`CREATE TABLE IF NOT EXISTS gate_records (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			session_id TEXT NOT NULL,
+			work_item_id TEXT,
+			harness TEXT,
+			project_type TEXT NOT NULL,
+			gate_command TEXT NOT NULL,
+			status TEXT NOT NULL CHECK(status IN ('pass','fail')),
+			checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			signature TEXT NOT NULL,
+			allowlist_hits_json TEXT NOT NULL DEFAULT '[]',
+			allowlist_hit_count INTEGER NOT NULL DEFAULT 0,
+			source TEXT NOT NULL DEFAULT 'check',
+			output_summary TEXT
+		)`,
 	}
 
 	for _, stmt := range stmts {
@@ -418,6 +435,9 @@ func CreateAllIndexes(db *sql.DB) error {
 		// plan_feedback
 		"CREATE INDEX IF NOT EXISTS idx_plan_feedback_plan_id ON plan_feedback(plan_id)",
 		"CREATE INDEX IF NOT EXISTS idx_plan_feedback_section ON plan_feedback(plan_id, section)",
+		// gate_records
+		"CREATE INDEX IF NOT EXISTS idx_gate_records_session_checked ON gate_records(session_id, checked_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_gate_records_work_item_checked ON gate_records(work_item_id, checked_at DESC)",
 	}
 
 	for _, idx := range indexes {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -286,6 +287,11 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 	// rationale on the .wipnote artifact for compliance/snapshot tooling.
 	if status == "done" && shouldAutocommitWorkitemArtifact(typeName) {
 		if err := checkProvenanceCompleteGate(p, col, typeName, id, wiAcceptedAdvisory); err != nil {
+			return err
+		}
+	}
+	if status == "done" && shouldAutocommitWorkitemArtifact(typeName) {
+		if err := checkCompletionGateRecord(p.DB, filepath.Dir(dir), sessionID, id); err != nil {
 			return err
 		}
 	}
@@ -874,6 +880,20 @@ func checkFeatureCompleteSpecGate(wipnoteDir, featureID string) error {
 			featureID)
 	}
 	return nil
+}
+
+func checkCompletionGateRecord(database *sql.DB, projectRoot, sessionID, workItemID string) error {
+	if database == nil {
+		return nil
+	}
+	codePaths, err := dbpkg.CodeBearingPaths(database, workItemID)
+	if err != nil {
+		return fmt.Errorf("quality gate: inspect code-bearing paths for %s: %w", workItemID, err)
+	}
+	if len(codePaths) == 0 {
+		return nil
+	}
+	return validateCompletionGateRecord(projectRoot, database, sessionID, workItemID)
 }
 
 // unwrapPreBlock strips a leading/trailing <pre>...</pre> wrapper plus HTML
