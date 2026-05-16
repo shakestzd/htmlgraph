@@ -9,6 +9,7 @@ import (
 
 	dbpkg "github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/otel/indexer"
+	otelreceiver "github.com/shakestzd/wipnote/internal/otel/receiver"
 	otelsqlite "github.com/shakestzd/wipnote/internal/otel/sink/sqlite"
 )
 
@@ -51,7 +52,7 @@ func reindexOtelEvents(dbPath, wipnoteDir string) (int, int, int) {
 		return 0, 0, 0
 	}
 
-	writer, werr := otelsqlite.NewWriter(dbPath)
+	writer, werr := otelreceiver.NewWriter(dbPath)
 	if werr != nil {
 		log.Printf("reindex otel: open writer: %v", werr)
 		return 0, 0, 1

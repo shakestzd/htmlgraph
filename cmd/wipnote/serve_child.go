@@ -13,6 +13,7 @@ import (
 	dbpkg "github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/db/writequeue"
 	"github.com/shakestzd/wipnote/internal/otel/indexer"
+	otelreceiver "github.com/shakestzd/wipnote/internal/otel/receiver"
 	"github.com/shakestzd/wipnote/internal/otel/retention"
 	sqls "github.com/shakestzd/wipnote/internal/otel/sink/sqlite"
 	"github.com/shakestzd/wipnote/internal/registry"
@@ -89,7 +90,7 @@ func runServeChild(port int) error {
 	// This is the architectural fix for the SQLITE_BUSY contention the
 	// plan targets — see plan q-service-owner for the post-launch
 	// `wipnote daemon` graduation path.
-	if writer, err := sqls.NewWriter(dbPath); err != nil {
+	if writer, err := otelreceiver.NewWriter(dbPath); err != nil {
 		fmt.Fprintf(os.Stderr, "writer service init: %v\n", err)
 	} else {
 		q := writequeue.New(writequeue.Config{
