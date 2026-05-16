@@ -10,15 +10,15 @@
 <body>
     <article id="feat-7b593272"
              data-type="feature"
-             data-status="in-progress"
+             data-status="done"
              data-priority="medium"
              data-created="2026-05-16T04:16:51.035979"
-             data-updated="2026-05-16T05:25:16.023195" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
+             data-updated="2026-05-16T05:32:29.647842" data-agent-assigned="claude-code" data-track-id="trk-0677c709">
 
         <header>
             <h1>Provenance-required completion (zero-commit block &#43; advisory override)</h1>
             <div class="metadata">
-                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
@@ -63,7 +63,8 @@ cmd/wipnote/workitem.go). The existing checkFeatureCompleteSpecGate
 (workitem.go:236) only applies to typeName=="feature"; this provenance
 gate MUST be type-agnostic and also cover bug and spike code-bearing
 items. Record the reason on the .wipnote artifact and surface it in
-wipnote snapshot and wipnote check / compliance output.</p>
+wipnote snapshot and wipnote check / compliance output.
+[2026-05-16 05:32 claude-code] accepted-advisory (provenance override): implementation committed in 09d9ab14a (feat(complete): provenance gate); read index not yet caught up at completion time</p>
         </section>
     </article>
 
