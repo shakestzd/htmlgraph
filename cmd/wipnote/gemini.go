@@ -241,6 +241,9 @@ func maybeEnsureGeminiExtensionOnLaunch(dryRun bool) {
 // launchGeminiDefault launches Gemini interactively with wipnote env injection.
 // Corresponds to: wipnote gemini
 func launchGeminiDefault(trackID, featureID, worktreePath, workItem string, noWorktree bool, extraArgs []string, dryRun bool) error {
+	// Compute launcher mode for preflight logging/inspection (no behavior change).
+	_ = computeLauncherMode(worktreePath, false, false)
+
 	projectRoot, _ := resolveProjectRoot()
 	maybeEnsureGeminiExtensionOnLaunch(dryRun)
 
@@ -350,6 +353,9 @@ func buildGeminiLinkArgs(localExtPath string) []string {
 // launchGeminiDev links the local packages/gemini-extension and launches Gemini.
 // Corresponds to: wipnote gemini --dev [--isolate]
 func launchGeminiDev(isolate, dryRun bool, extraArgs []string) error {
+	// Compute launcher mode for preflight logging/inspection (no behavior change).
+	_ = computeLauncherMode("", true, false)
+
 	// Resolve the local extension path relative to the project root.
 	localExtPath, err := resolveLocalGeminiExtension()
 	if err != nil {

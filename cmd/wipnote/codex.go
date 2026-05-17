@@ -862,6 +862,9 @@ func runCodexInit(yes, dryRun bool) error {
 // This replaces the historical "user must run --init first" path with the
 // brew/curl-install bundled tree.
 func launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem string, noWorktree, yolo bool, extraArgs []string) error {
+	// Compute launcher mode for preflight logging/inspection (no behavior change).
+	_ = computeLauncherMode(worktreePath, false, false)
+
 	projectRoot, _ := resolveProjectRoot()
 	configPath := codexConfigPath()
 
@@ -997,6 +1000,9 @@ func launchCodexContinue(resumeID string, yolo bool, extraArgs []string) error {
 // If a mismatched marketplace is already registered (e.g., from a prior --init),
 // it is removed and replaced with the local path.
 func launchCodexDev(resumeID string, cleanup, dryRun, yolo bool, extraArgs []string) error {
+	// Compute launcher mode for preflight logging/inspection (no behavior change).
+	_ = computeLauncherMode("", true, false)
+
 	// Resolve the local marketplace path relative to the project root.
 	localMarketplace, err := resolveLocalCodexMarketplace()
 	if err != nil {

@@ -473,6 +473,10 @@ func ensureWipnotePlugin() error {
 
 // launchClaude is the shared launcher used by all modes.
 func launchClaude(opts LaunchOpts) error {
+	// Compute launcher mode for preflight logging/inspection (no behavior change).
+	// devPlugin is true when a PluginDir was supplied in go/dev mode.
+	_ = computeLauncherMode(opts.WipnoteRoot, opts.PluginDir != "" && opts.Mode == "go", false)
+
 	// Write launch marker to the main project root, not the worktree.
 	markerRoot := opts.ProjectRoot
 	if opts.WipnoteRoot != "" {

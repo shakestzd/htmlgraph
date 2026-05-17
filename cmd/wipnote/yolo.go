@@ -217,6 +217,10 @@ func launchYoloPlanningMode(projectRoot string, extraArgs []string) error {
 }
 
 func launchYoloDefault(permMode, trackID, featureID string, noWorktree bool, resumeID, name string, extraArgs []string) error {
+	// Compute launcher mode for preflight logging/inspection (no behavior change).
+	// Worktree path and devPlugin are resolved below; pass empty/false here for the initial compute.
+	_ = computeLauncherMode("", false, false)
+
 	projectRoot := ""
 	if wipnoteDir, err := findWipnoteDir(); err == nil {
 		projectRoot = filepath.Dir(wipnoteDir)
