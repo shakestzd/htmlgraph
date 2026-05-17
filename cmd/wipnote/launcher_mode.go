@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/shakestzd/wipnote/internal/launcher/mode"
+	"github.com/shakestzd/wipnote/internal/launcher/plan"
 )
 
 // LauncherModeResult is the computed mode object exposed to preflight paths.
@@ -28,4 +30,36 @@ func computeLauncherMode(worktreePath string, devPlugin, generatedPort bool) Lau
 		)
 	}
 	return m
+}
+
+// applyLaunchPlan computes the isolation plan for a mutating launcher invocation
+// and prints any dirty-main warning to w. It does NOT create the worktree —
+// that will happen when the managed-worktree path is executed (slice-3+).
+//
+// Rollout rules (HIGH critique honored):
+//   - Host runtime → warn-only; RefuseLaunch is always false by default.
+//   - Devcontainer → managed-worktree when a workItemID is provided.
+//   - inPlace=true → IsolationExplicitInPlace; no warning.
+func applyLaunchPlan(repoRoot, workItemID string, inPlace bool, w io.Writer) plan.LaunchPlan {
+	m := mode.Compute("", false, false, false)
+	p, err := plan.PlanLaunch(plan.Input{
+		RepoRoot:    repoRoot,
+		WorkItemID:  workItemID,
+		RuntimeMode: m.Runtime,
+		InPlace:     inPlace,
+		// EnforceIsolation: false — gated off until slice-9 (migration/doctor).
+	})
+	if err != nil {
+		return p
+	}
+	if p.DirtyMainWarning != "" {
+		fmt.Fprintln(w, p.DirtyMainWarning)
+	}
+	if os.Getenv("WIPNOTE_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr,
+			"wipnote [debug]: launch-plan isolation=%s worktree=%s refuse=%v\n",
+			p.IsolationMode, p.PlannedWorktreePath, p.RefuseLaunch,
+		)
+	}
+	return p
 }

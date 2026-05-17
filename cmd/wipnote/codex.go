@@ -678,8 +678,8 @@ func promptYesNo(question string, yes bool) bool {
 
 // codexCmd returns the cobra command for `wipnote codex`.
 func codexCmd() *cobra.Command {
-	var init_, continue_, dev, cleanup, dryRun, yes, noWorktree, yolo bool
-	var resumeID, trackID, featureID, worktreePath, workItem string
+	var init_, continue_, dev, cleanup, dryRun, yes, noWorktree, inPlace, yolo bool
+	var resumeID, trackID, featureID, worktreePath, workItem, baseBranch string
 
 	cmd := &cobra.Command{
 		Use:   "codex",
@@ -706,7 +706,9 @@ Session IDs come from ~/.codex/session_index.jsonl.`,
 			case continue_:
 				return launchCodexContinue(resumeID, yolo, args)
 			default:
-				return launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem, noWorktree, yolo, args)
+				effectiveInPlace := inPlace || noWorktree
+				_ = baseBranch // reserved for slice-3+
+				return launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem, effectiveInPlace, yolo, args)
 			}
 		},
 	}
@@ -717,13 +719,15 @@ Session IDs come from ~/.codex/session_index.jsonl.`,
 	cmd.Flags().BoolVar(&cleanup, "cleanup", false, "With --dev: unregister the local marketplace on exit")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would happen without executing")
 	cmd.Flags().BoolVar(&yes, "yes", false, "Answer yes to all prompts (non-interactive)")
-	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation (run in project root)")
+	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation; run in project root (alias for --in-place)")
+	cmd.Flags().BoolVar(&inPlace, "in-place", false, "Intentional in-place mutation; records opt-out of isolation")
 	cmd.Flags().BoolVar(&yolo, "yolo", false, "Pass Codex --dangerously-bypass-approvals-and-sandbox")
 	cmd.Flags().StringVar(&resumeID, "resume", "", "Resume a specific Codex session by ID")
 	cmd.Flags().StringVar(&trackID, "track", "", "Track ID to work on (e.g., trk-3719d8f3)")
 	cmd.Flags().StringVar(&featureID, "feature", "", "Feature ID to work on (e.g., feat-15c458aa)")
 	cmd.Flags().StringVar(&worktreePath, "worktree", "", "Explicit worktree path (overrides --track/--feature resolution)")
 	cmd.Flags().StringVar(&workItem, "work-item", "", "Work item ID for attribution prefix (e.g., feat-15c458aa)")
+	cmd.Flags().StringVar(&baseBranch, "base", "", "Base branch for managed worktree (advanced; default: current HEAD)")
 
 	return cmd
 }
@@ -862,10 +866,10 @@ func runCodexInit(yes, dryRun bool) error {
 // This replaces the historical "user must run --init first" path with the
 // brew/curl-install bundled tree.
 func launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem string, noWorktree, yolo bool, extraArgs []string) error {
-	// Compute launcher mode for preflight logging/inspection (no behavior change).
-	_ = computeLauncherMode(worktreePath, false, false)
-
 	projectRoot, _ := resolveProjectRoot()
+	// Apply isolation plan: compute dirty-main guard warning, record isolation decision.
+	// noWorktree here is effectiveInPlace (--in-place || --no-worktree).
+	applyLaunchPlan(projectRoot, workItem, noWorktree, os.Stderr)
 	configPath := codexConfigPath()
 
 	// Auto-register the bundled marketplace if not registered.

@@ -241,10 +241,10 @@ func maybeEnsureGeminiExtensionOnLaunch(dryRun bool) {
 // launchGeminiDefault launches Gemini interactively with wipnote env injection.
 // Corresponds to: wipnote gemini
 func launchGeminiDefault(trackID, featureID, worktreePath, workItem string, noWorktree bool, extraArgs []string, dryRun bool) error {
-	// Compute launcher mode for preflight logging/inspection (no behavior change).
-	_ = computeLauncherMode(worktreePath, false, false)
-
 	projectRoot, _ := resolveProjectRoot()
+	// Apply isolation plan: compute dirty-main guard warning, record isolation decision.
+	// noWorktree here is effectiveInPlace (--in-place || --no-worktree).
+	applyLaunchPlan(projectRoot, workItem, noWorktree, os.Stderr)
 	maybeEnsureGeminiExtensionOnLaunch(dryRun)
 
 	// Work item attribution: emit `wipnote feature start <id>` before launching.
@@ -476,8 +476,8 @@ func resolveLocalGeminiExtension() (string, error) {
 
 // geminiCmd returns the cobra command for `wipnote gemini`.
 func geminiCmd() *cobra.Command {
-	var init_, continue_, dev, force, isolate, listSessions, dryRun, noWorktree bool
-	var resumeIndex, ref, trackID, featureID, worktreePath, workItem string
+	var init_, continue_, dev, force, isolate, listSessions, dryRun, noWorktree, inPlace bool
+	var resumeIndex, ref, trackID, featureID, worktreePath, workItem, baseBranch string
 
 	cmd := &cobra.Command{
 		Use:   "gemini",
@@ -512,7 +512,9 @@ Installation:
 			case resumeIndex != "":
 				return launchGeminiResume(resumeIndex, args, dryRun)
 			default:
-				return launchGeminiDefault(trackID, featureID, worktreePath, workItem, noWorktree, args, dryRun)
+				effectiveInPlace := inPlace || noWorktree
+				_ = baseBranch // reserved for slice-3+
+				return launchGeminiDefault(trackID, featureID, worktreePath, workItem, effectiveInPlace, args, dryRun)
 			}
 		},
 	}
@@ -524,13 +526,15 @@ Installation:
 	cmd.Flags().BoolVar(&isolate, "isolate", false, "With --dev: pass -e wipnote to suppress other extensions")
 	cmd.Flags().BoolVar(&listSessions, "list-sessions", false, "Pass-through to gemini --list-sessions")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would happen without executing")
-	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation (run in project root)")
+	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation; run in project root (alias for --in-place)")
+	cmd.Flags().BoolVar(&inPlace, "in-place", false, "Intentional in-place mutation; records opt-out of isolation")
 	cmd.Flags().StringVar(&resumeIndex, "resume", "", "Resume a specific Gemini session by index (e.g. --resume 3)")
 	cmd.Flags().StringVar(&ref, "ref", "", "With --init: override the extension ref (default: gemini-extension-v<version>)")
 	cmd.Flags().StringVar(&trackID, "track", "", "Track ID to work on (e.g., trk-3719d8f3)")
 	cmd.Flags().StringVar(&featureID, "feature", "", "Feature ID to work on (e.g., feat-15c458aa)")
 	cmd.Flags().StringVar(&worktreePath, "worktree", "", "Explicit worktree path (overrides --track/--feature resolution)")
 	cmd.Flags().StringVar(&workItem, "work-item", "", "Work item ID for attribution prefix (e.g., feat-15c458aa)")
+	cmd.Flags().StringVar(&baseBranch, "base", "", "Base branch for managed worktree (advanced; default: current HEAD)")
 
 	return cmd
 }

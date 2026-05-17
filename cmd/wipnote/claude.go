@@ -61,6 +61,10 @@ type LaunchOpts struct {
 func claudeCmd() *cobra.Command {
 	var dev, init_, continue_, auto, tmux bool
 	var resumeID, name string
+	// Isolation flags (slice-2). --no-worktree and --in-place are mutually equivalent;
+	// --in-place is the preferred semantic name going forward.
+	var noWorktree, inPlace bool
+	var workItem, baseBranch string
 
 	cmd := &cobra.Command{
 		Use:   "claude",
@@ -75,6 +79,9 @@ func claudeCmd() *cobra.Command {
 			if err := maybeTmuxWrap("wipnote-dev"); err != nil {
 				return err
 			}
+			// --no-worktree is a legacy alias for --in-place.
+			effectiveInPlace := inPlace || noWorktree
+			_ = baseBranch // reserved for slice-3+; accepted but not yet acted on
 			switch {
 			case dev:
 				return launchClaudeDev(args, auto, resumeID, name)
@@ -85,7 +92,7 @@ func claudeCmd() *cobra.Command {
 			case continue_:
 				return launchClaudeContinue(args, resumeID)
 			default:
-				return launchClaudeDefault(args, resumeID, name)
+				return launchClaudeDefault(args, resumeID, name, workItem, effectiveInPlace)
 			}
 		},
 	}
@@ -94,8 +101,12 @@ func claudeCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&init_, "init", false, "Launch with marketplace plugin installation")
 	cmd.Flags().BoolVar(&continue_, "continue", false, "Resume last session with marketplace plugin")
 	cmd.Flags().BoolVar(&tmux, "tmux", false, "Wrap in a tmux session named 'wipnote-dev' (survives disconnects; reattaches on re-run)")
+	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation; run in project root (alias for --in-place)")
+	cmd.Flags().BoolVar(&inPlace, "in-place", false, "Intentional in-place mutation; preserves existing behavior, records opt-out of isolation")
 	cmd.Flags().StringVar(&resumeID, "resume", "", "Resume a specific Claude Code session by ID")
 	cmd.Flags().StringVar(&name, "name", "", "Session label shown in Claude TUI (default: <project>-<timestamp>)")
+	cmd.Flags().StringVar(&workItem, "work-item", "", "Work item ID for isolation planning (e.g. feat-15c458aa, trk-3719d8f3)")
+	cmd.Flags().StringVar(&baseBranch, "base", "", "Base branch for managed worktree (advanced; default: current HEAD)")
 	cmd.AddCommand(yoloCmd())
 	return cmd
 }
@@ -414,9 +425,16 @@ func launchClaudeContinue(extraArgs []string, resumeID string) error {
 	})
 }
 
-func launchClaudeDefault(extraArgs []string, resumeID, name string) error {
+func launchClaudeDefault(extraArgs []string, resumeID, name, workItem string, inPlace bool) error {
 	projectRoot, _ := resolveProjectRoot()
 	cleanupStaleDev(projectRoot)
+
+	// Run the isolation planner (slice-2). The plan is computed and any warning
+	// is printed; the actual worktree is not yet created here (that happens when
+	// slice-3 canonical identity and slice-4 session-family land). For now we
+	// record the decision and emit the dirty-main guard warning.
+	applyLaunchPlan(projectRoot, workItem, inPlace, os.Stderr)
+
 	pluginDir, err := resolveBundledPluginDir()
 	if err != nil {
 		return err

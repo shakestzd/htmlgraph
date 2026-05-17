@@ -15,7 +15,7 @@ import (
 )
 
 func yoloCmd() *cobra.Command {
-	var dev, initMode, continueMode, noWorktree, tmux bool
+	var dev, initMode, continueMode, noWorktree, inPlace, tmux bool
 	var permMode, trackID, featureID, resumeID, name string
 
 	cmd := &cobra.Command{
@@ -45,13 +45,15 @@ Without either flag, launches in planning mode to help you create one first.`,
 			}
 			switch {
 			case dev:
-				return launchYoloDev(trackID, featureID, noWorktree, resumeID, name, args)
+				effectiveInPlaceDev := inPlace || noWorktree
+				return launchYoloDev(trackID, featureID, effectiveInPlaceDev, resumeID, name, args)
 			case initMode:
 				return launchYoloInit(trackID, featureID, resumeID, name, args)
 			case continueMode:
 				return launchYoloContinue(args, resumeID)
 			default:
-				return launchYoloDefault(permMode, trackID, featureID, noWorktree, resumeID, name, args)
+				effectiveInPlace := inPlace || noWorktree
+				return launchYoloDefault(permMode, trackID, featureID, effectiveInPlace, resumeID, name, args)
 			}
 		},
 	}
@@ -59,7 +61,8 @@ Without either flag, launches in planning mode to help you create one first.`,
 	cmd.Flags().BoolVar(&dev, "dev", false, "Load plugin from local source (development mode)")
 	cmd.Flags().BoolVar(&initMode, "init", false, "Initialize .wipnote/ then launch in YOLO mode")
 	cmd.Flags().BoolVar(&continueMode, "continue", false, "Resume last YOLO session")
-	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation (run in project root)")
+	cmd.Flags().BoolVar(&noWorktree, "no-worktree", false, "Skip worktree creation; run in project root (alias for --in-place)")
+	cmd.Flags().BoolVar(&inPlace, "in-place", false, "Intentional in-place mutation; records opt-out of isolation")
 	cmd.Flags().BoolVar(&tmux, "tmux", false, "Wrap yolo in a tmux session named 'wipnote-yolo' (survives disconnects; reattaches on re-run)")
 	cmd.Flags().StringVar(&permMode, "permission-mode", "bypassPermissions",
 		"Permission mode (bypassPermissions, acceptEdits)")
