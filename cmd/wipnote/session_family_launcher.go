@@ -12,31 +12,38 @@ import (
 //  1. If WIPNOTE_SESSION_FAMILY_ID is already set in the environment (e.g. the
 //     user is re-running inside a shell that already has the launcher env
 //     injected), reuse it — this keeps all sub-invocations in one family.
-//  2. If this is a resume/continue launch AND the project has an existing active
-//     session with a known family, inherit that family so resumed sessions are
-//     grouped with their originating session.
+//  2. If this is a resume/continue launch:
+//     a. When the concrete resumed session ID is known (resumeID != ""), look
+//        up THAT session's family directly. Resuming session X must join
+//        family X — never an arbitrary parallel root's family.
+//     b. When no concrete ID is known ("resume last"), inherit the family of
+//        the most-recently-registered session by timestamp order, not by Go
+//        map iteration (which is randomized and, with parallel roots, would
+//        attach the resumed session to an arbitrary unrelated family).
 //  3. Otherwise create a new family ID equal to the new session ID (each fresh
 //     start is its own family of one until a resume joins it).
 //
-// The projectDir and isResume arguments let the caller signal resume intent.
+// projectDir and isResume let the caller signal resume intent. resumeID is the
+// concrete harness session ID being resumed when the caller knows it (""
+// otherwise — e.g. Gemini's numeric --resume index or "resume last").
 // newSessionID is the freshly-minted OTel session ID for this launch.
-func resolveSessionFamilyID(projectDir, newSessionID string, isResume bool) string {
+func resolveSessionFamilyID(projectDir, newSessionID, resumeID string, isResume bool) string {
 	// 1. Inherit from environment (nested / re-launched within the same family).
 	if v := os.Getenv("WIPNOTE_SESSION_FAMILY_ID"); v != "" {
 		return v
 	}
 
-	// 2. On resume: look up the most-recently-written session state and inherit
-	//    its family. This creates the concrete link between resumed sessions.
 	if isResume && projectDir != "" {
-		// Read the family index to find the most recent family for this project.
-		idx, err := agent.ReadSessionFamilyIndex(projectDir)
-		if err == nil && len(idx) > 0 {
-			// Return the first family found — any family is better than none.
-			// The session start hook will set the DB column from this value.
-			for _, fam := range idx {
+		// 2a. Concrete resumed session ID known → resolve its OWN family.
+		if resumeID != "" {
+			if fam := agent.SessionFamilyFor(projectDir, resumeID); fam != "" {
 				return fam
 			}
+		}
+		// 2b. "Resume last" / unknown concrete ID → most-recently-registered
+		//     session's family by timestamp order (deterministic, not map order).
+		if fam := agent.MostRecentSessionFamily(projectDir); fam != "" {
+			return fam
 		}
 	}
 

@@ -17,7 +17,7 @@ func TestResolveSessionFamilyID_FreshLaunch(t *testing.T) {
 	}
 	t.Setenv("WIPNOTE_SESSION_FAMILY_ID", "")
 
-	got := resolveSessionFamilyID(dir, "new-sess-001", false)
+	got := resolveSessionFamilyID(dir, "new-sess-001", "", false)
 	if got != "new-sess-001" {
 		t.Errorf("fresh launch family = %q, want %q", got, "new-sess-001")
 	}
@@ -29,7 +29,7 @@ func TestResolveSessionFamilyID_InheritEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("WIPNOTE_SESSION_FAMILY_ID", "existing-family-xyz")
 
-	got := resolveSessionFamilyID(dir, "new-sess-002", false)
+	got := resolveSessionFamilyID(dir, "new-sess-002", "", false)
 	if got != "existing-family-xyz" {
 		t.Errorf("env inherit family = %q, want %q", got, "existing-family-xyz")
 	}
@@ -49,9 +49,70 @@ func TestResolveSessionFamilyID_ResumeInheritsFamily(t *testing.T) {
 		t.Fatalf("RegisterSessionFamily: %v", err)
 	}
 
-	got := resolveSessionFamilyID(dir, "new-resumed-sess", true /* isResume */)
+	got := resolveSessionFamilyID(dir, "new-resumed-sess", "", true /* isResume */)
 	if got != "family-abc" {
 		t.Errorf("resume family = %q, want %q", got, "family-abc")
+	}
+}
+
+// TestResolveSessionFamilyID_ResumeConcreteSession verifies that when a
+// concrete resumed session ID is known, its OWN family is inherited even when
+// other unrelated parallel-root families exist in the index. This is the
+// regression guard for the map-iteration bug: resuming sess-x must yield
+// family-x, never the family of an unrelated parallel root.
+func TestResolveSessionFamilyID_ResumeConcreteSession(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".wipnote"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	t.Setenv("WIPNOTE_SESSION_FAMILY_ID", "")
+
+	// Two unrelated parallel roots plus the one we will resume.
+	if err := agent.RegisterSessionFamily(dir, "root-1", "family-1"); err != nil {
+		t.Fatalf("register root-1: %v", err)
+	}
+	if err := agent.RegisterSessionFamily(dir, "sess-x", "family-x"); err != nil {
+		t.Fatalf("register sess-x: %v", err)
+	}
+	if err := agent.RegisterSessionFamily(dir, "root-2", "family-2"); err != nil {
+		t.Fatalf("register root-2: %v", err)
+	}
+
+	// Resuming the concrete session sess-x must yield family-x deterministically
+	// regardless of map iteration order over {root-1, sess-x, root-2}.
+	for i := 0; i < 20; i++ {
+		got := resolveSessionFamilyID(dir, "new-sess", "sess-x", true /* isResume */)
+		if got != "family-x" {
+			t.Fatalf("iter %d: resume concrete sess-x family = %q, want %q", i, got, "family-x")
+		}
+	}
+}
+
+// TestResolveSessionFamilyID_ResumeLastIsMostRecent verifies that a "resume
+// last" launch (no concrete session ID) inherits the family of the
+// most-recently-registered session, not an arbitrary map entry.
+func TestResolveSessionFamilyID_ResumeLastIsMostRecent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".wipnote"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	t.Setenv("WIPNOTE_SESSION_FAMILY_ID", "")
+
+	if err := agent.RegisterSessionFamily(dir, "old-root", "family-old"); err != nil {
+		t.Fatalf("register old-root: %v", err)
+	}
+	if err := agent.RegisterSessionFamily(dir, "mid-root", "family-mid"); err != nil {
+		t.Fatalf("register mid-root: %v", err)
+	}
+	if err := agent.RegisterSessionFamily(dir, "new-root", "family-new"); err != nil {
+		t.Fatalf("register new-root: %v", err)
+	}
+
+	for i := 0; i < 20; i++ {
+		got := resolveSessionFamilyID(dir, "fresh-sess", "", true /* isResume */)
+		if got != "family-new" {
+			t.Fatalf("iter %d: resume-last family = %q, want %q (most recent)", i, got, "family-new")
+		}
 	}
 }
 

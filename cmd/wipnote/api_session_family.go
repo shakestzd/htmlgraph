@@ -44,27 +44,53 @@ func familyTreeHandler(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Build the full event tree (all sessions, all harnesses) and then
-		// filter down to turns belonging to this family. This reuses the
-		// existing merge/dedup/sort pipeline without duplicating it.
-		allTurns, err := buildEventTree(database, limit*len(sessionIDs))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("build event tree: %v", err), http.StatusInternalServerError)
-			return
-		}
-
 		// Build a set of family session IDs for O(1) lookup.
 		inFamily := make(map[string]bool, len(sessionIDs))
 		for _, sid := range sessionIDs {
 			inFamily[sid] = true
 		}
 
+		// buildEventTree applies a GLOBAL newest-first limit before any family
+		// filtering is possible. If recent, unrelated sessions fill that global
+		// window, a family whose turns are older returns empty/incomplete. To
+		// fetch family-specific turns before the requested limit bites, grow the
+		// global fetch budget until the family is fully represented (>= limit
+		// family turns) or a hard ceiling is reached. The ceiling bounds work on
+		// pathological histories while still scanning far enough back to surface
+		// an older family's turns.
+		const familyFetchCeiling = 5000
+		fetch := limit * len(sessionIDs)
+		if fetch < limit {
+			fetch = limit
+		}
 		var familyTurns []turn
-		for _, t := range allTurns {
-			if inFamily[t.SessionID] {
-				familyTurns = append(familyTurns, t)
+		for {
+			allTurns, err := buildEventTree(database, fetch)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("build event tree: %v", err), http.StatusInternalServerError)
+				return
+			}
+
+			familyTurns = familyTurns[:0]
+			for _, t := range allTurns {
+				if inFamily[t.SessionID] {
+					familyTurns = append(familyTurns, t)
+				}
+			}
+
+			// Stop when we have enough family turns to satisfy the requested
+			// limit, when the underlying scan is exhausted (fewer rows returned
+			// than requested means there is no older data to find), or when the
+			// hard ceiling is hit.
+			if len(familyTurns) >= limit || len(allTurns) < fetch || fetch >= familyFetchCeiling {
+				break
+			}
+			fetch *= 2
+			if fetch > familyFetchCeiling {
+				fetch = familyFetchCeiling
 			}
 		}
+
 		if len(familyTurns) > limit {
 			familyTurns = familyTurns[:limit]
 		}

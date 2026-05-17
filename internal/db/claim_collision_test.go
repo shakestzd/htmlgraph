@@ -70,6 +70,82 @@ func TestClaimCollisionPolicy(t *testing.T) {
 	}
 }
 
+// TestSameHarnessTwoRootSessionsCollision is the headline slice-5 case:
+// two ROOT sessions from the SAME harness claim the same work item. Root
+// sessions share an (empty) claimed_by_agent_id, so before the renewal
+// identity included owner_session_id the second ClaimItemOrRenew silently
+// renewed the first session's row instead of inserting a second claimant —
+// and DetectCollaboration never saw the collision. This test fails with the
+// old (work_item_id, claimed_by_agent_id)-only renewal and passes once
+// owner_session_id is part of the renewal identity.
+func TestSameHarnessTwoRootSessionsCollision(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	insertExtraFeature(t, database, "feat-tworoot")
+	insertExtraSession(t, database, "sess-root-1", "claude-code")
+	insertExtraSession(t, database, "sess-root-2", "claude-code")
+
+	// First root session — same harness, empty claimed_by_agent_id (root).
+	c1 := &models.Claim{
+		ClaimID:          "clm-root-1",
+		WorkItemID:       "feat-tworoot",
+		OwnerSessionID:   "sess-root-1",
+		OwnerAgent:       "claude-code",
+		ClaimedByAgentID: "", // root / orchestrator: no subagent discriminator
+		Status:           models.ClaimInProgress,
+	}
+	if err := db.ClaimItemOrRenew(database, c1, 30*time.Minute); err != nil {
+		t.Fatalf("first root claim: %v", err)
+	}
+
+	// Second root session, SAME harness, SAME empty claimed_by_agent_id.
+	c2 := &models.Claim{
+		ClaimID:          "clm-root-2",
+		WorkItemID:       "feat-tworoot",
+		OwnerSessionID:   "sess-root-2",
+		OwnerAgent:       "claude-code",
+		ClaimedByAgentID: "",
+		Status:           models.ClaimInProgress,
+	}
+	if err := db.ClaimItemOrRenew(database, c2, 30*time.Minute); err != nil {
+		t.Fatalf("second root claim (warn-and-allow must succeed): %v", err)
+	}
+
+	// Both root sessions must hold distinct active claim rows.
+	claimsForItem, err := db.ListClaimsForWorkItem(database, "feat-tworoot")
+	if err != nil {
+		t.Fatalf("ListClaimsForWorkItem: %v", err)
+	}
+	if len(claimsForItem) != 2 {
+		t.Fatalf("expected exactly 2 active claims (one per root session), got %d", len(claimsForItem))
+	}
+
+	// DetectCollaboration must report the collision between the two roots.
+	coll, err := db.DetectCollaboration(database, "feat-tworoot")
+	if err != nil {
+		t.Fatalf("DetectCollaboration: %v", err)
+	}
+	if !coll.HasCollision {
+		t.Fatal("expected HasCollision=true for two root sessions on same work item")
+	}
+	if len(coll.Claimants) != 2 {
+		t.Fatalf("expected 2 distinct claimants, got %d", len(coll.Claimants))
+	}
+
+	// Idempotency guard: a SAME-session re-claim renews in place (no 3rd row).
+	if err := db.ClaimItemOrRenew(database, c1, 30*time.Minute); err != nil {
+		t.Fatalf("re-claim from sess-root-1: %v", err)
+	}
+	again, err := db.ListClaimsForWorkItem(database, "feat-tworoot")
+	if err != nil {
+		t.Fatalf("ListClaimsForWorkItem after re-claim: %v", err)
+	}
+	if len(again) != 2 {
+		t.Fatalf("re-claim from same session must renew in place, expected 2 rows, got %d", len(again))
+	}
+}
+
 // TestParallelHarnessClaims — three harnesses (Claude, Codex, Gemini) claim the
 // same work item concurrently. All three must coexist; collaboration state shows
 // all three with correct attribution (session, agent/harness).

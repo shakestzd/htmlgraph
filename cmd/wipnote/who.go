@@ -9,6 +9,7 @@ import (
 	"time"
 
 	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/harness"
 	"github.com/shakestzd/wipnote/internal/hooks"
 	"github.com/shakestzd/wipnote/internal/provenance"
 	"github.com/spf13/cobra"
@@ -97,12 +98,13 @@ func runWho(jsonOut bool) error {
 		sessionID, _ = dbpkg.MostRecentActiveSession(database)
 	}
 
-	// Detect harness from environment.
+	// Detect the raw harness token from the environment. The launcher sets
+	// WIPNOTE_AGENT_ID to the AgentID ("codex"/"gemini"), and subagents set it
+	// to an arbitrary agent role name — neither is the display harness name
+	// resolveTaskTrackingInfo keys on. Authoritative resolution happens below
+	// once the claim identity (DB owner_agent) is loaded; this is the fallback.
 	prov := provenance.Detect()
-	harness := prov.Agent
-	if harness == "" {
-		harness = "claude-code" // default
-	}
+	rawHarness := prov.Agent
 
 	// Resolve session family from DB.
 	familyID := sessionID
@@ -121,13 +123,28 @@ func runWho(jsonOut bool) error {
 		identity, _ = dbpkg.GetClaimIdentity(database, sessionID)
 	}
 
+	// Resolve the display harness name. Prefer the claim/session DB owner_agent
+	// (authoritative for what actually claimed the work, and correct even for
+	// subagent sessions whose WIPNOTE_AGENT_ID is a role name, not a harness),
+	// falling back to the env token. Normalize through the harness registry so
+	// launcher AgentIDs ("codex"/"gemini") and DB IDs ("gemini_cli") map to the
+	// canonical display name ("codex-cli"/"gemini-cli") before capability lookup.
+	harnessToken := rawHarness
+	if identity != nil && identity.Harness != "" {
+		harnessToken = identity.Harness
+	}
+	displayHarness := harness.NormalizeDisplayName(harnessToken)
+	if displayHarness == "" {
+		displayHarness = "claude-code" // default when nothing is known
+	}
+
 	// Per-harness task tracking support.
-	taskInfo := resolveTaskTrackingInfo(harness)
+	taskInfo := resolveTaskTrackingInfo(displayHarness)
 
 	out := whoOutput{
 		SessionID:       sessionID,
 		SessionFamilyID: familyID,
-		Harness:         harness,
+		Harness:         displayHarness,
 		IsSubagent:      false,
 		TaskTracking:    taskInfo,
 	}
@@ -169,8 +186,8 @@ func runWho(jsonOut bool) error {
 }
 
 // resolveTaskTrackingInfo returns per-harness task lifecycle tracking support.
-func resolveTaskTrackingInfo(harness string) taskTrackingInfo {
-	switch harness {
+func resolveTaskTrackingInfo(displayHarness string) taskTrackingInfo {
+	switch displayHarness {
 	case "claude-code":
 		return taskTrackingInfo{
 			Supported: true,
@@ -189,7 +206,7 @@ func resolveTaskTrackingInfo(harness string) taskTrackingInfo {
 	default:
 		return taskTrackingInfo{
 			Supported: false,
-			Detail:    fmt.Sprintf("unknown harness %q; task lifecycle tracking status unknown", harness),
+			Detail:    fmt.Sprintf("unknown harness %q; task lifecycle tracking status unknown", displayHarness),
 		}
 	}
 }

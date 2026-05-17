@@ -140,7 +140,14 @@ func GetClaimIdentity(database *sql.DB, sessionID string) (*ClaimIdentity, error
 	}
 	id.LeasedAt, _ = time.Parse(time.RFC3339, leasedStr)
 	id.IsSubagent = isSubagent == 1
-	if id.ExecutionRoot == "" || id.IsSubagent {
+	// ExecutionRoot is COALESCE(parent_session_id, '') from the query: for a
+	// subagent claim it should be the parent/root session, NOT the child's own
+	// session. Only fall back to OwnerSessionID when no parent is recorded
+	// (root sessions, or subagents whose parent linkage was never written) —
+	// the old `|| id.IsSubagent` clause clobbered a valid parent_session_id
+	// with the child session, making the execution root point at the subagent
+	// itself instead of its parent/root.
+	if id.ExecutionRoot == "" {
 		id.ExecutionRoot = id.OwnerSessionID
 	}
 	return id, nil

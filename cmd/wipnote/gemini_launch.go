@@ -248,7 +248,10 @@ func execGemini(opts geminiLaunchOpts) error {
 	// that survives even when hooks are not configured).
 	if otelSessionID != "" && effectiveProjDir != "" {
 		isResume := opts.ResumeLast || opts.ResumeIndex != ""
-		familyID := resolveSessionFamilyID(effectiveProjDir, otelSessionID, isResume)
+		// Gemini resume is a numeric --resume <N> index, never a wipnote
+		// session ID, so no concrete resumed session ID is available here;
+		// resolveSessionFamilyID uses the ordered most-recent-session family.
+		familyID := resolveSessionFamilyID(effectiveProjDir, otelSessionID, "", isResume)
 		env = setOrReplaceEnv(env, "WIPNOTE_SESSION_FAMILY_ID", familyID)
 		persistLauncherSessionFamily(effectiveProjDir, otelSessionID, "gemini", familyID)
 	}

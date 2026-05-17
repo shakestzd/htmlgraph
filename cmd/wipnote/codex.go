@@ -1302,7 +1302,11 @@ func execCodex(opts codexLaunchOpts) error {
 	// that survives even when hooks are not configured).
 	if otelSessionID != "" && effectiveProjDir != "" {
 		isResume := opts.ResumeID != "" || opts.ResumeLast
-		familyID := resolveSessionFamilyID(effectiveProjDir, otelSessionID, isResume)
+		// opts.ResumeID is the Codex-native session ID. It only matches a
+		// wipnote family-index key in the rare case the two coincide; when it
+		// does not, resolveSessionFamilyID falls through to the ordered
+		// most-recent-session family (correct for "resume last").
+		familyID := resolveSessionFamilyID(effectiveProjDir, otelSessionID, opts.ResumeID, isResume)
 		env = setOrReplaceEnv(env, "WIPNOTE_SESSION_FAMILY_ID", familyID)
 		persistLauncherSessionFamily(effectiveProjDir, otelSessionID, "codex", familyID)
 	}
