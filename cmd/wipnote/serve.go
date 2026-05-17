@@ -81,6 +81,8 @@ func buildSingleProjectMux(database *sql.DB, wipnoteDir string) *http.ServeMux {
 	mux.Handle("/api/events/recent", recentEventsHandler(database))
 	mux.Handle("/api/events/feed", eventsFeedHandler(database))
 	mux.Handle("/api/events/tree", treeHandler(database))
+	mux.Handle("/api/sessions/family", familyTreeHandler(database))
+	mux.Handle("/api/sessions/family-info", sessionFamilyHandler(database))
 	mux.Handle("/api/events/stream", sseHandler(database))
 	mux.Handle("/api/events/subagent", subagentEventsHandler(database))
 	mux.Handle("/api/sessions", sessionsHandler(database, projectDir, wipnoteDir))

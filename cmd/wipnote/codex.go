@@ -1271,6 +1271,19 @@ func execCodex(opts codexLaunchOpts) error {
 	}
 	env = buildCodexOtelEnv(env, otelPort, otelSessionID)
 	env = buildCodexAgentEnv(env)
+
+	// Session-family continuity (slice-4, feat-a225ce7c):
+	// Resolve which family this Codex session belongs to, then inject
+	// WIPNOTE_SESSION_FAMILY_ID so the SessionStart hook can write the DB column.
+	// Also persist the launcher-side state file immediately (concrete write path
+	// that survives even when hooks are not configured).
+	if otelSessionID != "" && effectiveProjDir != "" {
+		isResume := opts.ResumeID != "" || opts.ResumeLast
+		familyID := resolveSessionFamilyID(effectiveProjDir, otelSessionID, isResume)
+		env = setOrReplaceEnv(env, "WIPNOTE_SESSION_FAMILY_ID", familyID)
+		persistLauncherSessionFamily(effectiveProjDir, otelSessionID, "codex", familyID)
+	}
+
 	c.Env = env
 	if workDir != "" {
 		c.Dir = workDir
