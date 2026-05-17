@@ -522,44 +522,113 @@ func TestCleanLegacyDBIfSafe_WIPNOTE_DB_PATH_PointingAtLegacy(t *testing.T) {
 
 // ---- WAL-safe path selection tests (Slice 4) ----
 
-// TestCanonicalDBPath_PrefersWalSafeCandidate injects a probe that marks
-// overlayfs as unsafe and tmpfs as safe. When XDG_RUNTIME_DIR is unset and
-// TMPDIR points at a tmpfs-backed dir, the selected path must be under TMPDIR,
-// not the user-cache dir which is overlayfs.
-func TestCanonicalDBPath_PrefersWalSafeCandidate(t *testing.T) {
+// TestCanonicalDBPath_PrefersUserCacheWhenWalSafe verifies the default path is
+// managed by the cache-pruning system instead of volatile /tmp when both are
+// WAL-safe.
+func TestCanonicalDBPath_PrefersUserCacheWhenWalSafe(t *testing.T) {
 	t.Setenv("WIPNOTE_DB_PATH", "")
 	t.Setenv("XDG_RUNTIME_DIR", "")
 
+	cacheBase := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheBase)
 	tmpBase := t.TempDir()
 	t.Setenv("TMPDIR", tmpBase)
 
-	// Inject probe: tmpBase → tmpfs (safe); cacheBase → overlayfs (unsafe).
 	origProber := storage.FsTypeProber
 	t.Cleanup(func() { storage.FsTypeProber = origProber })
 	storage.FsTypeProber = func(path string) (string, bool) {
+		if strings.HasPrefix(path, cacheBase) {
+			return "ext4", true
+		}
 		if strings.HasPrefix(path, tmpBase) {
 			return "tmpfs", true
 		}
 		return "overlayfs", false
 	}
 
-	// We can't control UserCacheDir, but we can verify the returned path is
-	// under tmpBase (TMPDIR), which the probe marks as safe.
+	info, err := storage.CanonicalDBPathWithInfo("/some/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasPrefix(info.Path, cacheBase) {
+		t.Errorf("expected path under cacheBase %q, got %q", cacheBase, info.Path)
+	}
+	if !info.WalSafe {
+		t.Errorf("expected WalSafe=true for cache candidate")
+	}
+	if info.FsType != "ext4" {
+		t.Errorf("expected FsType=ext4, got %q", info.FsType)
+	}
+	if strings.Contains(info.Path, tmpBase) {
+		t.Errorf("must not choose volatile tmp path when cache is WAL-safe: %q", info.Path)
+	}
+}
+
+func TestCanonicalDBPath_SkipsTmpfsByDefaultWhenCacheUnsafe(t *testing.T) {
+	t.Setenv("WIPNOTE_DB_PATH", "")
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	t.Setenv("WIPNOTE_ALLOW_TMPFS_DB", "")
+
+	cacheBase := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheBase)
+	tmpBase := t.TempDir()
+	t.Setenv("TMPDIR", tmpBase)
+
+	origProber := storage.FsTypeProber
+	t.Cleanup(func() { storage.FsTypeProber = origProber })
+	storage.FsTypeProber = func(path string) (string, bool) {
+		if strings.HasPrefix(path, cacheBase) {
+			return "overlayfs", false
+		}
+		if strings.HasPrefix(path, tmpBase) {
+			return "tmpfs", true
+		}
+		return "overlayfs", false
+	}
+
+	info, err := storage.CanonicalDBPathWithInfo("/some/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasPrefix(info.Path, cacheBase) {
+		t.Errorf("expected path under cacheBase %q when tmpfs is skipped, got %q", cacheBase, info.Path)
+	}
+	if info.WalSafe || !strings.Contains(info.Reason, "tmpfs DB disabled") {
+		t.Errorf("expected DELETE-mode cache fallback, got reason=%q walSafe=%v", info.Reason, info.WalSafe)
+	}
+}
+
+func TestCanonicalDBPath_AllowsTmpfsWithOptIn(t *testing.T) {
+	t.Setenv("WIPNOTE_DB_PATH", "")
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	t.Setenv("WIPNOTE_ALLOW_TMPFS_DB", "1")
+
+	cacheBase := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheBase)
+	tmpBase := t.TempDir()
+	t.Setenv("TMPDIR", tmpBase)
+
+	origProber := storage.FsTypeProber
+	t.Cleanup(func() { storage.FsTypeProber = origProber })
+	storage.FsTypeProber = func(path string) (string, bool) {
+		if strings.HasPrefix(path, cacheBase) {
+			return "overlayfs", false
+		}
+		if strings.HasPrefix(path, tmpBase) {
+			return "tmpfs", true
+		}
+		return "overlayfs", false
+	}
+
 	info, err := storage.CanonicalDBPathWithInfo("/some/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.HasPrefix(info.Path, tmpBase) {
-		t.Errorf("expected path under tmpBase %q, got %q", tmpBase, info.Path)
+		t.Errorf("expected opted-in tmpfs path under %q, got %q", tmpBase, info.Path)
 	}
-	if !info.WalSafe {
-		t.Errorf("expected WalSafe=true for tmpfs candidate")
-	}
-	if info.FsType != "tmpfs" {
-		t.Errorf("expected FsType=tmpfs, got %q", info.FsType)
-	}
-	if !strings.Contains(info.Reason, "tmpfs") {
-		t.Errorf("expected reason to mention tmpfs, got %q", info.Reason)
+	if !info.WalSafe || info.FsType != "tmpfs" {
+		t.Errorf("expected tmpfs WAL-safe fallback, got fstype=%q walSafe=%v", info.FsType, info.WalSafe)
 	}
 }
 

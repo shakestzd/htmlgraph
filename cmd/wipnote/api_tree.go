@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/shakestzd/wipnote/internal/ingest"
 )
 
 // turnStats holds per-turn aggregate counts.
@@ -304,6 +306,9 @@ func buildEventTreeOtel(database *sql.DB, limit int) ([]turn, error) {
 		if promptText == "" && traceID != "" {
 			promptText = fetchPromptFromTrace(database, traceID)
 		}
+		if ingest.IsSystemMessage(promptText) {
+			continue
+		}
 
 		// Look up feature title when we have a feature_id.
 		featureTitle := ""
@@ -393,6 +398,9 @@ func buildEventTreeOtelLogFallback(database *sql.DB, limit int) ([]turn, error) 
 		}
 		anchor.AttrsRaw = attrsRaw
 		anchor.PromptText = extractPromptText(attrsRaw)
+		if ingest.IsSystemMessage(anchor.PromptText) {
+			continue
+		}
 		_, anchor.TSMicros = treeTimestampFromOtel(anchor.RawTSMicros, anchor.AttrsRaw)
 		if anchor.TSMicros == 0 {
 			continue
@@ -599,6 +607,9 @@ func buildEventTreeHookUnanchored(database *sql.DB, limit int) ([]turn, error) {
 	for rows.Next() {
 		evt := scanEvent(rows)
 		if evt == nil {
+			continue
+		}
+		if inputSummary, _ := evt["input_summary"].(string); ingest.IsSystemMessage(inputSummary) {
 			continue
 		}
 
@@ -1057,9 +1068,9 @@ func findToolUseInChildren(children []map[string]any, id string) bool {
 func nestTaskNotificationTurns(turns []turn) []turn {
 	// Separate notification turns from normal turns.
 	type notifTurn struct {
-		t          turn
-		toolUseID  string
-		taskID     string
+		t         turn
+		toolUseID string
+		taskID    string
 	}
 
 	var normal []turn

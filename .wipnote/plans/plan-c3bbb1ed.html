@@ -427,6 +427,13 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
       </a>
     </li>
     
+    <li>
+      <a href="#slice-5" class="slice-nav-item" data-slice-nav="5">
+        <span class="slice-nav-dot" data-approval="pending" data-dot-for="5"></span>
+        <span>#5 Tier 4 — Kanban work-board execution visibility</span>
+      </a>
+    </li>
+    
   </ul>
   
   <a href="#questions" class="nav-link" data-spy="questions" data-initial="Q">Decisions</a>
@@ -444,7 +451,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
   
   <div class="meta">
     <span class="badge badge-pending">Draft</span>
-    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 4 slices · Created 2026-05-16</span>
+    <span style="font-size:.75rem;color:var(--text-muted)">v2 · 5 slices · Created 2026-05-16</span>
   </div>
 </header>
 <button id="themeToggle" style="position:fixed;top:16px;right:16px;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:0.75rem;cursor:pointer;">
@@ -468,6 +475,7 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
     <div data-node="2" data-name="Tier 1 — Live file-overlap detection: who ⚠ flag + PreToolUse advisory (+ composite index)" data-status="pending" data-deps="1,4" data-files="5"></div>
     <div data-node="3" data-name="Tier 2 — Populate claims.write_scope.Paths in PreToolUse alongside the heartbeat UPDATE" data-status="pending" data-deps="1" data-files="4"></div>
     <div data-node="4" data-name="Tier 3 — Honest liveness + claimless visibility (session_files) + cross-harness release" data-status="pending" data-deps="1" data-files="7"></div>
+    <div data-node="5" data-name="Tier 4 — Kanban work-board execution visibility" data-status="pending" data-deps="1,2,4" data-files="9"></div>
     
     <!--PLAN_GRAPH_NODES-->
   </div>
@@ -488,13 +496,14 @@ body.right-rail-collapsed .sidebar-reopen{display:flex}
 <li data-markdown>Detect and warn on live file overlaps before edits are made</li>
 <li data-markdown>Build first-class file-ownership semantics via claims.write_scope</li>
 <li data-markdown>Establish honest session liveness and cross-harness lifecycle hooks</li>
+<li data-markdown>Make the dashboard Kanban board the user-facing source of truth for active work, step progress, ownership, and cross-CLI movement</li>
 </ol>
 <h4>Constraints</h4>
 <ul>
 <li data-markdown>Zero write amplification on the PreToolUse/PostToolUse hot path (feat-156e0a1a SQLITE_BUSY gate must stay at zero)</li>
-<li data-markdown>Use only existing DB columns and tables; no new session_files or file_lock tables</li>
+<li data-markdown>Avoid new hot-path lock tables; the only new derived table allowed by this plan is session_files for claimless file touches</li>
 <li data-markdown>Roster and overlap detection must be pull-queries (explicit CLI/API calls), not a live-watch daemon</li>
-<li data-markdown>Codex/Gemini SessionEnd hooks are required; cross-harness parity with Claude</li>
+<li data-markdown>Codex/Gemini liveness must be honest even when a harness lacks Claude-style SessionEnd semantics</li>
 </ul>
 
     <div class="approval-row">
@@ -1353,6 +1362,231 @@ session-end event — must verify Codex CLI lifecycle).</p>
     </details>
   </div>
 </details>
+<details class="slice-card" id="slice-5" data-slice="5" data-slice-name="slice-5" data-status="pending" data-approval="pending">
+  <summary class="slice-summary" aria-label="Slice 5: Tier 4 — Kanban work-board execution visibility">
+    <span class="slice-num">#5</span>
+    <span class="slice-title-col">
+      <span class="slice-name">Tier 4 — Kanban work-board execution visibility</span>
+      <span class="slice-preview">Promote the dashboard Work/Kanban view from a static work-item list into</span>
+      <span class="slice-meta-row">
+        <span class="slice-summary-badges">
+          <span class="badge badge-blocked badge-sm">L</span>
+          <span class="badge badge-revision badge-sm">Med</span>
+          <span class="badge badge-revision badge-sm badge-complexity" title="Complexity: complex">Complex</span>
+          
+          <span class="badge badge-pending badge-sm slice-approval-badge" data-badge-for="slice-5">Pending</span>
+          <span class="badge badge-sm badge-issues" title="3 critic issue(s)">3 issues</span>
+          <span class="badge badge-sm badge-questions" title="2 open question(s)">2 Q</span>
+        </span>
+        <span class="slice-actions" onclick="event.stopPropagation()">
+          <span class="approval-segmented" role="group" aria-label="Approval action">
+            <label class="seg-btn seg-approve" title="Approve">
+              <input type="radio" name="slice-5-approval" value="approved" data-section="slice-5" data-action="approve" aria-label="Approve slice 5">
+              &#10003;
+            </label>
+            <label class="seg-btn seg-changes" title="Request changes">
+              <input type="radio" name="slice-5-approval" value="changes_requested" data-section="slice-5" data-action="approve" aria-label="Request changes for slice 5">
+              &#8635;
+            </label>
+            <label class="seg-btn seg-reject" title="Reject">
+              <input type="radio" name="slice-5-approval" value="rejected" data-section="slice-5" data-action="approve" aria-label="Reject slice 5">
+              &#10005;
+            </label>
+          </span>
+        </span>
+      </span>
+    </span>
+    <span class="slice-chevron" aria-hidden="true"></span>
+  </summary>
+
+  <div class="slice-body">
+    
+      
+      <div class="slice-field slice-what">
+        <div class="slice-field-label">What</div>
+        <div class="slice-field-value">
+          
+          <input type="checkbox" id="slice-5-what-reveal" class="reveal-toggle">
+          <div class="markdown-block reveal-content serif-prose"><p>Promote the dashboard Work/Kanban view from a static work-item list into
+the user-facing coordination surface for concurrent CLIs. Extend
+/api/features with derived active-session/work-owner data from
+active_work_items + sessions + claims, step counters already stored on
+features, recent move/start/complete/add-step activity, and the file
+overlap signals from slices 1-4. Render those signals directly on
+Kanban cards and track groups: active CLI/model/session badge, step
+progress, last activity age, last touched file, overlap/conflict badge,
+and moved/reassigned markers. Keep card data read-only; canonical
+mutations still go through wipnote CLI commands and existing HTML
+work-item files.</p>
+<p>Define the cross-harness step contract explicitly. Claude TaskCreated /
+TaskCompleted continues to drive hook-only add-task-step /
+complete-task-step. Codex TaskStarted / TaskComplete and Gemini tool or
+session events must either map to the same canonical hidden commands
+when a work item is active, or be documented as unsupported with a
+visible dashboard &#34;steps not live for this harness&#34; state. Do not let a
+user infer that a stalled 0/N checklist is live if the harness cannot
+emit step events.</p>
+</div>
+          <label for="slice-5-what-reveal" class="reveal-label">Show full description</label>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field slice-why">
+        <div class="slice-field-label">Why</div>
+        <div class="slice-field-value">
+          
+          <div class="markdown-block serif-prose"><p>The first four slices give agents better file/session awareness, but the
+user still has to infer actual work progress from separate panels. The
+WAC Kanban board already groups work by status and track; this slice
+makes it the single glanceable answer to &#34;what is each CLI working on,
+what moved, what step is running, and where are conflicts?&#34;</p>
+</div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Files</div>
+        <div class="slice-field-value"><code>cmd/wipnote/api.go, cmd/wipnote/api_feature_activity.go, cmd/wipnote/dashboard/js/app.js, cmd/wipnote/dashboard/css/components.css, cmd/wipnote/workitem_modify.go, cmd/wipnote/workitem.go, internal/hooks/task_tracking.go, internal/hooks/missing_events.go, packages/plugin-core/manifest.json</code></div>
+      </div>
+      
+      
+      <div class="slice-field">
+        <div class="slice-field-label">Done when</div>
+        <ul class="slice-done-list slice-done-list--grid"><li>Kanban cards for in-progress work items show active CLI/session/model and claim lease freshness when present</li><li>Kanban cards show step progress (steps_completed/steps_total) without opening detail</li><li>Kanban cards show last activity age and last touched file, derived from feature activity and session/file data</li><li>Work items with live file overlap show the same conflict badge used by `wipnote who`</li><li>Track-group headers show active count, blocked/stale count, recently moved count, and done progress</li><li>Work detail shows step provenance (agent/CLI/session/timestamp) for task-created and task-completed steps</li><li>Start/complete/move/add-step/complete-task-step mutations are visible in the dashboard after refresh or the existing polling/SSE path</li><li>Cross-harness step tracking behavior is tested or explicitly surfaced as unsupported per harness; no dashboard state implies live step tracking when events are unavailable</li></ul>
+      </div>
+      
+    
+
+    
+    <div class="slice-field slice-decisions-notes">
+      <div class="slice-field-label">Decisions</div>
+      <div class="slice-field-value">
+        
+        <input type="checkbox" id="slice-5-decisions-reveal" class="reveal-toggle">
+        <div class="markdown-block reveal-content serif-prose"><p><strong>Trigger:</strong> dashboard /api/features load/refresh and existing
+feature-activity reads; hook-driven step events when available.
+<strong>State:</strong> derived from existing work-item HTML/SQLite tables,
+active_work_items, sessions, claims, feature activity, and session/file
+data from slices 1-4. No dashboard-authored canonical work-item writes.
+<strong>Payload:</strong> card-level owner/session/model, progress, last activity,
+last file, conflict, movement, and track aggregate fields.
+<strong>Track:</strong> trk-cd61bbae and trk-97f85b3b.
+<strong>Rejected:</strong> drag/drop mutation in this plan — first make existing CLI
+movement visible and trustworthy; interactive mutation can follow after
+the read model is stable.</p>
+</div>
+        <label for="slice-5-decisions-reveal" class="reveal-label">Show full decisions</label>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-tests-field">
+      <div class="slice-field-label">Test Strategy</div>
+      <div class="slice-field-value">
+        
+        
+        <div class="test-strategy">
+          
+          <div class="test-group" data-kind="api">
+            <span class="test-chip">API &middot; 1</span>
+            <ul><li>TestFeaturesHandler_WorkBoardSignals — active sessions, step counters, last activity, moved/reassigned metadata</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="dashboard">
+            <span class="test-chip">DASHBOARD &middot; 1</span>
+            <ul><li>renderKanban card unit/DOM test or focused browser smoke validates owner badges, progress, conflict, and no text overflow</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="hook">
+            <span class="test-chip">HOOK &middot; 1</span>
+            <ul><li>TestCodexTaskLifecycleStepMapping or explicit unsupported-state test, depending on actual Codex/Gemini events</li></ul>
+          </div>
+          
+          <div class="test-group" data-kind="regression">
+            <span class="test-chip">REGRESSION &middot; 1</span>
+            <ul><li>existing work detail still renders full step list and feature activity panels</li></ul>
+          </div>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-critic-revisions">
+      <div class="slice-field-label">Critic Revisions</div>
+      <div class="slice-field-value">
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">codex</span>
+          <span class="critic-revision-summary">Original plan made agent file visibility first-class but did not require Kanban cards or track groups to surface active work, step progress, movement, or conflicts. RESOLVED: slice-5 adds board/API acceptance criteria.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-blocked critic-revision-badge">HIGH</span>
+          <span class="critic-revision-source">codex</span>
+          <span class="critic-revision-summary">Cross-harness step execution visibility was undefined; current TaskCreated/TaskCompleted hooks are Claude-only while Codex/Gemini lifecycle differs. RESOLVED: slice-5 requires explicit mapping or visible unsupported state per harness.</span>
+        </div>
+        
+        <div class="critic-revision">
+          <span class="badge badge-revision critic-revision-badge">MED</span>
+          <span class="critic-revision-source">codex</span>
+          <span class="critic-revision-summary">Work-item movement via move/start/complete/add-step existed but was not part of the dashboard contract. RESOLVED: slice-5 requires moved/reassigned and mutation freshness visibility.</span>
+        </div>
+        
+      </div>
+    </div>
+    
+
+    
+    <div class="slice-field slice-questions">
+      <div class="slice-field-label">Open Questions</div>
+      <div class="slice-field-value">
+        
+        <div class="question-block slice-question-block">
+          <p>Should the Kanban board be the primary user-facing status surface?</p>
+          
+          
+          <textarea
+            data-section="slice-5-question-q-board-source"
+            data-comment-for="slice-5-question-q-board-source"
+            placeholder="Answer question q-board-source...">Yes — sessions/files panels support diagnosis, but Work/Kanban is the single glanceable progress surface for users.</textarea>
+          
+        </div>
+        
+        <div class="question-block slice-question-block">
+          <p>Should dashboard drag/drop move work items between columns or tracks?</p>
+          
+          
+          <textarea
+            data-section="slice-5-question-q-board-mutations"
+            data-comment-for="slice-5-question-q-board-mutations"
+            placeholder="Answer question q-board-mutations...">Not in this plan. Keep the dashboard read-only and reflect CLI mutations first; interactive board mutations can be a later slice.</textarea>
+          
+        </div>
+        
+      </div>
+    </div>
+    
+
+    <div class="slice-deps">Dependencies: slices 1,2,4</div>
+
+    <details class="comment-collapse">
+      <summary class="comment-collapse-trigger">+ Leave a comment</summary>
+      <div class="comment-collapse-body">
+        <textarea data-section="slice-5" data-comment-for="slice-5" placeholder="Comments on slice 5..."></textarea>
+      </div>
+    </details>
+  </div>
+</details>
 
     <!--PLAN_SLICE_CARDS-->
   </div>
@@ -1370,8 +1604,8 @@ session-end event — must verify Codex CLI lifecycle).</p>
   <h2>Feedback Summary</h2>
   <div class="progress-stats">
     <div class="progress-stat"><strong id="approvedCount">0</strong> approved</div>
-    <div class="progress-stat"><strong id="totalSections">5</strong> sections</div>
-    <div class="progress-stat"><strong id="pendingCount">5</strong> pending</div>
+    <div class="progress-stat"><strong id="totalSections">6</strong> sections</div>
+    <div class="progress-stat"><strong id="pendingCount">6</strong> pending</div>
   </div>
   <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
   <div class="comments-summary">
@@ -1451,7 +1685,7 @@ var planId=(function(){var a=document.querySelector('article[id]');return a?a.id
 
 (function(){
   'use strict';
-  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4"]/*END_PLAN_SECTIONS_JSON*/;
+  var SECTIONS=/*PLAN_SECTIONS_JSON*/["design","slice-1","slice-2","slice-3","slice-4","slice-5"]/*END_PLAN_SECTIONS_JSON*/;
 
   function setBadge(el,ok){
     el.className='badge badge-'+(ok?'approved':'pending');

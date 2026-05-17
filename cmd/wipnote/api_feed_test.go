@@ -140,6 +140,40 @@ func TestEventsFeedHandler_IncludesAssistantMessages(t *testing.T) {
 	}
 }
 
+func TestEventsFeedHandler_FiltersHookSystemPrompt(t *testing.T) {
+	database := seedFeedEventsDB(t)
+	_, err := database.Exec(`
+		INSERT INTO agent_events (
+			event_id, agent_id, event_type, timestamp, tool_name, input_summary, session_id, status
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"uq-review", "claude-code", "tool_call", "1970-01-01T00:00:01Z", "UserQuery",
+		"You are a code reviewer. Review the code changes shown below and provide feedback.",
+		"sess-feed-1", "recorded")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/events/feed?limit=10", nil)
+	rec := httptest.NewRecorder()
+	eventsFeedHandler(database).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var payload struct {
+		Events []feedEvent `json:"events"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, ev := range payload.Events {
+		if ev.ID == "uq-review" {
+			t.Fatalf("reviewer prompt leaked into feed: %+v", ev)
+		}
+	}
+}
+
 func TestDeduplicateUserPromptLogs(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -219,8 +253,8 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 			},
 			wantLen: 2,
 			wantType: map[int]string{
-				0: "api_request",  // preserved in original order
-				1: "user_prompt",  // codex event preserved (gemini user_prompt suppressed)
+				0: "api_request", // preserved in original order
+				1: "user_prompt", // codex event preserved (gemini user_prompt suppressed)
 			},
 		},
 		{
@@ -254,5 +288,47 @@ func TestDeduplicateUserPromptLogs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEventsFeedHandler_FiltersInternalPrompts(t *testing.T) {
+	database := seedFeedEventsDB(t)
+
+	mustInsert := func(args ...any) {
+		t.Helper()
+		_, err := database.Exec(`
+			INSERT INTO otel_signals (
+				signal_id, harness, session_id, kind, canonical, native, ts_micros,
+				tool_name, model, duration_ms, success, decision, attrs_json
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			args...,
+		)
+		if err != nil {
+			t.Fatalf("insert otel_signals: %v", err)
+		}
+	}
+
+	mustInsert("sig-resume", "codex", "sess-feed-1", "log", "user_prompt", "codex.user_prompt", int64(3000), "", "", int64(0), nil, "", `{"text":"↩ resumed: background task bt8yi6rhf completed"}`)
+	mustInsert("sig-reviewer", "codex", "sess-feed-1", "span", "interaction", "codex.interaction", int64(4000), "", "", int64(0), nil, "", `{"user_prompt":"You are a code reviewer. Review the code changes shown below and provide feedback."}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/events/feed?limit=10", nil)
+	rec := httptest.NewRecorder()
+	eventsFeedHandler(database).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var payload struct {
+		Events []feedEvent `json:"events"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	for _, ev := range payload.Events {
+		if ev.ID == "sig-resume" || ev.ID == "sig-reviewer" {
+			t.Fatalf("unexpected internal event in feed: %+v", ev)
+		}
 	}
 }

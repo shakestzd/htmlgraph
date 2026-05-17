@@ -5,9 +5,9 @@ meta:
     description: |
         Design production-ready launcher isolation across Claude, Codex, and Gemini: default branch/worktree behavior, devcontainer versus host deployment modes, and robust attribution/event capture for parallel CLIs and subagents.
     created_at: "2026-05-08"
-    status: active
+    status: finalized
     created_by: codex
-    version: 1
+    version: 2
 design:
     problem: |
         wipnote can currently launch multiple AI CLIs directly from a mutable checkout. That is convenient, but it allows long-running local stacks, generated plugin changes, work-item bookkeeping, and merged upstream work to accumulate on local main. The result is avoidable divergence, hard-to-review commits, and fragile reconciliation after PR merges. The obvious fix is to launch mutating sessions in isolated branches or worktrees by default, but that changes the shape of project identity, session continuity, active-session fallback state, event capture, subagent attribution, and dashboard grouping. The design must also account for the difference between production host installs and devcontainer sessions, where ports, bind addresses, filesystem permissions, plugin paths, and temp execution policy differ.
@@ -26,7 +26,7 @@ design:
         - 'Branch naming must remain compatible with existing work-item completion and lineage conventions until explicit metadata replaces branch-name inference. DELIVERED SUBSTRATE: branch-name-completion transition is delivered by plan-83f909bc slice-3 provenance gate (feat-7b593272); this plan does not re-implement it.'
         - Devcontainer defaults must bind dashboard services to 0.0.0.0:8088, while host installs keep the production default of 127.0.0.1:8080.
         - 'No implementation slice may rely solely on global mutable fallback files when parallel CLI sessions are expected. DELIVERED SUBSTRATE: SQLite single-writer contention is solved by plan-ae0c37b2 single-writer queue; this plan does not re-implement it.'
-        - 'Dashboard work-board and wipnote who visibility belong in plan-c3bbb1ed, but this plan must expose the stable identity/claim/session fields those views consume.'
+        - Dashboard work-board and wipnote who visibility belong in plan-c3bbb1ed, but this plan must expose the stable identity/claim/session fields those views consume.
         - 'Cross-plan provenance: slice-3 depends on plan-2133adf2 (feat-edbc978b, feat-3973e948); slice-5 depends on plan-83f909bc (feat-7b593272); slices 9/10 depend on plan-ae0c37b2 (feat-2c631aa9, feat-156e0a1a, feat-f3bcbcef).'
         - 'Surviving critical path: slice-1 (launcher mode contract) -> slice-2 (gated worktree launch) -> slice-4 (session-family). Slices 1, 4, and 8 are kept unchanged in intent.'
     approved: true
@@ -360,7 +360,7 @@ slices:
           summary: Tighten transition away from branch-name completion; metadata-based completion must be live before arbitrary fresh-worktree branch names are allowed.
         - source: codex
           severity: MED
-          summary: 'Cross-session visibility plan plan-c3bbb1ed consumes claim/session/step identity here; slice now exports those fields explicitly for `wipnote who`, /api/features, and Kanban.'
+          summary: Cross-session visibility plan plan-c3bbb1ed consumes claim/session/step identity here; slice now exports those fields explicitly for `wipnote who`, /api/features, and Kanban.
     - id: slice-7
       num: 7
       title: Dashboard worktree/session-family UX
@@ -428,7 +428,7 @@ slices:
           summary: Pin down dashboard grouping semantics and required API fields instead of leaving family grouping as an optional view.
         - source: codex
           severity: MED
-          summary: 'Dashboard UX now reserves the Work/Kanban identity data contract consumed by plan-c3bbb1ed, while leaving detailed card rendering to that visibility plan.'
+          summary: Dashboard UX now reserves the Work/Kanban identity data contract consumed by plan-c3bbb1ed, while leaving detailed card rendering to that visibility plan.
     - id: slice-8
       num: 8
       title: Host, devcontainer, and production deployment profiles

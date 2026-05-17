@@ -151,7 +151,7 @@ func parseGemini(r io.Reader) (*ParseResult, error) {
 
 func parseGeminiUserMessage(m geminiMessage, ordinal int) *models.Message {
 	content := extractGeminiUserContent(m.Content)
-	if content == "" {
+	if content == "" || IsSystemMessage(content) {
 		return nil
 	}
 

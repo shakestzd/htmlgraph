@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/ingest"
 	"github.com/shakestzd/wipnote/internal/models"
 )
 
@@ -38,6 +39,9 @@ func UserPrompt(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 
 	promptSummary := sanitizePrompt(event.Prompt)
 	if promptSummary == "" {
+		return &HookResult{Continue: true}, nil
+	}
+	if ingest.IsSystemMessage(promptSummary) {
 		return &HookResult{Continue: true}, nil
 	}
 	if len(promptSummary) > promptSummaryMaxLen {

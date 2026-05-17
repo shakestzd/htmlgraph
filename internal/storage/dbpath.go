@@ -62,11 +62,15 @@ type candidateRoot struct {
 
 // candidateRoots returns the ordered list of candidate root directories for
 // the DB cache. Priority:
-//  1. $XDG_RUNTIME_DIR (often tmpfs on Linux, tied to user session)
-//  2. $TMPDIR / /tmp  (tmpfs on most Linux systems; volatile but WAL-safe)
-//  3. os.UserCacheDir()  (overlayfs in devcontainers — safe fallback)
+//  1. os.UserCacheDir()  (persistent, managed by `wipnote cache prune`)
+//  2. $XDG_RUNTIME_DIR (often tmpfs on Linux, tied to user session)
+//  3. $TMPDIR / /tmp  (tmpfs on many Linux systems; volatile fallback)
 func candidateRoots() []candidateRoot {
 	var roots []candidateRoot
+
+	if cacheDir, err := os.UserCacheDir(); err == nil {
+		roots = append(roots, candidateRoot{dir: cacheDir, label: "user-cache"})
+	}
 
 	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
 		roots = append(roots, candidateRoot{dir: xdg, label: "XDG_RUNTIME_DIR"})
@@ -78,10 +82,6 @@ func candidateRoots() []candidateRoot {
 		tmpDir = "/tmp"
 	}
 	roots = append(roots, candidateRoot{dir: tmpDir, label: "tmp"})
-
-	if cacheDir, err := os.UserCacheDir(); err == nil {
-		roots = append(roots, candidateRoot{dir: cacheDir, label: "user-cache"})
-	}
 
 	return roots
 }
@@ -112,10 +112,11 @@ func projectKey(projectDir string) (string, error) {
 //
 // Selection priority:
 //  1. WIPNOTE_DB_PATH env var — always wins, never silently moved.
-//  2. First candidate root (XDG_RUNTIME_DIR, /tmp, UserCacheDir) whose
-//     backing filesystem is WAL-safe.
-//  3. If no WAL-safe path is found, fall back to UserCacheDir (or /tmp) with
-//     DELETE-mode diagnostics noting that no WAL-safe path was available.
+//  2. First candidate root whose backing filesystem is WAL-safe. tmpfs roots
+//     are skipped by default because long-running OTel indexes can exhaust
+//     small /tmp mounts; set WIPNOTE_ALLOW_TMPFS_DB=1 to opt in.
+//  3. If no non-volatile WAL-safe path is found, fall back to UserCacheDir
+//     (or /tmp) with DELETE-mode diagnostics.
 func CanonicalDBPathWithInfo(projectDir string) (DBPathInfo, error) {
 	// 1. Explicit override — never silently moved.
 	if override := os.Getenv("WIPNOTE_DB_PATH"); override != "" {
@@ -135,12 +136,17 @@ func CanonicalDBPathWithInfo(projectDir string) (DBPathInfo, error) {
 
 	// 2. Probe candidate roots in priority order; pick first WAL-safe one.
 	candidates := candidateRoots()
+	skippedTmpfs := false
 	for _, c := range candidates {
 		if c.dir == "" {
 			continue
 		}
 		candidatePath := filepath.Join(c.dir, "wipnote", key, DBFileName)
 		fstype, walSafe := FsTypeProber(candidatePath)
+		if c.label != "user-cache" && fstype == "tmpfs" && os.Getenv("WIPNOTE_ALLOW_TMPFS_DB") == "" {
+			skippedTmpfs = true
+			continue
+		}
 		if walSafe {
 			reason := buildWalSafeReason(fstype)
 			return DBPathInfo{
@@ -169,7 +175,7 @@ func CanonicalDBPathWithInfo(projectDir string) (DBPathInfo, error) {
 		Path:    fallbackPath,
 		FsType:  fstype,
 		WalSafe: false,
-		Reason:  buildDeleteModeReason(fstype),
+		Reason:  buildDeleteModeReason(fstype, skippedTmpfs),
 	}, nil
 }
 
@@ -184,7 +190,10 @@ func buildWalSafeReason(fstype string) string {
 
 // buildDeleteModeReason constructs a human-readable reason when no WAL-safe
 // path was found. It is always explicit that DELETE mode is intentional.
-func buildDeleteModeReason(fstype string) string {
+func buildDeleteModeReason(fstype string, skippedTmpfs bool) string {
+	if skippedTmpfs {
+		return fmt.Sprintf("%s (DELETE mode — tmpfs DB disabled; set WIPNOTE_ALLOW_TMPFS_DB=1 to opt in)", fstype)
+	}
 	if strings.HasPrefix(fstype, "unknown") {
 		return fmt.Sprintf("%s (DELETE mode — fstype probe failed, using fallback)", fstype)
 	}

@@ -138,6 +138,9 @@ func parse(r io.Reader) (*ParseResult, error) {
 			if gjson.Get(line, "isMeta").Bool() || gjson.Get(line, "isCompactSummary").Bool() {
 				continue
 			}
+			if gjson.Get(line, "isSidechain").Bool() {
+				continue
+			}
 			msg := parseUserMessage(line, ordinal)
 			if msg == nil {
 				continue
@@ -185,7 +188,7 @@ func parseUserMessage(line string, ordinal int) *models.Message {
 		return nil
 	}
 	// Filter system messages embedded as user turns.
-	if isSystemMessage(content) {
+	if IsSystemMessage(content) {
 		return nil
 	}
 
@@ -312,18 +315,4 @@ func parseTimestamp(line string) time.Time {
 		t, _ = time.Parse("2006-01-02T15:04:05.000Z", ts)
 	}
 	return t
-}
-
-func isSystemMessage(content string) bool {
-	prefixes := []string{
-		"This session is being continued",
-		"[Request interrupted",
-		"[Session resumed",
-	}
-	for _, p := range prefixes {
-		if strings.HasPrefix(content, p) {
-			return true
-		}
-	}
-	return false
 }

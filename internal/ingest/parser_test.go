@@ -116,6 +116,26 @@ func TestParse_FiltersMetaAndSystem(t *testing.T) {
 	}
 }
 
+func TestParse_FiltersSidechainAndRuntimeMessages(t *testing.T) {
+	jsonl := strings.Join([]string{
+		`{"type":"user","uuid":"u-side","isSidechain":true,"message":{"role":"user","content":"You are a code reviewer. Review the code changes shown below and provide feedback."},"timestamp":"2026-03-27T20:00:00.000Z","sessionId":"sess-side"}`,
+		`{"type":"user","uuid":"u-resume","message":{"role":"user","content":"↩ resumed: background task bt8yi6rhf completed"},"timestamp":"2026-03-27T20:00:01.000Z","sessionId":"sess-side"}`,
+		`{"type":"user","uuid":"u-real","message":{"role":"user","content":"please fix the dashboard feed"},"timestamp":"2026-03-27T20:00:02.000Z","sessionId":"sess-side"}`,
+	}, "\n")
+
+	result, err := parse(strings.NewReader(jsonl))
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	if len(result.Messages) != 1 {
+		t.Fatalf("got %d messages, want 1", len(result.Messages))
+	}
+	if got := result.Messages[0].Content; got != "please fix the dashboard feed" {
+		t.Fatalf("content = %q, want real user prompt", got)
+	}
+}
+
 func TestParse_ThinkingBlock(t *testing.T) {
 	jsonl := `{"type":"assistant","uuid":"a1","message":{"model":"claude-opus-4-6","role":"assistant","content":[{"type":"thinking","thinking":"let me reason..."},{"type":"text","text":"Here is my answer."}],"usage":{"output_tokens":10}},"timestamp":"2026-03-27T20:00:00.000Z","sessionId":"sess-4"}`
 

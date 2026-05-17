@@ -1281,3 +1281,89 @@ func TestBuildEventTree_SubagentUserQueryNotTopLevel(t *testing.T) {
 		t.Errorf("top-level UserQuery agent_id = %q, want claude-code", agentID)
 	}
 }
+
+func TestBuildEventTree_FiltersHookSystemPrompt(t *testing.T) {
+	database := openTreeTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+	ts := now.Format(time.RFC3339)
+
+	mustExec(t, database,
+		`INSERT INTO agent_events (event_id, agent_id, event_type, timestamp, tool_name, session_id, status, input_summary)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"uq-review", "claude-code", "tool_call", ts, "UserQuery", "sess-test", "recorded",
+		"You are a code reviewer. Review the code changes shown below and provide feedback.")
+	mustExec(t, database,
+		`INSERT INTO agent_events (event_id, agent_id, event_type, timestamp, tool_name, session_id, status, parent_event_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"child-review", "claude-code", "tool_call", ts, "Bash", "sess-test", "recorded", "uq-review")
+
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
+	if len(turns) != 0 {
+		t.Fatalf("got %d turns, want 0 (system reviewer prompt should be filtered)", len(turns))
+	}
+}
+
+func TestBuildEventTree_FiltersInternalOtelPrompts(t *testing.T) {
+	database := openTreeTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+	ts := now.UnixMicro()
+
+	mustExec(t, database,
+		`INSERT INTO otel_signals (signal_id, harness, session_id, kind, canonical, native, trace_id, ts_micros, attrs_json)
+		 VALUES (?, ?, ?, 'span', 'interaction', ?, ?, ?, ?)`,
+		"sig-reviewer", "codex", "sess-test", "codex.interaction", "trace-reviewer", ts,
+		`{"user_prompt":"You are a code reviewer. Review the code changes shown below and provide feedback."}`)
+	mustExec(t, database,
+		`INSERT INTO otel_signals (signal_id, harness, session_id, kind, canonical, native, trace_id, ts_micros, attrs_json)
+		 VALUES (?, ?, ?, 'span', 'interaction', ?, ?, ?, ?)`,
+		"sig-real", "codex", "sess-test", "codex.interaction", "trace-real", ts+1_000_000,
+		`{"user_prompt":"please fix the dashboard feed"}`)
+
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("got %d turns, want 1", len(turns))
+	}
+	if got := turns[0].UserQuery["input_summary"]; got != "please fix the dashboard feed" {
+		t.Fatalf("input_summary = %v, want real user prompt", got)
+	}
+}
+
+func TestBuildEventTree_FiltersResumeNotificationPromptLogs(t *testing.T) {
+	database := openTreeTestDB(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+	ts := now.UnixMicro()
+
+	mustExec(t, database,
+		`INSERT INTO otel_signals (signal_id, harness, session_id, kind, canonical, native, ts_micros, attrs_json)
+		 VALUES (?, ?, ?, 'log', 'user_prompt', ?, ?, ?)`,
+		"sig-resume", "codex", "sess-test", "codex.user_prompt", ts,
+		`{"text":"↩ resumed: background task bt8yi6rhf completed"}`)
+	mustExec(t, database,
+		`INSERT INTO otel_signals (signal_id, harness, session_id, kind, canonical, native, ts_micros, attrs_json)
+		 VALUES (?, ?, ?, 'log', 'user_prompt', ?, ?, ?)`,
+		"sig-real", "codex", "sess-test", "codex.user_prompt", ts+1_000_000,
+		`{"text":"please fix the dashboard feed"}`)
+
+	turns, err := buildEventTree(database, 50)
+	if err != nil {
+		t.Fatalf("buildEventTree: %v", err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("got %d turns, want 1", len(turns))
+	}
+	if got := turns[0].UserQuery["event_id"]; got != "sig-real" {
+		t.Fatalf("event_id = %v, want sig-real", got)
+	}
+}

@@ -685,7 +685,16 @@
       "Bash(TMPDIR=/workspaces/wipnote/.build-cache go test *)",
       "Bash(dd if=/workspaces/wipnote/.wipnote/sessions/019e1244a4875e27bc7eeb21cc26/events.ndjson bs=1 skip=6764000 count=500)",
       "Bash(dd if=/workspaces/wipnote/.wipnote/sessions/019e1342209ae28b0d4710501510/events.ndjson bs=1 skip=2673800 count=500)",
-      "Bash(wipnote sweep *)"
+      "Bash(wipnote sweep *)",
+      "Bash(wipnote sh *)",
+      "Skill(wipnote:plan)",
+      "Bash(wipnote help *)",
+      "Skill(wipnote:plan-critique)",
+      "Bash(wipnote --version)",
+      "Bash(wipnote trace *)",
+      "Bash(mkdir -p /home/vscode/.gotest-tmp)",
+      "Bash(TMPDIR=/home/vscode/.gotest-tmp go test ./cmd/wipnote/ -run TestWritableDBOpenBoundary -count=1)",
+      "Skill(wipnote:report-issue)"
     ]
   },
   "enabledPlugins": {

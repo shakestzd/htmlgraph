@@ -10,6 +10,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	dbpkg "github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/ingest"
 	"github.com/shakestzd/wipnote/internal/models"
 )
 
@@ -150,6 +151,9 @@ func parseSessionHTML(database *sql.DB, path, fallbackProjectDir string) (int, e
 		summary := strings.TrimSpace(li.Text())
 		if len([]rune(summary)) > maxInputSummaryLen {
 			summary = string([]rune(summary)[:maxInputSummaryLen-1]) + "\u2026"
+		}
+		if toolName == "UserQuery" && ingest.IsSystemMessage(summary) {
+			return
 		}
 
 		evt := &models.AgentEvent{

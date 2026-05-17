@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shakestzd/wipnote/internal/ingest"
 )
 
 // feedEvent is the unified wire shape for /api/events/feed.
@@ -148,6 +150,9 @@ func queryOtelFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 
 		ev.Source = "otel"
 		ev.Timestamp, ev.tsMicros = feedTimestampFromOtel(tsMicros, attrsRaw)
+		if (ev.Type == "interaction" || ev.Type == "user_prompt") && ingest.IsSystemMessage(extractPromptText(attrsRaw)) {
+			continue
+		}
 		ev.Summary = otelSummary(ev.Type, ev.ToolName, ev.Model, ev.TokensIn, ev.TokensOut, attrsRaw)
 
 		// Zero out empty optional fields to keep JSON tidy.
@@ -308,6 +313,9 @@ func queryHookFeedEvents(database *sql.DB, limit int) ([]feedEvent, error) {
 			&ev.ToolName, &inputSum, &outputSum,
 			&ev.SessionID, &ev.FeatureID, &parentEvtID, &ev.FeatureTitle,
 		); err != nil {
+			continue
+		}
+		if ingest.IsSystemMessage(inputSum) {
 			continue
 		}
 
@@ -608,8 +616,8 @@ func deduplicateMessageEvents(otelEvents, messageEvents []feedEvent) []feedEvent
 // deduplicateUserPromptLogs suppresses user_prompt OTel log events for
 // gemini_cli sessions that have other OTel coverage (api_request,
 // assistant_text, tool_result, etc.). Gemini emits both:
-//   1. hook check_point events that render the user's prompt with tool children
-//   2. a gemini_cli.user_prompt OTel log with the same prompt text and 0 tools
+//  1. hook check_point events that render the user's prompt with tool children
+//  2. a gemini_cli.user_prompt OTel log with the same prompt text and 0 tools
 //
 // If any non-user_prompt gemini_cli OTel signal exists for a session, the hook
 // path already covers that turn and the user_prompt log is redundant.

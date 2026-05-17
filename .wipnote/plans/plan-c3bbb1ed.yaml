@@ -13,11 +13,12 @@ design:
         - Detect and warn on live file overlaps before edits are made
         - Build first-class file-ownership semantics via claims.write_scope
         - Establish honest session liveness and cross-harness lifecycle hooks
+        - Make the dashboard Kanban board the user-facing source of truth for active work, step progress, ownership, and cross-CLI movement
     constraints:
         - Zero write amplification on the PreToolUse/PostToolUse hot path (feat-156e0a1a SQLITE_BUSY gate must stay at zero)
-        - Use only existing DB columns and tables; no new session_files or file_lock tables
+        - Avoid new hot-path lock tables; the only new derived table allowed by this plan is session_files for claimless file touches
         - Roster and overlap detection must be pull-queries (explicit CLI/API calls), not a live-watch daemon
-        - Codex/Gemini SessionEnd hooks are required; cross-harness parity with Claude
+        - Codex/Gemini liveness must be honest even when a harness lacks Claude-style SessionEnd semantics
     approved: false
     comment: ""
 slices:
@@ -318,6 +319,98 @@ slices:
         (unreliable for non-Claude — bug-6c3e8252 root cause); assuming Codex
         has SessionEnd (manifest line 68 is claude-only; Codex has no
         session-end event — must verify Codex CLI lifecycle).
+    - id: slice-5
+      num: 5
+      title: Tier 4 — Kanban work-board execution visibility
+      what: |
+        Promote the dashboard Work/Kanban view from a static work-item list into
+        the user-facing coordination surface for concurrent CLIs. Extend
+        /api/features with derived active-session/work-owner data from
+        active_work_items + sessions + claims, step counters already stored on
+        features, recent move/start/complete/add-step activity, and the file
+        overlap signals from slices 1-4. Render those signals directly on
+        Kanban cards and track groups: active CLI/model/session badge, step
+        progress, last activity age, last touched file, overlap/conflict badge,
+        and moved/reassigned markers. Keep card data read-only; canonical
+        mutations still go through wipnote CLI commands and existing HTML
+        work-item files.
+
+        Define the cross-harness step contract explicitly. Claude TaskCreated /
+        TaskCompleted continues to drive hook-only add-task-step /
+        complete-task-step. Codex TaskStarted / TaskComplete and Gemini tool or
+        session events must either map to the same canonical hidden commands
+        when a work item is active, or be documented as unsupported with a
+        visible dashboard "steps not live for this harness" state. Do not let a
+        user infer that a stalled 0/N checklist is live if the harness cannot
+        emit step events.
+      why: |
+        The first four slices give agents better file/session awareness, but the
+        user still has to infer actual work progress from separate panels. The
+        WAC Kanban board already groups work by status and track; this slice
+        makes it the single glanceable answer to "what is each CLI working on,
+        what moved, what step is running, and where are conflicts?"
+      files:
+        - cmd/wipnote/api.go
+        - cmd/wipnote/api_feature_activity.go
+        - cmd/wipnote/dashboard/js/app.js
+        - cmd/wipnote/dashboard/css/components.css
+        - cmd/wipnote/workitem_modify.go
+        - cmd/wipnote/workitem.go
+        - internal/hooks/task_tracking.go
+        - internal/hooks/missing_events.go
+        - packages/plugin-core/manifest.json
+      deps:
+        - 1
+        - 2
+        - 4
+      done_when:
+        - Kanban cards for in-progress work items show active CLI/session/model and claim lease freshness when present
+        - Kanban cards show step progress (steps_completed/steps_total) without opening detail
+        - Kanban cards show last activity age and last touched file, derived from feature activity and session/file data
+        - Work items with live file overlap show the same conflict badge used by `wipnote who`
+        - Track-group headers show active count, blocked/stale count, recently moved count, and done progress
+        - Work detail shows step provenance (agent/CLI/session/timestamp) for task-created and task-completed steps
+        - Start/complete/move/add-step/complete-task-step mutations are visible in the dashboard after refresh or the existing polling/SSE path
+        - Cross-harness step tracking behavior is tested or explicitly surfaced as unsupported per harness; no dashboard state implies live step tracking when events are unavailable
+      effort: L
+      risk: Med
+      tests: |
+        API: TestFeaturesHandler_WorkBoardSignals — active sessions, step counters, last activity, moved/reassigned metadata
+        Dashboard: renderKanban card unit/DOM test or focused browser smoke validates owner badges, progress, conflict, and no text overflow
+        Hook: TestCodexTaskLifecycleStepMapping or explicit unsupported-state test, depending on actual Codex/Gemini events
+        Regression: existing work detail still renders full step list and feature activity panels
+      complexity: complex
+      approved: false
+      comment: ""
+      questions:
+        - id: q-board-source
+          text: Should the Kanban board be the primary user-facing status surface?
+          answer: Yes — sessions/files panels support diagnosis, but Work/Kanban is the single glanceable progress surface for users.
+        - id: q-board-mutations
+          text: Should dashboard drag/drop move work items between columns or tracks?
+          answer: Not in this plan. Keep the dashboard read-only and reflect CLI mutations first; interactive board mutations can be a later slice.
+      critic_revisions:
+        - source: codex
+          severity: HIGH
+          summary: 'Original plan made agent file visibility first-class but did not require Kanban cards or track groups to surface active work, step progress, movement, or conflicts. RESOLVED: slice-5 adds board/API acceptance criteria.'
+        - source: codex
+          severity: HIGH
+          summary: 'Cross-harness step execution visibility was undefined; current TaskCreated/TaskCompleted hooks are Claude-only while Codex/Gemini lifecycle differs. RESOLVED: slice-5 requires explicit mapping or visible unsupported state per harness.'
+        - source: codex
+          severity: MED
+          summary: 'Work-item movement via move/start/complete/add-step existed but was not part of the dashboard contract. RESOLVED: slice-5 requires moved/reassigned and mutation freshness visibility.'
+      decisions_notes: |
+        **Trigger:** dashboard /api/features load/refresh and existing
+        feature-activity reads; hook-driven step events when available.
+        **State:** derived from existing work-item HTML/SQLite tables,
+        active_work_items, sessions, claims, feature activity, and session/file
+        data from slices 1-4. No dashboard-authored canonical work-item writes.
+        **Payload:** card-level owner/session/model, progress, last activity,
+        last file, conflict, movement, and track aggregate fields.
+        **Track:** trk-cd61bbae and trk-97f85b3b.
+        **Rejected:** drag/drop mutation in this plan — first make existing CLI
+        movement visible and trustworthy; interactive mutation can follow after
+        the read model is stable.
 questions: []
 critique:
     reviewed_at: "2026-05-16"
