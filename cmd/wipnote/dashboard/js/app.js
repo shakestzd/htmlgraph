@@ -191,6 +191,9 @@ function renderPlans(filteredPlans) {
     // Title
     tr.appendChild(td(p.title));
 
+    // ID (monospace, consistent with session/work item ID style)
+    tr.appendChild(td(p.id, { className: 'mono' }));
+
     // Status badge
     var statusClass = p.status === 'finalized' ? 'badge-done' :
                       p.status === 'in-progress' ? 'badge-ip' : 'badge-todo';
@@ -216,6 +219,9 @@ function renderPlans(filteredPlans) {
     progWrap.appendChild(progLabel);
     progTd.appendChild(progWrap);
     tr.appendChild(progTd);
+
+    // Version
+    tr.appendChild(td('v' + (p.version || 1), { className: 'mono' }));
 
     // Linked feature/track
     tr.appendChild(td(p.feature_id || '\u2014'));
@@ -3720,6 +3726,9 @@ function dashSidebarBuildRail(planId, body) {
         if (r.ok) {
           btn.textContent = 'Plan Finalized';
           btn.style.background = 'var(--approved, #22c55e)';
+          return r.json().then(function(data) {
+            renderFinalizeResult(data);
+          });
         } else {
           return r.text().then(function(body) {
             btn.textContent = 'Finalize Plan';
@@ -3733,6 +3742,39 @@ function dashSidebarBuildRail(planId, body) {
       });
     });
   }
+}
+
+// renderFinalizeResult renders the finalize success panel showing created
+// features and agentic next-step commands. Uses the result div injected by
+// the finalize click handler into the sidebar below the finalize button.
+function renderFinalizeResult(data) {
+  var panel = document.getElementById('dash-finalize-result');
+  if (!panel) return;
+  panel.style.display = '';
+
+  var html = '<p style="color:var(--status-done,#22c55e);font-weight:600;margin:8px 0 4px">Plan finalized.</p>';
+
+  var features = data.created_features || [];
+  if (features.length > 0) {
+    html += '<p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 2px">Features created (' + features.length + '):</p>';
+    html += '<ul style="margin:0 0 8px;padding-left:16px;font-size:0.78rem;">';
+    features.forEach(function(fid) {
+      html += '<li style="font-family:var(--font-mono,monospace);color:var(--text-muted)">' + fid + '</li>';
+    });
+    html += '</ul>';
+  }
+
+  if (data.next_command) {
+    html += '<p style="font-size:0.75rem;color:var(--text-secondary);margin:8px 0 2px">Next — run the agentic generation (integrates review feedback):</p>';
+    html += '<pre style="margin:0 0 4px;padding:6px 8px;background:var(--bg-tertiary);border-radius:4px;font-family:var(--font-mono,monospace);font-size:0.75rem;white-space:pre-wrap;word-break:break-all;user-select:text">' + data.next_command + '</pre>';
+  }
+
+  if (data.yolo_command) {
+    html += '<p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 2px">Or autonomous mode:</p>';
+    html += '<pre style="margin:0;padding:6px 8px;background:var(--bg-tertiary);border-radius:4px;font-family:var(--font-mono,monospace);font-size:0.75rem;white-space:pre-wrap;word-break:break-all;user-select:text">' + data.yolo_command + '</pre>';
+  }
+
+  panel.innerHTML = html;
 }
 
 function dashSidebarSetupChat(planId) {
@@ -3928,4 +3970,6 @@ function dashSidebarTeardown() {
   if (dotsEl) dotsEl.innerHTML = '';
   var fb = document.getElementById('dash-finalize-btn');
   if (fb) { fb.textContent = 'Finalize Plan'; fb.disabled = true; fb.style.background = ''; fb.style.display = ''; }
+  var fr = document.getElementById('dash-finalize-result');
+  if (fr) { fr.style.display = 'none'; fr.innerHTML = ''; }
 }

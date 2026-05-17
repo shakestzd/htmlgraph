@@ -30,6 +30,7 @@ type planListItem struct {
 	FeatureID string    `json:"feature_id"`
 	Approved  int       `json:"approved"`
 	Total     int       `json:"total"`
+	Version   int       `json:"version"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -100,12 +101,18 @@ func parsePlanListItem(planPath, planID string, database *sql.DB) (planListItem,
 	article := doc.Find("article[id]").First()
 	featureID, _ := article.Attr("data-feature-id")
 
-	// Read status from YAML source of truth; fall back to HTML attribute for
-	// backward compatibility (missing YAML, broken envs, existing tests).
+	// Read status and slice metadata from YAML source of truth; fall back to
+	// HTML attribute for backward compatibility (missing YAML, broken envs).
 	status := ""
+	version := 0
+	var yamlSliceCount int
+	var yamlSlices []planyaml.PlanSlice
 	yamlPath := strings.TrimSuffix(planPath, ".html") + ".yaml"
 	if yamlPlan, yamlErr := planyaml.Load(yamlPath); yamlErr == nil {
 		status = yamlPlan.Meta.Status
+		version = yamlPlan.Meta.Version
+		yamlSlices = yamlPlan.Slices
+		yamlSliceCount = len(yamlPlan.Slices)
 	}
 	if status == "" {
 		// Fallback: parse HTML attribute (legacy — YAML is the canonical source).
@@ -120,20 +127,32 @@ func parsePlanListItem(planPath, planID string, database *sql.DB) (planListItem,
 		title = planID
 	}
 
-	// Count total approve checkboxes from HTML (defines the section count).
+	// Prefer YAML slice count as Total; fall back to HTML approve-input count
+	// only for legacy plans that pre-date the slice YAML schema (zero slices).
 	var total int
-	doc.Find("input[data-action='approve']").Each(func(_ int, s *goquery.Selection) {
-		total++
-	})
+	if yamlSliceCount > 0 {
+		total = yamlSliceCount
+	} else {
+		// Legacy fallback: count rendered approve checkboxes in HTML.
+		doc.Find("input[data-action='approve']").Each(func(_ int, s *goquery.Selection) {
+			total++
+		})
+	}
 
-	// Get live approval count from SQLite (overrides HTML checked attrs).
+	// Get live approval count from SQLite.
+	// For YAML plans: count approved "slice-N" keys (consistent with finalize gate).
+	// For legacy plans (zero slices): count any approve=true feedback rows.
 	approved := 0
 	if database != nil {
-		feedback, err := dbpkg.GetPlanFeedback(database, planID)
-		if err == nil {
-			for _, fb := range feedback {
-				if fb.Action == "approve" && fb.Value == "true" {
-					approved++
+		if yamlSliceCount > 0 {
+			approved = countApprovedSlices(database, planID, yamlSlices)
+		} else {
+			feedback, err := dbpkg.GetPlanFeedback(database, planID)
+			if err == nil {
+				for _, fb := range feedback {
+					if fb.Action == "approve" && fb.Value == "true" {
+						approved++
+					}
 				}
 			}
 		}
@@ -157,8 +176,8 @@ func parsePlanListItem(planPath, planID string, database *sql.DB) (planListItem,
 		}
 	}
 
-	// Fall back to HTML checked attrs if SQLite has nothing
-	if approved == 0 {
+	// For legacy plans with no YAML: fall back to HTML checked attrs if SQLite empty.
+	if approved == 0 && yamlSliceCount == 0 {
 		doc.Find("input[data-action='approve']").Each(func(_ int, s *goquery.Selection) {
 			if _, exists := s.Attr("checked"); exists {
 				approved++
@@ -173,8 +192,44 @@ func parsePlanListItem(planPath, planID string, database *sql.DB) (planListItem,
 		FeatureID: featureID,
 		Approved:  approved,
 		Total:     total,
+		Version:   version,
 		UpdatedAt: info.ModTime().UTC(),
 	}, nil
+}
+
+// countApprovedSlices counts the number of slices with an approved "slice-N"
+// feedback key in SQLite, consistent with the logic used by loadPlanApprovals
+// in plan_finalize_yaml.go and the finalize-enable gate in the dashboard.
+// Falls back to PlanSlice.ApprovalStatus=="approved" for slices missing DB rows.
+func countApprovedSlices(database *sql.DB, planID string, slices []planyaml.PlanSlice) int {
+	// Read live approvals from SQLite (keyed "slice-N").
+	rows, err := database.Query(
+		"SELECT section, value FROM plan_feedback WHERE plan_id = ? AND action = 'approve'",
+		planID,
+	)
+	dbApprovals := map[string]bool{}
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var section, value string
+			rows.Scan(&section, &value) //nolint:errcheck
+			dbApprovals[section] = strings.EqualFold(value, "true")
+		}
+	}
+
+	count := 0
+	for _, s := range slices {
+		key := fmt.Sprintf("slice-%d", s.Num)
+		if approved, ok := dbApprovals[key]; ok {
+			if approved {
+				count++
+			}
+		} else if s.ApprovalStatus == "approved" || s.Approved {
+			// Fallback: YAML-baked approval for plans with no live DB rows.
+			count++
+		}
+	}
+	return count
 }
 
 // planStatusResponse is returned by GET /api/plans/{id}/status.
@@ -418,12 +473,24 @@ func planFinalizeHandler(database *sql.DB, wipnoteDir string) http.HandlerFunc {
 			failureInfos = []failureInfo{}
 		}
 
+		// Read track ID from YAML (written by finalizeYAMLWithDB) for the
+		// next-step commands surfaced in the dashboard finalize result panel.
+		trackID := ""
+		yamlPath := filepath.Join(wipnoteDir, "plans", planID+".yaml")
+		if finalizedPlan, yErr := planyaml.Load(yamlPath); yErr == nil {
+			trackID = finalizedPlan.Meta.TrackID
+		}
+		nextCmd, yoloCmd := planNextCommands(planID, trackID)
+
 		respondJSON(w, map[string]any{
 			"plan_id":          planID,
 			"status":           "finalized",
 			"feedback":         feedback,
 			"created_features": createdFeatures,
 			"failures":         failureInfos,
+			"track_id":         trackID,
+			"next_command":     nextCmd,
+			"yolo_command":     yoloCmd,
 		})
 	}
 }
@@ -986,6 +1053,15 @@ func planAmendmentsHandler(database *sql.DB) http.HandlerFunc {
 }
 
 // ---- helpers ----------------------------------------------------------------
+
+// planNextCommands returns the agentic dispatch commands for a finalized plan.
+// Both planFinalizeHandler (API) and printFinalizeYAMLSummary (CLI) use this
+// so the format string is defined in exactly one place.
+func planNextCommands(planID, trackID string) (nextCommand, yoloCommand string) {
+	nextCommand = fmt.Sprintf("/wipnote:execute %s", planID)
+	yoloCommand = fmt.Sprintf("wipnote yolo --track %s", trackID)
+	return
+}
 
 // extractPlanID parses a plan ID from URL paths of the form
 // /api/plans/{id}/{suffix}. Returns an error if the ID is missing.

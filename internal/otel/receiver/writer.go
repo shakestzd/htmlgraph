@@ -22,6 +22,11 @@ type dbExecer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
+// metricRowsPerSessionLimit bounds high-cardinality metric streams in the
+// derived SQLite index. Canonical NDJSON remains the durable replay source;
+// SQLite keeps recent metric rows for dashboard queries and drops the tail.
+const metricRowsPerSessionLimit = 5000
+
 // Writer persists UnifiedSignals into the otel_signals table. It owns
 // its own *sql.DB with MaxOpenConns=1 so every write serializes through
 // one connection — this eliminates SQLITE_BUSY errors under concurrent
@@ -290,6 +295,9 @@ func (w *Writer) WriteBatch(
 			// a missing one means the adapter couldn't normalize.
 			continue
 		}
+		if !shouldPersistSignal(s) {
+			continue
+		}
 		if !seen[s.SessionID] {
 			agent := string(harness)
 			if _, err = w.sessStmt.ExecContext(ctx, s.SessionID, agent); err != nil {
@@ -397,11 +405,48 @@ func (w *Writer) WriteBatch(
 		}
 	}
 
+	for sessionID := range seen {
+		if err = pruneMetricSignals(ctx, w.conn, sessionID, metricRowsPerSessionLimit); err != nil {
+			return inserted, fmt.Errorf("prune metric signals for session %s: %w", sessionID, err)
+		}
+	}
+
 	if _, err = w.conn.ExecContext(ctx, "COMMIT"); err != nil {
 		return inserted, fmt.Errorf("commit: %w", err)
 	}
 	committed = true
 	return inserted, nil
+}
+
+func shouldPersistSignal(s *otel.UnifiedSignal) bool {
+	if s.Kind == otel.KindMetric && s.CanonicalName == otel.CanonicalUnknown {
+		return false
+	}
+	return true
+}
+
+func pruneMetricSignals(ctx context.Context, conn dbExecer, sessionID string, keep int) error {
+	if keep <= 0 {
+		_, err := conn.ExecContext(ctx,
+			`DELETE FROM otel_signals WHERE session_id = ? AND kind = 'metric'`,
+			sessionID,
+		)
+		return err
+	}
+	_, err := conn.ExecContext(ctx, `
+		DELETE FROM otel_signals
+		WHERE session_id = ?
+		  AND kind = 'metric'
+		  AND signal_id NOT IN (
+			SELECT signal_id
+			FROM otel_signals
+			WHERE session_id = ? AND kind = 'metric'
+			ORDER BY ts_micros DESC, created_at DESC, signal_id DESC
+			LIMIT ?
+		  )`,
+		sessionID, sessionID, keep,
+	)
+	return err
 }
 
 // maybeCreatePlaceholder synthesises a subagent_invocation placeholder row when

@@ -138,6 +138,80 @@ func TestWriter_IdempotentOnDuplicateSignalID(t *testing.T) {
 	}
 }
 
+func TestWriter_DropsUnknownMetrics(t *testing.T) {
+	w, _ := newWriter(t)
+	ctx := context.Background()
+
+	unknownMetric := sigFixture("sess-unknown-metric", "p1", func(s *otel.UnifiedSignal) {
+		s.SignalID = "sig-unknown-metric"
+		s.Kind = otel.KindMetric
+		s.CanonicalName = otel.CanonicalUnknown
+		s.NativeName = "gemini_cli.ui.flicker.count"
+	})
+	n, err := w.WriteBatch(ctx, otel.HarnessGemini, map[string]any{"service.name": "gemini-cli"}, []otel.UnifiedSignal{unknownMetric})
+	if err != nil {
+		t.Fatalf("WriteBatch: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("inserted = %d, want 0", n)
+	}
+
+	var count int
+	if err := w.DB().QueryRow(`SELECT COUNT(*) FROM otel_signals WHERE session_id = 'sess-unknown-metric'`).Scan(&count); err != nil {
+		t.Fatalf("count signals: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("unknown metric rows = %d, want 0", count)
+	}
+}
+
+func TestWriter_PrunesMetricsPerSession(t *testing.T) {
+	w, _ := newWriter(t)
+	ctx := context.Background()
+
+	const total = 5005
+	batch := make([]otel.UnifiedSignal, 0, total)
+	for i := 0; i < total; i++ {
+		i := i
+		batch = append(batch, sigFixture("sess-metric-cap", fmt.Sprintf("p-%04d", i), func(s *otel.UnifiedSignal) {
+			s.SignalID = fmt.Sprintf("sig-metric-cap-%04d", i)
+			s.Kind = otel.KindMetric
+			s.CanonicalName = otel.CanonicalTokenUsage
+			s.NativeName = "gemini_cli.token.usage"
+			s.Timestamp = time.UnixMicro(int64(i + 1))
+		}))
+	}
+
+	n, err := w.WriteBatch(ctx, otel.HarnessGemini, map[string]any{"service.name": "gemini-cli"}, batch)
+	if err != nil {
+		t.Fatalf("WriteBatch: %v", err)
+	}
+	if n != total {
+		t.Fatalf("inserted = %d, want %d before pruning", n, total)
+	}
+
+	var count int
+	if err := w.DB().QueryRow(`SELECT COUNT(*) FROM otel_signals WHERE session_id = 'sess-metric-cap' AND kind = 'metric'`).Scan(&count); err != nil {
+		t.Fatalf("count metrics: %v", err)
+	}
+	if count != 5000 {
+		t.Fatalf("metric rows = %d, want 5000", count)
+	}
+
+	var oldest string
+	if err := w.DB().QueryRow(`
+		SELECT signal_id
+		FROM otel_signals
+		WHERE session_id = 'sess-metric-cap' AND kind = 'metric'
+		ORDER BY ts_micros ASC
+		LIMIT 1`).Scan(&oldest); err != nil {
+		t.Fatalf("oldest metric: %v", err)
+	}
+	if oldest != "sig-metric-cap-0005" {
+		t.Errorf("oldest retained metric = %q, want sig-metric-cap-0005", oldest)
+	}
+}
+
 func TestWriter_BatchMultipleSessions(t *testing.T) {
 	w, _ := newWriter(t)
 	ctx := context.Background()

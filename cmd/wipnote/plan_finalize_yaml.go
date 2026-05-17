@@ -460,9 +460,12 @@ func printFinalizeYAMLSummary(
 		}
 	}
 
+	// Use the shared helper so the command format is defined in one place
+	// (api_plans.go:planNextCommands) and matches what the dashboard surfaces.
+	nextCmd, yoloCmd := planNextCommands(plan.Meta.ID, trackID)
 	fmt.Println("\nNext:")
-	fmt.Printf("  /wipnote:execute %s   (in Claude — dispatches tasks)\n", plan.Meta.ID)
-	fmt.Printf("  OR: wipnote yolo --track %s   (autonomous mode)\n", trackID)
+	fmt.Printf("  %s   (in Claude — dispatches tasks)\n", nextCmd)
+	fmt.Printf("  OR: %s   (autonomous mode)\n", yoloCmd)
 }
 
 // applyAmendments applies accepted amendment directives to plan slices in memory.

@@ -145,7 +145,7 @@ var approvedWriteSites = []writeSite{
 	},
 	{
 		File:           "internal/otel/receiver/writer.go",
-		Line:           66,
+		Line:           71,
 		Function:       "NewWriter",
 		OpenExpr:       "sql.Open",
 		Classification: daemonRoutedWriterService,
