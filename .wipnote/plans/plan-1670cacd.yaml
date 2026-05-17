@@ -7,7 +7,7 @@ meta:
     created_at: "2026-05-08"
     status: finalized
     created_by: codex
-    version: 4
+    version: 5
 design:
     problem: |
         wipnote can currently launch multiple AI CLIs directly from a mutable checkout. That is convenient, but it allows long-running local stacks, generated plugin changes, work-item bookkeeping, and merged upstream work to accumulate on local main. The result is avoidable divergence, hard-to-review commits, and fragile reconciliation after PR merges. The obvious fix is to launch mutating sessions in isolated branches or worktrees by default, but that changes the shape of project identity, session continuity, active-session fallback state, event capture, subagent attribution, and dashboard grouping. The design must also account for the difference between production host installs and devcontainer sessions, where ports, bind addresses, filesystem permissions, plugin paths, and temp execution policy differ.
@@ -172,6 +172,7 @@ slices:
           severity: HIGH
           summary: Do not enforce fresh-worktree defaults before canonical identity and per-session fallback/session-family hardening are available.
     - id: slice-3
+      feature_id: feat-6164aa2d
       num: 3
       title: Canonical project identity across worktrees
       what: |
@@ -215,7 +216,7 @@ slices:
       approved: false
       comment: ""
       approval_status: pending
-      execution_status: not_started
+      execution_status: promoted
     - id: slice-4
       num: 4
       title: Session-family continuity and per-session fallback state
