@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Flaky orchestrator completion gate: wipnote check --gate intermittently FAILs then passes on rerun (load-correlated, test unidentified)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-36df6c7f"
+             data-type="bug"
+             data-status="todo"
+             data-priority="low"
+             data-created="2026-05-18T21:16:13.029708"
+             data-updated="2026-05-18T21:16:13.048691" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-582-gc8646013c">
+
+        <header>
+            <h1>Flaky orchestrator completion gate: wipnote check --gate intermittently FAILs then passes on rerun (load-correlated, test unidentified)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-low">Low Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T21:16:13.048173">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Symptom: wipnote check --gate (runs go test ./...) FAILed on the FIRST attempt during completion of BOTH bug-f9622af9 and bug-af107c36, then a plain go test ./... diagnostic re-run and a second wipnote check --gate both passed with ZERO FAIL/panic lines, writing a passing session-local gate record. Investigation per request: go test ./... -count=2 (full suite x2) and go test ./cmd/wipnote/ -count=3 both completed with zero failures — the flake does NOT reproduce under controlled repeated runs. Hypothesis: a rare load-correlated timing/concurrency-sensitive test that only trips under the heavy concurrent CPU/IO load present during completion gates (concurrent roborev codex review jobs + background roborev poll loops + subagent go-test runs all active simultaneously). Not a regression in any shipped change (every subagent gate and roborev pass were clean; the diagnostic reruns were clean). Recommended next step: when it next FAILs, capture the FULL gate stdout (not just tail) to identify the failing package/test; then -race + -count on that package; consider CI flake-tracking and running the gate under synthetic load to reproduce.</p>
+        </section>
+    </article>
+</body>
+</html>
