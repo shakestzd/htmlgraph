@@ -717,27 +717,33 @@ In some harness environments (notably VS Code devcontainer / agent-teams runtime
 1. **Detect non-final return:** Message ends mid-step, no completion summary, no final SHA or deliverable list, trailing incomplete sentence
 2. **DO NOT treat as done:** This is NOT a task failure; it's a pause condition
 3. **DO NOT re-dispatch a fresh agent:** Re-dispatch loses all prior context and forces the agent to restart from scratch
-4. **MUST resume the SAME agent:** Use `SendMessage` with the agent's agentId and a restated, explicit finish-line:
+4. **MUST resume the SAME agent via your harness's agent-resume mechanism** with a restated, explicit finish-line. Do NOT re-dispatch (that loses context). The exact primitive depends on your harness:
+   
+   **Claude Code:** Use `SendMessage` to send a continuation message to the paused agent by its `agentId` (available in the original task result):
    ```
-   Continue and finish the work. You paused mid-task. Complete the remaining steps: <restate exact deliverables>
-   Report final status with commit SHA or summary.
+   SendMessage({ to: <agentId> }, "Continue and finish the work. You paused mid-task. Complete the remaining steps: <restate exact deliverables>. Report final status with commit SHA or summary.")
    ```
-5. **Expect multiple resume cycles:** May require 2-3 additional `SendMessage` calls before a genuine final report is returned
+   
+   **Codex CLI:** Use Codex's subagent continuation mechanism (check your Codex version's documentation for re-engaging the same spawned agent instance to continue work without re-dispatch).
+   
+   **Gemini CLI:** Use Gemini's agent-messaging API to continue the paused agent (refer to your Gemini CLI docs for message-passing or agent-resume mechanisms).
+
+5. **Expect multiple resume cycles:** May require 2-3 additional messages/resumes before a genuine final report is returned
 
 **Why this matters:**
 - Harness tool budgets are per-session — temporary, not permanent
 - Resuming the same agent keeps context and avoids restarting
 - Multiple resumes are normal and expected in this condition
 
-**Pattern (pseudocode):**
+**Pattern (harness-agnostic pseudocode):**
 ```
 Task(subagent_type="...", prompt="...")
   → returns intermediate result, no completion
   
-→ Message(agentId="<from-task-result>", text="Continue and finish: <deliverables>")
+→ Resume(same_agent, "Continue and finish: <deliverables>")
   → returns partial progress
   
-→ Message(agentId="<same>", text="Still not done. Complete: <deliverables>. Report final SHA/summary.")
+→ Resume(same_agent, "Still not done. Complete: <deliverables>. Report final SHA/summary.")
   → finally returns complete result
 ```
 
