@@ -157,20 +157,34 @@ func TestIndexer_PromptIDRoutingThroughQueue(t *testing.T) {
 	}
 }
 
-// TestIndexer_PromptIDFallbackWithoutQueue verifies that the legacy / reindex
-// path still works when no queue is wired: WithWriteDB alone (no WithQueue)
-// must set the prompt_id directly on writeDB.
-func TestIndexer_PromptIDFallbackWithoutQueue(t *testing.T) {
+// TestIndexer_PromptIDReindexPath verifies the legacy / reindex fallback
+// branch in maybeSetPromptID.
+//
+// The ACTUAL wipnote reindex wiring (cmd/wipnote/reindex_otel_events.go:84-86)
+// is:
+//
+//	idxr := indexer.New(wipnoteDir, sink)
+//	if bridgeDB != nil {
+//	    idxr = idxr.WithDB(bridgeDB)   // writable handle, no WithWriteDB, no WithQueue
+//	}
+//
+// That exercises the third branch of maybeSetPromptID: idx.database (the
+// legacy/single-handle fallback), NOT idx.writeDB and NOT idx.queue.  This
+// test constructs the indexer with exactly that wiring so a regression in
+// the idx.database branch would be caught here.
+func TestIndexer_PromptIDReindexPath(t *testing.T) {
 	w, dbPath := setupIndexerDB(t)
 
-	writeDB, err := dbpkg.Open(dbPath)
+	// bridgeDB: writable handle, passed only through WithDB — exactly what
+	// reindex_otel_events.go does.  WithWriteDB and WithQueue are NOT called.
+	bridgeDB, err := dbpkg.Open(dbPath)
 	if err != nil {
-		t.Fatalf("open writeDB: %v", err)
+		t.Fatalf("open bridgeDB: %v", err)
 	}
-	defer writeDB.Close()
+	defer bridgeDB.Close()
 
-	sessionID := "prmq-fallback-sess"
-	if _, err := writeDB.Exec(
+	sessionID := "prmq-reindex-sess"
+	if _, err := bridgeDB.Exec(
 		`INSERT INTO sessions (session_id, agent_assigned) VALUES (?, 'claude-code')
 		 ON CONFLICT(session_id) DO NOTHING`,
 		sessionID,
@@ -178,8 +192,8 @@ func TestIndexer_PromptIDFallbackWithoutQueue(t *testing.T) {
 		t.Fatalf("seed sessions: %v", err)
 	}
 
-	eventID := "prmq-fallback-evt"
-	if _, err := writeDB.Exec(
+	eventID := "prmq-reindex-evt"
+	if _, err := bridgeDB.Exec(
 		`INSERT INTO agent_events
 		     (event_id, agent_id, event_type, tool_name, session_id, timestamp, prompt_id)
 		 VALUES (?, 'human', 'tool_call', 'UserQuery', ?, '2026-05-18T10:00:00Z', NULL)`,
@@ -189,25 +203,26 @@ func TestIndexer_PromptIDFallbackWithoutQueue(t *testing.T) {
 	}
 
 	wipnoteDir := t.TempDir()
-	promptID := "prmq-fallback-prompt"
-	line := `{"kind":"log","harness":"claude_code","ts":"2026-05-18T10:00:00Z","signal_id":"prmq-fb-s1","session_id":"prmq-fallback-sess","canonical":"user_prompt","native":"claude_code.user_prompt","prompt_id":"prmq-fallback-prompt"}`
+	promptID := "prmq-reindex-prompt"
+	line := `{"kind":"log","harness":"claude_code","ts":"2026-05-18T10:00:00Z","signal_id":"prmq-rx-s1","session_id":"prmq-reindex-sess","canonical":"user_prompt","native":"claude_code.user_prompt","prompt_id":"prmq-reindex-prompt"}`
 	writeNDJSONFixture(t, wipnoteDir, sessionID, []string{line})
 
-	// No queue — WithWriteDB only, matching the wipnote reindex path.
+	// Mirror reindex_otel_events.go exactly: New + WithDB only.
+	// No WithWriteDB, no WithQueue — exercises the idx.database legacy branch.
 	idxr := New(wipnoteDir, sqls.New(w)).
-		WithWriteDB(writeDB)
+		WithDB(bridgeDB)
 
 	if err := idxr.processSession(context.Background(), sessionID); err != nil {
 		t.Fatalf("processSession: %v", err)
 	}
 
 	var gotPromptID sql.NullString
-	if err := writeDB.QueryRow(
+	if err := bridgeDB.QueryRow(
 		`SELECT prompt_id FROM agent_events WHERE event_id = ?`, eventID,
 	).Scan(&gotPromptID); err != nil {
 		t.Fatalf("query prompt_id: %v", err)
 	}
 	if !gotPromptID.Valid || gotPromptID.String != promptID {
-		t.Errorf("fallback: prompt_id = %v, want %q", gotPromptID, promptID)
+		t.Errorf("reindex path: prompt_id = %v, want %q", gotPromptID, promptID)
 	}
 }
