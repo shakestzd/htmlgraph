@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>ApplyPragmas open-time PRAGMA journal_mode SQLITE_BUSY uncovered by RetryOnBusy; bug-56b686aa fix insufficient under saturation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-dd5db2d1"
+             data-type="bug"
+             data-status="todo"
+             data-priority="high"
+             data-created="2026-05-18T09:03:12.330108"
+             data-updated="2026-05-18T09:03:12.342105" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-427-g39ed400c9">
+
+        <header>
+            <h1>ApplyPragmas open-time PRAGMA journal_mode SQLITE_BUSY uncovered by RetryOnBusy; bug-56b686aa fix insufficient under saturation</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T09:03:12.341177">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Connection-open ApplyPragmas pragma writes (PRAGMA journal_mode etc. in internal/db/pragmas.go) can return SQLITE_BUSY BEFORE runMigrations. Not wrapped by any RetryOnBusy: bug-74a7bda7=completion/hook/dashboard, bug-7dbaf552 Fix1 wraps runMigrations which runs AFTER ApplyPragmas. busy_timeout 5s is exhausted under multi-session DELETE-mode saturation. bug-56b686aa is marked done for this exact failure but is demonstrably insufficient; reconcile/supersede. Reproduced: wipnote check --gate and wipnote bug complete both failed with applying PRAGMA journal_mode: database is locked. Fix: wrap ApplyPragmas write-bearing pragma statements in db.RetryOnBusy (deepest open layer, every DB open flows through it); reuse db.RetryOnBusy/DefaultBusyBackoff; do not change journal-mode selection.</p>
+        </section>
+    </article>
+</body>
+</html>
