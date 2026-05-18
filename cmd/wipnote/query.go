@@ -45,11 +45,14 @@ func runQuery(dsl string) error {
 	}
 	// bug-7dbaf552: `wipnote query` is strictly read-only — graph.ExecuteDSL
 	// only issues SELECTs and closes every *sql.Rows it opens internally
-	// before returning a materialised slice. Open mode=ro so the command can
-	// never hold the writer lock, and wrap the (idempotent, no-leaked-handle)
-	// ExecuteDSL call in RetryOnBusy so a transient SQLITE_BUSY under
-	// contention doesn't fail the user's query.
-	database, err := dbpkg.OpenReadOnly(dbPath)
+	// before returning a materialised slice. OpenReadOnlyMigrated bootstraps
+	// (writable Open → schema/migrations, RetryOnBusy-safe) then hands back a
+	// mode=ro handle so the long query path can never hold the writer lock.
+	// roborev followup: the bare OpenReadOnly here previously regressed fresh
+	// / schema-behind workspaces (mode=ro never creates or migrates) — the
+	// migrated helper restores that guarantee while keeping the contention
+	// benefit. ExecuteDSL stays wrapped in RetryOnBusy (no-leaked-handle).
+	database, err := dbpkg.OpenReadOnlyMigrated(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

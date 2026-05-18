@@ -214,19 +214,26 @@ func openDB(wipnoteDir string) (*sql.DB, error) {
 	return db, nil
 }
 
-// openReadOnlyDB resolves the canonical DB path exactly like openDB but opens
-// the handle in SQLite engine-level read-only mode (mode=ro). It is for
-// strictly read-only CLI surfaces (e.g. `wipnote lineage`) so they cannot
-// hold the writer lock and so the engine hard-rejects any accidental write.
-// bug-7dbaf552: read-only callers still get busy_timeout via OpenReadOnly's
-// DSN; callers layer dbpkg.RetryOnBusy around their individual queries.
+// openReadOnlyDB resolves the canonical DB path exactly like openDB but
+// returns a SQLite engine-level read-only handle (mode=ro) for strictly
+// read-only CLI surfaces (e.g. `wipnote lineage`) so they cannot hold the
+// writer lock and so the engine hard-rejects any accidental write.
+//
+// bug-7dbaf552 / roborev followup: it bootstraps via dbpkg.OpenReadOnlyMigrated
+// (writable Open FIRST so the schema exists / is migrated — that path is
+// Fix-1 RetryOnBusy-safe and its handle is closed before the read handle
+// opens — THEN mode=ro). This restores the migrate-on-open guarantee that the
+// pre-7dbaf552 writable openDB provided, which a bare OpenReadOnly dropped
+// (mode=ro never creates a file and never migrates), while keeping the
+// contention benefit. Callers still layer dbpkg.RetryOnBusy around individual
+// queries.
 func openReadOnlyDB(wipnoteDir string) (*sql.DB, error) {
 	projectDir := filepath.Dir(wipnoteDir)
 	dbPath, err := storage.CanonicalDBPath(projectDir)
 	if err != nil {
 		return nil, fmt.Errorf("resolve db path: %w", err)
 	}
-	db, err := dbpkg.OpenReadOnly(dbPath)
+	db, err := dbpkg.OpenReadOnlyMigrated(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open database (read-only): %w", err)
 	}

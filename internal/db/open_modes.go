@@ -126,6 +126,32 @@ func OpenWritable(dbPath string) (*sql.DB, error) {
 	return database, nil
 }
 
+// OpenReadOnlyMigrated guarantees the database at dbPath exists and is at the
+// current schema version, then returns a read-only handle for the actual
+// query work. It mirrors the serve_child.go topology (writable Open FIRST so
+// schema/migrations are applied — mode=ro never creates a file and never
+// migrates — THEN a separate read-only handle for the long read path).
+//
+// bug-7dbaf552 / roborev followup: read-only CLI surfaces (`wipnote query`,
+// `wipnote lineage`) were switched to OpenReadOnly for contention safety, but
+// that dropped the migrate-on-open guarantee that the prior writable open
+// provided — a fresh or schema-behind workspace would fail before the read
+// even ran. This helper restores BOTH guarantees: Open here is the Fix-1
+// RetryOnBusy-wrapped migration path, so the brief bootstrap open is itself
+// resilient to a transient SQLITE_BUSY; the bootstrap handle is closed
+// immediately so it never holds the writer lock during the (potentially long)
+// read path that follows on the returned read-only handle.
+func OpenReadOnlyMigrated(dbPath string) (*sql.DB, error) {
+	boot, err := Open(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("bootstrap (schema/migrations): %w", err)
+	}
+	if cerr := boot.Close(); cerr != nil {
+		return nil, fmt.Errorf("close bootstrap handle: %w", cerr)
+	}
+	return OpenReadOnly(dbPath)
+}
+
 // buildReadOnlyDSN builds a URI DSN for SQLite read-only access.
 func buildReadOnlyDSN(dbPath string) string {
 	if strings.Contains(dbPath, ":memory:") {

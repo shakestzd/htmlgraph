@@ -26,6 +26,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -62,18 +63,38 @@ func seedLineageGraph(t *testing.T, dbPath, root string) {
 }
 
 // holdWriteLock spins a goroutine that repeatedly takes the writer lock
-// (BEGIN IMMEDIATE → tiny write → COMMIT) until ctx is cancelled. Under
-// DELETE journal mode this is the contention source that drives a concurrent
-// reader's SHARED-lock acquisition into the transient SQLITE_BUSY that
-// busy_timeout alone does not always absorb — i.e. the exact condition
-// bfsWalk's RetryOnBusy wrapper must hide from the caller.
-func holdWriteLock(ctx context.Context, t *testing.T, dbPath string, wg *sync.WaitGroup) {
+// (BEGIN → tiny write → COMMIT) until ctx is cancelled. Under DELETE journal
+// mode this is the contention source that drives a concurrent reader's
+// SHARED-lock acquisition into the transient SQLITE_BUSY that busy_timeout
+// alone does not always absorb — i.e. the exact condition bfsWalk's
+// RetryOnBusy wrapper must hide from the caller.
+//
+// roborev followup (LOW): the writer no longer fails silently. A failed
+// OpenWritable / Begin / Commit is reported to the test via t.Errorf (guarded
+// by mu so it is goroutine-safe), and every COMMITTED cycle increments
+// *cycles so the caller can assert the contention workload actually ran (a
+// zero-cycle writer would make the no-BUSY assertion vacuous).
+func holdWriteLock(
+	ctx context.Context,
+	t *testing.T,
+	dbPath string,
+	wg *sync.WaitGroup,
+	mu *sync.Mutex,
+	cycles *atomic.Int64,
+) {
 	t.Helper()
+	reportf := func(format string, a ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		t.Errorf(format, a...)
+	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		w, err := db.OpenWritable(dbPath)
 		if err != nil {
+			reportf("holdWriteLock: OpenWritable setup failed (contention "+
+				"workload would not run): %v", err)
 			return
 		}
 		defer w.Close()
@@ -81,15 +102,33 @@ func holdWriteLock(ctx context.Context, t *testing.T, dbPath string, wg *sync.Wa
 		for ctx.Err() == nil {
 			tx, err := w.Begin()
 			if err != nil {
+				// A transient BUSY on Begin is expected under DELETE journal
+				// contention and is retried by the loop; only a non-BUSY
+				// Begin failure is a real setup defect worth surfacing.
+				if !db.IsBusyError(err) {
+					reportf("holdWriteLock: Begin failed (non-BUSY): %v", err)
+				}
 				continue
 			}
-			_, _ = tx.Exec(
+			if _, err := tx.Exec(
 				`INSERT OR REPLACE INTO metadata (key, value) VALUES ('busy-probe', ?)`,
-				fmt.Sprintf("%d", n))
+				fmt.Sprintf("%d", n)); err != nil {
+				_ = tx.Rollback()
+				if !db.IsBusyError(err) {
+					reportf("holdWriteLock: tx.Exec failed (non-BUSY): %v", err)
+				}
+				continue
+			}
 			n++
 			// Hold the RESERVED lock briefly so overlapping readers must wait.
 			time.Sleep(2 * time.Millisecond)
-			_ = tx.Commit()
+			if err := tx.Commit(); err != nil {
+				if !db.IsBusyError(err) {
+					reportf("holdWriteLock: Commit failed (non-BUSY): %v", err)
+				}
+				continue
+			}
+			cycles.Add(1)
 		}
 	}()
 }
@@ -120,8 +159,10 @@ func TestLineageBfsWalk_NoBusyUnderContention(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			var writers sync.WaitGroup
-			holdWriteLock(ctx, t, dbPath, &writers)
-			holdWriteLock(ctx, t, dbPath, &writers)
+			var reportMu sync.Mutex
+			var writeCycles atomic.Int64
+			holdWriteLock(ctx, t, dbPath, &writers, &reportMu, &writeCycles)
+			holdWriteLock(ctx, t, dbPath, &writers, &reportMu, &writeCycles)
 
 			// Run many bfsWalk passes against the contended DB. Each pass is
 			// the production code path (forwardWalk → bfsWalk). The retry
@@ -153,13 +194,23 @@ func TestLineageBfsWalk_NoBusyUnderContention(t *testing.T) {
 				t.Fatalf("[%s] no bfsWalk passes ran — workload didn't "+
 					"exercise the path", mode)
 			}
+			// roborev followup (LOW): assert the writer goroutines actually
+			// completed at least one BEGIN→write→COMMIT cycle. Without this a
+			// silently-broken writer (e.g. setup failure) would make the
+			// no-BUSY assertion vacuously green — the test would "pass"
+			// without ever exercising lock contention.
+			if c := writeCycles.Load(); c < 1 {
+				t.Fatalf("[%s] writer goroutines completed %d write-lock "+
+					"cycles, want >=1 — contention workload did not run, so "+
+					"the no-BUSY assertion would be vacuous", mode, c)
+			}
 			if total := db.FirstPartyBusyTotal(); total != 0 {
 				t.Fatalf("[%s] FirstPartyBusyTotal = %d, want 0 "+
 					"(transient BUSY must be absorbed by bfsWalk's "+
 					"RetryOnBusy, not leaked to the launch gate)", mode, total)
 			}
-			t.Logf("[%s] %d contended bfsWalk passes, zero BUSY surfaced",
-				mode, passes)
+			t.Logf("[%s] %d contended bfsWalk passes, %d writer cycles, "+
+				"zero BUSY surfaced", mode, passes, writeCycles.Load())
 		})
 	}
 }

@@ -193,9 +193,13 @@ Examples:
 			// handle — bfsWalk, annotateTimestamps, ResolveToMap,
 			// RenderAgentTree, TraceCommit and TraceFile are all SELECT-only
 			// (trace.go already opens the same TraceCommit/TraceFile
-			// primitives read-only). Opening mode=ro means lineage can never
-			// hold the writer's RESERVED lock, eliminating it as a source of
-			// contention, and the engine hard-rejects any accidental write.
+			// primitives read-only). openReadOnlyDB bootstraps the schema /
+			// runs migrations on a brief writable handle FIRST (roborev
+			// followup: restores the migrate-on-open guarantee for fresh /
+			// schema-behind workspaces that a bare mode=ro open dropped) and
+			// then hands back a mode=ro handle, so the long bfsWalk read path
+			// can never hold the writer's RESERVED lock and the engine
+			// hard-rejects any accidental write.
 			db, err := openReadOnlyDB(dir)
 			if err != nil {
 				return err
