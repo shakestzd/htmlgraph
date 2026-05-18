@@ -214,6 +214,25 @@ func openDB(wipnoteDir string) (*sql.DB, error) {
 	return db, nil
 }
 
+// openReadOnlyDB resolves the canonical DB path exactly like openDB but opens
+// the handle in SQLite engine-level read-only mode (mode=ro). It is for
+// strictly read-only CLI surfaces (e.g. `wipnote lineage`) so they cannot
+// hold the writer lock and so the engine hard-rejects any accidental write.
+// bug-7dbaf552: read-only callers still get busy_timeout via OpenReadOnly's
+// DSN; callers layer dbpkg.RetryOnBusy around their individual queries.
+func openReadOnlyDB(wipnoteDir string) (*sql.DB, error) {
+	projectDir := filepath.Dir(wipnoteDir)
+	dbPath, err := storage.CanonicalDBPath(projectDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve db path: %w", err)
+	}
+	db, err := dbpkg.OpenReadOnly(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open database (read-only): %w", err)
+	}
+	return db, nil
+}
+
 // sessionShowCmd returns a cobra.Command that displays full session details.
 func sessionShowCmd() *cobra.Command {
 	return &cobra.Command{

@@ -189,7 +189,14 @@ Examples:
 			if err != nil {
 				return err
 			}
-			db, err := openDB(dir)
+			// bug-7dbaf552: lineage performs ZERO writes through this
+			// handle — bfsWalk, annotateTimestamps, ResolveToMap,
+			// RenderAgentTree, TraceCommit and TraceFile are all SELECT-only
+			// (trace.go already opens the same TraceCommit/TraceFile
+			// primitives read-only). Opening mode=ro means lineage can never
+			// hold the writer's RESERVED lock, eliminating it as a source of
+			// contention, and the engine hard-rejects any accidental write.
+			db, err := openReadOnlyDB(dir)
 			if err != nil {
 				return err
 			}
@@ -323,7 +330,32 @@ func bfsWalk(db *sql.DB, root string, rels []string, maxDepth int, forward bool)
 		for _, r := range rels {
 			args = append(args, r)
 		}
-		rows, err := db.Query(query, args...)
+		// bug-7dbaf552: the retry unit is THIS QUERY ONLY, never the BFS
+		// iteration. On a contended DELETE-journal DB a single neighbour
+		// query can transiently SQLITE_BUSY; without a retry the whole
+		// `wipnote lineage` invocation fails. RetryOnBusy re-runs only the
+		// db.Query call. Critical lock-hygiene: a *sql.Rows from a failed
+		// attempt holds a read lock until closed, so if the closure ever
+		// captured rows on a BUSY path we MUST close it before the next
+		// attempt. Here db.Query returns err WITHOUT a usable rows handle on
+		// BUSY (rows is nil / already finalised by the driver), so there is
+		// nothing to leak between attempts; rows is assigned only on the
+		// terminal (success or hard-error) attempt and is closed exactly
+		// once below after iteration. We defensively Close any non-nil rows
+		// from a BUSY attempt before retrying to make the invariant explicit
+		// and robust to driver changes.
+		var rows *sql.Rows
+		err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+			r, qerr := db.Query(query, args...)
+			if qerr != nil {
+				if r != nil { // defensive: never carry an open lock into a retry
+					r.Close()
+				}
+				return qerr
+			}
+			rows = r
+			return nil
+		})
 		if err != nil {
 			return nil, fmt.Errorf("query neighbors of %s: %w", cur.id, err)
 		}
@@ -396,17 +428,29 @@ func sortLineageTimeline(nodes []lineageNode) {
 func annotateTimestamps(db *sql.DB, nodes []lineageNode) {
 	for i := range nodes {
 		var ts sql.NullString
+		// bug-7dbaf552: best-effort timestamp lookups still wrapped in
+		// RetryOnBusy so a transient SQLITE_BUSY doesn't silently blank the
+		// timeline column under contention. QueryRow().Scan() consumes and
+		// closes its single row internally, so there is no *sql.Rows to leak
+		// across retries — the retry unit is naturally the whole Scan.
+		// sql.ErrNoRows is NOT a BusyError, so RetryOnBusy returns it
+		// immediately and we keep the original best-effort (ignore-error)
+		// behaviour.
 		// Try git_commits first (commit-shaped IDs).
-		_ = db.QueryRow(
-			`SELECT timestamp FROM git_commits WHERE commit_hash = ? LIMIT 1`,
-			nodes[i].ID,
-		).Scan(&ts)
-		if !ts.Valid || ts.String == "" {
-			// Fall back to agent_events.timestamp via session_id.
-			_ = db.QueryRow(
-				`SELECT MIN(timestamp) FROM agent_events WHERE session_id = ?`,
+		_ = dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+			return db.QueryRow(
+				`SELECT timestamp FROM git_commits WHERE commit_hash = ? LIMIT 1`,
 				nodes[i].ID,
 			).Scan(&ts)
+		})
+		if !ts.Valid || ts.String == "" {
+			// Fall back to agent_events.timestamp via session_id.
+			_ = dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+				return db.QueryRow(
+					`SELECT MIN(timestamp) FROM agent_events WHERE session_id = ?`,
+					nodes[i].ID,
+				).Scan(&ts)
+			})
 		}
 		if ts.Valid {
 			nodes[i].Timestamp = ts.String

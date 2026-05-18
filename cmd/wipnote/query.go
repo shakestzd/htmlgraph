@@ -43,14 +43,27 @@ func runQuery(dsl string) error {
 	if err != nil {
 		return fmt.Errorf("resolve db path: %w", err)
 	}
-	database, err := dbpkg.Open(dbPath)
+	// bug-7dbaf552: `wipnote query` is strictly read-only — graph.ExecuteDSL
+	// only issues SELECTs and closes every *sql.Rows it opens internally
+	// before returning a materialised slice. Open mode=ro so the command can
+	// never hold the writer lock, and wrap the (idempotent, no-leaked-handle)
+	// ExecuteDSL call in RetryOnBusy so a transient SQLITE_BUSY under
+	// contention doesn't fail the user's query.
+	database, err := dbpkg.OpenReadOnly(dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer database.Close()
 
-	results, err := graph.ExecuteDSL(database, dsl)
-	if err != nil {
+	var results []graph.NodeResult
+	if err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+		r, derr := graph.ExecuteDSL(database, dsl)
+		if derr != nil {
+			return derr
+		}
+		results = r
+		return nil
+	}); err != nil {
 		return fmt.Errorf("query error: %w", err)
 	}
 

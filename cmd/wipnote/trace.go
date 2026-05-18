@@ -121,8 +121,20 @@ func runTraceCommit(sha string, jsonOut bool) error {
 	}
 	defer database.Close()
 
-	commits, err := dbpkg.TraceCommit(database, sha)
-	if err != nil {
+	// bug-7dbaf552: dbpkg.TraceCommit fully materialises its result slice and
+	// closes its own *sql.Rows before returning, so there is no read lock to
+	// leak across retries. Wrap the (idempotent, handle-free) call in
+	// RetryOnBusy so a transient SQLITE_BUSY under contention doesn't fail
+	// `wipnote trace <sha>`.
+	var commits []dbpkg.TraceResult
+	if err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+		c, derr := dbpkg.TraceCommit(database, sha)
+		if derr != nil {
+			return derr
+		}
+		commits = c
+		return nil
+	}); err != nil {
 		return err
 	}
 	if len(commits) == 0 {
@@ -202,8 +214,18 @@ func runTraceFile(filePath string, jsonOut bool) error {
 	}
 	defer database.Close()
 
-	results, err := dbpkg.TraceFile(database, filePath)
-	if err != nil {
+	// bug-7dbaf552: same discipline as runTraceCommit — TraceFile returns a
+	// materialised slice with no caller-held *sql.Rows, so RetryOnBusy can
+	// safely re-run the whole call on a transient SQLITE_BUSY.
+	var results []dbpkg.FileTraceResult
+	if err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+		r, derr := dbpkg.TraceFile(database, filePath)
+		if derr != nil {
+			return derr
+		}
+		results = r
+		return nil
+	}); err != nil {
 		return err
 	}
 
@@ -316,16 +338,43 @@ func uniqueSessions(commits []models.GitCommit, files []models.FeatureFile) []st
 	return out
 }
 
-// runTraceFeature writes a human-readable text tree for a feature's forward trace.
-func runTraceFeature(w io.Writer, database *sql.DB, featureID string) error {
-	commits, err := dbpkg.GetCommitsByFeature(database, featureID)
-	if err != nil {
-		return fmt.Errorf("get commits: %w", err)
+// traceFeatureData loads a feature's commits and files, each fetch wrapped in
+// RetryOnBusy. bug-7dbaf552: GetCommitsByFeature / ListFilesByFeature each
+// fully materialise their slice and close their own *sql.Rows before
+// returning, so re-running either on a transient SQLITE_BUSY leaks no read
+// lock. Shared by the text and JSON feature-trace renderers (DRY).
+func traceFeatureData(database *sql.DB, featureID string) ([]models.GitCommit, []models.FeatureFile, error) {
+	var commits []models.GitCommit
+	if err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+		c, derr := dbpkg.GetCommitsByFeature(database, featureID)
+		if derr != nil {
+			return derr
+		}
+		commits = c
+		return nil
+	}); err != nil {
+		return nil, nil, fmt.Errorf("get commits: %w", err)
 	}
 
-	files, err := dbpkg.ListFilesByFeature(database, featureID)
+	var files []models.FeatureFile
+	if err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, func() error {
+		f, derr := dbpkg.ListFilesByFeature(database, featureID)
+		if derr != nil {
+			return derr
+		}
+		files = f
+		return nil
+	}); err != nil {
+		return nil, nil, fmt.Errorf("list files: %w", err)
+	}
+	return commits, files, nil
+}
+
+// runTraceFeature writes a human-readable text tree for a feature's forward trace.
+func runTraceFeature(w io.Writer, database *sql.DB, featureID string) error {
+	commits, files, err := traceFeatureData(database, featureID)
 	if err != nil {
-		return fmt.Errorf("list files: %w", err)
+		return err
 	}
 
 	sessions := uniqueSessions(commits, files)
@@ -362,14 +411,9 @@ func runTraceFeature(w io.Writer, database *sql.DB, featureID string) error {
 
 // runTraceFeatureJSON writes structured JSON for a feature's forward trace.
 func runTraceFeatureJSON(w io.Writer, database *sql.DB, featureID string) error {
-	commits, err := dbpkg.GetCommitsByFeature(database, featureID)
+	commits, files, err := traceFeatureData(database, featureID)
 	if err != nil {
-		return fmt.Errorf("get commits: %w", err)
-	}
-
-	files, err := dbpkg.ListFilesByFeature(database, featureID)
-	if err != nil {
-		return fmt.Errorf("list files: %w", err)
+		return err
 	}
 
 	sessions := uniqueSessions(commits, files)

@@ -227,14 +227,11 @@ var approvedWriteSites = []writeSite{
 		Classification: intentionalCLIMutation,
 		Note:           "User-driven `wipnote plan read-feedback-yaml`; short-lived.",
 	},
-	{
-		File:           "cmd/wipnote/query.go",
-		Line:           46,
-		Function:       "runQuery",
-		OpenExpr:       "dbpkg.Open",
-		Classification: intentionalCLIMutation,
-		Note:           "User-driven `wipnote query`; opens writable to migrate-on-open then queries.",
-	},
+	// bug-7dbaf552: `wipnote query` (runQuery) was switched from the writable
+	// dbpkg.Open to dbpkg.OpenReadOnly — graph.ExecuteDSL is strictly
+	// SELECT-only, so it no longer needs (and must not hold) the writer lock.
+	// Its former intentional-cli-mutation inventory entry is therefore
+	// removed; the read-only open is not a writable-boundary site.
 	{
 		File:           "cmd/wipnote/serve_child.go",
 		Line:           100,

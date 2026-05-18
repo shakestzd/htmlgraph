@@ -50,7 +50,17 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("applying pragmas: %w", err)
 	}
 
-	if err := runMigrations(db); err != nil {
+	// bug-7dbaf552: runMigrations performs the user_version write (and, for a
+	// brand-new / legacy DB, DDL). On a contended DELETE-journal database the
+	// SHARED→RESERVED upgrade can transiently SQLITE_BUSY even with
+	// busy_timeout set. Wrapping the whole migration step in RetryOnBusy makes
+	// EVERY dbpkg.Open caller (lineage/query/session/workitem/...) resilient
+	// without each having to hand-roll its own loop. runMigrations is
+	// version-gated and idempotent, so re-running it is safe. Same-package
+	// call: RetryOnBusy + DefaultBusyBackoff live in busy_retry.go.
+	if err := RetryOnBusy(DefaultBusyBackoff, func() error {
+		return runMigrations(db)
+	}); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("running migrations: %w", err)
 	}
