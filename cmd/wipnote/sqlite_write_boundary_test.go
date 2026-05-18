@@ -246,7 +246,7 @@ var approvedWriteSites = []writeSite{
 		Function:       "openDB",
 		OpenExpr:       "dbpkg.Open",
 		Classification: intentionalCLIMutation,
-		Note:           "Helper for `wipnote session start/end` (mutating) CLI commands. session list/show were moved to openReadOnlyDB by bug-af107c36.",
+		Note:           "Package-level writable-open helper used by many mutating CLI paths (session start/end, claim, ingest, backfill, blame, cleanup, compliance, report, who, …). Read-only paths (session list/show, trace, query, lineage) correctly use openReadOnlyDB. This inventory entry exists to catch any future read-only command that wrongly calls openDB instead of openReadOnlyDB.",
 	},
 	{
 		File:           "cmd/wipnote/status.go",
