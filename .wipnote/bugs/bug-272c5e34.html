@@ -10,26 +10,20 @@
 <body>
     <article id="bug-272c5e34"
              data-type="bug"
-             data-status="in-progress"
+             data-status="done"
              data-priority="medium"
              data-created="2026-05-18T13:26:43.678296"
-             data-updated="2026-05-18T13:44:41.172112" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-582-gc8646013c">
+             data-updated="2026-05-18T18:31:36.165128" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-582-gc8646013c">
 
         <header>
             <h1>serve indexer &#43; writequeue self-livelock: tight begin-immediate loop SQLITE_BUSY-starves under DELETE journal, blanks dashboard</h1>
             <div class="metadata">
-                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
 
         <nav data-graph-edges>
-            <section data-edge-type="part_of">
-                <h3>Part Of:</h3>
-                <ul>
-                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T13:26:43.708912">trk-a30e8df4</a></li>
-                </ul>
-            </section>
             <section data-edge-type="relates_to">
                 <h3>Relates To:</h3>
                 <ul>
@@ -44,18 +38,25 @@
                     <li><a href="d2101130-3162-4850-8793-414841978b28.html" data-relationship="implemented_in" data-since="2026-05-18T13:40:38.247979">session d2101130-3162-4850-8793-414841978b28</a></li>
                 </ul>
             </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T13:26:43.708912">trk-a30e8df4</a></li>
+                </ul>
+            </section>
         </nav>
 
         <section data-steps>
             <h3>Implementation Steps</h3>
             <ol>
-                <li data-completed="false" data-step-id="task-3" data-agent="claude-code" data-created-by-agent="claude-code">⏳ Fix serve indexer/writequeue SQLITE_BUSY self-livelock (bug-272c5e34)</li>
+                <li data-completed="true" data-step-id="task-3" data-agent="claude-code" data-created-by-agent="claude-code">✅ Fix serve indexer/writequeue SQLITE_BUSY self-livelock (bug-272c5e34)</li>
             </ol>
         </section>
 
         <section data-content>
             <h3>Description</h3>
-            <p>wipnote serve runs a background indexer (~5s loop) issuing begin-immediate write txns to ingest sessions, plus a separate writequeue. Under DELETE-journal single-writer semantics (correct for overlayfs) the indexer contends with its own writequeue and periodic CLI opens, producing a self-perpetuating SQLITE_BUSY storm: every begin-immediate fails database is locked (5), the orphan filter query fails, the read-index never updates, and dashboard data endpoints degrade to unavailable right now (metric tiles show --). Even plain wipnote session list and wipnote bug create fail at applying PRAGMA journal_mode / read user_version. The running serve already contains deployed fixes bug-74a7bda7 / bug-7dbaf552 / bug-dd5db2d1 (binary 0.59.1-582-gc8646013c, not replaced under the process) so those RetryOnBusy fixes are INSUFFICIENT for the serve background write loop, a path they did not cover. Likely fix: route all serve-side writes through the single writequeue (stop the indexer issuing independent begin-immediate), add RetryOnBusy + exponential backoff to the indexer path, and back off hard when busy instead of hammering every 5s. Reproduced live 2026-05-18 with no external concurrent launcher processes running, so this is serve self-contention not external load.</p>
+            <p>wipnote serve runs a background indexer (~5s loop) issuing begin-immediate write txns to ingest sessions, plus a separate writequeue. Under DELETE-journal single-writer semantics (correct for overlayfs) the indexer contends with its own writequeue and periodic CLI opens, producing a self-perpetuating SQLITE_BUSY storm: every begin-immediate fails database is locked (5), the orphan filter query fails, the read-index never updates, and dashboard data endpoints degrade to unavailable right now (metric tiles show --). Even plain wipnote session list and wipnote bug create fail at applying PRAGMA journal_mode / read user_version. The running serve already contains deployed fixes bug-74a7bda7 / bug-7dbaf552 / bug-dd5db2d1 (binary 0.59.1-582-gc8646013c, not replaced under the process) so those RetryOnBusy fixes are INSUFFICIENT for the serve background write loop, a path they did not cover. Likely fix: route all serve-side writes through the single writequeue (stop the indexer issuing independent begin-immediate), add RetryOnBusy + exponential backoff to the indexer path, and back off hard when busy instead of hammering every 5s. Reproduced live 2026-05-18 with no external concurrent launcher processes running, so this is serve self-contention not external load.
+[2026-05-18 18:30 claude-code] accepted-advisory (provenance override): serve indexer self-livelock fixed: indexer filter reads moved to read-only handle and prompt-ID UPDATE routed through the single writequeue, eliminating the second concurrent writer + SHARED-lock contention under DELETE-journal; added WIPNOTE_NO_AUTO_SERVE guard in ensureServeForDashboard. Commit chain: 3333b22c4 (core fix: split read/write handle, queued prompt-ID, env guard, serve_indexer stress producer), 82d60aacb (focused tests TestIndexer_PromptIDRoutingThroughQueue + fallback), 8719576e7 (align fallback test to real reindex WithDB legacy-path wiring, TestIndexer_PromptIDReindexPath). roborev job 3257 on 8719576: no issues found. Orchestrator session gate passed (signature 004b7f9e12f). Subagent-delegated code; advisory accepted per bug-3718b630 known limitation. NOTE: TestSQLiteContentionStress is skip-guarded on overlayfs (this devcontainer) so the deterministic livelock repro/proof runs only on WAL-capable CI per plan-ae0c37b2 launch-readiness.</p>
         </section>
     </article>
 </body>
