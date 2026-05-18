@@ -242,11 +242,11 @@ var approvedWriteSites = []writeSite{
 	},
 	{
 		File:           "cmd/wipnote/session.go",
-		Line:           210,
+		Line:           213,
 		Function:       "openDB",
 		OpenExpr:       "dbpkg.Open",
 		Classification: intentionalCLIMutation,
-		Note:           "Helper for `wipnote session list/start/end/show` CLI commands.",
+		Note:           "Helper for `wipnote session start/end` (mutating) CLI commands. session list/show were moved to openReadOnlyDB by bug-af107c36.",
 	},
 	{
 		File:           "cmd/wipnote/status.go",

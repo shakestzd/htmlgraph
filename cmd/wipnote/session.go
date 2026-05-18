@@ -53,7 +53,10 @@ func runSessionList(activeOnly bool, limit int) error {
 		return err
 	}
 
-	db, err := openDB(dir)
+	// bug-af107c36: session list is purely read-only; switch to
+	// OpenReadOnlyMigrated (bootstrap+migrate then read-only) so it neither
+	// holds the writer lock nor surfaces SQLITE_BUSY under contention.
+	db, err := openReadOnlyDB(dir)
 	if err != nil {
 		return err
 	}
@@ -257,7 +260,10 @@ func runSessionShow(sessionID string) error {
 	if err != nil {
 		return err
 	}
-	db, err := openDB(dir)
+	// bug-af107c36: session show is purely read-only; switch to
+	// OpenReadOnlyMigrated (bootstrap+migrate then read-only) so it neither
+	// holds the writer lock nor surfaces SQLITE_BUSY under contention.
+	db, err := openReadOnlyDB(dir)
 	if err != nil {
 		return err
 	}
