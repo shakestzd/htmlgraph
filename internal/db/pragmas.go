@@ -96,9 +96,45 @@ func ApplyPragmas(db *sql.DB, pragmas map[string]string) error {
 			}
 			// fall through to the SET below if query failed or modes differ
 		}
-		_, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA %s = %s", pragma, value))
-		if err != nil {
-			return fmt.Errorf("applying PRAGMA %s: %w", pragma, err)
+		// bug-dd5db2d1 (supersedes bug-56b686aa): the required-pragma SETs run
+		// at EVERY db.Open, BEFORE runMigrations. busy_timeout (applied above)
+		// only covers SQLite's internal lock-wait — it does NOT cover the
+		// SHARED→RESERVED upgrade race, so under multi-session DELETE-journal
+		// saturation `PRAGMA journal_mode = DELETE` (a header/rollback-journal
+		// write) can return SQLITE_BUSY immediately and bypass busy_timeout
+		// entirely. bug-56b686aa's busy_timeout-first ordering + query-before-set
+		// fast path do NOT close this race (the fast path only skips the SET
+		// when the mode already matches; on a contended DB that still needs the
+		// SET, the unprotected ExecContext was the failure surface). Wrap the
+		// write in the SHARED RetryOnBusy/DefaultBusyBackoff helper (busy_retry.go,
+		// same package) so the transient BUSY is absorbed transparently for
+		// EVERY caller (CLI, dashboard, hooks, gate, completion, reindex,
+		// migrate) instead of each hand-rolling its own loop. PRAGMA writes are
+		// fast and idempotent, so re-running an attempt is safe; RetryOnBusy
+		// returns immediately on success or any non-BUSY error, so the only
+		// added cost is bounded backoff latency on genuine transient contention.
+		//
+		// journal_mode is a result-returning pragma (it echoes the mode). Drive
+		// it via QueryContext and drain+close the row set on EVERY attempt so a
+		// retried attempt does not leak the rows handle from the prior attempt.
+		setPragma := pragma
+		setValue := value
+		if err := RetryOnBusy(DefaultBusyBackoff, func() error {
+			rows, qerr := conn.QueryContext(ctx, fmt.Sprintf("PRAGMA %s = %s", setPragma, setValue))
+			if qerr != nil {
+				return qerr
+			}
+			// Drain so the statement fully executes and the connection is
+			// returned to a clean state before the next attempt / pragma.
+			for rows.Next() {
+			}
+			cerr := rows.Err()
+			if closeErr := rows.Close(); closeErr != nil && cerr == nil {
+				cerr = closeErr
+			}
+			return cerr
+		}); err != nil {
+			return fmt.Errorf("applying PRAGMA %s: %w", setPragma, err)
 		}
 	}
 
