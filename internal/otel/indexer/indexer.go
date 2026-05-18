@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/shakestzd/wipnote/internal/db"
+	"github.com/shakestzd/wipnote/internal/db/writequeue"
 	"github.com/shakestzd/wipnote/internal/otel"
 	"github.com/shakestzd/wipnote/internal/otel/sink"
 )
@@ -50,7 +51,9 @@ type FileInfo struct {
 type Indexer struct {
 	wipnoteDir string
 	snk        sink.SignalSink
-	database   *sql.DB // optional; enables prompt_id bridging when set
+	database   *sql.DB           // optional; read-only handle for orphan-filter SELECTs
+	writeDB    *sql.DB           // optional; writable handle used for prompt-ID bridge when no queue
+	queue      *writequeue.Queue // optional; when set, prompt-ID bridge goes through the queue
 
 	mu     sync.RWMutex
 	status map[string]FileInfo
@@ -66,11 +69,37 @@ func New(wipnoteDir string, snk sink.SignalSink) *Indexer {
 	}
 }
 
-// WithDB attaches a *sql.DB to the indexer so it can bridge OTel prompt_id
-// values back to the corresponding UserQuery rows in agent_events. This is
-// optional: when not set, prompt_id bridging is silently skipped.
+// WithDB attaches a read-only *sql.DB to the indexer for the orphan-filter
+// SELECT queries in filterSessionsByDB / queryKnownSessionIDs.  Using a
+// read-only handle here (bug-272c5e34 Change 1) prevents those SELECTs from
+// holding a SHARED lock on the writable handle, which was blocking the queue
+// worker's BEGIN IMMEDIATE and causing a symmetric DELETE-journal deadlock.
+//
+// When a write queue is also attached (WithQueue), the prompt-ID bridge uses
+// the queue instead of this handle for writes.  When no queue is attached,
+// the bridge falls back to WriteDB (set via WithWriteDB) if provided.
 func (idx *Indexer) WithDB(database *sql.DB) *Indexer {
 	idx.database = database
+	return idx
+}
+
+// WithWriteDB attaches a writable *sql.DB for the prompt-ID bridge fallback
+// path used when no write queue has been wired via WithQueue.  In production
+// serve_child.go always calls WithQueue, so this handle is the last-resort
+// path for callers (e.g. wipnote reindex) that drive the indexer without a
+// queue.
+func (idx *Indexer) WithWriteDB(writeDB *sql.DB) *Indexer {
+	idx.writeDB = writeDB
+	return idx
+}
+
+// WithQueue wires the single write-queue so the prompt-ID bridge
+// (maybeSetPromptID) submits its SELECT+UPDATE as a fire-and-forget WriteOp
+// through the queue instead of issuing an independent write directly.  This
+// eliminates the second independent writer that was causing the symmetric
+// DELETE-journal deadlock (bug-272c5e34 Change 2).
+func (idx *Indexer) WithQueue(q *writequeue.Queue) *Indexer {
+	idx.queue = q
 	return idx
 }
 
@@ -301,12 +330,21 @@ func (idx *Indexer) writeParsedBatch(ctx context.Context, parsed []parsedSignal)
 
 // maybeSetPromptID correlates a user_prompt OTel signal back to the closest
 // UserQuery event in agent_events by session_id + timestamp. It is a no-op
-// when the indexer has no database attached, the signal is not a user_prompt,
-// or the signal carries no prompt_id.
+// when the indexer has no writable path attached, the signal is not a
+// user_prompt, or the signal carries no prompt_id.
+//
+// Write routing (bug-272c5e34 Change 2):
+//
+//	When a write queue is attached (WithQueue), the SELECT+UPDATE is
+//	submitted as a fire-and-forget WriteOp through the queue.  This is
+//	acceptable because the prompt-ID bridge is explicitly best-effort —
+//	a missed correlation is a cosmetic gap, never a data-loss event.  On
+//	submit error (queue full / stopped) we log and continue, matching the
+//	prior best-effort behaviour.
+//
+//	When no queue is attached (e.g. wipnote reindex) the bridge falls back
+//	to WriteDB if set, or is silently skipped.
 func (idx *Indexer) maybeSetPromptID(sig otel.UnifiedSignal) {
-	if idx.database == nil {
-		return
-	}
 	if sig.Kind != otel.KindLog {
 		return
 	}
@@ -316,9 +354,39 @@ func (idx *Indexer) maybeSetPromptID(sig otel.UnifiedSignal) {
 	if sig.PromptID == "" || sig.SessionID == "" {
 		return
 	}
-	if err := db.SetPromptID(idx.database, sig.SessionID, sig.PromptID, sig.Timestamp); err != nil {
-		log.Printf("indexer: set prompt_id (session=%s, prompt=%s): %v",
-			sig.SessionID, sig.PromptID, err)
+
+	// Prefer queue path: fire-and-forget through the single writer.
+	if idx.queue != nil && idx.writeDB != nil {
+		sessionID := sig.SessionID
+		promptID := sig.PromptID
+		ts := sig.Timestamp
+		wdb := idx.writeDB
+		op := writequeue.WriteOp(func(_ context.Context) error {
+			return db.SetPromptID(wdb, sessionID, promptID, ts)
+		})
+		if err := idx.queue.Submit(context.Background(), op); err != nil {
+			log.Printf("indexer: set prompt_id submit (session=%s, prompt=%s): %v",
+				sig.SessionID, sig.PromptID, err)
+		}
+		return
+	}
+
+	// Fallback: direct write on writeDB (no queue — e.g. wipnote reindex).
+	if idx.writeDB != nil {
+		if err := db.SetPromptID(idx.writeDB, sig.SessionID, sig.PromptID, sig.Timestamp); err != nil {
+			log.Printf("indexer: set prompt_id (session=%s, prompt=%s): %v",
+				sig.SessionID, sig.PromptID, err)
+		}
+		return
+	}
+
+	// Legacy path: if only the old read/write database field is set (callers
+	// that used WithDB before bug-272c5e34 split the handles), use it.
+	if idx.database != nil {
+		if err := db.SetPromptID(idx.database, sig.SessionID, sig.PromptID, sig.Timestamp); err != nil {
+			log.Printf("indexer: set prompt_id (session=%s, prompt=%s): %v",
+				sig.SessionID, sig.PromptID, err)
+		}
 	}
 }
 

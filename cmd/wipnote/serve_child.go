@@ -155,10 +155,20 @@ func runServeChild(port int) error {
 	// produced by per-session collectors, so user work is durable on
 	// disk before any submit hits the queue (canonical-first contract).
 	if writerService.sink != nil {
-		// WithDB(writeDB): the indexer's attached handle does the prompt-ID
-		// bridge UPDATE (db.SetPromptID) — it MUST be the writable handle,
-		// not the read-only mux handle (bug-74a7bda7 STEP 0 reroute).
-		idxr := indexer.New(wipnoteDir, writerService.sink).WithDB(writeDB)
+		// Change 1 (bug-272c5e34): pass the read-only `database` handle so
+		// filterSessionsByDB / queryKnownSessionIDs SELECTs no longer hold a
+		// SHARED lock on the writable handle and can't block the queue
+		// worker's BEGIN IMMEDIATE.
+		//
+		// Change 2 (bug-272c5e34): wire the writequeue so maybeSetPromptID
+		// routes its SELECT+UPDATE through the single writer instead of
+		// issuing an independent write on a second connection.  WithDB is
+		// still needed for the read-only filter path above; the writable
+		// operations now go through the queue.
+		idxr := indexer.New(wipnoteDir, writerService.sink).
+			WithDB(database).
+			WithWriteDB(writeDB).
+			WithQueue(writerService.queue)
 		ctx := context.Background()
 		go idxr.Start(ctx)
 		// /api/indexer/status — per-file health for observability (Q7).

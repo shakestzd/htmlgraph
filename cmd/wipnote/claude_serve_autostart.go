@@ -89,6 +89,9 @@ func ensureServeForDashboard(projectDir string) {
 	if isExplicitlyDisabled(os.Getenv("WIPNOTE_OTEL_ENABLED")) {
 		return
 	}
+	if os.Getenv("WIPNOTE_NO_AUTO_SERVE") != "" {
+		return
+	}
 
 	// Resolve the dashboard bind address. In devcontainers this is
 	// 0.0.0.0:8088; on host installs it is 127.0.0.1:8080.

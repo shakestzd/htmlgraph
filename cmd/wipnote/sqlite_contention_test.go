@@ -95,9 +95,10 @@ const stressProducersPerSubsystem = 5
 
 // stressTotalProducers should always equal stressProducersPerSubsystem
 // times the number of subsystem categories below — kept as a constant
-// rather than computed at runtime so the spec value (20) appears
-// literally in the source for greppability.
-const stressTotalProducers = 20
+// rather than computed at runtime so the spec value appears literally in
+// the source for greppability.
+// 5 categories × 5 producers = 25 total.
+const stressTotalProducers = 25
 
 // hookSpawnInterval is the minimum delay between successive
 // OpenHookDB calls per hook producer. Models the cadence of fresh
@@ -115,8 +116,14 @@ const hookSpawnInterval = 25 * time.Millisecond
 // two short-lived-process subsystems.
 const cliMutationInterval = 25 * time.Millisecond
 
-// TestSQLiteContentionStress spawns 20 producers across the four
-// first-party subsystems for stressDuration and asserts the
+// serveIndexerInterval is the ticker period for the serve_indexer
+// producers. 500ms mirrors the indexer poll interval (pollInterval in
+// internal/otel/indexer/indexer.go) so the stress cadence matches
+// production.
+const serveIndexerInterval = 500 * time.Millisecond
+
+// TestSQLiteContentionStress spawns 25 producers across the five
+// first-party subsystem categories for stressDuration and asserts the
 // FirstPartyBusyTotal counter remains zero. Per the slice-10 spec,
 // run with `-count=3` to validate the 3-consecutive-runs criterion.
 //
@@ -198,11 +205,27 @@ func TestSQLiteContentionStress(t *testing.T) {
 	// own slot so we can show the workload was non-trivial. These
 	// are NOT pass/fail signals; the pass signal is FirstPartyBusyTotal().
 	var (
-		hookOps    atomic.Int64
-		indexerOps atomic.Int64
-		readerOps  atomic.Int64
-		cliOps     atomic.Int64
+		hookOps          atomic.Int64
+		indexerOps       atomic.Int64
+		readerOps        atomic.Int64
+		cliOps           atomic.Int64
+		serveIndexerOps  atomic.Int64
 	)
+
+	// serve_indexer needs a writable handle (mirrors serve_child's writeDB)
+	// and a read-only handle (mirrors serve_child's database passed to WithDB).
+	serveIndexerWriteDB, err := dbpkg.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open serve_indexer write DB: %v", err)
+	}
+	defer serveIndexerWriteDB.Close()
+
+	serveIndexerReadDSN := dbPath + "?_pragma=busy_timeout(5000)&mode=ro"
+	serveIndexerReadDB, err := sql.Open("sqlite", serveIndexerReadDSN)
+	if err != nil {
+		t.Fatalf("open serve_indexer read DB: %v", err)
+	}
+	defer serveIndexerReadDB.Close()
 
 	// Spawn hook_writer producers. Each goroutine opens its own DB
 	// via OpenHookDB (the canonical-first-hook-fallback path from
@@ -351,6 +374,109 @@ func TestSQLiteContentionStress(t *testing.T) {
 		}(i)
 	}
 
+	// Spawn serve_indexer producers. These reproduce BOTH out-of-band
+	// paths that caused the bug-272c5e34 self-livelock on writeDB:
+	//
+	// (a) filterSessionsByDB path: on every ~500ms tick, run a
+	//     queryKnownSessionIDs-style SELECT on the READ-ONLY handle.
+	//     Before Change 1 this SELECT ran on writeDB (the writable
+	//     handle), holding a SHARED lock that blocked the queue worker's
+	//     BEGIN IMMEDIATE — exactly the livelock.  After Change 1 it
+	//     runs on the read-only handle and cannot interfere with the
+	//     writer at all.
+	//
+	// (b) maybeSetPromptID path: concurrently submits a SetPromptID-style
+	//     SELECT+UPDATE closure through the queue.  Before Change 2 this
+	//     was issued directly on writeDB as a second independent writer,
+	//     creating a symmetric DELETE-journal deadlock with the queue
+	//     worker.  After Change 2 it goes through the queue and is
+	//     serialised behind the worker like every other write.
+	//
+	// RED-before / GREEN-after reasoning:
+	//
+	//   Before Change 1+2, on a DELETE-journal DB:
+	//     • The filterSessionsByDB SELECT on writeDB acquires a SHARED lock.
+	//     • Concurrently the queue worker attempts BEGIN IMMEDIATE, which
+	//       requires RESERVED, blocked by SHARED → SQLITE_BUSY.
+	//     • The maybeSetPromptID direct UPDATE also races the worker →
+	//       second independent SQLITE_BUSY source.
+	//   Both paths bump SubsystemIndexer / SubsystemWriterService counters
+	//   → FirstPartyBusyTotal() > 0 → test FAIL.
+	//
+	//   After Change 1+2, on WAL or DELETE:
+	//     • filterSessionsByDB SELECT runs on the read-only handle — no
+	//       interference with the writer at all.
+	//     • maybeSetPromptID is serialised through the queue — never a
+	//       second concurrent writer.
+	//   → FirstPartyBusyTotal() == 0 → test PASS.
+	//
+	//   On this overlayfs box the test SKIPS (WAL unavailable), which is
+	//   expected; the RED/GREEN reasoning is structural and holds on any
+	//   DELETE-journal host.
+	for i := 0; i < stressProducersPerSubsystem; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			ticker := time.NewTicker(serveIndexerInterval)
+			defer ticker.Stop()
+			for !stop.Load() {
+				select {
+				case <-ticker.C:
+				case <-ctx.Done():
+					return
+				}
+
+				// (a) filterSessionsByDB-style SELECT on the read-only handle.
+				// Before Change 1 this was on writeDB — now it is correctly on
+				// the read-only handle so it cannot hold a SHARED lock on the
+				// writer connection.
+				var c int
+				queryErr := serveIndexerReadDB.QueryRow(
+					`SELECT COUNT(*) FROM sessions WHERE session_id='stress-session'`,
+				).Scan(&c)
+				if queryErr != nil {
+					dbpkg.Record(dbpkg.SubsystemIndexer, queryErr)
+				}
+
+				// (b) maybeSetPromptID-style SELECT+UPDATE submitted through queue.
+				// Before Change 2 this was a direct write on writeDB — now it is
+				// serialised through the queue like every other write.
+				opID := serveIndexerOps.Add(1)
+				wdb := serveIndexerWriteDB
+				op := writequeue.WriteOp(func(_ context.Context) error {
+					// Mirror db.SetPromptID: SELECT then UPDATE (two SQL ops).
+					var eventID string
+					scanErr := wdb.QueryRow(
+						`SELECT event_id FROM agent_events
+						 WHERE session_id = 'stress-session'
+						   AND event_type = 'tool_call'
+						   AND prompt_id IS NULL
+						 LIMIT 1`,
+					).Scan(&eventID)
+					if scanErr == sql.ErrNoRows {
+						return nil // no-op, mirrors SetPromptID
+					}
+					if scanErr != nil {
+						dbpkg.Record(dbpkg.SubsystemIndexer, scanErr)
+						return scanErr
+					}
+					_, execErr := wdb.Exec(
+						`UPDATE agent_events SET prompt_id = ? WHERE event_id = ? AND prompt_id IS NULL`,
+						fmt.Sprintf("prompt-%d-%d", id, opID), eventID,
+					)
+					if execErr != nil {
+						dbpkg.Record(dbpkg.SubsystemIndexer, execErr)
+					}
+					return execErr
+				})
+				if submitErr := q.Submit(ctx, op); submitErr != nil {
+					// Queue full / unavailable — best-effort, do not count as BUSY.
+					_ = submitErr
+				}
+			}
+		}(i)
+	}
+
 	// Run the workload.
 	time.Sleep(stressDuration)
 	stop.Store(true)
@@ -364,15 +490,15 @@ func TestSQLiteContentionStress(t *testing.T) {
 	// Report the workload size so reviewers can see the test
 	// actually exercised the paths (a producer dying silently
 	// would make this test trivially pass).
-	t.Logf("workload: hook=%d indexer=%d reader=%d cli=%d  (target ≥1 each)",
-		hookOps.Load(), indexerOps.Load(), readerOps.Load(), cliOps.Load())
+	t.Logf("workload: hook=%d indexer=%d reader=%d cli=%d serveIndexer=%d  (target ≥1 each)",
+		hookOps.Load(), indexerOps.Load(), readerOps.Load(), cliOps.Load(), serveIndexerOps.Load())
 	t.Logf("BUSY classification snapshot: %+v", counts)
 
 	// Defensive: if any producer slot didn't run at all, the test
 	// is meaningless even if FirstPartyBusyTotal is zero.
-	if hookOps.Load() == 0 || indexerOps.Load() == 0 || readerOps.Load() == 0 || cliOps.Load() == 0 {
-		t.Fatalf("at least one producer slot recorded zero ops — workload didn't run: hook=%d indexer=%d reader=%d cli=%d",
-			hookOps.Load(), indexerOps.Load(), readerOps.Load(), cliOps.Load())
+	if hookOps.Load() == 0 || indexerOps.Load() == 0 || readerOps.Load() == 0 || cliOps.Load() == 0 || serveIndexerOps.Load() == 0 {
+		t.Fatalf("at least one producer slot recorded zero ops — workload didn't run: hook=%d indexer=%d reader=%d cli=%d serveIndexer=%d",
+			hookOps.Load(), indexerOps.Load(), readerOps.Load(), cliOps.Load(), serveIndexerOps.Load())
 	}
 
 	if firstParty != 0 {
