@@ -421,38 +421,37 @@ func TestTraceStaleSchemaRegressions(t *testing.T) {
 	tests := []struct {
 		name          string
 		runFunc       func() error
-		wantErrorMsg  string // substring expected in error if OpenReadOnlyMigrated worked (schema bootstrapped)
-		rejectErrorMsg string // substring that indicates bare OpenReadOnly was used (schema NOT bootstrapped)
+		wantErrorMsg  string // exact substring expected in error if OpenReadOnlyMigrated worked; empty string means expect nil
 	}{
 		{
 			name: "runTrace with work-item ID (line 78)",
 			runFunc: func() error {
 				// runTrace takes a work-item ID (feat-, bug-, spk- prefix) and calls
 				// dbpkg.OpenReadOnlyMigrated at line 78 in the looksLikeWorkItemID branch.
+				// Against a fresh, schema-bootstrapped-but-empty DB, it returns nil
+				// (prints empty results to stdout).
 				return runTrace("feat-deadbeef", false)
 			},
-			wantErrorMsg:  "no commits",
-			rejectErrorMsg: "no such table",
+			wantErrorMsg: "", // expects nil on success
 		},
 		{
 			name: "runTraceCommit with SHA (line 118)",
 			runFunc: func() error {
 				// runTraceCommit takes a commit SHA and calls dbpkg.OpenReadOnlyMigrated
-				// at line 118.
+				// at line 118. Against a fresh DB with no commits, it returns an error.
 				return runTraceCommit("deadbeef1234567", false)
 			},
-			wantErrorMsg:   "not found in git_commits table",
-			rejectErrorMsg: "no such table",
+			wantErrorMsg: "not found in git_commits table", // exact substring expected in the error
 		},
 		{
 			name: "runTraceFile with file path (line 211)",
 			runFunc: func() error {
 				// runTraceFile takes a file path and calls dbpkg.OpenReadOnlyMigrated
-				// at line 211.
+				// at line 211. Against a fresh, schema-bootstrapped-but-empty DB, it
+				// returns nil (prints "No features found" to stdout).
 				return runTraceFile("cmd/wipnote/main.go", false)
 			},
-			wantErrorMsg:   "No features found",
-			rejectErrorMsg: "no such table",
+			wantErrorMsg: "", // expects nil on success
 		},
 	}
 
@@ -466,24 +465,26 @@ func TestTraceStaleSchemaRegressions(t *testing.T) {
 
 			// RED signal: schema error indicates bare OpenReadOnly was used.
 			// The "no such table" error proves the schema was NOT bootstrapped.
-			if err != nil && strings.Contains(err.Error(), tt.rejectErrorMsg) {
-				t.Fatalf("schema error (bare OpenReadOnly detected, not OpenReadOnlyMigrated): %v", err)
+			if err != nil {
+				if strings.Contains(err.Error(), "no such table") {
+					t.Fatalf("schema error (bare OpenReadOnly detected, not OpenReadOnlyMigrated): %v", err)
+				}
 			}
 
-			// GREEN signal: if we got here, the schema was bootstrapped by
-			// OpenReadOnlyMigrated. For runTrace and runTraceFile, success (nil) is
-			// acceptable because they print to stdout rather than returning errors.
-			// For runTraceCommit, we expect a "not found" error.
-			if err != nil {
-				// Double-check it's not a schema error (those go RED above).
-				if strings.Contains(err.Error(), tt.rejectErrorMsg) {
-					t.Fatalf("schema error (bare OpenReadOnly): %v", err)
+			// GREEN signal: assert the concrete expected outcome per case.
+			if tt.wantErrorMsg == "" {
+				// This case expects nil (schema bootstrapped, query succeeded with empty/no results).
+				if err != nil {
+					t.Fatalf("expected nil but got error: %v", err)
 				}
-				// Post-bootstrap error is fine (e.g., "not found in git_commits table").
-				t.Logf("%s: reached query layer with error: %v", tt.name, err)
 			} else {
-				// No error: schema was bootstrapped and query succeeded (empty results).
-				t.Logf("%s: returned nil (schema was bootstrapped, query succeeded with empty results)", tt.name)
+				// This case expects a specific error substring (schema bootstrapped, query ran).
+				if err == nil {
+					t.Fatalf("expected error with substring %q but got nil", tt.wantErrorMsg)
+				}
+				if !strings.Contains(err.Error(), tt.wantErrorMsg) {
+					t.Fatalf("expected error substring %q, got: %v", tt.wantErrorMsg, err)
+				}
 			}
 		})
 	}
