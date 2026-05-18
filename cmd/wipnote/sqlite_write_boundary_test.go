@@ -246,7 +246,7 @@ var approvedWriteSites = []writeSite{
 		Function:       "openDB",
 		OpenExpr:       "dbpkg.Open",
 		Classification: intentionalCLIMutation,
-		Note:           "Package-level writable-open helper used by many mutating CLI paths (session start/end, claim, ingest, backfill, blame, cleanup, compliance, report, who, …). Read-only paths (session list/show, trace, query, lineage) correctly use openReadOnlyDB. This inventory entry exists to catch any future read-only command that wrongly calls openDB instead of openReadOnlyDB.",
+		Note:           "Package-level writable-open helper used by many mutating CLI paths (session start/end, claim, ingest, backfill, blame, cleanup, compliance, report, who, …). Read-only commands must NOT use openDB — they open read-only, either via the cmd-level openReadOnlyDB helper or a direct dbpkg.OpenReadOnlyMigrated call. This inventory entry exists to catch any future read-only command that wrongly calls the writable openDB instead.",
 	},
 	{
 		File:           "cmd/wipnote/status.go",
