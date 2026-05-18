@@ -170,6 +170,158 @@ func TestDashboardParallelSessionsAPI(t *testing.T) {
 	}
 }
 
+// TestParallelSessionsAPI_ActiveWorkItemsOwnership asserts that work_item_id
+// in /api/sessions/parallel is resolved from active_work_items (preferred) with
+// fallback to sessions.active_feature_id. This verifies the fix for roborev
+// job-3095 slice-7 finding: sessions that claim via active_work_items were
+// previously reported as having no work_item_id (and thus no claim status/
+// collision) in the parallel endpoint.
+func TestParallelSessionsAPI_ActiveWorkItemsOwnership(t *testing.T) {
+	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "awi.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	projectDir := "/repo/awi-project"
+	// Insert two sessions: one claims via active_work_items, one via
+	// sessions.active_feature_id (legacy). Both should surface work_item_id.
+	insertParallelSession(t, database, "s-awi-1", "claude-code", projectDir, "fam-awi", "active", "claude-haiku")
+	insertParallelSession(t, database, "s-legacy", "codex", projectDir, "fam-awi", "active", "gpt-4o-mini")
+
+	// Seed the feature row for FK constraint.
+	_, _ = database.Exec(`INSERT INTO features (id, type, title, status) VALUES (?, 'feature', 'AWI Test', 'in-progress')`, "feat-awi-001")
+
+	// Write via active_work_items (the Batch B path — SetActiveWorkItem).
+	if err := dbpkg.SetActiveWorkItem(database, "s-awi-1", dbpkg.AgentRootSentinel, "feat-awi-001"); err != nil {
+		t.Fatalf("SetActiveWorkItem: %v", err)
+	}
+	// Write legacy path directly on sessions table for s-legacy.
+	_, err = database.Exec(`UPDATE sessions SET active_feature_id = ? WHERE session_id = ?`, "feat-awi-001", "s-legacy")
+	if err != nil {
+		t.Fatalf("UPDATE active_feature_id: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/parallel", nil)
+	w := httptest.NewRecorder()
+	parallelSessionsHandler(database)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+
+	var resp struct {
+		Groups []projectGroup `json:"groups"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Groups) == 0 {
+		t.Fatal("no project groups returned")
+	}
+
+	// Collect all sessions from all groups and families.
+	byID := map[string]parallelSessionIdentity{}
+	for _, pg := range resp.Groups {
+		for _, fg := range pg.Families {
+			for _, s := range fg.Sessions {
+				byID[s.SessionID] = s
+			}
+		}
+	}
+
+	// s-awi-1 must surface feat-awi-001 via active_work_items.
+	if s, ok := byID["s-awi-1"]; !ok {
+		t.Error("s-awi-1 not in response")
+	} else if s.WorkItemID != "feat-awi-001" {
+		t.Errorf("s-awi-1 work_item_id = %q, want feat-awi-001 (active_work_items path)", s.WorkItemID)
+	}
+
+	// s-legacy must surface feat-awi-001 via sessions.active_feature_id fallback.
+	if s, ok := byID["s-legacy"]; !ok {
+		t.Error("s-legacy not in response")
+	} else if s.WorkItemID != "feat-awi-001" {
+		t.Errorf("s-legacy work_item_id = %q, want feat-awi-001 (active_feature_id fallback)", s.WorkItemID)
+	}
+}
+
+// TestParallelSessionsAPI_SubagentVisibility asserts that /api/sessions/parallel
+// includes subagent rows and sets exec_root from parent_session_id, as required
+// by the documented response contract. Fixes roborev job-3095 slice-7 finding
+// where is_subagent=FALSE excluded subagents from Level 3 data entirely.
+func TestParallelSessionsAPI_SubagentVisibility(t *testing.T) {
+	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "subagent.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	projectDir := "/repo/subagent-project"
+	now := time.Now().UTC()
+
+	// Insert root session.
+	root := &models.Session{
+		SessionID:     "s-root",
+		AgentAssigned: "claude-code",
+		CreatedAt:     now,
+		Status:        "active",
+		ProjectDir:    projectDir,
+	}
+	if err := dbpkg.InsertSession(database, root); err != nil {
+		t.Fatalf("InsertSession root: %v", err)
+	}
+
+	// Insert subagent session under root.
+	sub := &models.Session{
+		SessionID:       "s-subagent",
+		AgentAssigned:   "claude-code",
+		CreatedAt:       now.Add(time.Second),
+		Status:          "active",
+		ProjectDir:      projectDir,
+		ParentSessionID: "s-root",
+		IsSubagent:      true,
+	}
+	if err := dbpkg.InsertSession(database, sub); err != nil {
+		t.Fatalf("InsertSession subagent: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/parallel", nil)
+	w := httptest.NewRecorder()
+	parallelSessionsHandler(database)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+
+	var resp struct {
+		Groups []projectGroup `json:"groups"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	byID := map[string]parallelSessionIdentity{}
+	for _, pg := range resp.Groups {
+		for _, fg := range pg.Families {
+			for _, s := range fg.Sessions {
+				byID[s.SessionID] = s
+			}
+		}
+	}
+
+	// Root session must appear.
+	if s, ok := byID["s-root"]; !ok {
+		t.Error("root session s-root not in parallel response")
+	} else if s.ExecRoot != "s-root" {
+		t.Errorf("s-root exec_root = %q, want s-root", s.ExecRoot)
+	}
+
+	// Subagent must appear with exec_root pointing to root (not itself).
+	if s, ok := byID["s-subagent"]; !ok {
+		t.Error("subagent s-subagent not in parallel response (subagent visibility fix required)")
+	} else if s.ExecRoot != "s-root" {
+		t.Errorf("s-subagent exec_root = %q, want s-root (parent_session_id)", s.ExecRoot)
+	}
+}
+
 // TestSessionsAPI_CollisionFieldPresent verifies claim_collision and
 // claim_status are present in sessions list (stable contract for plan-c3bbb1ed).
 func TestSessionsAPI_CollisionFieldPresent(t *testing.T) {

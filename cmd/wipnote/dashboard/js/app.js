@@ -4013,7 +4013,10 @@ function renderSessionFilterRow() {
     if (s.harness || s.agent) harnesses[s.harness || s.agent] = true;
   });
   var harnessKeys = Object.keys(harnesses);
-  if (harnessKeys.length < 2 && !_sessionCollisionFilter) return; // single harness: filters not needed
+  // Compute hasAnyCollision BEFORE the early return so the Collision pill is
+  // shown even when there is only one harness (single-harness collision case).
+  var hasAnyCollision = sessions.some(function(s) { return s.claim_collision; });
+  if (harnessKeys.length < 2 && !hasAnyCollision && !_sessionCollisionFilter) return; // no harness choice and no collision: filters not needed
 
   var row = document.createElement('div');
   row.id = 'session-filter-row';
@@ -4045,7 +4048,6 @@ function renderSessionFilterRow() {
   });
 
   // Collision filter pill (only show if any collision exists)
-  var hasAnyCollision = sessions.some(function(s) { return s.claim_collision; });
   if (hasAnyCollision) {
     var colPill = document.createElement('button');
     colPill.className = 'session-filter-pill' + (_sessionCollisionFilter ? ' active' : '');
@@ -4106,6 +4108,19 @@ function renderCollectorWarningBanner(sessionID, container) {
     // Post-render pass: inject filter row and slice-7 badges.
     renderSessionFilterRow();
     _injectSlice7Badges();
+    // Wire stale-collector warning banners for active sessions (slice-7 deliverable).
+    // renderCollectorWarningBanner is best-effort/async: it fetches /api/collector-status
+    // and inserts a banner above the sessions table when the collector is offline.
+    // One banner per active session; duplicates are avoided by the banner's container-insert
+    // (each call targets a fresh container derived from the session row).
+    var body = document.getElementById('sessions-body');
+    if (body) {
+      var activeRows = body.querySelectorAll('tr.session-row.live');
+      activeRows.forEach(function(tr) {
+        var sid = tr.getAttribute('data-session-id');
+        if (sid) renderCollectorWarningBanner(sid, tr.parentNode || body);
+      });
+    }
   };
 })();
 

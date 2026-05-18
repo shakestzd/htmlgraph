@@ -25,6 +25,30 @@ func probeExec(path string) error {
 	return exec.Command(path).Run()
 }
 
+// requireExecCapableTmpdir verifies that t.TempDir() returns an exec-capable
+// path, and calls t.Skip when it does not. Call this at the start of every
+// test that creates and executes shell scripts in the temp dir — not only in
+// buildFakeChild — so tests that create scripts directly (TestInvalidHandshakeFails,
+// TestHandshakeTimeout) also skip cleanly on noexec /tmp rather than passing
+// for the wrong reason (fork/exec: permission denied instead of invalid-handshake
+// or timeout behaviour).
+func requireExecCapableTmpdir(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("executable shell scripts are POSIX-only")
+	}
+	dir := t.TempDir()
+	probe := filepath.Join(dir, "probe-exec.sh")
+	if err := os.WriteFile(probe, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Skipf("requireExecCapableTmpdir: WriteFile: %v", err)
+	}
+	if err := probeExec(probe); err != nil {
+		t.Skipf("requireExecCapableTmpdir: exec probe failed — noexec TMPDIR. "+
+			"Set TMPDIR=/home/vscode/.gotest-tmp for exec-capable temp dir. "+
+			"Current TMPDIR=%q, error: %v", os.Getenv("TMPDIR"), err)
+	}
+}
+
 // buildFakeChild writes a shell script that ignores its args, prints the
 // handshake line, then sleeps. The script is used as the BinPath for a
 // Supervisor so the handshake/lifecycle/reap logic can be exercised
@@ -166,6 +190,7 @@ func TestGetOrSpawnConcurrent(t *testing.T) {
 }
 
 func TestInvalidHandshakeFails(t *testing.T) {
+	requireExecCapableTmpdir(t)
 	// Fake binary that prints the wrong line.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad-wipnote")
@@ -186,6 +211,7 @@ func TestInvalidHandshakeFails(t *testing.T) {
 }
 
 func TestHandshakeTimeout(t *testing.T) {
+	requireExecCapableTmpdir(t)
 	// Fake binary that never prints — sleeps forever with no output.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "silent-wipnote")

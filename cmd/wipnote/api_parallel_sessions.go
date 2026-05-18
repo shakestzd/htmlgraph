@@ -81,10 +81,13 @@ func parallelSessionsHandler(database *sql.DB) http.HandlerFunc {
 			       COALESCE(s.session_family_id, s.session_id) AS family_id,
 			       COALESCE(s.project_dir, '') AS project_dir,
 			       COALESCE(s.parent_session_id, '') AS parent_session_id,
-			       COALESCE(s.active_feature_id, '') AS work_item_id
+			       COALESCE(
+			           (SELECT work_item_id FROM active_work_items
+			            WHERE session_id = s.session_id
+			            ORDER BY claimed_at DESC LIMIT 1),
+			           s.active_feature_id, '') AS work_item_id
 			FROM sessions s
 			WHERE s.status = 'active'
-			  AND s.is_subagent = FALSE
 			ORDER BY s.project_dir, s.session_family_id, s.created_at`)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

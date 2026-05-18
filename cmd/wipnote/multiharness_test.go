@@ -20,6 +20,7 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 
+	"github.com/shakestzd/wipnote/internal/agent"
 	dbpkg "github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/models"
 	"github.com/shakestzd/wipnote/internal/otel/sink/ndjson"
@@ -384,16 +385,30 @@ func TestParallelHarnessLineage(t *testing.T) {
 		t.Errorf("lineage: subagent %q not found under claude root", subSessID)
 	}
 
-	// Assert resumed session inherits family (slice-4).
-	var famIDFromDB string
-	row := database.QueryRow(
-		`SELECT COALESCE(session_family_id, '') FROM sessions WHERE session_id = ?`,
-		"sess-claude-root")
-	if err := row.Scan(&famIDFromDB); err != nil {
-		t.Fatalf("query session family: %v", err)
+	// Assert resumed session inherits family via the REAL resume path (slice-4).
+	//
+	// Register the original session's family in the family index (mirrors what the
+	// hook handler / launcher does on a fresh start), then resolve a new "resumed"
+	// session using resolveSessionFamilyID with isResume=true and the concrete
+	// resumeID — this exercises GetClaimIdentity → SessionFamilyFor path added in
+	// Batch B (resolveSessionFamilyID rule 2a). The resolved family must match the
+	// original session's family.
+	resumeProjectDir := t.TempDir() // isolated project dir for family index files
+	originalSessID := "sess-claude-root"
+	// Register the original session's family in the family index.
+	if err := agent.RegisterSessionFamily(resumeProjectDir, originalSessID, familyID); err != nil {
+		t.Fatalf("RegisterSessionFamily: %v", err)
 	}
-	if famIDFromDB != familyID {
-		t.Errorf("session_family_id: got %q, want %q", famIDFromDB, familyID)
+	// Now resolve a new session ID as a resume of the original.
+	resumedSessID := "sess-claude-resumed"
+	resolvedFamilyID := resolveSessionFamilyID(resumeProjectDir, resumedSessID, originalSessID, true /*isResume*/)
+	if resolvedFamilyID != familyID {
+		t.Errorf("resumed session family: got %q, want %q (resolveSessionFamilyID rule 2a failed)", resolvedFamilyID, familyID)
+	}
+	// Also verify via MostRecentSessionFamily ("resume last" path, rule 2b).
+	resumedLastFamilyID := resolveSessionFamilyID(resumeProjectDir, "sess-claude-resumed-last", "", true /*isResume*/)
+	if resumedLastFamilyID != familyID {
+		t.Errorf("resumed-last session family: got %q, want %q (resolveSessionFamilyID rule 2b failed)", resumedLastFamilyID, familyID)
 	}
 }
 
