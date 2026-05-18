@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -364,54 +366,74 @@ func TestTraceFile_MultipleFeatures(t *testing.T) {
 	}
 }
 
-// TestTraceCommitWithStaleSchema verifies that trace.go read-only opens now
-// bootstrap+migrate via OpenReadOnlyMigrated, ensuring a fresh or stale-schema
-// DB succeeds where bare OpenReadOnly would fail. bug-f9622af9.
+// TestTraceCommitWithStaleSchema verifies that runTraceCommit (and the
+// trace.go read-only open paths) now bootstrap+migrate via
+// OpenReadOnlyMigrated, ensuring a fresh or stale-schema DB succeeds where
+// bare OpenReadOnly would fail. bug-f9622af9.
+//
+// The test drives the ACTUAL runTraceCommit command path (not just
+// OpenReadOnlyMigrated directly), so it would FAIL if a trace.go callsite is
+// accidentally reverted to bare dbpkg.OpenReadOnly. Bare OpenReadOnly errors
+// immediately on a missing schema; OpenReadOnlyMigrated bootstraps+migrates
+// and succeeds (returning empty results for a nonexistent commit).
 func TestTraceCommitWithStaleSchema(t *testing.T) {
-	// Create a temporary file-based DB without schema (simulating a fresh or
-	// stale-schema DB that would fail with bare OpenReadOnly).
+	// Create a temporary project directory with a .wipnote subdir.
 	tmpDir := t.TempDir()
-	freshDBPath := tmpDir + "/fresh.db"
+	wipnoteDir := filepath.Join(tmpDir, ".wipnote")
+	if err := os.MkdirAll(wipnoteDir, 0o755); err != nil {
+		t.Fatalf("create .wipnote dir: %v", err)
+	}
 
-	// Touch the file so it exists but has no schema.
-	if _, err := sql.Open("sqlite", freshDBPath); err != nil {
+	// Create a fresh (schema-less) DB file. Opening with sql.Open + immediate
+	// close leaves an empty file with no schema.
+	freshDBPath := filepath.Join(tmpDir, "wipnote.db")
+	freshDB, err := sql.Open("sqlite", freshDBPath)
+	if err != nil {
 		t.Fatalf("create fresh db file: %v", err)
 	}
+	freshDB.Close()
 
-	// First, seed data using the writable Open (which bootstraps schema).
-	database, err := dbpkg.Open(freshDBPath)
+	// Verify the DB file exists but is genuinely schema-less by attempting to
+	// read from a table. This confirms we're testing the stale-schema path.
+	schemalessDB, err := sql.Open("sqlite", freshDBPath)
 	if err != nil {
-		t.Fatalf("bootstrap writable: %v", err)
+		t.Fatalf("reopen fresh db to verify empty: %v", err)
 	}
+	_, err = schemalessDB.Query("SELECT 1 FROM git_commits LIMIT 1")
+	if err == nil {
+		schemalessDB.Close()
+		t.Fatal("expected fresh db to be schema-less, but query succeeded unexpectedly")
+	}
+	schemalessDB.Close()
 
-	// Seed a commit.
-	commitSHA := "deadbeef1234567"
-	_, err = database.Exec(
-		`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp) VALUES (?, ?, ?, ?, ?)`,
-		commitSHA, "sess-test", "feat-test", "test message", time.Now().UTC().Format(time.RFC3339),
-	)
-	if err != nil {
-		t.Fatalf("insert commit: %v", err)
-	}
-	database.Close()
+	// Set WIPNOTE_DB_PATH so CanonicalDBPath returns our fresh DB file.
+	// This is the standard pattern used by other cmd/wipnote tests.
+	t.Setenv("WIPNOTE_DB_PATH", freshDBPath)
 
-	// Now open read-only using OpenReadOnlyMigrated (which should succeed even
-	// if the DB file is fresh/stale).
-	roDatabase, err := dbpkg.OpenReadOnlyMigrated(freshDBPath)
-	if err != nil {
-		t.Fatalf("OpenReadOnlyMigrated: %v", err)
-	}
-	defer roDatabase.Close()
+	// Also set projectDirFlag to ensure findWipnoteDir can succeed.
+	oldProjectDir := projectDirFlag
+	projectDirFlag = tmpDir
+	defer func() { projectDirFlag = oldProjectDir }()
 
-	// Verify we can trace the commit.
-	results, err := dbpkg.TraceCommit(roDatabase, commitSHA)
-	if err != nil {
-		t.Fatalf("TraceCommit: %v", err)
+	// Now call runTraceCommit. This exercises the actual command path:
+	// runTraceCommit -> findWipnoteDir -> CanonicalDBPath -> dbpkg.OpenReadOnlyMigrated
+	//
+	// If a trace.go callsite were reverted to bare dbpkg.OpenReadOnly, this test
+	// would FAIL: bare OpenReadOnly errors on the missing schema with "no such table"
+	// or similar. OpenReadOnlyMigrated succeeds (bootstraps schema, then returns
+	// empty results for the nonexistent commit).
+	nonexistentSHA := "deadbeef1234567"
+	err = runTraceCommit(nonexistentSHA, false)
+
+	// The expected outcome: runTraceCommit returns an error saying the commit
+	// wasn't found. This proves the schema was successfully bootstrapped and
+	// OpenReadOnlyMigrated was used (not bare OpenReadOnly).
+	if err == nil {
+		t.Fatal("runTraceCommit should error on nonexistent commit")
 	}
-	if len(results) == 0 {
-		t.Fatal("expected to find seeded commit via TraceCommit")
+	if !strings.Contains(err.Error(), "not found in git_commits table") {
+		t.Fatalf("runTraceCommit error should mention git_commits table, got: %v", err)
 	}
-	if results[0].CommitHash != commitSHA {
-		t.Errorf("CommitHash = %q, want %q", results[0].CommitHash, commitSHA)
-	}
+	// If we get here, the test passed: the schema was bootstrapped (OpenReadOnlyMigrated
+	// worked) and we reached the query layer (not a "no such table" error).
 }
