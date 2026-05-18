@@ -189,3 +189,37 @@ func TestApplyPragmas_JournalModeSET_RetriesNonWaitableBusy(t *testing.T) {
 			"launch-gate counter)", total)
 	}
 }
+
+// DESIGN NOTE — why there is no separate "concurrent" regression test.
+//
+// roborev job 3237 correctly flagged the prior concurrent-churn test as
+// VACUOUS: on a DELETE-selecting host (this overlayfs devcontainer) the seed
+// DB was already DELETE and the explicit target was DELETE, so bug-56b686aa's
+// query-before-set fast path SKIPPED the `PRAGMA journal_mode = DELETE` write
+// entirely — RetryOnBusy was never exercised yet the test "passed".
+//
+// Two rewrites were attempted to make a concurrent test non-vacuous, and both
+// were rejected on evidence gathered THIS session:
+//
+//   - Continuous-churn writer + WAL-seed (current!=target) + seam assertion:
+//     FAILED its own non-vacuity guard. SQLite's busy_timeout=5000ms on the
+//     pinned pragma connection internally waits the churn out, so the seam
+//     never fires. A churn test asserting the seam fired is inherently
+//     UNSATISFIABLE in-process.
+//   - Non-waitable SHARED+RESERVED topology + N concurrent ApplyPragmas +
+//     seam assertion: passed in isolation but FLAKED under full-suite load
+//     (the first goroutine to hit BUSY releases the locks via the seam, so
+//     remaining goroutines find no contention; under scheduler load a run can
+//     have zero goroutines hit the non-waitable window before busy_timeout
+//     absorbs it, tripping the non-vacuity guard nondeterministically).
+//
+// Conclusion: a test that is BOTH concurrent AND deterministically
+// non-vacuous is not achievable in-process for this bug. The single-call
+// TestApplyPragmas_JournalModeSET_RetriesNonWaitableBusy above IS the
+// deterministic, non-vacuous regression test — it seeds current!=target
+// (WAL->DELETE so the SET executes, skipping cleanly if the host rejects
+// WAL), reproduces the genuine non-waitable SQLITE_BUSY, and ASSERTS the
+// busySleep seam fired (sleeps==0 -> t.Fatal), so it can never pass without
+// genuinely exercising the RetryOnBusy wrap. It is verified stable across
+// repeated and full-suite runs. Adding a flaky concurrent sibling would be a
+// net regression in suite reliability, not added coverage.
