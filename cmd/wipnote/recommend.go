@@ -31,9 +31,10 @@ type typeCounts struct {
 }
 
 type wipSummary struct {
-	Count int      `json:"count"`
-	Limit int      `json:"limit"`
-	Items []wipRow `json:"items"`
+	Count               int      `json:"count"`
+	AdvisoryLimit       int      `json:"advisory_limit"`
+	PerSessionSoftLimit int      `json:"per_session_soft_limit"`
+	Items               []wipRow `json:"items"`
 }
 
 type wipRow struct {
@@ -154,10 +155,10 @@ func printRecommendText(
 	fmt.Println()
 
 	wipStatus := "OK"
-	if len(wipItems) >= wipLimit {
-		wipStatus = "AT LIMIT"
+	if len(wipItems) >= wipGlobalAdvisoryLimit {
+		wipStatus = "ADVISORY"
 	}
-	fmt.Printf("WIP: %d/%d [%s]\n", len(wipItems), wipLimit, wipStatus)
+	fmt.Printf("WIP: %d/%d [%s]\n", len(wipItems), wipGlobalAdvisoryLimit, wipStatus)
 	for _, n := range wipItems {
 		fmt.Printf("  %-20s  %-8s  %s\n", n.ID, n.Type, truncate(n.Title, 44))
 	}
@@ -202,7 +203,7 @@ func printRecommendJSON(
 	recs []workitem.Recommendation,
 	parallelSets []workitem.ParallelSet,
 ) error {
-	wip := wipSummary{Count: len(wipItems), Limit: wipLimit}
+	wip := wipSummary{Count: len(wipItems), AdvisoryLimit: wipGlobalAdvisoryLimit, PerSessionSoftLimit: wipPerSessionSoftLimit}
 	for _, n := range wipItems {
 		wip.Items = append(wip.Items, wipRow{ID: n.ID, Type: n.Type, Title: n.Title})
 	}

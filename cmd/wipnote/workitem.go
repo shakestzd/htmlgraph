@@ -361,6 +361,16 @@ func wiSetStatusWithAgent(typeName, id, status, sessionID, agentID string) error
 				_ = dbpkg.ClaimItemOrRenew(p.DB, claim, 30*time.Minute)
 			}
 			autoImplementedInEdge(col, id, sessionID, p.DB)
+			// Non-fatal advisory: warn when this session now owns >= wipPerSessionSoftLimit
+			// in-progress items. Never blocks; yolo/orchestrator may legitimately pre-start.
+			if allItems, scanErr := scanInProgress(dir); scanErr == nil {
+				bysess := wipGroupBySession(allItems)
+				if len(bysess[sessionID]) >= wipPerSessionSoftLimit {
+					fmt.Fprintf(os.Stderr,
+						"wip advisory: session %s now owns %d in-progress items (soft limit %d) — consider completing before starting more\n",
+						truncate(sessionID, 16), len(bysess[sessionID]), wipPerSessionSoftLimit)
+				}
+			}
 		}
 	}
 

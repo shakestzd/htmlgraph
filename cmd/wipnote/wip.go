@@ -5,16 +5,24 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/htmlparse"
 	"github.com/shakestzd/wipnote/internal/models"
 	"github.com/shakestzd/wipnote/internal/workitem"
 	"github.com/spf13/cobra"
 )
 
-const wipLimit = 5
+// wipPerSessionSoftLimit is the per-owner-session advisory threshold.
+// A session owning this many or more in-progress items is flagged [SOFT LIMIT].
+const wipPerSessionSoftLimit = 3
+
+// wipGlobalAdvisoryLimit is the global advisory threshold across all sessions.
+// When total in-progress items reach this value the display shows [ADVISORY].
+const wipGlobalAdvisoryLimit = 10
 
 func wipCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -48,23 +56,113 @@ func runWipShow() error {
 		return err
 	}
 
-	status := "OK"
-	if len(items) >= wipLimit {
-		status = "AT LIMIT"
+	// Resolve live session IDs from the SQLite read index.
+	liveSessions := wipLiveSessions(dir)
+
+	// Group items by owner session (the implemented_in edge target).
+	bySession := wipGroupBySession(items)
+
+	globalStatus := "OK"
+	if len(items) >= wipGlobalAdvisoryLimit {
+		globalStatus = fmt.Sprintf("ADVISORY — global advisory limit %d", wipGlobalAdvisoryLimit)
 	}
-	fmt.Printf("WIP: %d / %d  [%s]\n\n", len(items), wipLimit, status)
+	fmt.Printf("WIP: %d total  [%s]\n", len(items), globalStatus)
 
 	if len(items) == 0 {
-		fmt.Println("No in-progress work items.")
+		fmt.Println("\nNo in-progress work items.")
 		return nil
 	}
 
-	fmt.Printf("%-22s  %-8s  %s\n", "ID", "TYPE", "TITLE")
-	fmt.Println(strings.Repeat("-", 70))
-	for _, n := range items {
-		fmt.Printf("%-22s  %-8s  %s\n", n.ID, n.Type, truncate(n.Title, 44))
+	// Print per-session summary table.
+	fmt.Println()
+	fmt.Printf("%-24s  %-5s  %s\n", "SESSION", "ITEMS", "STATUS")
+	fmt.Println(strings.Repeat("-", 50))
+
+	// Stable ordering: sessions sorted, "unknown" always last.
+	sessionKeys := wipSortedSessionKeys(bySession)
+	for _, sess := range sessionKeys {
+		sessItems := bySession[sess]
+		sessStatus := "OK"
+		if sess != "unknown" {
+			if len(sessItems) >= wipPerSessionSoftLimit {
+				sessStatus = "SOFT LIMIT"
+			}
+			if !liveSessions[sess] {
+				if sessStatus == "SOFT LIMIT" {
+					sessStatus = "SOFT LIMIT  SESSION DEAD?"
+				} else {
+					sessStatus = "SESSION DEAD?"
+				}
+			}
+		}
+		display := truncate(sess, 22)
+		fmt.Printf("%-24s  %-5d  %s\n", display, len(sessItems), sessStatus)
+	}
+
+	// Print per-item detail table with SESSION column.
+	fmt.Println()
+	fmt.Printf("%-22s  %-8s  %-16s  %s\n", "ID", "TYPE", "SESSION", "TITLE")
+	fmt.Println(strings.Repeat("-", 80))
+	for _, sess := range sessionKeys {
+		for _, n := range bySession[sess] {
+			sessDisplay := truncate(sess, 16)
+			if sess != "unknown" && !liveSessions[sess] {
+				sessDisplay = truncate(sess, 8) + " [dead?]"
+			}
+			fmt.Printf("%-22s  %-8s  %-16s  %s\n", n.ID, n.Type, sessDisplay, truncate(n.Title, 36))
+		}
 	}
 	return nil
+}
+
+// wipLiveSessions returns a set of session IDs that are known in the DB.
+// Returns an empty map (not nil) on any error so liveness checks degrade gracefully.
+func wipLiveSessions(wipnoteDir string) map[string]bool {
+	live := make(map[string]bool)
+	db, err := openReadOnlyDB(wipnoteDir)
+	if err != nil {
+		return live
+	}
+	defer db.Close()
+	// Use a large limit so we don't miss any session.
+	sessions, err := dbpkg.ListSessions(db, false, 1000)
+	if err != nil {
+		return live
+	}
+	for _, s := range sessions {
+		live[s.SessionID] = true
+	}
+	return live
+}
+
+// wipGroupBySession groups in-progress nodes by the target of their first
+// implemented_in edge, or under "unknown" if no such edge exists.
+func wipGroupBySession(items []*models.Node) map[string][]*models.Node {
+	bySession := make(map[string][]*models.Node)
+	for _, n := range items {
+		sess := "unknown"
+		if edges, ok := n.Edges[string(models.RelImplementedIn)]; ok && len(edges) > 0 {
+			sess = edges[0].TargetID
+		}
+		bySession[sess] = append(bySession[sess], n)
+	}
+	return bySession
+}
+
+// wipSortedSessionKeys returns the session keys in stable alphabetical order,
+// with "unknown" always last.
+func wipSortedSessionKeys(bySession map[string][]*models.Node) []string {
+	keys := make([]string, 0, len(bySession))
+	for k := range bySession {
+		if k != "unknown" {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	if _, ok := bySession["unknown"]; ok {
+		keys = append(keys, "unknown")
+	}
+	return keys
 }
 
 // wipResetCmd marks all in-progress items as todo.
