@@ -73,12 +73,13 @@ func seededJournalDB(t *testing.T) string {
 	return dbPath
 }
 
-// NOTE: the concurrent-churn regression test that must defeat bug-56b686aa's
-// query-before-set fast path AND assert the retry seam actually fired lives in
-// pragmas_busy_whitebox_test.go (package db) as
-// TestApplyPragmas_JournalModeWriteChurnExercisesRetry — it needs the
-// unexported busySleep seam for the non-vacuity assertion, which is not
-// reachable from this external db_test package. Keeping it here would risk
+// NOTE: the deterministic non-waitable-BUSY regression test that must defeat
+// bug-56b686aa's query-before-set fast path AND assert the retry seam
+// actually fired lives in pragmas_busy_whitebox_test.go (package db) as
+// TestApplyPragmas_JournalModeSET_RetriesNonWaitableBusy — it bootstraps the
+// DB into WAL mode and holds a SHARED lock to force the contended SET path,
+// needing the unexported busySleep seam for the non-vacuity assertion, which is
+// not reachable from this external db_test package. Keeping it here would risk
 // re-introducing the vacuity roborev job 3237 flagged (on a DELETE-selecting
 // host, seed==target makes ApplyPragmas skip the SET entirely).
 
