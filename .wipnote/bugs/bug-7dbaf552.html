@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>SQLITE_BUSY in general CLI read/write paths: lineage/trace/query lack RetryOnBusy after open</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-7dbaf552"
+             data-type="bug"
+             data-status="todo"
+             data-priority="high"
+             data-created="2026-05-18T05:43:44.555448"
+             data-updated="2026-05-18T05:43:44.624252" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-427-g39ed400c9">
+
+        <header>
+            <h1>SQLITE_BUSY in general CLI read/write paths: lineage/trace/query lack RetryOnBusy after open</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T05:43:44.623884">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>busy_timeout=5s is set on every connection but general CLI paths lack db.RetryOnBusy after open. dbpkg.Open does not wrap runMigrations in RetryOnBusy (schema.go); lineage bfsWalk and trace/query issue bare db.Query with no retry. Under live multi-session DELETE-mode contention wipnote lineage and item-create return SQLITE_BUSY to the user. Extends bug-74a7bda7 (completion+hook+dashboard only) to the general CLI surface. Fix: wrap runMigrations in schema.go Open with RetryOnBusy (covers all openers); wrap lineage bfsWalk query in RetryOnBusy with rows.Close before retry; reuse db.RetryOnBusy/DefaultBusyBackoff; do not touch journal-mode selection.</p>
+        </section>
+    </article>
+</body>
+</html>
