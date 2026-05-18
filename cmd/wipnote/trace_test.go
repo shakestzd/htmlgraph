@@ -367,18 +367,18 @@ func TestTraceFile_MultipleFeatures(t *testing.T) {
 }
 
 // setupStaleSchemaDB creates a fresh, schema-less DB and configures the test
-// environment to use it via WIPNOTE_DB_PATH and projectDirFlag. Returns a
-// cleanup function that restores projectDirFlag.
-func setupStaleSchemaDB(t *testing.T) (tmpDir, dbPath string, cleanup func()) {
+// environment to use it via WIPNOTE_DB_PATH and projectDirFlag. It registers
+// cleanup via t.Cleanup so callers don't manage cleanup manually.
+func setupStaleSchemaDB(t *testing.T) {
 	t.Helper()
-	tmpDir = t.TempDir()
+	tmpDir := t.TempDir()
 	wipnoteDir := filepath.Join(tmpDir, ".wipnote")
 	if err := os.MkdirAll(wipnoteDir, 0o755); err != nil {
 		t.Fatalf("create .wipnote dir: %v", err)
 	}
 
 	// Create a fresh (schema-less) DB file.
-	dbPath = filepath.Join(tmpDir, "wipnote.db")
+	dbPath := filepath.Join(tmpDir, "wipnote.db")
 	freshDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("create fresh db file: %v", err)
@@ -401,9 +401,7 @@ func setupStaleSchemaDB(t *testing.T) (tmpDir, dbPath string, cleanup func()) {
 	t.Setenv("WIPNOTE_DB_PATH", dbPath)
 	oldProjectDir := projectDirFlag
 	projectDirFlag = tmpDir
-
-	cleanup = func() { projectDirFlag = oldProjectDir }
-	return
+	t.Cleanup(func() { projectDirFlag = oldProjectDir })
 }
 
 // TestTraceStaleSchemaRegressions verifies that all three trace.go read-only
@@ -411,18 +409,20 @@ func setupStaleSchemaDB(t *testing.T) (tmpDir, dbPath string, cleanup func()) {
 // now bootstrap+migrate via OpenReadOnlyMigrated, ensuring a fresh or
 // stale-schema DB succeeds where bare OpenReadOnly would fail. bug-f9622af9.
 //
-// The test drives the ACTUAL command paths against a fresh, schema-less DB,
-// so it would FAIL if any callsite is accidentally reverted to bare
-// dbpkg.OpenReadOnly. Bare OpenReadOnly errors on "no such table";
-// OpenReadOnlyMigrated succeeds (bootstraps schema, then reaches the query layer).
+// Each subtest gets its own fresh, schema-less DB (via setupStaleSchemaDB
+// called per-subtest, not shared). This prevents the first subtest's successful
+// OpenReadOnlyMigrated from poisoning the schema state for later subtests,
+// ensuring each callsite is independently guarded: if any callsite reverts to
+// bare dbpkg.OpenReadOnly, its subtest goes RED ("no such table" error).
+//
+// The test drives the ACTUAL command paths (not direct OpenReadOnlyMigrated
+// calls), so a revert at any line (78, 118, 211) makes that subtest FAIL.
 func TestTraceStaleSchemaRegressions(t *testing.T) {
-	_, _, cleanup := setupStaleSchemaDB(t)
-	defer cleanup()
-
 	tests := []struct {
-		name      string
-		runFunc   func() error
-		errorWant string // substring expected in error message if schema was bootstrapped
+		name          string
+		runFunc       func() error
+		wantErrorMsg  string // substring expected in error if OpenReadOnlyMigrated worked (schema bootstrapped)
+		rejectErrorMsg string // substring that indicates bare OpenReadOnly was used (schema NOT bootstrapped)
 	}{
 		{
 			name: "runTrace with work-item ID (line 78)",
@@ -431,7 +431,8 @@ func TestTraceStaleSchemaRegressions(t *testing.T) {
 				// dbpkg.OpenReadOnlyMigrated at line 78 in the looksLikeWorkItemID branch.
 				return runTrace("feat-deadbeef", false)
 			},
-			errorWant: "expected to find seeded commits",
+			wantErrorMsg:  "no commits",
+			rejectErrorMsg: "no such table",
 		},
 		{
 			name: "runTraceCommit with SHA (line 118)",
@@ -440,7 +441,8 @@ func TestTraceStaleSchemaRegressions(t *testing.T) {
 				// at line 118.
 				return runTraceCommit("deadbeef1234567", false)
 			},
-			errorWant: "not found in git_commits table",
+			wantErrorMsg:   "not found in git_commits table",
+			rejectErrorMsg: "no such table",
 		},
 		{
 			name: "runTraceFile with file path (line 211)",
@@ -449,43 +451,40 @@ func TestTraceStaleSchemaRegressions(t *testing.T) {
 				// at line 211.
 				return runTraceFile("cmd/wipnote/main.go", false)
 			},
-			errorWant: "No features found", // runTraceFile prints this when no results
+			wantErrorMsg:   "No features found",
+			rejectErrorMsg: "no such table",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Each subtest gets its own fresh, schema-less DB to prevent
+			// cross-test pollution from OpenReadOnlyMigrated bootstrapping.
+			setupStaleSchemaDB(t)
+
 			err := tt.runFunc()
 
-			// For runTraceFile, success (nil err) is acceptable if no features found.
-			// For runTraceCommit and runTrace, we expect an error.
-			if strings.Contains(tt.name, "runTraceFile") {
-				if err != nil && !strings.Contains(err.Error(), "no such table") {
-					// Got a non-schema error, or nil — both are acceptable.
-					t.Logf("runTraceFile returned: %v (acceptable for stale schema test)", err)
-					return
+			// RED signal: schema error indicates bare OpenReadOnly was used.
+			// The "no such table" error proves the schema was NOT bootstrapped.
+			if err != nil && strings.Contains(err.Error(), tt.rejectErrorMsg) {
+				t.Fatalf("schema error (bare OpenReadOnly detected, not OpenReadOnlyMigrated): %v", err)
+			}
+
+			// GREEN signal: if we got here, the schema was bootstrapped by
+			// OpenReadOnlyMigrated. For runTrace and runTraceFile, success (nil) is
+			// acceptable because they print to stdout rather than returning errors.
+			// For runTraceCommit, we expect a "not found" error.
+			if err != nil {
+				// Double-check it's not a schema error (those go RED above).
+				if strings.Contains(err.Error(), tt.rejectErrorMsg) {
+					t.Fatalf("schema error (bare OpenReadOnly): %v", err)
 				}
-				if err != nil && strings.Contains(err.Error(), "no such table") {
-					// This would indicate bare OpenReadOnly was used (RED signal).
-					t.Fatalf("runTraceFile schema error (bare OpenReadOnly detected): %v", err)
-				}
-				// Success or non-schema error: OpenReadOnlyMigrated worked.
-				return
+				// Post-bootstrap error is fine (e.g., "not found in git_commits table").
+				t.Logf("%s: reached query layer with error: %v", tt.name, err)
+			} else {
+				// No error: schema was bootstrapped and query succeeded (empty results).
+				t.Logf("%s: returned nil (schema was bootstrapped, query succeeded with empty results)", tt.name)
 			}
-
-			// For runTrace and runTraceCommit, error is expected.
-			if err == nil {
-				t.Logf("%s: returned nil (query layer not reached, might be acceptable)", tt.name)
-				return
-			}
-
-			// The key guard: if error contains "no such table", bare OpenReadOnly was used (RED).
-			if strings.Contains(err.Error(), "no such table") {
-				t.Fatalf("%s schema error (bare OpenReadOnly detected): %v", tt.name, err)
-			}
-
-			// Otherwise, we reached the query layer — OpenReadOnlyMigrated succeeded.
-			t.Logf("%s: reached query layer with error: %v", tt.name, err)
 		})
 	}
 }
