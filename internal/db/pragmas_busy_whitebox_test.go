@@ -82,7 +82,6 @@ func TestApplyPragmas_JournalModeSET_RetriesNonWaitableBusy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connA open: %v", err)
 	}
-	defer connA.Close()
 	connA.SetMaxOpenConns(1)
 	if _, err := connA.Exec(`CREATE TABLE IF NOT EXISTS _wb (id INTEGER)`); err != nil {
 		t.Fatalf("connA create: %v", err)
@@ -109,25 +108,20 @@ func TestApplyPragmas_JournalModeSET_RetriesNonWaitableBusy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connB open: %v", err)
 	}
-	defer connB.Close()
 	connB.SetMaxOpenConns(1)
 	if _, err := connB.Exec("BEGIN IMMEDIATE"); err != nil {
 		t.Fatalf("connB BEGIN IMMEDIATE: %v", err)
 	}
 
-	// Instrument the shared backoff seam so we can both count retry attempts
-	// AND release the contention mid-flight (on the first backoff sleep) so
-	// the retried attempt deterministically succeeds.
-	origSleep := busySleep
-	var sleeps int
+	// Single sync.Once-guarded release: fully drop BOTH contending handles
+	// exactly once. The seam invokes it mid-flight (so the retried attempt
+	// succeeds); a t.Cleanup fallback invokes it if the seam never fired
+	// (e.g. no BUSY observed) so handles are never leaked AND never
+	// double-closed (the Once makes it idempotent — no harmless double-close).
+	// Closing the whole *sql.DB (not just the pinned conn) guarantees the
+	// OS-level SQLite file locks are released before the retried attempt runs.
 	var releaseOnce sync.Once
-	busySleep = func(d time.Duration) {
-		sleeps++
-		// On the first backoff, fully drop BOTH contending handles so the
-		// next attempt's journal_mode SET can acquire its lock and succeed.
-		// Closing the whole *sql.DB (not just the pinned conn / a COMMIT on a
-		// pooled handle) guarantees the OS-level SQLite file locks are
-		// released before the retried attempt runs.
+	releaseContention := func() {
 		releaseOnce.Do(func() {
 			rows.Close()
 			pinned.Close()
@@ -135,6 +129,17 @@ func TestApplyPragmas_JournalModeSET_RetriesNonWaitableBusy(t *testing.T) {
 			_, _ = connB.Exec("ROLLBACK")
 			connB.Close()
 		})
+	}
+	t.Cleanup(releaseContention)
+
+	// Instrument the shared backoff seam so we can both count retry attempts
+	// AND release the contention mid-flight (on the first backoff sleep) so
+	// the retried attempt deterministically succeeds.
+	origSleep := busySleep
+	var sleeps int
+	busySleep = func(d time.Duration) {
+		sleeps++
+		releaseContention() // first backoff drops the locks (idempotent)
 		// Do not actually sleep the full backoff in the test.
 	}
 	t.Cleanup(func() { busySleep = origSleep })

@@ -48,62 +48,70 @@ func TestApplyPragmas_AppliesBusyTimeout(t *testing.T) {
 	}
 }
 
-// forceDeleteJournalDB creates a fresh schema'd temp-file DB and forces it into
-// DELETE journal mode via the documented seam: a direct `PRAGMA journal_mode =
-// delete` on a real temp-file handle. It does NOT stub isUnsafeForMmap or edit
-// pragmas.go's mode selection (out of scope per the bug brief — only the WRITE
-// of the pragma is hardened, not which mode is chosen). DELETE is the failing
-// scenario for bug-dd5db2d1: under DELETE-journal saturation the SHARED→RESERVED
-// upgrade that `PRAGMA journal_mode = DELETE` performs at every db.Open can
-// return SQLITE_BUSY immediately, bypassing busy_timeout. The schema-creating
-// handle is closed before returning so it does not itself contend; the file's
-// DELETE journal mode persists on disk.
-func forceDeleteJournalDB(t *testing.T) string {
+// selectedJournalMode returns the journal mode the REAL, unchanged selection
+// logic (BuildPragmas -> isUnsafeForMmap) chooses for dbPath on the host
+// running the test. Assertions derive the expected mode from this — never a
+// hardcoded "delete", which only holds on WAL-unsafe filesystems (overlayfs/
+// FUSE devcontainers) and would false-fail on WAL hosts (host installs on
+// APFS/ext4). This is the same filesystem-agnostic discipline as
+// bug-74a7bda7's busy_filesystem_agnostic_test.go.
+func selectedJournalMode(dbPath string) string {
+	return strings.ToLower(db.BuildPragmas(dbPath)["journal_mode"])
+}
+
+// seededJournalDB creates a fresh schema'd temp-file DB via db.Open (which
+// applies BuildPragmas, so the file lands in whatever mode the host's
+// selection logic chooses) and returns its path. It does NOT force a specific
+// journal mode — callers that need the DELETE-specific contention path either
+// skip-on-WAL or drive ApplyPragmas directly with an explicit DELETE pragma
+// map. The schema-creating handle is closed before returning so it does not
+// itself contend.
+func seededJournalDB(t *testing.T) string {
 	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "pragma-busy.db")
 	w, err := db.Open(dbPath) // creates schema + runs migrations
 	if err != nil {
 		t.Fatalf("db.Open seed: %v", err)
 	}
-	if _, err := w.Exec("PRAGMA journal_mode = delete"); err != nil {
-		w.Close()
-		t.Fatalf("force journal_mode=delete: %v", err)
-	}
-	got := db.QueryJournalMode(w)
 	w.Close()
-	if got != "delete" {
-		t.Fatalf("journal_mode = %q, want delete", got)
-	}
 	return dbPath
 }
 
+// deleteModePragmas returns an explicit pragma map identical to the real
+// BuildPragmas output EXCEPT journal_mode is pinned to DELETE. Driving
+// ApplyPragmas with this map deterministically exercises the DELETE-journal
+// contended-write path the bug is about, on ANY host filesystem, WITHOUT
+// touching production mode selection (isUnsafeForMmap/BuildPragmas are
+// unchanged — the test simply supplies its own inputs to ApplyPragmas).
+func deleteModePragmas(dbPath string) map[string]string {
+	p := db.BuildPragmas(dbPath)
+	p["journal_mode"] = "DELETE"
+	return p
+}
+
 // TestApplyPragmas_JournalModeWriteRetriesUnderContention is the bug-dd5db2d1
-// regression test. It reproduces the EXACT failing scenario: a DELETE-journal
-// DB with a parked open reader (a live, undrained *sql.Rows cursor holding a
-// SHARED lock). Changing journal mode requires escalating to a RESERVED/
-// EXCLUSIVE lock; with a reader parked mid-statement SQLite returns
-// SQLITE_BUSY *immediately* and does NOT honor busy_timeout (busy_timeout only
-// waits on lock acquisition, not on the SHARED→RESERVED upgrade conflict). This
-// is precisely the race bug-56b686aa's busy_timeout-first ordering + query-
-// before-set fast path leave unprotected — and the failure surface is
-// "applying PRAGMA journal_mode: database is locked" raised to the db.Open
-// caller. The fix wraps that SET in RetryOnBusy; this test proves concurrent
-// db.Open calls retry through the parked-reader contention (which is released
-// mid-flight) and succeed without ever surfacing the lock error.
+// regression test. It reproduces the EXACT failing scenario deterministically
+// on ANY host filesystem: it drives ApplyPragmas DIRECTLY with an explicit
+// DELETE pragma map (deleteModePragmas) — option (b) from the roborev
+// followup — so the DELETE-journal contended write is exercised regardless of
+// whether the host's BuildPragmas would have selected WAL or DELETE.
+// Production mode SELECTION (isUnsafeForMmap/BuildPragmas) is UNCHANGED; the
+// test merely supplies its own pragma inputs.
+//
+// A continuous-churn writer (BEGIN IMMEDIATE → tiny write → COMMIT, the proven
+// harness from cmd/wipnote/lineage_busy_test.go) saturates the write lock. A
+// concurrent `PRAGMA journal_mode = DELETE` (the open-time SET in
+// ApplyPragmas) loses the lock-upgrade race to the next churn cycle before
+// SQLite's busy poll resolves. Without the RetryOnBusy wrap this surfaces as
+// "applying PRAGMA journal_mode: database is locked" — the exact bug-dd5db2d1
+// failure. The test proves concurrent opens retry through it and succeed.
 func TestApplyPragmas_JournalModeWriteRetriesUnderContention(t *testing.T) {
 	db.ResetBusyCounters()
-	dbPath := forceDeleteJournalDB(t)
+	dbPath := seededJournalDB(t)
+	deletePragmas := deleteModePragmas(dbPath)
 
 	// Continuous-churn writer: a goroutine that repeatedly takes the writer
-	// lock (BEGIN IMMEDIATE → tiny write → COMMIT) with no gap. This is the
-	// proven contention harness from cmd/wipnote/lineage_busy_test.go's
-	// holdWriteLock. Under DELETE journal mode a rapidly-cycling RESERVED lock
-	// drives a concurrent `PRAGMA journal_mode = delete` (the open-time SET in
-	// ApplyPragmas) into the SQLITE_BUSY that busy_timeout alone does NOT
-	// reliably absorb: the lock-upgrade keeps losing the race to the next
-	// churn cycle before SQLite's busy poll resolves. Without the RetryOnBusy
-	// wrap this surfaces as "applying PRAGMA journal_mode: database is locked"
-	// to the db.Open caller — the exact bug-dd5db2d1 failure.
+	// lock (BEGIN IMMEDIATE → tiny write → COMMIT) with no gap.
 	churnCtx, stopChurn := context.WithCancel(context.Background())
 	var churnWG sync.WaitGroup
 	var churnCycles atomic.Int64
@@ -134,11 +142,11 @@ func TestApplyPragmas_JournalModeWriteRetriesUnderContention(t *testing.T) {
 		}
 	}()
 
-	// Fire concurrent Opens while the churn writer saturates the write lock,
-	// then stop the churn so the bounded RetryOnBusy backoff (~200/600/1800ms)
-	// can recover. Every Open runs ApplyPragmas -> the wrapped journal_mode SET
-	// against the DELETE-journal file. They must all retry through the
-	// contention and succeed; none may surface the journal_mode lock error.
+	// Fire concurrent opens that each drive ApplyPragmas with the explicit
+	// DELETE pragma map (exactly the code path db.Open uses, but with a
+	// deterministic DELETE selection independent of host filesystem). They
+	// must all retry through the churn contention and succeed; none may
+	// surface the journal_mode lock error.
 	const concurrentOpens = 6
 	var wg sync.WaitGroup
 	errs := make([]error, concurrentOpens)
@@ -146,15 +154,17 @@ func TestApplyPragmas_JournalModeWriteRetriesUnderContention(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			d, openErr := db.Open(dbPath)
-			if openErr == nil {
-				d.Close()
+			d, oerr := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)")
+			if oerr != nil {
+				errs[idx] = oerr
+				return
 			}
-			errs[idx] = openErr
+			defer d.Close()
+			errs[idx] = db.ApplyPragmas(d, deletePragmas)
 		}(i)
 	}
 
-	// Let the contention bite for a window that spans multiple Open attempts,
+	// Let the contention bite for a window that spans multiple attempts,
 	// then release so retries converge well within the deadline.
 	go func() {
 		time.Sleep(1200 * time.Millisecond)
@@ -168,7 +178,7 @@ func TestApplyPragmas_JournalModeWriteRetriesUnderContention(t *testing.T) {
 	case <-time.After(20 * time.Second):
 		stopChurn()
 		churnWG.Wait()
-		t.Fatal("concurrent Opens did not complete within 20s")
+		t.Fatal("concurrent ApplyPragmas did not complete within 20s")
 	}
 	stopChurn()
 	churnWG.Wait()
@@ -209,7 +219,12 @@ func TestApplyPragmas_JournalModeWriteRetriesUnderContention(t *testing.T) {
 // transitively proves the wrap is a near-no-op on the success path that EVERY
 // db.Open now traverses.
 func TestApplyPragmas_NonBusyPragmaErrorNotRetried(t *testing.T) {
-	dbPath := forceDeleteJournalDB(t)
+	dbPath := seededJournalDB(t)
+	// Expected mode is whatever the REAL, unchanged selection logic chooses
+	// for this host's filesystem — DELETE on overlayfs/FUSE, WAL on APFS/ext4.
+	// Never a hardcoded literal.
+	wantMode := selectedJournalMode(dbPath)
+
 	start := time.Now()
 	d, err := db.Open(dbPath)
 	if err != nil {
@@ -220,12 +235,13 @@ func TestApplyPragmas_NonBusyPragmaErrorNotRetried(t *testing.T) {
 		t.Fatalf("uncontended Open took %v; RetryOnBusy wrap must be a "+
 			"near-no-op on the success path (no backoff when not BUSY)", elapsed)
 	}
-	// Sanity: the forced DELETE mode survived the wrapped re-application
-	// (we only hardened the WRITE; mode SELECTION is unchanged).
-	if jm := db.QueryJournalMode(d); !strings.EqualFold(jm, "delete") {
+	// Sanity: the selected mode survived the wrapped re-application (we only
+	// hardened the WRITE; mode SELECTION is unchanged and filesystem-derived).
+	if jm := db.QueryJournalMode(d); !strings.EqualFold(jm, wantMode) {
 		d.Close()
-		t.Fatalf("journal_mode = %q after Open, want delete "+
-			"(RetryOnBusy wrap must not change which mode is written)", jm)
+		t.Fatalf("journal_mode = %q after Open, want %q (the host-selected "+
+			"mode; RetryOnBusy wrap must not change which mode is written)",
+			jm, wantMode)
 	}
 	d.Close()
 }
