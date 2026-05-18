@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Canonical completion blocked by Git index writability</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-c78b1344"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-18T05:13:51.866632"
+             data-updated="2026-05-18T05:13:51.972941" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33" data-created-by-agent="claude-code" data-created-by-model="gpt-5.5" data-created-by-role="codex" data-created-by-cli-version="0.59.1-457-gf516dac26">
+
+        <header>
+            <h1>Canonical completion blocked by Git index writability</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-18T05:13:51.972469">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Completion currently depends on Git autocommit succeeding after writing .wipnote artifacts. If Git cannot create .git/index.lock, such as a read-only worktree or locked Git common dir, wipnote reopens the item even though canonical state could be durable. Make canonical .wipnote state persist atomically first, record Git sync as committed or pending, add retry via wipnote sync, and keep strict blocking only as configurable dogfood/dev policy.</p>
+        </section>
+    </article>
+</body>
+</html>
