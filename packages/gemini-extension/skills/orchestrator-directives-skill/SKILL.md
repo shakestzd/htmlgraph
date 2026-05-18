@@ -694,6 +694,97 @@ Use Gemini agent invocation with:
 
 ---
 
+## Subagent Budget-Pause Handling
+
+<details>
+<summary><strong>Pattern A: Auto-Resume Budget-Paused Subagents</strong></summary>
+
+In some harness environments (notably VS Code devcontainer / agent-teams runtime), a delegated subagent may pause at a low tool budget and return an INTERMEDIATE, non-final message with NO completion. This is harness/runtime behavior, not a task failure. The message may be mid-sentence, lack a final report, or trail with "let me now…" — clear signs the work is not actually finished.
+
+**Detection & Recovery:**
+1. **Detect non-final return:** Message ends mid-step, no completion summary, no final SHA or deliverable list, trailing incomplete sentence
+2. **DO NOT treat as done:** This is NOT a task failure; it's a pause condition
+3. **DO NOT re-dispatch a fresh agent:** Re-dispatch loses all prior context and forces the agent to restart from scratch
+4. **MUST resume the SAME agent:** Use `SendMessage` with the agent's agentId and a restated, explicit finish-line:
+   ```
+   Continue and finish the work. You paused mid-task. Complete the remaining steps: <restate exact deliverables>
+   Report final status with commit SHA or summary.
+   ```
+5. **Expect multiple resume cycles:** May require 2-3 additional `SendMessage` calls before a genuine final report is returned
+
+**Why this matters:**
+- Harness tool budgets are per-session — temporary, not permanent
+- Resuming the same agent keeps context and avoids restarting
+- Multiple resumes are normal and expected in this condition
+
+**Pattern (pseudocode):**
+```
+use the ... workflow described here
+  → returns intermediate result, no completion
+  
+→ Message(agentId="<from-task-result>", text="Continue and finish: <deliverables>")
+  → returns partial progress
+  
+→ Message(agentId="<same>", text="Still not done. Complete: <deliverables>. Report final SHA/summary.")
+  → finally returns complete result
+```
+
+</details>
+
+<details>
+<summary><strong>Pattern B: Completion Gate for Subagent-Delegated Code</strong></summary>
+
+When code for a work item was written by a delegated subagent, completing the item (`wipnote <type> complete <id>`) is DOUBLE-GATED. The orchestrator MUST perform both:
+
+**(a) Run its OWN session-scoped quality gate:**
+```bash
+wipnote check --gate
+```
+A subagent's gate record does NOT count toward work-item completion — gate records are session-bound. You (the orchestrator in the main session) must run the gate yourself.
+
+**(b) Pass explicit completion rationale with committed SHAs:**
+```bash
+wipnote feature complete <feat-id> --accepted-advisory "Subagent implementation verified. Commits: <SHA1>, <SHA2> (cite real SHAs from git log, no host paths)."
+```
+Subagent commits are not auto-linked to the work item in the current schema. You must cite the real commit SHAs in the completion advisory so reviewers can trace implementation back to the work.
+
+**Why double-gating is necessary:**
+
+The underlying defect is tracked in **bug-3718b630**: the harness/hook system currently lacks:
+- Auto-linking of subagent commits to the work item they implement
+- Orchestrator-visible gate records (subagent gates are session-local, not visible to orchestrator)
+
+Both are durable fixes that belong in the binary and hooks, not in per-user guidance. Until those fixes land, completion is gated twice: (a) verifies code quality in orchestrator context, (b) documents the subagent's commits for future traceability.
+
+**Example:**
+```bash
+# Subagent finishes: feat-abc
+wipnote feature show feat-abc  # check commit history
+git log --oneline --grep="feat-abc" | head -3
+# Output: a1b2c3d feat: implementation detail
+#         x9y8z7w docs: added guide
+
+# Orchestrator runs quality gate
+wipnote check --gate
+# ✓ build, vet, tests pass
+
+# Orchestrator completes with rationale
+wipnote feature complete feat-abc --accepted-advisory \
+  "Subagent implementation validated. Commits: a1b2c3d, x9y8z7w. Quality gate passed."
+```
+
+</details>
+
+---
+
+## Known Issues / Environment
+
+**Devcontainer subagent budget-pause behavior:** In the VS Code devcontainer runtime, delegated subagents may pause at low tool budgets and return intermediate (non-final) results. This is harness/runtime behavior, not a code error. **See Pattern A (Auto-Resume) above** for detection and recovery steps.
+
+**Subagent commit linkage gap (bug-3718b630):** Subagent commits are not auto-linked to the work item they implement, and subagent quality-gate records are session-local and invisible to the orchestrator. This blocks full automation of completion gates. **See Pattern B (Completion Gate) above** for the interim workaround (double-gating + explicit SHAs in advisory). The durable fix belongs in the binary and hooks.
+
+---
+
 ## Advanced: Post-Compact Persistence
 
 <details>
