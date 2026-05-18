@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Transient SQLITE_BUSY on /api/timeline &#43; 500 on /api/transcript under concurrent load (post bug-272c5e34)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-0d50102a"
+             data-type="bug"
+             data-status="todo"
+             data-priority="low"
+             data-created="2026-05-18T23:27:49.237913"
+             data-updated="2026-05-18T23:27:49.252663" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-582-gc8646013c">
+
+        <header>
+            <h1>Transient SQLITE_BUSY on /api/timeline &#43; 500 on /api/transcript under concurrent load (post bug-272c5e34)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-low">Low Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-a31c489b.html" data-relationship="caused_by" data-since="2026-05-18T23:27:49.247611">bug-a31c489b</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T23:27:49.252373">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Live dashboard validation (serve 0.59.1-625, fixed binary, running concurrently with orphaned codex processes) showed the core serve-livelock fix (bug-272c5e34) holding — feed/recent/stats/initial-stats/tree all 200 with data. However /api/timeline returned database is locked (5) SQLITE_BUSY once then 200 on immediate retry (transient, self-recovers), and /api/transcript returned 500 once. Hypothesis: timelineHandler / transcriptHandler read paths may still lack db.RetryOnBusy or are sensitive to residual write contention not covered by the bug-272c5e34 indexer/writequeue fix. Recommend auditing those two handlers and wrapping their reads in db.RetryOnBusy and/or OpenReadOnlyMigrated consistent with the bug-7dbaf552/af107c36/272c5e34 pattern. Low priority: self-recovers, no livelock; surfaced during bug-a31c489b validation.</p>
+        </section>
+    </article>
+</body>
+</html>
