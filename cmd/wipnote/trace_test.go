@@ -363,3 +363,55 @@ func TestTraceFile_MultipleFeatures(t *testing.T) {
 		t.Fatalf("expected 2 results, got %d", len(results))
 	}
 }
+
+// TestTraceCommitWithStaleSchema verifies that trace.go read-only opens now
+// bootstrap+migrate via OpenReadOnlyMigrated, ensuring a fresh or stale-schema
+// DB succeeds where bare OpenReadOnly would fail. bug-f9622af9.
+func TestTraceCommitWithStaleSchema(t *testing.T) {
+	// Create a temporary file-based DB without schema (simulating a fresh or
+	// stale-schema DB that would fail with bare OpenReadOnly).
+	tmpDir := t.TempDir()
+	freshDBPath := tmpDir + "/fresh.db"
+
+	// Touch the file so it exists but has no schema.
+	if _, err := sql.Open("sqlite", freshDBPath); err != nil {
+		t.Fatalf("create fresh db file: %v", err)
+	}
+
+	// First, seed data using the writable Open (which bootstraps schema).
+	database, err := dbpkg.Open(freshDBPath)
+	if err != nil {
+		t.Fatalf("bootstrap writable: %v", err)
+	}
+
+	// Seed a commit.
+	commitSHA := "deadbeef1234567"
+	_, err = database.Exec(
+		`INSERT INTO git_commits (commit_hash, session_id, feature_id, message, timestamp) VALUES (?, ?, ?, ?, ?)`,
+		commitSHA, "sess-test", "feat-test", "test message", time.Now().UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		t.Fatalf("insert commit: %v", err)
+	}
+	database.Close()
+
+	// Now open read-only using OpenReadOnlyMigrated (which should succeed even
+	// if the DB file is fresh/stale).
+	roDatabase, err := dbpkg.OpenReadOnlyMigrated(freshDBPath)
+	if err != nil {
+		t.Fatalf("OpenReadOnlyMigrated: %v", err)
+	}
+	defer roDatabase.Close()
+
+	// Verify we can trace the commit.
+	results, err := dbpkg.TraceCommit(roDatabase, commitSHA)
+	if err != nil {
+		t.Fatalf("TraceCommit: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected to find seeded commit via TraceCommit")
+	}
+	if results[0].CommitHash != commitSHA {
+		t.Errorf("CommitHash = %q, want %q", results[0].CommitHash, commitSHA)
+	}
+}
