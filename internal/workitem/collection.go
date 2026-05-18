@@ -190,7 +190,9 @@ func (c *Collection) Start(id string) (*models.Node, error) {
 		return nil
 	}, func(*models.Node) {
 		if c.base.DB != nil {
-			_ = dbpkg.UpdateFeatureStatus(c.base.DB, id, "in-progress")
+			completeWithBusyRetry(func() error {
+				return dbpkg.UpdateFeatureStatus(c.base.DB, id, "in-progress")
+			})
 		}
 	})
 	if err != nil {
@@ -215,9 +217,19 @@ func (c *Collection) Complete(id string) (*models.Node, error) {
 		return nil
 	}, func(*models.Node) {
 		if c.base.DB != nil {
-			_ = dbpkg.UpdateFeatureStatus(c.base.DB, id, "done")
+			// bug-74a7bda7: the completion status transition is THE
+			// user-visible contended write. A dashboard read pool or a
+			// parallel session's writer can briefly hold the lock; retry
+			// with bounded backoff so a transient SQLITE_BUSY resolves
+			// transparently instead of silently dropping the derived-index
+			// completion (canonical HTML is still authoritative either way).
+			completeWithBusyRetry(func() error {
+				return dbpkg.UpdateFeatureStatus(c.base.DB, id, "done")
+			})
 			if activeClaim, err := dbpkg.GetActiveClaim(c.base.DB, id); err == nil && activeClaim != nil {
-				_ = dbpkg.ReleaseClaim(c.base.DB, activeClaim.ClaimID, activeClaim.OwnerSessionID, models.ClaimCompleted)
+				completeWithBusyRetry(func() error {
+					return dbpkg.ReleaseClaim(c.base.DB, activeClaim.ClaimID, activeClaim.OwnerSessionID, models.ClaimCompleted)
+				})
 			}
 		}
 	})
@@ -225,6 +237,19 @@ func (c *Collection) Complete(id string) (*models.Node, error) {
 		return nil, err
 	}
 	return node, nil
+}
+
+// completeWithBusyRetry runs a derived-index write for the work-item
+// status-transition path, retrying on SQLITE_BUSY with bounded exponential
+// backoff (bug-74a7bda7). It records any terminal BUSY under the
+// cli_mutation subsystem so the launch stress gate stays observable, then
+// swallows the error: the canonical HTML on disk remains the source of
+// truth and `wipnote reindex` recovers any row the derived index missed.
+// This is the universal-resilience layer — it helps WAL hosts too, it just
+// almost never has to retry there.
+func completeWithBusyRetry(fn func() error) {
+	err := dbpkg.RetryOnBusy(dbpkg.DefaultBusyBackoff, fn)
+	dbpkg.Record(dbpkg.SubsystemCLIMutation, err)
 }
 
 // --- Edge operations ---------------------------------------------------------

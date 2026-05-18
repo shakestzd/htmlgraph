@@ -37,6 +37,14 @@ var writerService struct {
 	sink  *sqls.QueuedSink
 }
 
+// dashboardReadPoolMaxConns bounds the dashboard mux's read-only SQLite
+// connection pool. bug-74a7bda7: an uncapped pool lets a request burst open
+// arbitrarily many SHARED-lock-holding connections, which under DELETE
+// journal mode serialise hard against the single writer and starve the
+// completion path. 12 sits well above steady dashboard concurrency while
+// bounding worst-case lock pressure on every filesystem.
+const dashboardReadPoolMaxConns = 12
+
 // serveChildCmd is the hidden internal subcommand the parent wipnote
 // server spawns for each project in multi-project mode. It is NOT intended
 // for direct invocation — end users run `wipnote serve`, which forks this
@@ -77,11 +85,33 @@ func runServeChild(port int) error {
 	if err := storage.EnsureDBDir(dbPath); err != nil {
 		return fmt.Errorf("ensure db dir: %w", err)
 	}
-	database, err := dbpkg.Open(dbPath)
+	// bug-74a7bda7 topology split: the dashboard mux gets a READ-ONLY handle
+	// so no HTTP request can ever escalate a SHARED lock to RESERVED on the
+	// project DB (the root cause of SQLITE_BUSY blocking completions while a
+	// parallel session writes — on every filesystem, WAL or DELETE).
+	//
+	// dbpkg.Open (writable + migrations) still runs FIRST so the schema
+	// exists / is current before any read-only connection opens (mode=ro
+	// never creates a file and never migrates). That same writable handle is
+	// then reused by the background maintenance loops that legitimately write
+	// but do NOT fit the slice-6 signal-batch write queue API
+	// (auto-ingest, ai-title backfill, indexer prompt-ID bridge). The
+	// slice-6 Writer still owns all OTLP/indexer-batch writes.
+	writeDB, err := dbpkg.Open(dbPath)
 	if err != nil {
-		return fmt.Errorf("open db: %w", err)
+		return fmt.Errorf("open db (writable, schema): %w", err)
 	}
-	// database is closed when the process exits; no defer Close — Serve blocks.
+	database, err := dbpkg.OpenReadOnly(dbPath)
+	if err != nil {
+		return fmt.Errorf("open db (read-only mux): %w", err)
+	}
+	// Cap the dashboard read pool so a burst of concurrent HTTP requests
+	// cannot open an unbounded number of SQLite connections (each of which
+	// takes a SHARED lock and, under DELETE journal mode, serialises against
+	// the single writer). 12 is comfortably above the dashboard's steady
+	// concurrency while bounding worst-case lock pressure.
+	database.SetMaxOpenConns(dashboardReadPoolMaxConns)
+	// Both handles live for the process lifetime; no defer Close — Serve blocks.
 
 	// Slice 6 writer service (plan-ae0c37b2): one Writer + one queue
 	// per project DB. Every in-process producer (indexer, future OTLP
@@ -125,7 +155,10 @@ func runServeChild(port int) error {
 	// produced by per-session collectors, so user work is durable on
 	// disk before any submit hits the queue (canonical-first contract).
 	if writerService.sink != nil {
-		idxr := indexer.New(wipnoteDir, writerService.sink).WithDB(database)
+		// WithDB(writeDB): the indexer's attached handle does the prompt-ID
+		// bridge UPDATE (db.SetPromptID) — it MUST be the writable handle,
+		// not the read-only mux handle (bug-74a7bda7 STEP 0 reroute).
+		idxr := indexer.New(wipnoteDir, writerService.sink).WithDB(writeDB)
 		ctx := context.Background()
 		go idxr.Start(ctx)
 		// /api/indexer/status — per-file health for observability (Q7).
@@ -172,8 +205,11 @@ func runServeChild(port int) error {
 	// first ingest cycle completes we kick off a one-time ai-title backfill
 	// so it observes any newly-ingested legacy sessions instead of writing
 	// its `.done` marker against an empty sessions table.
-	go autoIngestLoop(database, wipnoteDir, func() {
-		startAITitleBackfill(context.Background(), database, wipnoteDir)
+	// auto-ingest and ai-title backfill both issue INSERT/UPDATE/DELETE on
+	// sessions/messages/tool_calls — route them to the writable handle, not
+	// the read-only mux handle (bug-74a7bda7 STEP 0 reroute).
+	go autoIngestLoop(writeDB, wipnoteDir, func() {
+		startAITitleBackfill(context.Background(), writeDB, wipnoteDir)
 	})
 
 	// Retention job: archive sessions older than WIPNOTE_SESSION_RETAIN_DAYS

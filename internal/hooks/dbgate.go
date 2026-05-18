@@ -174,10 +174,17 @@ func SubmitDerivedOp(handler, sessionID string, q *writequeue.Queue, database *s
 		RecordFallback(handler, sessionID, FallbackWriterUnavailable, "no queue and no db")
 		return
 	}
-	// Synchronous fallback. Errors from the op itself are logged but never
-	// returned — canonical NDJSON is the authoritative copy and reindex will
-	// recover any rows the synchronous path missed.
-	if err := op(database); err != nil {
+	// Synchronous fallback. The hook subprocess writes directly to SQLite
+	// here while the dashboard read pool and a parallel session's writer may
+	// briefly contend the lock. Retry the op on SQLITE_BUSY with bounded
+	// backoff (bug-74a7bda7) so a transient lock overlap resolves
+	// transparently instead of dropping the derived-index update. A terminal
+	// BUSY is classified under hook_writer for the launch gate, then
+	// swallowed — canonical NDJSON is the authoritative copy and reindex
+	// recovers any rows the synchronous path missed.
+	err := db.RetryOnBusy(db.DefaultBusyBackoff, func() error { return op(database) })
+	db.Record(db.SubsystemHookWriter, err)
+	if err != nil {
 		debugLogFields(resolveLogDir(), handler,
 			map[string]string{"phase": "derived-op", "session": safeSessionID(sessionID)},
 			"sync derived-op error (recoverable via reindex): "+err.Error())

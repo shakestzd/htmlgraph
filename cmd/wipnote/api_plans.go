@@ -945,7 +945,11 @@ func planEventsHandler(database *sql.DB) http.HandlerFunc {
 			case <-r.Context().Done():
 				return
 			case <-ticker.C:
-				database.Exec("PRAGMA wal_checkpoint(PASSIVE)")
+				// No wal_checkpoint here: the dashboard mux handle is
+				// read-only (bug-74a7bda7) so it cannot (and must not)
+				// drive a checkpoint, and the checkpoint is a no-op under
+				// DELETE journal mode anyway. WAL checkpointing is owned by
+				// the writable handles that actually commit.
 				rows, err := database.Query(`
 					SELECT id, section, action, value
 					FROM plan_feedback

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -91,6 +92,20 @@ func NewWriter(dbPath string) (*Writer, error) {
 		return nil, fmt.Errorf("pin conn: %w", err)
 	}
 
+	// bug-74a7bda7 cold-start race: the DSN deliberately omits journal_mode
+	// so the read-pool Open's BuildPragmas stays the single source of truth.
+	// But if the Writer is the very first connection to a brand-new DB file
+	// (it opens before the read pool in runServeChild), the file starts in
+	// the SQLite default (DELETE) and stays there until some WAL-safe
+	// connection flips it. On a WAL-safe filesystem that means the writer
+	// runs in DELETE for the cold-start window, re-introducing the
+	// shared/reserved contention this bug is about. So: assert journal_mode
+	// once, here, and ONLY promote DELETE→WAL when the backing filesystem is
+	// WAL-safe. On WAL-unsafe filesystems (overlayfs/FUSE/9p/NFS — the
+	// devcontainer case) we accept DELETE silently: no error, no log spam.
+	// This never forces WAL on overlayfs and never touches isUnsafeForMmap.
+	assertWriterJournalMode(conn, dbPath)
+
 	w := &Writer{db: db, conn: conn}
 	if err := w.prepare(); err != nil {
 		conn.Close()
@@ -98,6 +113,30 @@ func NewWriter(dbPath string) (*Writer, error) {
 		return nil, err
 	}
 	return w, nil
+}
+
+// assertWriterJournalMode promotes a fresh DB from the SQLite default
+// (DELETE) to WAL when — and only when — the backing filesystem is WAL-safe.
+// It is a no-op when the DB is already in WAL or when the filesystem is
+// WAL-unsafe (the correct, filesystem-agnostic outcome). All failures are
+// swallowed: journal-mode resolution is best-effort and the read-pool Open
+// remains the authoritative pragma applier.
+func assertWriterJournalMode(conn *sql.Conn, dbPath string) {
+	ctx := context.Background()
+	var mode string
+	if err := conn.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode); err != nil {
+		return
+	}
+	if strings.EqualFold(mode, "wal") {
+		return // already WAL — nothing to do
+	}
+	if _, walSafe := db.ProbeFsType(dbPath); !walSafe {
+		return // WAL-unsafe FS (overlayfs/FUSE/9p/NFS): DELETE is correct
+	}
+	// WAL-safe filesystem sitting in DELETE only because this writer is the
+	// cold-start connection. Promote to WAL so readers and the writer stop
+	// blocking each other for the rest of the DB file's life.
+	_, _ = conn.ExecContext(ctx, "PRAGMA journal_mode = WAL")
 }
 
 func (w *Writer) prepare() error {

@@ -145,7 +145,7 @@ var approvedWriteSites = []writeSite{
 	},
 	{
 		File:           "internal/otel/receiver/writer.go",
-		Line:           71,
+		Line:           72,
 		Function:       "NewWriter",
 		OpenExpr:       "sql.Open",
 		Classification: daemonRoutedWriterService,
@@ -237,11 +237,11 @@ var approvedWriteSites = []writeSite{
 	},
 	{
 		File:           "cmd/wipnote/serve_child.go",
-		Line:           80,
+		Line:           100,
 		Function:       "runServeChild",
 		OpenExpr:       "dbpkg.Open",
 		Classification: intentionalCLIMutation,
-		Note:           "Dashboard child process (long-lived but single-instance per project).",
+		Note:           "Dashboard child: ONE writable handle for schema/migrations + background maintenance loops (auto-ingest, ai-title backfill, indexer prompt-ID bridge). The HTTP mux uses a SEPARATE read-only handle (dbpkg.OpenReadOnly, line 104) — bug-74a7bda7.",
 	},
 	{
 		File:           "cmd/wipnote/session.go",
@@ -599,7 +599,7 @@ func findModuleRoot(t *testing.T) string {
 	}
 	// Walk up at most 6 levels searching for go.mod.
 	dir := cwd
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
 			return dir
 		}
