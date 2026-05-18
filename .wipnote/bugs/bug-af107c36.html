@@ -10,26 +10,20 @@
 <body>
     <article id="bug-af107c36"
              data-type="bug"
-             data-status="in-progress"
+             data-status="done"
              data-priority="medium"
              data-created="2026-05-18T09:03:13.048086"
-             data-updated="2026-05-18T18:46:17.720151" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-427-g39ed400c9">
+             data-updated="2026-05-18T19:07:40.169698" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-427-g39ed400c9">
 
         <header>
             <h1>wipnote session show|list use writable open without RetryOnBusy under contention</h1>
             <div class="metadata">
-                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
 
         <nav data-graph-edges>
-            <section data-edge-type="part_of">
-                <h3>Part Of:</h3>
-                <ul>
-                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T09:03:13.057464">trk-a30e8df4</a></li>
-                </ul>
-            </section>
             <section data-edge-type="implemented_in">
                 <h3>Implemented In:</h3>
                 <ul>
@@ -48,11 +42,18 @@
                     <li><a href="bug-dd5db2d1.html" data-relationship="caused_by" data-since="2026-05-18T09:03:13.054841">bug-dd5db2d1</a></li>
                 </ul>
             </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T09:03:13.057464">trk-a30e8df4</a></li>
+                </ul>
+            </section>
         </nav>
 
         <section data-content>
             <h3>Description</h3>
-            <p>session show|list use the writable openDB with no db.RetryOnBusy, so they can surface SQLITE_BUSY under contention. Deferred from bug-7dbaf552 as out-of-blast-radius. Fix: wrap dbpkg.GetSession/ListSessions in db.RetryOnBusy and/or move to OpenReadOnlyMigrated after auditing DeriveSessionAdherence for write-freeness.</p>
+            <p>session show|list use the writable openDB with no db.RetryOnBusy, so they can surface SQLITE_BUSY under contention. Deferred from bug-7dbaf552 as out-of-blast-radius. Fix: wrap dbpkg.GetSession/ListSessions in db.RetryOnBusy and/or move to OpenReadOnlyMigrated after auditing DeriveSessionAdherence for write-freeness.
+[2026-05-18 19:06 claude-code] accepted-advisory (provenance override): session show|list now use dbpkg.OpenReadOnlyMigrated instead of the writable openDB, eliminating SQLITE_BUSY under contention (and fixing fresh/stale-schema failures). Write-freeness audit confirmed the entire path (GetSession, ListSessions, DeriveSessionAdherence + all callees, GetCommitsBySession, DistinctFeatureIDs, CountEventsByTool) is strictly read-only SELECT. Commit chain: e324f46 (core fix + TestSessionShowListStaleSchemaRegressions non-vacuous per-subtest guard + approvedWriteSites boundary update), 0dbd295 (correct misleading openDB inventory note), f79d58d (generic/accurate read-only-path note). roborev job 3263 on f79d58d: no issues found. Orchestrator session gate passed (signature 8f4d9afa2de). Subagent-delegated code; advisory accepted per bug-3718b630 known limitation. NOTE: orchestrator gate exhibited a flaky FAIL on first run then passed on immediate re-run (no FAIL/panic on diagnostic re-run) on both this item and bug-f9622af9 — a flaky test in go test ./..., not a regression in this change.</p>
         </section>
     </article>
 </body>
