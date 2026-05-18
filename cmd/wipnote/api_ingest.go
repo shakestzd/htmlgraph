@@ -15,7 +15,13 @@ import (
 // It dispatches to the appropriate sub-handler based on the URL suffix:
 //   - /ingest  → existing ingest logic (POST)
 //   - /preview → new preview handler (GET)
-func sessionIngestHandler(database *sql.DB) http.HandlerFunc {
+// sessionIngestHandler routes /api/sessions/{id}/preview (read-only) and
+// POST /api/sessions/{id}/ingest (writes via ingestSession). bug-74a7bda7:
+// the preview sub-route runs on the read-only mux handle; the ingest write
+// path runs on the dedicated writable handle (writeDB). writeDB may be nil
+// in read-only unit tests — the POST path is only reached when the /ingest
+// route is hit, so a nil writeDB never affects preview coverage.
+func sessionIngestHandler(database, writeDB *sql.DB) http.HandlerFunc {
 	preview := previewHandler(database)
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, suffix := extractSessionIDWithSuffix(r.URL.Path)
@@ -36,7 +42,9 @@ func sessionIngestHandler(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		msgCount, toolCount, err := ingestSession(database, sessionID)
+		// Manual ingest mutates sessions/messages/tool_calls — use the
+		// writable handle, never the read-only mux handle (bug-74a7bda7).
+		msgCount, toolCount, err := ingestSession(writeDB, sessionID)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				respondJSON(w, map[string]any{

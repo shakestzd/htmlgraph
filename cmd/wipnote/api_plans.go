@@ -516,8 +516,10 @@ func planFeedbackReadHandler(database *sql.DB) http.HandlerFunc {
 }
 
 // planFeedbackHandler routes GET and POST for /api/plans/{id}/feedback.
-func planFeedbackHandler(database *sql.DB) http.HandlerFunc {
-	submitH := planFeedbackSubmitHandler(database)
+// bug-74a7bda7: POST (StorePlanFeedback) uses the writable handle; GET
+// (GetPlanFeedback) stays on the read-only handle.
+func planFeedbackHandler(database, writeDB *sql.DB) http.HandlerFunc {
+	submitH := planFeedbackSubmitHandler(writeDB)
 	readH := planFeedbackReadHandler(database)
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -706,12 +708,18 @@ func loadPlanContext(wipnoteDir, planID string) string {
 
 // planRouter dispatches /api/plans/{id}/{action} to the appropriate handler.
 // Registered under /api/plans/ in serve.go.
-func planRouter(database *sql.DB, wipnoteDir string) http.HandlerFunc {
+// planRouter fans /api/plans/{id}/* out to per-action sub-handlers.
+// bug-74a7bda7 (roborev HIGH follow-up): read-only sub-handlers
+// (status, render, events, amendments, yaml, feedback GET) run on the
+// read-only mux handle `database`; mutating sub-handlers
+// (feedback POST, finalize, delete, chat) run on the dedicated writable
+// handle `writeDB` so they don't fail with SQLITE_READONLY.
+func planRouter(database, writeDB *sql.DB, wipnoteDir string) http.HandlerFunc {
 	statusH := planStatusHandler(database, wipnoteDir)
-	feedbackH := planFeedbackHandler(database)
-	finalizeH := planFinalizeHandler(database, wipnoteDir)
-	deleteH := planDeleteHandler(database, wipnoteDir)
-	chatH := planChatHandler(database, wipnoteDir)
+	feedbackH := planFeedbackHandler(database, writeDB)
+	finalizeH := planFinalizeHandler(writeDB, wipnoteDir)
+	deleteH := planDeleteHandler(writeDB, wipnoteDir)
+	chatH := planChatHandler(writeDB, wipnoteDir)
 	amendmentsH := planAmendmentsHandler(database)
 	yamlH := planYAMLHandler(wipnoteDir)
 	renderH := planRenderHandler(database, wipnoteDir)

@@ -366,9 +366,12 @@ func sseHandler(database *sql.DB) http.HandlerFunc {
 			case <-r.Context().Done():
 				return
 			case <-ticker.C:
-				// Force WAL checkpoint so we see writes from hook processes.
-				database.Exec("PRAGMA wal_checkpoint(PASSIVE)")
-
+				// No wal_checkpoint here: the dashboard mux handle is
+				// read-only (bug-74a7bda7) so it cannot drive a checkpoint,
+				// and the checkpoint is a no-op under DELETE journal mode
+				// anyway. The writable handles that commit own
+				// checkpointing; in WAL mode a read connection still sees
+				// committed writes without an explicit checkpoint.
 				rows, err := database.Query(`
 					SELECT rowid, event_id, agent_id, event_type, timestamp,
 					       tool_name, COALESCE(input_summary, ''),

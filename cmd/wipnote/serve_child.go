@@ -146,7 +146,7 @@ func runServeChild(port int) error {
 		}
 	}
 
-	mux := buildSingleProjectMux(database, wipnoteDir)
+	mux := buildSingleProjectMux(database, writeDB, wipnoteDir)
 
 	// NDJSON→SQLite indexer (unconditional per Q5 cutover decision).
 	// The indexer now routes every SignalSink batch through the slice-6

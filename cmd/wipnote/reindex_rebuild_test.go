@@ -523,7 +523,7 @@ func TestReindex_DashboardSmoke(t *testing.T) {
 	db := openCachedDB(t, projectDir)
 	defer db.Close()
 	wipnoteDir := filepath.Join(projectDir, ".wipnote")
-	mux := buildSingleProjectMux(db, wipnoteDir)
+	mux := buildSingleProjectMux(db, db, wipnoteDir)
 
 	// Dashboard-critical endpoints. These map 1:1 onto the slice-9 named
 	// dashboard-critical datasets:

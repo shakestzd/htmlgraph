@@ -12,7 +12,7 @@ func TestTerminalGate_UnsetEnvReturns404(t *testing.T) {
 	// Ensure the env var is unset for this test.
 	t.Setenv("WIPNOTE_TERMINAL", "")
 
-	mux := buildSingleProjectMux(nil, t.TempDir())
+	mux := buildSingleProjectMux(nil, nil, t.TempDir())
 
 	endpoints := []string{
 		"/api/terminal/sessions",
@@ -37,7 +37,7 @@ func TestTerminalGate_UnsetEnvReturns404(t *testing.T) {
 func TestTerminalGate_SetEnvRegistersRoutes(t *testing.T) {
 	t.Setenv("WIPNOTE_TERMINAL", "1")
 
-	mux := buildSingleProjectMux(nil, t.TempDir())
+	mux := buildSingleProjectMux(nil, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/terminal/sessions", nil)
 	rec := httptest.NewRecorder()
@@ -57,7 +57,7 @@ func TestTerminalGate_FalsyValuesReturn404(t *testing.T) {
 		t.Run(v, func(t *testing.T) {
 			t.Setenv("WIPNOTE_TERMINAL", v)
 
-			mux := buildSingleProjectMux(nil, t.TempDir())
+			mux := buildSingleProjectMux(nil, nil, t.TempDir())
 
 			req := httptest.NewRequest(http.MethodGet, "/api/terminal/sessions", nil)
 			rec := httptest.NewRecorder()

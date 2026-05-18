@@ -78,7 +78,7 @@ func setupProvenanceDBWithData(t *testing.T) (*sql.DB, string) {
 
 func TestProvenanceHandler_KnownFeature(t *testing.T) {
 	database, featureID := setupProvenanceDBWithData(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/provenance/"+featureID, nil)
 	w := httptest.NewRecorder()
@@ -107,7 +107,7 @@ func TestProvenanceHandler_KnownFeature(t *testing.T) {
 
 func TestProvenanceHandler_UnknownID(t *testing.T) {
 	database, _ := setupProvenanceDB(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/provenance/feat-does-not-exist", nil)
 	w := httptest.NewRecorder()
@@ -129,7 +129,7 @@ func TestProvenanceHandler_UnknownID(t *testing.T) {
 
 func TestCommitsForFeatureHandler_ReturnsCommits(t *testing.T) {
 	database, featureID := setupProvenanceDBWithData(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/graph/commits?feature="+featureID, nil)
 	w := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestCommitsForFeatureHandler_ReturnsCommits(t *testing.T) {
 
 func TestCommitsForFeatureHandler_EmptyResult(t *testing.T) {
 	database, _ := setupProvenanceDB(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/graph/commits?feature=feat-no-commits", nil)
 	w := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func TestCommitsForFeatureHandler_EmptyResult(t *testing.T) {
 
 func TestFilesForFeatureHandler_ReturnsFiles(t *testing.T) {
 	database, featureID := setupProvenanceDBWithData(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/graph/files?feature="+featureID, nil)
 	w := httptest.NewRecorder()
@@ -202,7 +202,7 @@ func TestFilesForFeatureHandler_ReturnsFiles(t *testing.T) {
 
 func TestSessionsForFeatureHandler_ReturnsSessions(t *testing.T) {
 	database, featureID := setupProvenanceDBWithData(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/graph/sessions?feature="+featureID, nil)
 	w := httptest.NewRecorder()
@@ -229,7 +229,7 @@ func TestSessionsForFeatureHandler_ReturnsSessions(t *testing.T) {
 // finding that commit/file/agent drill-downs were empty.
 func TestProvenanceHandler_CommitNodeResolvesDerivedEdges(t *testing.T) {
 	database, featureID := setupProvenanceDBWithData(t)
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/provenance/abc123def456", nil)
 	w := httptest.NewRecorder()
@@ -274,7 +274,7 @@ func TestProvenanceHandler_AgentNodeResolves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed lineage: %v", err)
 	}
-	mux := buildSingleProjectMux(database, t.TempDir())
+	mux := buildSingleProjectMux(database, nil, t.TempDir())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/provenance/wipnote:feature-coder", nil)
 	w := httptest.NewRecorder()

@@ -56,7 +56,24 @@ func runServer(bind string, port int) error {
 //
 // dashboardFS is accessed via the package-level dashboardSub() helper and
 // is intentionally not a parameter.
-func buildSingleProjectMux(database *sql.DB, wipnoteDir string) *http.ServeMux {
+// buildSingleProjectMux wires the dashboard HTTP routes.
+//
+// bug-74a7bda7 (roborev HIGH follow-up): the dashboard child opens TWO
+// handles — a read-only `database` (mode=ro, the cornerstone fix that
+// removes shared→reserved lock escalation on every request) and a single
+// writable `writeDB` owned by the child for the background maintenance
+// loops. The vast majority of HTTP routes are SELECT-only and stay on the
+// read-only handle. A small set of mutating endpoints (manual session
+// ingest, plan feedback/finalize/delete/chat) perform INSERT/UPDATE/DELETE
+// and MUST receive `writeDB` or they fail with SQLITE_READONLY. This
+// function is the single place that decides per-route which handle a
+// handler gets; do NOT pass `writeDB` to a read-only route (that would
+// reintroduce a fully-writable mux and the original contention).
+//
+// `writeDB` may be nil in unit tests that only exercise read routes; the
+// mutating handlers are only reachable when their routes are hit, so a nil
+// writeDB is safe for read-only test coverage.
+func buildSingleProjectMux(database, writeDB *sql.DB, wipnoteDir string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// /api/mode — lets the dashboard detect single vs global mode on load.
@@ -93,7 +110,11 @@ func buildSingleProjectMux(database *sql.DB, wipnoteDir string) *http.ServeMux {
 	mux.Handle("/api/timeline", timelineHandler(database))
 	mux.Handle("/api/transcript", transcriptHandler(database, wipnoteDir))
 	mux.Handle("/api/sessions/parallel", parallelSessionsHandler(database))
-	mux.Handle("/api/sessions/", sessionIngestHandler(database))
+	// sessionIngestHandler serves a read-only /preview sub-route AND a
+	// POST /ingest that writes (DeleteSessionMessages/ensureSession/
+	// storeParseResult/UpdateTranscriptSync). It needs both handles:
+	// read-only for preview, writable for the ingest write path.
+	mux.Handle("/api/sessions/", sessionIngestHandler(database, writeDB))
 	mux.Handle("/api/features/", featureActivityRouter(database, wipnoteDir))
 	mux.Handle("/api/graph", graphAPIHandler(database))
 	mux.Handle("/api/graph/agents", agentsHandler(database))
@@ -114,7 +135,11 @@ func buildSingleProjectMux(database *sql.DB, wipnoteDir string) *http.ServeMux {
 	// CRISPI plan routes — list route must precede the per-plan catch-all.
 	mux.Handle("/api/plans", plansListHandler(wipnoteDir, database))
 	mux.Handle("/plans/", planFileHandler(wipnoteDir))
-	mux.Handle("/api/plans/", planRouter(database, wipnoteDir))
+	// planRouter fans out to 9 sub-handlers; the mutating ones
+	// (feedback POST, finalize, delete, chat) need writeDB while the
+	// read-only ones (status/render/events/amendments/yaml/feedback GET)
+	// stay on the read-only handle. planRouter wires this internally.
+	mux.Handle("/api/plans/", planRouter(database, writeDB, wipnoteDir))
 
 	// Terminal sidecar routes — spawn/stop ttyd processes for the embedded
 	// interactive terminal. Must be registered before the catch-all "/" below.

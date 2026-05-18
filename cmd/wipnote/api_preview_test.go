@@ -150,7 +150,7 @@ func TestIngestRouteStillWorks(t *testing.T) {
 	}
 	defer database.Close()
 
-	handler := sessionIngestHandler(database)
+	handler := sessionIngestHandler(database, database)
 	body := bytes.NewBufferString(`{}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/sessions/"+sessionID+"/ingest", body)
 	rec := httptest.NewRecorder()

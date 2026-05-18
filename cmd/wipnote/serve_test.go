@@ -15,7 +15,7 @@ import (
 // is gutted or where runServer stops wiring the mode endpoint.
 func TestBuildSingleProjectMuxRegistersMode(t *testing.T) {
 	// /api/mode has no DB dependency so nil is safe here.
-	mux := buildSingleProjectMux(nil, t.TempDir())
+	mux := buildSingleProjectMux(nil, nil, t.TempDir())
 	if mux == nil {
 		t.Fatal("buildSingleProjectMux returned nil")
 	}
@@ -41,7 +41,7 @@ func TestBuildSingleProjectMuxRegistersMode(t *testing.T) {
 // 404. This catches the failure mode where the factory registers API routes
 // but forgets the root handler.
 func TestBuildSingleProjectMuxServesDashboard(t *testing.T) {
-	mux := buildSingleProjectMux(nil, t.TempDir())
+	mux := buildSingleProjectMux(nil, nil, t.TempDir())
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rec := httptest.NewRecorder()

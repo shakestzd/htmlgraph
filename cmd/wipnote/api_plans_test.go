@@ -419,7 +419,7 @@ func TestPlanChatHandler_MethodNotAllowed(t *testing.T) {
 	database, planID := setupPlanTestDB(t)
 	wipnoteDir := writeTempPlanHTML(t, planID)
 
-	router := planRouter(database, wipnoteDir)
+	router := planRouter(database, database, wipnoteDir)
 	req := httptest.NewRequest(http.MethodGet, "/api/plans/"+planID+"/chat", nil)
 	w := httptest.NewRecorder()
 	router(w, req)
@@ -433,7 +433,7 @@ func TestPlanChatHandler_EmptyMessage(t *testing.T) {
 	database, planID := setupPlanTestDB(t)
 	wipnoteDir := writeTempPlanHTML(t, planID)
 
-	router := planRouter(database, wipnoteDir)
+	router := planRouter(database, database, wipnoteDir)
 	body, _ := json.Marshal(map[string]string{"message": ""})
 	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/chat", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -449,7 +449,7 @@ func TestPlanChatHandler_InvalidJSON(t *testing.T) {
 	database, planID := setupPlanTestDB(t)
 	wipnoteDir := writeTempPlanHTML(t, planID)
 
-	router := planRouter(database, wipnoteDir)
+	router := planRouter(database, database, wipnoteDir)
 	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/chat",
 		bytes.NewReader([]byte("not json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -472,7 +472,7 @@ func TestPlanChatHandler_Unavailable(t *testing.T) {
 	t.Setenv("PATH", "/nonexistent")
 	t.Setenv("ANTHROPIC_API_KEY", "")
 
-	router := planRouter(database, wipnoteDir)
+	router := planRouter(database, database, wipnoteDir)
 	body, _ := json.Marshal(map[string]string{"message": "hello"})
 	req := httptest.NewRequest(http.MethodPost, "/api/plans/"+planID+"/chat", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
