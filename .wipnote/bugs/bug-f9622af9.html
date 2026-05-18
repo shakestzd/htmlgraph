@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>trace.go read-only opens lack bootstrap/migrate (fresh/stale DB) — swap to OpenReadOnlyMigrated</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-f9622af9"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-18T09:03:12.826338"
+             data-updated="2026-05-18T09:03:12.837612" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-427-g39ed400c9">
+
+        <header>
+            <h1>trace.go read-only opens lack bootstrap/migrate (fresh/stale DB) — swap to OpenReadOnlyMigrated</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-dd5db2d1.html" data-relationship="caused_by" data-since="2026-05-18T09:03:12.833334">bug-dd5db2d1</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T09:03:12.837128">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>trace.go opens read-only at 3 entry points with no bootstrap/migrate (pre-existing since commit 0a8d2f99d, not introduced by bug-7dbaf552). Fresh or schema-behind workspace makes wipnote trace fail before the read. Trivial fix: swap the 3 dbpkg.OpenReadOnly calls to the new dbpkg.OpenReadOnlyMigrated helper.</p>
+        </section>
+    </article>
+</body>
+</html>
