@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Stale-WIP accumulation &#43; WIP-limit semantics for multi-harness parallel dogfooding</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="spk-54c5c25e"
+             data-type="spike"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-18T09:03:13.256908"
+             data-updated="2026-05-18T09:03:13.262716" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-427-g39ed400c9">
+
+        <header>
+            <h1>Stale-WIP accumulation &#43; WIP-limit semantics for multi-harness parallel dogfooding</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-18T09:03:13.26253">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>WIP shows 15/5 AT LIMIT: many in-progress items never closed (downstream of blocked completions: bug-74a7bda7 contention + bug-c78b1344 git-coupling + crashed concurrent sessions). Also the global hard cap of 5 no longer fits the multi-harness model (claude+codex+gemini+yolo+subagents each legitimately hold active items). Spike: design a surgical stale-WIP audit (classify by owner-session liveness + age, do NOT wip reset live sessions) and redesign WIP-limit semantics (per-owner/advisory vs global hard cap).</p>
+        </section>
+    </article>
+</body>
+</html>
