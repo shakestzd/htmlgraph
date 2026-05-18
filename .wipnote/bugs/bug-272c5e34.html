@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>serve indexer &#43; writequeue self-livelock: tight begin-immediate loop SQLITE_BUSY-starves under DELETE journal, blanks dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-272c5e34"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-18T13:26:43.678296"
+             data-updated="2026-05-18T13:26:43.709503" data-agent-assigned="claude-code" data-track-id="trk-a30e8df4" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-582-gc8646013c">
+
+        <header>
+            <h1>serve indexer &#43; writequeue self-livelock: tight begin-immediate loop SQLITE_BUSY-starves under DELETE journal, blanks dashboard</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="bug-f9622af9.html" data-relationship="caused_by" data-since="2026-05-18T13:26:43.696927">bug-f9622af9</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-a30e8df4.html" data-relationship="part_of" data-since="2026-05-18T13:26:43.708912">trk-a30e8df4</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>wipnote serve runs a background indexer (~5s loop) issuing begin-immediate write txns to ingest sessions, plus a separate writequeue. Under DELETE-journal single-writer semantics (correct for overlayfs) the indexer contends with its own writequeue and periodic CLI opens, producing a self-perpetuating SQLITE_BUSY storm: every begin-immediate fails database is locked (5), the orphan filter query fails, the read-index never updates, and dashboard data endpoints degrade to unavailable right now (metric tiles show --). Even plain wipnote session list and wipnote bug create fail at applying PRAGMA journal_mode / read user_version. The running serve already contains deployed fixes bug-74a7bda7 / bug-7dbaf552 / bug-dd5db2d1 (binary 0.59.1-582-gc8646013c, not replaced under the process) so those RetryOnBusy fixes are INSUFFICIENT for the serve background write loop, a path they did not cover. Likely fix: route all serve-side writes through the single writequeue (stop the indexer issuing independent begin-immediate), add RetryOnBusy + exponential backoff to the indexer path, and back off hard when busy instead of hammering every 5s. Reproduced live 2026-05-18 with no external concurrent launcher processes running, so this is serve self-contention not external load.</p>
+        </section>
+    </article>
+</body>
+</html>
