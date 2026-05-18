@@ -424,3 +424,125 @@ func TestWipSessionDeadFlagInDetailTable(t *testing.T) {
 		t.Errorf("per-item SESSION column must show [dead?] for dead session; output:\n%s", out)
 	}
 }
+
+// TestWipCompletedSessionFlaggedDead verifies that a session with status='completed'
+// (present in the DB but not active) is flagged SESSION DEAD?, not treated as live.
+// This is the M1 bug regression: before the fix, any row in the DB was "live".
+func TestWipCompletedSessionFlaggedDead(t *testing.T) {
+	hgDir := setupWipDir(t)
+
+	makeInProgressNode(t, hgDir, "feature", "feat-comp001", "Completed-session item", "sess-completed")
+
+	p, err := workitem.Open(hgDir, "claude-code")
+	if err != nil {
+		t.Fatalf("open project: %v", err)
+	}
+	defer p.Close()
+
+	if p.DB == nil {
+		t.Skip("no DB available — cannot test completed-session liveness")
+	}
+
+	// Insert a session row with status='completed' — exists in DB, but not active.
+	_, err = p.DB.Exec(
+		`INSERT OR IGNORE INTO sessions (session_id, agent_assigned, created_at, status) VALUES (?, ?, ?, ?)`,
+		"sess-completed", "test-agent", time.Now().UTC().Format("2006-01-02T15:04:05Z"), "completed",
+	)
+	if err != nil {
+		t.Fatalf("insert completed session: %v", err)
+	}
+
+	out := captureWipShow(t)
+	// A completed session must NOT be treated as live — it should be flagged dead.
+	if !strings.Contains(out, "SESSION DEAD?") {
+		t.Errorf("SESSION DEAD? must appear for completed (non-active) session; output:\n%s", out)
+	}
+}
+
+// makeInProgressNodeMultiEdge writes an in-progress node with multiple
+// implemented_in edges. olderSession is the first (stale) owner; newerSession
+// is the most-recent owner. The timestamps are separated by 1 hour so
+// wipLatestImplementedInSession will unambiguously pick newerSession.
+func makeInProgressNodeMultiEdge(t *testing.T, dir, nodeType, id, title, olderSession, newerSession string) {
+	t.Helper()
+	now := time.Now().UTC()
+	n := &models.Node{
+		ID:     id,
+		Type:   nodeType,
+		Title:  title,
+		Status: models.StatusInProgress,
+		Edges: map[string][]models.Edge{
+			string(models.RelImplementedIn): {
+				{
+					TargetID:     olderSession,
+					Relationship: models.RelImplementedIn,
+					Title:        "session " + olderSession,
+					Since:        now.Add(-1 * time.Hour), // stale
+				},
+				{
+					TargetID:     newerSession,
+					Relationship: models.RelImplementedIn,
+					Title:        "session " + newerSession,
+					Since:        now, // latest = current owner
+				},
+			},
+		},
+	}
+	subDir := filepath.Join(dir, nodeType+"s")
+	if _, err := workitem.WriteNodeHTML(subDir, n); err != nil {
+		t.Fatalf("WriteNodeHTML multi-edge %s: %v", id, err)
+	}
+}
+
+// TestWipGroupBySessionLatestEdge verifies that an item with multiple
+// implemented_in edges is grouped under the MOST RECENT session (by Since
+// timestamp), not the first one. This is the M2 bug regression: before the
+// fix, the first edge was used, mis-attributing restarted/handed-off items.
+func TestWipGroupBySessionLatestEdge(t *testing.T) {
+	hgDir := setupWipDir(t)
+
+	// feat-multi: started in sess-old, then handed to sess-new (latest edge).
+	makeInProgressNodeMultiEdge(t, hgDir, "feature", "feat-multi001", "Multi-edge feature", "sess-old", "sess-new")
+	// feat-single: owned by sess-new only (to make soft-limit count clear).
+	makeInProgressNode(t, hgDir, "feature", "feat-single001", "Single edge feature", "sess-new")
+
+	items, err := scanInProgress(hgDir)
+	if err != nil {
+		t.Fatalf("scanInProgress: %v", err)
+	}
+
+	bySession := wipGroupBySession(items)
+
+	// feat-multi must be under sess-new (latest), NOT sess-old (first).
+	if len(bySession["sess-old"]) != 0 {
+		t.Errorf("sess-old must have 0 items after handoff; got %d — multi-edge item was mis-attributed to stale session", len(bySession["sess-old"]))
+	}
+	if len(bySession["sess-new"]) != 2 {
+		t.Errorf("sess-new must own both items (latest edge wins); got %d", len(bySession["sess-new"]))
+	}
+}
+
+// TestWipSoftLimitCountsLatestOwner verifies the per-session soft-limit count
+// uses most-recent ownership: if an item has been handed off from sess-prev to
+// sess-curr, it counts against sess-curr (not sess-prev) for the soft limit.
+func TestWipSoftLimitCountsLatestOwner(t *testing.T) {
+	hgDir := setupWipDir(t)
+
+	// Add wipPerSessionSoftLimit items all handed-off TO sess-curr.
+	// Each item has sess-prev as the stale first edge, sess-curr as latest.
+	for i := 0; i < wipPerSessionSoftLimit; i++ {
+		id := "feat-sl" + string(rune('a'+i))
+		makeInProgressNodeMultiEdge(t, hgDir, "feature", id, "Soft-limit item "+string(rune('a'+i)), "sess-prev", "sess-curr")
+	}
+
+	out := captureWipShow(t)
+	// sess-curr owns wipPerSessionSoftLimit items → SOFT LIMIT must appear.
+	if !strings.Contains(out, "SOFT LIMIT") {
+		t.Errorf("[SOFT LIMIT] must appear: sess-curr owns %d items via latest edge; output:\n%s",
+			wipPerSessionSoftLimit, out)
+	}
+	// sess-prev must NOT appear as owner of any item (all handed off).
+	if strings.Contains(out, "sess-prev") {
+		t.Errorf("sess-prev must not appear in output after all items handed off to sess-curr; output:\n%s", out)
+	}
+}

@@ -115,7 +115,9 @@ func runWipShow() error {
 	return nil
 }
 
-// wipLiveSessions returns a set of session IDs that are known in the DB.
+// wipLiveSessions returns the set of currently-active session IDs from the DB.
+// "Active" is the canonical definition used by `wipnote session list --active`:
+// status = 'active' (see ListSessions activeOnly=true, session_repo.go:85).
 // Returns an empty map (not nil) on any error so liveness checks degrade gracefully.
 func wipLiveSessions(wipnoteDir string) map[string]bool {
 	live := make(map[string]bool)
@@ -124,8 +126,11 @@ func wipLiveSessions(wipnoteDir string) map[string]bool {
 		return live
 	}
 	defer db.Close()
-	// Use a large limit so we don't miss any session.
-	sessions, err := dbpkg.ListSessions(db, false, 1000)
+	// activeOnly=true: matches `wipnote session list --active` — only status='active'
+	// rows are live. Completed/failed/stale sessions are intentionally excluded so
+	// items they own are flagged SESSION DEAD?.  Use a large limit to catch all
+	// concurrently active sessions (orchestrator can spawn many).
+	sessions, err := dbpkg.ListSessions(db, true, 1000)
 	if err != nil {
 		return live
 	}
@@ -135,15 +140,30 @@ func wipLiveSessions(wipnoteDir string) map[string]bool {
 	return live
 }
 
-// wipGroupBySession groups in-progress nodes by the target of their first
-// implemented_in edge, or under "unknown" if no such edge exists.
+// wipLatestImplementedInSession returns the TargetID of the most recent
+// implemented_in edge by Edge.Since timestamp, or "unknown" when none exist.
+// Items accumulate edges on restart/handoff; the latest edge reflects current
+// ownership, not the first session that ever touched the item.
+func wipLatestImplementedInSession(n *models.Node) string {
+	edges, ok := n.Edges[string(models.RelImplementedIn)]
+	if !ok || len(edges) == 0 {
+		return "unknown"
+	}
+	latest := edges[0]
+	for _, e := range edges[1:] {
+		if e.Since.After(latest.Since) {
+			latest = e
+		}
+	}
+	return latest.TargetID
+}
+
+// wipGroupBySession groups in-progress nodes by the most-recent implemented_in
+// session edge owner. Items with no such edge land in the "unknown" bucket.
 func wipGroupBySession(items []*models.Node) map[string][]*models.Node {
 	bySession := make(map[string][]*models.Node)
 	for _, n := range items {
-		sess := "unknown"
-		if edges, ok := n.Edges[string(models.RelImplementedIn)]; ok && len(edges) > 0 {
-			sess = edges[0].TargetID
-		}
+		sess := wipLatestImplementedInSession(n)
 		bySession[sess] = append(bySession[sess], n)
 	}
 	return bySession
