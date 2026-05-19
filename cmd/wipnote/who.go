@@ -74,10 +74,15 @@ type whoOutput struct {
 }
 
 // whoFileEntry is a single file touched by this session.
+//
+// OverlapSessions lists OTHER live sessions that touched the same file within
+// the recency window (Tier 1 live file-overlap detection). Non-empty means a
+// potential concurrent-edit collision — rendered with a ⚠ marker in text mode.
 type whoFileEntry struct {
-	FilePath  string `json:"file_path"`
-	Operation string `json:"operation"`
-	LastSeen  string `json:"last_seen"`
+	FilePath        string   `json:"file_path"`
+	Operation       string   `json:"operation"`
+	LastSeen        string   `json:"last_seen"`
+	OverlapSessions []string `json:"overlap_sessions,omitempty"`
 }
 
 type collabOutput struct {
@@ -205,6 +210,27 @@ func runWho(jsonOut bool) error {
 		fileEntries = []whoFileEntry{}
 	}
 
+	// Live file-overlap detection (Tier 1): for each file this session has
+	// touched, surface OTHER *live* sessions that touched the same path within
+	// the recency window. Liveness is heartbeat-recency derived (Tier 3), so a
+	// stale status='active' ghost session never produces a false ⚠
+	// (bug-6c3e8252). Each lookup is a single indexed SELECT with zero writes.
+	if sessionID != "" {
+		window := dbpkg.FileOverlapWindow(projectDir)
+		liveness := dbpkg.LivenessStalenessThreshold(projectDir)
+		for i := range fileEntries {
+			overlaps, oerr := dbpkg.FindLiveFileOverlaps(
+				database, fileEntries[i].FilePath, sessionID, window, liveness)
+			if oerr != nil {
+				continue
+			}
+			for _, o := range overlaps {
+				fileEntries[i].OverlapSessions = append(
+					fileEntries[i].OverlapSessions, o.SessionID)
+			}
+		}
+	}
+
 	out := whoOutput{
 		SessionID:       sessionID,
 		SessionFamilyID: familyID,
@@ -320,10 +346,18 @@ func renderWhoText(out whoOutput) error {
 
 	if len(out.Files) > 0 {
 		fmt.Printf("\n  Files touched (%d):\n", len(out.Files))
-		fmt.Printf("    %-10s  %-24s  %s\n", "OPERATION", "LAST SEEN", "PATH")
-		fmt.Printf("    %s\n", strings.Repeat("-", 70))
+		fmt.Printf("    %-3s %-10s  %-24s  %s\n", "", "OPERATION", "LAST SEEN", "PATH")
+		fmt.Printf("    %s\n", strings.Repeat("-", 74))
 		for _, f := range out.Files {
-			fmt.Printf("    %-10s  %-24s  %s\n", f.Operation, f.LastSeen, f.FilePath)
+			marker := "  "
+			if len(f.OverlapSessions) > 0 {
+				marker = "⚠ "
+			}
+			fmt.Printf("    %-3s %-10s  %-24s  %s\n", marker, f.Operation, f.LastSeen, f.FilePath)
+			if len(f.OverlapSessions) > 0 {
+				fmt.Printf("        ⚠ also touched by live session(s): %s\n",
+					strings.Join(f.OverlapSessions, ", "))
+			}
 		}
 	} else {
 		fmt.Printf("\n  No files recorded for this session.\n")

@@ -462,6 +462,10 @@ func CreateAllIndexes(db *sql.DB) error {
 		// feature_files
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_feature ON feature_files(feature_id)",
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_path ON feature_files(file_path)",
+		// Composite (file_path, last_seen) — supports the live file-overlap
+		// query (Tier 1): an equality+range probe on (file_path, recent
+		// last_seen) without range-scanning every row for the path.
+		"CREATE INDEX IF NOT EXISTS idx_feature_files_path_seen ON feature_files(file_path, last_seen)",
 		// session_files
 		"CREATE INDEX IF NOT EXISTS idx_session_files_session ON session_files(session_id)",
 		"CREATE INDEX IF NOT EXISTS idx_session_files_path ON session_files(file_path)",

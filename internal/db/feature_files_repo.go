@@ -2,11 +2,136 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/shakestzd/wipnote/internal/models"
 )
+
+// DefaultFileOverlapWindow is the recency window for live file-overlap
+// detection (Tier 1 / feat-b5fa9392). Aligned to the claim heartbeat / lease
+// cadence: a file touched by another session within this window is treated as
+// a potential concurrent-edit collision. Configurable via
+// .wipnote/config.json "file_overlap_window_minutes".
+const DefaultFileOverlapWindow = 15 * time.Minute
+
+// FileOverlap is one other session that touched the same file_path within the
+// recency window. SessionID is the *other* session; the caller filters these
+// to LIVE sessions (heartbeat-recency liveness, NOT sessions.status) before
+// surfacing them so stale 'active' ghost sessions never false-fire (bug-6c3e8252).
+type FileOverlap struct {
+	SessionID string
+	FeatureID string
+	Operation string
+	LastSeen  string
+}
+
+// FindFileOverlaps returns every OTHER session (session_id != excludeSessionID)
+// that touched filePath within `window` of now, as recorded in feature_files.
+//
+// This is a single indexed SELECT with ZERO writes. It is served by the
+// composite index idx_feature_files_path_seen(file_path, last_seen): the
+// equality on file_path plus the range on last_seen is an index probe, not a
+// per-path range scan (preserving the feat-156e0a1a zero-SQLITE_BUSY hot-path
+// guarantee — nothing on this path acquires a write lock).
+//
+// Recency is computed in SQL via datetime('now', ?) so both sides of the
+// comparison are SQLite's UTC 'YYYY-MM-DD HH:MM:SS' string form (the same form
+// CURRENT_TIMESTAMP writes into last_seen) — no timezone parsing, no client
+// clock skew. Liveness is intentionally NOT filtered here: the caller applies
+// SessionLivenessByHeartbeat so the SQL stays a single indexed range probe.
+func FindFileOverlaps(db *sql.DB, filePath, excludeSessionID string, window time.Duration) ([]FileOverlap, error) {
+	if db == nil || filePath == "" {
+		return nil, nil
+	}
+	if window <= 0 {
+		window = DefaultFileOverlapWindow
+	}
+	// Negative-minutes modifier, e.g. "-15 minutes".
+	mod := fmt.Sprintf("-%d minutes", int64(window/time.Minute))
+	rows, err := db.Query(`
+		SELECT COALESCE(session_id, ''), feature_id,
+		       COALESCE(operation, ''), last_seen
+		FROM feature_files
+		WHERE file_path = ?
+		  AND last_seen >= datetime('now', ?)
+		  AND COALESCE(session_id, '') != ''
+		  AND COALESCE(session_id, '') != ?
+		ORDER BY last_seen DESC`,
+		filePath, mod, excludeSessionID)
+	if err != nil {
+		return nil, fmt.Errorf("find file overlaps for %s: %w", filePath, err)
+	}
+	defer rows.Close()
+	var out []FileOverlap
+	for rows.Next() {
+		var o FileOverlap
+		if err := rows.Scan(&o.SessionID, &o.FeatureID, &o.Operation, &o.LastSeen); err != nil {
+			continue
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// FindLiveFileOverlaps wraps FindFileOverlaps and keeps only overlaps whose
+// other session is honestly LIVE per heartbeat recency (Tier 3 primitive),
+// de-duplicated to one entry per other session (newest last_seen wins, which
+// the ORDER BY in FindFileOverlaps already guarantees). This is the function
+// `wipnote who` and the PreToolUse advisory consume — a stale status='active'
+// ghost session never produces a ⚠ (bug-6c3e8252).
+func FindLiveFileOverlaps(db *sql.DB, filePath, excludeSessionID string, window time.Duration, livenessThreshold time.Duration) ([]FileOverlap, error) {
+	raw, err := FindFileOverlaps(db, filePath, excludeSessionID, window)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var out []FileOverlap
+	for _, o := range raw {
+		if seen[o.SessionID] {
+			continue
+		}
+		if !SessionLivenessByHeartbeat(db, o.SessionID, livenessThreshold) {
+			continue
+		}
+		seen[o.SessionID] = true
+		out = append(out, o)
+	}
+	return out, nil
+}
+
+// FileOverlapWindow returns the configured live file-overlap recency window.
+// Reads .wipnote/config.json under projectDir via the same local os.ReadFile
+// pattern as LivenessStalenessThreshold / readTaskCompletionConfig (there is
+// NO shared internal/config package). Falls back to DefaultFileOverlapWindow
+// when the file is missing/unreadable, the key is absent, or the value is
+// non-positive.
+func FileOverlapWindow(projectDir string) time.Duration {
+	if projectDir == "" {
+		return DefaultFileOverlapWindow
+	}
+	data, err := os.ReadFile(filepath.Join(projectDir, ".wipnote", "config.json"))
+	if err != nil {
+		return DefaultFileOverlapWindow
+	}
+	var cfg fileOverlapConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return DefaultFileOverlapWindow
+	}
+	if cfg.WindowMinutes <= 0 {
+		return DefaultFileOverlapWindow
+	}
+	return time.Duration(cfg.WindowMinutes) * time.Minute
+}
+
+// fileOverlapConfig mirrors the local config.json decode pattern; only the one
+// tunable field is read, everything else in config.json is ignored.
+type fileOverlapConfig struct {
+	WindowMinutes int `json:"file_overlap_window_minutes"`
+}
 
 // UpsertFeatureFile inserts a feature_file row or updates last_seen on conflict.
 // The UNIQUE constraint is (feature_id, file_path), so re-touching the same file
