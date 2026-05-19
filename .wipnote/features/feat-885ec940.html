@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Tier 4 — Kanban work-board execution visibility</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-885ec940"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-05-19T00:38:27.291864"
+             data-updated="2026-05-19T16:35:22.108762" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
+
+        <header>
+            <h1>Tier 4 — Kanban work-board execution visibility</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-c3bbb1ed.html" data-relationship="planned_in" data-since="2026-05-19T00:38:27.296304">plan-c3bbb1ed</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f15004d6.html" data-relationship="part_of" data-since="2026-05-19T00:38:27.301256">trk-f15004d6</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-f1c6f92e.html" data-relationship="blocked_by">feat-f1c6f92e</a></li>
+                    <li><a href="feat-b5fa9392.html" data-relationship="blocked_by">feat-b5fa9392</a></li>
+                    <li><a href="feat-793844bd.html" data-relationship="blocked_by">feat-793844bd</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="1ddaa17f-dfe6-4e94-a3c1-55b4357477ba.html" data-relationship="implemented_in" data-since="2026-05-19T16:35:22.108378">session 1ddaa17f-dfe6-4e94-a3c1-55b4357477ba</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Promote the dashboard Work/Kanban view from a static work-item list into
+the user-facing coordination surface for concurrent CLIs. Extend
+/api/features with derived active-session/work-owner data from
+active_work_items + sessions + claims, step counters already stored on
+features, recent move/start/complete/add-step activity, and the file
+overlap signals from slices 1-4. Render those signals directly on
+Kanban cards and track groups: active CLI/model/session badge, step
+progress, last activity age, last touched file, overlap/conflict badge,
+and moved/reassigned markers. Keep card data read-only; canonical
+mutations still go through wipnote CLI commands and existing HTML
+work-item files.
+
+Define the cross-harness step contract explicitly. Claude TaskCreated /
+TaskCompleted continues to drive hook-only add-task-step /
+complete-task-step. Codex TaskStarted / TaskComplete and Gemini tool or
+session events must either map to the same canonical hidden commands
+when a work item is active, or be documented as unsupported with a
+visible dashboard "steps not live for this harness" state. Do not let a
+user infer that a stalled 0/N checklist is live if the harness cannot
+emit step events.</p>
+        </section>
+    </article>
+</body>
+</html>
