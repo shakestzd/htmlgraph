@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Flaky api_tree dedup tests: wall-clock bucket-boundary straddle</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-18d09db3"
+             data-type="bug"
+             data-status="todo"
+             data-priority="high"
+             data-created="2026-05-19T02:16:08.508673"
+             data-updated="2026-05-19T02:16:08.515326" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>Flaky api_tree dedup tests: wall-clock bucket-boundary straddle</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-19T02:16:08.51467">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Pre-existing flaky tests TestCollapseDuplicateTurns_RichestSurvives (api_tree_test.go:694) and TestNestTaskNotificationTurns_DeduplicateThenNest (api_tree_test.go:1002) use time.Now().UTC().Truncate(time.Second). collapseDuplicateTurns buckets on floor(parsed.Unix()/collapseBucketSecs), collapseBucketSecs=10 (api_tree.go:238). When base.Unix()%10==9 the ~1s-apart duplicate rows straddle a 10s bucket boundary and are NOT collapsed (got N+1, want N), failing ~10% of runs and blocking the full-suite quality gate for every plan-c3bbb1ed slice. Fix: anchor base to a collapseBucketSecs boundary. Deterministic; zero production change.</p>
+        </section>
+    </article>
+</body>
+</html>
