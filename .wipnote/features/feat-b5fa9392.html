@@ -10,15 +10,15 @@
 <body>
     <article id="feat-b5fa9392"
              data-type="feature"
-             data-status="in-progress"
+             data-status="done"
              data-priority="medium"
              data-created="2026-05-19T00:38:27.217027"
-             data-updated="2026-05-19T15:49:25.905064" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
+             data-updated="2026-05-19T16:33:03.994691" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
 
         <header>
             <h1>Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory (&#43; composite index)</h1>
             <div class="metadata">
-                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
@@ -66,7 +66,8 @@ would otherwise range-scan). Config flags `warn_on_file_overlap`
 (default true) and `block_on_file_overlap` (default false → exit 2),
 read via the same local os.ReadFile pattern as
 block_task_completion_on_quality_failure (task_completion_gate.go:77-96;
-no shared internal/config package exists).</p>
+no shared internal/config package exists).
+[2026-05-19 16:31 claude-code] accepted-advisory (provenance override): Implementation committed as 133a380c6 on track branch trk-f15004d6 in the isolated worktree; subject carries (feat-b5fa9392); gate verified green from the worktree; durable provenance backfilled at track→main integration via wipnote ingest commits.</p>
         </section>
     </article>
 </body>
