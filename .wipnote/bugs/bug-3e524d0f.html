@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Slice approvals stored only in SQLite plan_feedback, never reconciled to canonical plan YAML — finalize-yaml sees 0 approved</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-3e524d0f"
+             data-type="bug"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-05-19T00:03:31.657248"
+             data-updated="2026-05-19T00:08:47.136004" data-agent-assigned="claude-code" data-track-id="trk-cd61bbae" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-625-ge416b178d">
+
+        <header>
+            <h1>Slice approvals stored only in SQLite plan_feedback, never reconciled to canonical plan YAML — finalize-yaml sees 0 approved</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-cd61bbae.html" data-relationship="part_of" data-since="2026-05-19T00:03:31.664729">trk-cd61bbae</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="7c55cfac-573e-47b3-8282-4ad81b830136.html" data-relationship="implemented_in" data-since="2026-05-19T00:08:47.134014">session 7c55cfac-573e-47b3-8282-4ad81b830136</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Dashboard Approve button and 'wipnote plan approve-slice' both write approval only to SQLite plan_feedback (section=slice-N, action=approve), which renders the green APPROVED badge. But 'wipnote plan finalize-yaml' reads the canonical plan YAML 'approved:' boolean, which nothing ever flips to true. Result: plan-c3bbb1ed shows all 5 slices APPROVED in the dashboard yet finalize-yaml reports 0 of 5 approved and creates no features/track, blocking yolo launch. CLAUDE.md mandates YAML is the single source of truth and SQLite is a derived index — approval must be persisted into the plan YAML (and HTML regenerated via commitPlanChange), surviving reindex. Repro: open plan in dashboard, approve all slices, run wipnote plan finalize-yaml ; observe 0 of N approved despite badges.</p>
+        </section>
+    </article>
+</body>
+</html>
