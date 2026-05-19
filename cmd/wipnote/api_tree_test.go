@@ -691,7 +691,11 @@ func TestFilterAnchorsAgainstInteractionSpans_ZeroTS(t *testing.T) {
 // one with a harness agent_id (rich) and one without (poor). Only the rich one
 // must survive.
 func TestCollapseDuplicateTurns_RichestSurvives(t *testing.T) {
-	base := time.Now().UTC().Truncate(time.Second)
+	// Anchor base to a collapseBucketSecs boundary so the ~1s-apart rows always
+	// land in the same dedup bucket. Truncating only to the second is flaky:
+	// it fails ~10% of runs when wall-clock places base at a bucket edge
+	// (bucket = unix/collapseBucketSecs, api_tree.go). bug-18d09db3.
+	base := time.Now().UTC().Truncate(time.Duration(collapseBucketSecs) * time.Second)
 	rich := turn{
 		SessionID: "sess-rich",
 		UserQuery: map[string]any{
@@ -999,7 +1003,11 @@ func TestNestTaskNotificationTurns_NormalTurnUntouched(t *testing.T) {
 // (collapseDuplicateTurns) followed by nestTaskNotificationTurns correctly
 // collapses a duplicate pair AND nests a notification turn.
 func TestNestTaskNotificationTurns_DeduplicateThenNest(t *testing.T) {
-	base := time.Now().UTC().Truncate(time.Second)
+	// Anchor base to a collapseBucketSecs boundary so the rich(-30s)/poor(-29s)
+	// duplicate pair always shares a dedup bucket. Truncating only to the second
+	// is flaky: it fails ~10% of runs when wall-clock places base at a bucket
+	// edge (bucket = unix/collapseBucketSecs, api_tree.go). bug-18d09db3.
+	base := time.Now().UTC().Truncate(time.Duration(collapseBucketSecs) * time.Second)
 
 	// Two duplicates of the same prompt (rich + poor).
 	richTurn := turn{
