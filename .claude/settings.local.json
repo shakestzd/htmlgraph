@@ -725,7 +725,10 @@
       "Bash(/home/vscode/coldclone-audit/wipnote help *)",
       "Bash(TMPDIR=/home/vscode/.gotest-tmp go vet *)",
       "Bash(/home/vscode/coldclone-audit/wipnote status *)",
-      "Bash(/home/vscode/coldclone-audit/wipnote trace *)"
+      "Bash(/home/vscode/coldclone-audit/wipnote trace *)",
+      "Bash(wipnote ingest *)",
+      "Bash(TMPDIR=/home/vscode/.gotest-tmp wipnote check --gate)",
+      "Bash(TMPDIR=/home/vscode/.gotest-tmp GOTMPDIR=/home/vscode/.gotest-tmp ./scripts/deploy-all.sh 0.60.0 --no-confirm)"
     ]
   },
   "enabledPlugins": {

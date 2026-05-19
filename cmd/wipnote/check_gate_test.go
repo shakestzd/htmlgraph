@@ -44,7 +44,7 @@ func setupGateTestProject(t *testing.T) string {
 ]`), 0o644); err != nil {
 		t.Fatalf("write allowlist: %v", err)
 	}
-	tmpBase := filepath.Join("/home/vscode/.codex/memories", "wipnote-gotmp")
+	tmpBase := execCapableBase(t)
 	for _, dir := range []string{"gotmp-exec", "gocache"} {
 		if err := os.MkdirAll(filepath.Join(tmpBase, dir), 0o755); err != nil {
 			t.Fatalf("mkdir external %s: %v", dir, err)

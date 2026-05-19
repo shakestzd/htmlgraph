@@ -7,12 +7,26 @@ import (
 	"testing"
 )
 
+func execCapableBase(t *testing.T) string {
+	t.Helper()
+	base := os.Getenv("GOTMPDIR")
+	if base == "" {
+		base = os.Getenv("TMPDIR")
+	}
+	if base == "" {
+		base = os.TempDir()
+	}
+	dir, err := os.MkdirTemp(base, "wipnote-gotmp-")
+	if err != nil {
+		t.Fatalf("mkdir exec-capable tmp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
 func execCapableTempDir(t *testing.T) string {
 	t.Helper()
-	base := filepath.Join("/home/vscode/.codex/memories", "wipnote-gotmp", "gotmp-exec")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		t.Fatalf("mkdir exec-capable tmp base: %v", err)
-	}
+	base := execCapableBase(t)
 	t.Setenv("TMPDIR", base)
 	return t.TempDir()
 }
