@@ -271,6 +271,41 @@ func SetSessionFamilyID(db *sql.DB, sessionID, familyID string) error {
 	return nil
 }
 
+// SessionFile holds a file path and its access metadata for a given session.
+type SessionFile struct {
+	FilePath  string `json:"file_path"`
+	Operation string `json:"operation"`
+	LastSeen  string `json:"last_seen"`
+}
+
+// ListFilesBySession returns all file paths recorded for the given session,
+// reusing the feature_files.session_id column (schema ~301-311, nullable).
+// Results are ordered by last_seen DESC. Returns nil (not an error) when the
+// session has no recorded files.
+func ListFilesBySession(db *sql.DB, sessionID string) ([]SessionFile, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+	rows, err := db.Query(`
+		SELECT file_path, COALESCE(operation, ''), last_seen
+		FROM feature_files
+		WHERE session_id = ?
+		ORDER BY last_seen DESC`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list files for session %s: %w", sessionID, err)
+	}
+	defer rows.Close()
+	var out []SessionFile
+	for rows.Next() {
+		var sf SessionFile
+		if err := rows.Scan(&sf.FilePath, &sf.Operation, &sf.LastSeen); err != nil {
+			continue
+		}
+		out = append(out, sf)
+	}
+	return out, rows.Err()
+}
+
 // GetSessionsByFamily returns all session_ids that belong to the given family.
 // Results are ordered by created_at DESC so the most recent session is first.
 func GetSessionsByFamily(db *sql.DB, familyID string) ([]string, error) {

@@ -569,6 +569,84 @@ function renderSessions() {
     frag.appendChild(previewRow);
   });
   body.appendChild(frag);
+  renderActiveSessionsFilesPanel();
+}
+
+function renderActiveSessionsFilesPanel() {
+  var panel = document.getElementById('active-sessions-files-panel');
+  var body = document.getElementById('active-sessions-files-body');
+  if (!panel || !body) return;
+
+  var active = sessions.filter(function(s) { return s.status === 'active'; });
+  if (active.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  body.textContent = '';
+
+  var frag = document.createDocumentFragment();
+  active.forEach(function(s) {
+    var block = document.createElement('div');
+    block.className = 'asf-session-block';
+
+    // Session header: id + agent + model
+    var hdr = document.createElement('div');
+    hdr.className = 'asf-session-header';
+    var idSpan = document.createElement('span');
+    idSpan.className = 'asf-session-id';
+    idSpan.textContent = (s.session_id || '').substring(0, 18);
+    hdr.appendChild(idSpan);
+    var metaSpan = document.createElement('span');
+    metaSpan.className = 'asf-session-meta';
+    metaSpan.textContent = [s.agent, s.model].filter(Boolean).join(' / ');
+    hdr.appendChild(metaSpan);
+    block.appendChild(hdr);
+
+    // Work item (claim)
+    if (s.feature_id) {
+      var wi = document.createElement('div');
+      wi.className = 'asf-work-item';
+      wi.textContent = 'Work item: ' + s.feature_id;
+      block.appendChild(wi);
+    }
+
+    // Files touched
+    var files = Array.isArray(s.files) ? s.files : [];
+    if (files.length === 0) {
+      var noFiles = document.createElement('div');
+      noFiles.className = 'asf-no-files';
+      noFiles.textContent = 'No files recorded yet.';
+      block.appendChild(noFiles);
+    } else {
+      var ul = document.createElement('ul');
+      ul.className = 'asf-files-list';
+      files.slice(0, 20).forEach(function(f) {
+        var li = document.createElement('li');
+        li.className = 'asf-file-row';
+        var opSpan = document.createElement('span');
+        opSpan.className = 'asf-file-op';
+        opSpan.textContent = f.operation || '-';
+        li.appendChild(opSpan);
+        var pathSpan = document.createElement('span');
+        pathSpan.className = 'asf-file-path';
+        pathSpan.textContent = f.file_path || '';
+        pathSpan.title = f.file_path || '';
+        li.appendChild(pathSpan);
+        ul.appendChild(li);
+      });
+      if (files.length > 20) {
+        var more = document.createElement('li');
+        more.className = 'asf-file-row asf-no-files';
+        more.textContent = '… and ' + (files.length - 20) + ' more';
+        ul.appendChild(more);
+      }
+      block.appendChild(ul);
+    }
+
+    frag.appendChild(block);
+  });
+  body.appendChild(frag);
 }
 
 function renderSessionAdherenceTrend(forceEmpty) {

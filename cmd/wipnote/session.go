@@ -340,6 +340,17 @@ func renderSessionShow(w io.Writer, db *sql.DB, s *models.Session) error {
 		}
 	}
 
+	// Files touched during this session (from feature_files.session_id).
+	sessionFiles, _ := dbpkg.ListFilesBySession(db, s.SessionID)
+	if len(sessionFiles) > 0 {
+		fmt.Fprintln(w, "\nFiles:")
+		fmt.Fprintf(w, "  %-10s  %-24s  %s\n", "OPERATION", "LAST SEEN", "PATH")
+		fmt.Fprintf(w, "  %s\n", strings.Repeat("-", 70))
+		for _, sf := range sessionFiles {
+			fmt.Fprintf(w, "  %-10s  %-24s  %s\n", sf.Operation, sf.LastSeen, sf.FilePath)
+		}
+	}
+
 	// Event summary by tool.
 	counts, _ := dbpkg.CountEventsByTool(db, s.SessionID)
 	if len(counts) > 0 {

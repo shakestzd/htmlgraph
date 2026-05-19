@@ -17,7 +17,8 @@ import (
 
 // whoCmd implements `wipnote who` — prints the current session identity:
 // claim owner, session family, harness, work item, execution root.
-// Also surfaces any claim collision/collaboration state for the active item.
+// Also surfaces any claim collision/collaboration state for the active item,
+// and the files this session has touched (from feature_files.session_id).
 func whoCmd() *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
@@ -25,6 +26,7 @@ func whoCmd() *cobra.Command {
 		Short: "Show current session identity and claim attribution",
 		Long: `Show the identity, harness, session family, active work item claim,
 and any concurrent-claimant (collision/collaboration) state for this session.
+Also lists files this session has touched (current project only).
 
 Fields exported:
   session_id        — this session's ID
@@ -35,6 +37,7 @@ Fields exported:
   claim_status      — claim lifecycle status
   execution_root    — root session for subagent chains
   collision         — warns when two+ sessions hold concurrent claims
+  files             — files this session has touched (path, operation, last_seen)
 
 Step/task event support per harness:
   claude-code  — TaskCreated/TaskCompleted mapped to task_created/task_completed
@@ -61,6 +64,14 @@ type whoOutput struct {
 	IsSubagent      bool             `json:"is_subagent"`
 	Collaboration   *collabOutput    `json:"collaboration,omitempty"`
 	TaskTracking    taskTrackingInfo `json:"task_tracking"`
+	Files           []whoFileEntry   `json:"files"`
+}
+
+// whoFileEntry is a single file touched by this session.
+type whoFileEntry struct {
+	FilePath  string `json:"file_path"`
+	Operation string `json:"operation"`
+	LastSeen  string `json:"last_seen"`
 }
 
 type collabOutput struct {
@@ -141,12 +152,30 @@ func runWho(jsonOut bool) error {
 	// Per-harness task tracking support.
 	taskInfo := resolveTaskTrackingInfo(displayHarness)
 
+	// Files touched by this session (current project only, read-only).
+	var fileEntries []whoFileEntry
+	if sessionID != "" {
+		if sfiles, ferr := dbpkg.ListFilesBySession(database, sessionID); ferr == nil {
+			for _, sf := range sfiles {
+				fileEntries = append(fileEntries, whoFileEntry{
+					FilePath:  sf.FilePath,
+					Operation: sf.Operation,
+					LastSeen:  sf.LastSeen,
+				})
+			}
+		}
+	}
+	if fileEntries == nil {
+		fileEntries = []whoFileEntry{}
+	}
+
 	out := whoOutput{
 		SessionID:       sessionID,
 		SessionFamilyID: familyID,
 		Harness:         displayHarness,
 		IsSubagent:      false,
 		TaskTracking:    taskInfo,
+		Files:           fileEntries,
 	}
 
 	if identity != nil {
@@ -246,6 +275,18 @@ func renderWhoText(out whoOutput) error {
 	}
 
 	fmt.Printf("\n  Task tracking:   %s\n", out.TaskTracking.Detail)
+
+	if len(out.Files) > 0 {
+		fmt.Printf("\n  Files touched (%d):\n", len(out.Files))
+		fmt.Printf("    %-10s  %-24s  %s\n", "OPERATION", "LAST SEEN", "PATH")
+		fmt.Printf("    %s\n", strings.Repeat("-", 70))
+		for _, f := range out.Files {
+			fmt.Printf("    %-10s  %-24s  %s\n", f.Operation, f.LastSeen, f.FilePath)
+		}
+	} else {
+		fmt.Printf("\n  No files recorded for this session.\n")
+	}
+
 	fmt.Println(sep)
 	return nil
 }

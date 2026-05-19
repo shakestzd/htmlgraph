@@ -188,6 +188,11 @@ func sessionsHandler(database *sql.DB, projectDir, wipnoteDir string) http.Handl
 			if id, cerr := dbpkg.GetClaimIdentity(database, sid); cerr == nil && id != nil && id.SessionFamilyID != "" {
 				claimSessionFamily = id.SessionFamilyID
 			}
+			// Files touched by this session — best-effort, never fatal.
+			sessionFiles, _ := dbpkg.ListFilesBySession(database, sid)
+			if sessionFiles == nil {
+				sessionFiles = []dbpkg.SessionFile{}
+			}
 			sessions = append(sessions, map[string]any{
 				"session_id":           sid,
 				"agent":                agent,
@@ -211,6 +216,8 @@ func sessionsHandler(database *sql.DB, projectDir, wipnoteDir string) http.Handl
 				"claim_collision":      claimCollision,
 				"claim_status":         claimStatus,
 				"claim_session_family": claimSessionFamily,
+				// Files this session touched (feat-f1c6f92e Tier 0).
+				"files":                sessionFiles,
 			})
 		}
 

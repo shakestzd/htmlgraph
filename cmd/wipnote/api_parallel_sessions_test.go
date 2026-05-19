@@ -364,3 +364,131 @@ func TestSessionsAPI_CollisionFieldPresent(t *testing.T) {
 		t.Error("claim_status missing from sessions API")
 	}
 }
+
+// TestSessionsAPI_IncludesFilesArray verifies that /api/sessions includes a
+// files[] array per session (feat-f1c6f92e Tier 0). When feature_files rows
+// exist for a session they must appear in the response; when none exist the
+// field must still be present as an empty array (never absent/null).
+func TestSessionsAPI_IncludesFilesArray(t *testing.T) {
+	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	projectDir := "/test/files-array"
+
+	insertParallelSession(t, database, "sess-files-1", "claude-code", projectDir, "fam-files", "active", "claude-sonnet-4-5")
+	for i := 0; i < 5; i++ {
+		_, _ = database.Exec(
+			`INSERT INTO messages (session_id, role, content, ordinal) VALUES (?, ?, ?, ?)`,
+			"sess-files-1", "user", "hello", i+1,
+		)
+	}
+
+	// Seed a feature and a feature_files row for this session.
+	now := time.Now().UTC()
+	_ = dbpkg.UpsertFeature(database, &dbpkg.Feature{
+		ID: "feat-files-test", Type: "feature", Title: "Files Test",
+		Status: "in-progress", Priority: "medium",
+		CreatedAt: now, UpdatedAt: now,
+	})
+	_ = dbpkg.UpsertFeatureFile(database, &models.FeatureFile{
+		ID:        "ff-api-1",
+		FeatureID: "feat-files-test",
+		FilePath:  "/src/main.go",
+		Operation: "write",
+		SessionID: "sess-files-1",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	w := httptest.NewRecorder()
+	sessionsHandler(database, projectDir, "/test/files-array/.wipnote")(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d, want 200", w.Code)
+	}
+
+	var sessions []map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&sessions); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(sessions) == 0 {
+		t.Fatal("expected at least one session")
+	}
+
+	s := sessions[0]
+
+	// files[] must be present.
+	rawFiles, ok := s["files"]
+	if !ok {
+		t.Fatal("files field missing from /api/sessions response")
+	}
+
+	// files[] must be a JSON array ([]interface{} after decode).
+	files, ok := rawFiles.([]interface{})
+	if !ok {
+		t.Fatalf("files field type %T, want []interface{}", rawFiles)
+	}
+
+	// Expect 1 file for this session.
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
+	}
+
+	f := files[0].(map[string]interface{})
+	if f["file_path"] != "/src/main.go" {
+		t.Errorf("file_path = %v, want /src/main.go", f["file_path"])
+	}
+	if f["operation"] != "write" {
+		t.Errorf("operation = %v, want write", f["operation"])
+	}
+}
+
+// TestSessionsAPI_FilesArrayEmptyWhenNoFiles verifies that sessions with no
+// feature_files rows still have files:[] (empty array, not null/absent).
+func TestSessionsAPI_FilesArrayEmptyWhenNoFiles(t *testing.T) {
+	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	projectDir := "/test/no-files"
+	insertParallelSession(t, database, "sess-nofiles", "claude-code", projectDir, "fam-nf", "active", "claude-haiku")
+	for i := 0; i < 5; i++ {
+		_, _ = database.Exec(
+			`INSERT INTO messages (session_id, role, content, ordinal) VALUES (?, ?, ?, ?)`,
+			"sess-nofiles", "user", "hello", i+1,
+		)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	w := httptest.NewRecorder()
+	sessionsHandler(database, projectDir, "/test/no-files/.wipnote")(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+
+	var sessions []map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&sessions); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(sessions) == 0 {
+		t.Fatal("expected sessions")
+	}
+
+	s := sessions[0]
+	rawFiles, ok := s["files"]
+	if !ok {
+		t.Fatal("files field missing when session has no feature_files")
+	}
+	files, ok := rawFiles.([]interface{})
+	if !ok {
+		t.Fatalf("files field type %T, want []interface{}", rawFiles)
+	}
+	if len(files) != 0 {
+		t.Errorf("expected 0 files for session with no feature_files, got %d", len(files))
+	}
+}

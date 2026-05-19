@@ -2552,3 +2552,87 @@ p.numbered-step { padding-left: 1.5em; text-indent: -1.5em; }
   color: #fff;
 }
 .session-filter-pill:hover:not(.active) { background: var(--bg-secondary, #1a1a1a); }
+
+/* ── Active sessions & files panel (feat-f1c6f92e Tier 0) ─── */
+.active-sessions-files-panel {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+.active-sessions-files-panel .panel-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.asf-session-block {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.asf-session-block:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.asf-session-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.asf-session-id {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--accent);
+}
+.asf-session-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.asf-work-item {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  padding-left: 2px;
+}
+.asf-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.asf-file-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 1px 0;
+}
+.asf-file-op {
+  width: 40px;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.asf-file-path {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asf-no-files {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
