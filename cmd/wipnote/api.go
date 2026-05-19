@@ -189,10 +189,20 @@ func sessionsHandler(database *sql.DB, projectDir, wipnoteDir string) http.Handl
 				claimSessionFamily = id.SessionFamilyID
 			}
 			// Files touched by this session — best-effort, never fatal.
+			// Merge claimed (feature_files) + claimless (session_files) touches.
 			sessionFiles, _ := dbpkg.ListFilesBySession(database, sid)
+			if claimless, cerr := dbpkg.ListClaimlessFilesBySession(database, sid); cerr == nil {
+				sessionFiles = append(sessionFiles, claimless...)
+			}
 			if sessionFiles == nil {
 				sessionFiles = []dbpkg.SessionFile{}
 			}
+			// Honest liveness: derived from claim-heartbeat recency, NOT
+			// sessions.status. A stale status='active' ghost row reports
+			// live=false (folds bug-6c3e8252). projectDir is the canonical
+			// project root for the config-tunable staleness threshold.
+			live := dbpkg.SessionLivenessByHeartbeat(
+				database, sid, dbpkg.LivenessStalenessThreshold(projectDir))
 			sessions = append(sessions, map[string]any{
 				"session_id":           sid,
 				"agent":                agent,
@@ -218,6 +228,8 @@ func sessionsHandler(database *sql.DB, projectDir, wipnoteDir string) http.Handl
 				"claim_session_family": claimSessionFamily,
 				// Files this session touched (feat-f1c6f92e Tier 0).
 				"files":                sessionFiles,
+				// Honest liveness from heartbeat recency (feat-793844bd).
+				"live":                 live,
 			})
 		}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,6 +63,11 @@ type whoOutput struct {
 	ClaimedAt       string           `json:"claimed_at,omitempty"`
 	ExecutionRoot   string           `json:"execution_root,omitempty"`
 	IsSubagent      bool             `json:"is_subagent"`
+	// Live is derived from claim-heartbeat recency (NOT sessions.status). It is
+	// the honest cross-harness liveness signal — true only when this session's
+	// newest claim heartbeat is within the staleness threshold. A stale
+	// status='active' ghost row reports Live=false (folds bug-6c3e8252).
+	Live            bool             `json:"live"`
 	Collaboration   *collabOutput    `json:"collaboration,omitempty"`
 	TaskTracking    taskTrackingInfo `json:"task_tracking"`
 	Files           []whoFileEntry   `json:"files"`
@@ -152,16 +158,46 @@ func runWho(jsonOut bool) error {
 	// Per-harness task tracking support.
 	taskInfo := resolveTaskTrackingInfo(displayHarness)
 
-	// Files touched by this session (current project only, read-only).
+	// Honest liveness: derive from claim-heartbeat recency, NOT sessions.status.
+	// projectDir = parent of the .wipnote dir; used only to read the optional
+	// liveness_staleness_seconds tunable from .wipnote/config.json.
+	projectDir := filepath.Dir(dir)
+	live := false
+	if sessionID != "" {
+		live = dbpkg.SessionLivenessByHeartbeat(
+			database, sessionID, dbpkg.LivenessStalenessThreshold(projectDir))
+	}
+
+	// Files touched by this session (current project only, read-only). Two
+	// ledgers are merged: feature_files (claimed touches) and session_files
+	// (claimless touches — work done with no active feature, previously
+	// invisible). Deduped on file_path, newest last_seen wins.
+	fileSeen := map[string]int{} // file_path -> index into fileEntries
 	var fileEntries []whoFileEntry
+	addFile := func(sf dbpkg.SessionFile) {
+		if idx, ok := fileSeen[sf.FilePath]; ok {
+			if sf.LastSeen > fileEntries[idx].LastSeen {
+				fileEntries[idx].Operation = sf.Operation
+				fileEntries[idx].LastSeen = sf.LastSeen
+			}
+			return
+		}
+		fileSeen[sf.FilePath] = len(fileEntries)
+		fileEntries = append(fileEntries, whoFileEntry{
+			FilePath:  sf.FilePath,
+			Operation: sf.Operation,
+			LastSeen:  sf.LastSeen,
+		})
+	}
 	if sessionID != "" {
 		if sfiles, ferr := dbpkg.ListFilesBySession(database, sessionID); ferr == nil {
 			for _, sf := range sfiles {
-				fileEntries = append(fileEntries, whoFileEntry{
-					FilePath:  sf.FilePath,
-					Operation: sf.Operation,
-					LastSeen:  sf.LastSeen,
-				})
+				addFile(sf)
+			}
+		}
+		if cfiles, cerr := dbpkg.ListClaimlessFilesBySession(database, sessionID); cerr == nil {
+			for _, sf := range cfiles {
+				addFile(sf)
 			}
 		}
 	}
@@ -174,6 +210,7 @@ func runWho(jsonOut bool) error {
 		SessionFamilyID: familyID,
 		Harness:         displayHarness,
 		IsSubagent:      false,
+		Live:            live,
 		TaskTracking:    taskInfo,
 		Files:           fileEntries,
 	}
@@ -254,6 +291,11 @@ func renderWhoText(out whoOutput) error {
 	} else {
 		fmt.Printf("  Role:            root CLI\n")
 	}
+	liveLabel := "no (no recent claim heartbeat)"
+	if out.Live {
+		liveLabel = "yes (claim heartbeat recent)"
+	}
+	fmt.Printf("  Live:            %s\n", liveLabel)
 
 	if out.WorkItem != "" {
 		fmt.Printf("\n  Active claim:\n")

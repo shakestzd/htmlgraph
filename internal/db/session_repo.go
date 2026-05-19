@@ -1,8 +1,12 @@
 package db
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/shakestzd/wipnote/internal/models"
@@ -327,3 +331,141 @@ func GetSessionsByFamily(db *sql.DB, familyID string) ([]string, error) {
 	}
 	return ids, rows.Err()
 }
+
+// claimHeartbeatInterval is the PreToolUse claim-heartbeat cadence
+// (pretooluse.go heartbeats with a 30m lease but fires on every tool call;
+// the meaningful liveness signal is the heartbeat *recency*, not the lease).
+// A session is considered live only when its most recent claim heartbeat is
+// younger than the staleness threshold. The default threshold is 2× this
+// interval (2 minutes), tunable via .wipnote/config.json.
+const claimHeartbeatInterval = 60 * time.Second
+
+// defaultLivenessStalenessSeconds is 2× claimHeartbeatInterval. A session
+// whose newest claim heartbeat is older than this is NOT live, regardless of
+// sessions.status (folds bug-6c3e8252: stale status='active' ghost rows).
+const defaultLivenessStalenessSeconds = 120
+
+// livenessConfig mirrors the local os.ReadFile(.wipnote/config.json) pattern
+// used by readTaskCompletionConfig in internal/hooks/task_completion_gate.go
+// (there is no shared internal/config package). Only the one tunable field is
+// decoded; everything else in config.json is ignored.
+type livenessConfig struct {
+	LivenessStalenessSeconds int `json:"liveness_staleness_seconds"`
+}
+
+// LivenessStalenessThreshold returns the heartbeat-age cutoff beyond which a
+// session is considered not-live. Reads .wipnote/config.json under projectDir;
+// falls back to the 2×interval default when the file is missing, unreadable,
+// the key is absent, or the value is non-positive. projectDir may be "" (e.g.
+// CLI contexts without a resolved project) — the default is returned then.
+func LivenessStalenessThreshold(projectDir string) time.Duration {
+	def := time.Duration(defaultLivenessStalenessSeconds) * time.Second
+	if projectDir == "" {
+		return def
+	}
+	data, err := os.ReadFile(filepath.Join(projectDir, ".wipnote", "config.json"))
+	if err != nil {
+		return def
+	}
+	var cfg livenessConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return def
+	}
+	if cfg.LivenessStalenessSeconds <= 0 {
+		return def
+	}
+	return time.Duration(cfg.LivenessStalenessSeconds) * time.Second
+}
+
+// SessionLivenessByHeartbeat reports whether a session is *honestly* live,
+// derived from claim-heartbeat recency rather than sessions.status. This is the
+// cross-harness liveness primitive: it works for every harness with zero
+// dependency on a session-end event firing (folds bug-6c3e8252 — stale
+// status='active' rows whose last heartbeat is ancient are correctly reported
+// not-live).
+//
+// A session is live iff it has at least one claim whose last_heartbeat_at is
+// within `threshold` of now. Sessions with no claims at all are not live (we
+// have no liveness signal for them — honest absence of evidence). The query is
+// a single indexed lookup on claims(owner_session_id); it never writes.
+func SessionLivenessByHeartbeat(db *sql.DB, sessionID string, threshold time.Duration) bool {
+	if db == nil || sessionID == "" {
+		return false
+	}
+	var hb sql.NullString
+	err := db.QueryRow(`
+		SELECT MAX(last_heartbeat_at) FROM claims
+		WHERE owner_session_id = ?`, sessionID).Scan(&hb)
+	if err != nil || !hb.Valid || hb.String == "" {
+		return false
+	}
+	t, perr := time.Parse(time.RFC3339, hb.String)
+	if perr != nil {
+		return false
+	}
+	return time.Since(t) <= threshold
+}
+
+// sessionFilePathHash returns an 8-char hex digest of a file path, used to
+// build deterministic primary keys for session_files rows so an upsert keyed
+// on (session_id,file_path) stays a single statement.
+func sessionFilePathHash(filePath string) string {
+	h := sha256.Sum256([]byte(filePath))
+	return fmt.Sprintf("%x", h[:4])
+}
+
+// UpsertSessionFile records a claimless file touch (no active claim/feature) in
+// the session_files ledger. Idempotent on (session_id,file_path): a repeat
+// touch updates operation + last_seen in place. This is the ONLY new derived
+// write on the PostToolUse path for claimless edits — exactly one statement,
+// preserving the feat-156e0a1a zero-SQLITE_BUSY hot-path guarantee.
+func UpsertSessionFile(db *sql.DB, sessionID, filePath, operation string) error {
+	if sessionID == "" || filePath == "" {
+		return nil
+	}
+	if operation == "" {
+		operation = "unknown"
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	id := sessionID + "-" + sessionFilePathHash(filePath)
+	_, err := db.Exec(`
+		INSERT INTO session_files (id, session_id, file_path, operation, first_seen, last_seen, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(session_id, file_path) DO UPDATE SET
+			operation = excluded.operation,
+			last_seen = excluded.last_seen`,
+		id, sessionID, filePath, operation, now, now, now,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert session_file %s/%s: %w", sessionID, filePath, err)
+	}
+	return nil
+}
+
+// ListClaimlessFilesBySession returns claimless touches from the session_files
+// ledger for the given session, newest first. Distinct from
+// ListFilesBySession (which reads feature_files for *claimed* touches).
+func ListClaimlessFilesBySession(db *sql.DB, sessionID string) ([]SessionFile, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+	rows, err := db.Query(`
+		SELECT file_path, COALESCE(operation, ''), last_seen
+		FROM session_files
+		WHERE session_id = ?
+		ORDER BY last_seen DESC`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list claimless files for session %s: %w", sessionID, err)
+	}
+	defer rows.Close()
+	var out []SessionFile
+	for rows.Next() {
+		var sf SessionFile
+		if err := rows.Scan(&sf.FilePath, &sf.Operation, &sf.LastSeen); err != nil {
+			continue
+		}
+		out = append(out, sf)
+	}
+	return out, rows.Err()
+}
+

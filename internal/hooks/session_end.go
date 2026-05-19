@@ -21,6 +21,23 @@ import (
 
 // SessionEnd handles the SessionEnd Claude Code hook event.
 // It marks the session as completed and records the end commit.
+//
+// Cross-harness session-end coverage (feat-793844bd slice-4 part c):
+//   - Claude Code: native SessionEnd event → this handler.
+//   - Gemini CLI:  Stop event is mapped to geminiEventName "SessionEnd" with
+//     geminiHandler "session-end" in packages/plugin-core/manifest.json, so
+//     Gemini reaches this handler and releases claims on session exit.
+//   - Codex CLI:   emits TaskComplete (its session-end-equivalent lifecycle
+//     event); manifest.json wires TaskComplete → "session-end" for the codex
+//     target, so Codex also reaches this handler.
+//
+// Honest liveness (db.SessionLivenessByHeartbeat) is the cross-harness safety
+// net layered UNDERNEATH all three: even if a harness's session-end event
+// never fires (crash, kill -9, network drop), a session whose newest claim
+// heartbeat is stale is reported not-live and its lease is reaped — so
+// liveness never depends on a session-end event arriving. This is why no
+// invented Codex-specific hook is needed: TaskComplete already covers the
+// graceful path, and heartbeat-recency + lease reap cover the abrupt path.
 func SessionEnd(event *CloudEvent, database *sql.DB, projectDir string) (*HookResult, error) {
 	sessionID := EnvSessionID(event.SessionID)
 	if sessionID == "" {

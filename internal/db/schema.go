@@ -321,6 +321,24 @@ func CreateAllTables(db *sql.DB) error {
 			UNIQUE(feature_id, file_path)
 		)`,
 
+		// 12b. session_files — file paths touched by a session WITHOUT an active
+		// claim/feature (claimless visibility, feat-793844bd slice-4). Distinct
+		// from feature_files because feature_files.feature_id is NOT NULL with
+		// UNIQUE(feature_id,file_path) and cannot hold empty-feature_id rows.
+		// Keyed on (session_id, file_path) so a session's claimless touches are
+		// upserted idempotently with a single statement and zero hot-path write
+		// amplification.
+		`CREATE TABLE IF NOT EXISTS session_files (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			file_path TEXT NOT NULL,
+			operation TEXT NOT NULL DEFAULT 'unknown',
+			first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+			last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(session_id, file_path)
+		)`,
+
 		// 13. agent_presence
 		`CREATE TABLE IF NOT EXISTS agent_presence (
 			agent_id TEXT PRIMARY KEY,
@@ -444,6 +462,9 @@ func CreateAllIndexes(db *sql.DB) error {
 		// feature_files
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_feature ON feature_files(feature_id)",
 		"CREATE INDEX IF NOT EXISTS idx_feature_files_path ON feature_files(file_path)",
+		// session_files
+		"CREATE INDEX IF NOT EXISTS idx_session_files_session ON session_files(session_id)",
+		"CREATE INDEX IF NOT EXISTS idx_session_files_path ON session_files(file_path)",
 		// plan_feedback
 		"CREATE INDEX IF NOT EXISTS idx_plan_feedback_plan_id ON plan_feedback(plan_id)",
 		"CREATE INDEX IF NOT EXISTS idx_plan_feedback_section ON plan_feedback(plan_id, section)",

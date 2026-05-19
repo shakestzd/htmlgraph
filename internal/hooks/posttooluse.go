@@ -132,8 +132,18 @@ func PostToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 			}
 		}
 	} else if event.ToolName == "Edit" || event.ToolName == "Write" || event.ToolName == "MultiEdit" {
+		// Claimless visibility (feat-793844bd slice-4): previously this branch
+		// only debugLog'd and DROPPED the attribution when there was no active
+		// feature, making cross-session file work invisible. Instead record the
+		// touch in the lightweight session_files ledger keyed on
+		// (session_id,file_path). feature_files cannot hold these rows
+		// (feature_id is NOT NULL with UNIQUE(feature_id,file_path)). This is
+		// exactly ONE upsert — the only new write on the claimless hot path,
+		// preserving the feat-156e0a1a zero-SQLITE_BUSY guarantee.
 		if filePath := extractFilePath(event.ToolInput); filePath != "" {
-			debugLog(ctx.ProjectDir, "[posttooluse] skipped file attribution for %s (no active feature)", filePath)
+			if err := db.UpsertSessionFile(database, ctx.SessionID, filePath, strings.ToLower(event.ToolName)); err != nil {
+				debugLog(ctx.ProjectDir, "[posttooluse] session_files upsert failed for %s: %v", filePath, err)
+			}
 		}
 	}
 

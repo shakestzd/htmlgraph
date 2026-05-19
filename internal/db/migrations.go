@@ -16,7 +16,7 @@ import (
 // executes ZERO CREATE / ALTER / DROP / trigger / normalisation statements —
 // avoiding the write-lock acquisition that caused SQLITE_BUSY in short-lived
 // hook processes.
-const currentSchemaVersion = 7
+const currentSchemaVersion = 8
 
 // copySwapStepName is the name of the agent_events copy-and-swap migration
 // step. Exposed via CopySwapStepName() so tests can assert it runs at most
@@ -78,6 +78,11 @@ var migrations = []migrationStep{
 		version: 7,
 		name:    "007_session_family_id",
 		apply:   stepSessionFamilyID,
+	},
+	{
+		version: 8,
+		name:    "008_session_files",
+		apply:   stepSessionFiles,
 	},
 }
 
@@ -374,6 +379,36 @@ func stepSessionFamilyID(db *sql.DB) error {
 	// Index for efficient family-based grouping queries.
 	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_sessions_family ON sessions(session_family_id)"); err != nil {
 		return fmt.Errorf("create idx_sessions_family: %w", err)
+	}
+	return nil
+}
+
+// stepSessionFiles creates the session_files table (claimless file-touch
+// visibility, feat-793844bd slice-4) and its lookup indexes. Idempotent:
+// CREATE TABLE/INDEX IF NOT EXISTS are no-ops on a DB that already has them
+// (e.g. a fresh DB where stepCreateBaseTables already created the table from
+// CreateAllTables). Legacy DBs at user_version<8 that pre-date the table get
+// it created here.
+func stepSessionFiles(db *sql.DB) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS session_files (
+		id TEXT PRIMARY KEY,
+		session_id TEXT NOT NULL,
+		file_path TEXT NOT NULL,
+		operation TEXT NOT NULL DEFAULT 'unknown',
+		first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+		last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(session_id, file_path)
+	)`); err != nil {
+		return fmt.Errorf("create session_files: %w", err)
+	}
+	for _, stmt := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_session_files_session ON session_files(session_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_session_files_path ON session_files(file_path)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("create session_files index: %w", err)
+		}
 	}
 	return nil
 }
