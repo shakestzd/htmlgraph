@@ -285,6 +285,30 @@ var approvedWriteSites = []writeSite{
 	// reindex-only (rebuilds SQLite from canonical HTML/NDJSON)
 	// ----------------------------------------------------------------------
 	{
+		File:           "cmd/wipnote/lazy_reindex.go",
+		Line:           42,
+		Function:       "ensureIndexPopulated",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "bug-4b07fd94: brief writable open for cold-clone staleness check (COUNT on features/graph_edges). Closed immediately before any reindex write path runs.",
+	},
+	{
+		File:           "cmd/wipnote/lazy_reindex.go",
+		Line:           93,
+		Function:       "runFullSyncReindex",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "bug-4b07fd94: lazy full-reindex on cold clone — reuses the same reindex primitives as `wipnote reindex --full`.",
+	},
+	{
+		File:           "cmd/wipnote/lazy_reindex.go",
+		Line:           120,
+		Function:       "runFullSyncReindex",
+		OpenExpr:       "dbpkg.Open",
+		Classification: reindexOnly,
+		Note:           "bug-4b07fd94: second open in runFullSyncReindex for plan-edge rebuild pass after main handle is closed.",
+	},
+	{
 		File:           "cmd/wipnote/purge_spikes.go",
 		Line:           126,
 		Function:       "runFullReindex",

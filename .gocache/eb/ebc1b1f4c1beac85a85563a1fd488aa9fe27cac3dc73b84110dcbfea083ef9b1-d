@@ -1,0 +1,5 @@
+./adapter.go
+./claude.go
+./codex.go
+./gemini.go
+./adapter_test.go

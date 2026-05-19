@@ -1,0 +1,5 @@
+./checkpoint.go
+./indexer.go
+./orphans.go
+./parse.go
+./watch_fallback.go

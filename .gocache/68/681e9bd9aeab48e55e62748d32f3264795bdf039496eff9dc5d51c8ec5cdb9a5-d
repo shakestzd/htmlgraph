@@ -1,0 +1,5 @@
+./normalize.go
+./normalize_apply.go
+./tracks.go
+./normalize_test.go
+./tracks_test.go

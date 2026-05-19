@@ -1,0 +1,4 @@
+./hostpattern.go
+./normalize.go
+./projecttype.go
+./resolve.go

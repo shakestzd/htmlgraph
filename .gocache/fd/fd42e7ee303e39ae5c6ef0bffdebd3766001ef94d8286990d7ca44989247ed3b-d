@@ -1,0 +1,4 @@
+./discover.go
+./gemini_discover.go
+./gemini_parser.go
+./parser.go

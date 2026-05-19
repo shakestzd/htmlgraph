@@ -1,0 +1,7 @@
+./algorithms.go
+./dsl.go
+./loader.go
+./pattern.go
+./query.go
+./querybuilder.go
+./sessions.go

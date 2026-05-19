@@ -1,0 +1,10 @@
+# test log
+getenv TMPDIR
+open /workspaces/wipnote/.gotmp-exec/TestParse_ValidFile2319644102/001/WORKOWNERS
+open /workspaces/wipnote/.gotmp-exec/TestParse_ValidFile2319644102/001/WORKOWNERS
+open /workspaces/wipnote/.gotmp-exec
+open /nonexistent/WORKOWNERS
+getenv TMPDIR
+open /workspaces/wipnote/.gotmp-exec/TestParse_CommentsAndBlanks4132155866/001/WORKOWNERS
+open /workspaces/wipnote/.gotmp-exec/TestParse_CommentsAndBlanks4132155866/001/WORKOWNERS
+open /workspaces/wipnote/.gotmp-exec

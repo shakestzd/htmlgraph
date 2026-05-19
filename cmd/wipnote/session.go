@@ -231,6 +231,17 @@ func openDB(wipnoteDir string) (*sql.DB, error) {
 // contention benefit. Callers still layer dbpkg.RetryOnBusy around individual
 // queries.
 func openReadOnlyDB(wipnoteDir string) (*sql.DB, error) {
+	// bug-4b07fd94: on a fresh clone the SQLite read-index is missing/empty
+	// even though .wipnote/*.html has lineage edges. Lazily build the index
+	// synchronously before opening the read-only handle. On a warm index this
+	// is a near-zero-cost staleness check (one SELECT COUNT).
+	if err := ensureIndexPopulated(wipnoteDir); err != nil {
+		// Non-fatal: if the lazy build fails (e.g. DB locked by another process)
+		// we still open the read-only handle and let the caller get whatever data
+		// is available rather than aborting the command entirely.
+		fmt.Fprintf(os.Stderr, "[wipnote] warning: lazy index build: %v\n", err)
+	}
+
 	projectDir := filepath.Dir(wipnoteDir)
 	dbPath, err := storage.CanonicalDBPath(projectDir)
 	if err != nil {

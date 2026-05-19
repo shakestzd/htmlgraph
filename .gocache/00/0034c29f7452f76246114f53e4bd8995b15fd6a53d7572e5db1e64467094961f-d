@@ -1,0 +1,4 @@
+./registry.go
+./registry_claude.go
+./registry_codex.go
+./registry_gemini.go

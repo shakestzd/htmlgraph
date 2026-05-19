@@ -1,0 +1,4 @@
+./http_test.go
+./receiver_test.go
+./signalid_test.go
+./writer_test.go

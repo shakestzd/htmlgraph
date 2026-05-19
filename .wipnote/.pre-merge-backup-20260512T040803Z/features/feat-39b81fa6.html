@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Idempotent migration rewriter with collision detection and dirty-tree guard</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-39b81fa6"
+             data-type="feature"
+             data-status="done"
+             data-priority="medium"
+             data-created="2026-05-12T02:15:34.033666"
+             data-updated="2026-05-12T03:00:35.746779" data-agent-assigned="claude-code" data-track-id="trk-08dcbb33">
+
+        <header>
+            <h1>Idempotent migration rewriter with collision detection and dirty-tree guard</h1>
+            <div class="metadata">
+                <span class="badge status-done">Done</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-2133adf2.html" data-relationship="planned_in" data-since="2026-05-12T02:15:34.042496">plan-2133adf2</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-edbc978b.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:34.04337">feat-edbc978b</a></li>
+                    <li><a href="feat-b6a9f2d4.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:34.045177">feat-b6a9f2d4</a></li>
+                    <li><a href="feat-ab99d13b.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:34.047287">feat-ab99d13b</a></li>
+                    <li><a href="feat-3973e948.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:34.050132">feat-3973e948</a></li>
+                    <li><a href="feat-4417b8df.html" data-relationship="blocked_by" data-since="2026-05-12T02:15:34.05188">feat-4417b8df</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="a400442f-4147-4bd1-a006-5a728ef93bad.html" data-relationship="implemented_in" data-since="2026-05-12T02:44:38.400628">session a400442f-4147-4bd1-a006-5a728ef93bad</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-08dcbb33.html" data-relationship="part_of" data-since="2026-05-12T02:15:34.037003">trk-08dcbb33</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>New CLI subcommand `wipnote migrate normalize-paths` that walks
+`.wipnote/` and rewrites absolute paths to repo-relative in place.
+
+Safety preconditions (must pass before any write):
+  a. Working tree clean — run `git -C  status --porcelain .wipnote/`;
+     abort with a clear error if dirty. Use `--allow-dirty` to bypass
+     (records audit reason).
+  b. Collision check — for `feature_files` (which has
+     `UNIQUE(feature_id, file_path)`), pre-scan: if two rows for the
+     same feature would normalize to the same relative path, list
+     them in the dry-run output. Default behavior is to MERGE (take
+     earliest `first_seen`, sum sessions); `--no-merge-collisions`
+     causes the migration to abort instead.
+
+Targets (7, corrected from initial 6):
+  1. `agent_events.tool_input` — SINGLE-encoded JSON; unmarshal once,
+     walk path keys, re-marshal. (Initial plan said doubly-encoded;
+     that was wrong.)
+  2. `feature_files.file_path` (SQLite TEXT) — with collision detection.
+  3. `agent_events.input_summary` free-text — regex-replace WorktreePath embeds.
+  4. `pending_subagent_starts.cwd`
+  5. `sessions.project_dir` (SQLite) — newly added; missed in initial design.
+  6. `
+` in `.wipnote/sessions/*.html`
+  7. `affected_files` properties in `.wipnote/{features,bugs,spikes}/*.html`
+
+Out-of-scope (documented explicitly):
+  - `sessions.transcript_path` — Claude's private machine-local store.
+  - `.wipnote/.active-session` — transient per-session JSON; rewritten
+    on next SessionStart anyway.
+
+Idempotency: re-running on already-relative records is a no-op.
+Achieved by skipping any value that doesn't match `HostPathPattern`.
+
+Backup + dry-run + restore:
+  - `--backup` (default on): copies touched HTML to `.wipnote/.backup-/`.
+  - `--dry-run`: prints proposed changes and pending collisions; no writes.
+  - Companion: `wipnote migrate restore-paths --from .wipnote/.backup-/`
+    copies backups back into place.
+
+Print summary: N files rewritten, M values normalized, K skipped as
+already-relative, J marked unresolved, P collisions merged, A
+collisions aborted (if --no-merge-collisions).
+
+Rendering audit: confirm `wipnote feature show`, `wipnote blame`,
+`wipnote lineage`, and the dashboard template render relative paths
+correctly (resolve against current repo root for display, strip
+`unresolved:` prefix). Update each call site as needed.</p>
+        </section>
+    </article>
+</body>
+</html>
