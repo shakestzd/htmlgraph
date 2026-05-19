@@ -10,32 +10,20 @@
 <body>
     <article id="feat-885ec940"
              data-type="feature"
-             data-status="in-progress"
+             data-status="done"
              data-priority="medium"
              data-created="2026-05-19T00:38:27.291864"
-             data-updated="2026-05-19T16:35:22.108762" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
+             data-updated="2026-05-19T16:55:49.075961" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
 
         <header>
             <h1>Tier 4 — Kanban work-board execution visibility</h1>
             <div class="metadata">
-                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge status-done">Done</span>
                 <span class="badge priority-medium">Medium Priority</span>
             </div>
         </header>
 
         <nav data-graph-edges>
-            <section data-edge-type="planned_in">
-                <h3>Planned In:</h3>
-                <ul>
-                    <li><a href="plan-c3bbb1ed.html" data-relationship="planned_in" data-since="2026-05-19T00:38:27.296304">plan-c3bbb1ed</a></li>
-                </ul>
-            </section>
-            <section data-edge-type="part_of">
-                <h3>Part Of:</h3>
-                <ul>
-                    <li><a href="trk-f15004d6.html" data-relationship="part_of" data-since="2026-05-19T00:38:27.301256">trk-f15004d6</a></li>
-                </ul>
-            </section>
             <section data-edge-type="blocked_by">
                 <h3>Blocked By:</h3>
                 <ul>
@@ -48,6 +36,18 @@
                 <h3>Implemented In:</h3>
                 <ul>
                     <li><a href="1ddaa17f-dfe6-4e94-a3c1-55b4357477ba.html" data-relationship="implemented_in" data-since="2026-05-19T16:35:22.108378">session 1ddaa17f-dfe6-4e94-a3c1-55b4357477ba</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-c3bbb1ed.html" data-relationship="planned_in" data-since="2026-05-19T00:38:27.296304">plan-c3bbb1ed</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f15004d6.html" data-relationship="part_of" data-since="2026-05-19T00:38:27.301256">trk-f15004d6</a></li>
                 </ul>
             </section>
         </nav>
@@ -73,7 +73,8 @@ session events must either map to the same canonical hidden commands
 when a work item is active, or be documented as unsupported with a
 visible dashboard "steps not live for this harness" state. Do not let a
 user infer that a stalled 0/N checklist is live if the harness cannot
-emit step events.</p>
+emit step events.
+[2026-05-19 16:53 claude-code] accepted-advisory (provenance override): Implementation committed as 3847fa5f01cd2aaf3ee64645e4c4243c47906938 on track branch trk-f15004d6 in the isolated worktree; subject carries (feat-885ec940); gate verified green from the worktree; durable provenance backfilled at track→main integration via wipnote ingest commits.</p>
         </section>
     </article>
 </body>
