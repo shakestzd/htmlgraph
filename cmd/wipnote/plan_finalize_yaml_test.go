@@ -1,10 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	dbpkg "github.com/shakestzd/wipnote/internal/db"
 	"github.com/shakestzd/wipnote/internal/planyaml"
+	"github.com/shakestzd/wipnote/internal/workitem"
 )
 
 func TestApplyAmendments(t *testing.T) {
@@ -181,5 +186,217 @@ func TestBuildFeatureContent_SkipsQuestionsWithNoAnswer(t *testing.T) {
 	content := buildFeatureContent("base", questions, map[string]string{})
 	if strings.Contains(content, "Accepted Design Decisions") {
 		t.Error("should not emit decisions section when no question has an answer or recommended")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Regression tests for bug-3e524d0f: finalize-yaml must read plan_feedback
+// approvals and reconcile them into the YAML before creating track+features.
+// ---------------------------------------------------------------------------
+
+// TestFinalizeYAML_ReconcilesFeedbackApprovals is the primary regression test for
+// bug-3e524d0f. It verifies that finalizeYAMLWithDB reads plan_feedback, flips
+// per-slice approved flags, creates the track+features, and is idempotent.
+func TestFinalizeYAML_ReconcilesFeedbackApprovals(t *testing.T) {
+	const numSlices = 3
+
+	dir := t.TempDir()
+	for _, sub := range []string{"plans", "features", "tracks"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", sub, err)
+		}
+	}
+
+	pID := workitem.GenerateID("plan", "finalize-yaml regression test")
+	plan := planyaml.NewPlan(pID, "Finalize YAML Regression", "test description")
+	plan.Meta.Status = "active"
+	for i := 1; i <= numSlices; i++ {
+		plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+			ID:       workitem.GenerateID("slice", fmt.Sprintf("slice-%d", i)),
+			Num:      i,
+			Title:    fmt.Sprintf("Slice %d Title", i),
+			What:     fmt.Sprintf("What for slice %d", i),
+			Approved: false, // explicitly false in YAML — must be flipped
+		})
+	}
+	planPath := filepath.Join(dir, "plans", pID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save plan yaml: %v", err)
+	}
+	htmlStub := []byte("<html><body></body></html>")
+	if err := os.WriteFile(filepath.Join(dir, "plans", pID+".html"), htmlStub, 0o644); err != nil {
+		t.Fatalf("write html stub: %v", err)
+	}
+
+	// Seed approve rows in plan_feedback for all slices.
+	sqlDB, err := openPlanDB(dir)
+	if err != nil {
+		t.Fatalf("openPlanDB: %v", err)
+	}
+	defer sqlDB.Close()
+	for i := 1; i <= numSlices; i++ {
+		section := fmt.Sprintf("slice-%d", i)
+		if err := dbpkg.StorePlanFeedback(sqlDB, pID, section, "approve", "true", ""); err != nil {
+			t.Fatalf("seed approval slice-%d: %v", i, err)
+		}
+	}
+	// Also seed an amendment to verify amendment integration (set slice-1 title via amendment).
+	amendJSON := `{"slice_num":1,"field":"what","operation":"set","content":"Amended what for slice 1"}`
+	if err := dbpkg.StorePlanFeedback(sqlDB, pID, "amendment", "accepted", amendJSON, ""); err != nil {
+		t.Fatalf("seed amendment: %v", err)
+	}
+
+	// --- First run ---
+	createdIDs, failures, err := finalizeYAMLWithDB(sqlDB, dir, pID)
+	if err != nil {
+		t.Fatalf("finalizeYAMLWithDB first run: %v", err)
+	}
+	if len(failures) > 0 {
+		t.Errorf("unexpected failures: %v", failures)
+	}
+
+	// (a) Correct number of features created.
+	if len(createdIDs) != numSlices {
+		t.Errorf("created features = %d, want %d", len(createdIDs), numSlices)
+	}
+	for _, id := range createdIDs {
+		if !strings.HasPrefix(id, "feat-") {
+			t.Errorf("feature id %q has wrong prefix", id)
+		}
+	}
+
+	// (b) Reconciled YAML has approved:true for all slices.
+	reloaded, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("reload plan yaml: %v", err)
+	}
+	if reloaded.Meta.Status != "finalized" {
+		t.Errorf("plan status = %q, want finalized", reloaded.Meta.Status)
+	}
+	for _, s := range reloaded.Slices {
+		if !s.Approved {
+			t.Errorf("slice %d: approved = false in YAML after finalize, want true", s.Num)
+		}
+	}
+
+	// (c) Amendment was applied: slice 1 what should be the amended value.
+	if reloaded.Slices[0].What != "Amended what for slice 1" {
+		t.Errorf("slice 1 what = %q, want %q", reloaded.Slices[0].What, "Amended what for slice 1")
+	}
+
+	// (d) Track was created and linked.
+	if reloaded.Meta.TrackID == "" {
+		t.Error("plan meta.track_id is empty after finalize")
+	}
+
+	// (e) Features exist in project.
+	p, err := workitem.Open(dir, "test-agent")
+	if err != nil {
+		t.Fatalf("workitem.Open: %v", err)
+	}
+	defer p.Close()
+	for _, fid := range createdIDs {
+		if _, err := p.Features.Get(fid); err != nil {
+			t.Errorf("feature %s not found: %v", fid, err)
+		}
+	}
+
+	// --- Second run (idempotency) ---
+	createdIDs2, failures2, err := finalizeYAMLWithDB(sqlDB, dir, pID)
+	if err != nil {
+		t.Fatalf("finalizeYAMLWithDB second run: %v", err)
+	}
+	if len(failures2) > 0 {
+		t.Errorf("second run unexpected failures: %v", failures2)
+	}
+	if len(createdIDs2) != numSlices {
+		t.Errorf("second run returned %d feature IDs, want %d (idempotent)", len(createdIDs2), numSlices)
+	}
+	// Same IDs — no new features created.
+	for i, id := range createdIDs {
+		if i < len(createdIDs2) && createdIDs2[i] != id {
+			t.Errorf("second run feature[%d] = %q, want %q (dup created)", i, createdIDs2[i], id)
+		}
+	}
+}
+
+// TestFinalizeYAML_PreMarkedFinalized reproduces the exact live failure from
+// bug-3e524d0f: when a plan is ALREADY marked status:finalized in the YAML
+// (e.g. by updatePlanStatus before feature creation succeeded) but no features
+// were created, finalize-yaml must fall through and create them anyway.
+func TestFinalizeYAML_PreMarkedFinalized(t *testing.T) {
+	const numSlices = 2
+
+	dir := t.TempDir()
+	for _, sub := range []string{"plans", "features", "tracks"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", sub, err)
+		}
+	}
+
+	pID := workitem.GenerateID("plan", "premarked finalized test")
+	plan := planyaml.NewPlan(pID, "Pre-Marked Finalized Plan", "")
+	// Simulate the buggy state: status=finalized, approved:false, no features.
+	plan.Meta.Status = "finalized"
+	for i := 1; i <= numSlices; i++ {
+		plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+			ID:       workitem.GenerateID("slice", fmt.Sprintf("s%d", i)),
+			Num:      i,
+			Title:    fmt.Sprintf("Pre-Finalized Slice %d", i),
+			What:     fmt.Sprintf("do thing %d", i),
+			Approved: false, // bug state: approved not flipped
+		})
+	}
+	planPath := filepath.Join(dir, "plans", pID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save plan yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plans", pID+".html"), []byte("<html></html>"), 0o644); err != nil {
+		t.Fatalf("write html: %v", err)
+	}
+
+	sqlDB, err := openPlanDB(dir)
+	if err != nil {
+		t.Fatalf("openPlanDB: %v", err)
+	}
+	defer sqlDB.Close()
+
+	// Seed approvals in plan_feedback — this is what the dashboard writes.
+	for i := 1; i <= numSlices; i++ {
+		if err := dbpkg.StorePlanFeedback(sqlDB, pID, fmt.Sprintf("slice-%d", i), "approve", "true", ""); err != nil {
+			t.Fatalf("seed approval: %v", err)
+		}
+	}
+
+	// Must NOT short-circuit — must create features even though YAML says "finalized".
+	createdIDs, failures, err := finalizeYAMLWithDB(sqlDB, dir, pID)
+	if err != nil {
+		t.Fatalf("finalizeYAMLWithDB on pre-finalized plan: %v", err)
+	}
+	if len(failures) > 0 {
+		t.Errorf("unexpected failures: %v", failures)
+	}
+	if len(createdIDs) != numSlices {
+		t.Errorf("created %d features, want %d — finalize-yaml short-circuited incorrectly", len(createdIDs), numSlices)
+	}
+
+	// YAML must now reflect approved:true for all slices.
+	reloaded, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	for _, s := range reloaded.Slices {
+		if !s.Approved {
+			t.Errorf("slice %d: approved still false after recovery finalize", s.Num)
+		}
+	}
+
+	// Idempotent: second run returns same IDs, no duplicates.
+	createdIDs2, _, err := finalizeYAMLWithDB(sqlDB, dir, pID)
+	if err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if len(createdIDs2) != numSlices {
+		t.Errorf("second run returned %d, want %d", len(createdIDs2), numSlices)
 	}
 }

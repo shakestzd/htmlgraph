@@ -433,12 +433,6 @@ func planFinalizeHandler(database *sql.DB, wipnoteDir string) http.HandlerFunc {
 			}
 		}
 
-		// Keep YAML meta.status in sync with HTML finalization so YAML remains
-		// the source of truth for status reads (parsePlanHTMLStatus, plan wait, etc.).
-		if yamlErr := updatePlanStatus(wipnoteDir, planID, "finalized"); yamlErr != nil {
-			log.Printf("warning: updatePlanStatus(finalized) failed for %s: %v", planID, yamlErr)
-		}
-
 		feedback, err := dbpkg.GetPlanFeedback(database, planID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("reading feedback: %v", err), http.StatusInternalServerError)
@@ -449,6 +443,11 @@ func planFinalizeHandler(database *sql.DB, wipnoteDir string) http.HandlerFunc {
 		// does via `wipnote plan finalize-yaml`. Partial failures are logged and
 		// reported in the response — a finalized plan with N/M features created is
 		// better than aborting and leaving the plan in a half-finalized state.
+		//
+		// NOTE: updatePlanStatus("finalized") is called AFTER finalizeYAMLWithDB so
+		// that finalizeYAMLWithDB does not see status="finalized" in the YAML and
+		// short-circuit before creating features. finalizeYAMLWithDB sets the status
+		// itself as part of saving the reconciled YAML.
 		createdFeatures, featFailures, featErr := finalizeYAMLWithDB(database, wipnoteDir, planID)
 		if featErr != nil {
 			log.Printf("warning: finalizeYAMLWithDB failed for %s: %v", planID, featErr)

@@ -154,9 +154,18 @@ func finalizeYAMLWithDB(db *sql.DB, wipnoteDir, planID string) (createdIDs []str
 	}
 	defer p.Close()
 
-	// Idempotent re-finalize: plan already finalized — look up existing features.
+	// Idempotent re-finalize: plan already finalized AND features already exist —
+	// short-circuit to avoid duplicate creation. If the plan was marked finalized
+	// but features were never created (e.g. due to a bug in a prior run), fall
+	// through so this run creates them.
 	if plan.Meta.Status == "finalized" {
-		return findFeaturesForPlan(db, planID), nil, nil
+		existing := findFeaturesForPlan(db, planID)
+		if len(existing) > 0 {
+			return existing, nil, nil
+		}
+		// Fall through: finalized but no features yet — create them now.
+		// Reset status so Save at the end of this function re-writes it.
+		plan.Meta.Status = ""
 	}
 
 	// Reuse existing track when meta.track_id references a valid track;
