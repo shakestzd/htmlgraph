@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory (&#43; composite index)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-b5fa9392"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-05-19T00:38:27.217027"
+             data-updated="2026-05-19T15:49:25.905064" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
+
+        <header>
+            <h1>Tier 1 — Live file-overlap detection: who ⚠ flag &#43; PreToolUse advisory (&#43; composite index)</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-f1c6f92e.html" data-relationship="blocked_by">feat-f1c6f92e</a></li>
+                    <li><a href="feat-793844bd.html" data-relationship="blocked_by">feat-793844bd</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-c3bbb1ed.html" data-relationship="planned_in" data-since="2026-05-19T00:38:27.22375">plan-c3bbb1ed</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f15004d6.html" data-relationship="part_of" data-since="2026-05-19T00:38:27.231672">trk-f15004d6</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="1ddaa17f-dfe6-4e94-a3c1-55b4357477ba.html" data-relationship="implemented_in" data-since="2026-05-19T15:49:25.904627">session 1ddaa17f-dfe6-4e94-a3c1-55b4357477ba</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Compute intersection of recently-touched file sets (feature_files,
+last_seen within a window) across LIVE sessions. `wipnote who` marks
+files touched by >=2 live sessions with ⚠ and the other session id.
+PreToolUse check: before Edit/Write, a single indexed SELECT for the
+same path touched by another live session within the window emits a
+non-blocking advisory. ADD a composite index
+idx_feature_files_path_seen ON feature_files(file_path, last_seen) via
+schema.go + a migration (FEASIBILITY CRITIC: only idx_feature_files_path
+on (file_path) exists today — schema.go:433-434 — the overlap query
+would otherwise range-scan). Config flags `warn_on_file_overlap`
+(default true) and `block_on_file_overlap` (default false → exit 2),
+read via the same local os.ReadFile pattern as
+block_task_completion_on_quality_failure (task_completion_gate.go:77-96;
+no shared internal/config package exists).</p>
+        </section>
+    </article>
+</body>
+</html>
