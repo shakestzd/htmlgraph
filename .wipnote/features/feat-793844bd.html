@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Tier 3 — Honest liveness &#43; claimless visibility (session_files) &#43; cross-harness release</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-793844bd"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-05-19T00:38:27.265106"
+             data-updated="2026-05-19T02:50:20.176945" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
+
+        <header>
+            <h1>Tier 3 — Honest liveness &#43; claimless visibility (session_files) &#43; cross-harness release</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-c3bbb1ed.html" data-relationship="planned_in" data-since="2026-05-19T00:38:27.276333">plan-c3bbb1ed</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f15004d6.html" data-relationship="part_of" data-since="2026-05-19T00:38:27.282583">trk-f15004d6</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="blocked_by">
+                <h3>Blocked By:</h3>
+                <ul>
+                    <li><a href="feat-f1c6f92e.html" data-relationship="blocked_by">feat-f1c6f92e</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="1ddaa17f-dfe6-4e94-a3c1-55b4357477ba.html" data-relationship="implemented_in" data-since="2026-05-19T02:50:20.176743">session 1ddaa17f-dfe6-4e94-a3c1-55b4357477ba</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>(a) PRIMARY cross-harness fix: derive 'live' in who/roster from
+claim-heartbeat recency, not sessions.status — works for ALL harnesses
+with no dependency on a session-end event. (b) Claimless visibility:
+the PostToolUse else-branch (posttooluse.go:134-138) currently only
+debugLogs and drops attribution when ctx.FeatureID=="". Replace with a
+new lightweight `session_files` table (session_id, file_path,
+operation, last_seen, UNIQUE(session_id,file_path)) — chosen over
+relaxing feature_files because feature_files.feature_id is NOT NULL
+with UNIQUE(feature_id,file_path) (schema.go:301-311) and cannot hold
+empty-feature_id rows. (c) Cross-harness session-end: Gemini already
+releases via Stop→SessionEnd (manifest:78, geminiEventName SessionEnd);
+Codex has NO session-end event in the manifest at all (SessionEnd:68 is
+claude-only; no Codex Stop/SessionEnd). New manifest work is
+Codex-specific and contingent on whether Codex CLI emits any
+session-end / task-lifecycle event; if it does not, Codex correctly
+relies on heartbeat-recency liveness (part a) + lease reap. Folds
+bug-6c3e8252.</p>
+        </section>
+    </article>
+</body>
+</html>
