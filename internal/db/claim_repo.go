@@ -215,23 +215,74 @@ func HeartbeatClaim(db *sql.DB, claimID, sessionID string, leaseDuration time.Du
 	return nil
 }
 
-// HeartbeatClaimByWorkItem renews the lease on the active claim for a work item.
+// writeScopePathsCap is the maximum number of paths stored in write_scope.paths.
+// Oldest paths are dropped when this cap is reached (FIFO eviction).
+const writeScopePathsCap = 200
+
+// HeartbeatClaimByWorkItem renews the lease on the active claim for a work item
+// and appends writePath (if non-empty) to write_scope.paths with dedup + FIFO cap.
+//
 // This is the main hook entry point — hooks know the work item ID, not the claim ID.
-func HeartbeatClaimByWorkItem(db *sql.DB, workItemID, sessionID string, leaseDuration time.Duration) error {
+//
+// Ephemeral/reindex contract: write_scope is ephemeral, stored only in SQLite.
+// It is NOT persisted to canonical HTML. On reindex, claims are rebuilt from HTML
+// with empty write_scope.paths; paths re-accumulate as the session fires heartbeats.
+// No extra reset logic is needed.
+func HeartbeatClaimByWorkItem(db *sql.DB, workItemID, sessionID, writePath string, leaseDuration time.Duration) error {
 	now := time.Now().UTC()
 	newExpiry := now.Add(leaseDuration)
 	activeList := activeStatusList()
 
+	// The write_scope SET expression is a single CASE: no-op when writePath is
+	// empty (?4 = ''), otherwise merges + dedupes + FIFO-caps to writeScopePathsCap.
+	//
+	// Implementation note: modernc.org/sqlite rejects a correlated reference to
+	// the UPDATE target column (write_scope) inside a subquery used as an OFFSET
+	// expression. The workaround is ORDER BY mo DESC LIMIT cap (keeps the newest
+	// 'cap' entries) followed by an outer ORDER BY mo ASC to restore FIFO order.
+	// This avoids the second correlated json_each call that would have been needed
+	// to compute the COUNT for the OFFSET. All other correlated json_each refs to
+	// write_scope (inside the CASE ELSE body, not inside OFFSET) are accepted.
+	//
+	// Dedup: GROUP BY value with MIN(key) preserves the original FIFO slot for a
+	// re-appended existing path; a new path gets sentinel key 1000000000 so it
+	// always sorts last. ORDER BY mo DESC LIMIT writeScopePathsCap drops the
+	// oldest entries (smallest mo). The outer ORDER BY mo ASC restores FIFO order.
+	// json_set preserves sibling keys (branch, worktree, directories).
 	query := fmt.Sprintf(`
 		UPDATE claims
-		SET last_heartbeat_at = ?, lease_expires_at = ?, updated_at = ?
-		WHERE work_item_id = ?
-		  AND owner_session_id = ?
-		  AND status IN (%s)`, activeList)
+		SET last_heartbeat_at = ?1,
+		    lease_expires_at  = ?2,
+		    updated_at        = ?3,
+		    write_scope = CASE WHEN ?4 = '' THEN write_scope ELSE
+		      json_set(
+		        COALESCE(write_scope,'{}'),
+		        '$.paths',
+		        (SELECT json_group_array(p) FROM
+		          (SELECT p FROM
+		            (SELECT value AS p, MIN(key) AS mo
+		             FROM (
+		               SELECT value, key
+		               FROM json_each(COALESCE(json_extract(write_scope,'$.paths'),'[]'))
+		               UNION ALL SELECT ?4 AS value, 1000000000 AS key
+		             )
+		             GROUP BY value
+		             ORDER BY mo DESC LIMIT %d
+		            )
+		            ORDER BY mo ASC
+		          )
+		        )
+		      )
+		    END
+		WHERE work_item_id = ?5
+		  AND owner_session_id = ?6
+		  AND status IN (%s)`,
+		writeScopePathsCap, activeList)
 
 	result, err := db.Exec(query,
 		now.Format(time.RFC3339), newExpiry.Format(time.RFC3339),
-		now.Format(time.RFC3339), workItemID, sessionID,
+		now.Format(time.RFC3339), writePath,
+		workItemID, sessionID,
 	)
 	if err != nil {
 		return fmt.Errorf("heartbeat claim for work item %s: %w", workItemID, err)
@@ -293,7 +344,7 @@ func ReleaseAllClaimsForSession(db *sql.DB, sessionID string) (int, error) {
 	activeList := activeStatusList()
 
 	query := fmt.Sprintf(`
-		UPDATE claims SET status = 'abandoned', updated_at = ?
+		UPDATE claims SET status = 'abandoned', write_scope = NULL, updated_at = ?
 		WHERE owner_session_id = ?
 		  AND status IN (%s)`, activeList)
 
@@ -312,7 +363,7 @@ func ReapExpiredClaims(db *sql.DB) (int, error) {
 	activeList := activeStatusList()
 
 	query := fmt.Sprintf(`
-		UPDATE claims SET status = 'expired', updated_at = ?
+		UPDATE claims SET status = 'expired', write_scope = NULL, updated_at = ?
 		WHERE lease_expires_at < ?
 		  AND status IN (%s)`, activeList)
 

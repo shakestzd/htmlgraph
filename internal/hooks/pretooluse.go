@@ -239,7 +239,8 @@ func recordEventAndAllow(event *CloudEvent, ctx *toolUseContext, database *sql.D
 	_ = db.InsertEvent(database, ev)
 
 	if ctx.FeatureID != "" {
-		_ = db.HeartbeatClaimByWorkItem(database, ctx.FeatureID, ctx.SessionID, 30*time.Minute)
+		writePath := paths.MustNormalize(extractFilePath(event.ToolInput), "")
+		_ = db.HeartbeatClaimByWorkItem(database, ctx.FeatureID, ctx.SessionID, writePath, 30*time.Minute)
 	}
 	_, _ = db.ReapExpiredClaims(database)
 

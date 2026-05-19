@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -160,7 +161,7 @@ func TestHeartbeatClaimByWorkItem(t *testing.T) {
 		t.Fatalf("GetClaim before: %v", err)
 	}
 
-	if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", 30*time.Minute); err != nil {
+	if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", "", 30*time.Minute); err != nil {
 		t.Fatalf("HeartbeatClaimByWorkItem: %v", err)
 	}
 
@@ -646,6 +647,270 @@ func TestUpdateClaimAgentIDNoOverwrite(t *testing.T) {
 	}
 	if got.ClaimedByAgentID != "original-agent" {
 		t.Errorf("claimed_by_agent_id: got %q, want %q (should not have been overwritten)", got.ClaimedByAgentID, "original-agent")
+	}
+}
+
+// unmarshalWriteScope is a test helper that unmarshals the write_scope JSON of a claim.
+func unmarshalWriteScope(t *testing.T, raw json.RawMessage) models.WriteScope {
+	t.Helper()
+	var scope models.WriteScope
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &scope); err != nil {
+			t.Fatalf("unmarshal write_scope: %v (raw: %s)", err, string(raw))
+		}
+	}
+	return scope
+}
+
+// TestWriteScopeAppendedInHeartbeatUpdate verifies that a heartbeat with a non-empty
+// writePath stores that path in write_scope.paths via a single UPDATE per call.
+//
+// Single-UPDATE proof: HeartbeatClaimByWorkItem both extends lease_expires_at AND
+// populates write_scope in one SQL statement. We verify the path is present AND the
+// lease was extended — if only one happened, it would imply two separate statements,
+// one of which would have been silently lost.
+func TestWriteScopeAppendedInHeartbeatUpdate(t *testing.T) {
+	database := setupClaimDB(t)
+	defer database.Close()
+
+	c := makeClaim("claim-ws1", "feat-test", "sess-test")
+	if err := db.ClaimItem(database, c, 5*time.Minute); err != nil {
+		t.Fatalf("ClaimItem: %v", err)
+	}
+
+	// Record lease before heartbeat.
+	before, err := db.GetClaim(database, "claim-ws1")
+	if err != nil {
+		t.Fatalf("GetClaim before: %v", err)
+	}
+
+	// Heartbeat with a path — extends lease AND sets write_scope in one UPDATE.
+	if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", "internal/foo/bar.go", 30*time.Minute); err != nil {
+		t.Fatalf("HeartbeatClaimByWorkItem: %v", err)
+	}
+
+	after, err := db.GetClaim(database, "claim-ws1")
+	if err != nil {
+		t.Fatalf("GetClaim after: %v", err)
+	}
+
+	// Lease must have extended from 5m to 30m — proving the UPDATE executed.
+	if !after.LeaseExpiresAt.After(before.LeaseExpiresAt) {
+		t.Errorf("lease_expires_at did not extend: before=%v after=%v",
+			before.LeaseExpiresAt, after.LeaseExpiresAt)
+	}
+
+	// write_scope.paths must contain the heartbeated path (set in the SAME UPDATE).
+	scope := unmarshalWriteScope(t, after.WriteScope)
+	found := false
+	for _, p := range scope.Paths {
+		if p == "internal/foo/bar.go" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("write_scope.paths does not contain the heartbeated path; got %v", scope.Paths)
+	}
+}
+
+// TestWriteScopeDedupeCap verifies deduplication and the 200-path FIFO cap.
+func TestWriteScopeDedupeCap(t *testing.T) {
+	database := setupClaimDB(t)
+	defer database.Close()
+
+	c := makeClaim("claim-ws2", "feat-test", "sess-test")
+	if err := db.ClaimItem(database, c, 30*time.Minute); err != nil {
+		t.Fatalf("ClaimItem: %v", err)
+	}
+
+	// Append 205 distinct paths (0..204).
+	for i := 0; i < 205; i++ {
+		path := fmt.Sprintf("file-%03d.go", i)
+		if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", path, 30*time.Minute); err != nil {
+			t.Fatalf("HeartbeatClaimByWorkItem path %d: %v", i, err)
+		}
+	}
+
+	got, err := db.GetClaim(database, "claim-ws2")
+	if err != nil {
+		t.Fatalf("GetClaim: %v", err)
+	}
+	scope := unmarshalWriteScope(t, got.WriteScope)
+
+	// Cap: exactly 200 paths should remain.
+	if len(scope.Paths) != 200 {
+		t.Errorf("expected 200 paths after cap, got %d", len(scope.Paths))
+	}
+
+	// Oldest 5 paths (file-000..file-004) should have been dropped.
+	dropped := map[string]bool{}
+	for i := 0; i < 5; i++ {
+		dropped[fmt.Sprintf("file-%03d.go", i)] = true
+	}
+	for _, p := range scope.Paths {
+		if dropped[p] {
+			t.Errorf("dropped path %q should not be in write_scope after cap", p)
+		}
+	}
+
+	// Newest path (file-204.go) must be present.
+	newest := "file-204.go"
+	found := false
+	for _, p := range scope.Paths {
+		if p == newest {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("newest path %q not found in write_scope; paths=%v", newest, scope.Paths)
+	}
+
+	// Re-append an existing path — length must stay at 200.
+	existingPath := "file-100.go"
+	if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", existingPath, 30*time.Minute); err != nil {
+		t.Fatalf("HeartbeatClaimByWorkItem re-append: %v", err)
+	}
+	got2, err := db.GetClaim(database, "claim-ws2")
+	if err != nil {
+		t.Fatalf("GetClaim after re-append: %v", err)
+	}
+	scope2 := unmarshalWriteScope(t, got2.WriteScope)
+	if len(scope2.Paths) != 200 {
+		t.Errorf("after re-append: expected 200 paths, got %d", len(scope2.Paths))
+	}
+	// The re-appended path should still be present.
+	found = false
+	for _, p := range scope2.Paths {
+		if p == existingPath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("re-appended path %q should still be in write_scope", existingPath)
+	}
+}
+
+// TestWriteScopeClearedOnRelease verifies that write_scope is set to NULL when
+// a session is released (ReleaseAllClaimsForSession) or when claims expire (ReapExpiredClaims).
+func TestWriteScopeClearedOnRelease(t *testing.T) {
+	t.Run("ReleaseAllClaimsForSession", func(t *testing.T) {
+		database := setupClaimDB(t)
+		defer database.Close()
+
+		c := makeClaim("claim-wscr1", "feat-test", "sess-test")
+		if err := db.ClaimItem(database, c, 30*time.Minute); err != nil {
+			t.Fatalf("ClaimItem: %v", err)
+		}
+		if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", "some/file.go", 30*time.Minute); err != nil {
+			t.Fatalf("HeartbeatClaimByWorkItem: %v", err)
+		}
+		// Verify path is present before release.
+		pre, _ := db.GetClaim(database, "claim-wscr1")
+		scope := unmarshalWriteScope(t, pre.WriteScope)
+		if len(scope.Paths) == 0 {
+			t.Fatal("expected write_scope.paths to be populated before release")
+		}
+
+		if _, err := db.ReleaseAllClaimsForSession(database, "sess-test"); err != nil {
+			t.Fatalf("ReleaseAllClaimsForSession: %v", err)
+		}
+
+		post, err := db.GetClaim(database, "claim-wscr1")
+		if err != nil {
+			t.Fatalf("GetClaim after release: %v", err)
+		}
+		if len(post.WriteScope) > 0 {
+			t.Errorf("expected write_scope to be NULL after release, got: %s", string(post.WriteScope))
+		}
+	})
+
+	t.Run("ReapExpiredClaims", func(t *testing.T) {
+		database := setupClaimDB(t)
+		defer database.Close()
+
+		c := makeClaim("claim-wscr2", "feat-test", "sess-test")
+		if err := db.ClaimItem(database, c, 30*time.Minute); err != nil {
+			t.Fatalf("ClaimItem: %v", err)
+		}
+		// Use a direct DB exec to add a path without expiring the claim yet.
+		if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", "another/file.go", 30*time.Minute); err != nil {
+			t.Fatalf("HeartbeatClaimByWorkItem: %v", err)
+		}
+		// Force expiry by setting lease_expires_at in the past.
+		_, err := database.Exec(
+			`UPDATE claims SET lease_expires_at = ? WHERE claim_id = ?`,
+			time.Now().Add(-1*time.Minute).UTC().Format(time.RFC3339), "claim-wscr2",
+		)
+		if err != nil {
+			t.Fatalf("force-expire: %v", err)
+		}
+		if _, err := db.ReapExpiredClaims(database); err != nil {
+			t.Fatalf("ReapExpiredClaims: %v", err)
+		}
+
+		post, err := db.GetClaim(database, "claim-wscr2")
+		if err != nil {
+			t.Fatalf("GetClaim after reap: %v", err)
+		}
+		if len(post.WriteScope) > 0 {
+			t.Errorf("expected write_scope to be NULL after reap, got: %s", string(post.WriteScope))
+		}
+	})
+}
+
+// TestWriteScopeEmptyAfterClaim verifies the ephemeral contract:
+// a freshly claimed item has no write_scope.paths until a heartbeat-with-path fires.
+func TestWriteScopeEmptyAfterClaim(t *testing.T) {
+	database := setupClaimDB(t)
+	defer database.Close()
+
+	c := makeClaim("claim-ws-fresh", "feat-test", "sess-test")
+	if err := db.ClaimItem(database, c, 30*time.Minute); err != nil {
+		t.Fatalf("ClaimItem: %v", err)
+	}
+
+	got, err := db.GetClaim(database, "claim-ws-fresh")
+	if err != nil {
+		t.Fatalf("GetClaim: %v", err)
+	}
+
+	// No heartbeat-with-path yet: write_scope should be absent or have empty paths.
+	if len(got.WriteScope) > 0 {
+		scope := unmarshalWriteScope(t, got.WriteScope)
+		if len(scope.Paths) != 0 {
+			t.Errorf("expected empty write_scope.paths after bare claim, got %v", scope.Paths)
+		}
+	}
+
+	// Fire heartbeat with empty path — still no paths.
+	if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", "", 30*time.Minute); err != nil {
+		t.Fatalf("HeartbeatClaimByWorkItem empty: %v", err)
+	}
+	got2, err := db.GetClaim(database, "claim-ws-fresh")
+	if err != nil {
+		t.Fatalf("GetClaim after empty heartbeat: %v", err)
+	}
+	if len(got2.WriteScope) > 0 {
+		scope2 := unmarshalWriteScope(t, got2.WriteScope)
+		if len(scope2.Paths) != 0 {
+			t.Errorf("expected still-empty paths after empty heartbeat, got %v", scope2.Paths)
+		}
+	}
+
+	// Now fire heartbeat with a real path — it should appear.
+	if err := db.HeartbeatClaimByWorkItem(database, "feat-test", "sess-test", "cmd/wipnote/main.go", 30*time.Minute); err != nil {
+		t.Fatalf("HeartbeatClaimByWorkItem with path: %v", err)
+	}
+	got3, err := db.GetClaim(database, "claim-ws-fresh")
+	if err != nil {
+		t.Fatalf("GetClaim after path heartbeat: %v", err)
+	}
+	scope3 := unmarshalWriteScope(t, got3.WriteScope)
+	if len(scope3.Paths) != 1 || scope3.Paths[0] != "cmd/wipnote/main.go" {
+		t.Errorf("expected exactly one path after first path heartbeat, got %v", scope3.Paths)
 	}
 }
 
