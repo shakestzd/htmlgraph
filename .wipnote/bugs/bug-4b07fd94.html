@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Cold-clone: &#39;wipnote lineage&#39; returns &#39;no related nodes&#39; — SQLite read-index not built on fresh clone though HTML has edges</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-4b07fd94"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-19T19:31:47.159191"
+             data-updated="2026-05-19T19:31:47.189234" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>Cold-clone: &#39;wipnote lineage&#39; returns &#39;no related nodes&#39; — SQLite read-index not built on fresh clone though HTML has edges</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-19T19:31:47.188772">trk-0677c709</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="caused_by">
+                <h3>Caused By:</h3>
+                <ul>
+                    <li><a href="feat-5d2188b9.html" data-relationship="caused_by" data-since="2026-05-19T19:31:47.180627">feat-5d2188b9</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>On a fresh git clone the canonical .wipnote/*.html files contain lineage edges, but 'wipnote lineage ' returns 'no related nodes' because the SQLite read-index is per-user/derived and not committed, and is not built on first run. A brand-new OSS user running the headline lineage command cold gets an empty result -> bounces. Launch-blocking for the OSS Show-HN flag-plant. Repro: clone repo to a fresh dir with CLAUDE_PROJECT_DIR unset, run 'wipnote lineage' on a committed feature id. Fix direction: lazily build/refresh the read index on first read when missing/stale (must NOT depend on a hazardous background reindex), or ship a documented one-line bootstrap that the README quickstart runs before the aha. Discovered during feat-5d2188b9 cold-clone audit.</p>
+        </section>
+    </article>
+</body>
+</html>
