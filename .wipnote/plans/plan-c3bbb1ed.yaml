@@ -1,11 +1,12 @@
 meta:
     id: plan-c3bbb1ed
+    track_id: trk-f15004d6
     title: Cross-session file visibility for concurrent CLI sessions
     description: ""
     created_at: ""
-    status: draft
+    status: finalized
     schema_version: v3
-    version: 2
+    version: 4
 design:
     problem: Concurrent CLI sessions (Claude/Codex/Gemini) edit overlapping files invisibly — users cannot see which files other active sessions are touching, causing attribution mix-ups and coordination failures in shared projects.
     goals:
@@ -63,7 +64,7 @@ slices:
         API: /api/sessions response includes files[]
         Regression: existing cmd/wipnote/session_test.go must still pass
       complexity: complex
-      approved: false
+      approved: true
       comment: ""
       questions:
         - id: q-scope
@@ -132,7 +133,7 @@ slices:
         Migration: TestMigration_FeatureFilesPathSeenIndex
         Contention regression: feat-156e0a1a SQLITE_BUSY assertion remains zero
       complexity: complex
-      approved: false
+      approved: true
       comment: ""
       questions:
         - id: q-window
@@ -202,7 +203,7 @@ slices:
         Unit: TestWriteScopeClearedOnRelease — release + expiry both clear it
         Behavior: reindex resets write_scope (no stale paths)
       complexity: complex
-      approved: false
+      approved: true
       comment: ""
       questions:
         - id: q-cap
@@ -282,7 +283,7 @@ slices:
         Port regen: build-ports emits any new Codex session-end event
         Repro: bug-6c3e8252 stale-active harness → 0 after fix
       complexity: complex
-      approved: false
+      approved: true
       comment: ""
       questions:
         - id: q-claimless
@@ -380,7 +381,7 @@ slices:
         Hook: TestCodexTaskLifecycleStepMapping or explicit unsupported-state test, depending on actual Codex/Gemini events
         Regression: existing work detail still renders full step list and feature activity panels
       complexity: complex
-      approved: false
+      approved: true
       comment: ""
       questions:
         - id: q-board-source
