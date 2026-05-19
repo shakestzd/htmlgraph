@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Test suite hardcodes devcontainer-only tmp base path; breaks CI and any non-devcontainer machine</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-903850c9"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-19T21:15:12.531483"
+             data-updated="2026-05-19T21:15:12.556386" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>Test suite hardcodes devcontainer-only tmp base path; breaks CI and any non-devcontainer machine</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-19T21:15:12.555737">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Three cmd/wipnote test files hardcode an absolute devcontainer-specific tmp base instead of deriving it portably from GOTMPDIR/TMPDIR/os.TempDir. On CI and any contributor machine the mkdir fails (permission denied) and the entire cmd/wipnote test package FAILs. Introduced by feat-b2d1dc2e (commit e945f12d2, before this session); surfaced when v0.60.0 release triggered CI. Shipped binary is unaffected (test-only). Show-HN blocker: go test fails for every cloner; release tag CI is red. Fix: shared portable exec-capable temp helper, ~6 lines across 3 test files.</p>
+        </section>
+    </article>
+</body>
+</html>
