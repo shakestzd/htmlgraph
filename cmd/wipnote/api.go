@@ -266,6 +266,7 @@ func featuresHandler(database *sql.DB, projectDir string) http.HandlerFunc {
 			mergeProvenanceFromHTML(features, projectDir)
 		}
 		mergeClaimAttributionFromDB(features, database)
+		mergeWorkBoardSignals(features, database, projectDir)
 		respondJSON(w, features)
 	}
 }

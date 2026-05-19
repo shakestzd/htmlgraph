@@ -1202,6 +1202,70 @@
 }
 .kanban-card-meta .type-icon svg { display: block; }
 
+/* Tier 4 — execution-visibility (READ-ONLY) on Kanban cards */
+.kanban-card-exec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+.kanban-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.4;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--bg-tertiary, rgba(127,127,127,0.15));
+  color: var(--text-muted);
+}
+.kanban-badge.is-live   { box-shadow: inset 0 0 0 1px var(--status-ip); color: var(--text-primary); }
+.kanban-badge.is-stale  { opacity: 0.65; }
+.kanban-badge-conflict {
+  background: rgba(239,68,68,0.18);
+  color: #f87171;
+  font-weight: 600;
+}
+.kanban-badge-steps   { background: rgba(59,130,246,0.16); color: #60a5fa; }
+.kanban-badge-unsupported {
+  background: rgba(127,127,127,0.14);
+  color: var(--text-muted);
+  font-style: italic;
+}
+.kanban-badge-age    { color: var(--text-muted); }
+.kanban-badge-moved  { background: rgba(234,179,8,0.18); color: #facc15; }
+.kanban-card-file {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.track-section-stat {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+.track-stat-active { background: rgba(59,130,246,0.16); color: #60a5fa; }
+.track-stat-stale  { background: rgba(239,68,68,0.16);  color: #f87171; }
+.track-stat-moved  { background: rgba(234,179,8,0.16);  color: #facc15; }
+.step-provenance {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
 /* Scroll-to highlight animation */
 @keyframes msgHighlight {
   0% { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 12px rgba(205,255,0,0.3); }

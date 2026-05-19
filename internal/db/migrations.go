@@ -16,7 +16,7 @@ import (
 // executes ZERO CREATE / ALTER / DROP / trigger / normalisation statements —
 // avoiding the write-lock acquisition that caused SQLITE_BUSY in short-lived
 // hook processes.
-const currentSchemaVersion = 8
+const currentSchemaVersion = 9
 
 // copySwapStepName is the name of the agent_events copy-and-swap migration
 // step. Exposed via CopySwapStepName() so tests can assert it runs at most
@@ -83,6 +83,11 @@ var migrations = []migrationStep{
 		version: 8,
 		name:    "008_session_files",
 		apply:   stepSessionFiles,
+	},
+	{
+		version: 9,
+		name:    "009_feature_files_path_seen_index",
+		apply:   stepFeatureFilesPathSeenIndex,
 	},
 }
 
@@ -409,6 +414,22 @@ func stepSessionFiles(db *sql.DB) error {
 		if _, err := db.Exec(stmt); err != nil {
 			return fmt.Errorf("create session_files index: %w", err)
 		}
+	}
+	return nil
+}
+
+// stepFeatureFilesPathSeenIndex adds the composite (file_path, last_seen)
+// index on feature_files (live file-overlap detection, Tier 1 / feat-b5fa9392).
+// Only idx_feature_files_path on (file_path) existed before; the overlap query
+// filters by file_path AND a recent last_seen window, so without the trailing
+// last_seen column the planner range-scans every row for the path. Idempotent:
+// CREATE INDEX IF NOT EXISTS is a no-op on a DB that already has it (e.g. a
+// fresh DB where stepCreateIndexes created it from CreateAllIndexes).
+func stepFeatureFilesPathSeenIndex(db *sql.DB) error {
+	if _, err := db.Exec(
+		`CREATE INDEX IF NOT EXISTS idx_feature_files_path_seen ON feature_files(file_path, last_seen)`,
+	); err != nil {
+		return fmt.Errorf("create idx_feature_files_path_seen: %w", err)
 	}
 	return nil
 }

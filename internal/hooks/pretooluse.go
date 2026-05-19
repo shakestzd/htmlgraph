@@ -197,8 +197,124 @@ func PreToolUse(event *CloudEvent, database *sql.DB) (*HookResult, error) {
 		}
 	}
 
+	// Tier 1 — live file-overlap advisory. Runs for Write/Edit/MultiEdit only.
+	// A single indexed SELECT (idx_feature_files_path_seen) with ZERO writes:
+	// it never acquires a write lock, so the feat-156e0a1a zero-SQLITE_BUSY
+	// hot-path guarantee is preserved. Non-blocking by default
+	// (warn_on_file_overlap=true); blocks with exit 2 + recovery hint only when
+	// block_on_file_overlap=true.
+	if advisory, blockErr := checkFileOverlapAdvisory(event, ctx, database); blockErr != nil {
+		return nil, blockErr
+	} else if advisory != "" {
+		result, err := recordEventAndAllow(event, ctx, database)
+		if err == nil && result != nil {
+			if result.AdditionalContext != "" {
+				result.AdditionalContext += "\n" + advisory
+			} else {
+				result.AdditionalContext = advisory
+			}
+		}
+		return result, err
+	}
+
 	// Record the event and allow the tool to proceed.
 	return recordEventAndAllow(event, ctx, database)
+}
+
+// fileOverlapConfig holds the two opt-in flags read from .wipnote/config.json
+// via the same local os.ReadFile pattern as readTaskCompletionConfig (there is
+// NO shared internal/config package). warn defaults to true, block to false —
+// so the JSON pointers distinguish "absent" (use default) from "explicitly
+// set" (honor the value).
+type fileOverlapConfig struct {
+	WarnOnFileOverlap  *bool `json:"warn_on_file_overlap"`
+	BlockOnFileOverlap *bool `json:"block_on_file_overlap"`
+}
+
+// readFileOverlapConfig returns (warn, block) for the live file-overlap
+// advisory. Defaults: warn=true, block=false. A missing/unreadable config or
+// absent key keeps the defaults; an explicit false in config disables warning.
+func readFileOverlapConfig(projectDir string) (warn, block bool) {
+	warn, block = true, false
+	if projectDir == "" {
+		return warn, block
+	}
+	data, err := os.ReadFile(filepath.Join(projectDir, ".wipnote", "config.json"))
+	if err != nil {
+		return warn, block
+	}
+	var cfg fileOverlapConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return warn, block
+	}
+	if cfg.WarnOnFileOverlap != nil {
+		warn = *cfg.WarnOnFileOverlap
+	}
+	if cfg.BlockOnFileOverlap != nil {
+		block = *cfg.BlockOnFileOverlap
+	}
+	return warn, block
+}
+
+// checkFileOverlapAdvisory performs the single-SELECT live file-overlap probe
+// for Write/Edit/MultiEdit. Returns (advisory, nil) for the non-blocking warn
+// path, ("", &BlockExit2Error) for the blocking path, or ("", nil) when there
+// is no overlap or the feature is disabled. ZERO writes on every path.
+func checkFileOverlapAdvisory(event *CloudEvent, ctx *toolUseContext, database *sql.DB) (string, error) {
+	switch event.ToolName {
+	case "Write", "Edit", "MultiEdit", "apply_patch":
+	default:
+		return "", nil
+	}
+	if ctx == nil || ctx.SessionID == "" || database == nil {
+		return "", nil
+	}
+	warn, block := readFileOverlapConfig(ctx.ProjectDir)
+	if !warn && !block {
+		return "", nil
+	}
+
+	rawPath := extractFilePath(event.ToolInput)
+	if rawPath == "" {
+		return "", nil
+	}
+	// feature_files stores repo-relative paths (recordEventAndAllow uses the
+	// same MustNormalize call), so normalize before matching.
+	target := paths.MustNormalize(rawPath, "")
+
+	window := db.FileOverlapWindow(ctx.ProjectDir)
+	liveness := db.LivenessStalenessThreshold(ctx.ProjectDir)
+	overlaps, err := db.FindLiveFileOverlaps(database, target, ctx.SessionID, window, liveness)
+	if err != nil || len(overlaps) == 0 {
+		return "", nil
+	}
+
+	var others []string
+	for _, o := range overlaps {
+		desc := o.SessionID
+		if o.FeatureID != "" {
+			desc += " (" + o.FeatureID + ")"
+		}
+		others = append(others, desc)
+	}
+	sessions := strings.Join(others, ", ")
+
+	if block {
+		return "", &BlockExit2Error{Message: fmt.Sprintf(
+			"File-overlap block: %s was touched within the last %s by another "+
+				"live session: %s.\n"+
+				"Recovery: coordinate with the other session, or re-run after it "+
+				"completes. To proceed anyway, set block_on_file_overlap=false in "+
+				".wipnote/config.json (or export WIPNOTE_GUARDS_OFF=1 for an "+
+				"emergency override).",
+			target, window.String(), sessions),
+		}
+	}
+	return fmt.Sprintf(
+		"⚠ wipnote: %s was also touched within the last %s by another live "+
+			"session: %s. You may be editing the same file concurrently — "+
+			"coordinate to avoid clobbering each other's changes.",
+		target, window.String(), sessions), nil
 }
 
 // recordEventAndAllow inserts a tool_call agent_event row for observability
@@ -239,7 +355,8 @@ func recordEventAndAllow(event *CloudEvent, ctx *toolUseContext, database *sql.D
 	_ = db.InsertEvent(database, ev)
 
 	if ctx.FeatureID != "" {
-		_ = db.HeartbeatClaimByWorkItem(database, ctx.FeatureID, ctx.SessionID, 30*time.Minute)
+		writePath := paths.MustNormalize(extractFilePath(event.ToolInput), "")
+		_ = db.HeartbeatClaimByWorkItem(database, ctx.FeatureID, ctx.SessionID, writePath, 30*time.Minute)
 	}
 	_, _ = db.ReapExpiredClaims(database)
 

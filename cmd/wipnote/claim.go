@@ -72,9 +72,9 @@ func runClaimList(sessionID, status string, limit int) error {
 		return nil
 	}
 
-	fmt.Printf("%-12s  %-10s  %-12s  %-8s  %-12s  %s\n",
-		"CLAIM", "ITEM", "OWNER", "STATUS", "AGENT", "EXPIRES")
-	fmt.Println(strings.Repeat("-", 90))
+	fmt.Printf("%-12s  %-10s  %-12s  %-8s  %-12s  %-5s  %s\n",
+		"CLAIM", "ITEM", "OWNER", "STATUS", "AGENT", "FILES", "EXPIRES")
+	fmt.Println(strings.Repeat("-", 97))
 
 	for _, c := range claims {
 		printClaimRow(&c)
@@ -91,8 +91,16 @@ func printClaimRow(c *models.Claim) {
 	agent := truncate(c.OwnerAgent, 12)
 	expiry := c.LeaseExpiresAt.Local().Format("15:04:05")
 
-	fmt.Printf("%-12s  %-10s  %-12s  %-8s  %-12s  %s\n",
-		claimID, itemID, sessionID, c.Status, agent, expiry)
+	fileCount := 0
+	if len(c.WriteScope) > 0 {
+		var scope models.WriteScope
+		if err := json.Unmarshal(c.WriteScope, &scope); err == nil {
+			fileCount = len(scope.Paths)
+		}
+	}
+
+	fmt.Printf("%-12s  %-10s  %-12s  %-8s  %-12s  %-5d  %s\n",
+		claimID, itemID, sessionID, c.Status, agent, fileCount, expiry)
 }
 
 // claimShowCmd displays details about a specific claim.
@@ -137,9 +145,20 @@ func runClaimShow(claimID string) error {
 
 	// Print write scope if non-empty
 	if len(claim.WriteScope) > 0 {
-		var scope []string
-		if err := json.Unmarshal(claim.WriteScope, &scope); err == nil && len(scope) > 0 {
-			fmt.Printf("Scope:    %v\n", scope)
+		var scope models.WriteScope
+		if err := json.Unmarshal(claim.WriteScope, &scope); err == nil && len(scope.Paths) > 0 {
+			const maxDisplay = 20
+			fmt.Printf("Scope:    %d file(s)\n", len(scope.Paths))
+			shown := scope.Paths
+			if len(shown) > maxDisplay {
+				shown = shown[len(shown)-maxDisplay:]
+			}
+			for _, p := range shown {
+				fmt.Printf("          %s\n", p)
+			}
+			if len(scope.Paths) > maxDisplay {
+				fmt.Printf("          ... (%d total)\n", len(scope.Paths))
+			}
 		}
 	}
 
