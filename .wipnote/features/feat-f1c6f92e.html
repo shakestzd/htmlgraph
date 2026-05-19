@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>Tier 0 — Surface session→files: wipnote who &#43; session show &#43; API &#43; dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="feat-f1c6f92e"
+             data-type="feature"
+             data-status="in-progress"
+             data-priority="medium"
+             data-created="2026-05-19T00:38:27.185081"
+             data-updated="2026-05-19T01:35:07.786089" data-agent-assigned="claude-code" data-track-id="trk-f15004d6">
+
+        <header>
+            <h1>Tier 0 — Surface session→files: wipnote who &#43; session show &#43; API &#43; dashboard</h1>
+            <div class="metadata">
+                <span class="badge status-in-progress">In Progress</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="planned_in">
+                <h3>Planned In:</h3>
+                <ul>
+                    <li><a href="plan-c3bbb1ed.html" data-relationship="planned_in" data-since="2026-05-19T00:38:27.194678">plan-c3bbb1ed</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-f15004d6.html" data-relationship="part_of" data-since="2026-05-19T00:38:27.20238">trk-f15004d6</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="1ddaa17f-dfe6-4e94-a3c1-55b4357477ba.html" data-relationship="implemented_in" data-since="2026-05-19T01:35:07.78589">session 1ddaa17f-dfe6-4e94-a3c1-55b4357477ba</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Add read-only surfacing of data wipnote already captures. New `wipnote
+who` command lists every active session in the current project (joined
+sessions + claims + feature_files) with agent, model, active work item,
+claim lease remaining, and the files that session has touched
+(feature_files.session_id already exists — schema.go:301-311, nullable).
+Extend `wipnote session show ` with a Files section. Add a `files[]`
+array per session to GET /api/sessions (api.go:97-173, today 13 scalar
+fields, no files). Add an "Active sessions & files" dashboard panel.
+Reuse the ListFilesByFeature pattern (feature_files_repo.go:42) for a
+new ListFilesBySession. No new tables, no writes.</p>
+        </section>
+    </article>
+</body>
+</html>
