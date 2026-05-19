@@ -29,6 +29,32 @@ func selfBinary() string {
 	return "wipnote"
 }
 
+// CROSS-HARNESS STEP CONTRACT (feat-885ec940, Tier 4).
+//
+// Hook-driven step tracking (addTaskStep / completeTaskStep) is reachable ONLY
+// from the Claude TaskCreated / TaskCompleted handlers in missing_events.go.
+// This is intentional and load-bearing:
+//
+//   - Claude:  TaskCreated → addTaskStep, TaskCompleted → completeTaskStep.
+//              A create/complete pair exists, so steps are honestly LIVE.
+//   - Codex:   TaskStarted → TrackEvent (generic checkpoint agent_event only,
+//              never addTaskStep); TaskComplete → stop/session-end (a SESSION
+//              lifecycle event, NOT a per-task completion). There is no Codex
+//              TaskCreate analog to pair with, so mapping TaskComplete to
+//              completeTaskStep would tick steps that were never created as
+//              steps — a dishonest "live steps" state. Deliberately NOT mapped.
+//   - Gemini:  emits no task lifecycle hooks at all (manifest.json declares
+//              none with targets:[gemini]). Nothing to map.
+//
+// The honest per-harness truth is centralized in resolveTaskTrackingInfo
+// (cmd/wipnote/who.go): codex-cli / gemini-cli report Supported=false with an
+// UNSUPPORTED detail string. Tier 4 surfaces that exact signal into
+// /api/features as step_tracking_supported / step_tracking_detail so the
+// Kanban board renders a visible "steps not live for this harness" state and
+// NEVER implies live step tracking for a harness that cannot emit step events.
+// Because no harness→step mapping changed, manifest.json is unchanged and no
+// `wipnote plugin build-ports` regeneration is required.
+//
 // addTaskStep shells out to the wipnote CLI to add a task-associated step to
 // the active feature. The CLI sets StepID="task-<taskID>" so completeTaskStep
 // can find and tick it. Shells out rather than importing workitem directly

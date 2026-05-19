@@ -772,8 +772,97 @@ function buildKanbanCard(f) {
     meta.appendChild(priBadge);
   }
 
+  // Conflict badge — SAME semantics as `wipnote who` ⚠ (claim collision or
+  // a live cross-session file overlap on a file the owner touched).
+  if (f.file_conflict) {
+    var conf = document.createElement('span');
+    conf.className = 'kanban-badge kanban-badge-conflict';
+    conf.textContent = '⚠ conflict';
+    conf.title = 'Live file/claim conflict — see `wipnote who`';
+    meta.appendChild(conf);
+  }
+
   card.appendChild(meta);
+
+  // Execution-visibility row (READ-ONLY). Owner/CLI/model + liveness, step
+  // progress, last-activity age, last touched file, moved/reassigned markers.
+  var exec = document.createElement('div');
+  exec.className = 'kanban-card-exec';
+
+  if (f.active_session) {
+    var owner = document.createElement('span');
+    var harnessKey = (f.active_owner_harness || '').replace(/[^a-z0-9-]/gi, '');
+    owner.className = 'kanban-badge badge-cli badge-cli-' + (harnessKey || 'claude-code') +
+      (f.active_session_live ? ' is-live' : ' is-stale');
+    var lbl = f.active_owner_harness || 'agent';
+    if (f.active_owner_model) lbl += ' · ' + f.active_owner_model;
+    owner.textContent = (f.active_session_live ? '● ' : '○ ') + lbl;
+    owner.title = 'Owner session ' + f.active_session +
+      (f.active_session_live ? ' (live: claim heartbeat fresh)' : ' (stale: no recent heartbeat)');
+    exec.appendChild(owner);
+  }
+
+  var st = Number(f.steps_total) || 0;
+  if (st > 0) {
+    var steps = document.createElement('span');
+    steps.className = 'kanban-badge kanban-badge-steps';
+    steps.textContent = (Number(f.steps_completed) || 0) + '/' + st + ' steps';
+    if (f.step_tracking_supported === false) {
+      steps.classList.add('kanban-badge-unsupported');
+      steps.textContent = (Number(f.steps_completed) || 0) + '/' + st + ' steps (not live)';
+      steps.title = f.step_tracking_detail ||
+        'Step tracking not live for this harness';
+    }
+    exec.appendChild(steps);
+  } else if (f.step_tracking_supported === false && f.active_session) {
+    var ns = document.createElement('span');
+    ns.className = 'kanban-badge kanban-badge-unsupported';
+    ns.textContent = 'steps n/a';
+    ns.title = f.step_tracking_detail || 'Step tracking not live for this harness';
+    exec.appendChild(ns);
+  }
+
+  var ageS = Number(f.last_activity_age_seconds);
+  if (!isNaN(ageS) && ageS >= 0) {
+    var age = document.createElement('span');
+    age.className = 'kanban-badge kanban-badge-age';
+    age.textContent = shortAge(ageS) + ' ago';
+    if (f.last_tool) age.title = 'Last: ' + f.last_tool;
+    exec.appendChild(age);
+  }
+
+  if (f.moved_recently) {
+    var mv = document.createElement('span');
+    mv.className = 'kanban-badge kanban-badge-moved';
+    mv.textContent = 'moved';
+    exec.appendChild(mv);
+  }
+  if (f.reassigned_recently) {
+    var ra = document.createElement('span');
+    ra.className = 'kanban-badge kanban-badge-moved';
+    ra.textContent = 'reassigned';
+    exec.appendChild(ra);
+  }
+
+  if (exec.childNodes.length > 0) card.appendChild(exec);
+
+  if (f.last_touched_file) {
+    var lf = document.createElement('div');
+    lf.className = 'kanban-card-file';
+    lf.textContent = f.last_touched_file;
+    lf.title = f.last_touched_file;
+    card.appendChild(lf);
+  }
+
   return card;
+}
+
+// shortAge renders an age in seconds as a compact human string (no overflow).
+function shortAge(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) return Math.floor(s / 3600) + 'h';
+  return Math.floor(s / 86400) + 'd';
 }
 
 function buildKanbanColumns(items) {
@@ -826,6 +915,36 @@ function buildTrackSection(trackId, trackTitle, items) {
   titleSpan.className = 'track-section-title';
   titleSpan.textContent = trackTitle || trackId;
   sectionHeader.appendChild(titleSpan);
+
+  var activeCount = items.filter(function(f) {
+    return f.active_session && f.active_session_live;
+  }).length;
+  var staleCount = items.filter(function(f) {
+    return f.status === 'blocked' ||
+      (f.status === 'in-progress' && f.active_session && !f.active_session_live);
+  }).length;
+  var movedCount = items.filter(function(f) {
+    return f.moved_recently || f.reassigned_recently;
+  }).length;
+
+  if (activeCount > 0) {
+    var aBadge = document.createElement('span');
+    aBadge.className = 'track-section-stat track-stat-active';
+    aBadge.textContent = activeCount + ' active';
+    sectionHeader.appendChild(aBadge);
+  }
+  if (staleCount > 0) {
+    var sBadge = document.createElement('span');
+    sBadge.className = 'track-section-stat track-stat-stale';
+    sBadge.textContent = staleCount + ' blocked/stale';
+    sectionHeader.appendChild(sBadge);
+  }
+  if (movedCount > 0) {
+    var mBadge = document.createElement('span');
+    mBadge.className = 'track-section-stat track-stat-moved';
+    mBadge.textContent = movedCount + ' moved';
+    sectionHeader.appendChild(mBadge);
+  }
 
   var progressSpan = document.createElement('span');
   progressSpan.className = 'track-section-progress';
@@ -1167,6 +1286,23 @@ function renderWorkDetail(container, node) {
       text.textContent = step.description || step.step_id || '';
       if (step.completed) text.style.textDecoration = 'line-through';
       li.appendChild(text);
+
+      // Step provenance (agent/CLI/session/timestamp). Surfaced for
+      // task-created & task-completed (hook-driven) steps; gracefully
+      // absent for hand-authored steps with no provenance.
+      var provBits = [];
+      if (step.agent) provBits.push(step.agent);
+      if (step.created_by_model) provBits.push(step.created_by_model);
+      if (step.created_by_cli_version) provBits.push('v' + step.created_by_cli_version);
+      if (step.timestamp) provBits.push(relTime(step.timestamp));
+      if (provBits.length > 0) {
+        var prov = document.createElement('span');
+        prov.className = 'step-provenance';
+        prov.textContent = ' · ' + provBits.join(' / ');
+        var stepIdHint = step.step_id || '';
+        if (stepIdHint.indexOf('task-') === 0) prov.title = 'Hook-tracked step (' + stepIdHint + ')';
+        li.appendChild(prov);
+      }
       stepsList.appendChild(li);
     });
     stepsSection.appendChild(stepsList);
