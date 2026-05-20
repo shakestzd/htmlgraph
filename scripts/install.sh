@@ -36,9 +36,9 @@ ENVIRONMENT VARIABLES
   WIPNOTE_BIN_DIR   Directory to install the binary. Defaults to "$HOME/.local/bin".
 
 SUPPORTED PLATFORMS
-  darwin_amd64, darwin_arm64, linux_amd64
+  darwin_amd64, darwin_arm64, linux_amd64, linux_arm64
 
-  Other platforms (e.g. linux_arm64, Windows) must build from source:
+  Other platforms (e.g. Windows) must build from source:
     git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote
 
 EXAMPLES
@@ -89,10 +89,7 @@ PLATFORM="${OS}_${ARCH}"
 
 # Verify we publish an asset for this combination
 case "$PLATFORM" in
-  darwin_amd64|darwin_arm64|linux_amd64)
-    ;;
-  linux_arm64)
-    error "No pre-built asset for linux_arm64. Build from source: git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote"
+  darwin_amd64|darwin_arm64|linux_amd64|linux_arm64)
     ;;
   *)
     error "No pre-built asset for ${PLATFORM}. Build from source: https://github.com/shakestzd/wipnote"

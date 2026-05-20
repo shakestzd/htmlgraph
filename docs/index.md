@@ -163,7 +163,7 @@ wipnote serve    # see everything at localhost:4000
 curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | bash
 ```
 
-Supported platforms: `darwin_amd64`, `darwin_arm64`, `linux_amd64`.
+Supported platforms: `darwin_amd64`, `darwin_arm64`, `linux_amd64`, `linux_arm64`.
 
 **Pinned to a specific version:**
 
@@ -226,7 +226,7 @@ rm -rf "$TMPD"
 wipnote version
 ```
 
-For other platforms (e.g. `linux_arm64`, Windows), build from source:
+For other platforms (e.g. Windows), build from source:
 
 ```bash
 git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote
