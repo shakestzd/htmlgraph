@@ -13,7 +13,7 @@
              data-status="done"
              data-priority="high"
              data-created="2026-05-20T16:02:09.244399"
-             data-updated="2026-05-20T16:42:53.660295" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="claude-code" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.60.4">
+             data-updated="2026-05-20T16:44:36.740201" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="claude-code" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.60.4">
 
         <header>
             <h1>wipnote codex registration fails on macOS install — Codex CLI does not find manifest at marketplace root</h1>
@@ -49,7 +49,8 @@
             <h3>Description</h3>
             <p>Reproduction (v0.60.4 darwin/arm64): after 'wipnote upgrade' lays down ~/.local/share/wipnote/codex-marketplace, 'wipnote codex' prints 'WIPNOTE AGENTS NOT LOADED' with Codex CLI error 'invalid marketplace file ...codex-marketplace: marketplace root does not contain a supported manifest'. Root cause: prior fix for bug-53e78bcc (commit 46b94966f) updated the validator isValidHarnessTree to accept both flat and deep codex layouts so resolveSharedTreePath succeeds, but did not fix the registration call. cmd/wipnote/codex.go:772 passes the tree ROOT to 'codex plugin marketplace add', while the actual marketplace.json lives at /.agents/plugins/marketplace.json. Codex CLI looks for the manifest at the path it was given and errors. Affects all dogfooders running wipnote codex from a v0.60.3+ install. Likely fix: pass /.agents/plugins/marketplace.json (or its parent dir) to Codex; or restructure bundled tree so marketplace.json lives at root. Workaround: codex plugin marketplace add ~/.local/share/wipnote/codex-marketplace/.agents/plugins/marketplace.json
 [2026-05-20 16:39 claude-code] accepted-advisory (provenance override): Implementation committed in b22f44b2e (fix(codex): pass marketplace.json file path to codex CLI); link command unavailable, provenance tracked via commit message referencing bug-276a9ef4
-[2026-05-20 16:41 claude-code] accepted-advisory (provenance override): Implementation committed in b22f44b2e (fix(codex): pass marketplace.json file path to codex CLI); link command unavailable, provenance tracked via commit message referencing bug-276a9ef4</p>
+[2026-05-20 16:41 claude-code] accepted-advisory (provenance override): Implementation committed in b22f44b2e (fix(codex): pass marketplace.json file path to codex CLI); link command unavailable, provenance tracked via commit message referencing bug-276a9ef4
+[2026-05-20 16:42 claude-code] accepted-advisory (provenance override): Implementation committed in b22f44b2e (fix(codex): pass marketplace.json file path to codex CLI); link command unavailable, provenance tracked via commit message referencing bug-276a9ef4</p>
         </section>
     </article>
 </body>
