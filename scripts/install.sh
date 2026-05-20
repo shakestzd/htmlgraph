@@ -3,8 +3,9 @@
 # Usage: curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | bash
 #
 # Environment variables:
-#   WIPNOTE_VERSION   Version to install (default: latest). Example: 0.60.1
-#   WIPNOTE_BIN_DIR   Directory to install the binary (default: $HOME/.local/bin)
+#   WIPNOTE_VERSION    Version to install (default: latest). Example: 0.60.1
+#   WIPNOTE_BIN_DIR    Directory to install the binary (default: $HOME/.local/bin)
+#   WIPNOTE_SHARE_DIR  Directory to install plugin trees (default: $HOME/.local/share/wipnote)
 #
 # Examples:
 #   Install latest:
@@ -15,6 +16,9 @@
 #
 #   Custom install directory:
 #     curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_BIN_DIR=$HOME/bin bash
+#
+#   Custom share directory:
+#     curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_SHARE_DIR=$HOME/share/wipnote bash
 
 set -euo pipefail
 
@@ -31,9 +35,11 @@ USAGE
   curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_BIN_DIR=$HOME/bin bash
 
 ENVIRONMENT VARIABLES
-  WIPNOTE_VERSION   Version to install. Defaults to "latest" (resolves from GitHub API).
-                    Set to a specific semver tag without the leading "v", e.g. "0.60.1".
-  WIPNOTE_BIN_DIR   Directory to install the binary. Defaults to "$HOME/.local/bin".
+  WIPNOTE_VERSION    Version to install. Defaults to "latest" (resolves from GitHub API).
+                     Set to a specific semver tag without the leading "v", e.g. "0.60.1".
+  WIPNOTE_BIN_DIR    Directory to install the binary. Defaults to "$HOME/.local/bin".
+  WIPNOTE_SHARE_DIR  Directory to install plugin trees (plugin/, codex-marketplace/,
+                     gemini-extension/). Defaults to "$HOME/.local/share/wipnote".
 
 SUPPORTED PLATFORMS
   darwin_amd64, darwin_arm64, linux_amd64, linux_arm64
@@ -50,6 +56,9 @@ EXAMPLES
 
   # Install into ~/bin
   curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_BIN_DIR=$HOME/bin bash
+
+  # Install with custom share directory
+  curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_SHARE_DIR=$HOME/share/wipnote bash
 EOF
   exit 0
 fi
@@ -119,9 +128,10 @@ fi
 info "Installing wipnote v${VERSION}…"
 
 # ---------------------------------------------------------------------------
-# Install directory
+# Install directories
 # ---------------------------------------------------------------------------
 WIPNOTE_BIN_DIR="${WIPNOTE_BIN_DIR:-$HOME/.local/bin}"
+WIPNOTE_SHARE_DIR="${WIPNOTE_SHARE_DIR:-$HOME/.local/share/wipnote}"
 
 # ---------------------------------------------------------------------------
 # Download
@@ -179,6 +189,23 @@ mv "${TMPDIR_INSTALL}/wipnote" "${WIPNOTE_BIN_DIR}/wipnote"
 chmod +x "${WIPNOTE_BIN_DIR}/wipnote"
 
 # ---------------------------------------------------------------------------
+# Install bundled plugin trees
+# ---------------------------------------------------------------------------
+mkdir -p "${WIPNOTE_SHARE_DIR}"
+
+for tree in plugin codex-marketplace gemini-extension; do
+  SRC="${TMPDIR_INSTALL}/${tree}"
+  DST="${WIPNOTE_SHARE_DIR}/${tree}"
+
+  if [[ -d "$SRC" ]]; then
+    # Clean replace on upgrade
+    rm -rf "$DST"
+    mv "$SRC" "$DST"
+    info "Installed plugin tree → ${DST}"
+  fi
+done
+
+# ---------------------------------------------------------------------------
 # macOS Gatekeeper
 # ---------------------------------------------------------------------------
 if [[ "$OS" == "darwin" ]]; then
@@ -206,5 +233,8 @@ esac
 # Done
 # ---------------------------------------------------------------------------
 printf '\n'
-info "Installed wipnote v${VERSION} → ${WIPNOTE_BIN_DIR}/wipnote"
+info "Installed wipnote v${VERSION}"
+info "  Binary  → ${WIPNOTE_BIN_DIR}/wipnote"
+info "  Plugins → ${WIPNOTE_SHARE_DIR}"
+printf '\n'
 "${WIPNOTE_BIN_DIR}/wipnote" version

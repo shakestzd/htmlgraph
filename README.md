@@ -28,6 +28,8 @@ curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/inst
 
 Supported platforms: `darwin_amd64`, `darwin_arm64`, `linux_amd64`, `linux_arm64`.
 
+The installer places the `wipnote` binary in `~/.local/bin/` and the bundled plugin trees (`plugin/`, `codex-marketplace/`, `gemini-extension/`) in `~/.local/share/wipnote/`. Both locations can be customized via environment variables.
+
 **Pinned to a specific version:**
 
 ```bash
@@ -37,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/inst
 **Custom install directory:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_BIN_DIR=$HOME/bin bash
+curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_BIN_DIR=$HOME/bin WIPNOTE_SHARE_DIR=$HOME/share/wipnote bash
 ```
 
 ### Upgrading
@@ -61,10 +63,11 @@ The `install.sh` script:
 2. Resolves the version — from `WIPNOTE_VERSION` env var, or fetches the latest tag from `https://api.github.com/repos/shakestzd/wipnote/releases/latest`.
 3. Downloads `wipnote_${VERSION}_${OS}_${ARCH}.tar.gz` and `wipnote_${VERSION}_checksums.txt` to a temp dir (cleaned up via `trap … EXIT`).
 4. Verifies the sha256 checksum via `sha256sum` (Linux) or `shasum -a 256` (macOS). Hard-fails on mismatch; prints a clear warning if neither tool is available and skips (does NOT silently bypass).
-5. Extracts the tarball, `mkdir -p`s the install dir (`WIPNOTE_BIN_DIR`, default `$HOME/.local/bin`), moves the binary, `chmod +x`.
-6. On macOS: removes the quarantine attribute (`xattr -d com.apple.quarantine`) to avoid Gatekeeper blocking.
-7. Checks whether the install dir is on your `PATH`. If not, prints instructions — it does NOT mutate your shell rc files.
-8. Prints `==> Installed wipnote vX.Y.Z` and runs `wipnote version`.
+5. Extracts the tarball, `mkdir -p`s the binary dir (`WIPNOTE_BIN_DIR`, default `$HOME/.local/bin`), moves the binary, `chmod +x`.
+6. Installs the bundled plugin trees (`plugin/`, `codex-marketplace/`, `gemini-extension/`) to the share dir (`WIPNOTE_SHARE_DIR`, default `$HOME/.local/share/wipnote/`).
+7. On macOS: removes the quarantine attribute (`xattr -d com.apple.quarantine`) to avoid Gatekeeper blocking.
+8. Checks whether the binary dir is on your `PATH`. If not, prints instructions — it does NOT mutate your shell rc files.
+9. Prints `==> Installed wipnote vX.Y.Z` and runs `wipnote version`.
 
 **Manual install equivalent:**
 
@@ -81,9 +84,13 @@ curl -fsSL "https://github.com/shakestzd/wipnote/releases/download/v${VERSION}/w
 sha256sum --check --ignore-missing "$TMPD/checksums.txt"  # Linux
 # shasum -a 256 --check "$TMPD/checksums.txt"             # macOS
 tar -xzf "$TMPD/wipnote.tar.gz" -C "$TMPD"
-mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/wipnote"
 mv "$TMPD/wipnote" "$HOME/.local/bin/wipnote"
 chmod +x "$HOME/.local/bin/wipnote"
+# Install bundled plugin trees
+for tree in plugin codex-marketplace gemini-extension; do
+  [[ -d "$TMPD/$tree" ]] && mv "$TMPD/$tree" "$HOME/.local/share/wipnote/$tree"
+done
 xattr -d com.apple.quarantine "$HOME/.local/bin/wipnote" 2>/dev/null || true  # macOS only
 rm -rf "$TMPD"
 wipnote version
