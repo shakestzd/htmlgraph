@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>wipnote check --gate hardcoded to load &lt;project&gt;/plugin/config/quality-gate-flake-allowlist.json — fails in every non-wipnote project</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-3658bd4f"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-20T07:52:34.619872"
+             data-updated="2026-05-20T07:52:34.637712" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>wipnote check --gate hardcoded to load &lt;project&gt;/plugin/config/quality-gate-flake-allowlist.json — fails in every non-wipnote project</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T07:52:34.637198">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>First-time-use surfacing: in a non-wipnote project (e.g. user's actual app), 'wipnote check --gate' fails with 'load gate allowlist: open /plugin/config/quality-gate-flake-allowlist.json: no such file or directory'. This file only exists in the wipnote repo. Downstream effect: feature/bug/spike completion requires a passing gate record, but the gate can never produce one in any other project. The entire completion flow is broken for real users. CRITICAL Show-HN blocker — affects every cloner/installer doing actual work. Fix direction: make the allowlist optional (treat missing as empty), or ship a sensible default at a wipnote-managed user-local path, or relax the gate to not require this file at all.</p>
+        </section>
+    </article>
+</body>
+</html>
