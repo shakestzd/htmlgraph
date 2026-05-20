@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -258,6 +260,9 @@ func loadGateAllowlist(projectRoot string) ([]gateAllowlistEntry, error) {
 	path := filepath.Join(projectRoot, "plugin", "config", "quality-gate-flake-allowlist.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("load gate allowlist: %w", err)
 	}
 	var entries []gateAllowlistEntry

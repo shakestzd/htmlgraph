@@ -275,3 +275,14 @@ func TestCheckCompletionGateRecord_AcceptsMatchingSessionAfterRecheck(t *testing
 		t.Fatalf("expected recheck to write a second gate record, got %d", count)
 	}
 }
+
+func TestLoadGateAllowlist_MissingFileReturnsEmpty(t *testing.T) {
+	projectRoot := t.TempDir()
+	entries, err := loadGateAllowlist(projectRoot)
+	if err != nil {
+		t.Fatalf("loadGateAllowlist: %v", err)
+	}
+	if entries != nil && len(entries) != 0 {
+		t.Fatalf("expected nil or empty allowlist, got %d entries", len(entries))
+	}
+}

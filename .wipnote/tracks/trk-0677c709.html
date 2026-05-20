@@ -13,7 +13,7 @@
              data-status="in-progress"
              data-priority="high"
              data-created="2026-04-10T22:30:29.647944"
-             data-updated="2026-05-19T21:15:12.573732" data-agent-assigned="claude-code">
+             data-updated="2026-05-20T07:52:35.458645" data-agent-assigned="claude-code">
 
         <header>
             <h1>Launch Readiness — close pitch/reality gaps before LinkedIn launch</h1>
@@ -24,18 +24,6 @@
         </header>
 
         <nav data-graph-edges>
-            <section data-edge-type="implemented_in">
-                <h3>Implemented In:</h3>
-                <ul>
-                    <li><a href="1c5cbe83-cc15-44e1-b099-5ad730cecece.html" data-relationship="implemented_in" data-since="2026-04-11T00:00:08.02862">session 1c5cbe83-cc15-44e1-b099-5ad730cecece</a></li>
-                </ul>
-            </section>
-            <section data-edge-type="relates_to">
-                <h3>Relates To:</h3>
-                <ul>
-                    <li><a href="trk-bf3f8aa4.html" data-relationship="relates_to" data-since="2026-05-05T21:42:44.563879">Public Launch 2026-05 — Erinn AI rename &#43; announcement</a></li>
-                </ul>
-            </section>
             <section data-edge-type="contains">
                 <h3>Contains:</h3>
                 <ul>
@@ -227,6 +215,29 @@
                     <li><a href="feat-5d2188b9.html" data-relationship="contains" data-since="2026-05-19T18:43:02.642643">OSS launch readiness audit — positioning, cold-clone demo, concurrency &#43; contention gates</a></li>
                     <li><a href="bug-4b07fd94.html" data-relationship="contains" data-since="2026-05-19T19:31:47.188772">Cold-clone: &#39;wipnote lineage&#39; returns &#39;no related nodes&#39; — SQLite read-index not built on fresh clone though HTML has edges</a></li>
                     <li><a href="bug-903850c9.html" data-relationship="contains" data-since="2026-05-19T21:15:12.555737">Test suite hardcodes devcontainer-only tmp base path; breaks CI and any non-devcontainer machine</a></li>
+                    <li><a href="bug-eaed0425.html" data-relationship="contains" data-since="2026-05-20T03:07:18.519293">scripts/deploy-all.sh does not regenerate codex/gemini port trees before release commit; every release tag ships stale ports</a></li>
+                    <li><a href="feat-88f6af9f.html" data-relationship="contains" data-since="2026-05-20T05:05:19.813416">Add first-time install instructions (curl one-liner) to README and docs site</a></li>
+                    <li><a href="feat-62dc5aae.html" data-relationship="contains" data-since="2026-05-20T05:35:53.649369">Ship hosted install.sh and reduce documented install to one-liner</a></li>
+                    <li><a href="feat-f09ad75a.html" data-relationship="contains" data-since="2026-05-20T05:45:59.693805">Add linux_arm64 to GoReleaser build matrix</a></li>
+                    <li><a href="bug-4de3b640.html" data-relationship="contains" data-since="2026-05-20T05:48:06.175088">install.sh and install docs use &#39;wipnote --version&#39; but CLI exposes &#39;wipnote version&#39; (subcommand) — final verify step errors with &#39;unknown flag: --version&#39;</a></li>
+                    <li><a href="bug-90fcddec.html" data-relationship="contains" data-since="2026-05-20T05:54:52.19805">install.sh incorrectly hard-errors on linux_arm64 though the asset is published</a></li>
+                    <li><a href="bug-0eba234c.html" data-relationship="contains" data-since="2026-05-20T06:08:50.038037">install.sh installs only the wipnote binary; bundled plugin/codex-marketplace/gemini-extension trees are discarded, breaking &#39;wipnote claude/codex/gemini&#39; launchers</a></li>
+                    <li><a href="bug-53e78bcc.html" data-relationship="contains" data-since="2026-05-20T07:50:48.633362">wipnote codex/gemini broken from binary install: validator sentinel &#39;.agents/plugins/marketplace.json&#39; doesn&#39;t match bundled tarball layout (flattened to marketplace.json at root)</a></li>
+                    <li><a href="bug-3658bd4f.html" data-relationship="contains" data-since="2026-05-20T07:52:34.637198">wipnote check --gate hardcoded to load &lt;project&gt;/plugin/config/quality-gate-flake-allowlist.json — fails in every non-wipnote project</a></li>
+                    <li><a href="bug-9a298dfa.html" data-relationship="contains" data-since="2026-05-20T07:52:35.034791">PreToolUse Write guard over-broadly blocks writes outside the project (e.g. /tmp scratch files), forcing fake work-item creation</a></li>
+                    <li><a href="bug-2a99e9d4.html" data-relationship="contains" data-since="2026-05-20T07:52:35.448988">Spike/feature completion treats /tmp paths as &#39;code-bearing source&#39; and refuses to complete on missing commit; blocks planning-only work flows</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="implemented_in">
+                <h3>Implemented In:</h3>
+                <ul>
+                    <li><a href="1c5cbe83-cc15-44e1-b099-5ad730cecece.html" data-relationship="implemented_in" data-since="2026-04-11T00:00:08.02862">session 1c5cbe83-cc15-44e1-b099-5ad730cecece</a></li>
+                </ul>
+            </section>
+            <section data-edge-type="relates_to">
+                <h3>Relates To:</h3>
+                <ul>
+                    <li><a href="trk-bf3f8aa4.html" data-relationship="relates_to" data-since="2026-05-05T21:42:44.563879">Public Launch 2026-05 — Erinn AI rename &#43; announcement</a></li>
                 </ul>
             </section>
         </nav>
