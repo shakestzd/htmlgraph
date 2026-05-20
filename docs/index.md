@@ -186,7 +186,7 @@ wipnote upgrade
 ### Verify
 
 ```bash
-wipnote --version    # should print 0.60.1 (or later)
+wipnote version    # should print 0.60.1 (or later)
 ```
 
 <details>
@@ -201,7 +201,7 @@ The `install.sh` script:
 5. Extracts the tarball, `mkdir -p`s the install dir (`WIPNOTE_BIN_DIR`, default `$HOME/.local/bin`), moves the binary, `chmod +x`.
 6. On macOS: removes the quarantine attribute (`xattr -d com.apple.quarantine`) to avoid Gatekeeper blocking.
 7. Checks whether the install dir is on your `PATH`. If not, prints instructions — it does NOT mutate your shell rc files.
-8. Prints `==> Installed wipnote vX.Y.Z` and runs `wipnote --version`.
+8. Prints `==> Installed wipnote vX.Y.Z` and runs `wipnote version`.
 
 **Manual install equivalent:**
 
@@ -223,7 +223,7 @@ mv "$TMPD/wipnote" "$HOME/.local/bin/wipnote"
 chmod +x "$HOME/.local/bin/wipnote"
 xattr -d com.apple.quarantine "$HOME/.local/bin/wipnote" 2>/dev/null || true  # macOS only
 rm -rf "$TMPD"
-wipnote --version
+wipnote version
 ```
 
 For other platforms (e.g. `linux_arm64`, Windows), build from source:

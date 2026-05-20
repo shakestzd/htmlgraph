@@ -210,4 +210,4 @@ esac
 # ---------------------------------------------------------------------------
 printf '\n'
 info "Installed wipnote v${VERSION} → ${WIPNOTE_BIN_DIR}/wipnote"
-"${WIPNOTE_BIN_DIR}/wipnote" --version
+"${WIPNOTE_BIN_DIR}/wipnote" version
