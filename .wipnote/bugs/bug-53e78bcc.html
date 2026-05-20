@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>wipnote codex/gemini broken from binary install: validator sentinel &#39;.agents/plugins/marketplace.json&#39; doesn&#39;t match bundled tarball layout (flattened to marketplace.json at root)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-53e78bcc"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-20T07:50:48.560275"
+             data-updated="2026-05-20T07:50:48.637853" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>wipnote codex/gemini broken from binary install: validator sentinel &#39;.agents/plugins/marketplace.json&#39; doesn&#39;t match bundled tarball layout (flattened to marketplace.json at root)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T07:50:48.633362">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>share_paths.go isValidHarnessTree checks for treeRoot/.agents/plugins/marketplace.json as the codex-marketplace sentinel. The repo source has that exact path under packages/codex-marketplace/, so dev mode works. But the GoReleaser archive flattens .agents/plugins/ out — the published tarball has codex-marketplace/marketplace.json at the root with no .agents/plugins/ prefix. Result: every binary-install user gets 'wipnote codex-marketplace tree not found' even when the tree is correctly installed. WIPNOTE_CODEX_DIR override does NOT bypass validation, so the error is unavoidable from a binary install. Same risk pattern likely affects wipnote gemini (different sentinel — gemini-extension.json — needs separate verification). wipnote claude is unaffected (its sentinel .claude-plugin/plugin.json survives the flattening). Fix requires choosing one of: (a) update validator to accept the flattened layout, (b) update GoReleaser/plugin-build-ports to preserve deep layout, (c) consolidate so dev source and bundled tree share one layout. Out-of-scope for tonight's launch flag-plant since codex/gemini are documented experimental; needs focused follow-up. NOT a blocker for wipnote claude dogfooding or the Show-HN positioning, which is the Claude path.</p>
+        </section>
+    </article>
+</body>
+</html>
