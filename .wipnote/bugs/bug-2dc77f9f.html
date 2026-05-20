@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>plan finalize &#43; CLI promote-slice creates duplicate feature work items (GH#113)</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-2dc77f9f"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-20T09:46:44.668537"
+             data-updated="2026-05-20T09:46:44.68608" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="claude-code" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.60.1">
+
+        <header>
+            <h1>plan finalize &#43; CLI promote-slice creates duplicate feature work items (GH#113)</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T09:46:44.685178">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Reported via GH issue #113. Finalizing a plan via the dashboard auto-promotes approved slices into features; running wipnote plan promote-slice from CLI for the same slices creates duplicates. Plan YAML feature_id only records the latest promote call, orphaning the dashboard-created feature. 9 slices became 18 features. Promote-slice should be idempotent — short-circuit if slice already promoted, returning existing id. Need optional --force/--re-promote flag.</p>
+        </section>
+    </article>
+</body>
+</html>
