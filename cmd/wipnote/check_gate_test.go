@@ -282,7 +282,7 @@ func TestLoadGateAllowlist_MissingFileReturnsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadGateAllowlist: %v", err)
 	}
-	if entries != nil && len(entries) != 0 {
+	if len(entries) != 0 {
 		t.Fatalf("expected nil or empty allowlist, got %d entries", len(entries))
 	}
 }
