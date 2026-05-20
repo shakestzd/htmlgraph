@@ -159,16 +159,30 @@ wipnote serve    # see everything at localhost:4000
 
 <h2 class="hg-section__title">Install</h2>
 
+### Mac & Linux (recommended — auto-detects platform + latest release)
+
 ```bash
-# Install (universal)
-curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/install.sh | sh
+ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+VERSION=$(curl -fsSL https://api.github.com/repos/shakestzd/wipnote/releases/latest \
+  | grep -m1 '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/')
+TMPD=$(mktemp -d)
+curl -fsSL "https://github.com/shakestzd/wipnote/releases/download/v${VERSION}/wipnote_${VERSION}_${OS}_${ARCH}.tar.gz" \
+  | tar -xz -C "$TMPD"
+mkdir -p "$HOME/.local/bin"
+mv "$TMPD/wipnote" "$HOME/.local/bin/wipnote"
+chmod +x "$HOME/.local/bin/wipnote"
+xattr -d com.apple.quarantine "$HOME/.local/bin/wipnote" 2>/dev/null || true  # macOS Gatekeeper, if needed
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" ;; esac
+rm -rf "$TMPD"
+wipnote --version
+```
 
-# Or as a Claude Code plugin
-claude plugin install wipnote
+### Pinned to a specific version
 
-# Or build from source
-git clone https://github.com/shakestzd/wipnote.git
-cd wipnote && go build -o wipnote ./cmd/wipnote/
+```bash
+VERSION=0.60.1   # see https://github.com/shakestzd/wipnote/releases for latest
+# …then the rest of the block above
 ```
 
 ### Upgrading
@@ -177,6 +191,17 @@ cd wipnote && go build -o wipnote ./cmd/wipnote/
 wipnote upgrade            # latest release
 wipnote upgrade --check    # check without installing
 wipnote update             # alias for upgrade
+```
+
+### Supported release assets
+
+`darwin_amd64`, `darwin_arm64`, `linux_amd64`. For other platforms (e.g. `linux_arm64`, Windows), build from source: `git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote`.
+
+### Verify
+
+```bash
+wipnote --version    # should print 0.60.1 (or later)
+which wipnote        # should print $HOME/.local/bin/wipnote
 ```
 
 </section>

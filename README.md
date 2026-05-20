@@ -22,26 +22,53 @@ HTML is the source of truth; SQLite is derived. If they drift, `wipnote reindex`
 
 ## Install
 
+### Mac & Linux (recommended — auto-detects platform + latest release)
+
 ```bash
-# Homebrew (macOS / Linux)
-brew install shakestzd/wipnote/wipnote
-
-# Or universal curl install
-curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/install.sh | sh
-
-# Or build from source
-git clone https://github.com/shakestzd/wipnote.git
-cd wipnote && go build -o wipnote ./cmd/wipnote/
+ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+VERSION=$(curl -fsSL https://api.github.com/repos/shakestzd/wipnote/releases/latest \
+  | grep -m1 '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/')
+TMPD=$(mktemp -d)
+curl -fsSL "https://github.com/shakestzd/wipnote/releases/download/v${VERSION}/wipnote_${VERSION}_${OS}_${ARCH}.tar.gz" \
+  | tar -xz -C "$TMPD"
+mkdir -p "$HOME/.local/bin"
+mv "$TMPD/wipnote" "$HOME/.local/bin/wipnote"
+chmod +x "$HOME/.local/bin/wipnote"
+xattr -d com.apple.quarantine "$HOME/.local/bin/wipnote" 2>/dev/null || true  # macOS Gatekeeper, if needed
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" ;; esac
+rm -rf "$TMPD"
+wipnote --version
 ```
 
-The release tarball (and the Homebrew formula) bundle the plugin trees for
-Claude Code, Codex CLI, and Gemini CLI alongside the `wipnote` binary. There is
-no separate `claude plugin install` step — `wipnote claude` loads the bundled
-plugin via `--plugin-dir` automatically.
+### Pinned to a specific version
 
-For subsequent rebuilds after the binary is on your PATH, use `wipnote build`
-(it rebuilds the binary AND mirrors the plugin trees into
-`~/.local/share/wipnote/`).
+```bash
+VERSION=0.60.1   # see https://github.com/shakestzd/wipnote/releases for latest
+# …then the rest of the block above
+```
+
+### Upgrading later
+
+```bash
+wipnote upgrade
+```
+
+### Supported release assets
+
+`darwin_amd64`, `darwin_arm64`, `linux_amd64`. For other platforms (e.g. `linux_arm64`, Windows), build from source: `git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote`.
+
+### Verify
+
+```bash
+wipnote --version    # should print 0.60.1 (or later)
+which wipnote        # should print $HOME/.local/bin/wipnote
+```
+
+The release tarball bundles the plugin trees for Claude Code, Codex CLI, and
+Gemini CLI alongside the `wipnote` binary. There is no separate
+`claude plugin install` step — `wipnote claude` loads the bundled plugin via
+`--plugin-dir` automatically.
 
 ### Using wipnote with each harness
 
@@ -52,9 +79,8 @@ wipnote gemini   # Gemini CLI with bundled extension
 ```
 
 Each launcher resolves the bundled tree (from `~/.local/share/wipnote/` for the
-curl/dev install or `$(brew --prefix)/share/wipnote/` for Homebrew) and points
-the harness at it. Override the resolved path per-tree with
-`WIPNOTE_PLUGIN_DIR`, `WIPNOTE_CODEX_DIR`, or `WIPNOTE_GEMINI_DIR`.
+curl/dev install) and points the harness at it. Override the resolved path
+per-tree with `WIPNOTE_PLUGIN_DIR`, `WIPNOTE_CODEX_DIR`, or `WIPNOTE_GEMINI_DIR`.
 
 For users who want the bare `claude` / `codex` / `gemini` commands to route
 through wipnote, opt in via shell aliases:
@@ -66,14 +92,6 @@ wipnote shell-alias >> ~/.zshrc    # or ~/.bashrc
 This is intentionally opt-in — per-project `wipnote claude` invocation is the
 recommended flow because it avoids surprising shell behavior in non-wipnote
 projects.
-
-### Upgrading
-
-```bash
-wipnote upgrade            # latest release
-wipnote upgrade --check    # check without installing
-wipnote update             # alias for upgrade
-```
 
 ## Quick Start
 
