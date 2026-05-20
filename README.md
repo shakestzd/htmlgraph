@@ -22,48 +22,80 @@ HTML is the source of truth; SQLite is derived. If they drift, `wipnote reindex`
 
 ## Install
 
-### Mac & Linux (recommended — auto-detects platform + latest release)
-
 ```bash
-ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-VERSION=$(curl -fsSL https://api.github.com/repos/shakestzd/wipnote/releases/latest \
-  | grep -m1 '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/')
-TMPD=$(mktemp -d)
-curl -fsSL "https://github.com/shakestzd/wipnote/releases/download/v${VERSION}/wipnote_${VERSION}_${OS}_${ARCH}.tar.gz" \
-  | tar -xz -C "$TMPD"
-mkdir -p "$HOME/.local/bin"
-mv "$TMPD/wipnote" "$HOME/.local/bin/wipnote"
-chmod +x "$HOME/.local/bin/wipnote"
-xattr -d com.apple.quarantine "$HOME/.local/bin/wipnote" 2>/dev/null || true  # macOS Gatekeeper, if needed
-case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" ;; esac
-rm -rf "$TMPD"
-wipnote --version
+curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | bash
 ```
 
-### Pinned to a specific version
+Supported platforms: `darwin_amd64`, `darwin_arm64`, `linux_amd64`.
+
+**Pinned to a specific version:**
 
 ```bash
-VERSION=0.60.1   # see https://github.com/shakestzd/wipnote/releases for latest
-# …then the rest of the block above
+curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_VERSION=0.60.1 bash
 ```
 
-### Upgrading later
+**Custom install directory:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shakestzd/wipnote/main/scripts/install.sh | WIPNOTE_BIN_DIR=$HOME/bin bash
+```
+
+### Upgrading
 
 ```bash
 wipnote upgrade
 ```
 
-### Supported release assets
-
-`darwin_amd64`, `darwin_arm64`, `linux_amd64`. For other platforms (e.g. `linux_arm64`, Windows), build from source: `git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote`.
-
 ### Verify
 
 ```bash
 wipnote --version    # should print 0.60.1 (or later)
-which wipnote        # should print $HOME/.local/bin/wipnote
 ```
+
+<details>
+<summary>What does this script do? / Manual install</summary>
+
+The `install.sh` script:
+
+1. Detects your OS (`uname -s`: `darwin` or `linux`) and architecture (`uname -m`: `x86_64`→`amd64`, `arm64`/`aarch64`→`arm64`). Errors clearly on unsupported combinations.
+2. Resolves the version — from `WIPNOTE_VERSION` env var, or fetches the latest tag from `https://api.github.com/repos/shakestzd/wipnote/releases/latest`.
+3. Downloads `wipnote_${VERSION}_${OS}_${ARCH}.tar.gz` and `wipnote_${VERSION}_checksums.txt` to a temp dir (cleaned up via `trap … EXIT`).
+4. Verifies the sha256 checksum via `sha256sum` (Linux) or `shasum -a 256` (macOS). Hard-fails on mismatch; prints a clear warning if neither tool is available and skips (does NOT silently bypass).
+5. Extracts the tarball, `mkdir -p`s the install dir (`WIPNOTE_BIN_DIR`, default `$HOME/.local/bin`), moves the binary, `chmod +x`.
+6. On macOS: removes the quarantine attribute (`xattr -d com.apple.quarantine`) to avoid Gatekeeper blocking.
+7. Checks whether the install dir is on your `PATH`. If not, prints instructions — it does NOT mutate your shell rc files.
+8. Prints `==> Installed wipnote vX.Y.Z` and runs `wipnote --version`.
+
+**Manual install equivalent:**
+
+```bash
+VERSION=0.60.1
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+TMPD=$(mktemp -d)
+curl -fsSL "https://github.com/shakestzd/wipnote/releases/download/v${VERSION}/wipnote_${VERSION}_${OS}_${ARCH}.tar.gz" \
+  -o "$TMPD/wipnote.tar.gz"
+curl -fsSL "https://github.com/shakestzd/wipnote/releases/download/v${VERSION}/wipnote_${VERSION}_checksums.txt" \
+  -o "$TMPD/checksums.txt"
+# Verify checksum (Linux: sha256sum, macOS: shasum -a 256)
+sha256sum --check --ignore-missing "$TMPD/checksums.txt"  # Linux
+# shasum -a 256 --check "$TMPD/checksums.txt"             # macOS
+tar -xzf "$TMPD/wipnote.tar.gz" -C "$TMPD"
+mkdir -p "$HOME/.local/bin"
+mv "$TMPD/wipnote" "$HOME/.local/bin/wipnote"
+chmod +x "$HOME/.local/bin/wipnote"
+xattr -d com.apple.quarantine "$HOME/.local/bin/wipnote" 2>/dev/null || true  # macOS only
+rm -rf "$TMPD"
+wipnote --version
+```
+
+For other platforms (e.g. `linux_arm64`, Windows), build from source:
+
+```bash
+git clone https://github.com/shakestzd/wipnote && cd wipnote && go build -o ~/.local/bin/wipnote ./cmd/wipnote
+```
+
+</details>
 
 The release tarball bundles the plugin trees for Claude Code, Codex CLI, and
 Gemini CLI alongside the `wipnote` binary. There is no separate
