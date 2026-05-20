@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>PreToolUse Write guard over-broadly blocks writes outside the project (e.g. /tmp scratch files), forcing fake work-item creation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-9a298dfa"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-20T07:52:35.024256"
+             data-updated="2026-05-20T07:52:35.035541" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>PreToolUse Write guard over-broadly blocks writes outside the project (e.g. /tmp scratch files), forcing fake work-item creation</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T07:52:35.034791">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>First-time-use surfacing: agent tried to Write to /tmp/plan.yaml (scratch buffer, not project source) during plan creation. Guard rejected with 'An active work item is required before writing code.' The /tmp path has no relationship to the project's repo — should not be gated as 'code.' Forces users to create a throwaway spike/feature just to write a scratch file. Pattern repeated 4+ times in tonight's own dogfooding session for memory files, scratch buffers, etc. Fix direction: scope the guard to the project root (CLAUDE_PROJECT_DIR / .wipnote root walk-up). Writes outside that tree are NOT project code — let them through.</p>
+        </section>
+    </article>
+</body>
+</html>
