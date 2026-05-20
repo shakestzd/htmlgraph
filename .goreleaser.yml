@@ -51,6 +51,18 @@ archives:
         dst: gemini-extension
         info:
           mode: 0644
+      - src: "packages/gemini-extension/gemini-extension.json"
+        dst: gemini-extension
+        info:
+          mode: 0644
+      - src: "packages/gemini-extension/GEMINI.md"
+        dst: gemini-extension
+        info:
+          mode: 0644
+      - src: "packages/gemini-extension/README.md"
+        dst: gemini-extension
+        info:
+          mode: 0644
 
 checksum:
   name_template: "wipnote_{{.Version}}_checksums.txt"

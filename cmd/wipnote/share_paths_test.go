@@ -117,6 +117,11 @@ func TestIsValidHarnessTree(t *testing.T) {
 			_ = os.MkdirAll(filepath.Join(dir, ".agents", "plugins"), 0o755)
 			_ = os.WriteFile(filepath.Join(dir, ".agents", "plugins", "marketplace.json"), []byte("{}"), 0o644)
 		}},
+		{"codex-marketplace", true, func(dir string) {
+			// bundled tarball flat layout: marketplace.json at root (no .agents/plugins/)
+			_ = os.MkdirAll(dir, 0o755)
+			_ = os.WriteFile(filepath.Join(dir, "marketplace.json"), []byte("{}"), 0o644)
+		}},
 		{"gemini-extension", true, func(dir string) {
 			_ = os.MkdirAll(dir, 0o755)
 			_ = os.WriteFile(filepath.Join(dir, "gemini-extension.json"), []byte("{}"), 0o644)
@@ -128,6 +133,38 @@ func TestIsValidHarnessTree(t *testing.T) {
 		got := isValidHarnessTree(dir, c.tree)
 		if got != c.ok {
 			t.Errorf("case %d (%s): got %v, want %v", i, c.tree, got, c.ok)
+		}
+	}
+}
+
+func TestIsValidHarnessTree_CodexAcceptsBundledFlatLayout(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "marketplace.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if !isValidHarnessTree(dir, "codex-marketplace") {
+		t.Fatal("expected true for codex flat layout, got false")
+	}
+}
+
+func TestIsValidHarnessTree_CodexAcceptsDevDeepLayout(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".agents", "plugins"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".agents", "plugins", "marketplace.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if !isValidHarnessTree(dir, "codex-marketplace") {
+		t.Fatal("expected true for codex deep layout, got false")
+	}
+}
+
+func TestIsValidHarnessTree_RejectsEmptyTree(t *testing.T) {
+	for _, tree := range []string{"plugin", "codex-marketplace", "gemini-extension"} {
+		dir := t.TempDir()
+		if isValidHarnessTree(dir, tree) {
+			t.Errorf("expected false for empty tree %q, got true", tree)
 		}
 	}
 }

@@ -106,22 +106,26 @@ func isValidHarnessTree(path, treeName string) bool {
 	if err != nil || !info.IsDir() {
 		return false
 	}
-	var sentinel string
+	var sentinels []string
 	switch treeName {
 	case "plugin":
-		sentinel = filepath.Join(".claude-plugin", "plugin.json")
+		sentinels = []string{filepath.Join(".claude-plugin", "plugin.json")}
 	case "codex-marketplace":
-		// The bundled tree has .agents/plugins/marketplace.json at the root.
-		sentinel = filepath.Join(".agents", "plugins", "marketplace.json")
+		sentinels = []string{
+			"marketplace.json",                                      // bundled tarball (GoReleaser flat layout)
+			filepath.Join(".agents", "plugins", "marketplace.json"), // dev source (deep layout)
+		}
 	case "gemini-extension":
-		sentinel = "gemini-extension.json"
+		sentinels = []string{"gemini-extension.json"}
 	default:
 		return false
 	}
-	if _, err := os.Stat(filepath.Join(path, sentinel)); err != nil {
-		return false
+	for _, s := range sentinels {
+		if _, err := os.Stat(filepath.Join(path, s)); err == nil {
+			return true
+		}
 	}
-	return true
+	return false
 }
 
 // devSourceTreePath walks up from CWD looking for a go.mod that identifies
