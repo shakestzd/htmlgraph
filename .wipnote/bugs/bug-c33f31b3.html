@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>codex marketplace registration: tarball uses FLAT layout (marketplace.json at root), dev source uses DEEP layout (.agents/plugins/marketplace.json) — fix must handle both</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-c33f31b3"
+             data-type="bug"
+             data-status="todo"
+             data-priority="high"
+             data-created="2026-05-20T18:54:35.900381"
+             data-updated="2026-05-20T18:54:35.917024" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="claude-code" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.60.4">
+
+        <header>
+            <h1>codex marketplace registration: tarball uses FLAT layout (marketplace.json at root), dev source uses DEEP layout (.agents/plugins/marketplace.json) — fix must handle both</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T18:54:35.916533">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>v0.60.7 fix assumed deep layout for all installs. Empirical inspection of the released wipnote_0.60.7_darwin_arm64.tar.gz shows GoReleaser flattens the codex tree: tarball contains codex-marketplace/marketplace.json at root and codex-marketplace/wipnote/.codex-plugin/plugin.json — no .agents/plugins/ prefix. Dev source AND wipnote build install retain the deep layout (.agents/plugins/marketplace.json with .agents/plugins/wipnote/). Need a helper codexManifestPath(treeRoot) that stat-checks the flat path first, falls back to the deep path. Apply at all marketplace-add call sites in cmd/wipnote/codex.go (runCodexInit ~781, launchCodexDefault ~893, --dev ~1086) and in ensureCodexLocalPluginInstalled (~344-353). Repro: 'wipnote upgrade' to v0.60.7 on Mac then 'wipnote codex' → Error: failed to resolve local marketplace source path: No such file or directory.</p>
+        </section>
+    </article>
+</body>
+</html>
