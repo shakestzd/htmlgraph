@@ -810,7 +810,7 @@ func checkProvenanceCompleteGate(p *workitem.Project, col *workitem.Collection, 
 		return nil
 	}
 
-	codePaths, err := dbpkg.CodeBearingPaths(p.DB, id)
+	codePaths, err := dbpkg.CodeBearingPaths(p.DB, id, filepath.Dir(p.ProjectDir))
 	if err != nil {
 		return fmt.Errorf("provenance gate: inspect code-bearing paths for %s: %w", id, err)
 	}
@@ -896,7 +896,7 @@ func checkCompletionGateRecord(database *sql.DB, projectRoot, sessionID, workIte
 	if database == nil {
 		return nil
 	}
-	codePaths, err := dbpkg.CodeBearingPaths(database, workItemID)
+	codePaths, err := dbpkg.CodeBearingPaths(database, workItemID, projectRoot)
 	if err != nil {
 		return fmt.Errorf("quality gate: inspect code-bearing paths for %s: %w", workItemID, err)
 	}

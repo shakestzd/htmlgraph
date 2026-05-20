@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -225,11 +226,16 @@ func GetCommitsByFeature(database *sql.DB, featureID string) ([]models.GitCommit
 // generic item ID column (feature_id), so this works type-agnostically for
 // features, bugs, and spikes alike.
 //
+// projectRoot is the absolute path to the repository root (i.e. the parent
+// of the .wipnote/ directory). Paths that are outside the project root
+// (e.g. /tmp/foo.yaml) and paths with the "unresolved:" sentinel prefix are
+// excluded in addition to .wipnote-scoped paths.
+//
 // An item is "code-bearing" iff this returns a non-empty slice: its trace
 // touched at least one source path outside .wipnote/. Pure-.wipnote/doc
 // items (or items with no recorded files) return an empty slice and are
 // exempt from the provenance completion gate.
-func CodeBearingPaths(database *sql.DB, featureID string) ([]string, error) {
+func CodeBearingPaths(database *sql.DB, featureID string, projectRoot string) ([]string, error) {
 	rows, err := database.Query(`
 		SELECT DISTINCT file_path
 		FROM feature_files
@@ -249,6 +255,9 @@ func CodeBearingPaths(database *sql.DB, featureID string) ([]string, error) {
 		if isWipnoteScopedPath(p) {
 			continue
 		}
+		if isOutsideProjectPath(p, projectRoot) {
+			continue
+		}
 		paths = append(paths, p)
 	}
 	return paths, rows.Err()
@@ -260,6 +269,32 @@ func CodeBearingPaths(database *sql.DB, featureID string) ([]string, error) {
 func isWipnoteScopedPath(p string) bool {
 	p = strings.TrimPrefix(strings.ReplaceAll(p, "\\", "/"), "./")
 	return p == ".wipnote" || strings.HasPrefix(p, ".wipnote/")
+}
+
+// isOutsideProjectPath reports whether a recorded file path should be excluded
+// because it is clearly outside the project repository. Two cases are handled:
+//
+//  1. The "unresolved:" sentinel prefix — these are paths that couldn't be
+//     resolved to the repo at recording time and are not project source.
+//  2. Absolute paths that are not under projectRoot — e.g. /tmp/foo.yaml or
+//     a scratch file in a different home directory.
+//
+// Relative paths (the common case for in-project files) are always considered
+// in-project and return false. If projectRoot is empty the absolute-path check
+// is skipped.
+func isOutsideProjectPath(p, projectRoot string) bool {
+	if strings.HasPrefix(p, "unresolved:") {
+		return true
+	}
+	if filepath.IsAbs(p) && projectRoot != "" {
+		clean := filepath.Clean(p)
+		root := filepath.Clean(projectRoot)
+		// Accept the root itself or anything strictly under it.
+		if clean != root && !strings.HasPrefix(clean, root+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 // TraceResult holds the result of tracing a commit back through the attribution chain.

@@ -246,7 +246,7 @@ func TestProvenanceGate_HasCommitsCompletes(t *testing.T) {
 
 // CodeBearingPaths unit: .wipnote paths excluded, source paths returned.
 func TestCodeBearingPaths_ExcludesWipnote(t *testing.T) {
-	_, hgDir := prepProject(t)
+	tmpDir, hgDir := prepProject(t)
 	id := "feat-cbtest01"
 	seedFeatureFile(t, hgDir, id, ".wipnote/features/"+id+".html")
 	seedFeatureFile(t, hgDir, id, "internal/db/lineage_repo.go")
@@ -257,7 +257,7 @@ func TestCodeBearingPaths_ExcludesWipnote(t *testing.T) {
 	}
 	defer database.Close()
 
-	paths, err := dbpkg.CodeBearingPaths(database, id)
+	paths, err := dbpkg.CodeBearingPaths(database, id, tmpDir)
 	if err != nil {
 		t.Fatalf("CodeBearingPaths: %v", err)
 	}
@@ -265,11 +265,58 @@ func TestCodeBearingPaths_ExcludesWipnote(t *testing.T) {
 		t.Errorf("expected only the non-.wipnote source path, got %v", paths)
 	}
 
-	none, err := dbpkg.CodeBearingPaths(database, "feat-nonexistent")
+	none, err := dbpkg.CodeBearingPaths(database, "feat-nonexistent", tmpDir)
 	if err != nil {
 		t.Fatalf("CodeBearingPaths(empty): %v", err)
 	}
 	if len(none) != 0 {
 		t.Errorf("expected no code-bearing paths for unknown item, got %v", none)
+	}
+}
+
+// TestCodeBearingPaths_ExcludesTmpScratch verifies that absolute paths outside
+// the project root (e.g. /tmp/foo.yaml) are not counted as code-bearing, while
+// an in-project path is still returned.
+func TestCodeBearingPaths_ExcludesTmpScratch(t *testing.T) {
+	tmpDir, hgDir := prepProject(t)
+	id := "feat-cbtest-tmp"
+	seedFeatureFile(t, hgDir, id, "/tmp/foo.yaml")
+	seedFeatureFile(t, hgDir, id, "internal/db/lineage_repo.go")
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "wipnote.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	paths, err := dbpkg.CodeBearingPaths(database, id, tmpDir)
+	if err != nil {
+		t.Fatalf("CodeBearingPaths: %v", err)
+	}
+	if len(paths) != 1 || paths[0] != "internal/db/lineage_repo.go" {
+		t.Errorf("expected only in-project path, got %v", paths)
+	}
+}
+
+// TestCodeBearingPaths_ExcludesUnresolvedPrefix verifies that paths with the
+// "unresolved:" sentinel prefix are not counted as code-bearing.
+func TestCodeBearingPaths_ExcludesUnresolvedPrefix(t *testing.T) {
+	tmpDir, hgDir := prepProject(t)
+	id := "feat-cbtest-unresolved"
+	seedFeatureFile(t, hgDir, id, "unresolved:/tmp/foo.yaml")
+	seedFeatureFile(t, hgDir, id, "internal/db/lineage_repo.go")
+
+	database, err := dbpkg.Open(filepath.Join(hgDir, ".db", "wipnote.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	paths, err := dbpkg.CodeBearingPaths(database, id, tmpDir)
+	if err != nil {
+		t.Fatalf("CodeBearingPaths: %v", err)
+	}
+	if len(paths) != 1 || paths[0] != "internal/db/lineage_repo.go" {
+		t.Errorf("expected only in-project path, got %v", paths)
 	}
 }
