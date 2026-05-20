@@ -886,14 +886,16 @@ func launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem str
 
 	// Auto-register the bundled marketplace if not registered.
 	if !isCodexMarketplaceInstalledAt(configPath) {
-		if bundled, err := resolveSharedTreePath("codex-marketplace"); err != nil {
+		bundled, err := resolveSharedTreePath("codex-marketplace")
+		if err != nil {
 			return fmt.Errorf("resolving bundled Codex marketplace: %w", err)
-		} else if out, addErr := exec.Command("codex", "plugin", "marketplace", "add", bundled).CombinedOutput(); addErr != nil {
+		}
+		bundledManifest := filepath.Join(bundled, ".agents", "plugins", "marketplace.json")
+		if out, addErr := exec.Command("codex", "plugin", "marketplace", "add", bundledManifest).CombinedOutput(); addErr != nil {
 			outStr := strings.TrimSpace(string(out))
 			return fmt.Errorf("WIPNOTE AGENTS NOT LOADED\n─────────────────────────\nFailed to register the wipnote marketplace with Codex CLI:\n  %v\n\nThe Codex session will run WITHOUT wipnote agents (researcher, feature-coder, etc.).\n\nTry:\n  - Run `wipnote codex --init` manually to retry the setup\n  - Check ~/.codex/config.toml for a stale marketplace entry under [plugins.\"wipnote@wipnote\"]\n  - Report this at https://github.com/shakestzd/wipnote/issues\n\nOutput:\n%s", addErr, outStr)
-		} else {
-			fmt.Printf("wipnote Codex marketplace registered (bundled): %s\n", bundled)
 		}
+		fmt.Printf("wipnote Codex marketplace registered (bundled): %s\n", bundledManifest)
 	}
 
 	if isCodexMarketplaceInstalledAt(configPath) && !isCodexHooksEnabledAt(configPath) {
@@ -1081,8 +1083,10 @@ func launchCodexDev(resumeID string, cleanup, dryRun, yolo bool, extraArgs []str
 	}
 
 	// Add the local marketplace if not already registered at the correct path
-	if registeredAbs != localAbs {
-		addArgs := []string{"plugin", "marketplace", "add", localMarketplace}
+	localManifest := filepath.Join(localMarketplace, ".agents", "plugins", "marketplace.json")
+	localManifestAbs, _ := filepath.Abs(localManifest)
+	if registeredAbs != localManifestAbs {
+		addArgs := []string{"plugin", "marketplace", "add", localManifest}
 		if dryRun {
 			fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
 		} else {
