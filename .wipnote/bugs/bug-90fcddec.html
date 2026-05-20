@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>install.sh incorrectly hard-errors on linux_arm64 though the asset is published</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-90fcddec"
+             data-type="bug"
+             data-status="todo"
+             data-priority="medium"
+             data-created="2026-05-20T05:54:52.174483"
+             data-updated="2026-05-20T05:54:52.198734" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="human" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.59.1-641-g0ec8f5293">
+
+        <header>
+            <h1>install.sh incorrectly hard-errors on linux_arm64 though the asset is published</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-medium">Medium Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T05:54:52.19805">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>scripts/install.sh has an explicit linux_arm64 unsupported-platform gate that hard-errors with a build-from-source hint. The gate was added on the (wrong) assumption that no linux_arm64 asset was published. In fact v0.60.1 (and v0.60.0) DO publish wipnote_VERSION_linux_arm64.tar.gz via the existing GoReleaser matrix. Affects: AWS Graviton, Asahi Linux, Raspberry Pi 4/5, devcontainers on Apple Silicon hosts. Fix: remove the linux_arm64-specific gate from install.sh, and add linux_arm64 to the supported-assets line in README.md and docs/index.md. End-to-end smoke test on linux_arm64 is possible directly in this devcontainer.</p>
+        </section>
+    </article>
+</body>
+</html>
