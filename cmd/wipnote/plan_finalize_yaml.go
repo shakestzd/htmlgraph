@@ -253,6 +253,10 @@ func finalizeYAMLWithDB(db *sql.DB, wipnoteDir, planID string) (createdIDs []str
 	plan.Meta.TrackID = track.ID
 	for i := range plan.Slices {
 		plan.Slices[i].Approved = approvals[fmt.Sprintf("slice-%d", plan.Slices[i].Num)]
+		if cf, ok := numToFeat[plan.Slices[i].Num]; ok {
+			plan.Slices[i].FeatureID = cf.id
+			plan.Slices[i].ExecutionStatus = "promoted"
+		}
 	}
 	if saveErr := planyaml.Save(planPath, plan); saveErr != nil {
 		return nil, failures, fmt.Errorf("save plan: %w", saveErr)

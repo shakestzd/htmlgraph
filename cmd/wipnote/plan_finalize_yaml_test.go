@@ -400,3 +400,85 @@ func TestFinalizeYAML_PreMarkedFinalized(t *testing.T) {
 		t.Errorf("second run returned %d, want %d", len(createdIDs2), numSlices)
 	}
 }
+
+// TestFinalizeYAMLWithDB_SetsSliceFeatureID verifies that finalizeYAMLWithDB
+// writes feature_id and execution_status back to the plan YAML for approved
+// slices. This regression test for bug-2dc77f9f ensures promote-slice's
+// idempotency guard (slice.FeatureID != "") fires correctly.
+func TestFinalizeYAMLWithDB_SetsSliceFeatureID(t *testing.T) {
+	const numSlices = 2
+
+	dir := t.TempDir()
+	for _, sub := range []string{"plans", "features", "tracks"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", sub, err)
+		}
+	}
+
+	pID := workitem.GenerateID("plan", "feature-id regression test")
+	plan := planyaml.NewPlan(pID, "Feature ID Test Plan", "")
+	plan.Meta.Status = "active"
+	for i := 1; i <= numSlices; i++ {
+		plan.Slices = append(plan.Slices, planyaml.PlanSlice{
+			ID:       workitem.GenerateID("slice", fmt.Sprintf("slice-%d", i)),
+			Num:      i,
+			Title:    fmt.Sprintf("Slice %d", i),
+			What:     fmt.Sprintf("do thing %d", i),
+			Approved: false,
+		})
+	}
+	planPath := filepath.Join(dir, "plans", pID+".yaml")
+	if err := planyaml.Save(planPath, plan); err != nil {
+		t.Fatalf("save plan yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plans", pID+".html"), []byte("<html></html>"), 0o644); err != nil {
+		t.Fatalf("write html stub: %v", err)
+	}
+
+	// Seed approvals in plan_feedback.
+	sqlDB, err := openPlanDB(dir)
+	if err != nil {
+		t.Fatalf("openPlanDB: %v", err)
+	}
+	defer sqlDB.Close()
+	for i := 1; i <= numSlices; i++ {
+		section := fmt.Sprintf("slice-%d", i)
+		if err := dbpkg.StorePlanFeedback(sqlDB, pID, section, "approve", "true", ""); err != nil {
+			t.Fatalf("seed approval slice-%d: %v", i, err)
+		}
+	}
+
+	// Run finalize.
+	createdIDs, failures, err := finalizeYAMLWithDB(sqlDB, dir, pID)
+	if err != nil {
+		t.Fatalf("finalizeYAMLWithDB: %v", err)
+	}
+	if len(failures) > 0 {
+		t.Errorf("unexpected failures: %v", failures)
+	}
+	if len(createdIDs) != numSlices {
+		t.Errorf("created %d features, want %d", len(createdIDs), numSlices)
+	}
+
+	// Reload and verify: each slice must have FeatureID and ExecutionStatus set.
+	reloaded, err := planyaml.Load(planPath)
+	if err != nil {
+		t.Fatalf("reload plan yaml: %v", err)
+	}
+
+	featureIDSet := make(map[string]bool)
+	for _, fid := range createdIDs {
+		featureIDSet[fid] = true
+	}
+
+	for _, s := range reloaded.Slices {
+		if s.FeatureID == "" {
+			t.Errorf("slice %d: FeatureID is empty after finalize", s.Num)
+		} else if !featureIDSet[s.FeatureID] {
+			t.Errorf("slice %d: FeatureID %q not in createdIDs", s.Num, s.FeatureID)
+		}
+		if s.ExecutionStatus != "promoted" {
+			t.Errorf("slice %d: ExecutionStatus = %q, want %q", s.Num, s.ExecutionStatus, "promoted")
+		}
+	}
+}

@@ -733,7 +733,8 @@
       "Bash(shellcheck /workspaces/wipnote/scripts/install.sh)",
       "Bash(mkdir -p /tmp/smoke-non-wipnote)",
       "Bash(rm -rf .wipnote plugin)",
-      "Bash(export GOTMPDIR=/home/vscode/.gotest-tmp)"
+      "Bash(export GOTMPDIR=/home/vscode/.gotest-tmp)",
+      "Bash(tar tzf *)"
     ]
   },
   "enabledPlugins": {
