@@ -51,15 +51,11 @@ archives:
         dst: gemini-extension
         info:
           mode: 0644
-      - src: "packages/gemini-extension/gemini-extension.json"
+      - src: "packages/gemini-extension/*.json"
         dst: gemini-extension
         info:
           mode: 0644
-      - src: "packages/gemini-extension/GEMINI.md"
-        dst: gemini-extension
-        info:
-          mode: 0644
-      - src: "packages/gemini-extension/README.md"
+      - src: "packages/gemini-extension/*.md"
         dst: gemini-extension
         info:
           mode: 0644
