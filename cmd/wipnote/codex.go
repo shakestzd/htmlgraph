@@ -346,7 +346,12 @@ func ensureCodexLocalPluginInstalled(configPath string, force bool) (bool, error
 		return false, nil
 	}
 
-	mktPath := filepath.Join(marketplacePath, ".agents", "plugins", "marketplace.json")
+	// Support both: legacy directory-root registration (manifest under
+	// .agents/plugins/marketplace.json) and new manifest-file registration.
+	mktPath := marketplacePath
+	if info, err := os.Stat(mktPath); err == nil && info.IsDir() {
+		mktPath = filepath.Join(marketplacePath, ".agents", "plugins", "marketplace.json")
+	}
 	pluginDir, err := codexPluginDirFromMarketplace(mktPath)
 	if err != nil {
 		return false, nil
@@ -749,13 +754,17 @@ func runCodexInit(yes, dryRun bool) error {
 	if bundleErr != nil {
 		return fmt.Errorf("resolving bundled Codex marketplace: %w", bundleErr)
 	}
+	// Codex CLI expects the marketplace.json file path (or its containing dir
+	// with marketplace.json at root). The bundled tree keeps the manifest one
+	// level deep under .agents/plugins/ — pass that exact file to Codex.
+	bundledManifest := filepath.Join(bundledMarketplace, ".agents", "plugins", "marketplace.json")
 
 	// Phase 1: Install or verify marketplace. If a different marketplace is
 	// already registered (e.g. from a previous GitHub-clone-based --init), we
 	// rewrite the registration to point at the bundled local path.
 	registeredPath := getCodexMarketplacePathAt(configPath)
 	registeredAbs, _ := filepath.Abs(registeredPath)
-	bundledAbs, _ := filepath.Abs(bundledMarketplace)
+	bundledAbs, _ := filepath.Abs(bundledManifest)
 
 	if registeredAbs != "" && registeredAbs != bundledAbs {
 		fmt.Printf("Replacing existing Codex marketplace registration (%s)\n", registeredPath)
@@ -769,9 +778,9 @@ func runCodexInit(yes, dryRun bool) error {
 	}
 
 	if registeredAbs != bundledAbs {
-		addArgs := []string{"plugin", "marketplace", "add", bundledMarketplace}
+		addArgs := []string{"plugin", "marketplace", "add", bundledManifest}
 		fmt.Printf("Installing wipnote Codex marketplace (bundled)...\n")
-		fmt.Printf("  path: %s\n", bundledMarketplace)
+		fmt.Printf("  path: %s\n", bundledManifest)
 		if dryRun {
 			fmt.Printf("[dry-run] codex %s\n", strings.Join(addArgs, " "))
 		} else {

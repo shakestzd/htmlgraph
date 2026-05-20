@@ -527,6 +527,95 @@ func TestEnsureCodexLocalPluginInstalled(t *testing.T) {
 	}
 }
 
+// TestEnsureCodexLocalPluginInstalledFilePathBranch verifies that when the
+// config stores the manifest file path (new registration form from runCodexInit),
+// ensureCodexLocalPluginInstalled resolves the plugin without double-appending
+// .agents/plugins/marketplace.json.
+func TestEnsureCodexLocalPluginInstalledFilePathBranch(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+	marketplaceRoot := filepath.Join(tmpdir, "codex-marketplace")
+	marketplaceDir := filepath.Join(marketplaceRoot, ".agents", "plugins")
+	pluginDir := filepath.Join(marketplaceDir, "wipnote")
+	if err := os.MkdirAll(filepath.Join(pluginDir, ".codex-plugin"), 0755); err != nil {
+		t.Fatalf("MkdirAll plugin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, ".codex-plugin", "plugin.json"), []byte(`{"name":"wipnote"}`), 0644); err != nil {
+		t.Fatalf("WriteFile plugin manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "hooks.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatalf("WriteFile hooks: %v", err)
+	}
+	marketplaceJSON := filepath.Join(marketplaceDir, "marketplace.json")
+	body := `{"plugins":[{"name":"wipnote","source":{"source":"local","path":"./wipnote"}}]}`
+	if err := os.WriteFile(marketplaceJSON, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile marketplace: %v", err)
+	}
+	// Store the manifest FILE PATH (new form) in the config — not the tree root.
+	config := "[marketplaces.wipnote]\nsource = \"" + filepath.ToSlash(marketplaceJSON) + "\"\n"
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+
+	installed, err := ensureCodexLocalPluginInstalled(configPath, true)
+	if err != nil {
+		t.Fatalf("ensureCodexLocalPluginInstalled (file-path branch): %v", err)
+	}
+	if !installed {
+		t.Fatalf("expected local plugin cache to be installed (file-path branch)")
+	}
+	wantManifest := filepath.Join(codexPluginCachePath(), codexLocalPluginCacheVersion, ".codex-plugin", "plugin.json")
+	if _, err := os.Stat(wantManifest); err != nil {
+		t.Errorf("expected local dev cache manifest at %s: %v", wantManifest, err)
+	}
+}
+
+// TestEnsureCodexLocalPluginInstalledDirBranchStillWorks verifies that the
+// legacy directory-root registration form still resolves the plugin correctly
+// after the tolerance logic was added.
+func TestEnsureCodexLocalPluginInstalledDirBranchStillWorks(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.toml")
+	marketplaceRoot := filepath.Join(tmpdir, "codex-marketplace")
+	marketplaceDir := filepath.Join(marketplaceRoot, ".agents", "plugins")
+	pluginDir := filepath.Join(marketplaceDir, "wipnote")
+	if err := os.MkdirAll(filepath.Join(pluginDir, ".codex-plugin"), 0755); err != nil {
+		t.Fatalf("MkdirAll plugin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, ".codex-plugin", "plugin.json"), []byte(`{"name":"wipnote"}`), 0644); err != nil {
+		t.Fatalf("WriteFile plugin manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "hooks.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatalf("WriteFile hooks: %v", err)
+	}
+	marketplaceJSON := filepath.Join(marketplaceDir, "marketplace.json")
+	body := `{"plugins":[{"name":"wipnote","source":{"source":"local","path":"./wipnote"}}]}`
+	if err := os.WriteFile(marketplaceJSON, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile marketplace: %v", err)
+	}
+	// Store the DIRECTORY ROOT (legacy form) in the config.
+	config := "[marketplaces.wipnote]\nsource = \"" + filepath.ToSlash(marketplaceRoot) + "\"\n"
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+
+	installed, err := ensureCodexLocalPluginInstalled(configPath, true)
+	if err != nil {
+		t.Fatalf("ensureCodexLocalPluginInstalled (dir-branch): %v", err)
+	}
+	if !installed {
+		t.Fatalf("expected local plugin cache to be installed (dir-branch)")
+	}
+	wantManifest := filepath.Join(codexPluginCachePath(), codexLocalPluginCacheVersion, ".codex-plugin", "plugin.json")
+	if _, err := os.Stat(wantManifest); err != nil {
+		t.Errorf("expected local dev cache manifest at %s: %v", wantManifest, err)
+	}
+}
+
 func TestEnsureCodexCustomAgentsInstalledCopiesTOML(t *testing.T) {
 	tmpdir := t.TempDir()
 	pluginDir := filepath.Join(tmpdir, "plugin")
