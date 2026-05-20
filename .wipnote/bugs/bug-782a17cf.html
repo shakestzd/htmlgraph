@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="wipnote-version" content="1.0">
+    <title>codex marketplace registration: incomplete fix — auto-register (launchCodexDefault) and --dev paths still pass directory root</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <article id="bug-782a17cf"
+             data-type="bug"
+             data-status="todo"
+             data-priority="high"
+             data-created="2026-05-20T18:26:13.337736"
+             data-updated="2026-05-20T18:26:13.348697" data-agent-assigned="claude-code" data-track-id="trk-0677c709" data-created-by-agent="claude-code" data-created-by-model="claude-opus-4-7[1m]" data-created-by-cli-version="0.60.4">
+
+        <header>
+            <h1>codex marketplace registration: incomplete fix — auto-register (launchCodexDefault) and --dev paths still pass directory root</h1>
+            <div class="metadata">
+                <span class="badge status-todo">Todo</span>
+                <span class="badge priority-high">High Priority</span>
+            </div>
+        </header>
+
+        <nav data-graph-edges>
+            <section data-edge-type="part_of">
+                <h3>Part Of:</h3>
+                <ul>
+                    <li><a href="trk-0677c709.html" data-relationship="part_of" data-since="2026-05-20T18:26:13.348392">trk-0677c709</a></li>
+                </ul>
+            </section>
+        </nav>
+
+        <section data-content>
+            <h3>Description</h3>
+            <p>Follow-up to bug-276a9ef4. The v0.60.5 patch (commit b22f44b2e) only fixed runCodexInit (cmd/wipnote/codex.go:781). Two sibling call sites still pass the tree root instead of the manifest file path: line 891 in launchCodexDefault (the auto-register path triggered by plain 'wipnote codex' with no --init) and line 1085 in the --dev path. Repro on macOS v0.60.6: wipnote codex → 'WIPNOTE AGENTS NOT LOADED — invalid marketplace file ~/.local/share/wipnote/codex-marketplace: marketplace root does not contain a supported manifest'. Same fix shape as the original: replace bundled (or localMarketplace) with filepath.Join(
+, .agents, plugins, marketplace.json) in the codex plugin marketplace add invocation, and update any nearby logging.</p>
+        </section>
+    </article>
+</body>
+</html>
