@@ -141,6 +141,19 @@ func codexInstalledPluginDirAt(cachePath string) string {
 	return ""
 }
 
+// codexManifestPath resolves the path to marketplace.json inside a
+// codex-marketplace tree, transparently handling both the flat layout
+// produced by the GoReleaser archive (marketplace.json at the tree root)
+// and the deep layout used by the dev source and `wipnote build`
+// install (.agents/plugins/marketplace.json).
+func codexManifestPath(treeRoot string) string {
+	flat := filepath.Join(treeRoot, "marketplace.json")
+	if _, err := os.Stat(flat); err == nil {
+		return flat
+	}
+	return filepath.Join(treeRoot, ".agents", "plugins", "marketplace.json")
+}
+
 // getCodexMarketplacePathAt parses config.toml and returns the registered wipnote
 // marketplace path, or empty string if not found.
 func getCodexMarketplacePathAt(configPath string) string {
@@ -350,7 +363,7 @@ func ensureCodexLocalPluginInstalled(configPath string, force bool) (bool, error
 	// .agents/plugins/marketplace.json) and new manifest-file registration.
 	mktPath := marketplacePath
 	if info, err := os.Stat(mktPath); err == nil && info.IsDir() {
-		mktPath = filepath.Join(marketplacePath, ".agents", "plugins", "marketplace.json")
+		mktPath = codexManifestPath(marketplacePath)
 	}
 	pluginDir, err := codexPluginDirFromMarketplace(mktPath)
 	if err != nil {
@@ -757,7 +770,7 @@ func runCodexInit(yes, dryRun bool) error {
 	// Codex CLI expects the marketplace.json file path (or its containing dir
 	// with marketplace.json at root). The bundled tree keeps the manifest one
 	// level deep under .agents/plugins/ — pass that exact file to Codex.
-	bundledManifest := filepath.Join(bundledMarketplace, ".agents", "plugins", "marketplace.json")
+	bundledManifest := codexManifestPath(bundledMarketplace)
 
 	// Phase 1: Install or verify marketplace. If a different marketplace is
 	// already registered (e.g. from a previous GitHub-clone-based --init), we
@@ -890,7 +903,7 @@ func launchCodexDefault(resumeID, trackID, featureID, worktreePath, workItem str
 		if err != nil {
 			return fmt.Errorf("resolving bundled Codex marketplace: %w", err)
 		}
-		bundledManifest := filepath.Join(bundled, ".agents", "plugins", "marketplace.json")
+		bundledManifest := codexManifestPath(bundled)
 		if out, addErr := exec.Command("codex", "plugin", "marketplace", "add", bundledManifest).CombinedOutput(); addErr != nil {
 			outStr := strings.TrimSpace(string(out))
 			return fmt.Errorf("WIPNOTE AGENTS NOT LOADED\n─────────────────────────\nFailed to register the wipnote marketplace with Codex CLI:\n  %v\n\nThe Codex session will run WITHOUT wipnote agents (researcher, feature-coder, etc.).\n\nTry:\n  - Run `wipnote codex --init` manually to retry the setup\n  - Check ~/.codex/config.toml for a stale marketplace entry under [plugins.\"wipnote@wipnote\"]\n  - Report this at https://github.com/shakestzd/wipnote/issues\n\nOutput:\n%s", addErr, outStr)
@@ -1083,7 +1096,7 @@ func launchCodexDev(resumeID string, cleanup, dryRun, yolo bool, extraArgs []str
 	}
 
 	// Add the local marketplace if not already registered at the correct path
-	localManifest := filepath.Join(localMarketplace, ".agents", "plugins", "marketplace.json")
+	localManifest := codexManifestPath(localMarketplace)
 	localManifestAbs, _ := filepath.Abs(localManifest)
 	if registeredAbs != localManifestAbs {
 		addArgs := []string{"plugin", "marketplace", "add", localManifest}

@@ -1057,3 +1057,63 @@ func TestCodexFlagsParseWorktree(t *testing.T) {
 		t.Fatal("codexCmd missing --yolo flag")
 	}
 }
+
+// TestCodexManifestPath verifies that codexManifestPath resolves the correct
+// marketplace.json path for both tarball flat and dev-source deep layouts.
+func TestCodexManifestPath(t *testing.T) {
+	t.Run("flat layout returns flat path", func(t *testing.T) {
+		dir := t.TempDir()
+		flatPath := filepath.Join(dir, "marketplace.json")
+		if err := os.WriteFile(flatPath, []byte(`{}`), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		got := codexManifestPath(dir)
+		if got != flatPath {
+			t.Errorf("got %q, want %q", got, flatPath)
+		}
+	})
+
+	t.Run("deep layout returns deep path when no flat file", func(t *testing.T) {
+		dir := t.TempDir()
+		deepDir := filepath.Join(dir, ".agents", "plugins")
+		if err := os.MkdirAll(deepDir, 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		deepPath := filepath.Join(deepDir, "marketplace.json")
+		if err := os.WriteFile(deepPath, []byte(`{}`), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		got := codexManifestPath(dir)
+		if got != deepPath {
+			t.Errorf("got %q, want %q", got, deepPath)
+		}
+	})
+
+	t.Run("flat takes precedence when both exist", func(t *testing.T) {
+		dir := t.TempDir()
+		flatPath := filepath.Join(dir, "marketplace.json")
+		if err := os.WriteFile(flatPath, []byte(`{}`), 0644); err != nil {
+			t.Fatalf("WriteFile flat: %v", err)
+		}
+		deepDir := filepath.Join(dir, ".agents", "plugins")
+		if err := os.MkdirAll(deepDir, 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(deepDir, "marketplace.json"), []byte(`{}`), 0644); err != nil {
+			t.Fatalf("WriteFile deep: %v", err)
+		}
+		got := codexManifestPath(dir)
+		if got != flatPath {
+			t.Errorf("got %q, want flat path %q", got, flatPath)
+		}
+	})
+
+	t.Run("empty dir returns deep path as fallback", func(t *testing.T) {
+		dir := t.TempDir()
+		wantDeep := filepath.Join(dir, ".agents", "plugins", "marketplace.json")
+		got := codexManifestPath(dir)
+		if got != wantDeep {
+			t.Errorf("got %q, want %q", got, wantDeep)
+		}
+	})
+}
