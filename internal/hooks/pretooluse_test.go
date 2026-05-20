@@ -337,6 +337,79 @@ func TestCheckProjectDivergence_EmptySessionID_Allows(t *testing.T) {
 	}
 }
 
+// TestCheckProjectDivergence_AllowsScratchCWD verifies that a Write tool event
+// whose CWD has no .wipnote/ ancestor (i.e. scratch space such as /tmp) is
+// NOT blocked, even though the session project is wipnote-tracked.
+func TestCheckProjectDivergence_AllowsScratchCWD(t *testing.T) {
+	// Session project is wipnote-tracked.
+	sessionProject := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(sessionProject, ".wipnote"), 0o755); err != nil {
+		t.Fatalf("mkdir session project: %v", err)
+	}
+
+	// Scratch dir: a directory under /tmp that has no .wipnote/ ancestor.
+	// We must not use t.TempDir() here because TMPDIR may be set to a path
+	// inside the current wipnote project (e.g. /workspaces/wipnote/.gotest-tmp),
+	// which would falsely give the scratch dir a .wipnote/ ancestor.
+	scratchDir, err := os.MkdirTemp("/tmp", "wipnote-scratch-test-*")
+	if err != nil {
+		t.Fatalf("create scratch dir: %v", err)
+	}
+	defer os.RemoveAll(scratchDir)
+
+	sessionID := "sess-scratch-cwd"
+	database := makeSessionDB(t, sessionID, sessionProject)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+
+	event := &CloudEvent{
+		ToolName:  "Write",
+		CWD:       scratchDir,
+		ToolInput: map[string]any{"path": filepath.Join(scratchDir, "notes.yaml")},
+	}
+
+	result := checkProjectDivergence(event, database, sessionID)
+	if result != nil {
+		t.Errorf("expected nil (allow) for scratch CWD with no .wipnote anchor, got: %+v", result)
+	}
+}
+
+// TestCheckProjectDivergence_BlocksDifferentWipnoteProject verifies that a
+// Write tool event whose CWD resolves to a different wipnote-tracked project
+// is still blocked (preserving the original guard behaviour).
+func TestCheckProjectDivergence_BlocksDifferentWipnoteProject(t *testing.T) {
+	sessionProject := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(sessionProject, ".wipnote"), 0o755); err != nil {
+		t.Fatalf("mkdir session project: %v", err)
+	}
+	otherProject := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(otherProject, ".wipnote"), 0o755); err != nil {
+		t.Fatalf("mkdir other project: %v", err)
+	}
+
+	sessionID := "sess-block-different-wipnote"
+	database := makeSessionDB(t, sessionID, sessionProject)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+
+	event := &CloudEvent{
+		ToolName:  "Write",
+		CWD:       otherProject,
+		ToolInput: map[string]any{"path": filepath.Join(otherProject, "foo.go")},
+	}
+
+	result := checkProjectDivergence(event, database, sessionID)
+	if result == nil {
+		t.Fatal("expected block for Write from a different wipnote project, got nil")
+	}
+	if result.Decision != "block" {
+		t.Errorf("expected decision=block, got %q", result.Decision)
+	}
+	if !strings.Contains(result.Reason, "different project") {
+		t.Errorf("expected 'different project' in reason, got: %q", result.Reason)
+	}
+}
+
 func TestIsWriteTool(t *testing.T) {
 	writeTools := []string{"Write", "Edit", "MultiEdit", "apply_patch", "Bash", "exec_command", "functions.exec_command", "NotebookEdit", "Agent"}
 	for _, name := range writeTools {

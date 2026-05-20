@@ -809,6 +809,17 @@ func checkProjectDivergence(event *CloudEvent, database *sql.DB, sessionID strin
 		return nil
 	}
 
+	// Scratch-space bypass: if the raw event CWD has no .wipnote/ ancestor,
+	// the user has moved to an untracked directory (e.g. /tmp). That is
+	// legitimate scratch-space usage — do not block. We check event.CWD
+	// directly (before ResolveProjectDir's walk-up logic) so that a scratch
+	// path like /tmp/notes is not mistaken for the current process's project.
+	// The guard only applies when both the session and the CWD are independently
+	// wipnote-tracked projects.
+	if !hasWipnoteAnchor(filepath.Clean(event.CWD)) {
+		return nil
+	}
+
 	if isWriteTool(event.ToolName) {
 		return &HookResult{
 			Decision: "block",
@@ -857,6 +868,25 @@ func canonicalRepoRoot(dir string) string {
 		return main
 	}
 	return abs
+}
+
+// hasWipnoteAnchor reports whether dir or any of its parent directories
+// contains a .wipnote/ subdirectory. Used by checkProjectDivergence to
+// distinguish a "different wipnote project" (should block) from an untracked
+// scratch directory like /tmp (should allow).
+func hasWipnoteAnchor(dir string) bool {
+	d := dir
+	for {
+		if _, err := os.Stat(filepath.Join(d, ".wipnote")); err == nil {
+			return true
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			break
+		}
+		d = parent
+	}
+	return false
 }
 
 // checkSubagentWorkItemGuard blocks Write/Edit/MultiEdit from subagents when
