@@ -256,7 +256,7 @@ Only these can be executed directly by orchestrator:
 
 1. **use the appropriate Gemini agent invocation** - Delegation itself
    - Use spawner subagent types when possible
-   - Example: `use the gemini-spawner workflow described here`
+   - Example: `use @feature-coder`
 
 2. **AskUserQuestion()** - Clarifying requirements
    - Get user input before delegating
@@ -385,19 +385,19 @@ copilot -p "Commit changes:
 - GitHub integration
 - Resolving conflicts
 
-### use the appropriate Gemini agent invocation with Sonnet/Opus (Strategic)
+### use the appropriate Gemini agent invocation with feature-coder/architect-coder (Strategic)
 ```python
 Use Gemini agent invocation with:
     message="Design authentication architecture...",
-    workflow="sonnet"  # or "opus" for deep reasoning
+    workflow="feature-coder"  # or "architect-coder" for deep reasoning
 ```
 
-**Sonnet (Mid-tier):**
+**feature-coder (Mid-tier):**
 - Coordinate complex workflows
 - Multi-agent orchestration
 - Fallback when spawners fail
 
-**Opus (Expensive):**
+**architect-coder (Expensive):**
 - Deep reasoning
 - Architecture decisions
 - Strategic planning

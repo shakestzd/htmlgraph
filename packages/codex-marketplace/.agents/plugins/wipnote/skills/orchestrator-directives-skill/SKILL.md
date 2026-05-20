@@ -254,7 +254,7 @@ Only these can be executed directly by orchestrator:
 
 1. **call spawn_agent with the appropriate agent_type** - Delegation itself
    - Use spawner subagent types when possible
-   - Example: `use the gemini-spawner workflow described here`
+   - Example: `call spawn_agent with agent_type "wipnote-feature-coder"`
 
 2. **AskUserQuestion()** - Clarifying requirements
    - Get user input before delegating
@@ -383,18 +383,18 @@ copilot -p "Commit changes:
 - GitHub integration
 - Resolving conflicts
 
-### call spawn_agent with the appropriate agent_type with Sonnet/Opus (Strategic)
+### call spawn_agent with the appropriate agent_type with feature-coder/architect-coder (Strategic)
 ```python
 Call spawn_agent with:
-Use the sonnet workflow described here with: prompt="Design authentication architecture..."; agent_type="sonnet"  # or "opus" for deep reasoning.
+Use the feature-coder workflow described here with: prompt="Design authentication architecture..."; agent_type="feature-coder"  # or "architect-coder" for deep reasoning.
 ```
 
-**Sonnet (Mid-tier):**
+**feature-coder (Mid-tier):**
 - Coordinate complex workflows
 - Multi-agent orchestration
 - Fallback when spawners fail
 
-**Opus (Expensive):**
+**architect-coder (Expensive):**
 - Deep reasoning
 - Architecture decisions
 - Strategic planning

@@ -257,7 +257,7 @@ Only these can be executed directly by orchestrator:
 
 1. **Task()** - Delegation itself
    - Use spawner subagent types when possible
-   - Example: `Task(subagent_type="wipnote:gemini-spawner", ...)`
+   - Example: `Task(subagent_type="wipnote:feature-coder", ...)`
 
 2. **AskUserQuestion()** - Clarifying requirements
    - Get user input before delegating
@@ -386,20 +386,20 @@ copilot -p "Commit changes:
 - GitHub integration
 - Resolving conflicts
 
-### Task() with Sonnet/Opus (Strategic)
+### Task() with feature-coder/architect-coder (Strategic)
 ```python
 Task(
     prompt="Design authentication architecture...",
-    subagent_type="sonnet"  # or "opus" for deep reasoning
+    subagent_type="feature-coder"  # or "architect-coder" for deep reasoning
 )
 ```
 
-**Sonnet (Mid-tier):**
+**feature-coder (Mid-tier):**
 - Coordinate complex workflows
 - Multi-agent orchestration
 - Fallback when spawners fail
 
-**Opus (Expensive):**
+**architect-coder (Expensive):**
 - Deep reasoning
 - Architecture decisions
 - Strategic planning
