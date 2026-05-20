@@ -180,6 +180,21 @@ if [[ -n "$VERSION" && "$VERSION" != "$CURRENT_VERSION" ]]; then
     fi
 fi
 
+# ── Regenerate port trees ─────────────────────────────────────
+
+if [[ -n "$VERSION" && "$VERSION" != "$CURRENT_VERSION" ]]; then
+    step "Regenerating codex/gemini port trees"
+
+    if $DRY_RUN; then
+        ok "[dry-run] Would run: wipnote plugin build-ports"
+    else
+        echo "  Running wipnote plugin build-ports..."
+        (cd "$PROJECT_ROOT" && go run ./cmd/wipnote plugin build-ports) \
+            || fail "plugin build-ports failed"
+        ok "Regenerated codex-marketplace and gemini-extension trees"
+    fi
+fi
+
 # ── Commit + push ──────────────────────────────────────────────
 
 step "Git commit and push"
@@ -190,8 +205,8 @@ if $DRY_RUN; then
         ok "[dry-run] Would tag v$VERSION"
     fi
 else
-    # Stage version files + any other tracked changes
-    git add "$PLUGIN_JSON" "$MANIFEST_JSON"
+    # Stage version files + regenerated port trees + any other tracked changes
+    git add "$PLUGIN_JSON" "$MANIFEST_JSON" packages/codex-marketplace packages/gemini-extension
 
     if git diff --cached --quiet; then
         ok "No changes to commit"
