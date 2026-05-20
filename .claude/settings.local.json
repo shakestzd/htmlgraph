@@ -730,7 +730,10 @@
       "Bash(TMPDIR=/home/vscode/.gotest-tmp wipnote check --gate)",
       "Bash(TMPDIR=/home/vscode/.gotest-tmp GOTMPDIR=/home/vscode/.gotest-tmp ./scripts/deploy-all.sh 0.60.0 --no-confirm)",
       "Bash(TMPDIR=/home/vscode/.gotest-tmp GOTMPDIR=/home/vscode/.gotest-tmp ./scripts/deploy-all.sh 0.60.1 --no-confirm)",
-      "Bash(shellcheck /workspaces/wipnote/scripts/install.sh)"
+      "Bash(shellcheck /workspaces/wipnote/scripts/install.sh)",
+      "Bash(mkdir -p /tmp/smoke-non-wipnote)",
+      "Bash(rm -rf .wipnote plugin)",
+      "Bash(export GOTMPDIR=/home/vscode/.gotest-tmp)"
     ]
   },
   "enabledPlugins": {
